@@ -15,7 +15,7 @@ data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)
                 | LogDBEntry LogDB
                 | InsertTxResult TransactionResult
-                | UpdateTxResult (SHA, SHA)
+                | UpdateTxResult (SHA, SHA, SHA, MiningStatus) -- TODO: Three SHA's with different meanings... newtype?
                 deriving (Eq, Read, Show)
 
 instance Binary LogDB

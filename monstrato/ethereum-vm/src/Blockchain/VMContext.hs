@@ -42,6 +42,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -73,7 +74,7 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextBestBlockInfo       :: ContextBestBlockInfo
                        , contextRedisPool           :: Redis.Connection
                        , contextInsertTxResultQueue :: [TransactionResult]
-                       , contextUpdateTxResultQueue :: [(SHA,SHA)]
+                       , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
                        , contextLogDBQueue          :: [LogDB]
                        }
 

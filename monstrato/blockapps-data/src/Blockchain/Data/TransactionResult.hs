@@ -22,7 +22,7 @@ import           Blockchain.Strato.Model.SHA
 
 class (Monad m) => HasMemTXResultDB m where
   enqueueInsertTransactionResults :: [TransactionResult] -> m ()
-  enqueueUpdateTransactionResults :: [(SHA,SHA)] -> m ()
+  enqueueUpdateTransactionResults :: [(SHA,SHA,SHA,MiningStatus)] -> m ()
   flushInsertTransactionResults   :: m ()
   flushUpdateTransactionResults   :: m ()
   flushTransactionResults :: m ()
@@ -30,7 +30,7 @@ class (Monad m) => HasMemTXResultDB m where
   enqueueInsertTransactionResult :: TransactionResult -> m ()
   enqueueInsertTransactionResult = enqueueInsertTransactionResults . pure
 
-  enqueueUpdateTransactionResult :: (SHA,SHA) -> m ()
+  enqueueUpdateTransactionResult :: (SHA,SHA,SHA,MiningStatus) -> m ()
   enqueueUpdateTransactionResult = enqueueUpdateTransactionResults . pure
 
 putInsertTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
@@ -44,16 +44,16 @@ putInsertTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
 putInsertTransactionResults trs = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany trs)
 
 putUpdateTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-                           => (SHA,SHA)
+                           => (SHA,SHA,SHA,MiningStatus)
                            -> m ()
-putUpdateTransactionResult (unmined,mined) = do
+putUpdateTransactionResult (txhash,old,new,status) = do
   sqldb <- getSQLDB
   runResourceT $ flip SQL.runSqlPool sqldb $ do
     E.update $ \tr -> do
-      E.set tr [ TransactionResultBlockHash E.=. E.val mined , TransactionResultMiningStatus E.=. E.val Mined]
-      E.where_ (tr E.^. TransactionResultBlockHash E.==. E.val unmined E.&&. tr E.^. TransactionResultMiningStatus E.==. E.val Unmined)
+      E.set tr [ TransactionResultBlockHash E.=. E.val new , TransactionResultMiningStatus E.=. E.val status ]
+      E.where_ (tr E.^. TransactionResultTransactionHash E.==. E.val txhash E.&&. tr E.^. TransactionResultBlockHash E.==. E.val old E.&&. tr E.^. TransactionResultMiningStatus E.==. E.val Unmined)
 
 putUpdateTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-                            => [(SHA,SHA)]
+                            => [(SHA,SHA,SHA,MiningStatus)]
                             -> m ()
 putUpdateTransactionResults = mapM_ putUpdateTransactionResult

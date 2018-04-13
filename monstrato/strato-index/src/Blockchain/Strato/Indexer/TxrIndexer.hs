@@ -13,6 +13,7 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
 import qualified Blockchain.Data.LogDB              as LogDB
+import           Blockchain.Data.MiningStatus
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Format
@@ -37,9 +38,9 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
                 void $ TxrDB.putInsertTransactionResult r
-            UpdateTxResult u -> do
+            UpdateTxResult u@(t,o,n,m) -> do
                 $logInfoS "txrIndexer" . T.pack $
-                    "Updating unmined TXResults for block hash " ++ format (fst u) ++ " with block hash " ++ format (snd u)
+                    "Updating TXResult for " ++ format t ++ " from block hash " ++ format o ++ " to block hash " ++ format n ++ " with mining status " ++ (if m == Mined then "Mined" else "Unmined") -- easier than making a Format instance
                 void $ TxrDB.putUpdateTransactionResult u
             _ -> return ()
         setKafkaCheckpoint nextIdx
