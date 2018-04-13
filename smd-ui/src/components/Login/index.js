@@ -6,7 +6,7 @@ import { Dialog } from '@blueprintjs/core';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
 import { toasts } from "../Toasts";
-import ExistingUser from './components/ExistingUser';
+import LoginForm from './components/LoginForm';
 
 class Login extends Component {
 
@@ -50,7 +50,7 @@ class Login extends Component {
             title="Login"
             className="pt-dark"
           >
-            <ExistingUser closeLoginOverlay={this.props.closeLoginOverlay} />
+            <LoginForm closeLoginOverlay={this.props.closeLoginOverlay} />
           </Dialog>
         </form>
       </div>
