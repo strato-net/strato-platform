@@ -94,8 +94,11 @@ ethereumVM = void . execContextM $ do
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
-            trrs <- B.lastExecutedTxs . B.miningCache <$> Bagger.getBaggerState
-            forM_ trrs $ outputTransactionResult (obBlockData newBlock) Unmined
+            cache <- B.miningCache <$> Bagger.getBaggerState
+            let inserts = B.newExecutedTxs cache
+                updates = B.updateExecutedTxs cache
+            forM_ inserts $ outputTransactionResult (obBlockData newBlock) Unmined
+            -- forM_ updates
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
