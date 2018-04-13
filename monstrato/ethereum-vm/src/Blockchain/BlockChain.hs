@@ -57,6 +57,7 @@ import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
+import qualified Blockchain.Data.TXOrigin                as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
@@ -78,6 +79,7 @@ import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
+import qualified Blockchain.Bagger.BaggerState           as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
@@ -198,7 +200,16 @@ addBlocks blocks = do
   let oldStateRoot = blockDataStateRoot oldHeader
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
-  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ addBlock block
+  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+    case (obOrigin block) of
+      TO.Direct -> do
+        updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+        Bagger.updateTxCallback
+          updates
+          (blockHeaderPartialHash $ obBlockData block)
+          (blockHeaderHash $ obBlockData block)
+          Mined
+      _ -> addBlock block
   (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter blocks'
   when didReplaceThisTime . liftIO $ do
       let Just nbb = newBestBlock
