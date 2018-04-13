@@ -9,7 +9,6 @@ class Faucet extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      disabled: !props.isBackClicked,
       sendEmailBtnClicked: false
     }
   }
@@ -19,7 +18,7 @@ class Faucet extends Component {
     let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
     window.location.href = mailto;
     this.props.faucetRequest(this.props.accountAddress);
-    this.setState({ disabled: false, sendEmailBtnClicked: true });
+    this.setState({ sendEmailBtnClicked: true });
   }
 
   render() {
@@ -72,13 +71,6 @@ class Faucet extends Component {
               text="Send email to BlockApps"
               disabled={this.props.submitting}
             />
-            {this.props.isWalkThrough ?
-              <Button
-                text="Email sent"
-                intent={Intent.PRIMARY}
-                onClick={this.props.handleEmailSentClick}
-                disabled={this.state.disabled}
-              /> : null}
           </div>
         </div>
       </div>
