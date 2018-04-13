@@ -161,8 +161,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
-partialHash :: DD.BlockData -> SHA
-partialHash _ = SHA 0
+-- partialHash :: DD.BlockData -> SHA
+-- partialHash _ = SHA 0
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do
