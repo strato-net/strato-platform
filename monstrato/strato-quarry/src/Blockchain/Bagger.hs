@@ -138,8 +138,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     !build <- buildFromMiningCache
                     newTxRanCallback newTxs (obBlockData build)
                     updateTxCallback newUpdates
-                                     (BDB.blockHeaderHash tempBlockHeader)
-                                     (BDB.blockHeaderHash $ obBlockData build)
+                                     (BDB.blockHeaderPartialHash tempBlockHeader)
+                                     (BDB.blockHeaderPartialHash $ obBlockData build)
                                      Unmined
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
@@ -154,9 +154,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
-
--- partialHash :: DD.BlockData -> SHA
--- partialHash _ = SHA 0
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do

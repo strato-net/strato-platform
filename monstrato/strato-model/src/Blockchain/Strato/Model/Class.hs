@@ -1,7 +1,8 @@
 module Blockchain.Strato.Model.Class where
 
 import qualified Data.ByteString                 as B
-import           Data.Time.Clock
+import           Data.Time
+import           Data.Time.Clock.POSIX
 import           Data.Word
 
 import           Blockchain.Data.RLP
@@ -53,6 +54,22 @@ class RLPSerializable h => BlockHeaderLike h where
 
     blockHeaderHash :: h -> SHA
     blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+
+    blockHeaderPartialHash :: h -> SHA
+    blockHeaderPartialHash h = superProprietaryStratoSHAHash . rlpSerialize $ RLPArray
+      [ rlpEncode $ blockHeaderParentHash       h
+      , rlpEncode $ blockHeaderOmmersHash       h
+      , rlpEncode $ blockHeaderBeneficiary      h
+      , rlpEncode $ blockHeaderStateRoot        h
+      , rlpEncode $ blockHeaderTransactionsRoot h
+      , rlpEncode $ blockHeaderReceiptsRoot     h
+      , rlpEncode $ blockHeaderDifficulty       h
+      , rlpEncode $ blockHeaderBlockNumber      h
+      , rlpEncode $ blockHeaderGasLimit         h
+      , rlpEncode $ blockHeaderGasUsed          h
+      , rlpEncode (round $ utcTimeToPOSIXSeconds (blockHeaderTimestamp h)::Integer)
+      , rlpEncode $ blockHeaderExtraData        h
+      ]
 
 data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 
