@@ -37,7 +37,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_port=5432
-    - PROD_DEV_MODE=${PROD_ENV_MODE:-false}
+    - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
@@ -65,10 +65,10 @@ services:
     environment:
     - cirrusHost=cirrus:3333
     - loglevel=${loglevel}
-    - postgres_user=postgres
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
+    - postgres_user=postgres
     - ssl=${ssl:-false}
     - stratoHost=strato:3000
     build: .
