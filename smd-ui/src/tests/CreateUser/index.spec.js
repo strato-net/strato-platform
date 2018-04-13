@@ -3,8 +3,8 @@ import CreateUser, { mapStateToProps, validate } from '../../components/CreateUs
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import { Dialog } from '@blueprintjs/core';
-import { reducer as formReducer } from 'redux-form'
-import { createStore, combineReducers } from 'redux'
+import { reducer as formReducer } from 'redux-form';
+import { createStore, combineReducers } from 'redux';
 import ReactDOM from 'react-dom';
 
 describe('Test createUser index', () => {

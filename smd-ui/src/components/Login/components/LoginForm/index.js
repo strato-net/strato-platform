@@ -5,7 +5,7 @@ import { Field, reduxForm } from 'redux-form';
 import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { login } from '../../../User/user.actions';
-import { loginValidate } from '../../validate.js';
+import { validate } from './validate.js';
 import { openWalkThroughOverlay } from '../../../WalkThrough/walkThrough.actions';
 
 class LoginForm extends Component {
@@ -23,7 +23,7 @@ class LoginForm extends Component {
   }
 
   submit = (values) => {
-    let errors = loginValidate(values);
+    let errors = validate(values);
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
@@ -103,9 +103,9 @@ class LoginForm extends Component {
   }
 }
 
-const formed = reduxForm({ form: 'exisitingUserLogin' })(LoginForm);
+const formed = reduxForm({ form: 'user-login' })(LoginForm);
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return { spinning: state.user.spinning };
 }
 

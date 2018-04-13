@@ -10,15 +10,6 @@ import LoginForm from './components/LoginForm';
 
 class Login extends Component {
 
-  constructor() {
-    super();
-    this.state = {
-      errors: null,
-      navbarTabId: "existingUser",
-    };
-    this.handleNavbarTabChange = this.handleNavbarTabChange.bind(this);
-  }
-
   componentWillReceiveProps(newProps) {
     if (newProps.isLoggedIn && newProps.selectedApp) {
       newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
@@ -31,10 +22,6 @@ class Login extends Component {
     }
   }
 
-  handleNavbarTabChange(navbarTabId) {
-    this.setState({ navbarTabId });
-  }
-
   render() {
     return (
       <div className="smd-pad-16">
@@ -43,7 +30,6 @@ class Login extends Component {
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={() => {
-              this.setState({ errors: null })
               this.props.resetSelectedApp()
               this.props.closeLoginOverlay()
             }}
@@ -58,7 +44,7 @@ class Login extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn,
     isOpen: state.user.isOpen,
