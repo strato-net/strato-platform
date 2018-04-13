@@ -128,8 +128,9 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot startingStateRoot
         return newStateRoot
 
-    newTxRanCallback _ = undefined
-    updateTxCallback _ _ _ _ = undefined
+    newTxRanCallback inserts bd = mapM_ (outputTransactionResult bd Unmined) inserts
+
+    updateTxCallback updates oldBd newBd miningStatus = undefined
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do

@@ -38,8 +38,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    newTxRanCallback :: [TxRunResult] -> m ()
-    updateTxCallback :: [TxRunResult] -> SHA -> SHA -> MiningStatus -> m ()
+    newTxRanCallback :: [TxRunResult] -> DD.BlockData -> m ()
+    updateTxCallback :: [TxRunResult] -> DD.BlockData -> DD.BlockData -> MiningStatus -> m ()
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, newTxRanCallback, updateTxCallback, txsDroppedCallback #-}
 
@@ -136,10 +136,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
                     setStateDBStateRoot existingStateDbStateRoot
                     !build <- buildFromMiningCache
-                    let oldPartial = partialHash tempBlockHeader
-                        newPartial = partialHash (obBlockData build)
-                    newTxRanCallback newTxs
-                    updateTxCallback newUpdates oldPartial newPartial Unmined
+                    newTxRanCallback newTxs (obBlockData build)
+                    updateTxCallback newUpdates tempBlockHeader (obBlockData build) Unmined
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
             $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
@@ -154,8 +152,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
-partialHash :: DD.BlockData -> SHA
-partialHash _ = SHA 0
+-- partialHash :: DD.BlockData -> SHA
+-- partialHash _ = SHA 0
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do
