@@ -38,7 +38,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true; docker system prune -f # Keeping the volumes
               cd strato-getting-started
               # syncing with cd2:
-              STRATO_GS_MODE="1" NODE_HOST=cd-multinode-1.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.65.148.250 ./strato-multinode-run.sh --stable
+              STRATO_GS_MODE="1" NODE_HOST=cd-multinode-1.southcentralus.cloudapp.azure.com BOOT_NODE_IP=13.65.148.250 ./strato.sh
               docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
