@@ -17,8 +17,8 @@ pipeline {
                   sudo rm -rf strato-getting-started || true
                   git clone https://github.com/blockapps/strato-getting-started
                   cd strato-getting-started
-                  mv /tmp/docker-compose.yml docker-compose.release.multinode.yml
-                  docker-compose -f docker-compose.release.multinode.yml pull
+                  mv /tmp/docker-compose.yml ./
+                  docker-compose pull
                   '''
                 }
               }
@@ -36,8 +36,8 @@ pipeline {
                   sudo rm -rf strato-getting-started || true
                   git clone https://github.com/blockapps/strato-getting-started
                   cd strato-getting-started
-                  mv /tmp/docker-compose.yml docker-compose.release.multinode.yml
-                  docker-compose -f docker-compose.release.multinode.yml pull
+                  mv /tmp/docker-compose.yml ./
+                  docker-compose pull
                   '''
                 }
               }
