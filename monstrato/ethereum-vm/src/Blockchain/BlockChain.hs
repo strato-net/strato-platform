@@ -130,7 +130,7 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot startingStateRoot
         return newStateRoot
 
-    newTxRanCallback inserts bd = mapM_ (outputTransactionResult bd Unmined) inserts
+    newTxRanCallback inserts bd = mapM_ (outputTransactionResult bd blockHeaderPartialHash Unmined) inserts
 
     updateTxCallback updates o n m = enqueueUpdateTransactionResults $ map (\h -> ((otHash $ trrTransaction h), o, n, m)) updates
 
@@ -202,8 +202,10 @@ addBlocks blocks = do
   replacedBest   <- liftIO (newIORef undefined)
   forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
     case (obOrigin block) of
-      TO.Direct -> do
+      TO.Quarry -> do
+        _ <- setParentStateRoot block
         updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+        lift $ $logInfoS "addBlocks_new" $ T.pack ("Block data from Quarry: " ++ show (obBlockData block))
         Bagger.updateTxCallback
           updates
           (blockHeaderPartialHash $ obBlockData block)
@@ -232,12 +234,17 @@ addBlocks blocks = do
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
 
+setParentStateRoot :: OutputBlock -> ContextM BlockSummary
+setParentStateRoot b@OutputBlock{..} = do
+    bSum <- BSDB.getBSum (blockDataParentHash obBlockData)
+    liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
+    lift $ $logInfoS "setParentStateRoot" . T.pack $ "Inserting block #" ++ show (blockDataNumber obBlockData) ++ " (" ++ format (outputBlockHash b) ++ ")."
+    setStateDBStateRoot (bSumStateRoot bSum)
+    return bSum
+
 addBlock :: OutputBlock -> ContextM () -- change Block to OutputBlock
 addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
-    bSum <- BSDB.getBSum (blockDataParentHash bd)
-    liftIO $ setTitle $ "Block #" ++ show (blockDataNumber bd)
-    lift $ $logInfoS "addBlock" . T.pack $ "Inserting block #" ++ show (blockDataNumber bd) ++ " (" ++ format (outputBlockHash b) ++ ")."
-    setStateDBStateRoot (bSumStateRoot bSum)
+    bSum <- setParentStateRoot b
     when (blockDataNumber bd == 1920000) runTheDAOFork
     s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
     unless s1 $ error "addToBalance failed even after a check in addBlock"
@@ -285,7 +292,7 @@ addTransactions b blockGas (t:rest) = do
   printTransactionMessage t result deltaT
   time deltaT time_vm_tx_mined
 
-  outputTransactionResult b Mined $ TxRunResult t result deltaT beforeMap afterMap
+  outputTransactionResult b blockHeaderHash Mined $ TxRunResult t result deltaT beforeMap afterMap
 
   let remainingBlockGas =
         case result of
@@ -449,10 +456,11 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 
 --outputTransactionMessage::IO ()
 outputTransactionResult :: BlockData
+                        -> (BlockData -> SHA)
                         -> MiningStatus
                         -> TxRunResult
                         -> ContextM ()
-outputTransactionResult b mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap) = do
   let
     (txrStatus, message, gasRemaining) =
       case result of
@@ -463,6 +471,8 @@ outputTransactionResult b mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
+  $logInfoS "outputTransactionResult" "1"
+
   when flags_createTransactionResults $ do
       let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
@@ -470,6 +480,7 @@ outputTransactionResult b mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
 
+      $logInfoS "outputTransactionResult" "2"
       --mpdb <- getStateDB
       --addrDiff <- addrDbDiff mpdb stateRootBefore stateRootAfter
 
@@ -479,18 +490,31 @@ outputTransactionResult b mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t
               Right r ->
                 (BC.unpack $ B16.encode $ fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
 
+      $logInfoS "outputTransactionResult" "3"
+
       let defaultNewAddrs = S.toList modified
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
+
+      $logInfoS "outputTransactionResult" "4"
+      $logInfoS "outputTransactionResult" . T.pack $ "Outputting transaction result with stateRoot " ++ show (blockDataStateRoot b)
 
       newAddresses <-
           case result of
               Left _ -> return []
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
-      let ranBlockHash = blockHeaderHash b
+      $logInfoS "outputTransactionResult" "5"
+
+      let ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+
+      $logInfoS "outputTransactionResult" "6"
+
       enqueueLogEntries $ mkLogEntry <$> theLogs
+
+      $logInfoS "outputTransactionResult" "7"
+
       enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash

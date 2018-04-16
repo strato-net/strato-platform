@@ -97,13 +97,13 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
         if noCachedTxsCulled then do
-            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
+            $logInfoS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
             if null $ B.promotedTransactions cache then do
-                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
+                    $logInfoS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
                     !build <- buildFromMiningCache
                     return build
                 else do
-                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
+                    $logInfoS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
@@ -112,7 +112,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let time            = B.startTimestamp cache
                     let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
                     let remGas          = B.remainingGas cache
-                    $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
                     (newSR, newGas, newExec, newUnexec, newTxs, newUpdates) <- case run of
                             Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [], newRR', lastExec)
@@ -132,18 +132,24 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                                 , B.lastExecutedTxs       = newExec
                                                 , B.promotedTransactions  = newUnexec
                                                 }
-                    $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
-                    setStateDBStateRoot existingStateDbStateRoot
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "Calling buildFromMiningCache with stateRoot " ++ show newSR
                     !build <- buildFromMiningCache
+                    !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "temp Block data: " ++ show tempRewarded
+                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "build Block data: " ++ show tempRewarded
+                    setStateDBStateRoot (DD.blockDataStateRoot $ obBlockData build)
                     newTxRanCallback newTxs (obBlockData build)
                     updateTxCallback newUpdates
-                                     (BDB.blockHeaderPartialHash tempBlockHeader)
+                                     (BDB.blockHeaderPartialHash tempRewarded)
                                      (BDB.blockHeaderPartialHash $ obBlockData build)
                                      Unmined
+                    setStateDBStateRoot existingStateDbStateRoot
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
-            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
+            $logInfoS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
             let sha    = B.bestBlockSHA cache
             let header = B.bestBlockHeader cache
             let txShas = B.bestBlockTxHashes cache
@@ -369,18 +375,13 @@ buildFromMiningCache = do
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-    previousStateRoot <- getStateRoot
-    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
-    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
-    rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
-    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
-    setStateDBStateRoot previousStateRoot
-    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "Building block " ++ show (parentNum + 1) ++ " with " ++ show (length txs) ++ " txs"
+    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
+    rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles
                        , obReceiptTransactions = txs
-                       , obBlockData = buildNextBlockHeader parentHeader parentHash uncles rewardedStateRoot txs time
+                       , obBlockData = rewardedBlockData
                        }
 
 ourCoinbase :: Address
@@ -414,3 +415,13 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
                         , DD.blockDataMixHash          = SHA 0
                         , DD.blockDataNonce            = 5
                         }
+
+buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
+buildRewardedBlockHeader bd uncles = do
+  previousStateRoot <- getStateRoot
+  $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
+  $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
+  rewardedStateRoot <- rewardCoinbases (DD.blockDataStateRoot bd) ourCoinbase uncles (DD.blockDataNumber bd)
+  $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
+  setStateDBStateRoot previousStateRoot
+  return bd{DD.blockDataStateRoot = rewardedStateRoot}
