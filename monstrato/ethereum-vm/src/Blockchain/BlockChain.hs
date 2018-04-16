@@ -483,6 +483,8 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
+  $logInfoS "outputTransactionResult" "1"
+
   when flags_createTransactionResults $ do
       let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
@@ -490,6 +492,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
 
+      $logInfoS "outputTransactionResult" "2"
       --mpdb <- getStateDB
       --addrDiff <- addrDbDiff mpdb stateRootBefore stateRootAfter
 
@@ -499,9 +502,14 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right r ->
                 (BC.unpack $ B16.encode $ fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
 
+      $logInfoS "outputTransactionResult" "3"
+
       let defaultNewAddrs = S.toList modified
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
+
+      $logInfoS "outputTransactionResult" "4"
+      $logInfoS "outputTransactionResult" . T.pack $ "Outputting transaction result with stateRoot " ++ show (blockDataStateRoot b)
 
       newAddresses <-
           case result of
@@ -509,7 +517,13 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
       let ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+
+      $logInfoS "outputTransactionResult" "6"
+
       enqueueLogEntries $ mkLogEntry <$> theLogs
+
+      $logInfoS "outputTransactionResult" "7"
+
       enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
