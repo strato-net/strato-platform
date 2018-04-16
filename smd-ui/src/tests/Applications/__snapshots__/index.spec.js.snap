@@ -74,7 +74,7 @@ ShallowWrapper {
             addApp={true}
           />
         </Blueprint.Dialog>,
-        <withRouter(Connect(ReduxForm)) />,
+        <withRouter(Connect(TokenRequest)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -274,7 +274,7 @@ ShallowWrapper {
               addApp={true}
             />
           </Blueprint.Dialog>,
-          <withRouter(Connect(ReduxForm)) />,
+          <withRouter(Connect(TokenRequest)) />,
         ],
         "className": "container-fluid pt-dark",
       },
@@ -507,7 +507,7 @@ ShallowWrapper {
             addApp={true}
           />
         </Blueprint.Dialog>,
-        <withRouter(Connect(ReduxForm)) />,
+        <withRouter(Connect(TokenRequest)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -722,7 +722,7 @@ ShallowWrapper {
               addApp={true}
             />
           </Blueprint.Dialog>,
-          <withRouter(Connect(ReduxForm)) />,
+          <withRouter(Connect(TokenRequest)) />,
         ],
         "className": "container-fluid pt-dark",
       },
@@ -974,7 +974,7 @@ ShallowWrapper {
             addApp={true}
           />
         </Blueprint.Dialog>,
-        <withRouter(Connect(ReduxForm)) />,
+        <withRouter(Connect(TokenRequest)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -1174,7 +1174,7 @@ ShallowWrapper {
               addApp={true}
             />
           </Blueprint.Dialog>,
-          <withRouter(Connect(ReduxForm)) />,
+          <withRouter(Connect(TokenRequest)) />,
         ],
         "className": "container-fluid pt-dark",
       },
