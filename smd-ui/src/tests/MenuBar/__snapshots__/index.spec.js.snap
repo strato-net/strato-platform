@@ -40,7 +40,7 @@ Object {
 }
 `;
 
-exports[`MenuBar: index render component 1`] = `
+exports[`MenuBar: index render component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -87,6 +87,33 @@ exports[`MenuBar: index render component 1`] = `
     </div>
   </div>
   <withRouter(Connect(Login)) />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(WalkThrough)) />
+</nav>"
+`;
+
+exports[`MenuBar: index render component without values 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <Blueprint.Button onClick={[Function: onClick]} text=\\"Developer Sign In\\" className=\\"pt-button pt-small pt-intent-primary\\" />
+    <span className=\\"pt-navbar-divider\\" />
+    <small className=\\"pt-text-muted\\">
+      v
+       
+    </small>
+  </div>
+  <withRouter(Connect(Login)) />
+  <withRouter(Connect(WalkThrough)) />
 </nav>"
 `;

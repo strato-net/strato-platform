@@ -9,7 +9,7 @@ describe('MenuBar: index', () => {
 
   let store = createStore(combineReducers({ form: formReducer }));
 
-  test('render component', () => {
+  test('render component with values', () => {
     const props = {
       isLoggedIn: true,
       currentUser: { username: 'tanuj44' },
@@ -21,7 +21,25 @@ describe('MenuBar: index', () => {
     let wrapper = shallow(
       <Provider store={store}>
         <MemoryRouter>
-          <MenuBar.WrappedComponent {...props}/>
+          <MenuBar.WrappedComponent {...props} />
+        </MemoryRouter>
+      </Provider>
+    ).dive().dive().dive();
+
+    expect(wrapper.debug()).toMatchSnapshot();
+  });
+
+  test('render component without values', () => {
+    const props = {
+      isLoggedIn: false,
+      currentUser: { username: '' },
+      openWalkThroughOverlay: jest.fn(),
+      location: {}
+    }
+    let wrapper = shallow(
+      <Provider store={store}>
+        <MemoryRouter>
+          <MenuBar.WrappedComponent {...props} />
         </MemoryRouter>
       </Provider>
     ).dive().dive().dive();
