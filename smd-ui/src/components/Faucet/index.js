@@ -1,24 +1,31 @@
 import React, { Component } from 'react';
 import { Button, Intent } from '@blueprintjs/core';
-import { Field } from 'redux-form';
+import { Field, reduxForm } from 'redux-form';
 import RequestTokenImage from './faucet.png';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './faucet.css';
+import { validate } from './validate';
 
 class Faucet extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      sendEmailBtnClicked: false
+      sendEmailBtnClicked: false,
+      errors: null
     }
   }
 
   submit = (values) => {
-    mixpanelWrapper.track('faucet_submit_click');
-    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
-    window.location.href = mailto;
-    this.props.faucetRequest(this.props.accountAddress);
-    this.setState({ sendEmailBtnClicked: true });
+    const errors = validate(values);
+    this.setState({ errors });
+
+    if (JSON.stringify(errors) === JSON.stringify({})) {
+      mixpanelWrapper.track('faucet_submit_click');
+      let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
+      window.location.href = mailto;
+      this.props.faucetRequest(this.props.accountAddress);
+      this.setState({ sendEmailBtnClicked: true });
+    }
   }
 
   render() {
@@ -47,7 +54,7 @@ class Faucet extends Component {
                     tabIndex="3"
                     required
                   />
-                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.building}</div>
+                  <div className="pt-form-helper-text">{this.state.errors && this.state.errors.building}</div>
                   {this.state.sendEmailBtnClicked
                     ? <p className="send-email-text">Send an email to product@blockapps.net with your address and use-case to receive your tokens.</p>
                     : null}
@@ -78,4 +85,6 @@ class Faucet extends Component {
   }
 }
 
-export default Faucet;
+const formed = reduxForm({ form: 'faucet' })(Faucet);
+
+export default formed;
