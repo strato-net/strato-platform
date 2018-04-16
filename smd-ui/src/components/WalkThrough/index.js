@@ -37,6 +37,11 @@ class WalkThrough extends Component {
       this.setState({ currentModal: 'Completed', step: 3 });
   }
 
+  handleContinue = () => {
+    this.setState({ currentModal: "CLI", step: 4 })
+    this.props.faucetRequest(this.props.currentUser.accountAddress);
+  }
+
   dialogContent() {
     switch (this.state.currentModal) {
       case "CreateUser":
@@ -49,11 +54,7 @@ class WalkThrough extends Component {
         return <CLI
           closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
       default:
-        return <Congrats
-          handleContinue={() => {
-            this.setState({ currentModal: "CLI", step: 4 })
-            this.props.faucetRequest(this.props.currentUser.accountAddress);
-          }} />
+        return <Congrats handleContinue={this.handleContinue} />
     }
   }
 
