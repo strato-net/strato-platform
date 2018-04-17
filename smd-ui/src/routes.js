@@ -15,8 +15,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Applications from './components/Applications/';
 import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
+import SideBar from './components/SideBar';
+import { isModePublic } from './lib/checkMode';
 
-export const routes = (
+export const routes = isModePublic() ? (
   <Switch>
     <Route exact path="/" component={App}>
       <Redirect to="/apps" />
@@ -34,5 +36,25 @@ export const routes = (
     <ProtectedRoute exact path="/contracts" component={Contracts} />
     <ProtectedRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <ProtectedRoute exact path="/code_editor" component={CodeEditor} />
+  </Switch>
+) : (
+  <Switch>
+    <Route exact path="/">
+      <Redirect to="/home" />
+    </Route>
+    <Route exact path="/home" component={Dashboard}/>
+    <Route exact path="/nodes" component={Nodes} />
+    <Route exact path="/blocks" component={Blocks} />
+    <Route exact path="/blocks/:block" component={BlockView} />
+    <Route exact path="/transactions" component={Transactions} />
+    <Route exact path="/transactions/:hash" component={TransactionView} />
+    <Route exact path="/accounts" component={Accounts}/>
+    <Route exact path="/accounts/:name/:address" component={Account} />
+    <Route exact path="/contracts" component={Contracts}/>
+    <Route exact path="/contracts/:name/query" component={ContractQuery} />
+    <Route exact path="/code_editor" component={CodeEditor}/>
+    <Route exact path="/apps" component={Applications} />
+    <Route exact path="/launchpad" component={LaunchPad} />
+    <Route component={SideBar}/>
   </Switch>
 );

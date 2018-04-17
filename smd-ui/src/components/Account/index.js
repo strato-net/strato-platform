@@ -9,7 +9,7 @@ class Account extends Component {
   //TODO: add an option to faucet the account. Tell user to faucet if account does not exist.
   render() {
     const {
-      // name,
+      name,
       address,
       account
     } = this.props;
@@ -29,7 +29,7 @@ class Account extends Component {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  this.props.faucetRequest(address);
+                  this.props.faucetRequest(address, name);
                 }}>
                   Faucet
               </button>

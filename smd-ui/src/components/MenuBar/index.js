@@ -11,18 +11,19 @@ import WalkThrough from '../WalkThrough';
 import { Button } from '@blueprintjs/core';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import qs from 'query-string';
+import { isModePublic } from '../../lib/checkMode';
 
 class MenuBar extends Component {
 
   componentDidMount(){
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if(developerSignIn) {
+    if(developerSignIn && isModePublic()) {
       this.props.openWalkThroughOverlay(false);
     }
   }
 
   afterLoggedIn() {
-    if (this.props.isLoggedIn) {
+    if (this.props.isLoggedIn || !isModePublic()) {
       return (
         <div>
           <span className="pt-navbar-divider" />
@@ -32,19 +33,19 @@ class MenuBar extends Component {
           <a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>
           </a>
-          <span className="pt-navbar-divider" />
-          <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
-          <span className="pt-navbar-divider" />
-          <a target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
-          </a>
+          {this.props.isLoggedIn && <span><span className="pt-navbar-divider" />
+            <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
+            <span className="pt-navbar-divider" />
+            <a target="_blank" rel="noopener noreferrer">
+              <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
+            </a></span>}
         </div>
       );
     }
   }
 
   renderDeveloperButton() {
-    if (!this.props.isLoggedIn) {
+    if (!this.props.isLoggedIn && isModePublic()) {
       return (
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
@@ -79,8 +80,8 @@ class MenuBar extends Component {
           
           {this.afterLoggedIn()}
         </div>
-        <Login />
-        <WalkThrough />
+        {isModePublic() && <div><Login />
+          <WalkThrough /></div>}
       </nav>
     );
   }

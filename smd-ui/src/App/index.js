@@ -12,6 +12,7 @@ import { env } from '../env';
 import LoadingBar from 'react-redux-loading-bar'
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
+import { isModePublic } from '../lib/checkMode';
 
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
 mixpanelWrapper.identify(env.NODE_NAME);
@@ -19,7 +20,7 @@ mixpanelWrapper.identify(env.NODE_NAME);
 class App extends Component {
 
   sideBar() {
-    return this.props.isLoggedIn ? <SideBar /> : null
+    return (this.props.isLoggedIn || !isModePublic()) ? <SideBar /> : null
   }
 
   render() {
@@ -28,7 +29,7 @@ class App extends Component {
         <LoadingBar style={{top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px'}} />
         <MenuBar />
         { this.sideBar() }
-        <main id="outer-container" style={{marginLeft: this.props.isLoggedIn ? '320px' : '0'}} >
+        <main id="outer-container" style={{marginLeft: (this.props.isLoggedIn || !isModePublic()) ? '320px' : '0'}} >
           {scenes}
         </main>
       </div>
