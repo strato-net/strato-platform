@@ -23,5 +23,5 @@ module.exports = {
   mixpanel: {
     token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
   },
-  signup: 'http://localhost:5000' //TODO: add production url
+  signup: 'https://signup.blockapps.net'
 };
