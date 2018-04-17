@@ -491,8 +491,6 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
 
-      $logInfoS "outputTransactionResult" . T.pack $ "Outputting transaction result with stateRoot " ++ show (blockDataStateRoot b)
-
       newAddresses <-
           case result of
               Left _ -> return []
