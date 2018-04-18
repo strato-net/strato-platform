@@ -249,9 +249,12 @@ bdrToBdrPrime = BlockDataRef'
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
 instance ToJSON AddressStateRef' where
-    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch bNum src) next) =
-        object ["next" .= next, "kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
-        "contractRoot" .= cr, "code" .= c, "codeHash" .= ch, "latestBlockNum" .= bNum, "source" .= src]
+    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch bNum src mName) next) =
+        let name = maybeToList . fmap ("contractName" .=) $ mName
+        in object $ name ++ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
+                             "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
+                             "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
+                             "latestBlockNum" .= bNum, "source" .= src]
 
 instance FromJSON AddressStateRef' where
     parseJSON (Object s) = do
@@ -267,6 +270,7 @@ instance FromJSON AddressStateRef' where
                 <*> s .: "codeHash"
                 <*> s .: "latestBlockNum"
                 <*> s .: "source"
+                <*> s .:? "contractName"
               )
     parseJSON _ = fail "JSON not an object"
 
