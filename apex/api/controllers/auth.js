@@ -54,9 +54,17 @@ module.exports = {
     }).then(user => {
       const authErrorText = "user does not exist or wrong user-password pair provided";
       if (!user) {
-        let err = new Error(authErrorText);
-        err.status = 401;
-        return next(err);
+        models.temp_user.findOne({ where: { email: username } }).then(tempUser => {
+          let err;
+          if (tempUser) {
+            err = new Error('Please link your account to STRATO Testnet');
+            err.status = 401;
+            return next(err);
+          }
+          err = new Error(authErrorText);
+          err.status = 401;
+          return next(err);
+        })
       } else {
         bcrypt.compare(password, user.passwordHash, function (err, passIsCorrect) {
           if (err) {
@@ -104,6 +112,19 @@ module.exports = {
         return next(err);
       }
 
+      const user = yield models.temp_user.findOne({ where: { email: username } });
+      if (!user) {
+        let err = new Error("User not found.");
+        err.status = 401;
+        return next(err);
+      }
+
+      if (!user.verified) {
+        let error = new Error('User not verified.');
+        error.status = 401;
+        return next(error);
+      } 
+
       // Create user in db if does not exist
       let newUser;
       try {
@@ -142,7 +163,7 @@ module.exports = {
         err.status = 500;
         return next(err);
       }
-
+      user.destroy();
       // Set the account address to user in db
       newUser.accountAddress = blocUser.address;
       yield newUser.save({ fields: ['accountAddress'] });
@@ -189,7 +210,9 @@ module.exports = {
             .then(password => res.status(200).json({ exists: true }))
             .catch(error => {
               if (error.name === "SequelizeUniqueConstraintError") {
-                return models.temp_user.update({ password: response.hash }, { where: { email } })
+                return models.temp_user.update(
+                  { password: response.hash, verified: false },
+                  { where: { email } })
                   .then(password => res.status(200).json({ exists: true }))
                   .catch(updateError => { throw updateError })
               }
@@ -225,8 +248,15 @@ module.exports = {
               err.status = 500;
               return next(err);
             }
-            if (response)
-              return res.status(200).json({ success: true, error: null });
+            if (response) {
+              return models.temp_user.update({ verified: true }, { where: { email } })
+                .then(() => res.status(200).json({ success: true, error: null }))
+                .catch(updateError => {
+                  let err = new Error('Unexpected server error. Please try again after sometime.');
+                  err.status = 500;
+                  return next(err); 
+                })
+            }
 
             let error = new Error('Your temporary password is incorrect');
             error.status = 401;
