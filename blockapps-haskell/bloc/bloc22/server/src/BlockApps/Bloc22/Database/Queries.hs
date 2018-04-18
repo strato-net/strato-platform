@@ -355,10 +355,11 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
         Nothing -> do
           return Nothing
 
-        Just (src,codeHash) -> do
+        Just (src, codeHash) -> do
           cmIds <- compileContract src
-          let correctContract = listToMaybe . filter (\cd -> codeHash == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cmIds
-          return correctContract
+          let valid cd = codeHash == contractDetailsCodeHash (snd cd) ||
+                         contractName == contractDetailsName (snd cd)
+          return . listToMaybe . filter valid . Map.elems $ cmIds
     getSourceFromStrato addr = do
       let afp = accountsFilterParams{qaAddress=Just addr}
       mAcc <- listToMaybe <$> blocStrato (getAccountsFilter afp)
@@ -394,8 +395,9 @@ getContractDetailsByAddressOnly contractAddr = do
 
         Just acct -> do
           cds <- compileContract (accountSource acct)
-          let correctContract = listToMaybe . filter (\cd -> (accountCodeHash acct) == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cds
-          return correctContract
+          let valid cd = accountCodeHash acct == contractDetailsCodeHash (snd cd) ||
+                         accountContractName acct == contractDetailsName (snd cd)
+          return . listToMaybe . filter valid . Map.elems $ cds
     getSourceFromStrato addr = do
       let afp = accountsFilterParams{qaAddress=Just addr}
       listToMaybe <$> blocStrato (getAccountsFilter afp)
