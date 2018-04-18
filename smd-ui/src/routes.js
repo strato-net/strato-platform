@@ -18,43 +18,41 @@ import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import { isModePublic } from './lib/checkMode';
 
+const CommonRoute = (props) => {
+  const CommonRoute = props.route === 'public' ? Route : ProtectedRoute;
+
+  return (<div>
+    <CommonRoute exact path="/nodes" component={Nodes} />
+    <CommonRoute exact path="/blocks" component={Blocks} />
+    <CommonRoute exact path="/blocks/:block" component={BlockView} />
+    <CommonRoute exact path="/transactions" component={Transactions} />
+    <CommonRoute exact path="/transactions/:hash" component={TransactionView} />
+    <CommonRoute exact path="/accounts" component={Accounts} />
+    <CommonRoute exact path="/accounts/:name/:address" component={Account} />
+    <CommonRoute exact path="/contracts" component={Contracts} />
+    <CommonRoute exact path="/contracts/:name/query" component={ContractQuery} />
+    <CommonRoute exact path="/code_editor" component={CodeEditor} />
+    <CommonRoute exact path="/launchpad" component={LaunchPad} />
+  </div>)
+};
+
 export const routes = isModePublic() ? (
   <Switch>
     <Route exact path="/" component={App}>
       <Redirect to="/apps" />
     </Route>
     <Route exact path="/apps" component={Applications} />
-    <ProtectedRoute exact path="/launchpad" component={LaunchPad} />
     <ProtectedRoute exact path="/home" component={Dashboard} />
-    <ProtectedRoute exact path="/nodes" component={Nodes} />
-    <ProtectedRoute exact path="/blocks" component={Blocks} />
-    <ProtectedRoute exact path="/blocks/:block" component={BlockView} />
-    <ProtectedRoute exact path="/transactions" component={Transactions} />
-    <ProtectedRoute exact path="/transactions/:hash" component={TransactionView} />
-    <ProtectedRoute exact path="/accounts" component={Accounts} />
-    <ProtectedRoute exact path="/accounts/:name/:address" component={Account} />
-    <ProtectedRoute exact path="/contracts" component={Contracts} />
-    <ProtectedRoute exact path="/contracts/:name/query" component={ContractQuery} />
-    <ProtectedRoute exact path="/code_editor" component={CodeEditor} />
+    <CommonRoute route="protected" />
   </Switch>
 ) : (
-  <Switch>
-    <Route exact path="/">
-      <Redirect to="/home" />
-    </Route>
-    <Route exact path="/home" component={Dashboard}/>
-    <Route exact path="/nodes" component={Nodes} />
-    <Route exact path="/blocks" component={Blocks} />
-    <Route exact path="/blocks/:block" component={BlockView} />
-    <Route exact path="/transactions" component={Transactions} />
-    <Route exact path="/transactions/:hash" component={TransactionView} />
-    <Route exact path="/accounts" component={Accounts}/>
-    <Route exact path="/accounts/:name/:address" component={Account} />
-    <Route exact path="/contracts" component={Contracts}/>
-    <Route exact path="/contracts/:name/query" component={ContractQuery} />
-    <Route exact path="/code_editor" component={CodeEditor}/>
-    <Route exact path="/apps" component={Applications} />
-    <Route exact path="/launchpad" component={LaunchPad} />
-    <Route component={SideBar}/>
-  </Switch>
-);
+    <Switch>
+      <Route exact path="/">
+        <Redirect to="/home" />
+      </Route>
+      <Route exact path="/home" component={Dashboard} />
+      <Route exact path="/apps" component={Applications} />
+      <CommonRoute route="public" />
+      <Route component={SideBar} />
+    </Switch>
+  );

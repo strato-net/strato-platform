@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import MenuBar from '../components/MenuBar'
 import SideBar from '../components/SideBar'
-import {routes as scenes} from '../routes';
+import { routes as scenes } from '../routes';
 import mixpanelWrapper from '../lib/mixpanelWrapper';
 import './App.css';
 import 'normalize.css/normalize.css';
@@ -10,8 +10,8 @@ import '@blueprintjs/table/dist/table.css';
 import 'bootstrap/dist/css/bootstrap.css';
 import { env } from '../env';
 import LoadingBar from 'react-redux-loading-bar'
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import { isModePublic } from '../lib/checkMode';
 
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
@@ -26,10 +26,10 @@ class App extends Component {
   render() {
     return (
       <div className="App" >
-        <LoadingBar style={{top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px'}} />
+        <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
         <MenuBar />
-        { this.sideBar() }
-        <main id="outer-container" style={{marginLeft: (this.props.isLoggedIn || !isModePublic()) ? '320px' : '0'}} >
+        {this.sideBar()}
+        <main id="outer-container" style={{ marginLeft: (this.props.isLoggedIn || !isModePublic()) ? '320px' : '0' }} >
           {scenes}
         </main>
       </div>
