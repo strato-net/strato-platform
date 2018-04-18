@@ -129,6 +129,7 @@ Object {
       },
     },
   },
+  "balance": 10000000000,
   "fromUsername": undefined,
   "initialValues": Object {
     "from": "Admin_1177_49507",
@@ -292,6 +293,7 @@ ShallowWrapper {
     asyncValidate={[Function]}
     asyncValidating={false}
     autofill={[Function]}
+    balance={10000000000}
     blur={[Function]}
     change={[Function]}
     clearAsyncError={[Function]}
@@ -606,7 +608,7 @@ ShallowWrapper {
                     className="form-width pt-input"
                     component="input"
                     dir="auto"
-                    id="input-b"
+                    id="password"
                     name="password"
                     placeholder="Password"
                     required={true}
@@ -859,6 +861,7 @@ ShallowWrapper {
                     className="form-width"
                   >
                     <Field
+                      balance={10000000000}
                       component={[Function]}
                       name="value"
                       required={true}
@@ -1152,7 +1155,7 @@ ShallowWrapper {
                     className="form-width pt-input"
                     component="input"
                     dir="auto"
-                    id="input-b"
+                    id="password"
                     name="password"
                     placeholder="Password"
                     required={true}
@@ -1405,6 +1408,7 @@ ShallowWrapper {
                     className="form-width"
                   >
                     <Field
+                      balance={10000000000}
                       component={[Function]}
                       name="value"
                       required={true}
@@ -1670,7 +1674,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -1923,6 +1927,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={10000000000}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -2193,7 +2198,7 @@ ShallowWrapper {
                         className="form-width pt-input"
                         component="input"
                         dir="auto"
-                        id="input-b"
+                        id="password"
                         name="password"
                         placeholder="Password"
                         required={true}
@@ -2447,6 +2452,7 @@ ShallowWrapper {
                         className="form-width"
                       >
                         <Field
+                          balance={10000000000}
                           component={[Function]}
                           name="value"
                           required={true}
@@ -3579,7 +3585,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -3628,7 +3634,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -3646,7 +3652,7 @@ ShallowWrapper {
                           "className": "form-width pt-input",
                           "component": "input",
                           "dir": "auto",
-                          "id": "input-b",
+                          "id": "password",
                           "name": "password",
                           "placeholder": "Password",
                           "required": true,
@@ -4926,6 +4932,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={10000000000}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -4973,6 +4980,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={10000000000}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -4987,6 +4995,7 @@ ShallowWrapper {
                         "nodeType": "host",
                         "props": Object {
                           "children": <Field
+                            balance={10000000000}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -4999,6 +5008,7 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "class",
                           "props": Object {
+                            "balance": 10000000000,
                             "component": [Function],
                             "name": "value",
                             "required": true,
@@ -5432,7 +5442,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -5685,6 +5695,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={10000000000}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -5978,7 +5989,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -6231,6 +6242,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={10000000000}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -6496,7 +6508,7 @@ ShallowWrapper {
                         className="form-width pt-input"
                         component="input"
                         dir="auto"
-                        id="input-b"
+                        id="password"
                         name="password"
                         placeholder="Password"
                         required={true}
@@ -6749,6 +6761,7 @@ ShallowWrapper {
                         className="form-width"
                       >
                         <Field
+                          balance={10000000000}
                           component={[Function]}
                           name="value"
                           required={true}
@@ -7019,7 +7032,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -7273,6 +7286,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={10000000000}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -8405,7 +8419,7 @@ ShallowWrapper {
                             className="form-width pt-input"
                             component="input"
                             dir="auto"
-                            id="input-b"
+                            id="password"
                             name="password"
                             placeholder="Password"
                             required={true}
@@ -8454,7 +8468,7 @@ ShallowWrapper {
                             className="form-width pt-input"
                             component="input"
                             dir="auto"
-                            id="input-b"
+                            id="password"
                             name="password"
                             placeholder="Password"
                             required={true}
@@ -8472,7 +8486,7 @@ ShallowWrapper {
                             "className": "form-width pt-input",
                             "component": "input",
                             "dir": "auto",
-                            "id": "input-b",
+                            "id": "password",
                             "name": "password",
                             "placeholder": "Password",
                             "required": true,
@@ -9752,6 +9766,7 @@ ShallowWrapper {
                             className="form-width"
                           >
                             <Field
+                              balance={10000000000}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -9799,6 +9814,7 @@ ShallowWrapper {
                             className="form-width"
                           >
                             <Field
+                              balance={10000000000}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -9813,6 +9829,7 @@ ShallowWrapper {
                           "nodeType": "host",
                           "props": Object {
                             "children": <Field
+                              balance={10000000000}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -9825,6 +9842,7 @@ ShallowWrapper {
                             "key": undefined,
                             "nodeType": "class",
                             "props": Object {
+                              "balance": 10000000000,
                               "component": [Function],
                               "name": "value",
                               "required": true,
@@ -10056,6 +10074,7 @@ ShallowWrapper {
     asyncValidate={[Function]}
     asyncValidating={false}
     autofill={[Function]}
+    balance={undefined}
     blur={[Function]}
     change={[Function]}
     clearAsyncError={[Function]}
@@ -10250,7 +10269,7 @@ ShallowWrapper {
                     className="form-width pt-input"
                     component="input"
                     dir="auto"
-                    id="input-b"
+                    id="password"
                     name="password"
                     placeholder="Password"
                     required={true}
@@ -10379,6 +10398,7 @@ ShallowWrapper {
                     className="form-width"
                   >
                     <Field
+                      balance={undefined}
                       component={[Function]}
                       name="value"
                       required={true}
@@ -10552,7 +10572,7 @@ ShallowWrapper {
                     className="form-width pt-input"
                     component="input"
                     dir="auto"
-                    id="input-b"
+                    id="password"
                     name="password"
                     placeholder="Password"
                     required={true}
@@ -10681,6 +10701,7 @@ ShallowWrapper {
                     className="form-width"
                   >
                     <Field
+                      balance={undefined}
                       component={[Function]}
                       name="value"
                       required={true}
@@ -10826,7 +10847,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -10955,6 +10976,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={undefined}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -11105,7 +11127,7 @@ ShallowWrapper {
                         className="form-width pt-input"
                         component="input"
                         dir="auto"
-                        id="input-b"
+                        id="password"
                         name="password"
                         placeholder="Password"
                         required={true}
@@ -11235,6 +11257,7 @@ ShallowWrapper {
                         className="form-width"
                       >
                         <Field
+                          balance={undefined}
                           component={[Function]}
                           name="value"
                           required={true}
@@ -11599,7 +11622,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -11648,7 +11671,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -11666,7 +11689,7 @@ ShallowWrapper {
                           "className": "form-width pt-input",
                           "component": "input",
                           "dir": "auto",
-                          "id": "input-b",
+                          "id": "password",
                           "name": "password",
                           "placeholder": "Password",
                           "required": true,
@@ -12149,6 +12172,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={undefined}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -12196,6 +12220,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={undefined}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -12210,6 +12235,7 @@ ShallowWrapper {
                         "nodeType": "host",
                         "props": Object {
                           "children": <Field
+                            balance={undefined}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -12222,6 +12248,7 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "class",
                           "props": Object {
+                            "balance": undefined,
                             "component": [Function],
                             "name": "value",
                             "required": true,
@@ -12535,7 +12562,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -12664,6 +12691,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={undefined}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -12837,7 +12865,7 @@ ShallowWrapper {
                       className="form-width pt-input"
                       component="input"
                       dir="auto"
-                      id="input-b"
+                      id="password"
                       name="password"
                       placeholder="Password"
                       required={true}
@@ -12966,6 +12994,7 @@ ShallowWrapper {
                       className="form-width"
                     >
                       <Field
+                        balance={undefined}
                         component={[Function]}
                         name="value"
                         required={true}
@@ -13111,7 +13140,7 @@ ShallowWrapper {
                         className="form-width pt-input"
                         component="input"
                         dir="auto"
-                        id="input-b"
+                        id="password"
                         name="password"
                         placeholder="Password"
                         required={true}
@@ -13240,6 +13269,7 @@ ShallowWrapper {
                         className="form-width"
                       >
                         <Field
+                          balance={undefined}
                           component={[Function]}
                           name="value"
                           required={true}
@@ -13390,7 +13420,7 @@ ShallowWrapper {
                           className="form-width pt-input"
                           component="input"
                           dir="auto"
-                          id="input-b"
+                          id="password"
                           name="password"
                           placeholder="Password"
                           required={true}
@@ -13520,6 +13550,7 @@ ShallowWrapper {
                           className="form-width"
                         >
                           <Field
+                            balance={undefined}
                             component={[Function]}
                             name="value"
                             required={true}
@@ -13884,7 +13915,7 @@ ShallowWrapper {
                             className="form-width pt-input"
                             component="input"
                             dir="auto"
-                            id="input-b"
+                            id="password"
                             name="password"
                             placeholder="Password"
                             required={true}
@@ -13933,7 +13964,7 @@ ShallowWrapper {
                             className="form-width pt-input"
                             component="input"
                             dir="auto"
-                            id="input-b"
+                            id="password"
                             name="password"
                             placeholder="Password"
                             required={true}
@@ -13951,7 +13982,7 @@ ShallowWrapper {
                             "className": "form-width pt-input",
                             "component": "input",
                             "dir": "auto",
-                            "id": "input-b",
+                            "id": "password",
                             "name": "password",
                             "placeholder": "Password",
                             "required": true,
@@ -14434,6 +14465,7 @@ ShallowWrapper {
                             className="form-width"
                           >
                             <Field
+                              balance={undefined}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -14481,6 +14513,7 @@ ShallowWrapper {
                             className="form-width"
                           >
                             <Field
+                              balance={undefined}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -14495,6 +14528,7 @@ ShallowWrapper {
                           "nodeType": "host",
                           "props": Object {
                             "children": <Field
+                              balance={undefined}
                               component={[Function]}
                               name="value"
                               required={true}
@@ -14507,6 +14541,7 @@ ShallowWrapper {
                             "key": undefined,
                             "nodeType": "class",
                             "props": Object {
+                              "balance": undefined,
                               "component": [Function],
                               "name": "value",
                               "required": true,

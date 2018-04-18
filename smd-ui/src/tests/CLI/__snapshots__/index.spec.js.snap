@@ -5,8 +5,8 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <CLI
-    closeCLIOverlay={[Function]}
-    isTokenOpen={true}
+    addApp={true}
+    closeWalkThroughOverlay={[Function]}
   />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
@@ -31,7 +31,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -49,10 +49,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -63,19 +64,15 @@ ShallowWrapper {
           className="pt-dialog-footer"
         >
           <div
-            className="pt-dialog-footer-actions"
+            className="pt-dialog-footer-actions button-center"
           >
-            <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
-                intent={0}
-                onClick={[Function]}
-                text="Continue"
-              />
-            </div>
+            <Blueprint.AnchorButton
+              className="read-docs-btn"
+              href="https://developers.blockapps.net/advanced/launch-dapp/"
+              intent={0}
+              target="_blank"
+              text="Upload an App"
+            />
           </div>
         </div>,
       ],
@@ -94,7 +91,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -112,10 +109,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -133,7 +131,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -151,10 +149,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -169,7 +168,7 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>,
                 <div
                   className="cli-content"
@@ -187,10 +186,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>,
@@ -204,10 +204,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "Download the STRATO CLI to deploy apps from the command line.",
+                  "children": "Download the STRATO CLI to deploy apps from the command line",
                 },
                 "ref": null,
-                "rendered": "Download the STRATO CLI to deploy apps from the command line.",
+                "rendered": "Download the STRATO CLI to deploy apps from the command line",
                 "type": "h4",
               },
               Object {
@@ -229,10 +229,11 @@ ShallowWrapper {
                         </code>
                       </li>
                       <li>
-                        Test your installation by running the 
+                        Run 
                         <code>
-                          strato --version
+                          strato init
                         </code>
+                         to upload a sample app to the STRATO blockchain
                       </li>
                     </ol>,
                   ],
@@ -280,10 +281,11 @@ ShallowWrapper {
                           </code>
                         </li>,
                         <li>
-                          Test your installation by running the 
+                          Run 
                           <code>
-                            strato --version
+                            strato init
                           </code>
+                           to upload a sample app to the STRATO blockchain
                         </li>,
                       ],
                     },
@@ -324,26 +326,28 @@ ShallowWrapper {
                         "nodeType": "host",
                         "props": Object {
                           "children": Array [
-                            "Test your installation by running the ",
+                            "Run ",
                             <code>
-                              strato --version
+                              strato init
                             </code>,
+                            " to upload a sample app to the STRATO blockchain",
                           ],
                         },
                         "ref": null,
                         "rendered": Array [
-                          "Test your installation by running the ",
+                          "Run ",
                           Object {
                             "instance": null,
                             "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": "strato --version",
+                              "children": "strato init",
                             },
                             "ref": null,
-                            "rendered": "strato --version",
+                            "rendered": "strato init",
                             "type": "code",
                           },
+                          " to upload a sample app to the STRATO blockchain",
                         ],
                         "type": "li",
                       },
@@ -366,19 +370,15 @@ ShallowWrapper {
         "nodeType": "host",
         "props": Object {
           "children": <div
-            className="pt-dialog-footer-actions"
+            className="pt-dialog-footer-actions button-center"
           >
-            <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
-                intent={0}
-                onClick={[Function]}
-                text="Continue"
-              />
-            </div>
+            <Blueprint.AnchorButton
+              className="read-docs-btn"
+              href="https://developers.blockapps.net/advanced/launch-dapp/"
+              intent={0}
+              target="_blank"
+              text="Upload an App"
+            />
           </div>,
           "className": "pt-dialog-footer",
         },
@@ -388,66 +388,30 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
-                intent={0}
-                onClick={[Function]}
-                text="Continue"
-              />
-            </div>,
-            "className": "pt-dialog-footer-actions",
+            "children": <Blueprint.AnchorButton
+              className="read-docs-btn"
+              href="https://developers.blockapps.net/advanced/launch-dapp/"
+              intent={0}
+              target="_blank"
+              text="Upload an App"
+            />,
+            "className": "pt-dialog-footer-actions button-center",
           },
           "ref": null,
           "rendered": Object {
             "instance": null,
             "key": undefined,
-            "nodeType": "host",
+            "nodeType": "class",
             "props": Object {
-              "children": Array [
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />,
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Continue"
-                />,
-              ],
+              "className": "read-docs-btn",
+              "href": "https://developers.blockapps.net/advanced/launch-dapp/",
+              "intent": 0,
+              "target": "_blank",
+              "text": "Upload an App",
             },
             "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "onClick": [Function],
-                  "text": "Back",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "intent": 0,
-                  "onClick": [Function],
-                  "text": "Continue",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-            ],
-            "type": "div",
+            "rendered": null,
+            "type": [Function],
           },
           "type": "div",
         },
@@ -473,7 +437,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -491,10 +455,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -505,19 +470,15 @@ ShallowWrapper {
             className="pt-dialog-footer"
           >
             <div
-              className="pt-dialog-footer-actions"
+              className="pt-dialog-footer-actions button-center"
             >
-              <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Continue"
-                />
-              </div>
+              <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
+                intent={0}
+                target="_blank"
+                text="Upload an App"
+              />
             </div>
           </div>,
         ],
@@ -536,7 +497,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -554,10 +515,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -575,7 +537,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -593,10 +555,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -611,7 +574,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <h4>
-                    Download the STRATO CLI to deploy apps from the command line.
+                    Download the STRATO CLI to deploy apps from the command line
                   </h4>,
                   <div
                     className="cli-content"
@@ -629,10 +592,11 @@ ShallowWrapper {
                         </code>
                       </li>
                       <li>
-                        Test your installation by running the 
+                        Run 
                         <code>
-                          strato --version
+                          strato init
                         </code>
+                         to upload a sample app to the STRATO blockchain
                       </li>
                     </ol>
                   </div>,
@@ -646,10 +610,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "Download the STRATO CLI to deploy apps from the command line.",
+                    "children": "Download the STRATO CLI to deploy apps from the command line",
                   },
                   "ref": null,
-                  "rendered": "Download the STRATO CLI to deploy apps from the command line.",
+                  "rendered": "Download the STRATO CLI to deploy apps from the command line",
                   "type": "h4",
                 },
                 Object {
@@ -671,10 +635,11 @@ ShallowWrapper {
                           </code>
                         </li>
                         <li>
-                          Test your installation by running the 
+                          Run 
                           <code>
-                            strato --version
+                            strato init
                           </code>
+                           to upload a sample app to the STRATO blockchain
                         </li>
                       </ol>,
                     ],
@@ -722,10 +687,11 @@ ShallowWrapper {
                             </code>
                           </li>,
                           <li>
-                            Test your installation by running the 
+                            Run 
                             <code>
-                              strato --version
+                              strato init
                             </code>
+                             to upload a sample app to the STRATO blockchain
                           </li>,
                         ],
                       },
@@ -766,26 +732,28 @@ ShallowWrapper {
                           "nodeType": "host",
                           "props": Object {
                             "children": Array [
-                              "Test your installation by running the ",
+                              "Run ",
                               <code>
-                                strato --version
+                                strato init
                               </code>,
+                              " to upload a sample app to the STRATO blockchain",
                             ],
                           },
                           "ref": null,
                           "rendered": Array [
-                            "Test your installation by running the ",
+                            "Run ",
                             Object {
                               "instance": null,
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "strato --version",
+                                "children": "strato init",
                               },
                               "ref": null,
-                              "rendered": "strato --version",
+                              "rendered": "strato init",
                               "type": "code",
                             },
+                            " to upload a sample app to the STRATO blockchain",
                           ],
                           "type": "li",
                         },
@@ -808,19 +776,15 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": <div
-              className="pt-dialog-footer-actions"
+              className="pt-dialog-footer-actions button-center"
             >
-              <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Continue"
-                />
-              </div>
+              <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
+                intent={0}
+                target="_blank"
+                text="Upload an App"
+              />
             </div>,
             "className": "pt-dialog-footer",
           },
@@ -830,66 +794,30 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Continue"
-                />
-              </div>,
-              "className": "pt-dialog-footer-actions",
+              "children": <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
+                intent={0}
+                target="_blank"
+                text="Upload an App"
+              />,
+              "className": "pt-dialog-footer-actions button-center",
             },
             "ref": null,
             "rendered": Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "host",
+              "nodeType": "class",
               "props": Object {
-                "children": Array [
-                  <Blueprint.Button
-                    onClick={[Function]}
-                    text="Back"
-                  />,
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Continue"
-                  />,
-                ],
+                "className": "read-docs-btn",
+                "href": "https://developers.blockapps.net/advanced/launch-dapp/",
+                "intent": 0,
+                "target": "_blank",
+                "text": "Upload an App",
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "onClick": [Function],
-                    "text": "Back",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "intent": 0,
-                    "onClick": [Function],
-                    "text": "Continue",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-              ],
-              "type": "div",
+              "rendered": null,
+              "type": [Function],
             },
             "type": "div",
           },
@@ -914,8 +842,8 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <CLI
-    closeCLIOverlay={[Function]}
-    isTokenOpen={false}
+    addApp={false}
+    closeWalkThroughOverlay={[Function]}
   />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
@@ -940,7 +868,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -958,10 +886,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -972,17 +901,16 @@ ShallowWrapper {
           className="pt-dialog-footer"
         >
           <div
-            className="pt-dialog-footer-actions"
+            className="pt-dialog-footer-actions button-center"
           >
             <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
+              <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
                 intent={0}
                 onClick={[Function]}
-                text="Continue"
+                target="_blank"
+                text="Upload an App"
               />
             </div>
           </div>
@@ -1003,7 +931,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -1021,10 +949,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -1042,7 +971,7 @@ ShallowWrapper {
               className="pt-form-content cli-container"
             >
               <h4>
-                Download the STRATO CLI to deploy apps from the command line.
+                Download the STRATO CLI to deploy apps from the command line
               </h4>
               <div
                 className="cli-content"
@@ -1060,10 +989,11 @@ ShallowWrapper {
                     </code>
                   </li>
                   <li>
-                    Test your installation by running the 
+                    Run 
                     <code>
-                      strato --version
+                      strato init
                     </code>
+                     to upload a sample app to the STRATO blockchain
                   </li>
                 </ol>
               </div>
@@ -1078,7 +1008,7 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>,
                 <div
                   className="cli-content"
@@ -1096,10 +1026,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>,
@@ -1113,10 +1044,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "Download the STRATO CLI to deploy apps from the command line.",
+                  "children": "Download the STRATO CLI to deploy apps from the command line",
                 },
                 "ref": null,
-                "rendered": "Download the STRATO CLI to deploy apps from the command line.",
+                "rendered": "Download the STRATO CLI to deploy apps from the command line",
                 "type": "h4",
               },
               Object {
@@ -1138,10 +1069,11 @@ ShallowWrapper {
                         </code>
                       </li>
                       <li>
-                        Test your installation by running the 
+                        Run 
                         <code>
-                          strato --version
+                          strato init
                         </code>
+                         to upload a sample app to the STRATO blockchain
                       </li>
                     </ol>,
                   ],
@@ -1189,10 +1121,11 @@ ShallowWrapper {
                           </code>
                         </li>,
                         <li>
-                          Test your installation by running the 
+                          Run 
                           <code>
-                            strato --version
+                            strato init
                           </code>
+                           to upload a sample app to the STRATO blockchain
                         </li>,
                       ],
                     },
@@ -1233,26 +1166,28 @@ ShallowWrapper {
                         "nodeType": "host",
                         "props": Object {
                           "children": Array [
-                            "Test your installation by running the ",
+                            "Run ",
                             <code>
-                              strato --version
+                              strato init
                             </code>,
+                            " to upload a sample app to the STRATO blockchain",
                           ],
                         },
                         "ref": null,
                         "rendered": Array [
-                          "Test your installation by running the ",
+                          "Run ",
                           Object {
                             "instance": null,
                             "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": "strato --version",
+                              "children": "strato init",
                             },
                             "ref": null,
-                            "rendered": "strato --version",
+                            "rendered": "strato init",
                             "type": "code",
                           },
+                          " to upload a sample app to the STRATO blockchain",
                         ],
                         "type": "li",
                       },
@@ -1275,17 +1210,16 @@ ShallowWrapper {
         "nodeType": "host",
         "props": Object {
           "children": <div
-            className="pt-dialog-footer-actions"
+            className="pt-dialog-footer-actions button-center"
           >
             <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
+              <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
                 intent={0}
                 onClick={[Function]}
-                text="Continue"
+                target="_blank"
+                text="Upload an App"
               />
             </div>
           </div>,
@@ -1298,17 +1232,16 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": <div>
-              <Blueprint.Button
-                onClick={[Function]}
-                text="Back"
-              />
-              <Blueprint.Button
+              <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
                 intent={0}
                 onClick={[Function]}
-                text="Continue"
+                target="_blank"
+                text="Upload an App"
               />
             </div>,
-            "className": "pt-dialog-footer-actions",
+            "className": "pt-dialog-footer-actions button-center",
           },
           "ref": null,
           "rendered": Object {
@@ -1316,46 +1249,32 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": Array [
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />,
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Continue"
-                />,
-              ],
+              "children": <Blueprint.AnchorButton
+                className="read-docs-btn"
+                href="https://developers.blockapps.net/advanced/launch-dapp/"
+                intent={0}
+                onClick={[Function]}
+                target="_blank"
+                text="Upload an App"
+              />,
             },
             "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "onClick": [Function],
-                  "text": "Back",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "class",
+              "props": Object {
+                "className": "read-docs-btn",
+                "href": "https://developers.blockapps.net/advanced/launch-dapp/",
+                "intent": 0,
+                "onClick": [Function],
+                "target": "_blank",
+                "text": "Upload an App",
               },
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "intent": 0,
-                  "onClick": [Function],
-                  "text": "Continue",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-            ],
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
             "type": "div",
           },
           "type": "div",
@@ -1382,7 +1301,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -1400,10 +1319,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -1414,17 +1334,16 @@ ShallowWrapper {
             className="pt-dialog-footer"
           >
             <div
-              className="pt-dialog-footer-actions"
+              className="pt-dialog-footer-actions button-center"
             >
               <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
+                <Blueprint.AnchorButton
+                  className="read-docs-btn"
+                  href="https://developers.blockapps.net/advanced/launch-dapp/"
                   intent={0}
                   onClick={[Function]}
-                  text="Continue"
+                  target="_blank"
+                  text="Upload an App"
                 />
               </div>
             </div>
@@ -1445,7 +1364,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -1463,10 +1382,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -1484,7 +1404,7 @@ ShallowWrapper {
                 className="pt-form-content cli-container"
               >
                 <h4>
-                  Download the STRATO CLI to deploy apps from the command line.
+                  Download the STRATO CLI to deploy apps from the command line
                 </h4>
                 <div
                   className="cli-content"
@@ -1502,10 +1422,11 @@ ShallowWrapper {
                       </code>
                     </li>
                     <li>
-                      Test your installation by running the 
+                      Run 
                       <code>
-                        strato --version
+                        strato init
                       </code>
+                       to upload a sample app to the STRATO blockchain
                     </li>
                   </ol>
                 </div>
@@ -1520,7 +1441,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <h4>
-                    Download the STRATO CLI to deploy apps from the command line.
+                    Download the STRATO CLI to deploy apps from the command line
                   </h4>,
                   <div
                     className="cli-content"
@@ -1538,10 +1459,11 @@ ShallowWrapper {
                         </code>
                       </li>
                       <li>
-                        Test your installation by running the 
+                        Run 
                         <code>
-                          strato --version
+                          strato init
                         </code>
+                         to upload a sample app to the STRATO blockchain
                       </li>
                     </ol>
                   </div>,
@@ -1555,10 +1477,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "Download the STRATO CLI to deploy apps from the command line.",
+                    "children": "Download the STRATO CLI to deploy apps from the command line",
                   },
                   "ref": null,
-                  "rendered": "Download the STRATO CLI to deploy apps from the command line.",
+                  "rendered": "Download the STRATO CLI to deploy apps from the command line",
                   "type": "h4",
                 },
                 Object {
@@ -1580,10 +1502,11 @@ ShallowWrapper {
                           </code>
                         </li>
                         <li>
-                          Test your installation by running the 
+                          Run 
                           <code>
-                            strato --version
+                            strato init
                           </code>
+                           to upload a sample app to the STRATO blockchain
                         </li>
                       </ol>,
                     ],
@@ -1631,10 +1554,11 @@ ShallowWrapper {
                             </code>
                           </li>,
                           <li>
-                            Test your installation by running the 
+                            Run 
                             <code>
-                              strato --version
+                              strato init
                             </code>
+                             to upload a sample app to the STRATO blockchain
                           </li>,
                         ],
                       },
@@ -1675,26 +1599,28 @@ ShallowWrapper {
                           "nodeType": "host",
                           "props": Object {
                             "children": Array [
-                              "Test your installation by running the ",
+                              "Run ",
                               <code>
-                                strato --version
+                                strato init
                               </code>,
+                              " to upload a sample app to the STRATO blockchain",
                             ],
                           },
                           "ref": null,
                           "rendered": Array [
-                            "Test your installation by running the ",
+                            "Run ",
                             Object {
                               "instance": null,
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "strato --version",
+                                "children": "strato init",
                               },
                               "ref": null,
-                              "rendered": "strato --version",
+                              "rendered": "strato init",
                               "type": "code",
                             },
+                            " to upload a sample app to the STRATO blockchain",
                           ],
                           "type": "li",
                         },
@@ -1717,17 +1643,16 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": <div
-              className="pt-dialog-footer-actions"
+              className="pt-dialog-footer-actions button-center"
             >
               <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
+                <Blueprint.AnchorButton
+                  className="read-docs-btn"
+                  href="https://developers.blockapps.net/advanced/launch-dapp/"
                   intent={0}
                   onClick={[Function]}
-                  text="Continue"
+                  target="_blank"
+                  text="Upload an App"
                 />
               </div>
             </div>,
@@ -1740,17 +1665,16 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <div>
-                <Blueprint.Button
-                  onClick={[Function]}
-                  text="Back"
-                />
-                <Blueprint.Button
+                <Blueprint.AnchorButton
+                  className="read-docs-btn"
+                  href="https://developers.blockapps.net/advanced/launch-dapp/"
                   intent={0}
                   onClick={[Function]}
-                  text="Continue"
+                  target="_blank"
+                  text="Upload an App"
                 />
               </div>,
-              "className": "pt-dialog-footer-actions",
+              "className": "pt-dialog-footer-actions button-center",
             },
             "ref": null,
             "rendered": Object {
@@ -1758,46 +1682,32 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <Blueprint.Button
-                    onClick={[Function]}
-                    text="Back"
-                  />,
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Continue"
-                  />,
-                ],
+                "children": <Blueprint.AnchorButton
+                  className="read-docs-btn"
+                  href="https://developers.blockapps.net/advanced/launch-dapp/"
+                  intent={0}
+                  onClick={[Function]}
+                  target="_blank"
+                  text="Upload an App"
+                />,
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "onClick": [Function],
-                    "text": "Back",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "className": "read-docs-btn",
+                  "href": "https://developers.blockapps.net/advanced/launch-dapp/",
+                  "intent": 0,
+                  "onClick": [Function],
+                  "target": "_blank",
+                  "text": "Upload an App",
                 },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "intent": 0,
-                    "onClick": [Function],
-                    "text": "Continue",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-              ],
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             "type": "div",

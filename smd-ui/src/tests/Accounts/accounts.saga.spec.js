@@ -6,7 +6,8 @@ import watchFetchContracts, {
   getAccountsApi,
   getUserAddressesApi,
   getAccountDetailApi,
-  postFaucet
+  postFaucet,
+  getBalance
 } from '../../components/Accounts/accounts.saga';
 import {
   takeEvery,
@@ -40,7 +41,8 @@ import {
   FAUCET_SUCCESS,
   FAUCET_FAILURE,
   FETCH_ACCOUNT_ADDRESS_REQUEST,
-  FETCH_ACCOUNT_DETAIL_REQUEST
+  FETCH_ACCOUNT_DETAIL_REQUEST,
+  GET_BALANCE
 } from '../../components/Accounts/accounts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
 import { accountsMock, userAddresses, error, accountDetail } from './accountsMock';
@@ -55,7 +57,8 @@ describe('Accounts: saga', () => {
       takeLatest(FETCH_ACCOUNTS, getAccounts),
       takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
       takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
-      takeLatest(FAUCET_REQUEST, faucetAccount)
+      takeLatest(FAUCET_REQUEST, faucetAccount),
+      takeEvery(GET_BALANCE, getBalance)
     ]
     expect(gen.next().value).toEqual(match);
   });

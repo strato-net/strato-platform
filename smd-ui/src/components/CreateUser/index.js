@@ -1,21 +1,21 @@
 import React, { Component } from 'react';
-import { createUser } from './createUser.actions';
-import { openLoginOverlay, firstTimeLogin } from '../User/user.actions';
+import { openLoginOverlay, firstTimeLogin, resetError } from '../User/user.actions';
 import { Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
+import { validate } from './validate';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { openWalkThroughOverlay, closeWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { closeWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import { toasts } from "../Toasts";
 
 class CreateUser extends Component {
 
   constructor() {
     super();
-    this.state = { serverError: null, errors: null }
+    this.state = { errors: null }
   }
 
   componentDidMount() {
@@ -23,9 +23,10 @@ class CreateUser extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.serverError && this.state.serverError !== nextProps.serverError) {
+    if (nextProps.serverError) {
       toasts.show({ message: nextProps.serverError });
       this.setState({ serverError: nextProps.serverError })
+      this.props.resetError();
     }
   }
 
@@ -108,33 +109,18 @@ class CreateUser extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.createUser.isOpen,
-    isLoggedIn: state.user.isLoggedIn,
-    serverError: state.createUser.error,
-    spinning: state.createUser.spinning
+    spinning: state.user.spinning
   };
-}
-
-export function validate(values) {
-  const errors = {};
-  if (!values.email) {
-    errors.email = 'Please enter a email address';
-  } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(values.email)) {
-    errors.email = 'Please enter a valid email address';
-  }
-
-  return errors;
 }
 
 const formed = reduxForm({ form: 'create-user' })(CreateUser);
 const connected = connect(
   mapStateToProps,
   {
-    createUser,
-    openWalkThroughOverlay,
     closeWalkThroughOverlay,
     openLoginOverlay,
-    firstTimeLogin
+    firstTimeLogin,
+    resetError,
   }
 )(formed);
 

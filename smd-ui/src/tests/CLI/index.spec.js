@@ -5,8 +5,8 @@ describe('CLI: index', () => {
 
   test('render stateless component without values', () => {
     const props = {
-      isTokenOpen: false,
-      closeCLIOverlay: jest.fn()
+      addApp: false,
+      closeWalkThroughOverlay: jest.fn()
     }
     const wrapper = shallow(
       <CLI.WrappedComponent {...props} />
@@ -17,8 +17,8 @@ describe('CLI: index', () => {
 
   test('render stateless component with values', () => {
     const props = {
-      isTokenOpen: true,
-      closeCLIOverlay: jest.fn()
+      addApp: true,
+      closeWalkThroughOverlay: jest.fn()
     }
     const wrapper = shallow(
       <CLI.WrappedComponent {...props} />

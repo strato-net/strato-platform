@@ -12,7 +12,7 @@ import { env } from '../../env';
 
 const verify = env.APEX_URL + '/verify-temporary-password';
 
-function verifyTempPasswordRequest(tempPassword, email) {
+export function verifyTempPasswordRequest(tempPassword, email) {
   return fetch(verify, {
     method: 'POST',
     headers: {
@@ -26,7 +26,7 @@ function verifyTempPasswordRequest(tempPassword, email) {
   });
 }
 
-function* verifyTempPassword(action) {
+export function* verifyTempPassword(action) {
   try {
     const response = yield call(verifyTempPasswordRequest, action.tempPassword, action.email);
 

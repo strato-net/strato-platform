@@ -1,0 +1,19 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CLI: reducer overlay close 1`] = `
+Object {
+  "isTokenOpen": false,
+}
+`;
+
+exports[`CLI: reducer overlay open 1`] = `
+Object {
+  "isTokenOpen": true,
+}
+`;
+
+exports[`CLI: reducer set initial state 1`] = `
+Object {
+  "isTokenOpen": false,
+}
+`;

@@ -34,6 +34,7 @@ Object {
       },
     },
   },
+  "currentUserBalance": undefined,
   "error": null,
   "filter": "",
 }
@@ -83,6 +84,7 @@ Object {
       },
     },
   },
+  "currentUserBalance": undefined,
   "error": null,
   "filter": "",
 }
@@ -229,6 +231,7 @@ Object {
 exports[`Accounts: reducer fetch accounts on request 1`] = `
 Object {
   "accounts": Object {},
+  "currentUserBalance": undefined,
   "error": null,
   "filter": "",
 }
@@ -301,6 +304,7 @@ Object {
       "error": "ERROR",
     },
   },
+  "currentUserBalance": undefined,
   "error": null,
   "filter": "",
 }
@@ -343,6 +347,7 @@ Object {
       },
     },
   },
+  "currentUserBalance": undefined,
   "error": null,
   "filter": "",
 }
