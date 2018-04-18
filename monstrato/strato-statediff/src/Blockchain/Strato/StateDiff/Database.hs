@@ -64,7 +64,8 @@ createAccount blockNumber addressSource address diff = do
       addressStateRefCode = getField (theError "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefSource = source
+      addressStateRefSource = source,
+      addressStateRefContractName = Nothing
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a
