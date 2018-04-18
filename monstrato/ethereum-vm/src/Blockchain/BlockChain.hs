@@ -492,10 +492,10 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
   let
     (txrStatus, message, gasRemaining) =
       case result of
-        Left err -> let fmt = format err in (Failure "Execution" Nothing ExecutionFailure Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
+        Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
         Right r  -> case erException r of
                       Nothing -> (Success, "Success!", erRemainingTxGas r)
-                      Just ex -> (Exception, show ex, erRemainingTxGas r)
+                      Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 

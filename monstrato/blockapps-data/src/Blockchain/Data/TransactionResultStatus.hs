@@ -10,7 +10,6 @@ import           Database.Persist.TH
 import           GHC.Generics
 
 data TransactionResultStatus = Success
-                             | Exception
                              | Failure { trfStage       :: String
                                        , trfQueue       :: Maybe String
                                        , trfType        :: TransactionFailureType
@@ -24,7 +23,7 @@ data TransactionFailureType = IncorrectNonce
                             | InsufficientFunds
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
-                            | ExecutionFailure
+                            | ExecutionFailure String
                             deriving (Eq, Read, Show, Generic)
 
 derivePersistField "TransactionResultStatus"
@@ -32,7 +31,6 @@ derivePersistField "TransactionFailureType"
 
 instance FromJSON TransactionResultStatus where
     parseJSON (String "success") = pure Success
-    parseJSON (String "exception") = pure Exception
     parseJSON x = flip (withObject "Failure") x $ \v -> Failure
         <$> v .:  "stage"
         <*> v .:? "queue"
@@ -43,7 +41,6 @@ instance FromJSON TransactionResultStatus where
 
 instance ToJSON   TransactionResultStatus where
     toJSON Success     = String "success"
-    toJSON Exception   = String "exception"
     toJSON Failure{..} = object $ [ "stage" .= trfStage
                                   , "type"  .= trfType
                                   ]
