@@ -9,6 +9,11 @@ module.exports = function (sequelize, DataTypes) {
     },
     password: {
       type: DataTypes.STRING
+    },
+    verified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
     }
   }, { freezeTableName: true, timestamps: false });
 
