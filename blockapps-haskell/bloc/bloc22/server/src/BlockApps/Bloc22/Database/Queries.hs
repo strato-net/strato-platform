@@ -770,7 +770,7 @@ getXabiFunctionsArgsQuery funcId = do
   for argsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
     return $ Xabi.IndexedType index ty
-    
+
 {- |
 SELECT
   (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
@@ -1462,7 +1462,7 @@ getContractXabi (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  getContractXabiByMetadataId metadataId 
+  getContractXabiByMetadataId metadataId
 
 getContractXabiAndMetadataId :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc (Int32, Xabi)
@@ -1471,7 +1471,7 @@ getContractXabiAndMetadataId (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  xabi <- getContractXabiByMetadataId metadataId 
+  xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
