@@ -54,9 +54,17 @@ module.exports = {
     }).then(user => {
       const authErrorText = "user does not exist or wrong user-password pair provided";
       if (!user) {
-        let err = new Error(authErrorText);
-        err.status = 401;
-        return next(err);
+        models.temp_user.findOne({ where: { email: username } }).then(tempUser => {
+          let err;
+          if (tempUser) {
+            err = new Error('Please link your account to STRATO Testnet');
+            err.status = 401;
+            return next(err);
+          }
+          err = new Error(authErrorText);
+          err.status = 401;
+          return next(err);
+        })
       } else {
         bcrypt.compare(password, user.passwordHash, function (err, passIsCorrect) {
           if (err) {
