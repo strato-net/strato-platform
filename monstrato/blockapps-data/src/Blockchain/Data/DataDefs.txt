@@ -11,7 +11,7 @@ BlockData
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    extraData Integer 
+    extraData Integer
     nonce Word64
     mixHash SHA
     deriving Eq Read Show
@@ -39,7 +39,7 @@ BlockDataRef
     totalDifficulty Integer sqltype=numeric(1000,0)
     deriving Eq Read Show
 
-Block 
+Block
     blockData BlockData
     receiptTransactions [Transaction]
     blockUncles [BlockData]
@@ -59,11 +59,11 @@ BlockTransaction
     transaction RawTransactionId
     deriving Eq Read Show
 
-AddressState 
+AddressState
     nonce Integer sqltype=numeric(1000,0)
     balance Integer sqltype=numeric(1000,0)
-    contractRoot StateRoot 
-    codeHash SHA 
+    contractRoot StateRoot
+    codeHash SHA
     deriving Eq Generic Read Show
 
 AddressStateRef
@@ -75,6 +75,7 @@ AddressStateRef
     codeHash SHA
     latestBlockDataRefNumber Integer
     source String
+    contractName String Maybe
     deriving Eq Read Show
 
 RawTransaction
@@ -83,7 +84,7 @@ RawTransaction
     nonce Integer sqltype=numeric(1000,0)
     gasPrice Integer sqltype=numeric(1000,0)
     gasLimit Integer sqltype=numeric(1000,0)
-    toAddress Address Maybe 
+    toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
     codeOrData BS.ByteString
     r Integer
@@ -132,7 +133,7 @@ UserData json
     address Address
     userId UserNId
     deriving Eq Read Show
-    
+
 BlockApp json
     name String
     developerName String
