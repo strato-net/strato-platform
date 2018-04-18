@@ -2,7 +2,6 @@ import React from 'react';
 import { Route, Redirect } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { logoutSuccess } from '../User/user.actions';
 import { currentUser } from '../../lib/localStorage';
 
 class ProtectedRoute extends Route {
@@ -11,7 +10,6 @@ class ProtectedRoute extends Route {
     const component = super.render();
 
     if (!Object.keys(currentUser()).length) {
-      this.props.logoutSuccess();
       return (<Redirect to={{
         pathname: '/apps',
         state: { from: this.props.location }
@@ -30,7 +28,5 @@ function mapStateToProps(state) {
 }
 
 export default withRouter(
-  connect(mapStateToProps, {
-    logoutSuccess
-  })(ProtectedRoute)
+  connect(mapStateToProps, {})(ProtectedRoute)
 );

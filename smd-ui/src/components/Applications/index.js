@@ -14,6 +14,7 @@ import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
 import { closeCLIOverlay } from '../CLI/cli.actions';
 import qs from 'query-string';
+import { isModePublic } from '../../lib/checkMode';
 
 import './application.css'
 
@@ -21,9 +22,11 @@ class Applications extends Component {
 
   componentDidMount() {
     // I am really sorry for this. But time.
-    const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if (!this.props.isLoggedIn && !developerSignIn) {
-      window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
+    if (isModePublic()) {
+      const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
+      if (!this.props.isLoggedIn && !developerSignIn) {
+        window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
+      }
     }
 
     mixpanelWrapper.track('launchpad_load');

@@ -22,6 +22,7 @@ services:
     - STRATO_DOC_URL=${STRATO_DOC_URL}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - STRATO_URL=${STRATO_URL}
+    - SMD_MODE=${SMD_MODE}
     build: .
     image: <REPO_URL>smd:<VERSION>
     restart: always

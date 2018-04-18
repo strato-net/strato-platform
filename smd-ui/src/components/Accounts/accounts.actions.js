@@ -102,10 +102,11 @@ export const fetchAccountDetailFailure = function(name, address, error) {
   }
 };
 
-export const faucetRequest = function(address) {
+export const faucetRequest = function(address, name) {
   return {
     type: FAUCET_REQUEST,
-    address: address
+    address,
+    name,
   }
 };
 
