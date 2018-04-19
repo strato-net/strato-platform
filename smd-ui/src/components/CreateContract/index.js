@@ -135,9 +135,9 @@ class CreateContract extends Component {
     this.props.reset();
   };
 
-  renderUsername = (disableDropDown) => {
+  renderUsername = (isPublicMode) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={ disableDropDown ? "" : "pt-select" }>
+    return (<div className={isPublicMode ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
@@ -145,38 +145,42 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         validate={required}
         required
-        disabled={ disableDropDown }
+        disabled={isPublicMode}
       >
-        {!disableDropDown && <option />}
+        <option value={isPublicMode ? this.props.initialValues.username : null}>
+          {isPublicMode && this.props.initialValues.username}
+        </option>
         {
-          users.map((user, i) => {
-            return (
-              <option key={'user' + i} value={user}>{user}</option>
-            )
-          })
+          (!isPublicMode && users) ?
+            users.map((user, i) => {
+              return (
+                <option key={'user' + i} value={user}>{user}</option>
+              )
+            })
+            : ''
         }
       </Field>
     </div>)
   };
 
-  renderAddress = (disableDropDown) => {
+  renderAddress = (isPublicMode) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
-    return (<div className={ disableDropDown ? "" : "pt-select" }>
+    return (<div className={isPublicMode ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="address"
         validate={required}
         required
-        disabled={ disableDropDown }
+        disabled={isPublicMode}
       >
-        <option value={disableDropDown ? this.props.initialValues.address : null}>
-          {disableDropDown && this.props.initialValues.address}
+        <option value={isPublicMode ? this.props.initialValues.address : null}>
+          {isPublicMode && this.props.initialValues.address}
         </option>
         {
-          (!disableDropDown && userAddresses) ?
+          (!isPublicMode && userAddresses) ?
             userAddresses.map((address, i) => {
               return (
                 <option key={address} value={address}>{address}</option>
@@ -239,7 +243,7 @@ class CreateContract extends Component {
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const disableDropDown = isModePublic();
+    const isPublicMode = isModePublic();
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
@@ -267,7 +271,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderUsername(disableDropDown)}
+                  {this.renderUsername(isPublicMode)}
                 </div>
               </div>
               <div className="row">
@@ -277,7 +281,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderAddress(disableDropDown)}
+                  {this.renderAddress(isPublicMode)}
                 </div>
               </div>
               <div className="row">
