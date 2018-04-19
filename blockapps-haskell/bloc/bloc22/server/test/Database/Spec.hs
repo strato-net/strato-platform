@@ -9,7 +9,7 @@ import Data.Either
 import Data.Map (toList)
 import Text.Parsec
 
-import BlockApps.Bloc22.Database.Solc 
+import BlockApps.Bloc22.Database.Solc
 import BlockApps.Solidity.Parse.Parser (parseXabi)
 import BlockApps.Solidity.Parse.Declarations
 import BlockApps.Solidity.Xabi
