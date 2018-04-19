@@ -3,7 +3,10 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
-  parameters { string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"') }
+  parameters {
+    string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"')
+    string(name: 'REFSPEC', defaultValue: 'v0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
+  }
   stages {
     stage('Prepare') {
       steps {
@@ -145,10 +148,10 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_LATEST --name "docker-compose.latest.yml" --file ./docker-compose.yml
 
               # Release as stable
-              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag build-$TAG_NAME"
-              github-release delete  $STRATOGS_RELEASE_DETAILS || true
-              github-release release $STRATOGS_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $STRATOGS_RELEASE_DETAILS --name "docker-compose.release.yml" --file ./docker-compose.yml
+              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag $TAG_NAME"
+              github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "$TAG_NAME"
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.release.yml" --file ./docker-compose.yml
             '''
           }
         }
