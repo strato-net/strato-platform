@@ -922,13 +922,29 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool
-          -> Bool
-          -> BlockData -- TODO: Use default BlockData instance
-          -> Address
-          -> ContextM String
-getSource isRunningTests' isHomestead b contractAddress = do
-  (eRes, _) <- call isRunningTests' isHomestead True S.empty b 0 contractAddress contractAddress (Address 0) 0 1 (fst $ B16.decode "ec630643") 1000000000000000000 (Address 0)
+getSource :: Bool -> Bool -> BlockData -> Address -> ContextM String
+getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
+
+getContractName :: Bool -> Bool -> BlockData -> Address -> ContextM String
+getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
+
+-- TODO: Use the default BlockData instance
+getFromSelector :: BC.ByteString -> Bool -> Bool -> BlockData -> Address -> ContextM String
+getFromSelector sel isRunningTests' isHomestead b contractAddress = do
+  (eRes, _) <- call isRunningTests'
+                    isHomestead
+                    True
+                    S.empty
+                    b
+                    0
+                    contractAddress
+                    contractAddress
+                    (Address 0)
+                    0
+                    1
+                    (fst $ B16.decode sel)
+                    1000000000000000000
+                    (Address 0)
   case eRes of
     Left _ -> return ""
     Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
