@@ -222,5 +222,13 @@ addGetSourceFuncToSource src = do
               . replace "\n" "\\n"
               . replace "'" "\\'"
 
+-- TODO: Merge with addGetSourceFunc if stable
+addGetNameFuncToSource :: Text -> Either String Text
+addGetNameFuncToSource src = do
+  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
+  let addGetName (name, (xabi, ts)) =
+       (name, (addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts))
+  return . pack . unparse . List.map addGetName $ fileContents
+
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines
