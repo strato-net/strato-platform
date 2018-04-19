@@ -193,7 +193,7 @@ services:
     image: <REPO_URL>docs:<VERSION>
     restart: always
   kafka:
-    command: [/bin/bash, -c, printf "\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n]
+    command: [/bin/bash, -c, printf "\ndelete.topic.enable=true\nlog.cleaner.enable=false\nLOG_RETENTION_HOURS=2147483647\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n]
     environment:
     - ADVERTISED_HOST=kafka
     - ADVERTISED_PORT=9092

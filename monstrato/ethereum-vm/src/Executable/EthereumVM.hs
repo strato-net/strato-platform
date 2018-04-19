@@ -196,9 +196,10 @@ shouldProcessNewTransactions =
                 return False -- we either had no peers or some other error, lets play it safe
             Just (RedisBestBlock worldBestSha _ _) -> do
                 didRunBest <- hasBSum worldBestSha
-                let msg = if didRunBest
-                            then "don't have a block summary for worldBestSha " ++ format worldBestSha ++ ", not mining"
-                            else "found blockSummary for worldBestSha " ++ format worldBestSha ++ ", will mine"
+                let msg =
+                      if didRunBest
+                      then "found blockSummary for worldBestSha " ++ format worldBestSha ++ ", will mine"
+                      else "A peer has claimed that block hash " ++ format worldBestSha ++ " is the best block, but we don't have this block yet. We are behind, mining is futile, bagger is shutting down (until we are caught up)."
                 $logInfoS "shouldProcessNewTransactions" (T.pack msg)
                 return didRunBest  -- todo, verify TDiff etc.
     else do
