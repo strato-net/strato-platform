@@ -400,6 +400,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                                       , erException          = Just e
                                        }
                 Right _ -> do
                     let realRefund = min (refund newVMState') ((transactionGasLimit bt - vmGasRemaining newVMState') `div` 2)
@@ -417,6 +418,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                                       , erException          = Nothing
                                        }
         else do
             s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
@@ -429,6 +431,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
+                               , erException = Just Blockchain.VM.VMState.InsufficientFunds
                                }
 
 runCodeForTransaction :: Bool
@@ -489,8 +492,10 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
   let
     (txrStatus, message, gasRemaining) =
       case result of
-        Left err -> let fmt = format err in (Failure "Execution" Nothing ExecutionFailure Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
-        Right r  -> (Success, "Success!", erRemainingTxGas r)
+        Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
+        Right r  -> case erException r of
+                      Nothing -> (Success, "Success!", erRemainingTxGas r)
+                      Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 

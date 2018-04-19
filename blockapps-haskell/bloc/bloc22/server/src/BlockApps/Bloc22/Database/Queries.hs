@@ -172,7 +172,7 @@ contractNameFromAddress contractAddress = proc () -> do
   returnA -< name
 
 contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
-contractByTxHash txHash = proc () -> do
+contractByTxHash txHash = limit 1 $ proc () -> do
   (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
   restrict -< tx_hash .== constant txHash
   returnA -< (cmId,ttype,name)
