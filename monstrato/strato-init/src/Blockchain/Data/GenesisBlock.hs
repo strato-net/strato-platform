@@ -90,7 +90,7 @@ initializeStateDB addressInfo = do
     mapM_ putAccount addressInfo
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _) -> bin))
+initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
 
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
@@ -182,10 +182,10 @@ initializeGenesisBlock backupType genesisBlockName = do
     }
     commitSqlDiffs diff Nothing Nothing
     -- TODO: also write contractName from the source info
-    let writeSource (account, CodeInfo _ src) = case account of
-                                                    NonContract _ _ -> return ()
-                                                    ContractNoStorage addr _ _ -> updateSource addr src
-                                                    ContractWithStorage addr _ _ _ -> updateSource addr src
+    let writeSource (account, CodeInfo _ name src) = case account of
+            NonContract _ _ -> return ()
+            ContractNoStorage addr _ _ -> updateSource addr name src
+            ContractWithStorage addr _ _ _ -> updateSource addr name src
 
     forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"

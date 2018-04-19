@@ -104,12 +104,13 @@ updateAccount blockNumber address diff = do
     takeIncremental Update{newValue} = newValue
 
 updateSource :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m) =>
-                Address -> String -> m ()
-updateSource address source = do
+                Address -> String -> String -> m ()
+updateSource address name source = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
     addrID <- getAddressStateSQL address "update"
-    SQL.update addrID [AddressStateRefSource =. source]
+    SQL.update addrID [AddressStateRefSource =. source,
+                       AddressStateRefContractName =. Just name]
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
