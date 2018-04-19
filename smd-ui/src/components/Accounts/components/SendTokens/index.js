@@ -14,6 +14,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
 import validate from './validate';
+import { isModePublic } from '../../../../lib/checkMode';
 
 // TODO: use solc instead of extabi for compile
 
@@ -59,13 +60,62 @@ class SendTokens extends Component {
     mixpanelWrapper.track("send_ether_loaded");
   }
 
+  userNameField = (users, isPublicMode) => {
+    return (
+      <Field
+        className="pt-input"
+        component="select"
+        name="from"
+        onChange={
+          (e) => this.props.fetchUserAddresses(e.target.value, true)
+        }
+        required
+        disabled={isPublicMode}
+      >
+        {isPublicMode && <option value={isPublicMode ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
+        {!isPublicMode && <option />}
+        {
+          !isPublicMode && users.map((user, i) => {
+            return (
+              <option key={'user' + i} value={user}>{user}</option>
+            )
+          })
+        }
+      </Field>
+    )
+  }
+
+  addressField = (isPublicMode) => {
+    const fromUserAddresses = Object.keys(this.props.accounts).length && this.props.fromUsername ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
+      : [];
+
+    return (
+      <Field
+        className="pt-input"
+        component="select"
+        name="fromAddress"
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
+        {
+          (!isPublicMode && fromUserAddresses.length) ?
+            fromUserAddresses.map((address, i) => {
+              return (
+                <option key={address} value={address}>{address}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    )
+  }
+
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-
-    // const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
-    //   Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
-    //   : [];
+    const isPublicMode = isModePublic();
 
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
@@ -75,7 +125,7 @@ class SendTokens extends Component {
       <div className="smd-pad-16">
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
-          this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
+          isModePublic() && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
           this.props.sendTokensOpenModal()
         }} className="pt-intent-primary pt-icon-add"
           text="Send Tokens" />
@@ -99,24 +149,7 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="from"
-                      onChange={
-                        (e) => this.props.fetchUserAddresses(e.target.value, true)
-                      }
-                      required
-                      disabled
-                    >
-                      {
-                        users.map((user, i) => {
-                          return (
-                            <option key={'user' + i} value={user}>{user}</option>
-                          )
-                        })
-                      }
-                    </Field>
+                    {this.userNameField(users, isPublicMode)}
                   </div>
                 </div>
               </div>
@@ -128,24 +161,7 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="fromAddress"
-                      required
-                      disabled
-                    >
-                      <option value={this.props.initialValues.fromAddress}>{this.props.initialValues.fromAddress}</option>
-                      {/*
-                        fromUserAddresses.length ?
-                          fromUserAddresses.map((address, i) => {
-                            return (
-                              <option key={address} value={address}>{address}</option>
-                            )
-                          })
-                          : ''
-                      */}
-                    </Field>
+                    {this.addressField(isPublicMode)}
                   </div>
                 </div>
               </div>
