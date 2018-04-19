@@ -3,7 +3,7 @@
 module Database.Spec where
 
 import           Test.Hspec
-import Data.Text (pack, unpack)
+import Data.Text (pack, unpack, Text)
 import Control.Monad
 import Data.Either
 import Data.Map (toList)
@@ -129,13 +129,16 @@ logleft x = case x of
   Left err -> putStrLn err
   Right _ -> return ()
 
+augment :: Text -> Either String Text
+augment = addGetNameFuncToSource <=< addGetSourceFuncToSource
+
 testAugment :: String -> String -> IO ()
 testAugment solPath expectedPath = do
   soliditySrc <- pack <$> readFile solPath
   void . fromEither =<< compileSolcIO soliditySrc
   expected <- pack <$> readFile expectedPath
   expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-  augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+  augmentedSrc <- unpack <$> (fromEither $ augment soliditySrc)
   void . fromEither =<< compileSolcIO (pack augmentedSrc)
   augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
   augmentedXabi `shouldBe` expectedXabi
@@ -144,12 +147,12 @@ writeAugment :: String -> String -> IO ()
 writeAugment solPath expectedPath = do
   soliditySrc <- pack <$> readFile solPath
   void . fromEither =<< compileSolcIO soliditySrc
-  augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+  augmentedSrc <- unpack <$> (fromEither $ augment soliditySrc)
   writeFile expectedPath augmentedSrc
 
 printAugment :: String -> IO ()
 printAugment solPath = do
   soliditySrc <- pack <$> readFile solPath
   void . fromEither =<< compileSolcIO soliditySrc
-  augmentedSrc <- (fromEither $ addGetSourceFuncToSource soliditySrc)
+  augmentedSrc <- (fromEither $ augment soliditySrc)
   print augmentedSrc
