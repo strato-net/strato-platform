@@ -6,7 +6,8 @@ import {
   compileContract,
   contractFormChange,
   usernameChange,
-  contractNameChange
+  contractNameChange,
+  resetError
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
@@ -61,6 +62,7 @@ class CreateContract extends Component {
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
       toasts.show({ message: nextProps.toastsMessage });
+      this.props.resetError();
     }
   }
 
@@ -476,7 +478,8 @@ const connected = connect(mapStateToProps, {
   fetchAccounts,
   fetchUserAddresses,
   usernameChange,
-  contractNameChange
+  contractNameChange,
+  resetError
 })(formed);
 
 export default withRouter(connected);

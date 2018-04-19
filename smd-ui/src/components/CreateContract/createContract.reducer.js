@@ -10,7 +10,8 @@ import {
   USERNAME_FORM_CHANGE,
   CONTRACT_FORM_CHANGE,
   CONTRACT_NAME_CHANGE,
-  UPDATE_TOAST
+  UPDATE_TOAST,
+  RESET_ERROR
 } from './createContract.actions';
 
 const initialState = {
@@ -120,6 +121,12 @@ const reducer = function (state = initialState, action) {
         contractName: contracts && contracts[0],
         contractCompileErrors: undefined,
       };
+    case RESET_ERROR:
+      return {
+        ...state,
+        isToasts: null,
+        toastsMessage: null
+      }
     default:
       return state;
   }
