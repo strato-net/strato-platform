@@ -22,7 +22,7 @@ describe('Accounts: index', () => {
         <Accounts.WrappedComponent {...props} />
       );
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
     test('mocked values', () => {
@@ -39,8 +39,8 @@ describe('Accounts: index', () => {
       const wrapper = shallow(
         <Accounts.WrappedComponent {...props} />
       );
-      
-      expect(wrapper).toMatchSnapshot();
+
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
   });
@@ -61,8 +61,10 @@ describe('Accounts: index', () => {
       <Accounts.WrappedComponent {...props} />
     );
 
-    wrapper.find('div').at(13).simulate('click');
+    wrapper.find('div').at(14).simulate('click');
     expect(props.resetUserAddress).toHaveBeenCalled();
+    expect(props.resetUserAddress).toHaveBeenCalledTimes(1);
+    expect(props.fetchUserAddresses).not.toHaveBeenCalled();
   });
 
   test('open account on click', () => {
@@ -80,8 +82,10 @@ describe('Accounts: index', () => {
       <Accounts.WrappedComponent {...props} />
     );
 
-    wrapper.find('div').at(57).simulate('click');
+    wrapper.find('div').at(59).simulate('click');
     expect(props.fetchUserAddresses).toHaveBeenCalled();
+    expect(props.fetchUserAddresses).toHaveBeenCalledTimes(1);
+    expect(props.resetUserAddress).not.toHaveBeenCalled();
   });
 
   test('invoke onchange on input and trigger changeAccountFilter', () => {

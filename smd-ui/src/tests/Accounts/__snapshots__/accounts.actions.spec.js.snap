@@ -93,6 +93,29 @@ Object {
 }
 `;
 
+exports[`Accounts: action fetch balance failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "BALANCE_FAILURE",
+}
+`;
+
+exports[`Accounts: action fetch balance request 1`] = `
+Object {
+  "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "type": "GET_BALANCE",
+}
+`;
+
+exports[`Accounts: action fetch balance success 1`] = `
+Object {
+  "detail": Object {
+    "balance": "3000000000000000000000",
+  },
+  "type": "BALANCE_SUCCESS",
+}
+`;
+
 exports[`Accounts: action fetch faucet failure 1`] = `
 Object {
   "error": "ERROR",
@@ -103,6 +126,7 @@ Object {
 exports[`Accounts: action fetch faucet request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "name": "blockapps",
   "type": "FAUCET_REQUEST",
 }
 `;
