@@ -6,6 +6,7 @@ module Blockchain.VM
     , call
     , create
     , getSource
+    , getContractName
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
@@ -922,15 +923,16 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> Bool -> BlockData -> Address -> ContextM String
+getSource :: Bool -> BlockData -> Address -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> Bool -> BlockData -> Address -> ContextM String
+getContractName :: Bool -> BlockData -> Address -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
 -- TODO: Use the default BlockData instance
-getFromSelector :: BC.ByteString -> Bool -> Bool -> BlockData -> Address -> ContextM String
-getFromSelector sel isRunningTests' isHomestead b contractAddress = do
+getFromSelector :: BC.ByteString -> Bool -> BlockData -> Address -> ContextM String
+getFromSelector sel isRunningTests' b contractAddress = do
+  let isHomestead = blockDataNumber b >= gHomesteadFirstBlock
   (eRes, _) <- call isRunningTests'
                     isHomestead
                     True
