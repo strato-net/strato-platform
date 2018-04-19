@@ -6,6 +6,7 @@ TESTS=(
   blockapps-ethereum-abi
   blockapps-solidity
   blockapps-strato-api
+  blockapps-bloc22-server
 )
 
 for tst in ${TESTS[@]}; do

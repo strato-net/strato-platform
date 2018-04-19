@@ -30,7 +30,7 @@ contract BidState {
     string public supplier;
     uint public amount;
     BidState public state;
-    function Bid(uint _id, string _name, string _supplier, uint _amount) public {
+    function Bid(uint256 _id, string _name, string _supplier, uint256 _amount) public {
         id = _id;
     name = _name;
     supplier = _supplier;

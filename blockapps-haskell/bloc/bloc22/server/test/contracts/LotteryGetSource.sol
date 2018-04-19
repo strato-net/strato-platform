@@ -5,7 +5,7 @@ contract Lottery {
     uint public ticketPrice;
     uint public winner;
     address public winnerAddress;
-    function Lottery(uint _ticketCount, uint _ticketPrice) public {
+    function Lottery(uint256 _ticketCount, uint256 _ticketPrice) public {
         if (_ticketCount < 2) {throw;
     }ticketCount = _ticketCount;
     ticketPrice = _ticketPrice;
@@ -30,11 +30,11 @@ contract Lottery {
     return true;
   
     }
-    function rand(uint seed) internal returns (uint) {
+    function rand(uint256 seed) internal returns (uint256) {
         return uint(keccak256(seed)) % entries.length;
   
     }
-    function testRand(uint seed) public returns (uint) {
+    function testRand(uint256 seed) public returns (uint256) {
         if (entries.length < 2) {return 99999999;
     }return rand(seed);
   
