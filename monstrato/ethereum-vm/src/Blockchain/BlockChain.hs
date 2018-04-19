@@ -183,8 +183,8 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: Bagger.TxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    s q actual OutputTx{otHash=hash, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show (transactionNonce bt) ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+    Bagger.NonceTooLow    s q expected OutputTx{otHash=hash, otBaseTx=bt} ->
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", s, q, hash)
     Bagger.BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
         (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", s, q, hash)
     Bagger.GasLimitTooLow s q _ OutputTx{otHash=hash} ->
