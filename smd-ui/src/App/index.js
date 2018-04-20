@@ -37,7 +37,7 @@ class App extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn
   };
