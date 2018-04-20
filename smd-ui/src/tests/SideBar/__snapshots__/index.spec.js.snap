@@ -1,6 +1,84 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`SideBar: index render component 1`] = `
+exports[`SideBar: index render component for enterprise mode 1`] = `
+"<aside>
+  <div className=\\"menu\\">
+    <NavLink id=\\"dashboard\\" to=\\"/home\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-rocket\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Dashboard
+      </span>
+    </NavLink>
+    <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-link\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Blocks
+      </span>
+    </NavLink>
+    <NavLink id=\\"transactions\\" to=\\"/transactions\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-exchange\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Transactions
+      </span>
+    </NavLink>
+    <NavLink id=\\"accounts\\" to=\\"/accounts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-users\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Accounts
+      </span>
+    </NavLink>
+    <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-gavel\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Contracts
+      </span>
+    </NavLink>
+    <NavLink id=\\"code_editor\\" to=\\"/code_editor\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-code\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+         
+        Code Editor
+      </span>
+    </NavLink>
+  </div>
+  <hr />
+  <div className=\\"menu\\">
+    <NavLink id=\\"apps\\" to=\\"/apps\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
+      <i className=\\"fa fa-rocket\\">
+         
+      </i>
+      <span className=\\"menu-text\\">
+        Apps
+      </span>
+    </NavLink>
+  </div>
+  <div />
+  <div className=\\"smd-sidebar-logo\\">
+    <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+      <img src={{...}} width=\\"120\\" alt=\\"Blockapps Logo\\" />
+    </a>
+  </div>
+</aside>"
+`;
+
+exports[`SideBar: index render component for public mode 1`] = `
 "<aside>
   <div className=\\"menu\\">
     <NavLink id=\\"dashboard\\" to=\\"/apps\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -77,117 +155,7 @@ exports[`SideBar: index render component 1`] = `
 </aside>"
 `;
 
-exports[`SideBar: index sequence of links fifth position /contracts 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="accounts"
-  onClick={[Function]}
-  to="/accounts"
->
-  <i
-    className="fa fa-users"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Accounts
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links first position /home 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="dashboard"
-  onClick={[Function]}
-  to="/apps"
->
-  <i
-    className="fa fa-rocket"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Dashboard
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links fourth position /accounts 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="transactions"
-  onClick={[Function]}
-  to="/transactions"
->
-  <i
-    className="fa fa-exchange"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Transactions
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links secound position /blocks 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="network"
-  onClick={[Function]}
-  to="/home"
->
-  <i
-    className="fa fa-dashboard"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Network
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links seventh position /apps 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="code_editor"
-  onClick={[Function]}
-  to="/code_editor"
->
-  <i
-    className="fa fa-code"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Code Editor
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links sixth position /code_editor 1`] = `
+exports[`SideBar: index sequence of links for enterprise mode fifth position /contracts 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -209,7 +177,270 @@ exports[`SideBar: index sequence of links sixth position /code_editor 1`] = `
 </NavLink>
 `;
 
-exports[`SideBar: index sequence of links third position /transactions 1`] = `
+exports[`SideBar: index sequence of links for enterprise mode first position /home 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="dashboard"
+  onClick={[Function]}
+  to="/home"
+>
+  <i
+    className="fa fa-rocket"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Dashboard
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for enterprise mode fourth position /accounts 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="accounts"
+  onClick={[Function]}
+  to="/accounts"
+>
+  <i
+    className="fa fa-users"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Accounts
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for enterprise mode secound position /blocks 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="blocks"
+  onClick={[Function]}
+  to="/blocks"
+>
+  <i
+    className="fa fa-link"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Blocks
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for enterprise mode seventh position /apps 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="apps"
+  onClick={[Function]}
+  to="/apps"
+>
+  <i
+    className="fa fa-rocket"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+    Apps
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for enterprise mode sixth position /code_editor 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="code_editor"
+  onClick={[Function]}
+  to="/code_editor"
+>
+  <i
+    className="fa fa-code"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Code Editor
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for enterprise mode third position /transactions 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="transactions"
+  onClick={[Function]}
+  to="/transactions"
+>
+  <i
+    className="fa fa-exchange"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Transactions
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode fifth position /accounts 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="accounts"
+  onClick={[Function]}
+  to="/accounts"
+>
+  <i
+    className="fa fa-users"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Accounts
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode first position /apps 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="dashboard"
+  onClick={[Function]}
+  to="/apps"
+>
+  <i
+    className="fa fa-rocket"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Dashboard
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode fourth position /transactions 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="transactions"
+  onClick={[Function]}
+  to="/transactions"
+>
+  <i
+    className="fa fa-exchange"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Transactions
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode secound position /home 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="network"
+  onClick={[Function]}
+  to="/home"
+>
+  <i
+    className="fa fa-dashboard"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Network
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode seventh position /code_editor 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="code_editor"
+  onClick={[Function]}
+  to="/code_editor"
+>
+  <i
+    className="fa fa-code"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Code Editor
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode sixth position /contracts 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="contracts"
+  onClick={[Function]}
+  to="/contracts"
+>
+  <i
+    className="fa fa-gavel"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+     
+    Contracts
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for public mode third position /blocks 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
