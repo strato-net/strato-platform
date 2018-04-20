@@ -1,34 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`MenuBar: index button execute block api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  Bloc API
-</button>
-`;
-
-exports[`MenuBar: index button execute for developer 1`] = `null`;
-
-exports[`MenuBar: index button execute logout 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  Logout
-</button>
-`;
-
-exports[`MenuBar: index button execute stato api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  STRATO API
-</button>
-`;
-
 exports[`MenuBar: index mapStateToProps 1`] = `
 Object {
   "currentUser": Object {
@@ -40,7 +11,25 @@ Object {
 }
 `;
 
-exports[`MenuBar: index render component with values 1`] = `
+exports[`MenuBar: index renders enterprise mode button execute block api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  Bloc API
+</button>
+`;
+
+exports[`MenuBar: index renders enterprise mode button execute stato api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  STRATO API
+</button>
+`;
+
+exports[`MenuBar: index renders enterprise mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -72,26 +61,147 @@ exports[`MenuBar: index render component with values 1`] = `
           STRATO API
         </button>
       </a>
+      <span>
+        <span className=\\"pt-navbar-divider\\" />
+        <small className=\\"pt-text-muted welcome-user\\">
+           Welcome, 
+          tanuj44
+           
+        </small>
+        <span className=\\"pt-navbar-divider\\" />
+        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+            Logout
+          </button>
+        </a>
+      </span>
+    </div>
+  </div>
+</nav>"
+`;
+
+exports[`MenuBar: index renders enterprise mode component without values 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <span className=\\"pt-navbar-divider\\" />
+    <small className=\\"pt-text-muted\\">
+      v
+       
+    </small>
+    <div>
       <span className=\\"pt-navbar-divider\\" />
-      <small className=\\"pt-text-muted welcome-user\\">
-         Welcome, 
-        tanuj44
-         
-      </small>
-      <span className=\\"pt-navbar-divider\\" />
-      <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Logout
+          Bloc API
+        </button>
+      </a>
+      <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          STRATO API
         </button>
       </a>
     </div>
   </div>
-  <withRouter(Connect(Login)) />
-  <withRouter(Connect(WalkThrough)) />
 </nav>"
 `;
 
-exports[`MenuBar: index render component without values 1`] = `
+exports[`MenuBar: index renders public mode button execute block api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  Bloc API
+</button>
+`;
+
+exports[`MenuBar: index renders public mode button execute for developer 1`] = `null`;
+
+exports[`MenuBar: index renders public mode button execute logout 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  Logout
+</button>
+`;
+
+exports[`MenuBar: index renders public mode button execute stato api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  STRATO API
+</button>
+`;
+
+exports[`MenuBar: index renders public mode component with values 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <span className=\\"pt-navbar-divider\\" />
+    <small className=\\"pt-text-muted\\">
+      v
+       
+    </small>
+    <div>
+      <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Bloc API
+        </button>
+      </a>
+      <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          STRATO API
+        </button>
+      </a>
+      <span>
+        <span className=\\"pt-navbar-divider\\" />
+        <small className=\\"pt-text-muted welcome-user\\">
+           Welcome, 
+          tanuj44
+           
+        </small>
+        <span className=\\"pt-navbar-divider\\" />
+        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+            Logout
+          </button>
+        </a>
+      </span>
+    </div>
+  </div>
+  <div>
+    <withRouter(Connect(Login)) />
+    <withRouter(Connect(WalkThrough)) />
+  </div>
+</nav>"
+`;
+
+exports[`MenuBar: index renders public mode component without values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -113,7 +223,9 @@ exports[`MenuBar: index render component without values 1`] = `
        
     </small>
   </div>
-  <withRouter(Connect(Login)) />
-  <withRouter(Connect(WalkThrough)) />
+  <div>
+    <withRouter(Connect(Login)) />
+    <withRouter(Connect(WalkThrough)) />
+  </div>
 </nav>"
 `;
