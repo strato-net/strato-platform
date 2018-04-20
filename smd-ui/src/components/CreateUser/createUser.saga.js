@@ -25,9 +25,9 @@ export function createUserApiCall(username, password) {
     {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json'
       },
-      body: "username=" + username + "&password=" + password,
+      body: JSON.stringify({ username, password }),
       credentials: 'include'
     }
   )
