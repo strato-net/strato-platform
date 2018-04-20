@@ -35,7 +35,7 @@ describe('SendTokens: saga', () => {
       const gen = sendTokens(action);
       expect(gen.next().value).toEqual(call(sendTokensAPICall, action.from, action.fromAddress, action.toAddress, action.value, action.password));
       expect(gen.next(sendTokensResponse).value).toEqual(put(sendTokensSuccess(sendTokensResponse)));
-      expect(gen.throw(error).value).toEqual(put(sendTokensFailure(error)));
+      expect(gen.throw({message: error}).value).toEqual(put(sendTokensFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 

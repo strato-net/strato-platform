@@ -20,14 +20,6 @@ import { isModePublic } from '../../../../lib/checkMode';
 
 class SendTokens extends Component {
 
-  // handleFromUsernameChange = (e) => {
-  //   this.props.fromUsernameChange(e.target.value);
-  // };
-  //
-  // handleToUsernameChange = (e) => {
-  //   this.props.toUsernameChange(e.target.value);
-  // };
-
   constructor(props) {
     super(props)
     this.state = {
