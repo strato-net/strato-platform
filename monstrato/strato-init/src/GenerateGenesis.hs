@@ -57,7 +57,8 @@ main = do
   _ <- $initHFlags "Setup Genesis Generation flags"
   bytes <- readBS flags_bytecode_file
   genesisText <- readBS flags_genesis_file
-  name <- readS flags_contract_name
+  let name = flags_contract_name
+  when (null name) usage
   src <- readS flags_source_file
   let genesis = case eitherDecodeStrict genesisText of
                     Right g -> g
