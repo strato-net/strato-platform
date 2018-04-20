@@ -31,7 +31,7 @@ data Operation =
     SWAP9 | SWAP10 | SWAP11 | SWAP12 |
     SWAP13 | SWAP14 | SWAP15 | SWAP16 |
     LOG0 | LOG1 | LOG2 | LOG3 | LOG4 |
-    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | INVALID | SUICIDE |
+    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | REVERT | INVALID | SUICIDE |
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
@@ -158,8 +158,10 @@ opDatas =
     OPData 0xf2 CALLCODE 7 1 "Message-call into this account with alternate account's code.",
     OPData 0xf3 RETURN 2 0 "Halt execution returning output data.",
     OPData 0xf4 DELEGATECALL 6 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
-    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes \
-                               \will throw an exception.",
+    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes\
+                               \ will throw an exception.",
+    OPData 0xfd REVERT 2 0 "Halt execution reverting state changes but returning data and\
+                           \ remaining gas.",
     -- These α and δ are technically ∅, but rather than risk an undefined exception set to 0.
     OPData 0xfe INVALID 0 0 "Designated invalid instruction",
     OPData 0xff SUICIDE 1 0 "Halt execution and register account for later deletion."

@@ -36,7 +36,8 @@ data VMException =
   CallStackTooDeep |
   InvalidJump |
   InvalidInstruction |
-  WriteProtection deriving (Show)
+  WriteProtection |
+  RevertException deriving (Show, Eq)
 
 data Memory =
   Memory {
