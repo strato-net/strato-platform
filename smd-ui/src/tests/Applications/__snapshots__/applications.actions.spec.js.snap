@@ -72,3 +72,25 @@ Object {
   "type": "LAUNCH_APP_SUCCESSFUL",
 }
 `;
+
+exports[`Applications: action select app reset selected app 1`] = `
+Object {
+  "type": "RESET_SELECTED_APP",
+}
+`;
+
+exports[`Applications: action select app select app 1`] = `
+Object {
+  "app": Object {
+    "address": "38a757f8a75453346dcb8149d52df09549f25562",
+    "appName": "Simple_storage_DApp",
+    "description": "The simplest example of the STRATO decentralized application running on top of the simple storage contract with value setter and getter functions",
+    "hash": "e80b681c42f831ea3c4b8db531f5e165",
+    "host": "stratodev.blockapps.net",
+    "maintainer": "BlockApps info@blockapps.net",
+    "owner": "083c94fdb36c50a044363845a6640da1abfb6cd2",
+    "version": "0.0.1",
+  },
+  "type": "SELECT_APP",
+}
+`;
