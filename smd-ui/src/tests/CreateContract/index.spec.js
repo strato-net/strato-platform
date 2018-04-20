@@ -11,6 +11,7 @@ import { indexAccountsMock } from '../Accounts/accountsMock'
 import { wrap } from 'module';
 import { findDOMNode } from 'react-dom';
 import { ReactWrapper } from 'enzyme';
+import * as checkMode from '../../lib/checkMode';
 
 describe('CreateContract: index', () => {
   let store
@@ -40,90 +41,190 @@ describe('CreateContract: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('render contracts without values', () => {
-    const props = {
-      isOpen: true,
-      abi: { src: {} },
-      createDisabled: false,
-      contractName: 'Cloner',
-      contractNameFromEditor: 'Greeter',
-      contract: payload.fileText,
-      accounts: indexAccountsMock,
-      sourceFromEditor: payload.fileText,
-      textFromEditor: payload.fileText,
-      username: 'Supplier1',
-      isToasts: false,
-      toastsMessage: 'message',
-      searchable: false,
-      enableCreateContract: true,
-      contractOpenModal: jest.fn(),
-      contractCloseModal: jest.fn(),
-      createContract: jest.fn(),
-      compileContract: jest.fn(),
-      contractFormChange: jest.fn(),
-      fetchContracts: jest.fn(),
-      fetchAccounts: jest.fn(),
-      fetchUserAddresses: jest.fn(),
-      usernameChange: jest.fn(),
-      contractNameChange: jest.fn(),
-      onChangeEditorContractName: jest.fn(),
-      touch: jest.fn(),
-      reset: jest.fn(),
-      pristine: false, submitting: false, valid: false,
-      initialValues: {
-        username: '',
-        address: ''
+  describe('render component (public mode)', () => {
+
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    });
+
+    test('render contracts without values', () => {
+      const props = {
+        isOpen: true,
+        abi: { src: {} },
+        createDisabled: false,
+        contractName: 'Cloner',
+        contractNameFromEditor: 'Greeter',
+        contract: payload.fileText,
+        accounts: indexAccountsMock,
+        sourceFromEditor: payload.fileText,
+        textFromEditor: payload.fileText,
+        username: 'Supplier1',
+        isToasts: false,
+        toastsMessage: 'message',
+        searchable: false,
+        enableCreateContract: true,
+        contractOpenModal: jest.fn(),
+        contractCloseModal: jest.fn(),
+        createContract: jest.fn(),
+        compileContract: jest.fn(),
+        contractFormChange: jest.fn(),
+        fetchContracts: jest.fn(),
+        fetchAccounts: jest.fn(),
+        fetchUserAddresses: jest.fn(),
+        usernameChange: jest.fn(),
+        contractNameChange: jest.fn(),
+        onChangeEditorContractName: jest.fn(),
+        touch: jest.fn(),
+        reset: jest.fn(),
+        pristine: false, submitting: false, valid: false,
+        initialValues: {
+          username: '',
+          address: ''
+        }
       }
-    }
-    const wrapper = render(
-      <Provider store={store}>
-        <CreateContract.WrappedComponent {...props} />
-      </Provider>
-    );
-    expect(wrapper).toMatchSnapshot();
+      const wrapper = shallow(
+        <Provider store={store}>
+          <CreateContract.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('render contracts without source', () => {
+      const props = {
+        isOpen: true,
+        abi: undefined,
+        createDisabled: false,
+        contractName: 'Cloner',
+        contractNameFromEditor: 'Greeter',
+        contract: payload.fileText,
+        accounts: indexAccountsMock,
+        sourceFromEditor: undefined,
+        textFromEditor: payload.fileText,
+        username: 'Supplier1',
+        isToasts: false,
+        toastsMessage: 'message',
+        searchable: false,
+        enableCreateContract: true,
+        contractOpenModal: jest.fn(),
+        contractCloseModal: jest.fn(),
+        createContract: jest.fn(),
+        compileContract: jest.fn(),
+        contractFormChange: jest.fn(),
+        fetchContracts: jest.fn(),
+        fetchAccounts: jest.fn(),
+        fetchUserAddresses: jest.fn(),
+        usernameChange: jest.fn(),
+        contractNameChange: jest.fn(),
+        onChangeEditorContractName: jest.fn(),
+        touch: jest.fn(),
+        reset: jest.fn(),
+        pristine: false, submitting: false, valid: false,
+        initialValues: {
+          username: 'Admin_1177_49507',
+          address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+        }
+      }
+      const wrapper = shallow(
+        <Provider store={store}>
+          <CreateContract.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
   });
 
-  test('render contracts without source', () => {
-    const props = {
-      isOpen: true,
-      abi: undefined,
-      createDisabled: false,
-      contractName: 'Cloner',
-      contractNameFromEditor: 'Greeter',
-      contract: payload.fileText,
-      accounts: indexAccountsMock,
-      sourceFromEditor: undefined,
-      textFromEditor: payload.fileText,
-      username: 'Supplier1',
-      isToasts: false,
-      toastsMessage: 'message',
-      searchable: false,
-      enableCreateContract: true,
-      contractOpenModal: jest.fn(),
-      contractCloseModal: jest.fn(),
-      createContract: jest.fn(),
-      compileContract: jest.fn(),
-      contractFormChange: jest.fn(),
-      fetchContracts: jest.fn(),
-      fetchAccounts: jest.fn(),
-      fetchUserAddresses: jest.fn(),
-      usernameChange: jest.fn(),
-      contractNameChange: jest.fn(),
-      onChangeEditorContractName: jest.fn(),
-      touch: jest.fn(),
-      reset: jest.fn(),
-      pristine: false, submitting: false, valid: false,
-      initialValues: {
-        username: 'Admin_1177_49507',
-        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+  describe('render component (enterprise mode)', () => {
+
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    });
+
+    test('render contracts without values', () => {
+      const props = {
+        isOpen: true,
+        abi: { src: undefined },
+        createDisabled: false,
+        contractName: 'Cloner',
+        contractNameFromEditor: 'Greeter',
+        contract: payload.fileText,
+        accounts: indexAccountsMock,
+        sourceFromEditor: payload.fileText,
+        textFromEditor: payload.fileText,
+        username: 'Supplier1',
+        isToasts: false,
+        toastsMessage: 'message',
+        searchable: false,
+        enableCreateContract: true,
+        contractOpenModal: jest.fn(),
+        contractCloseModal: jest.fn(),
+        createContract: jest.fn(),
+        compileContract: jest.fn(),
+        contractFormChange: jest.fn(),
+        fetchContracts: jest.fn(),
+        fetchAccounts: jest.fn(),
+        fetchUserAddresses: jest.fn(),
+        usernameChange: jest.fn(),
+        contractNameChange: jest.fn(),
+        onChangeEditorContractName: jest.fn(),
+        touch: jest.fn(),
+        reset: jest.fn(),
+        pristine: false, submitting: false, valid: false,
+        initialValues: {
+          username: '',
+          address: ''
+        }
       }
-    }
-    const wrapper = render(
-      <Provider store={store}>
-        <CreateContract.WrappedComponent {...props} />
-      </Provider>
-    );
-    expect(wrapper).toMatchSnapshot();
+      const wrapper = shallow(
+        <Provider store={store}>
+          <CreateContract.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('render contracts without source', () => {
+      const props = {
+        isOpen: true,
+        abi: undefined,
+        createDisabled: false,
+        contractName: 'Cloner',
+        contractNameFromEditor: 'Greeter',
+        contract: payload.fileText,
+        accounts: indexAccountsMock,
+        sourceFromEditor: undefined,
+        textFromEditor: payload.fileText,
+        username: 'Supplier1',
+        isToasts: false,
+        toastsMessage: 'message',
+        searchable: false,
+        enableCreateContract: true,
+        contractOpenModal: jest.fn(),
+        contractCloseModal: jest.fn(),
+        createContract: jest.fn(),
+        compileContract: jest.fn(),
+        contractFormChange: jest.fn(),
+        fetchContracts: jest.fn(),
+        fetchAccounts: jest.fn(),
+        fetchUserAddresses: jest.fn(),
+        usernameChange: jest.fn(),
+        contractNameChange: jest.fn(),
+        onChangeEditorContractName: jest.fn(),
+        touch: jest.fn(),
+        reset: jest.fn(),
+        pristine: false, submitting: false, valid: false,
+        initialValues: {
+          username: 'Admin_1177_49507',
+          address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+        }
+      }
+      const wrapper = shallow(
+        <Provider store={store}>
+          <CreateContract.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
   });
 
   test('open modal', () => {
