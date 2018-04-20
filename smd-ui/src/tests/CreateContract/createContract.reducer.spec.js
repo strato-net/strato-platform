@@ -12,15 +12,16 @@ import {
   compileContract,
   compileContractSuccess,
   compileContractFailure,
+  resetError,
   CONTRACT_CLOSE_MODAL
 } from '../../components/CreateContract/createContract.actions';
-import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileError, compileResponse  } from './createContractMock';
+import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileError, compileResponse } from './createContractMock';
 
 describe('CreateContract: reducer', () => {
-  
+
   let initialState
-  
-  beforeEach(()=>{
+
+  beforeEach(() => {
     initialState = {
       isOpen: false,
       contractCompileErrors: undefined,
@@ -51,23 +52,28 @@ describe('CreateContract: reducer', () => {
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('username change', ()=> {
+  test('username change', () => {
     const action = usernameChange(payload.username)
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
-  test('contract name change', ()=> {
+  test('contract name change', () => {
     const action = contractNameChange(payload.contract)
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
-  test('contract source change', ()=> {
+  test('contract source change', () => {
     const action = contractFormChange(payload.fileText)
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
-  test('update toast', ()=> {
+  test('update toast', () => {
     const action = updateToast(createContractResponse)
+    expect(reducer(initialState, action)).toMatchSnapshot();
+  })
+
+  test('reset error', () => {
+    const action = resetError();
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 

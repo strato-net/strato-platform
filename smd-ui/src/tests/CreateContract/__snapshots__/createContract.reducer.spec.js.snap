@@ -227,6 +227,24 @@ Object {
 }
 `;
 
+exports[`CreateContract: reducer reset error 1`] = `
+Object {
+  "abi": undefined,
+  "contract": "",
+  "contractCompileErrors": undefined,
+  "contractName": undefined,
+  "createDisabled": true,
+  "filename": undefined,
+  "isOpen": false,
+  "isToasts": null,
+  "response": "Status: Upload Contract",
+  "toastsMessage": null,
+  "toster": false,
+  "tosterMessage": "",
+  "username": "",
+}
+`;
+
 exports[`CreateContract: reducer set initial state 1`] = `
 Object {
   "abi": undefined,

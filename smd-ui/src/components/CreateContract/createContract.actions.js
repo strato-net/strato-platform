@@ -112,7 +112,7 @@ export const compileContractFailure = function(error) {
   }
 }
 
-export const resetError = function(error) {
+export const resetError = function() {
   return {
     type: RESET_ERROR
   }

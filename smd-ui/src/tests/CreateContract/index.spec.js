@@ -293,7 +293,8 @@ describe('CreateContract: index', () => {
       initialValues: {
         username: 'Admin_1177_49507',
         address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-      }
+      },
+      resetError: jest.fn()
     }
     const wrapper = shallow(
       <CreateContract.WrappedComponent {...props} />
