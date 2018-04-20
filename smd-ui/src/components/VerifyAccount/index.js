@@ -44,7 +44,7 @@ class VerifyAccount extends Component {
         <form>
           <div className="account-content">
             <div className="pt-form-group">
-              <center><h5 style={{color: '#00AE52'}}> A temporary password has been sent to your email address </h5></center>
+              <center><h5 className="account-title"> A temporary password has been sent to your email address </h5></center>
               <div className="pt-form-group pt-intent-danger">
                 <label className="pt-label items-center-75" htmlFor="input-a">
                   Enter temporary password
@@ -74,7 +74,7 @@ class VerifyAccount extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isOpen: state.verifyAccount.isOpen,
     serverError: state.verifyAccount.error,

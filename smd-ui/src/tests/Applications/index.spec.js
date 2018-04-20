@@ -11,7 +11,10 @@ describe('Applications: index', () => {
     test('initial values', () => {
       const props = {
         applications: [],
-        fetchApplications: jest.fn()
+        fetchApplications: jest.fn(),
+        location: {
+          search: '?developer'
+        }
       }
       const wrapper = shallow(<Applications.WrappedComponent {...props} />)
       expect(wrapper).toMatchSnapshot()
@@ -20,7 +23,10 @@ describe('Applications: index', () => {
     test('timers', () => {
       const props = {
         applications: [],
-        fetchApplications: jest.fn()
+        fetchApplications: jest.fn(),
+        location: {
+          search: '?developer'
+        }
       }
       const wrapper = shallow(<Applications.WrappedComponent {...props} />)
       jest.runOnlyPendingTimers()
@@ -36,7 +42,10 @@ describe('Applications: index', () => {
           url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/',
           isLoading: true
         }],
-        fetchApplications: jest.fn()
+        fetchApplications: jest.fn(),
+        location: {
+          search: '?developer'
+        }
       }
       const wrapper = shallow(<Applications.WrappedComponent {...props} />)
       expect(wrapper).toMatchSnapshot()
@@ -68,7 +77,10 @@ describe('Applications: index', () => {
         url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/',
         isLoading: true
       }],
-      fetchApplications: jest.fn()
+      fetchApplications: jest.fn(),
+      location: {
+        search: '?developer'
+      }
     }
     const wrapper = shallow(<Applications.WrappedComponent {...props} />
     );

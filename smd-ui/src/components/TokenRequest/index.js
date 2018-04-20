@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import { closeTokenRequestOverlay } from './tokenRequest.actions';
 import { Dialog } from '@blueprintjs/core';
-import { reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import Faucet from '../Faucet';
@@ -18,9 +17,6 @@ class TokenRequest extends Component {
         className="pt-dark token-request-dialog"
       >
         <Faucet 
-          errors={this.props.errors} 
-          handleSubmit={this.props.handleSubmit} 
-          submitting={this.props.submitting} 
           currentUser={this.props.currentUser} 
           faucetRequest={this.props.faucetRequest}
           accountAddress={this.props.currentUser.accountAddress} />
@@ -30,31 +26,15 @@ class TokenRequest extends Component {
 }
 
 export function mapStateToProps(state) {
-  let errors = { errors: undefined };
-
-  if (state.form && state.form["tokenRequest"]) {
-    errors = { errors: state.form["tokenRequest"].syncErrors }
-  }
   return {
     isTokenOpen: state.tokenRequest.isTokenOpen,
     currentUser: state.user.currentUser,
-    ...errors
   };
 }
 
-export function validate(values) {
-  const errors = {};
-  if (values.building === undefined && !values.building) {
-    errors.building = "Please tell us what are you building";
-  }
-
-  return errors;
-}
-
-const formed = reduxForm({ form: 'tokenRequest', validate })(TokenRequest);
 const connected = connect(mapStateToProps, {
   closeTokenRequestOverlay,
   faucetRequest
-})(formed);
+})(TokenRequest);
 
 export default withRouter(connected);

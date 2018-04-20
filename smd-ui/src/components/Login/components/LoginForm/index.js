@@ -3,12 +3,12 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Field, reduxForm } from 'redux-form';
 import { Button } from '@blueprintjs/core';
-import mixpanelWrapper from '../../../lib/mixpanelWrapper';
-import { login } from '../../User/user.actions';
-import { loginValidate } from '../validate.js';
-import { openWalkThroughOverlay } from '../../WalkThrough/walkThrough.actions';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import { login } from '../../../User/user.actions';
+import { validate } from './validate.js';
+import { openWalkThroughOverlay } from '../../../WalkThrough/walkThrough.actions';
 
-class ExistingUser extends Component {
+class LoginForm extends Component {
 
   constructor() {
     super();
@@ -23,7 +23,7 @@ class ExistingUser extends Component {
   }
 
   submit = (values) => {
-    let errors = loginValidate(values);
+    let errors = validate(values);
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
@@ -103,9 +103,9 @@ class ExistingUser extends Component {
   }
 }
 
-const formed = reduxForm({ form: 'exisitingUserLogin' })(ExistingUser);
+const formed = reduxForm({ form: 'user-login' })(LoginForm);
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return { spinning: state.user.spinning };
 }
 

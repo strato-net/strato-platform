@@ -27,6 +27,14 @@ const tourSteps = [/* {
 ];
 
 class Accounts extends Component {
+
+  constructor() {
+    super()
+    this.state = {
+      selected: 0
+    }
+  }
+
   componentDidMount() {
     this.props.fetchAccounts(true, true);
     mixpanelWrapper.track('accounts_page_load')
@@ -36,9 +44,10 @@ class Accounts extends Component {
     this.props.changeAccountFilter(filter);
   };
 
-  onUserClick(user, address) {
-    if (address.length) {
+  onUserClick(user, address, index) {
+    if (address.length && index === this.state.selected) {
       this.props.resetUserAddress(user);
+      this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('accounts_row_click');
       this.props.fetchUserAddresses(user, true)
@@ -50,6 +59,7 @@ class Accounts extends Component {
     const filter = this.props.filter;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
+    const selectedAddresses = [];
 
     users.filter(user => {
       if (!filter) {
@@ -61,19 +71,22 @@ class Accounts extends Component {
     })
       .forEach(function (user, index) {
         const addresses = Object.getOwnPropertyNames(accounts[user]);
-        let userClasseName = addresses.length > 0 ? " selected" : "";
+        let userClasseName = '';
+        if (this.state.selected === index && addresses.length > 0) {
+          userClasseName = ' selected';
+          addresses.map(address =>
+            selectedAddresses.push(<Account name={user} address={address} key={address} />)
+          );
+        }
 
         rows.push(
           <div className="smd-margin-8" key={user}>
             <div className="row">
-              <div className={`pt-card pt-elevation-2 col-sm-4 smd-pointer ${userClasseName}`} key={index} onClick={(e) => this.onUserClick(user, addresses)}>
+              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={index} onClick={(e) => {
+                this.setState({ selected: index });
+                this.onUserClick(user, addresses, index);
+              }}>
                 {user}
-              </div>
-              <div className="col-sm-8">
-                {
-                  addresses.length > 0 && addresses.map(address => {
-                    return <Account name={user} address={address} key={address} />
-                  })}
               </div>
             </div>
           </div>
@@ -109,9 +122,11 @@ class Accounts extends Component {
                 dir="auto" />
             </div>
           </div>
-          <div className="container-fluid pt-dark">
-            <div className="row">
-              <div className="col-sm-12 accounts-margin-top">
+        </div>
+        <div className="container-fluid pt-dark">
+          <div className="row">
+            <div className="col-sm-4">
+              <div className="accounts-margin-top">
                 {rows.length === 0
                   ? <tr>
                     <td colSpan={3}>No Accounts</td>
@@ -119,11 +134,11 @@ class Accounts extends Component {
                   : rows}
               </div>
             </div>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <br />
+            <div className="col-sm-8">
+              <div className="account-details">
+                {selectedAddresses.length ? selectedAddresses : null}
+              </div>
+            </div>
           </div>
         </div>
       </div>

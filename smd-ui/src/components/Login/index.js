@@ -6,18 +6,9 @@ import { Dialog } from '@blueprintjs/core';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
 import { toasts } from "../Toasts";
-import ExistingUser from './components/ExistingUser';
+import LoginForm from './components/LoginForm';
 
 class Login extends Component {
-
-  constructor() {
-    super();
-    this.state = {
-      errors: null,
-      navbarTabId: "existingUser",
-    };
-    this.handleNavbarTabChange = this.handleNavbarTabChange.bind(this);
-  }
 
   componentWillReceiveProps(newProps) {
     if (newProps.isLoggedIn && newProps.selectedApp) {
@@ -31,10 +22,6 @@ class Login extends Component {
     }
   }
 
-  handleNavbarTabChange(navbarTabId) {
-    this.setState({ navbarTabId });
-  }
-
   render() {
     return (
       <div className="smd-pad-16">
@@ -43,14 +30,13 @@ class Login extends Component {
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={() => {
-              this.setState({ errors: null })
               this.props.resetSelectedApp()
               this.props.closeLoginOverlay()
             }}
             title="Login"
             className="pt-dark"
           >
-            <ExistingUser closeLoginOverlay={this.props.closeLoginOverlay} />
+            <LoginForm closeLoginOverlay={this.props.closeLoginOverlay} />
           </Dialog>
         </form>
       </div>
@@ -58,7 +44,7 @@ class Login extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn,
     isOpen: state.user.isOpen,

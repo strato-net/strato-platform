@@ -6,16 +6,20 @@ import logo from './blockapps-logo-horizontal-white.png';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { isModePublic } from '../../lib/checkMode';
 
 class SideBar extends Component {
 
   // noOverlay
   // TODO: customCrossIcon={<div><div className="pt-icon-standard pt-icon-chevron-left"/></div>}
   render() {
+    let route = isModePublic() ? 
+      [{ path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }, { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" }]
+    : [{ path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }];
+
     const navLinksData = (
       [
-        { path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
-        { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" },
+        ...route,
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
         { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
@@ -24,7 +28,7 @@ class SideBar extends Component {
         { path: '/code_editor', label: 'Code Editor', id: 'code_editor', icon: "fa-code" },
       ]
     );
-
+    
     return (
       <aside>
         <div className="menu">
@@ -45,6 +49,18 @@ class SideBar extends Component {
           }
         </div>
         <hr />
+        { !isModePublic() && <div className="menu">
+          <NavLink
+            id={'apps'}
+            to={'/apps'}
+            className="menu-item"
+            activeClassName="active-menu-item"
+            onClick={() => { mixpanelWrapper.track('nav_link_contracts_click') }}
+          >
+            <i className='fa fa-rocket'> </i>
+            <span className="menu-text">Apps</span>
+          </NavLink>
+        </div>}
         <div>
         </div>
         <div className="smd-sidebar-logo">
