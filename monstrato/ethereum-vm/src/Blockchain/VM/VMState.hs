@@ -5,8 +5,6 @@ module Blockchain.VM.VMState (
   startingState,
   VMException(..),
   DebugCallCreate(..),
---  addErr
---  getReturnValue
   ) where
 
 import           Control.Monad
@@ -125,15 +123,3 @@ startingState isRunningTests' isHomestead env dbs' = do
                isRunningTests=isRunningTests',
                debugCallCreates=Nothing
              }
-
-{-
-getReturnValue :: VMState->IO B.ByteString
-getReturnValue state =
-  case stack state of
-    [add, size] -> mLoadByteString (memory state) add size
-    [] -> return B.empty --Happens when STOP is called
-    --TODO- This needs better error handling other than to just crash if the stack isn't 2 items long
-    _ -> error "Error in getReturnValue: VM ended with stack in an unsupported case"
-
-
--}

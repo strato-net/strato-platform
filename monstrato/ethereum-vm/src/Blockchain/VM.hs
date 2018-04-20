@@ -60,8 +60,6 @@ import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 
---import Debug.Trace
-
 bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
@@ -319,6 +317,18 @@ runOperation EXTCODECOPY = do
   addressState <- getAddressState address'
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
+
+runOperation RETURNDATASIZE = do
+  ret <- getReturnVal
+  let len = (fromIntegral . B.length $ ret) :: Word256
+  push len
+
+runOperation RETURNDATACOPY = do
+  memP <- pop
+  codeP <- pop
+  size <- pop
+  ret <- getReturnVal
+  mStoreByteString memP . safeTake size . safeDrop codeP $ ret
 
 runOperation BLOCKHASH = do
   number' <- pop::VMM Word256
@@ -799,6 +809,10 @@ opGasPriceAndRefund CALLDATACOPY = do
 opGasPriceAndRefund EXTCODECOPY = do
     size <- getStackItem 3::VMM Word256
     return (gEXTCODECOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32::Double)), 0)
+opGasPriceAndRefund RETURNDATACOPY = do
+    size <- getStackItem 3 :: VMM Word256
+    return (gRETURNDATACOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32 :: Double)), 0)
+
 opGasPriceAndRefund SSTORE = do
   p <- getStackItem 0
   val <- getStackItem 1
