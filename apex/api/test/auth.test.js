@@ -50,7 +50,8 @@ describe('App', function() {
           assert.equal(res.status, '401');
         });
      });
-    it('creates accounts', async function() {
+    // TODO(tim): Reenable with signup.blockapps.net working
+    xit('creates accounts', async function() {
       this.timeout(20000);
       const res1 = await chai.request(app)
           .post('/users')
@@ -82,7 +83,8 @@ describe('App', function() {
           });
     });
 
-    it('Accepts a working bundle', async function() {
+    // TODO(tim): Reenable with signup.blockapps.net working
+    xit('Accepts a working bundle', async function() {
       this.timeout(60000);
       const res1 = await chai.request(app)
          .post('/users')
@@ -134,6 +136,7 @@ describe('App', function() {
       expect(got).to.deep.equal(want);
     });
 
+    // TODO(tim): Reenable with signup.blockapps.net working
     xit("can upload init contracts", async function() {
       this.timeout(30000);
       console.log("about to create user");

@@ -47,4 +47,4 @@ displayMessage outbound peerName (BlockBodies bodies) = do
     ++ " bodies, includes " ++ show transactionCount
     ++ " transaction" ++ (if transactionCount == 1 then "" else "s") ++ ")"
 displayMessage outbound peerName msg =
-  $logDebugS "displayMessage" $ T.pack $ (prefix outbound peerName) ++ format msg
+  $logInfoS "displayMessage" $ T.pack $ (prefix outbound peerName) ++ format msg

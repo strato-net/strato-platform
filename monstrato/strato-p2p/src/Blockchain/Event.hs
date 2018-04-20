@@ -158,6 +158,9 @@ handleEvents mode peer = awaitForever $ \case
         Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
       chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      when (null chain) $
+        $logInfoS "handleEvents/GetBlockHeaders" $ T.pack $ "Warning: A peer requested blocks starting at #" ++ show start ++ ", but we don't have these in our canonical chain.... I don't know what to do, so I am returning a blank response. This may indicate something unhealthy in the network."
+
       yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do

@@ -172,7 +172,7 @@ contractNameFromAddress contractAddress = proc () -> do
   returnA -< name
 
 contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
-contractByTxHash txHash = proc () -> do
+contractByTxHash txHash = limit 1 $ proc () -> do
   (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
   restrict -< tx_hash .== constant txHash
   returnA -< (cmId,ttype,name)
@@ -770,7 +770,7 @@ getXabiFunctionsArgsQuery funcId = do
   for argsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
     return $ Xabi.IndexedType index ty
-    
+
 {- |
 SELECT
   (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
@@ -1105,7 +1105,7 @@ compileContract source' = do
   return metadataIds
   where
     addGetSourceFuncToSource' src =
-      case addGetSourceFuncToSource src of
+      case addGetSourceFuncToSource src >>= addGetNameFuncToSource of
         Left err -> blocError . UserError .Text.pack $ err
         Right msg' -> return msg'
 
@@ -1462,7 +1462,7 @@ getContractXabi (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  getContractXabiByMetadataId metadataId 
+  getContractXabiByMetadataId metadataId
 
 getContractXabiAndMetadataId :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc (Int32, Xabi)
@@ -1471,7 +1471,7 @@ getContractXabiAndMetadataId (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  xabi <- getContractXabiByMetadataId metadataId 
+  xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)

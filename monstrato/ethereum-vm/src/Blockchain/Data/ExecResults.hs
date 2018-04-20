@@ -5,6 +5,7 @@ module Blockchain.Data.ExecResults (
 
 import qualified Data.ByteString         as B
 
+import           Blockchain.VM.VMState
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 
@@ -15,5 +16,6 @@ data ExecResults =
     erReturnVal          :: Maybe B.ByteString,
     erTrace              :: [String],
     erLogs               :: [Log],
-    erNewContractAddress :: Maybe Address
+    erNewContractAddress :: Maybe Address,
+    erException          :: Maybe VMException
     }

@@ -23,7 +23,7 @@ data TransactionFailureType = IncorrectNonce
                             | InsufficientFunds
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
-                            | ExecutionFailure
+                            | ExecutionFailure String
                             deriving (Eq, Read, Show, Generic)
 
 derivePersistField "TransactionResultStatus"
