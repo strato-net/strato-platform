@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function (sequelize, DataTypes) {
-  let tempUser = sequelize.define('temp_user', {
+  let tempUser = sequelize.define('TempUser', {
     email: {
       type: DataTypes.STRING,
       allowNull: false,
