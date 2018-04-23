@@ -6,6 +6,8 @@ import { withRouter } from 'react-router-dom';
 import SendTokens from './components/SendTokens';
 import Tour from '../Tour';
 import Account from '../Account';
+import CreateBlocUser from '../CreateBlocUser';
+import { isModePublic } from '../../lib/checkMode';
 import './accounts.css';
 
 const tourSteps = [/* {
@@ -107,6 +109,7 @@ class Accounts extends Component {
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
               <SendTokens />
+              {!isModePublic() && <CreateBlocUser />}
             </div>
           </div>
         </div>
@@ -128,9 +131,14 @@ class Accounts extends Component {
             <div className="col-sm-4">
               <div className="accounts-margin-top">
                 {rows.length === 0
-                  ? <tr>
-                    <td colSpan={3}>No Accounts</td>
-                  </tr>
+                  ?
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td colSpan={3}>No Accounts</td>
+                      </tr>
+                    </tbody>
+                  </table>
                   : rows}
               </div>
             </div>

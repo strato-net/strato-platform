@@ -2,11 +2,58 @@ import React from 'react';
 import Accounts, { mapStateToProps } from '../../components/Accounts';
 import { error, accountsMock, filter, reducerAccounts, indexAccountsMock } from './accountsMock';
 import { deepClone } from '../helper/testHelper';
+import * as checkMode from '../../lib/checkMode';
 
 describe('Accounts: index', () => {
 
-  describe('render with', () => {
+  describe('render with (public mode)', () => {
 
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    })
+    test('empty values', () => {
+      const props = {
+        accounts: [],
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    test('mocked values', () => {
+      const props = {
+        accounts: indexAccountsMock,
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+  });
+
+  describe('render with (enterprise mode)', () => {
+
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    });
     test('empty values', () => {
       const props = {
         accounts: [],

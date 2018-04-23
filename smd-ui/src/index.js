@@ -33,6 +33,7 @@ import cliReducer from './components/CLI/cli.reducer';
 import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
+import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -59,6 +60,7 @@ import watchSendTokens from './components/Accounts/components/SendTokens/sendTok
 import watchFetchApplications from './components/Applications/applications.saga';
 import watchAppUpload from './components/LaunchPad/launchPad.saga';
 import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
+import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -96,7 +98,8 @@ const rootReducer = combineReducers({
   cli: cliReducer,
   walkThrough: walkThroughReducer,
   tokenRequest: tokenRequestReducer,
-  verifyAccount: verifyAccountReducer
+  verifyAccount: verifyAccountReducer,
+  createBlocUser: createBlocUserReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -122,7 +125,8 @@ const rootSaga = function* startForeman() {
     fork(watchAppUpload),
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
-    fork(watchVerifyAccount)
+    fork(watchVerifyAccount),
+    fork(watchCreateBlocUser)
   ])
 };
 
