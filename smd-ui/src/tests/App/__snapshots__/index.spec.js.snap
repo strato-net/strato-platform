@@ -18,15 +18,7 @@ exports[`App: index render in enterprise mode 1`] = `
   <withRouter(Connect(MenuBar)) />
   <SideBar />
   <main id=\\"outer-container\\" style={{...}}>
-    <Switch>
-      <Route exact={true} path=\\"/\\">
-        <Redirect to=\\"/home\\" push={false} />
-      </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/apps\\" component={[Function: C]} />
-      <CommonRoute route=\\"public\\" />
-      <Route component={[Function: SideBar]} />
-    </Switch>
+    ENTERPRISE
   </main>
 </div>"
 `;
@@ -37,15 +29,7 @@ exports[`App: index render in public mode when user is logged in 1`] = `
   <withRouter(Connect(MenuBar)) />
   <SideBar />
   <main id=\\"outer-container\\" style={{...}}>
-    <Switch>
-      <Route exact={true} path=\\"/\\">
-        <Redirect to=\\"/home\\" push={false} />
-      </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/apps\\" component={[Function: C]} />
-      <CommonRoute route=\\"public\\" />
-      <Route component={[Function: SideBar]} />
-    </Switch>
+    PUBLIC
   </main>
 </div>"
 `;
@@ -55,15 +39,7 @@ exports[`App: index render in public mode when user is not logged in 1`] = `
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(MenuBar)) />
   <main id=\\"outer-container\\" style={{...}}>
-    <Switch>
-      <Route exact={true} path=\\"/\\">
-        <Redirect to=\\"/home\\" push={false} />
-      </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/apps\\" component={[Function: C]} />
-      <CommonRoute route=\\"public\\" />
-      <Route component={[Function: SideBar]} />
-    </Switch>
+    PUBLIC
   </main>
 </div>"
 `;

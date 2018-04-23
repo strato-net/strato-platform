@@ -46,7 +46,9 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
   <div className=\\"pt-navbar-group pt-align-right\\">
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      v
+      SMD v
+       - 
+      Enterprise
        
     </small>
     <div>
@@ -97,7 +99,9 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
   <div className=\\"pt-navbar-group pt-align-right\\">
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      v
+      SMD v
+       - 
+      Enterprise
        
     </small>
     <div>
@@ -163,7 +167,9 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
   <div className=\\"pt-navbar-group pt-align-right\\">
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      v
+      SMD v
+       - 
+      Public
        
     </small>
     <div>
@@ -219,7 +225,9 @@ exports[`MenuBar: index renders public mode component without values 1`] = `
     <Blueprint.Button onClick={[Function: onClick]} text=\\"Developer Sign In\\" className=\\"pt-button pt-small pt-intent-primary\\" />
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      v
+      SMD v
+       - 
+      Public
        
     </small>
   </div>

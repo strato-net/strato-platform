@@ -54,7 +54,7 @@ exports[`SideBar: index render component for enterprise mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Code Editor
+        Contract Editor
       </span>
     </NavLink>
   </div>
@@ -141,7 +141,7 @@ exports[`SideBar: index render component for public mode 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Code Editor
+        Contract Editor
       </span>
     </NavLink>
   </div>
@@ -281,7 +281,7 @@ exports[`SideBar: index sequence of links for enterprise mode sixth position /co
     className="menu-text"
   >
      
-    Code Editor
+    Contract Editor
   </span>
 </NavLink>
 `;
@@ -413,7 +413,7 @@ exports[`SideBar: index sequence of links for public mode seventh position /code
     className="menu-text"
   >
      
-    Code Editor
+    Contract Editor
   </span>
 </NavLink>
 `;

@@ -1,11 +1,15 @@
 import React from 'react';
 import App, { mapStateToProps } from '../../App';
 import * as checkMode from '../../lib/checkMode';
+import * as scenes from '../../routes';
 
 describe('App: index', () => {
 
   describe('render in public mode', () => {
-    checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      scenes.routes = "PUBLIC";
+    });
 
     test('when user is not logged in', () => {
       const wrapper = shallow(
@@ -26,6 +30,7 @@ describe('App: index', () => {
 
   test('render in enterprise mode', () => {
     checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    scenes.routes = "ENTERPRISE";
     const wrapper = shallow(
       <App.WrappedComponent />
     );
