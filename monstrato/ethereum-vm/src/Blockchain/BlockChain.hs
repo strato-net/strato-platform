@@ -162,8 +162,8 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, BaggerStage, BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    NonceTooLow    s q actual OutputTx{otHash=hash, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show (transactionNonce bt) ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+    NonceTooLow    s q expected OutputTx{otHash=hash, otBaseTx=bt} ->
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", s, q, hash)
     BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
         (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", s, q, hash)
     GasLimitTooLow s q _ OutputTx{otHash=hash} ->

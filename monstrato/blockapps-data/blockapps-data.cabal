@@ -74,7 +74,6 @@ library
                    Blockchain.Data.BlockSummary
                    Blockchain.Data.Code
                    Blockchain.Data.DataDefs
-                   Blockchain.Data.ExecResults
                    Blockchain.Data.Extra
                    Blockchain.Data.Json
                    Blockchain.Data.Log
