@@ -68,13 +68,13 @@ spec = do
     it "should insert no contracts" $
       let input = defaultGenesisInfo
           want = []
-          got = insertContracts [] emptySource emptyContractB16 sharedStart input
+          got = insertContracts [] "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
           want = [ContractWithStorage sharedStart 0 emptyHash []]
-          got = insertContracts [[]] emptySource emptyContractB16 sharedStart input
+          got = insertContracts [[]] "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should insert 1m contracts" $
@@ -82,14 +82,14 @@ spec = do
           slots = replicate total []
           input = defaultGenesisInfo
           want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 emptyHash [])  [0..total-1]
-          got = insertContracts slots emptySource emptyContractB16 sharedStart input
+          got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should add emptyContract to the contractInfo" $
       let input = defaultGenesisInfo
-          want = [CodeInfo emptyContract emptySource]
+          want = [CodeInfo emptyContract "x" emptySource]
           slots = replicate 10 []
-          got = insertContracts slots emptySource emptyContractB16 sharedStart input
+          got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoCodeInfo got `shouldBe` want
 
     it "should have the right vehicle hash" $
@@ -97,9 +97,9 @@ spec = do
           want = [vehicleHash]
           slots = replicate 10 []
           got = map superProprietaryStratoSHAHash .
-                map (\(CodeInfo bin _) -> bin) .
+                map (\(CodeInfo bin _ _) -> bin) .
                 genesisInfoCodeInfo .
-                insertContracts slots vehicleSource vehicleContractB16 sharedStart $ input
+                insertContracts slots "Vehicle" vehicleSource vehicleContractB16 sharedStart $ input
       in got `shouldBe` want
 
   describe "Parsing storage values" $ do

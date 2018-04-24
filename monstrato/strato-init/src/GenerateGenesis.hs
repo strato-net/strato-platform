@@ -19,6 +19,7 @@ defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modification
 defineFlag "s:start" (0xfeb1989bbbea7000000000000000000000000000 :: Integer) "Starting address for seeding contract"
 defineFlag "b:bytecode_file" ("" :: String) "Filename pointing to the contract bytecode"
 defineFlag "source_file" ("" :: String) "Filename pointing to the contract source"
+defineFlag "contract_name" ("" :: String) "Name of the contract being uploaded"
 defineFlag "n:number" (0 :: Int) "Number of copies to seed"
 defineFlag "o:output_file" ("genesisWithContracts.json" :: String) "Name of output file to write"
 defineFlag "r:records_file" ("" :: String) "Filename containing CSV records of data to insert.\
@@ -35,6 +36,8 @@ usage = do
   name <- getProgName
   die . intercalate " " $ ["usage:", name, "--genesis_file=<gen.json>",
                            "--bytecode_file=<ctract.bin-runtime>",
+                           "--source_file=<ctract.sol>",
+                           "--contract_name=<Ctract>",
                            "[--number=<200>",
                            "--start=<0xdeadbeef>",
                            "--output_file=<out.json>]"]
@@ -54,6 +57,8 @@ main = do
   _ <- $initHFlags "Setup Genesis Generation flags"
   bytes <- readBS flags_bytecode_file
   genesisText <- readBS flags_genesis_file
+  let name = flags_contract_name
+  when (null name) usage
   src <- readS flags_source_file
   let genesis = case eitherDecodeStrict genesisText of
                     Right g -> g
@@ -64,7 +69,7 @@ main = do
               else do
                   json <- L.readFile flags_records_file
                   return $ insertContractsJSON json
-  let output = insert src bytes (fromInteger flags_start) genesis
+  let output = insert name src bytes (fromInteger flags_start) genesis
 
   case output of
     Left err -> error $ "couldn't generate: " ++ err

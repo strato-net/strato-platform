@@ -100,17 +100,17 @@ encodeAllRecords (Records recs) = mapM (encodeRecord 0) recs
 encodeJSON :: L.ByteString -> Either String [[(Word256, Word256)]]
 encodeJSON = encodeAllRecords <=< Ae.eitherDecode
 
-insertContractsCount :: Int -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsCount n src code start gi = return $ insertContracts (replicate n []) src code start gi
+insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsCount n name src code start gi = return $ insertContracts (replicate n []) name src code start gi
 
 
-insertContractsJSON :: L.ByteString -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsJSON rawJSON src code start gi = do
+insertContractsJSON :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsJSON rawJSON name src code start gi = do
   slotss <- encodeJSON rawJSON
-  return $ insertContracts slotss src code start gi
+  return $ insertContracts slotss name src code start gi
 
-insertContracts :: [[(Word256, Word256)]] -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
-insertContracts slotss src code start gi =
+insertContracts :: [[(Word256, Word256)]] -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContracts slotss name src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
@@ -121,4 +121,4 @@ insertContracts slotss src code start gi =
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
-         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src]}
+         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded name src]}

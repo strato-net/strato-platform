@@ -366,39 +366,47 @@ function addressToState(accounts, address) {
   return scope => {
     let codeHash = removeHexPrefix(accounts[address].codeHash);
         addressFormatted = removeHexPrefix(address);
-  
+
     let name;
     if(global.contractMap[codeHash] === undefined) {
-      console.log('Codehash undefined. Retrieving contract details.'); 
+      console.log('Codehash undefined. Retrieving contract details.');
       return getContractDetails(addressFormatted)(scope)
-  	    .then(v => {name = v.name; return addContract(v, (s) => {})(scope)})
-	    .then(() => {console.log('Name:',name); return getContractState(name, addressFormatted)(scope)})
-  	    .catch(err => {
-  	      throw new Error('No table found')
-  	    });
+               .then(v => {name = v.name; return addContract(v, (s) => {}, codeHash)(scope)})
+               .then(() => {console.log('Name:',name); return getContractState(name, addressFormatted)(scope)})
+               .catch(err => {
+                  throw new Error('No table found')
+               });
     }
     else {
-  
+
       const name = global.contractMap[codeHash].name;
-  
+
       return getContractState(name, addressFormatted)(scope);
     }
   }
 }
 
-function addContract(contractDetails, callback) {
+function addContract(contractDetails, callback, alternateHash) {
   return scope => {
     // incase the binaries are attached, remove them so we don't store
     delete contractDetails["bin"];
     delete contractDetails["bin-runtime"];
-   
+
     var schema = toSchemaString(contractDetails);
     var pool = scope.pool;
-   
+
     global.contractMap[contractDetails.codeHash] = contractDetails;
+    if (alternateHash != contractDetails.codeHash) {
+      // Why would the hashes ever differ? Because how bloch
+      // compiles the contract has changed. Behaviour should
+      // be the same, so we let cirrus share the xabi.
+      var cloned = JSON.parse(JSON.stringify(contractDetails));
+      cloned.codeHash = alternateHash;
+      global.contractMap[cloned.codeHash] = cloned;
+    }
     console.log("global.contractMap: " + JSON.stringify(global.contractMap));
     console.log("Schema: " + schema)
-   
+
     pool.query(schema)
       .then(_ => {
         console.log("done creating new table for contract")
