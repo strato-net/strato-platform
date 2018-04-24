@@ -2,17 +2,20 @@
 set -e
 set -x
 
-export blocRoot=http://${blocHost}/bloc/v2.2 # see config-prod.yaml
-export cirrusRoot=http://${cirrusHost} # see config-prod.yaml
-export postgresHost=${postgres_host}:${postgres_port} # see config/config.json
-export stratoRoot=http://${stratoHost}/eth/v1.2 # ALSO see config-prod.yaml
+blocRoot=http://${blocHost}/bloc/v2.2
+cirrusRoot=http://${cirrusHost}
+export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
+export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
+export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
 sed -i -e 's|__searchUrl__|'"${cirrusRoot}"'|g' config-prod.yaml
 
-export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
-export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
+sed -i -e 's|__postgres_user__|'"${postgres_user}"'|g' config/config.json
+sed -i -e 's|__postgres_password__|'"${postgres_password}"'|g' config/config.json
+sed -i -e 's|__postgres_host__|'"${postgres_host}"'|g' config/config.json
+sed -i -e 's|__postgres_port__|'"${postgres_port}"'|g' config/config.json
 
 echo 'Waiting for bloc to be available...'
 until curl --silent --output /dev/null --fail --location ${blocRoot}
@@ -24,6 +27,7 @@ echo 'bloc is available'
 echo 'Waiting for strato to be available...'
 until curl --silent --output /dev/null --fail --location ${stratoRoot}/uuid
 do
+  echo "Check at $(date)"
   sleep 1
 done
 echo 'strato is available'
@@ -31,16 +35,15 @@ echo 'strato is available'
 echo 'Waiting for cirrus to be available...'
 until curl --silent --output /dev/null --fail --location ${cirrusRoot}
 do
+  echo "Check at $(date)"
   sleep 1
 done
 echo 'cirrus is available'
 
 echo 'Waiting for postgres to be available...'
-while true; do
-    curl ${postgresHost} > /dev/null 2>&1 || EXIT_CODE=$? && true
-    if [ ${EXIT_CODE} = 52 ]; then
-        break
-    fi
+until pg_isready -h ${postgres_host} -p ${postgres_port}
+do
+    echo "Check at $(date)"
     sleep 1
 done
 echo 'postgres is available'

@@ -16,11 +16,11 @@
     "dialect": "postgres"
   },
   "production" : {
-    "username": "postgres",
-    "password": "api",
+    "username": "__postgres_user__",
+    "password": "__postgres_password__",
     "database": "apex_prod",
-    "host": "postgres",
-    "port": "5432",
+    "host": "__postgres_host__",
+    "port": "__postgres_port__",
     "dialect": "postgres",
     "logging": false
   }

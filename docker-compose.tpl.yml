@@ -37,7 +37,9 @@ services:
     - cirrusHost=cirrus:3333
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
+    - postgres_user=postgres
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
