@@ -12,13 +12,11 @@ import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Blockchain.Util
 
---import Debug.Trace
-
 data Operation =
     STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
     LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE |
     SHA3 |
-    ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY |
+    ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
     BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
     POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
     PUSH [Word8] |
@@ -31,7 +29,7 @@ data Operation =
     SWAP9 | SWAP10 | SWAP11 | SWAP12 |
     SWAP13 | SWAP14 | SWAP15 | SWAP16 |
     LOG0 | LOG1 | LOG2 | LOG3 | LOG4 |
-    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | INVALID | SUICIDE |
+    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | REVERT | INVALID | SUICIDE |
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
@@ -92,6 +90,9 @@ opDatas =
     OPData 0x3a GASPRICE 0 1 "Get price of gas in current environment.",
     OPData 0x3b EXTCODESIZE 0 1 "Get size of an account's code.",
     OPData 0x3c EXTCODECOPY 0 4 "Copy an account’s code to memory",
+    OPData 0x3d RETURNDATASIZE 0 1 "Get size of output data from previous call\
+                                   \ from the current environment",
+    OPData 0x3e RETURNDATACOPY 3 0 "Copy output data from the previous call to memory.",
 
     OPData 0x40 BLOCKHASH 0 1 "Get hash of most recent complete block.",
     OPData 0x41 COINBASE 0 1 "Get the block’s coinbase address.",
@@ -158,8 +159,10 @@ opDatas =
     OPData 0xf2 CALLCODE 7 1 "Message-call into this account with alternate account's code.",
     OPData 0xf3 RETURN 2 0 "Halt execution returning output data.",
     OPData 0xf4 DELEGATECALL 6 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
-    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes \
-                               \will throw an exception.",
+    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes\
+                               \ will throw an exception.",
+    OPData 0xfd REVERT 2 0 "Halt execution reverting state changes but returning data and\
+                           \ remaining gas.",
     -- These α and δ are technically ∅, but rather than risk an undefined exception set to 0.
     OPData 0xfe INVALID 0 0 "Designated invalid instruction",
     OPData 0xff SUICIDE 1 0 "Halt execution and register account for later deletion."

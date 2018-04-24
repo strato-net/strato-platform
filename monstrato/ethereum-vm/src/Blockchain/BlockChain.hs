@@ -395,7 +395,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     when flags_debug . lift . $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ tick ctr_vm_txs_unsuccessful
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
-                                       , erRemainingTxGas     = 0
+                                       , erRemainingTxGas     = if e == RevertException
+                                                                  then vmGasRemaining newVMState'
+                                                                  else 0
+                                       -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'

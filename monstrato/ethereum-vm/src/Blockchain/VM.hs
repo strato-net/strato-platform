@@ -37,7 +37,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -60,8 +59,6 @@ import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
-
---import Debug.Trace
 
 bool2Word256::Bool->Word256
 bool2Word256 True  = 1
@@ -320,6 +317,18 @@ runOperation EXTCODECOPY = do
   addressState <- getAddressState address'
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
+
+runOperation RETURNDATASIZE = do
+  ret <- getReturnVal
+  let len = (fromIntegral . B.length $ ret) :: Word256
+  push len
+
+runOperation RETURNDATACOPY = do
+  memP <- pop
+  codeP <- pop
+  size <- pop
+  ret <- getReturnVal
+  mStoreByteString memP . safeTake size . safeDrop codeP $ ret
 
 runOperation BLOCKHASH = do
   number' <- pop::VMM Word256
@@ -682,6 +691,15 @@ runOperation STATICCALL = do
   push gas
   localState (\vms -> vms {writable=False}) $ runOperation CALL
 
+runOperation REVERT = do
+  address' <- pop
+  size <- pop
+
+  retVal <- unsafeSliceByteString address' size
+
+  setReturnVal $ Just retVal
+  left RevertException
+
 runOperation INVALID = left InvalidInstruction
 
 runOperation SUICIDE = do
@@ -791,6 +809,10 @@ opGasPriceAndRefund CALLDATACOPY = do
 opGasPriceAndRefund EXTCODECOPY = do
     size <- getStackItem 3::VMM Word256
     return (gEXTCODECOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32::Double)), 0)
+opGasPriceAndRefund RETURNDATACOPY = do
+    size <- getStackItem 3 :: VMM Word256
+    return (gRETURNDATACOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32 :: Double)), 0)
+
 opGasPriceAndRefund SSTORE = do
   p <- getStackItem 0
   val <- getStackItem 1
@@ -1185,6 +1207,13 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           useGas (- vmGasRemaining finalVMState)
           addToRefund (refund finalVMState)
           return (1, Just retVal)
+        Left RevertException -> do
+          state' <- lift get
+          useGas (- vmGasRemaining finalVMState)
+          when flags_debug $
+            lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)
+          addToRefund (refund finalVMState)
+          return (0, returnVal finalVMState)
         Left e -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
