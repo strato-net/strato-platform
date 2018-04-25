@@ -198,7 +198,7 @@ module.exports = {
         },
         json: true
       };
-      rp(options)
+      rp.post(options)
         .then(response => {
           if (!response.hash) {
             const authErrorText = "User not found. Register your account on signup.blockapps.net";
@@ -244,7 +244,7 @@ module.exports = {
         if (user) {
           return bcrypt.compare(password, user.password, function (err, response) {
             if (err) {
-              let err = new Error('Your temporary password is incorrect');
+              let err = new Error('Unexpected server error. Please try again after sometime.');
               err.status = 500;
               return next(err);
             }
@@ -269,8 +269,8 @@ module.exports = {
           return next(err);
         }
       } catch (error) {
-        let err = new Error('Your temporary password is incorrect');
-        err.status = 401;
+        let err = new Error('Unexpected server error. Please try again after sometime.');
+        err.status = 500;
         return next(err);
       }
     });
