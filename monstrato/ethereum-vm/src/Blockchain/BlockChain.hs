@@ -75,6 +75,7 @@ import           Blockchain.VM.Code
 import           Blockchain.VM.OpcodePrices
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
@@ -405,7 +406,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erException = Just Blockchain.VM.VMState.InsufficientFunds
+                               , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
 runCodeForTransaction :: Bool

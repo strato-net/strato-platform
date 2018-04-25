@@ -59,6 +59,7 @@ import           Blockchain.VM.PrecompiledContracts
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
 bool2Word256::Bool->Word256

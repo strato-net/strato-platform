@@ -15,7 +15,6 @@ packages:
 - blockapps-util/
 - strato-api/
 - blockapps-tools/
-- strato-quarry/
 - strato-adit/
 - strato-index/
 - strato-sequencer/
@@ -100,6 +99,5 @@ ghc-options:
   blockapps-tools:         -Wall -Werror
   strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
   strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
-  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing

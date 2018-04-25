@@ -32,6 +32,7 @@ import           Blockchain.SHA
 import           Blockchain.VM.Environment
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 
 type VMM = EitherT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
 --type VMM2 = EitherT VMException (StateT VMState (ResourceT IO))

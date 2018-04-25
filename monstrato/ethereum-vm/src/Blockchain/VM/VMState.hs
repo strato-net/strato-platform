@@ -3,7 +3,6 @@ module Blockchain.VM.VMState (
   VMState(..),
   Memory(..),
   startingState,
-  VMException(..),
   DebugCallCreate(..),
   ) where
 
@@ -21,21 +20,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.VM.Environment
 import           Blockchain.VMContext
-
-data VMException =
-  OutOfGasException |
-  StackTooSmallException |
-  VMException String |
-  MalformedOpcodeException |
-  DivByZeroException |
-  InsufficientFunds |
-  AddressDoesNotExist |
-  StackTooLarge |
-  CallStackTooDeep |
-  InvalidJump |
-  InvalidInstruction |
-  WriteProtection |
-  RevertException deriving (Show, Eq)
+import           Blockchain.VM.VMException
 
 data Memory =
   Memory {
