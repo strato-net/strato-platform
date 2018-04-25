@@ -125,7 +125,7 @@ class Accounts extends Component {
         </div>
         <div className="container-fluid pt-dark">
           <div className="row">
-            <div className="col-sm-4">
+            <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
                 {rows.length === 0
                   ? <tr>
@@ -134,8 +134,8 @@ class Accounts extends Component {
                   : rows}
               </div>
             </div>
-            <div className="col-sm-8">
-              <div className="account-details">
+            <div className="col-sm-8 account-details">
+              <div>
                 {selectedAddresses.length ? selectedAddresses : null}
               </div>
             </div>
