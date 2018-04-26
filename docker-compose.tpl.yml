@@ -24,7 +24,7 @@ services:
     - STRATO_URL=${STRATO_URL}
     - SMD_MODE=${SMD_MODE}
     build: .
-    image: <REPO_URL>smd:<VERSION>
+    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
   apex:
     depends_on:
@@ -45,7 +45,7 @@ services:
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
     build: .
-    image: <REPO_URL>apex:<VERSION>
+    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     volumes:
     - dapps:/usr/src/app/apps
     restart: always
@@ -59,7 +59,7 @@ services:
     - CIRRUS_URL=${CIRRUS_URL}
     - STRATO_URL=${STRATO_URL}
     build: .
-    image: <REPO_URL>dappstore:<VERSION>
+    image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
     restart: always
   bloc:
     depends_on:
@@ -75,7 +75,7 @@ services:
     - ssl=${ssl:-false}
     - stratoHost=strato:3000
     build: .
-    image: <REPO_URL>bloc:<VERSION>
+    image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
   redis:
     command: [redis-server, --appendonly, "yes"]
@@ -101,7 +101,7 @@ services:
     - stratoHost=strato:3000
     - zookeeper_conn=kafka
     build: .
-    image: <REPO_URL>cirrus:<VERSION>
+    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
     restart: always
   strato:
     depends_on:
@@ -141,7 +141,7 @@ services:
     - useSyncMode=${useSyncMode}
     - zkHost=kafka
     build: .
-    image: <REPO_URL>strato:<VERSION>
+    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -156,7 +156,7 @@ services:
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     build: .
-    image: <REPO_URL>postgrest:<VERSION>
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: always
   postgres:
     environment:
@@ -181,7 +181,7 @@ services:
     - sslCertFileType=${sslCertFileType:-crt}
     - uiPassword=${uiPassword}
     build: .
-    image: <REPO_URL>nginx:<VERSION>
+    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
     - 80:80
     - 443:443
@@ -192,12 +192,12 @@ services:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
     build: .
-    image: <REPO_URL>docs:<VERSION>
+    image: ${DOCS_IMAGE:-<REPO_URL>docs:<VERSION>}
     restart: always
   kafka:
     command: [/bin/bash, -c, printf "\ndelete.topic.enable=true\nlog.cleaner.enable=false\nLOG_RETENTION_HOURS=2147483647\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n]
     environment:
     - ADVERTISED_HOST=kafka
     - ADVERTISED_PORT=9092
-    image: spotify/kafka:latest
+    image: ${KAFKA_IMAGE:-spotify/kafka:latest}
     restart: always
