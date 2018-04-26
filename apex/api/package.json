@@ -46,6 +46,7 @@
     "sequelize": "4.13.5",
     "sequelize-cli": "3.0.0",
     "serve-favicon": "2.4.5",
+    "sinon": "^4.5.0",
     "socket.io": "2.0.4",
     "sync-request": "4.1.0",
     "underscore": "1.8.3",
