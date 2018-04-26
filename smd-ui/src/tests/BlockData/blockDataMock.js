@@ -204,4 +204,33 @@ export const blocksMock = [
   }
 ];
 
+export const blockMockWithoutTx = [
+  {
+    "next": "",
+    "kind": "Block",
+    "blockUncles": [
+
+    ],
+    "receiptTransactions": [
+    ],
+    "blockData": {
+      "extraData": 0,
+      "gasUsed": 0,
+      "gasLimit": 2.7640800523559524e+31,
+      "kind": "BlockData",
+      "unclesHash": "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+      "mixHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "receiptsRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "number": 210,
+      "difficulty": 143854,
+      "timestamp": "2017-12-26T06:32:44Z",
+      "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+      "parentHash": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+      "nonce": 6,
+      "stateRoot": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+      "transactionsRoot": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+    }
+  },
+]
+
 export const error = "ERROR";
