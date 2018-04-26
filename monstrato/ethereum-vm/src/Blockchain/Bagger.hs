@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
@@ -76,6 +77,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.bestBlockHeader       = bd
                                            , B.bestBlockTxHashes     = txShas
                                            , B.lastExecutedStateRoot = thisStateRoot
+                                           , B.lastRewardedStateRoot = thisStateRoot
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
@@ -377,6 +379,7 @@ buildFromMiningCache = do
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
+    updateBaggerState (\s@B.BaggerState{B.miningCache = mc} -> s{B.miningCache = mc{B.lastRewardedStateRoot = DD.blockDataStateRoot rewardedBlockData}})
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles

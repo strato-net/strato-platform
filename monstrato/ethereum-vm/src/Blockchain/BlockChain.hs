@@ -195,39 +195,49 @@ addBlocks :: [OutputBlock] -> ContextM ()
 addBlocks [] = return ()
 addBlocks blocks = do
   let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
-  lift $ $logInfoS "addBlocks_new" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
+  lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
                                          (show . blockDataNumber . obBlockData $ head blocks))
   ContextBestBlockInfo (_, oldHeader, _, _, _) <- getContextBestBlockInfo
   let oldStateRoot = blockDataStateRoot oldHeader
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
-  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+  potentialBestBlocks <- forM blocks' $ \block -> timeit "Block insertion" timerToUse $ do
     case (obOrigin block) of
       TO.Quarry -> do
-        _ <- setParentStateRoot block
-        updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
-        lift $ $logInfoS "addBlocks_new" $ T.pack ("Block data from Quarry: " ++ show (obBlockData block))
-        Bagger.updateTxCallback
-          updates
-          (blockHeaderPartialHash $ obBlockData block)
-          (blockHeaderHash $ obBlockData block)
-          Mined
-      _ -> addBlock block
-  (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter blocks'
-  when didReplaceThisTime . liftIO $ do
-      let Just nbb = newBestBlock
-      writeIORef didReplaceBest True
-      writeIORef replacedBest (nbb, replacedBits)
-  didReplaceBest' <- liftIO (readIORef didReplaceBest)
-  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-  when didReplaceBest' $ do
-      $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
-      (theBlock, nbb) <- liftIO (readIORef replacedBest)
-      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-      let b = obBlockData theBlock
-          addressSource = getSource False b
-          addressContractName = getContractName False b
-      calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addresContractName)
+        currentBaggerStateRoot <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
+        lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ show currentBaggerStateRoot
+        lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ show (blockDataStateRoot $ obBlockData block)
+        if ((blockDataStateRoot $ obBlockData block) == currentBaggerStateRoot)
+          then do
+            _ <- setParentStateRoot block
+            updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+            lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ show (obBlockData block))
+            Bagger.updateTxCallback
+              updates
+              (blockHeaderPartialHash $ obBlockData block)
+              (blockHeaderHash $ obBlockData block)
+              Mined
+            return [block]
+          else return []
+      _ -> addBlock block >> return [block]
+  case getBestBlockInList (concat potentialBestBlocks) of
+    Nothing -> return ()
+    Just bestBlock -> do
+      (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
+      when didReplaceThisTime . liftIO $ do
+          let Just nbb = newBestBlock
+          writeIORef didReplaceBest True
+          writeIORef replacedBest (nbb, replacedBits)
+      didReplaceBest' <- liftIO (readIORef didReplaceBest)
+      void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+      when didReplaceBest' $ do
+          $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+          (theBlock, nbb) <- liftIO (readIORef replacedBest)
+          void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+          let b = obBlockData theBlock
+              addressSource = getSource False b
+              addressContractName = getContractName False b
+          calculateAndEmitStateDiffs theBlock oldStateRoot addressSource addressContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -576,44 +586,40 @@ getBestBlockInList (b:bs) = Just $ foldl' compareBlocks b bs
                             then b1
                             else b2
 
-replaceBestIfBetter :: [OutputBlock] -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
-replaceBestIfBetter obs = do
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
+replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
-    case getBestBlockInList obs of
-      Nothing -> return (False, Nothing, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
-      Just b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} -> do
+    let newNumber     = blockDataNumber bd
+        newStateRoot  = blockDataStateRoot bd
+        newTxCount    = fromIntegral $ length txs
+        newUncleCount = fromIntegral $ length uncles
+        oldNumber     = blockDataNumber oldBestBlock
+        oldStateRoot  = blockDataStateRoot oldBestBlock
+        bH            = outputBlockHash b
+        bTHs          = otHash <$> txs
 
-        let newNumber     = blockDataNumber bd
-            newStateRoot  = blockDataStateRoot bd
-            newTxCount    = fromIntegral $ length txs
-            newUncleCount = fromIntegral $ length uncles
-            oldNumber     = blockDataNumber oldBestBlock
-            oldStateRoot  = blockDataStateRoot oldBestBlock
-            bH            = outputBlockHash b
-            bTHs          = otHash <$> txs
+    let shouldReplace =     newNumber == 0
+                        || (newNumber > oldNumber)
+                        || ((newNumber == oldNumber) && (td > oldBestDifficulty))
+                        || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
 
-        let shouldReplace =     newNumber == 0
-                            || (newNumber > oldNumber)
-                            || ((newNumber == oldNumber) && (td > oldBestDifficulty))
-                            || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+    $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-        $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
+    when shouldReplace $ do
+        Bagger.processNewBestBlock bH bd bTHs
+        putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
 
-        when shouldReplace $ do
-            Bagger.processNewBestBlock bH bd bTHs
-            putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
+    -- we're replaying SeqEvents, and need to notify the mempool
+    when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
+        Bagger.processNewBestBlock bH bd bTHs
 
-        -- we're replaying SeqEvents, and need to notify the mempool
-        when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
-            Bagger.processNewBestBlock bH bd bTHs
+    let bestBlockInfo = (bestSha, bestNum, bestTdiff)
+        bestSha       = if shouldReplace then bH        else oldBestSha
+        bestNum       = if shouldReplace then newNumber else oldNumber
+        bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-        let bestBlockInfo = (bestSha, bestNum, bestTdiff)
-            bestSha       = if shouldReplace then bH        else oldBestSha
-            bestNum       = if shouldReplace then newNumber else oldNumber
-            bestTdiff     = if shouldReplace then td        else oldBestDifficulty
-
-        return (shouldReplace, Just b, bestBlockInfo)
+    return (shouldReplace, Just b, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b

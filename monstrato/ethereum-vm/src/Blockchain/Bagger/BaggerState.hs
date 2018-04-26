@@ -25,6 +25,7 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
                                , bestBlockTxHashes     :: [SHA]
                                , lastExecutedStateRoot :: StateRoot
+                               , lastRewardedStateRoot :: StateRoot
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
@@ -61,6 +62,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , bestBlockHeader       = error "reached defaultMiningCache"
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot
+                                  , lastRewardedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
