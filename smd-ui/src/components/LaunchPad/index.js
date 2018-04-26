@@ -15,6 +15,7 @@ import {
 } from './launchPad.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { canDeployApps } from '../../lib/envChecks';
+import { isModePublic } from '../../lib/checkMode';
 
 class LaunchPad extends Component {
 
@@ -23,8 +24,8 @@ class LaunchPad extends Component {
   }
 
   componentWillMount() {
-    if(this.props.launchPad.firstLoad) {
-      if(Object.getOwnPropertyNames(this.props.accounts).length === 0) {
+    if (this.props.launchPad.firstLoad) {
+      if (Object.getOwnPropertyNames(this.props.accounts).length === 0) {
         this.props.fetchAccounts(true, false);
       }
       this.props.loadLaunchPad();
@@ -32,12 +33,12 @@ class LaunchPad extends Component {
   }
 
   handleFileDrop = (files, field, appSetError) => {
-    if(files.length > 1) {
+    if (files.length > 1) {
       appSetError('Expected a zip archive, got multiple files');
       return;
     }
-    const regex = new RegExp(/.zip$/,'i');
-    if(!regex.test(files[0].name)) {
+    const regex = new RegExp(/.zip$/, 'i');
+    if (!regex.test(files[0].name)) {
       appSetError(`Please upload a zip archive`);
       return;
     }
@@ -46,7 +47,7 @@ class LaunchPad extends Component {
   }
 
   componentDidUpdate() {
-    if(this.props.launchPad.requestCompleted) {
+    if (this.props.launchPad.requestCompleted) {
       this.props.appReset();
       this.props.history.push('/apps');
     }
@@ -63,40 +64,94 @@ class LaunchPad extends Component {
       <div className="dropzoneContainer text-center">
         <Dropzone
           className="dropzone"
-          onDrop = {(files,e) => { this.handleFileDrop(files, field, appSetError) }}
+          onDrop={(files, e) => { this.handleFileDrop(files, field, appSetError) }}
           name={field.name}
         >
-          {({isDragActive, isDragReject, acceptedFiles}) => {
-            if(isDragActive) {
+          {({ isDragActive, isDragReject, acceptedFiles }) => {
+            if (isDragActive) {
               return (<span>Drop to Upload!</span>);
             }
             return (
               files && Array.isArray(files) && files.length > 0
-              ? ( <span>{files[0].name}</span> )
-              : ( <span>Drop the package here or click to browse</span> )
+                ? (<span>{files[0].name}</span>)
+                : (<span>Drop the package here or click to browse</span>)
             );
           }}
         </Dropzone>
       </div>
     );
-  };
+  }
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
     this.props.fetchUserAddresses(e.target.value)
-  };
+  }
 
   submit = (values) => {
     this.props.appUploadRequest(values);
     mixpanelWrapper.track('launchpad_upload_app');
-  };
+  }
+
+  renderUsername = (isPublicMode) => {
+    const users = Object.getOwnPropertyNames(this.props.accounts);
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="appUsername"
+        onChange={this.handleUsernameChange}
+        validate={required}
+        disabled={isPublicMode}
+        required
+      >
+        <option value={isPublicMode ? this.props.currentUser.username : null}>
+          {isPublicMode && this.props.currentUser.username}
+        </option>
+        {
+          (!isPublicMode && users) ?
+            users.map((user, i) => {
+              return (
+                <option key={'user' + i} value={user}>{user}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    </div>)
+  }
+
+  renderAddress = (isPublicMode) => {
+    const userAddresses = this.props.accounts && this.props.launchPad.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
+      : null;
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="appUserAddress"
+        validate={required}
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.currentUser.accountAddress : null}>
+          {isPublicMode && this.props.currentUser.accountAddress}
+        </option>
+        {
+          (!isPublicMode && userAddresses) ?
+            userAddresses.map((address, i) => {
+              return (
+                <option key={address} value={address}>{address}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    </div>)
+  }
 
   render() {
-    const {handleSubmit, pristine, submitting, valid} = this.props;
-    const users = Object.getOwnPropertyNames(this.props.accounts);
-    // const userAddresses = this.props.accounts && this.props.launchPad.username ?
-    //   Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
-    //   : null;
+    const isPublicMode = isModePublic();
+    const { handleSubmit, pristine, submitting, valid } = this.props;
 
     return (
       <div className="container-fluid pt-dark">
@@ -121,135 +176,96 @@ class LaunchPad extends Component {
             {!canDeployApps
               ? <div className="pt-card"><span>Unable to deploy apps when running multinode on localhost</span></div>
               :
-            <div className="pt-card">
-              <div className="row">
-                <div className="col-sm-6">
-                  <h4>Enter application details</h4>
-                </div>
-                <div className="col-sm-6 text-right">
-                  <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
-                    <button className="pt-button pt-minimal pt-intent-primary">
-                      <i className='fa fa-book smd-margin-right-8'> </i>
-                      Read the docs
+              <div className="pt-card">
+                <div className="row">
+                  <div className="col-sm-6">
+                    <h4>Enter application details</h4>
+                  </div>
+                  <div className="col-sm-6 text-right">
+                    <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
+                      <button className="pt-button pt-minimal pt-intent-primary">
+                        <i className='fa fa-book smd-margin-right-8'> </i>
+                        Read the docs
                     </button>
-                  </a>
+                    </a>
+                  </div>
                 </div>
+                <hr />
+                <form>
+                  <div className="row smd-pad-top-12">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Username
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      {this.renderUsername(isPublicMode)}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        User Address
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      {this.renderAddress(isPublicMode)}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Password
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      <Field
+                        name="appPassword"
+                        className="pt-input smd-input-width"
+                        component="input"
+                        type="password"
+                        placeholder="User Password"
+                        dir="auto"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Package
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      <Field
+                        className="pt-input"
+                        name="appPackage"
+                        component={this.renderDropzoneInput}
+                        dir="auto"
+                        title="Package"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-offset-2 col-sm-1">
+                      <button
+                        type="submit"
+                        onClick={handleSubmit(this.submit)}
+                        className="pt-button pt-intent-primary"
+                        disabled={pristine || submitting || !valid}
+                      >
+                        Upload
+                    </button>
+                    </div>
+                    <div className="col-sm-9">
+                      <div className="smd-pad-4 smd-text-warning">
+                        {this.props.launchPad.error}
+                      </div>
+                    </div>
+                  </div>
+                </form>
               </div>
-              <hr />
-              <form>
-                <div className="row smd-pad-top-12">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Username
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <div className="pt-select">
-                      <Field
-                        className="pt-input"
-                        component="select"
-                        name="appUsername"
-                        onChange={this.handleUsernameChange}
-                        validate={required}
-                        disabled
-                        required
-                      >
-                        <option />
-                        {
-                          users.map((user, i) => {
-                            return (
-                              <option key={'user' + i} value={user}>{user}</option>
-                            )
-                          })
-                        }
-                      </Field>
-                    </div>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      User Address
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <div className="pt-select">
-                      <Field
-                        className="pt-input"
-                        component="select"
-                        name="appUserAddress"
-                        validate={required}
-                        required
-                        disabled
-                      >
-                        <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
-                        {/* {
-                          userAddresses ?
-                            userAddresses.map((address, i) => {
-                              return (
-                                <option key={address} value={address}>{address}</option>
-                              )
-                            })
-                            : '' */}
-                        }
-                      </Field>
-                    </div>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Password
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <Field
-                      name="appPassword"
-                      className="pt-input smd-input-width"
-                      component="input"
-                      type="password"
-                      placeholder="User Password"
-                      dir="auto"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Package
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <Field
-                      className="pt-input"
-                      name="appPackage"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Package"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-offset-2 col-sm-1">
-                    <button
-                      type="submit"
-                      onClick={handleSubmit(this.submit)}
-                      className="pt-button pt-intent-primary"
-                      disabled={pristine || submitting || !valid}
-                    >
-                      Upload
-                    </button>
-                  </div>
-                  <div className="col-sm-9">
-                    <div className="smd-pad-4 smd-text-warning">
-                      {this.props.launchPad.error}
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
             }
           </div>
         </div>
@@ -259,7 +275,7 @@ class LaunchPad extends Component {
 
 }
 
-function validate (values) {
+function validate(values) {
   const errors = {};
   if (!values.appUsername) {
     errors.appUsername = "Username required";
@@ -270,7 +286,7 @@ function validate (values) {
   if (!values.appPassword) {
     errors.appPassword = "Password required";
   }
-  if(!values.appPackage) {
+  if (!values.appPackage) {
     errors.appPackage = "Upload file";
   }
   return errors;
@@ -290,10 +306,10 @@ export function mapStateToProps(state) {
 
 const CREATE_APP_FORM = 'create-app';
 
-const formed = reduxForm({form:CREATE_APP_FORM, validate})(LaunchPad);
+const formed = reduxForm({ form: CREATE_APP_FORM, validate })(LaunchPad);
 
 export default withRouter(
-  connect( mapStateToProps,
+  connect(mapStateToProps,
     {
       usernameChange,
       loadLaunchPad,

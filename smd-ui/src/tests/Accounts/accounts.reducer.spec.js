@@ -8,7 +8,9 @@ import {
   fetchUserAddressesFailure,
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure,
-  resetUserAddress
+  resetUserAddress,
+  fetchBalanceSuccess,
+  fetchBalanceFailure
 } from '../../components/Accounts/accounts.actions';
 import { deepClone } from '../helper/testHelper';
 import { accountsMock, reducerAccounts, filter, error, accountDetail, indexAccountsMock } from "./accountsMock";
@@ -148,5 +150,34 @@ describe('Accounts: reducer', () => {
     });
 
   })
+
+  describe('fetch balance', () => {
+
+    // BALANCE_SUCCESS
+    test('on success', () => {
+      const data = {
+        balance: "3000000000000000000000"
+      }
+      const action = fetchBalanceSuccess(data);
+      const initialState = {
+        accounts: reducerAccounts,
+        filter: '',
+        error: null
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    // BALANCE_FAILURE
+    test('on failure', () => {
+      const action = fetchBalanceFailure("error");
+      const initialState = {
+        accounts: reducerAccounts,
+        filter: '',
+        error: null
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+  });
 
 });

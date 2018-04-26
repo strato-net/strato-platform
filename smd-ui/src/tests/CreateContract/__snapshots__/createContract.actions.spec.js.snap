@@ -221,6 +221,12 @@ Object {
 }
 `;
 
+exports[`CreateContract: action reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;
+
 exports[`CreateContract: action update toast 1`] = `
 Object {
   "toasts": false,

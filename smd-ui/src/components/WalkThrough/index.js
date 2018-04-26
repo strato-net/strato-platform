@@ -73,6 +73,10 @@ class WalkThrough extends Component {
     }
   }
 
+  isCloseButtonVisible() {
+    return ( this.state.currentModal === "CreateUser" || this.state.currentModal === "CLI");
+  }
+
   render() {
     return (
       <div>
@@ -86,8 +90,8 @@ class WalkThrough extends Component {
             title={this.dialogTitle()}
             className="pt-dark dialog walk-through"
             canOutsideClickClose={false}
-            canEscapeKeyClose={this.state.currentModal === "CreateUser"}
-            isCloseButtonShown={this.state.currentModal === "CreateUser"}
+            canEscapeKeyClose={this.isCloseButtonVisible()}
+            isCloseButtonShown={this.isCloseButtonVisible()}
           >
             <Stepper step={this.state.step} />
             {this.dialogContent()}

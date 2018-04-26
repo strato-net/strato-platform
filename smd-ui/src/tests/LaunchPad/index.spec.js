@@ -6,7 +6,8 @@ import { createStore, combineReducers } from 'redux'
 import { Provider } from 'react-redux'
 import { Router, Switch, Redirect, Link, MemoryRouter } from 'react-router-dom'
 import { accountsMock, indexAccountsMock } from '../Accounts/accountsMock'
-import { uploadData } from './launchpadMock'
+import { uploadData } from './launchpadMock';
+import * as checkMode from '../../lib/checkMode';
 
 describe("Launchpad: index", () => {
 
@@ -30,7 +31,7 @@ describe("Launchpad: index", () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('render component with initial', () => {
+  test('render component with initial (public mode)', () => {
     const props = {
       history: { push: '/apps' },
       accounts: {},
@@ -53,10 +54,45 @@ describe("Launchpad: index", () => {
       appReset: jest.fn(),
       store: store
     }
+
+    checkMode.isModePublic = jest.fn().mockReturnValue(true);
+
     const wrapper = shallow(
       <LaunchPad.WrappedComponent {...props} />
     ).dive().dive().dive();
-    expect(wrapper).toMatchSnapshot();
+    expect(wrapper.debug()).toMatchSnapshot();
+  });
+
+  test('render component with initial (enterprise mode)', () => {
+    const props = {
+      history: { push: '/apps' },
+      accounts: {},
+      launchPad: {
+        firstLoad: true,
+        username: '',
+        error: '',
+        appPackage: null,
+        requestCompleted: false
+      },
+      currentUser: {
+        accountAddress: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
+      usernameChange: jest.fn(),
+      loadLaunchPad: jest.fn(),
+      fetchAccounts: jest.fn(),
+      fetchUserAddresses: jest.fn(),
+      appUploadRequest: jest.fn(),
+      appSetError: jest.fn(),
+      appReset: jest.fn(),
+      store: store
+    }
+
+    checkMode.isModePublic = jest.fn().mockReturnValue(false);
+
+    const wrapper = shallow(
+      <LaunchPad.WrappedComponent {...props} />
+    ).dive().dive().dive();
+    expect(wrapper.debug()).toMatchSnapshot();
   });
 
   test('mapStateToProps with default state', () => {

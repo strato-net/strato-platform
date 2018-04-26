@@ -1,0 +1,43 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateBlocUser: action close overlay 1`] = `
+Object {
+  "isOpen": false,
+  "type": "CLOSE_MODAL",
+}
+`;
+
+exports[`CreateBlocUser: action create bloc user failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isOpen": false,
+  "spinning": false,
+  "type": "CREATE_BLOC_USER_FAILURE",
+}
+`;
+
+exports[`CreateBlocUser: action create bloc user request 1`] = `
+Object {
+  "isOpen": true,
+  "password": "pass",
+  "spinning": true,
+  "type": "CREATE_BLOC_USER_REQUEST",
+  "username": "tanuj",
+}
+`;
+
+exports[`CreateBlocUser: action create bloc user success 1`] = `
+Object {
+  "isOpen": false,
+  "key": "562a277d3b5ace17d92348c36f412622aaffafdb",
+  "spinning": false,
+  "type": "CREATE_BLOC_USER_SUCCESS",
+}
+`;
+
+exports[`CreateBlocUser: action open overlay 1`] = `
+Object {
+  "isOpen": true,
+  "type": "OPEN_MODAL",
+}
+`;

@@ -42,15 +42,17 @@ import {
   FAUCET_FAILURE,
   FETCH_ACCOUNT_ADDRESS_REQUEST,
   FETCH_ACCOUNT_DETAIL_REQUEST,
-  GET_BALANCE
+  GET_BALANCE,
+  fetchBalanceSuccess,
+  fetchBalanceFailure
 } from '../../components/Accounts/accounts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
-import { accountsMock, userAddresses, error, accountDetail } from './accountsMock';
+import { accountsMock, userAddresses, error, accountDetail, getBalanceMock } from './accountsMock';
 import { hideLoading } from 'react-redux-loading-bar';
 import { deepClone } from '../helper/testHelper';
 
 describe('Accounts: saga', () => {
-  
+
   test('watch accounts', () => {
     const gen = watchFetchContracts();
     const match = [
@@ -226,6 +228,23 @@ describe('Accounts: saga', () => {
       });
 
     })
+
+  });
+
+  describe('getBalance generator', () => {
+
+    const action = {
+      address: "d2263b71c14010ff03d8f786670aba691b22b158",
+      type: GET_BALANCE
+    }
+
+    test('inspection', () => {
+      const gen = getBalance(action);
+      expect(gen.next().value).toEqual(call(getAccountDetailApi, action.address));
+      expect(gen.next(getBalanceMock).value).toEqual(put(fetchBalanceSuccess(getBalanceMock[0])));
+      expect(gen.throw(error).value).toEqual(put(fetchBalanceFailure(error)));
+      expect(gen.next().done).toBe(true);
+    });
 
   });
 

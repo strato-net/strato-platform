@@ -76,7 +76,7 @@ class MenuBar extends Component {
         <div className="pt-navbar-group pt-align-right">
           {this.renderDeveloperButton()}
           <span className="pt-navbar-divider" />
-          <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
+          <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
           
           {this.afterLoggedIn()}
         </div>

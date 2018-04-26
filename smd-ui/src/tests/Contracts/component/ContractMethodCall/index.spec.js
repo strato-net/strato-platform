@@ -1,11 +1,12 @@
 import React from 'react';
-import ContractMethodCall, { mapStateToProps } from '../../../../components/Contracts/components/ContractMethodCall/index';
+import ContractMethodCall, { mapStateToProps, validate } from '../../../../components/Contracts/components/ContractMethodCall/index';
 import { reducer as formReducer } from 'redux-form'
 import { createStore, combineReducers } from 'redux'
 import { Provider } from 'react-redux';
 import { modals, initialState } from './contractMethodCallMock';
 import { indexAccountsMock } from '../../../Accounts/accountsMock'
 import { Dialog } from '@blueprintjs/core';
+import * as checkMode from '../../../../lib/checkMode';
 
 describe('ContractMethodCall: index', () => {
   let store
@@ -14,7 +15,7 @@ describe('ContractMethodCall: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('renders contracts card with empty props', () => {
+  test('renders contracts card (enterprise mode)', () => {
     const props = {
       modal: {},
       accounts: indexAccountsMock,
@@ -29,13 +30,43 @@ describe('ContractMethodCall: index', () => {
       methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
+      store: store
     }
-    const wrapper = render(
-      <Provider store={store}>
-        <ContractMethodCall.WrappedComponent {...props} />
-      </Provider>
-    );
-    expect(wrapper).toMatchSnapshot();
+
+    checkMode.isModePublic = jest.fn().mockReturnValue(false);
+
+    const wrapper = shallow(
+      <ContractMethodCall.WrappedComponent {...props} />
+    ).dive().dive().dive();
+
+    expect(wrapper.debug()).toMatchSnapshot();
+  });
+
+  test('renders contracts card (public mode)', () => {
+    const props = {
+      modal: {},
+      accounts: indexAccountsMock,
+      modalUsername: 'Buyer1',
+      currentUser: {
+        "id": '',
+        "username": '',
+        "address": ''
+      },
+      methodCallFetchArgs: jest.fn(),
+      methodCallOpenModal: jest.fn(),
+      methodCallCloseModal: jest.fn(),
+      fetchAccounts: jest.fn(),
+      methodCall: jest.fn(),
+      store: store
+    }
+
+    checkMode.isModePublic = jest.fn().mockReturnValue(true);
+
+    const wrapper = shallow(
+      <ContractMethodCall.WrappedComponent {...props} />
+    ).dive().dive().dive();
+
+    expect(wrapper.debug()).toMatchSnapshot();
   });
 
   test('mapStateToProps with default values', () => {
@@ -135,6 +166,16 @@ describe('ContractMethodCall: index', () => {
     ).dive().dive().dive().dive();
     wrapper.find('button').simulate('click')
     expect(props.methodCall).toHaveBeenCalled();
+  });
+
+  test('validate', () => {
+    const values = {
+      username: '',
+      address: null,
+      password: null
+    }
+
+    expect(validate(values)).toMatchSnapshot();
   });
 
 });

@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
 import { indexAccountsMock } from '../../accountsMock';
+import * as checkMode from '../../../../lib/checkMode';
 
 describe('SendTokens: index', () => {
 
@@ -13,7 +14,11 @@ describe('SendTokens: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   });
 
-  describe('render component', () => {
+  describe('render enterprise mode', () => {
+
+    beforeEach(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    })
 
     test('without values', () => {
       const props = {
@@ -39,7 +44,7 @@ describe('SendTokens: index', () => {
         <SendTokens.WrappedComponent {...props} />
       ).dive().dive().dive();
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
     test('with values', () => {
@@ -66,10 +71,72 @@ describe('SendTokens: index', () => {
         <SendTokens.WrappedComponent {...props} />
       ).dive().dive().dive();
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
-  })
+  });
+
+  describe('render public mode', () => {
+
+    beforeEach(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    })
+
+    test('without values', () => {
+      const props = {
+        isOpen: false,
+        result: null,
+        accounts: [],
+        fromUsername: '',
+        toUsername: '',
+        createDisabled: true,
+        sendTokensOpenModal: jest.fn(),
+        sendTokensCloseModal: jest.fn(),
+        sendTokens: jest.fn(),
+        fetchAccounts: jest.fn(),
+        store: store,
+        initialValues: {
+          from: '',
+          fromAddress: ''
+        },
+        balance: undefined
+      };
+
+      const wrapper = shallow(
+        <SendTokens.WrappedComponent {...props} />
+      ).dive().dive().dive();
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        isOpen: true,
+        result: null,
+        accounts: indexAccountsMock,
+        fromUsername: 'Admin_1177_49507',
+        toUsername: 'User_1177_26292',
+        createDisabled: false,
+        sendTokensOpenModal: jest.fn(),
+        sendTokensCloseModal: jest.fn(),
+        sendTokens: jest.fn(),
+        fetchAccounts: jest.fn(),
+        store: store,
+        initialValues: {
+          from: 'Admin_1177_49507',
+          fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+        },
+        balance: 10000000000
+      };
+
+      const wrapper = shallow(
+        <SendTokens.WrappedComponent {...props} />
+      ).dive().dive().dive();
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+  });
 
 
   test('open modal on click', () => {

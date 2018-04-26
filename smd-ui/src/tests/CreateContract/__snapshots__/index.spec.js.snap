@@ -152,324 +152,2182 @@ Object {
 }
 `;
 
-exports[`CreateContract: index render contracts without source 1`] = `
-initialize {
-  "0": Object {
-    "attribs": Object {
-      "class": "smd-pad-16",
-      "style": "display:inline-block;",
-    },
-    "children": Array [
-      Object {
-        "attribs": Object {
-          "class": "pt-button pt-intent-primary pt-icon-add",
-          "id": "tour-create-contract-button",
-          "type": "button",
-        },
-        "children": Array [
-          Object {
-            "attribs": Object {},
-            "children": Array [
-              Object {
-                "data": "Create Contract",
-                "next": null,
-                "parent": [Circular],
-                "prev": null,
-                "type": "text",
-              },
-            ],
-            "name": "span",
-            "namespace": "http://www.w3.org/1999/xhtml",
-            "next": null,
-            "parent": [Circular],
-            "prev": null,
-            "type": "tag",
-            "x-attribsNamespace": Object {},
-            "x-attribsPrefix": Object {},
-          },
-        ],
-        "name": "button",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": Object {
-          "attribs": Object {},
-          "children": Array [],
-          "name": "form",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": null,
-          "parent": [Circular],
-          "prev": [Circular],
-          "type": "tag",
-          "x-attribsNamespace": Object {},
-          "x-attribsPrefix": Object {},
-        },
-        "parent": [Circular],
-        "prev": null,
-        "type": "tag",
-        "x-attribsNamespace": Object {
-          "class": undefined,
-          "id": undefined,
-          "type": undefined,
-        },
-        "x-attribsPrefix": Object {
-          "class": undefined,
-          "id": undefined,
-          "type": undefined,
-        },
-      },
-      Object {
-        "attribs": Object {},
-        "children": Array [],
-        "name": "form",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": null,
-        "parent": [Circular],
-        "prev": Object {
-          "attribs": Object {
-            "class": "pt-button pt-intent-primary pt-icon-add",
-            "id": "tour-create-contract-button",
-            "type": "button",
-          },
-          "children": Array [
-            Object {
-              "attribs": Object {},
-              "children": Array [
-                Object {
-                  "data": "Create Contract",
-                  "next": null,
-                  "parent": [Circular],
-                  "prev": null,
-                  "type": "text",
-                },
-              ],
-              "name": "span",
-              "namespace": "http://www.w3.org/1999/xhtml",
-              "next": null,
-              "parent": [Circular],
-              "prev": null,
-              "type": "tag",
-              "x-attribsNamespace": Object {},
-              "x-attribsPrefix": Object {},
-            },
-          ],
-          "name": "button",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": [Circular],
-          "parent": [Circular],
-          "prev": null,
-          "type": "tag",
-          "x-attribsNamespace": Object {
-            "class": undefined,
-            "id": undefined,
-            "type": undefined,
-          },
-          "x-attribsPrefix": Object {
-            "class": undefined,
-            "id": undefined,
-            "type": undefined,
-          },
-        },
-        "type": "tag",
-        "x-attribsNamespace": Object {},
-        "x-attribsPrefix": Object {},
-      },
-    ],
-    "name": "div",
-    "namespace": "http://www.w3.org/1999/xhtml",
-    "next": null,
-    "parent": null,
-    "prev": null,
-    "root": Object {
-      "attribs": Object {},
-      "children": Array [
-        [Circular],
-      ],
-      "name": "root",
-      "namespace": "http://www.w3.org/1999/xhtml",
-      "next": null,
-      "parent": null,
-      "prev": null,
-      "type": "root",
-      "x-attribsNamespace": Object {},
-      "x-attribsPrefix": Object {},
-    },
-    "type": "tag",
-    "x-attribsNamespace": Object {
-      "class": undefined,
-      "style": undefined,
-    },
-    "x-attribsPrefix": Object {
-      "class": undefined,
-      "style": undefined,
-    },
-  },
-  "_root": [Circular],
+exports[`CreateContract: index render component (enterprise mode) render contracts without source 1`] = `
+ShallowWrapper {
   "length": 1,
-  "options": Object {
-    "decodeEntities": true,
-    "normalizeWhitespace": false,
-    "withDomLvl1": true,
-    "xml": false,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={undefined}
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      initialValues={
+        Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor={undefined}
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": undefined,
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
+      },
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "initialValues": Object {
+        "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+        "username": "Admin_1177_49507",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": undefined,
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
+    },
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": undefined,
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "initialValues": Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": undefined,
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
   },
 }
 `;
 
-exports[`CreateContract: index render contracts without values 1`] = `
-initialize {
-  "0": Object {
-    "attribs": Object {
-      "class": "smd-pad-16",
-      "style": "display:inline-block;",
-    },
-    "children": Array [
+exports[`CreateContract: index render component (enterprise mode) render contracts without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
       Object {
-        "attribs": Object {
-          "class": "pt-button pt-intent-primary pt-icon-add",
-          "id": "tour-create-contract-button",
-          "type": "button",
-        },
-        "children": Array [
-          Object {
-            "attribs": Object {},
-            "children": Array [
-              Object {
-                "data": "Create Contract",
-                "next": null,
-                "parent": [Circular],
-                "prev": null,
-                "type": "text",
-              },
-            ],
-            "name": "span",
-            "namespace": "http://www.w3.org/1999/xhtml",
-            "next": null,
-            "parent": [Circular],
-            "prev": null,
-            "type": "tag",
-            "x-attribsNamespace": Object {},
-            "x-attribsPrefix": Object {},
-          },
-        ],
-        "name": "button",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": Object {
-          "attribs": Object {},
-          "children": Array [],
-          "name": "form",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": null,
-          "parent": [Circular],
-          "prev": [Circular],
-          "type": "tag",
-          "x-attribsNamespace": Object {},
-          "x-attribsPrefix": Object {},
-        },
-        "parent": [Circular],
-        "prev": null,
-        "type": "tag",
-        "x-attribsNamespace": Object {
-          "class": undefined,
-          "id": undefined,
-          "type": undefined,
-        },
-        "x-attribsPrefix": Object {
-          "class": undefined,
-          "id": undefined,
-          "type": undefined,
-        },
-      },
-      Object {
-        "attribs": Object {},
-        "children": Array [],
-        "name": "form",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": null,
-        "parent": [Circular],
-        "prev": Object {
-          "attribs": Object {
-            "class": "pt-button pt-intent-primary pt-icon-add",
-            "id": "tour-create-contract-button",
-            "type": "button",
-          },
-          "children": Array [
-            Object {
-              "attribs": Object {},
-              "children": Array [
-                Object {
-                  "data": "Create Contract",
-                  "next": null,
-                  "parent": [Circular],
-                  "prev": null,
-                  "type": "text",
-                },
-              ],
-              "name": "span",
-              "namespace": "http://www.w3.org/1999/xhtml",
-              "next": null,
-              "parent": [Circular],
-              "prev": null,
-              "type": "tag",
-              "x-attribsNamespace": Object {},
-              "x-attribsPrefix": Object {},
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={
+        Object {
+          "src": undefined,
+        }
+      }
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
             },
-          ],
-          "name": "button",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": [Circular],
-          "parent": [Circular],
-          "prev": null,
-          "type": "tag",
-          "x-attribsNamespace": Object {
-            "class": undefined,
-            "id": undefined,
-            "type": undefined,
           },
-          "x-attribsPrefix": Object {
-            "class": undefined,
-            "id": undefined,
-            "type": undefined,
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      initialValues={
+        Object {
+          "address": "",
+          "username": "",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": Object {
+        "src": undefined,
+      },
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
           },
         },
-        "type": "tag",
-        "x-attribsNamespace": Object {},
-        "x-attribsPrefix": Object {},
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
       },
-    ],
-    "name": "div",
-    "namespace": "http://www.w3.org/1999/xhtml",
-    "next": null,
-    "parent": null,
-    "prev": null,
-    "root": Object {
-      "attribs": Object {},
-      "children": Array [
-        [Circular],
-      ],
-      "name": "root",
-      "namespace": "http://www.w3.org/1999/xhtml",
-      "next": null,
-      "parent": null,
-      "prev": null,
-      "type": "root",
-      "x-attribsNamespace": Object {},
-      "x-attribsPrefix": Object {},
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "initialValues": Object {
+        "address": "",
+        "username": "",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
     },
-    "type": "tag",
-    "x-attribsNamespace": Object {
-      "class": undefined,
-      "style": undefined,
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": Object {
+          "src": undefined,
+        },
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "initialValues": Object {
+          "address": "",
+          "username": "",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
     },
-    "x-attribsPrefix": Object {
-      "class": undefined,
-      "style": undefined,
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
     },
   },
-  "_root": [Circular],
+}
+`;
+
+exports[`CreateContract: index render component (public mode) render contracts without source 1`] = `
+ShallowWrapper {
   "length": 1,
-  "options": Object {
-    "decodeEntities": true,
-    "normalizeWhitespace": false,
-    "withDomLvl1": true,
-    "xml": false,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={undefined}
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      initialValues={
+        Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor={undefined}
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": undefined,
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
+      },
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "initialValues": Object {
+        "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+        "username": "Admin_1177_49507",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": undefined,
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
+    },
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": undefined,
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "initialValues": Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": undefined,
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`CreateContract: index render component (public mode) render contracts without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={
+        Object {
+          "src": Object {},
+        }
+      }
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      initialValues={
+        Object {
+          "address": "",
+          "username": "",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": Object {
+        "src": Object {},
+      },
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
+      },
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "initialValues": Object {
+        "address": "",
+        "username": "",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
+    },
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": Object {
+          "src": Object {},
+        },
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "initialValues": Object {
+          "address": "",
+          "username": "",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
   },
 }
 `;

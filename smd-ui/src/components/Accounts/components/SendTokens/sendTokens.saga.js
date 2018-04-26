@@ -45,7 +45,7 @@ export function* sendTokens(action) {
     yield put(sendTokensSuccess(response));
   }
   catch (err) {
-    yield put(sendTokensFailure(err));
+    yield put(sendTokensFailure(err.message));
   }
 }
 

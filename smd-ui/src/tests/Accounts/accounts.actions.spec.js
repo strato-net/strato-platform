@@ -12,7 +12,10 @@ import {
   faucetRequest,
   faucetSuccess,
   faucetFailure,
-  resetUserAddress
+  resetUserAddress,
+  fetchBalanceRequest,
+  fetchBalanceSuccess,
+  fetchBalanceFailure
 } from '../../components/Accounts/accounts.actions';
 import { accountsMock, accountDetail, error } from './accountsMock';
 
@@ -112,7 +115,8 @@ describe('Accounts: action', () => {
 
     test('request', () => {
       let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
-      expect(faucetRequest(address)).toMatchSnapshot();
+      let name = 'blockapps';
+      expect(faucetRequest(address, name)).toMatchSnapshot();
     });
 
     test('success', () => {
@@ -123,6 +127,24 @@ describe('Accounts: action', () => {
       expect(faucetFailure(error)).toMatchSnapshot();
     });
 
-  })
+  });
+
+  describe('fetch balance', () => {
+
+    test('request', () => {
+      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
+      expect(fetchBalanceRequest(address)).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      let detail = { balance: "3000000000000000000000" };
+      expect(fetchBalanceSuccess(detail)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchBalanceFailure(error)).toMatchSnapshot();
+    });
+
+  });
 
 });

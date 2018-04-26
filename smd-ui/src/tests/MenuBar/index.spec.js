@@ -4,58 +4,22 @@ import { createStore, combineReducers } from 'redux';
 import { reducer as formReducer } from 'redux-form';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
+import * as checkMode from '../../lib/checkMode';
 
 describe('MenuBar: index', () => {
 
   let store = createStore(combineReducers({ form: formReducer }));
 
-  test('render component with values', () => {
-    const props = {
-      isLoggedIn: true,
-      currentUser: { username: 'tanuj44' },
-      openWalkThroughOverlay: jest.fn(),
-      location: {
-        search: '?developer'
-      }
-    }
-    let wrapper = shallow(
-      <Provider store={store}>
-        <MemoryRouter>
-          <MenuBar.WrappedComponent {...props} />
-        </MemoryRouter>
-      </Provider>
-    ).dive().dive().dive();
+  describe('renders public mode', () => {
 
-    expect(wrapper.debug()).toMatchSnapshot();
-  });
+    beforeEach(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    });
 
-  test('render component without values', () => {
-    const props = {
-      isLoggedIn: false,
-      currentUser: { username: '' },
-      openWalkThroughOverlay: jest.fn(),
-      location: {}
-    }
-    let wrapper = shallow(
-      <Provider store={store}>
-        <MemoryRouter>
-          <MenuBar.WrappedComponent {...props} />
-        </MemoryRouter>
-      </Provider>
-    ).dive().dive().dive();
-
-    expect(wrapper.debug()).toMatchSnapshot();
-  });
-
-  describe('button', () => {
-
-    test('execute block api', () => {
+    test('component with values', () => {
       const props = {
-        currentUser: { username: 'tanuj44' },
         isLoggedIn: true,
-        openOverlay: jest.fn(),
-        openLoginOverlay: jest.fn(),
-        logout: jest.fn(),
+        currentUser: { username: 'tanuj44' },
         openWalkThroughOverlay: jest.fn(),
         location: {
           search: '?developer'
@@ -70,69 +34,147 @@ describe('MenuBar: index', () => {
         </Provider>
       ).dive().dive().dive();
 
-      wrapper.find('button').first().simulate('click');
-      expect(wrapper.find('button').get(0)).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
-    test('execute stato api', () => {
+    test('component without values', () => {
       const props = {
-        currentUser: { username: 'tanuj44' },
-        isLoggedIn: true,
-        openOverlay: jest.fn(),
-        openLoginOverlay: jest.fn(),
-        logout: jest.fn(),
-        openWalkThroughOverlay: jest.fn(),
-        location: {
-          search: "?developer"
-        }
-      }
-
-      let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
-      ).dive().dive().dive();
-
-      wrapper.find('button').at(1).simulate('click');
-      expect(wrapper.find('button').get(1)).toMatchSnapshot();
-    });
-
-    test('execute logout', () => {
-      const props = {
-        currentUser: { username: 'tanuj44' },
-        isLoggedIn: true,
-        openOverlay: jest.fn(),
-        openLoginOverlay: jest.fn(),
-        logout: jest.fn(),
-        openWalkThroughOverlay: jest.fn(),
-        location: {
-          search: "?developer"
-        }
-      }
-
-      let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
-      ).dive().dive().dive();
-
-      wrapper.find('button').at(2).simulate('click');
-      expect(wrapper.find('button').get(2)).toMatchSnapshot();
-      expect(props.logout).toHaveBeenCalled();
-    });
-
-    test('execute for developer', () => {
-      const props = {
-        currentUser: { username: 'tanuj44' },
         isLoggedIn: false,
-        openLoginOverlay: jest.fn(),
+        currentUser: { username: '' },
+        openWalkThroughOverlay: jest.fn(),
+        location: {}
+      }
+
+      let wrapper = shallow(
+        <Provider store={store}>
+          <MemoryRouter>
+            <MenuBar.WrappedComponent {...props} />
+          </MemoryRouter>
+        </Provider>
+      ).dive().dive().dive();
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    describe('button', () => {
+
+      test('execute block api', () => {
+        const props = {
+          currentUser: { username: 'tanuj44' },
+          isLoggedIn: true,
+          openOverlay: jest.fn(),
+          openLoginOverlay: jest.fn(),
+          logout: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: '?developer'
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('button').first().simulate('click');
+        expect(wrapper.find('button').get(0)).toMatchSnapshot();
+      });
+
+      test('execute stato api', () => {
+        const props = {
+          currentUser: { username: 'tanuj44' },
+          isLoggedIn: true,
+          openOverlay: jest.fn(),
+          openLoginOverlay: jest.fn(),
+          logout: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: "?developer"
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('button').at(1).simulate('click');
+        expect(wrapper.find('button').get(1)).toMatchSnapshot();
+      });
+
+      test('execute logout', () => {
+        const props = {
+          currentUser: { username: 'tanuj44' },
+          isLoggedIn: true,
+          openOverlay: jest.fn(),
+          openLoginOverlay: jest.fn(),
+          logout: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: "?developer"
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('button').at(2).simulate('click');
+        expect(wrapper.find('button').get(2)).toMatchSnapshot();
+        expect(props.logout).toHaveBeenCalled();
+      });
+
+      test('execute for developer', () => {
+        const props = {
+          currentUser: { username: 'tanuj44' },
+          isLoggedIn: false,
+          openLoginOverlay: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: "?developer"
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('Button').last().simulate('click');
+        expect(wrapper.find('Button').get(1)).toMatchSnapshot();
+        expect(props.openWalkThroughOverlay).toHaveBeenCalled();
+      });
+
+    });
+
+  });
+
+  describe('renders enterprise mode', () => {
+
+    beforeEach(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    });
+
+    test('component with values', () => {
+      const props = {
+        isLoggedIn: true,
+        currentUser: { username: 'tanuj44' },
         openWalkThroughOverlay: jest.fn(),
         location: {
-          search: "?developer"
+          search: '?developer'
         }
       }
 
@@ -144,10 +186,82 @@ describe('MenuBar: index', () => {
         </Provider>
       ).dive().dive().dive();
 
-      wrapper.find('Button').last().simulate('click');
-      expect(wrapper.find('Button').get(1)).toMatchSnapshot();
-      expect(props.openWalkThroughOverlay).toHaveBeenCalled();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
+
+    test('component without values', () => {
+      const props = {
+        isLoggedIn: false,
+        currentUser: { username: null },
+        openWalkThroughOverlay: jest.fn(),
+        location: {}
+      }
+
+      let wrapper = shallow(
+        <Provider store={store}>
+          <MemoryRouter>
+            <MenuBar.WrappedComponent {...props} />
+          </MemoryRouter>
+        </Provider>
+      ).dive().dive().dive();
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    describe('button', () => {
+
+      test('execute block api', () => {
+        const props = {
+          isLoggedIn: false,
+          currentUser: { username: null },
+          openOverlay: jest.fn(),
+          openLoginOverlay: jest.fn(),
+          logout: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: '?developer'
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('button').first().simulate('click');
+        expect(wrapper.find('button').get(0)).toMatchSnapshot();
+      });
+
+      test('execute stato api', () => {
+        const props = {
+          isLoggedIn: false,
+          currentUser: { username: null },
+          openOverlay: jest.fn(),
+          openLoginOverlay: jest.fn(),
+          logout: jest.fn(),
+          openWalkThroughOverlay: jest.fn(),
+          location: {
+            search: "?developer"
+          }
+        }
+
+        let wrapper = shallow(
+          <Provider store={store}>
+            <MemoryRouter>
+              <MenuBar.WrappedComponent {...props} />
+            </MemoryRouter>
+          </Provider>
+        ).dive().dive().dive();
+
+        wrapper.find('button').at(1).simulate('click');
+        expect(wrapper.find('button').get(1)).toMatchSnapshot();
+      });
+
+    });
+
   });
 
   test('mapStateToProps', () => {
