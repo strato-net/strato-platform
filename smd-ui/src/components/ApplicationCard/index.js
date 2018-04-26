@@ -6,6 +6,7 @@ import { launchApp, selectApp } from '../Applications/applications.actions';
 import { Menu, MenuItem, Popover, Position, Button } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { isModePublic } from '../../lib/checkMode';
 
 class ApplicationCard extends Component {
 
@@ -28,8 +29,8 @@ class ApplicationCard extends Component {
     const height = 329;
     const width = 575;
     const top = (window.innerHeight - height) / 2;
-    const left = (window.innerWidth  - width) / 2;
-    const opts = 'status=1, width=' + width + ',height=' + height +',top='+ top + ',left=' + left;
+    const left = (window.innerWidth - width) / 2;
+    const opts = 'status=1, width=' + width + ',height=' + height + ',top=' + top + ',left=' + left;
     window.open('https://www.facebook.com/sharer/sharer.php?u=https%3A//blockapps.net/demo1', 'facebook-share-dialog', opts);
   }
 
@@ -90,7 +91,7 @@ class ApplicationCard extends Component {
                     Share
                   </button>
                 </Popover>
-                {!this.props.isLoggedIn ? this.renderLogin(app) : (app.isLoading ?
+                {(!this.props.isLoggedIn && isModePublic()) ? this.renderLogin(app) : (app.isLoading ?
                   <span className="launch-loader"> <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> </span> :
                   <button
                     className="pt-button pt-intent-primary pull-right"
