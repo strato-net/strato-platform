@@ -140,8 +140,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     !build <- buildFromMiningCache
                     !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
                     $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "temp Block data: " ++ show tempRewarded
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "build Block data: " ++ show tempRewarded
                     setStateDBStateRoot lastSR
                     newTxRanCallback newTxs (obBlockData build)
                     updateTxCallback newUpdates
