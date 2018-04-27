@@ -204,10 +204,11 @@ addBlocks blocks = do
   potentialBestBlocks <- forM blocks' $ \block -> timeit "Block insertion" timerToUse $ do
     case (obOrigin block) of
       TO.Quarry -> do
-        currentBaggerStateRoot <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
-        lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ show currentBaggerStateRoot
-        lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ show (blockDataStateRoot $ obBlockData block)
-        if ((blockDataStateRoot $ obBlockData block) == currentBaggerStateRoot)
+        currentBaggerSR <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
+        let blockSR = blockDataStateRoot $ obBlockData block
+        lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ show currentBaggerSR
+        lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ show blockSR
+        if (blockSR == currentBaggerSR)
           then do
             _ <- setParentStateRoot block
             updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
