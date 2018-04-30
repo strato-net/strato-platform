@@ -55,7 +55,7 @@ class Account extends Component {
             </tr>
             <tr>
               <td><strong>Balance</strong></td>
-              <td>{account.balance}</td>
+              <td>{account.balance} {account.balance ? 'wei' : ''}</td>
             </tr>
             <tr>
               <td><strong>Latest Block Number</strong></td>
