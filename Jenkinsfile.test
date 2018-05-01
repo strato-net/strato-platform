@@ -104,7 +104,7 @@ pipeline {
               cd blockapps-haskell
               ./run_unit_tests.sh
             '''
-          }
+          },
 
           'SMD tests': {
             sh '''#!/bin/bash -le
