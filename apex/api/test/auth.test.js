@@ -89,20 +89,27 @@ describe('App', function () {
             assert.equal(res.status, '401');
           });
       });
-      // TODO(tim): Reenable with signup.blockapps.net working
-      xit('creates accounts', async function () {
+      it('creates accounts', async function () {
         this.timeout(20000);
+        await models.TempUser.create({
+          email: 'you@test.com',
+          password: bcrypt.hashSync('hunter2', appConfig.passwordSaltRounds),
+          verified: true
+        });
         const res1 = await chai.request(app)
           .post('/users')
           .send({
-            username: "you",
+            username: "you@test.com",
             password: "hunter2"
           })
         assert.equal(res1.status, '200');
+        const tempUser = await models.TempUser.findOne({ where: { email: 'you@test.com' } });
+        // The user should be deleted from TempUser after account creation
+        should.not.exist(tempUser);
         const res2 = await chai.request(app)
           .post('/login')
           .send({
-            username: "you",
+            username: "you@test.com",
             password: "hunter2"
           })
         assert.equal(res2.status, '200');
@@ -130,20 +137,22 @@ describe('App', function () {
           });
       });
 
-      // TODO(tim): Reenable with signup.blockapps.net working
-      xit('Accepts a working bundle', async function () {
+      it('Accepts a working bundle', async function () {
         this.timeout(60000);
+        await models.TempUser.create({
+          email: 'dev@test.com',
+          password: bcrypt.hashSync('hunter3', appConfig.passwordSaltRounds),
+          verified: true
+        });
         const res1 = await chai.request(app)
           .post('/users')
           .send({
-            username: "dev",
+            username: "dev@test.com",
             password: "hunter3"
           })
         assert.equal(res1.status, '200');
         const address = JSON.parse(res1.text).user.accountAddress;
         assert.notEqual(address, undefined);
-
-
         const res2 = await chai.request(process.env.stratoRoot)
           .post('/faucet')
           .field('address', address)
@@ -188,14 +197,18 @@ describe('App', function () {
         expect(got).to.deep.equal(want);
       });
 
-      // TODO(tim): Reenable with signup.blockapps.net working
-      xit("can upload init contracts", async function () {
+      it("can upload init contracts", async function () {
         this.timeout(30000);
         console.log("about to create user");
+        await models.TempUser.create({
+          email: 'john_wayne@test.com',
+          password: bcrypt.hashSync('hunter2', appConfig.passwordSaltRounds),
+          verified: true
+        });
         const res1 = await chai.request(app)
           .post('/users')
           .send({
-            username: "john_wayne",
+            username: "john_wayne@test.com",
             password: "hunter2"
           });
         assert.equal(res1.status, '200');
@@ -208,7 +221,7 @@ describe('App', function () {
         assert.equal(res2.status, '200');
 
         const creds = {
-          name: "john_wayne",
+          name: "john_wayne@test.com",
           password: "hunter2",
           address: address
         };
