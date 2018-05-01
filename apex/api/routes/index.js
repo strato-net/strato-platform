@@ -8,17 +8,17 @@ const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
+const checkMode = require('../lib/checkMode').checkMode;
 
 router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-// TODO: should only be exposed for SMD_MODE var == 'public'
-router.post('/login', authController.login);
-router.post('/users', authController.create);
-router.post('/logout', authHandler.validateRequest(), authController.logout);
-router.post('/verify-email', authController.verifyEmail);
-router.post('/verify-temporary-password', authController.verifyTemporaryPassword);
+router.post('/login', checkMode, authController.login);
+router.post('/users', checkMode, authController.create);
+router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
+router.post('/verify-email', checkMode, authController.verifyEmail);
+router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);
