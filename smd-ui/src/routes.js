@@ -17,6 +17,7 @@ import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import { isModePublic } from './lib/checkMode';
+import Consortium from './components/Consortium';
 
 const CommonRoute = (props) => {
   const CommonRoute = props.route === 'public' ? Route : ProtectedRoute;
@@ -33,6 +34,7 @@ const CommonRoute = (props) => {
     <CommonRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <CommonRoute exact path="/code_editor" component={CodeEditor} />
     <CommonRoute exact path="/launchpad" component={LaunchPad} />
+
   </div>)
 };
 
@@ -52,6 +54,7 @@ export const routes = isModePublic() ? (
       </Route>
       <Route exact path="/home" component={Dashboard} />
       <Route exact path="/apps" component={Applications} />
+      <Route exact path="/consortium" component={Consortium} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>
