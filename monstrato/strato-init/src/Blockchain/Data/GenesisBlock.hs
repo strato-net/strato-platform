@@ -92,20 +92,13 @@ initializeStateDB addressInfo = do
                                 putStorageTrie address slots
     mapM_ putAccount addressInfo
 
-initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
 
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
-                          -> m ([(AccountInfo, CodeInfo)], Block)
+                          -> m ([AccountInfo], Block)
 genesisInfoToGenesisBlock gi = do
-    let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    let sourceInfo = case codes of
-                    [] -> []
-                    [c] -> zip accounts (repeat c)
-                    _ -> error "not equipped to seed for multiple contract types"
-    initializeCodeDB codes
+    let sourceInfo = []
     initializeStateDB accounts
     db <- getStateDB
     return (sourceInfo, Block {
@@ -133,7 +126,7 @@ genesisInfoToGenesisBlock gi = do
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
                                      => String
-                                     -> m ([(AccountInfo, CodeInfo)], Block)
+                                     -> m ([AccountInfo], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let theJSON = either error id (eitherDecode theJSONString)
@@ -154,7 +147,7 @@ initializeGenesisBlock :: ( MonadResource m
                        -> String
                        -> m ()
 initializeGenesisBlock backupType genesisBlockName = do
-    (srcInfo, genesisBlock, obGB) <-
+    (_, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
                 (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
@@ -184,12 +177,6 @@ initializeGenesisBlock backupType genesisBlockName = do
         updatedAccounts     = Map.empty
     }
     commitSqlDiffs diff Nothing Nothing
-    let writeSource (account, CodeInfo _ name src) = case account of
-            NonContract _ _ -> return ()
-            ContractNoStorage addr _ _ -> updateSource addr name src
-            ContractWithStorage addr _ _ _ -> updateSource addr name src
-
-    forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
