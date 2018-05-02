@@ -1,4 +1,4 @@
-FROM node:boron-slim
+FROM node:9
 
 RUN mkdir -p /usr/src/app
 
@@ -6,6 +6,7 @@ WORKDIR /usr/src/app
 
 COPY . /usr/src/app
 
-# npm test requires the dev-dependencies which are not installed in production image
-RUN npm install && \
-    npm test
+# Caching npm install
+RUN npm install
+
+RUN npm test

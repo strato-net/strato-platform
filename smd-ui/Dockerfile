@@ -1,7 +1,7 @@
-FROM node:boron-slim
+FROM node:9
 
 RUN mkdir -p /usr/src/app && \
-    npm install --verbose -g serve@6.5.3
+    npm install --verbose -g serve
 
 WORKDIR /usr/src/app
 
