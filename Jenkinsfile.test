@@ -104,6 +104,15 @@ pipeline {
               cd blockapps-haskell
               ./run_unit_tests.sh
             '''
+          },
+
+          'SMD tests': {
+            sh '''#!/bin/bash -le
+              set -x
+              echo 'Running SMD tests'
+              cd smd-ui
+              docker build -f Dockerfile.test .
+            '''
           }
         )
       }
