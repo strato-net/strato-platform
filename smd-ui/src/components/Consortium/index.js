@@ -8,6 +8,7 @@ class Consortium extends Component {
   constructor(props) {
     super(props);
     this.state = { navbarTab: 'entities' };
+    this.handleClick = this.handleClick.bind(this);
   }
 
   handleNavbarTabChange(navbarTab) {
@@ -25,6 +26,10 @@ class Consortium extends Component {
     }
   }
 
+  handleClick() {
+    this.props.history.push('/consortium/new');
+  }
+
   render() {
     return (
       <div className="container-fluid pt-dark consortium">
@@ -33,7 +38,7 @@ class Consortium extends Component {
             <h3>Consortium</h3>
           </div>
           <div className="col-md-8 text-right">
-            <Button text="Create New Consortium" className="smd-margin-16" />
+            <Button text="Create New Consortium" className="smd-margin-16" onClick={this.handleClick} />
           </div>
           <br />
         </div>

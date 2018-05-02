@@ -18,6 +18,7 @@ import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import { isModePublic } from './lib/checkMode';
 import Consortium from './components/Consortium';
+import CreateConsortium from './components/Consortium/components/CreateConsortium';
 
 const CommonRoute = (props) => {
   const CommonRoute = props.route === 'public' ? Route : ProtectedRoute;
@@ -55,6 +56,7 @@ export const routes = isModePublic() ? (
       <Route exact path="/home" component={Dashboard} />
       <Route exact path="/apps" component={Applications} />
       <Route exact path="/consortium" component={Consortium} />
+      <Route exact path="/consortium/new" component={CreateConsortium} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>

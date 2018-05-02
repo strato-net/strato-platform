@@ -35,6 +35,7 @@ import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer'
 import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 import entitesReducer from './components/Consortium/components/Entities/entities.reducer';
+import createConsortiumReducer from './components/Consortium/components/CreateConsortium/createConsortium.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -101,7 +102,8 @@ const rootReducer = combineReducers({
   tokenRequest: tokenRequestReducer,
   verifyAccount: verifyAccountReducer,
   createBlocUser: createBlocUserReducer,
-  entites: entitesReducer
+  entites: entitesReducer,
+  createConsortium: createConsortiumReducer
 });
 
 const rootSaga = function* startForeman() {
