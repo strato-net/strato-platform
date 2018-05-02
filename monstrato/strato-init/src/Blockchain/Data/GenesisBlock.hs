@@ -14,6 +14,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import           Data.List.Split                      (chunksOf)
 
 import           Blockchain.Database.MerklePatricia
 
@@ -68,9 +69,11 @@ initializeBlankStateDB = do
 putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
-    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
-    flushMemStorageDB
-    Mem.flushMemAddressStateDB
+    let slotss = chunksOf 10000 slots
+    forM_ slotss (\ss ->  do
+      mapM_ (\(k, v) -> putStorageKeyVal' address k v) ss
+      flushMemStorageDB
+      Mem.flushMemAddressStateDB)
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
