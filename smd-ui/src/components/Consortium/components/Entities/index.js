@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
+import InviteEntity from './InviteEntity';
 
 class Entities extends Component {
 
@@ -36,29 +37,34 @@ class Entities extends Component {
       })
     } else {
       return (
-        <tr> <td colSpan={5}> No records found </td> </tr>
+        <tr><td colSpan={5}>No records found</td></tr>
       )
     }
   }
 
   render() {
     return (
-      <table className="pt-table pt-interactive pt-condensed pt-striped"
-        style={{ width: '100%' }}>
-        <thead>
-          <tr>
-            <th><h5>Member</h5></th>
-            <th><h5>Nodes</h5></th>
-            <th><h5>Users</h5></th>
-            <th><h5>Status</h5></th>
-            <th><h5>Privacy</h5></th>
-          </tr>
-        </thead>
+      <div>
+        <div className="text-right">
+          <InviteEntity />
+        </div>
+        <table className="pt-table pt-interactive pt-condensed pt-striped"
+          style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th><h5>Member</h5></th>
+              <th><h5>Nodes</h5></th>
+              <th><h5>Users</h5></th>
+              <th><h5>Status</h5></th>
+              <th><h5>Privacy</h5></th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {this.tableData()}
-        </tbody>
-      </table>
+          <tbody>
+            {this.tableData()}
+          </tbody>
+        </table>
+      </div>
     )
   }
 }

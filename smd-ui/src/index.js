@@ -34,6 +34,7 @@ import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
+import entitesReducer from './components/Consortium/components/Entities/entities.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -99,7 +100,8 @@ const rootReducer = combineReducers({
   walkThrough: walkThroughReducer,
   tokenRequest: tokenRequestReducer,
   verifyAccount: verifyAccountReducer,
-  createBlocUser: createBlocUserReducer
+  createBlocUser: createBlocUserReducer,
+  entites: entitesReducer
 });
 
 const rootSaga = function* startForeman() {

@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { Button, Tabs2, Tab2 } from '@blueprintjs/core';
 import Nodes from './components/Nodes';
-import Admins from './components/Admins';
+import Users from './components/Users';
 import Entities from './components/Entities';
 
 class Consortium extends Component {
@@ -18,8 +18,8 @@ class Consortium extends Component {
     switch (this.state.navbarTab) {
       case 'nodes':
         return <Nodes />
-      case 'admins':
-        return <Admins />
+      case 'users':
+        return <Users />
       default:
         return <Entities />
     }
@@ -47,7 +47,7 @@ class Consortium extends Component {
             >
               <Tab2 id="entities" title="Entities" />
               <Tab2 id="nodes" title="Nodes" />
-              <Tab2 id="admins" title="Admins" />
+              <Tab2 id="users" title="Users" />
             </Tabs2>
 
             {this.renderComponent()}
