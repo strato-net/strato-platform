@@ -129,7 +129,6 @@ instance ToJSON Transaction' where
                   "to" .= showHex tto "",
                   "value" .= tval,
                   "data" .= td,
-                  "chainId" .= tcid,
                   "r" .= showHex tr "",
                   "s" .= showHex ts "",
                   "v" .= showHex tv "",
