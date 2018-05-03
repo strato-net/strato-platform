@@ -139,23 +139,25 @@ describe('App', function () {
 
       it('Accepts a working bundle', async function () {
         this.timeout(60000);
+        const username = 'username@example.com';
+        const password = 'randomPassword';
         await models.TempUser.create({
-          email: 'dev@test.com',
-          password: bcrypt.hashSync('hunter3', appConfig.passwordSaltRounds),
+          email: username,
+          password: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
           verified: true
         });
         const res1 = await chai.request(app)
           .post('/users')
           .send({
-            username: "dev@test.com",
-            password: "hunter3"
-          })
+            username: username,
+            password: password
+          });
         assert.equal(res1.status, '200');
         const address = JSON.parse(res1.text).user.accountAddress;
         assert.notEqual(address, undefined);
         const res2 = await chai.request(process.env.stratoRoot)
           .post('/faucet')
-          .field('address', address)
+          .field('address', address);
         assert.equal(res2.status, '200');
 
         let text = "[]";
@@ -176,8 +178,8 @@ describe('App', function () {
           .attach('file',
             fs.readFileSync('./test/testdata/testdata.zip'),
             'testdata.zip')
-          .field('username', 'dev')
-          .field('password', 'hunter3')
+          .field('username', username)
+          .field('password', password)
           .field('address', address)
         assert.equal(res3.status, 200);
         assert(res3.text.includes("\"url\""));
