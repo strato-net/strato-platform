@@ -12,7 +12,7 @@ import Data.ByteString (hGetContents, ByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
 
-import Blockchain.Generation (insertContractsCount, insertContractsJSON)
+import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address ()
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
@@ -27,7 +27,8 @@ defineFlag "r:records_file" ("" :: String) "Filename containing CSV records of d
                                            \ small strings as well). Little validation is \
                                            \ performed. Rows with fewer columns will \
                                            \ have fewer columns inserted."
-
+defineFlag "t:hash_maps" (False :: Bool) "Use an alternative JSON parsing scheme, where objects\
+                                          \ are hashmaps instead of structs"
 defineFlag "f:fake_flag" (0:: Integer) "Hflags will ignore this flag."
 
 
@@ -68,7 +69,9 @@ main = do
               then return $ insertContractsCount flags_number
               else do
                   json <- L.readFile flags_records_file
-                  return $ insertContractsJSON json
+                  return $ if flags_hash_maps
+                             then insertContractsJSONHashMaps json
+                             else insertContractsJSON json
   let output = insert name src bytes (fromInteger flags_start) genesis
 
   case output of

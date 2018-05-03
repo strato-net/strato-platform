@@ -276,3 +276,25 @@ spec = do
             ]]
         got = encodeJSON input
     in got `shouldBe` want
+
+  it "Should encode mapping(bytes32 => uint)" $
+    let input = "[[{\"hello, world\": 255, \
+                 \  \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\":65535, \
+                 \  \"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\": 16777215}]]"
+        want = Right [[
+            -- Mapping reserved spot
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x0000000000000000000000000000000000000000000000000000000000000000),
+            -- keccak256("hello, world" + '\0' * 20 <> uint256(0)) = 0cfed6...
+            (0x0cfed68a184422f13ee7ec91f5da2bb2308dd2f99b1e970d69a8fe4a32752620,
+             0x00000000000000000000000000000000000000000000000000000000000000ff),
+            -- keccak256('a' * 32 + '\0' * 32) = 31db...
+            (0x31bdf21e71593a7b324dcbb99d5d011856259a09fdda85b2c97448b1bb45c2de,
+             0x000000000000000000000000000000000000000000000000000000000000ffff),
+            -- Strings longer than 32 bytes are truncated to 32
+            -- keccak256('z' * 32 + '\0' * 32) = 4490...
+            (0x4490202cf2d5b5a4a1cc5b09643c81c0a37330a9ec8d1249a2b2febd1150027b,
+             0x0000000000000000000000000000000000000000000000000000000000ffffff)
+            ]]
+        got = encodeJSONHashMaps input
+    in got `shouldBe` want
