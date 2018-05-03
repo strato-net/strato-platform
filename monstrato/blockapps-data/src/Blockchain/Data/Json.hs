@@ -198,11 +198,11 @@ bPrimeToB (Block' x _) = x
 data BlockData' = BlockData' BlockData deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-      toJSON (BlockData' (BlockData ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh)) =
-        object ["kind" .= ("BlockData" :: String), "parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
+      toJSON (BlockData' (BlockData ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh cid)) =
+        object $ ["kind" .= ("BlockData" :: String), "parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
-        "mixHash" .= mh]
+        "mixHash" .= mh] ++ (("chainId" .=) <$> (maybeToList cid))
 
 instance FromJSON BlockData' where
     parseJSON = withObject "BlockData'" $ \v -> BlockData' <$> (BlockData
@@ -221,6 +221,7 @@ instance FromJSON BlockData' where
       <*> v .: "extraData"
       <*> v .: "nonce"
       <*> v .: "mixHash"
+      <*> v .:? "chainId"
       )
 
 instance FromJSON Block' where
@@ -241,11 +242,12 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh bi h pow isConf td)) =
-        object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
+      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh cid bi h pow isConf td)) =
+        object $ ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
         "mixHash" .= mh, "blockId" .= bi, "hash" .= h, "powVerified" .= pow, "isConfirmed" .= isConf, "totalDifficulty" .= td]
+        ++ (("chainId" .=) <$> (maybeToList cid))
 
 
 

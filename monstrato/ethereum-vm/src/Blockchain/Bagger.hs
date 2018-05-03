@@ -415,6 +415,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
                         , DD.blockDataExtraData        = 0
                         , DD.blockDataMixHash          = SHA 0
                         , DD.blockDataNonce            = 5
+                        , DD.blockDataChainId          = DD.blockDataChainId parentHeader
                         }
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData

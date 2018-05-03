@@ -7,6 +7,7 @@ module Blockchain.Data.BlockHeader (
   ) where
 
 import qualified Data.ByteString                    as B
+import           Data.Maybe                         (maybeToList)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
@@ -41,11 +42,12 @@ data BlockHeader =
     timestamp        :: UTCTime,
     extraData        :: Integer,
     mixHash          :: SHA,
-    nonce            :: Word64
+    nonce            :: Word64,
+    chainId          :: Maybe Word256
     } deriving (Eq, Read, Show)
 
 instance Format BlockHeader where
-  format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
+  format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce' cId) =
     CL.blue ("BlockHeader #" ++ show number') ++ " " ++ format (headerHash header) ++
     tab ("\nparentHash: " ++ format ph ++ "\n" ++
          "ommersHash: " ++ format oh ++
@@ -59,11 +61,12 @@ instance Format BlockHeader where
          "gasUsed: " ++ show gu ++ "\n" ++
          "timestamp: " ++ show ts ++ "\n" ++
          "extraData: " ++ show ed ++ "\n" ++
-         "nonce: " ++ showHex nonce' "")
+         "nonce: " ++ showHex nonce' "" ++ "\n" ++
+         "chainId: " ++ (show . fmap (flip showHex "") $ cId) ++ "\n")
 
 instance RLPSerializable BlockHeader where
-  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-    RLPArray [
+  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cId) =
+    RLPArray $ [
       rlpEncode ph,
       rlpEncode oh,
       rlpEncode b,
@@ -79,7 +82,26 @@ instance RLPSerializable BlockHeader where
       rlpEncode ed,
       rlpEncode mh,
       rlpEncode $ B.pack $ word64ToBytes nonce'
-      ]
+      ] ++ (maybeToList $ fmap rlpEncode cId)
+  rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce', cid]) =
+    BlockHeader {
+      parentHash=rlpDecode ph,
+      ommersHash=rlpDecode oh,
+      beneficiary=rlpDecode b,
+      stateRoot=rlpDecode sr,
+      transactionsRoot=rlpDecode tr,
+      receiptsRoot=rlpDecode rr,
+      logsBloom=rlpDecode lb,
+      difficulty=rlpDecode d,
+      number=rlpDecode number',
+      gasLimit=rlpDecode gl,
+      gasUsed=rlpDecode gu,
+      timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+      extraData=rlpDecode ed,
+      mixHash=rlpDecode mh,
+      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
+      chainId = Just $ rlpDecode cid
+      }
   rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
     BlockHeader {
       parentHash=rlpDecode ph,
@@ -96,7 +118,8 @@ instance RLPSerializable BlockHeader where
       timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
       extraData=rlpDecode ed,
       mixHash=rlpDecode mh,
-      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce'
+      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
+      chainId = Nothing
       }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
@@ -132,6 +155,7 @@ instance BlockHeaderLike BlockHeader where
                                               , extraData        = blockHeaderExtraData b
                                               , timestamp        = blockHeaderTimestamp b
                                               , mixHash          = blockHeaderMixHash b
+                                              , chainId          = Nothing -- TODO: Add chainId to BlockHeaderLike
                                               }
 
 headerHash :: BlockHeader->SHA
@@ -145,5 +169,5 @@ blockToBody Block{blockReceiptTransactions=transactions, blockBlockUncles=uncles
   (transactions, map blockDataToBlockHeader uncles)
 
 blockDataToBlockHeader::BlockData->BlockHeader
-blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-  BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cid) =
+  BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh cid

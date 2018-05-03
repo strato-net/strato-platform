@@ -1,7 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Sequencer.BinaryInstances() where
 
+import           Control.Monad               (when)
 import           Data.Binary
+import           Data.Binary.Get             (isEmpty)
+import           Data.Maybe                  (isJust)
 
 import           Blockchain.Data.Address     ()
 import qualified Blockchain.Data.DataDefs    as DD
@@ -24,7 +27,7 @@ instance Binary TX.Transaction where
         return . rlpDecode . rlpDeserialize $ bs
 
 instance Binary DD.BlockData where
-    put bd = sequence_ $ map ($ bd)
+    put bd = sequence_ $ map ($ bd) $
         [ put . DD.blockDataParentHash
         , put . DD.blockDataUnclesHash
         , put . DD.blockDataCoinbase
@@ -40,6 +43,7 @@ instance Binary DD.BlockData where
         , put . DD.blockDataExtraData
         , put . DD.blockDataNonce
         , put . DD.blockDataMixHash
+        , when (isJust $ DD.blockDataChainId bd) . put . DD.blockDataChainId
         ]
     get = do
         parentHash       <- get
@@ -57,9 +61,13 @@ instance Binary DD.BlockData where
         extraData        <- get
         nonce            <- get
         mixHash          <- get
+        areWeDoneYet     <- isEmpty
+        chainId          <- if areWeDoneYet
+                              then pure Nothing
+                              else Just <$> get
         return $ DD.BlockData parentHash unclesHash coinbase
             stateRoot transactionsRoot receiptsRoot logBloom
             difficulty number gasLimit gasUsed timestamp extraData
-            nonce mixHash
+            nonce mixHash chainId
 
 

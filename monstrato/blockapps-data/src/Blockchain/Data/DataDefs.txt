@@ -14,6 +14,7 @@ BlockData
     extraData Integer
     nonce Word64
     mixHash SHA
+    chainId Word256 Maybe
     deriving Eq Read Show
 
 BlockDataRef
@@ -32,6 +33,7 @@ BlockDataRef
     extraData Integer
     nonce Word64
     mixHash SHA
+    chainId Word256 Maybe
     blockId BlockId
     hash SHA
     powVerified Bool
