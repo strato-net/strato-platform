@@ -26,6 +26,8 @@ sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf lib
 sudo yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
 curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 sudo yum install libsodium libsodium-devel postgresql-devel stack cmake3 gcc-c++ libleveldb-devel
+stack upgrade
+# edit path to include ~/.local/bin for stack
 ```
 
 #### Mac people:
