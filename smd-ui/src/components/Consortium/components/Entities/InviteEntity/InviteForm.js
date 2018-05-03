@@ -5,6 +5,7 @@ import { Field, reduxForm } from 'redux-form';
 import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../../lib/mixpanelWrapper';
 import { closeInviteEntityModal } from '../entities.actions';
+import { validate } from './validate';
 
 class InviteForm extends Component {
 
@@ -14,7 +15,16 @@ class InviteForm extends Component {
   }
 
   submit = (values) => {
+    let errors = validate(values);
+    this.setState({ errors });
     // TODO to submit values
+  }
+
+  errorMessageFor = (fieldName) => {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
   }
 
   render() {
@@ -28,13 +38,14 @@ class InviteForm extends Component {
               </label>
               <div className="pt-form-content">
                 <Field
-                  name="entityname"
+                  name="entityName"
                   className="pt-input form-width smd-full-width"
                   placeholder="Entity Name"
                   component="input"
                   type="input"
                   required
                 />
+                <div className="error-text">{this.errorMessageFor('entityName')}</div>
               </div>
             </div>
 
@@ -52,6 +63,7 @@ class InviteForm extends Component {
                   required
                 />
               </div>
+              <div className="error-text">{this.errorMessageFor('nodeUrl')}</div>
             </div>
 
             <div className="pt-form-group pt-intent-danger">
@@ -67,6 +79,7 @@ class InviteForm extends Component {
                   type="input"
                   required
                 />
+                <div className="error-text">{this.errorMessageFor('adminEtheriumAddress')}</div>
               </div>
             </div>
 
@@ -83,6 +96,7 @@ class InviteForm extends Component {
                   type="input"
                   required
                 />
+                <div className="error-text">{this.errorMessageFor('adminName')}</div>
               </div>
             </div>
 
@@ -99,6 +113,7 @@ class InviteForm extends Component {
                   type="input"
                   required
                 />
+                <div className="error-text">{this.errorMessageFor('adminEmail')}</div>
               </div>
             </div>
 
@@ -115,6 +130,7 @@ class InviteForm extends Component {
                   type="input"
                   required
                 />
+                <div className="error-text">{this.errorMessageFor('tokenAmount')}</div>
               </div>
             </div>
 
