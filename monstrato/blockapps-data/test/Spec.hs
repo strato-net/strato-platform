@@ -10,7 +10,6 @@ import qualified Data.HashMap.Strict                    as HM
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
-import           Debug.Trace                     (traceShowId)
 import           Test.Hspec
 
 import           Blockchain.Data.Address
@@ -95,9 +94,9 @@ compareJSON :: (Show a, FromJSON a, ToJSON a) => C8.ByteString -> Either String 
 compareJSON expected actual =
   case actual of
       Left r -> expectationFailure r
-      Right c -> let output = traceShowId $ Ae.encode c
-                     inValue = traceShowId $ Ae.eitherDecode expected :: Either String Ae.Value
-                     outValue = traceShowId $ Ae.eitherDecode output :: Either String Ae.Value
+      Right c -> let output = Ae.encode c
+                     inValue = Ae.eitherDecode expected :: Either String Ae.Value
+                     outValue = Ae.eitherDecode output :: Either String Ae.Value
                  in liftM2 diff inValue outValue`shouldBe` (Right $ Patch [])
 
 unsafeExtractTX :: String -> IO Transaction'
