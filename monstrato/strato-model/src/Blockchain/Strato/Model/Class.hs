@@ -8,6 +8,7 @@ import           Data.Word
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
@@ -44,13 +45,14 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderExtraData        :: h -> Integer -- todo: extradata newtype
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
+    blockHeaderChainId          :: h -> Maybe Word256
 
     morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
     {-# MINIMAL blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
-                blockHeaderMixHash, morphBlockHeader #-}
+                blockHeaderMixHash, blockHeaderChainId, morphBlockHeader #-}
 
     blockHeaderHash :: h -> SHA
     blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
@@ -87,10 +89,11 @@ class (RLPSerializable t) => TransactionLike t where
     txGasLimit    :: t -> Integer
     txCode        :: t -> Maybe Code
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
+    txChainId     :: t -> Maybe Word256
 
     morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
-                txCode, txData, morphTx #-}
+                txCode, txData, txChainId, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

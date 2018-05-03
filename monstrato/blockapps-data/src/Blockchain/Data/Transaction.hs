@@ -82,6 +82,7 @@ instance TransactionLike Transaction where
     txValue       = transactionValue
     txGasPrice    = transactionGasPrice
     txGasLimit    = transactionGasLimit
+    txChainId     = transactionChainId
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation
@@ -96,8 +97,8 @@ instance TransactionLike Transaction where
     txData ContractCreationTX{} = Nothing
 
     morphTx t = case type' of
-        Message          -> MessageTX n gp gl dest val dat Nothing r s v       -- TODO: Add correct chain id morphing
-        ContractCreation -> ContractCreationTX n gp gl val code Nothing r s v
+        Message          -> MessageTX n gp gl dest val dat chainId r s v
+        ContractCreation -> ContractCreationTX n gp gl val code chainId r s v
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -107,6 +108,7 @@ instance TransactionLike Transaction where
               dat       = fromJust (txData t)
               code      = fromJust (txCode t)
               (r, s, v) = txSignature t
+              chainId   = txChainId t
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v _ _ _) = MessageTX nonce' gp gl to' val dat cid r s v

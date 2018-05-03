@@ -45,12 +45,13 @@ data BlockHeader =
     timestamp        :: UTCTime,
     extraData        :: Integer,
     mixHash          :: SHA,
-    nonce            :: Word64
+    nonce            :: Word64,
+    chainId          :: Maybe Word256
     } deriving (Eq, Read, Show)
 
 instance RLPSerializable BlockHeader where
-  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-    RLPArray [
+  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cid) =
+    RLPArray $ [
       rlpEncode ph,
       rlpEncode oh,
       rlpEncode b,
@@ -66,7 +67,26 @@ instance RLPSerializable BlockHeader where
       rlpEncode ed,
       rlpEncode mh,
       rlpEncode $ B.pack $ word64ToBytes nonce'
-      ]
+      ] ++ (maybeToList $ fmap rlpEncode cid)
+  rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce', cid]) =
+    BlockHeader {
+      parentHash=rlpDecode ph,
+      ommersHash=rlpDecode oh,
+      beneficiary=rlpDecode b,
+      stateRoot=rlpDecode sr,
+      transactionsRoot=rlpDecode tr,
+      receiptsRoot=rlpDecode rr,
+      logsBloom=rlpDecode lb,
+      difficulty=rlpDecode d,
+      number=rlpDecode number',
+      gasLimit=rlpDecode gl,
+      gasUsed=rlpDecode gu,
+      timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+      extraData=rlpDecode ed,
+      mixHash=rlpDecode mh,
+      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
+      chainId = Just $ rlpDecode cid
+      }
   rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
     BlockHeader {
       parentHash=rlpDecode ph,
@@ -83,7 +103,8 @@ instance RLPSerializable BlockHeader where
       timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
       extraData=rlpDecode ed,
       mixHash=rlpDecode mh,
-      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce'
+      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
+      chainId = Nothing
       }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
@@ -103,6 +124,7 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderExtraData        = extraData
     blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
+    blockHeaderChainId          = chainId
 
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
                                               , parentHash       = blockHeaderParentHash b
@@ -119,6 +141,7 @@ instance BlockHeaderLike BlockHeader where
                                               , extraData        = blockHeaderExtraData b
                                               , timestamp        = blockHeaderTimestamp b
                                               , mixHash          = blockHeaderMixHash b
+                                              , chainId          = blockHeaderChainId b
                                               }
 
 headerHash :: BlockHeader->SHA

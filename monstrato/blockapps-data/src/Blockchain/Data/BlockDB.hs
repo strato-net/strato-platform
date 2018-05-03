@@ -334,6 +334,7 @@ instance BlockHeaderLike BlockData where
     blockHeaderExtraData        = blockDataExtraData
     blockHeaderTimestamp        = blockDataTimestamp
     blockHeaderMixHash          = blockDataMixHash
+    blockHeaderChainId          = blockDataChainId
 
     morphBlockHeader h2 =
         BlockData { blockDataNumber           = blockHeaderBlockNumber h2
@@ -351,7 +352,7 @@ instance BlockHeaderLike BlockData where
                   , blockDataExtraData        = blockHeaderExtraData h2
                   , blockDataTimestamp        = blockHeaderTimestamp h2
                   , blockDataMixHash          = blockHeaderMixHash h2
-                  , blockDataChainId          = Nothing -- TODO: Add chainId to BlockHeaderLike
+                  , blockDataChainId          = blockHeaderChainId h2
                   }
 
 createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block

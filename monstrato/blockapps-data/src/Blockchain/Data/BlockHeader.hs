@@ -139,6 +139,7 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderExtraData        = extraData
     blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
+    blockHeaderChainId          = chainId
 
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
                                               , parentHash       = blockHeaderParentHash b
@@ -155,7 +156,7 @@ instance BlockHeaderLike BlockHeader where
                                               , extraData        = blockHeaderExtraData b
                                               , timestamp        = blockHeaderTimestamp b
                                               , mixHash          = blockHeaderMixHash b
-                                              , chainId          = Nothing -- TODO: Add chainId to BlockHeaderLike
+                                              , chainId          = blockHeaderChainId b
                                               }
 
 headerHash :: BlockHeader->SHA
