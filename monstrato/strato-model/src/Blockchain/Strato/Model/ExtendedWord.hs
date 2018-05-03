@@ -113,3 +113,10 @@ instance Format Word256 where
 instance Ae.ToJSONKey Word256 where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
     where f = T.pack . format
+
+instance RLPSerializable (Maybe Word256) where
+  rlpEncode Nothing  = RLPArray [RLPScalar 0]
+  rlpEncode (Just w) = RLPArray [RLPScalar 1, rlpEncode w]
+
+  rlpDecode (RLPArray [RLPScalar 1, rlps]) = Just (rlpDecode rlps)
+  rlpDecode _ = Nothing

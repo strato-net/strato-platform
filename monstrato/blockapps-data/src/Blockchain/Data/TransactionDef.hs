@@ -22,6 +22,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 derivePersistField "Transaction"
 
@@ -33,6 +34,7 @@ data Transaction =
     transactionTo       :: Address,
     transactionValue    :: Integer,
     transactionData     :: B.ByteString,
+    transactionChainId  :: Maybe Word256,
     transactionR        :: Integer,
     transactionS        :: Integer,
     transactionV        :: Word8
@@ -43,13 +45,14 @@ data Transaction =
     transactionGasLimit :: Integer,
     transactionValue    :: Integer,
     transactionInit     :: Code,
+    transactionChainId  :: Maybe Word256,
     transactionR        :: Integer,
     transactionS        :: Integer,
     transactionV        :: Word8
     } deriving (Show, Read, Eq, Ord, Generic)
 
 instance Format Transaction where
-  format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
+  format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid} =
     CL.blue "Message Transaction" ++
     tab (
       "\n" ++
@@ -59,8 +62,9 @@ instance Format Transaction where
       "to: " ++ show (pretty to') ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tData: " ++ ("\n" ++ format d) ++ "\n" ++
+      "chainId: " ++ show cid ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
-  format t@ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode} =
+  format t@ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode, transactionChainId=cid} =
     CL.blue "Contract Creation Transaction" ++
     tab (
       "\n" ++
@@ -69,47 +73,49 @@ instance Format Transaction where
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tInit: " ++ codeToString theCode ++ "\n" ++
+      "chainId: " ++ show cid ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init')        = format init'
       codeToString (PrecompiledCode _) = "<precompiledCode>"
 
 instance RLPSerializable Transaction where
-  rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal]) =
+  rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, cid, vVal, rVal, sVal]) =
     partial {
       transactionV = fromInteger $ rlpDecode vVal,
       transactionR = rlpDecode rVal,
       transactionS = rlpDecode sVal
       }
         where
-          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
+          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, cid, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
   rlpEncode t =
       RLPArray [
-        n, gp, gl, toAddr, val, i,
+        n, gp, gl, toAddr, val, i, cid,
         rlpEncode $ toInteger $ transactionV t,
         rlpEncode $ transactionR t,
         rlpEncode $ transactionS t
         ]
       where
-        (RLPArray [n, gp, gl, toAddr, val, i]) = partialRLPEncode t
+        (RLPArray [n, gp, gl, toAddr, val, i, cid]) = partialRLPEncode t
 
 
 --partialRLP(De|En)code are used for the signing algorithm
 partialRLPDecode :: RLPObject->Transaction
-partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
+partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, cid, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
     ContractCreationTX {
       transactionNonce = rlpDecode n,
       transactionGasPrice = rlpDecode gp,
       transactionGasLimit = rlpDecode gl,
       transactionValue = rlpDecode val,
       transactionInit = rlpDecode i,
+      transactionChainId = rlpDecode cid,
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"
       }
-partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
+partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, cid, _, _, _]) =
     MessageTX {
       transactionNonce = rlpDecode n,
       transactionGasPrice = rlpDecode gp,
@@ -117,6 +123,7 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
       transactionTo = rlpDecode toAddr,
       transactionValue = rlpDecode val,
       transactionData = rlpDecode i,
+      transactionChainId = rlpDecode cid,
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"
@@ -124,21 +131,23 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
 partialRLPEncode :: Transaction->RLPObject
-partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
+partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid} =
       RLPArray [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode to',
         rlpEncode v,
-        rlpEncode d
+        rlpEncode d,
+        rlpEncode cid
         ]
-partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init'} =
+partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init', transactionChainId=cid} =
       RLPArray [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode (0 :: Integer),
         rlpEncode v,
-        rlpEncode init'
+        rlpEncode init',
+        rlpEncode cid
         ]

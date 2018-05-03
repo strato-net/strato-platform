@@ -62,6 +62,7 @@ import           Control.DeepSeq
 import           System.Clock
 
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 instance NFData Address
 instance NFData Code
@@ -93,8 +94,8 @@ instance TransactionLike Transaction where
     txData ContractCreationTX{} = Nothing
 
     morphTx t = case type' of
-        Message          -> MessageTX n gp gl dest val dat r s v
-        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        Message          -> MessageTX n gp gl dest val dat Nothing r s v       -- TODO: Add correct chain id morphing
+        ContractCreation -> ContractCreationTX n gp gl val code Nothing r s v
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -106,18 +107,18 @@ instance TransactionLike Transaction where
               (r, s, v) = txSignature t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = MessageTX nonce' gp gl to' val dat r s v
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v _ _ _) = MessageTX nonce' gp gl to' val dat cid r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') cid r s v
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat r s v) ->
-        RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) ->
+    (MessageTX nonce' gp gl to' val dat cid r s v) ->
+        RawTransaction time signer nonce' gp gl (Just to') val dat cid r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _ _) ->
         error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
-    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->
-        RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val (Code init') cid r s v) ->
+        RawTransaction time signer nonce' gp gl Nothing val init' cid r s v (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -155,7 +156,19 @@ addLeadingZerosTo64::String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
 
 createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString->PrvKey->SecretT m Transaction
-createMessageTX n gp gl to' val theData prvKey = do
+createMessageTX n gp gl to' val theData prvKey = createChainMessageTX n gp gl to' val theData Nothing prvKey
+
+createChainMessageTX :: MonadIO m
+                     => Integer
+                     -> Integer
+                     -> Integer
+                     -> Address
+                     -> Integer
+                     -> B.ByteString
+                     -> Maybe Word256
+                     -> PrvKey
+                     -> SecretT m Transaction
+createChainMessageTX n gp gl to' val theData cid prvKey = do
   let unsignedTX = MessageTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
@@ -163,6 +176,7 @@ createMessageTX n gp gl to' val theData prvKey = do
                      transactionTo = to',
                      transactionValue = val,
                      transactionData = theData,
+                     transactionChainId = cid,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0
@@ -183,13 +197,25 @@ createMessageTX n gp gl to' val theData prvKey = do
     }
 
 createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code->PrvKey->SecretT m Transaction
-createContractCreationTX n gp gl val init' prvKey = do
+createContractCreationTX n gp gl val init' prvKey = createChainContractCreationTX n gp gl val init' Nothing prvKey
+
+createChainContractCreationTX :: MonadIO m
+                              => Integer
+                              -> Integer
+                              -> Integer
+                              -> Integer
+                              -> Code
+                              -> Maybe Word256
+                              -> PrvKey
+                              -> SecretT m Transaction
+createChainContractCreationTX n gp gl val init' cid prvKey = do
   let unsignedTX = ContractCreationTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
                      transactionGasLimit = gl,
                      transactionValue = val,
                      transactionInit = init',
+                     transactionChainId = cid,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0
