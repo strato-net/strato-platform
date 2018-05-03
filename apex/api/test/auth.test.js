@@ -176,7 +176,7 @@ describe('App', function () {
           .attach('file',
             fs.readFileSync('./test/testdata/testdata.zip'),
             'testdata.zip')
-          .field('username', 'dev')
+          .field('username', 'dev@test.com')
           .field('password', 'hunter3')
           .field('address', address)
         assert.equal(res3.status, 200);
