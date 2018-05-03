@@ -10,9 +10,10 @@ import {
   updateToast,
   compileContract,
   compileContractSuccess,
-  compileContractFailure
+  compileContractFailure,
+  resetError
 } from '../../components/CreateContract/createContract.actions';
-import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileError, compileResponse  } from './createContractMock';
+import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileError, compileResponse } from './createContractMock';
 
 describe('CreateContract: action', () => {
 
@@ -38,6 +39,10 @@ describe('CreateContract: action', () => {
 
   test('update toast', () => {
     expect(updateToast(createContractResponse)).toMatchSnapshot();
+  });
+
+  test('reset error', () => {
+    expect(resetError()).toMatchSnapshot();
   });
 
   describe('create contract', () => {

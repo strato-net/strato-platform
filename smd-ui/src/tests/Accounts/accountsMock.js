@@ -204,3 +204,18 @@ export const indexAccountsMock = {
     }
   }
 };
+
+export const getBalanceMock = [
+  {  
+    "contractRoot":"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "next":"/eth/v1.2/account?address=199f32fd8c50933d2cef8e36281146b28306f7f6&index=4",
+    "kind":"AddressStateRef",
+    "balance":"3000000000000000000000",
+    "address":"199f32fd8c50933d2cef8e36281146b28306f7f6",
+    "latestBlockNum":679,
+    "codeHash":"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+    "code":"",
+    "source":"",
+    "nonce":0
+ }
+];

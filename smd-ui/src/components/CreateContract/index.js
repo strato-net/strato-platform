@@ -6,7 +6,8 @@ import {
   compileContract,
   contractFormChange,
   usernameChange,
-  contractNameChange
+  contractNameChange,
+  resetError
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
@@ -18,6 +19,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
+import { isModePublic } from '../../lib/checkMode';
 
 // TODO: use solc instead of extabi for compile
 
@@ -60,6 +62,7 @@ class CreateContract extends Component {
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
       toasts.show({ message: nextProps.toastsMessage });
+      this.props.resetError();
     }
   }
 
@@ -134,6 +137,63 @@ class CreateContract extends Component {
     this.props.reset();
   };
 
+  renderUsername = (isPublicMode) => {
+    const users = Object.getOwnPropertyNames(this.props.accounts);
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="username"
+        onChange={this.handleUsernameChange}
+        validate={required}
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.initialValues.username : null}>
+          {isPublicMode && this.props.initialValues.username}
+        </option>
+        {
+          (!isPublicMode && users) ?
+            users.map((user, i) => {
+              return (
+                <option key={'user' + i} value={user}>{user}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    </div>)
+  };
+
+  renderAddress = (isPublicMode) => {
+    const userAddresses = this.props.accounts && this.props.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.username])
+      : null;
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="address"
+        validate={required}
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.initialValues.address : null}>
+          {isPublicMode && this.props.initialValues.address}
+        </option>
+        {
+          (!isPublicMode && userAddresses) ?
+            userAddresses.map((address, i) => {
+              return (
+                <option key={address} value={address}>{address}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    </div>);
+  };
+
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
@@ -184,11 +244,8 @@ class CreateContract extends Component {
 
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
-    const users = Object.getOwnPropertyNames(this.props.accounts);
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    // const userAddresses = this.props.accounts && this.props.username ?
-    //   Object.getOwnPropertyNames(this.props.accounts[this.props.username])
-    //   : null;
+    const isPublicMode = isModePublic();
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
@@ -216,25 +273,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div>
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="username"
-                      onChange={this.handleUsernameChange}
-                      validate={required}
-                      required
-                      disabled
-                    >
-                      {
-                        users.map((user, i) => {
-                          return (
-                            <option key={'user' + i} value={user}>{user}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
+                  {this.renderUsername(isPublicMode)}
                 </div>
               </div>
               <div className="row">
@@ -244,27 +283,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div>
-                    {<Field
-                      className="pt-input"
-                      component="select"
-                      name="address"
-                      validate={required}
-                      required
-                      disabled
-                    >
-                      <option value={this.props.initialValues.address}>{this.props.initialValues.address}</option>
-                      {/*
-                        userAddresses ?
-                          userAddresses.map((address, i) => {
-                            return (
-                              <option key={address} value={address}>{address}</option>
-                            )
-                          })
-                          : ''
-                      */}
-                    </Field>}
-                  </div>
+                  {this.renderAddress(isPublicMode)}
                 </div>
               </div>
               <div className="row">
@@ -459,7 +478,8 @@ const connected = connect(mapStateToProps, {
   fetchAccounts,
   fetchUserAddresses,
   usernameChange,
-  contractNameChange
+  contractNameChange,
+  resetError
 })(formed);
 
 export default withRouter(connected);

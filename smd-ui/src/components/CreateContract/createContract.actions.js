@@ -10,6 +10,7 @@ export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
 export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
 export const CONTRACT_NAME_CHANGE = "CONTRACT_NAME_CHANGE";
 export const UPDATE_TOAST = "UPDATE_TOAST";
+export const RESET_ERROR = "RESET_ERROR";
 
 export const contractFormChange = function(contract) {
   return {
@@ -108,5 +109,11 @@ export const compileContractFailure = function(error) {
     type: COMPILE_CONTRACT_FAILURE,
     error: error,
     isOpen: false,
+  }
+}
+
+export const resetError = function() {
+  return {
+    type: RESET_ERROR
   }
 }

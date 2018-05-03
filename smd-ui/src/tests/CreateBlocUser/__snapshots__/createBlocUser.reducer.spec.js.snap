@@ -1,0 +1,44 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateBlocUser: reducer close overlay 1`] = `
+Object {
+  "isOpen": false,
+}
+`;
+
+exports[`CreateBlocUser: reducer create bloc user on failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isOpen": false,
+  "spinning": false,
+}
+`;
+
+exports[`CreateBlocUser: reducer create bloc user on request 1`] = `
+Object {
+  "isOpen": true,
+  "spinning": true,
+}
+`;
+
+exports[`CreateBlocUser: reducer create bloc user on success 1`] = `
+Object {
+  "isOpen": false,
+  "key": "562a277d3b5ace17d92348c36f412622aaffafdb",
+  "spinning": false,
+}
+`;
+
+exports[`CreateBlocUser: reducer open overlay 1`] = `
+Object {
+  "isOpen": true,
+}
+`;
+
+exports[`CreateBlocUser: reducer set initial state 1`] = `
+Object {
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;

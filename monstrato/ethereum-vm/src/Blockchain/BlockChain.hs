@@ -251,9 +251,9 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
                       (theBlock, nbb) <- liftIO (readIORef replacedBest)
                       void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
                       let b = obBlockData theBlock
-                          isHomestead = blockIsHomestead $ blockDataNumber b
-                          addressSource = getSource False isHomestead b
-                      calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource)
+                          addressSource = getSource False b
+                          addressContractName = getContractName False b
+                      calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addressContractName)
 
 
           timerToUse = Just $ if isUnmined then time_vm_block_insertion_unmined else time_vm_block_insertion_mined
@@ -615,7 +615,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
         putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
         when emitStateDiff $ do
             $logInfoS "replaceBestIfBetter/emitStateDiff" "emitStateDiff = true, emitting StateDiff"
-            calculateAndEmitStateDiffs b oldStateRoot Nothing
+            calculateAndEmitStateDiffs b oldStateRoot Nothing Nothing
 
     -- we're replaying SeqEvents, and need to notify the mempool
     when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
@@ -632,15 +632,16 @@ calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData 
                            => b
                            -> MP.StateRoot
                            -> Maybe (Address -> ContextM String)
+                           -> Maybe (Address -> ContextM String)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot addressSource = when (flags_sqlDiff || flags_diffPublish) $ do
+calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractName = when (flags_sqlDiff || flags_diffPublish) $ do
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
-    when flags_sqlDiff $ commitSqlDiffs diffs addressSource
+    when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
          in withKafkaViolently $ do

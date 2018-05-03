@@ -4,7 +4,9 @@ import {
   fetchApplicationsFailure,
   launchApp,
   launchAppFailure,
-  launchAppSuccess
+  launchAppSuccess,
+  selectApp,
+  resetSelectedApp
 } from '../../components/Applications/applications.actions';
 import { applicationData, errorFetchApp, errorLaunchApp } from './applicationsMock';
 
@@ -40,6 +42,18 @@ describe('Applications: action', () => {
       expect(launchAppSuccess('', 'e80b681c42f831ea3c4b8db531f5e165')).toMatchSnapshot();
     });
 
-  })
+  });
+
+  describe('select app', () => {
+
+    test('select app', () => {
+      expect(selectApp(applicationData[0])).toMatchSnapshot();
+    });
+
+    test('reset selected app', () => {
+      expect(resetSelectedApp()).toMatchSnapshot();
+    });
+
+  });
 
 });

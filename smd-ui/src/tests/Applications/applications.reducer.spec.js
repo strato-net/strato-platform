@@ -6,7 +6,9 @@ import {
   fetchApplicationsSuccess,
   launchApp,
   launchAppFailure,
-  launchAppSuccess
+  launchAppSuccess,
+  selectApp,
+  resetSelectedApp
 } from '../../components/Applications/applications.actions';
 import { deepClone } from '../helper/testHelper';
 
@@ -97,6 +99,34 @@ describe('Applications: reducer', () => {
         error: null,
         hash: null
       }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
+
+  })
+
+  describe('applications', () => {
+
+    // SELECT_APP
+    test('select app', () => {
+      const action = selectApp(applicationData[0]);
+      const initialState = {
+        applications: [],
+        error: null,
+        hash: null,
+        selectedApp: null
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
+
+    // RESET_SELECTED_APP
+    test('reset selected app', () => {
+      const action = resetSelectedApp();
+      const initialState = {
+        applications: [],
+        error: null,
+        hash: null,
+        selectedApp: applicationData[0]
+      };
       expect(reducer(initialState, action)).toMatchSnapshot();
     })
 

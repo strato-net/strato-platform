@@ -13,6 +13,7 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
+// TODO: should only be exposed for SMD_MODE var == 'public'
 router.post('/login', authController.login);
 router.post('/users', authController.create);
 router.post('/logout', authHandler.validateRequest(), authController.logout);

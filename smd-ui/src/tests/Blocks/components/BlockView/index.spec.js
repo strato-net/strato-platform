@@ -1,6 +1,6 @@
 import React from 'react';
 import BlockView, { mapStateToProps } from '../../../../components/Blocks/components/BlockView/index';
-import { blocksMock } from '../../../BlockData/blockDataMock';
+import { blocksMock, blockMockWithoutTx } from '../../../BlockData/blockDataMock';
 
 describe('BlockView: index', () => {
 
@@ -21,8 +21,27 @@ describe('BlockView: index', () => {
         <BlockView.WrappedComponent {...props} />
       );
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
+
+    test('with no recipient transactions', () => {
+      const props = {
+        match: {
+          params: {
+            block: 210
+          }
+        },
+        block: blockMockWithoutTx[0],
+        fetchBlockData: jest.fn()
+      };
+
+      const wrapper = shallow(
+        <BlockView.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
 
     test('with values', () => {
       const props = {
@@ -39,12 +58,12 @@ describe('BlockView: index', () => {
         <BlockView.WrappedComponent {...props} />
       );
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
   });
 
-  describe('button', () => {
+  describe('actions', () => {
 
     test('back to blocks list', () => {
       const props = {
@@ -67,6 +86,29 @@ describe('BlockView: index', () => {
       wrapper.find('Button').simulate('click');
       expect(props.history.goBack).toHaveBeenCalled();
       expect(props.history.goBack.mock.calls.length).toBe(1);
+    });
+
+    test('handle click with values', () => {
+      const props = {
+        match: {
+          params: {
+            block: 210
+          }
+        },
+        block: blocksMock[0],
+        history: {
+          push: jest.fn()
+        },
+        fetchBlockData: jest.fn(),
+      };
+
+      const wrapper = shallow(
+        <BlockView.WrappedComponent {...props} />
+      );
+
+      wrapper.find('tr').at(9).simulate('click');
+      expect(props.history.push).toHaveBeenCalled();
+      expect(props.history.push.mock.calls.length).toBe(1);
     });
 
   });

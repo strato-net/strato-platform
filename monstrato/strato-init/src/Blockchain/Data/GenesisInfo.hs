@@ -27,7 +27,7 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 
-data CodeInfo = CodeInfo B.ByteString String
+data CodeInfo = CodeInfo B.ByteString String String
   deriving (Show, Eq, Generic)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)

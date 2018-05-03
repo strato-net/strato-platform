@@ -2,11 +2,15 @@ import React from 'react';
 import Accounts, { mapStateToProps } from '../../components/Accounts';
 import { error, accountsMock, filter, reducerAccounts, indexAccountsMock } from './accountsMock';
 import { deepClone } from '../helper/testHelper';
+import * as checkMode from '../../lib/checkMode';
 
 describe('Accounts: index', () => {
 
-  describe('render with', () => {
+  describe('render with (public mode)', () => {
 
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    })
     test('empty values', () => {
       const props = {
         accounts: [],
@@ -22,7 +26,7 @@ describe('Accounts: index', () => {
         <Accounts.WrappedComponent {...props} />
       );
 
-      expect(wrapper).toMatchSnapshot();
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
     test('mocked values', () => {
@@ -39,8 +43,51 @@ describe('Accounts: index', () => {
       const wrapper = shallow(
         <Accounts.WrappedComponent {...props} />
       );
-      
-      expect(wrapper).toMatchSnapshot();
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+  });
+
+  describe('render with (enterprise mode)', () => {
+
+    beforeAll(() => {
+      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    });
+    test('empty values', () => {
+      const props = {
+        accounts: [],
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    test('mocked values', () => {
+      const props = {
+        accounts: indexAccountsMock,
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
     });
 
   });
@@ -61,8 +108,10 @@ describe('Accounts: index', () => {
       <Accounts.WrappedComponent {...props} />
     );
 
-    wrapper.find('div').at(13).simulate('click');
+    wrapper.find('div').at(14).simulate('click');
     expect(props.resetUserAddress).toHaveBeenCalled();
+    expect(props.resetUserAddress).toHaveBeenCalledTimes(1);
+    expect(props.fetchUserAddresses).not.toHaveBeenCalled();
   });
 
   test('open account on click', () => {
@@ -80,8 +129,10 @@ describe('Accounts: index', () => {
       <Accounts.WrappedComponent {...props} />
     );
 
-    wrapper.find('div').at(57).simulate('click');
+    wrapper.find('div').at(59).simulate('click');
     expect(props.fetchUserAddresses).toHaveBeenCalled();
+    expect(props.fetchUserAddresses).toHaveBeenCalledTimes(1);
+    expect(props.resetUserAddress).not.toHaveBeenCalled();
   });
 
   test('invoke onchange on input and trigger changeAccountFilter', () => {

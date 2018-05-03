@@ -14,6 +14,7 @@ import {
 import { required } from '../../../../lib/reduxFormsValidations'
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
+import { isModePublic } from '../../../../lib/checkMode';
 
 class ContractMethodCall extends Component {
 
@@ -62,17 +63,68 @@ class ContractMethodCall extends Component {
 
   handleUsernameChange = (e) => {
     this.props.fetchUserAddresses(e.target.value, false)
-  };
+  }
+
+  renderUsername = (isPublicMode) => {
+    const users = Object.getOwnPropertyNames(this.props.accounts);
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        name="modalUsername"
+        component="select"
+        onChange={this.handleUsernameChange}
+        validate={required}
+        disabled={isPublicMode}
+        required
+      >
+        <option value={isPublicMode ? this.props.currentUser.username : null}>
+          {isPublicMode && this.props.currentUser.username}
+        </option>
+        {(!isPublicMode && users) ?
+          users.map((user, i) => {
+            return (
+              <option key={'user' + i} value={user}>{user}</option>
+            )
+          })
+          : ''
+        }
+      </Field>
+    </div>)
+  }
+
+  renderAddress = (isPublicMode) => {
+    const userAddresses = this.props.accounts && this.props.modalUsername ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
+      : null;
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="modalAddress"
+        validate={required}
+        disabled={isPublicMode}
+        required
+      >
+        <option value={isPublicMode ? this.props.currentUser.accountAddress : null}>
+          {isPublicMode && this.props.currentUser.accountAddress}
+        </option>
+        {
+          (!isPublicMode && userAddresses) ?
+            userAddresses.map((address, i) => {
+              return (
+                <option key={address} value={address}>{address}</option>
+              )
+            })
+            : ''
+        }
+      </Field>
+    </div>)
+  }
 
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
-
-    const users = Object.getOwnPropertyNames(this.props.accounts);
-
-    // const userAddresses = this.props.accounts && this.props.modalUsername ?
-    //   Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
-    //   : null;
+    const isPublicMode = isModePublic();
 
     if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
@@ -133,26 +185,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      name="modalUsername"
-                      component="select"
-                      onChange={this.handleUsernameChange}
-                      validate={required}
-                      disabled
-                      required
-                    >
-                      <option />
-                      {
-                        users.map((user, i) => {
-                          return (
-                            <option key={'user' + i} value={user}>{user}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
+                  {this.renderUsername(isPublicMode)}
                 </div>
               </div>
               <div className="row">
@@ -162,27 +195,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="modalAddress"
-                      validate={required}
-                      disabled
-                      required
-                    >
-                      <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
-                      {/* {
-                        userAddresses ?
-                          userAddresses.map((address, i) => {
-                            return (
-                              <option key={address} value={address}>{address}</option>
-                            )
-                          })
-                          : ''
-                      } */}
-                    </Field>
-                  </div>
+                  {this.renderAddress(isPublicMode)}
                 </div>
               </div>
               <div className="row">

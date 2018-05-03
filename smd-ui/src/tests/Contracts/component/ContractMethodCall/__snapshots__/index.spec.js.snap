@@ -17,148 +17,328 @@ Object {
 }
 `;
 
-exports[`ContractMethodCall: index renders contracts card with empty props 1`] = `
-initialize {
-  "0": Object {
-    "attribs": Object {},
-    "children": Array [
-      Object {
-        "attribs": Object {
-          "class": "pt-button pt-minimal pt-small pt-intent-primary",
-          "type": "button",
-        },
-        "children": Array [
-          Object {
-            "attribs": Object {},
-            "children": Array [
-              Object {
-                "data": "Call Method",
-                "next": null,
-                "parent": [Circular],
-                "prev": null,
-                "type": "text",
-              },
-            ],
-            "name": "span",
-            "namespace": "http://www.w3.org/1999/xhtml",
-            "next": null,
-            "parent": [Circular],
-            "prev": null,
-            "type": "tag",
-            "x-attribsNamespace": Object {},
-            "x-attribsPrefix": Object {},
-          },
-        ],
-        "name": "button",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": Object {
-          "attribs": Object {},
-          "children": Array [],
-          "name": "form",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": null,
-          "parent": [Circular],
-          "prev": [Circular],
-          "type": "tag",
-          "x-attribsNamespace": Object {},
-          "x-attribsPrefix": Object {},
-        },
-        "parent": [Circular],
-        "prev": null,
-        "type": "tag",
-        "x-attribsNamespace": Object {
-          "class": undefined,
-          "type": undefined,
-        },
-        "x-attribsPrefix": Object {
-          "class": undefined,
-          "type": undefined,
-        },
-      },
-      Object {
-        "attribs": Object {},
-        "children": Array [],
-        "name": "form",
-        "namespace": "http://www.w3.org/1999/xhtml",
-        "next": null,
-        "parent": [Circular],
-        "prev": Object {
-          "attribs": Object {
-            "class": "pt-button pt-minimal pt-small pt-intent-primary",
-            "type": "button",
-          },
-          "children": Array [
-            Object {
-              "attribs": Object {},
-              "children": Array [
-                Object {
-                  "data": "Call Method",
-                  "next": null,
-                  "parent": [Circular],
-                  "prev": null,
-                  "type": "text",
-                },
-              ],
-              "name": "span",
-              "namespace": "http://www.w3.org/1999/xhtml",
-              "next": null,
-              "parent": [Circular],
-              "prev": null,
-              "type": "tag",
-              "x-attribsNamespace": Object {},
-              "x-attribsPrefix": Object {},
-            },
-          ],
-          "name": "button",
-          "namespace": "http://www.w3.org/1999/xhtml",
-          "next": [Circular],
-          "parent": [Circular],
-          "prev": null,
-          "type": "tag",
-          "x-attribsNamespace": Object {
-            "class": undefined,
-            "type": undefined,
-          },
-          "x-attribsPrefix": Object {
-            "class": undefined,
-            "type": undefined,
-          },
-        },
-        "type": "tag",
-        "x-attribsNamespace": Object {},
-        "x-attribsPrefix": Object {},
-      },
-    ],
-    "name": "div",
-    "namespace": "http://www.w3.org/1999/xhtml",
-    "next": null,
-    "parent": null,
-    "prev": null,
-    "root": Object {
-      "attribs": Object {},
-      "children": Array [
-        [Circular],
-      ],
-      "name": "root",
-      "namespace": "http://www.w3.org/1999/xhtml",
-      "next": null,
-      "parent": null,
-      "prev": null,
-      "type": "root",
-      "x-attribsNamespace": Object {},
-      "x-attribsPrefix": Object {},
-    },
-    "type": "tag",
-    "x-attribsNamespace": Object {},
-    "x-attribsPrefix": Object {},
-  },
-  "_root": [Circular],
-  "length": 1,
-  "options": Object {
-    "decodeEntities": true,
-    "normalizeWhitespace": false,
-    "withDomLvl1": true,
-    "xml": false,
-  },
+exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] = `
+"<div>
+  <Blueprint.Button className=\\"pt-minimal pt-small pt-intent-primary\\" onClick={[Function]}>
+    Call Method
+  </Blueprint.Button>
+  <form>
+    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <h5>
+              Address: 
+            </h5>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Username
+            </label>
+          </div>
+          <div className=\\"col-sm-9\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} validate={[Function: required]} disabled={false} required={true}>
+                <option value={{...}} />
+                <option value=\\"Admin_1085_64667\\">
+                  Admin_1085_64667
+                </option>
+                <option value=\\"Supplier1\\">
+                  Supplier1
+                </option>
+                <option value=\\"Supplier2\\">
+                  Supplier2
+                </option>
+                <option value=\\"Buyer1\\">
+                  Buyer1
+                </option>
+                <option value=\\"Buyer2\\">
+                  Buyer2
+                </option>
+                <option value=\\"Admin_1177_49507\\">
+                  Admin_1177_49507
+                </option>
+                <option value=\\"Admin_1177_39206\\">
+                  Admin_1177_39206
+                </option>
+                <option value=\\"Admin_1177_31203\\">
+                  Admin_1177_31203
+                </option>
+                <option value=\\"User_1177_14462\\">
+                  User_1177_14462
+                </option>
+                <option value=\\"123456789012345678901234567890123\\">
+                  123456789012345678901234567890123
+                </option>
+                <option value=\\"User_1177_26292\\">
+                  User_1177_26292
+                </option>
+                <option value=\\"User_1177_69645 ?#%!@*\\">
+                  User_1177_69645 ?#%!@*
+                </option>
+                <option value=\\"User_1177_59578\\">
+                  User_1177_59578
+                </option>
+                <option value=\\"User_1177_79118\\">
+                  User_1177_79118
+                </option>
+                <option value=\\"User_1177_59359\\">
+                  User_1177_59359
+                </option>
+                <option value=\\"User_1177_42489\\">
+                  User_1177_42489
+                </option>
+                <option value=\\"User_1177_37717\\">
+                  User_1177_37717
+                </option>
+                <option value=\\"User_1177_52307\\">
+                  User_1177_52307
+                </option>
+                <option value=\\"Buyer1177_18955\\">
+                  Buyer1177_18955
+                </option>
+                <option value=\\"Supplier1177_62701\\">
+                  Supplier1177_62701
+                </option>
+                <option value=\\"Admin_1301_86023\\">
+                  Admin_1301_86023
+                </option>
+                <option value=\\"Admin_1301_62816\\">
+                  Admin_1301_62816
+                </option>
+                <option value=\\"Supplier0_1301_46441\\">
+                  Supplier0_1301_46441
+                </option>
+                <option value=\\"Supplier1_1301_46441\\">
+                  Supplier1_1301_46441
+                </option>
+                <option value=\\"Supplier2_1301_46441\\">
+                  Supplier2_1301_46441
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" validate={[Function: required]} disabled={false} required={true}>
+                <option value={{...}} />
+                <option value=\\"044eda43ba9c76fc36b9183c96f7a8fad8d21fe6\\">
+                  044eda43ba9c76fc36b9183c96f7a8fad8d21fe6
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Password
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"modalPassword\\" className=\\"pt-input\\" placeholder=\\"Password\\" component=\\"input\\" type=\\"password\\" validate={[Function: required]} required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Value
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"modalValue\\" component={[Function: ValueInput]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <h5>
+              Parameters
+            </h5>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12 smd-scrollable\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Name
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className=\\"text-center\\" colSpan={3}>
+                    <i>
+                      This method has no params
+                    </i>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <hr />
+            <h5>
+              Results
+            </h5>
+            <pre className=\\"smd-scrollable\\">
+               
+              <br />
+            </pre>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
+          <button disabled={true} className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+            Call Method
+          </button>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
+"<div>
+  <Blueprint.Button className=\\"pt-minimal pt-small pt-intent-primary\\" onClick={[Function]}>
+    Call Method
+  </Blueprint.Button>
+  <form>
+    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <h5>
+              Address: 
+            </h5>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Username
+            </label>
+          </div>
+          <div className=\\"col-sm-9\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} validate={[Function: required]} disabled={true} required={true}>
+                <option value=\\"\\" />
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" validate={[Function: required]} disabled={true} required={true}>
+                <option value={[undefined]} />
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Password
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"modalPassword\\" className=\\"pt-input\\" placeholder=\\"Password\\" component=\\"input\\" type=\\"password\\" validate={[Function: required]} required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label\\" style={{...}}>
+              Value
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"modalValue\\" component={[Function: ValueInput]} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <h5>
+              Parameters
+            </h5>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12 smd-scrollable\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Name
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className=\\"text-center\\" colSpan={3}>
+                    <i>
+                      This method has no params
+                    </i>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <hr />
+            <h5>
+              Results
+            </h5>
+            <pre className=\\"smd-scrollable\\">
+               
+              <br />
+            </pre>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
+          <button disabled={true} className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+            Call Method
+          </button>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`ContractMethodCall: index validate 1`] = `
+Object {
+  "username": "username Required",
 }
 `;
