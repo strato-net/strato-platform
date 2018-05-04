@@ -36,6 +36,8 @@ getStorageInfoR :: Handler Value
 getStorageInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 
+                 chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+
                  limit <- liftIO $ myFetchLimit
 
                  addHeader "Access-Control-Allow-Origin" "*"
@@ -44,7 +46,7 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        E.on ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId )
+                                        E.on ( ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId ) E.&&. (addrStRef E.^. AddressStateRefChainId E.==. E.val chainId) )
 
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
 
