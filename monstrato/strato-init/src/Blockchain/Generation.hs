@@ -12,8 +12,8 @@ module Blockchain.Generation (
   Type(..)
 ) where
 
-import Control.Monad ((<=<))
 import qualified Data.Aeson as Ae
+import qualified Data.JsonStream.Parser as JS
 import Data.Bits
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
@@ -98,7 +98,7 @@ encodeAllRecords :: Records -> Either String [[(Word256, Word256)]]
 encodeAllRecords (Records recs) = mapM (encodeRecord 0) recs
 
 encodeJSON :: L.ByteString -> Either String [[(Word256, Word256)]]
-encodeJSON = encodeAllRecords <=< Ae.eitherDecode
+encodeJSON = encodeAllRecords . Records . JS.parseLazyByteString (JS.arrayOf (JS.value))
 
 insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsCount n name src code start gi = return $ insertContracts (replicate n []) name src code start gi
