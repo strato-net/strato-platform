@@ -2,8 +2,26 @@ import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import InviteEntity from './InviteEntity';
+import VoteConfirmation from './VoteConfirmation';
+import './entities.css';
 
 class Entities extends Component {
+
+  constructor() {
+    super();
+    this.state = { isOpen: false }
+    this.handleClose = this.handleClose.bind(this);
+    this.handleVoteClick = this.handleVoteClick.bind(this);
+  }
+
+  handleClose() {
+    this.setState({ isOpen: false });
+  }
+
+  handleVoteClick(voteType) {
+    this.setState({ isOpen: true, voteType });
+
+  }
 
   tableData() {
     const entities = this.props.createConsortium.consortium[0]
@@ -24,7 +42,22 @@ class Entities extends Component {
             </td>
             <td>
               {entity.status}
-              {entity.status === 'Pending' && <Button>Vote</Button>}
+              {entity.status === 'Pending' && <span>
+                <Button
+                  className="vote-btn pt-intent-primary pt-icon-thumbs-up"
+                  onClick={() => this.handleVoteClick('in favor')}
+                />
+                <Button
+                  className="vote-btn pt-intent-primary pt-icon-thumbs-down"
+                  onClick={() => this.handleVoteClick('against')}
+                />
+                <VoteConfirmation
+                  isOpen={this.state.isOpen}
+                  handleClose={this.handleClose}
+                  entityName={entity.name}
+                  voteType={this.state.voteType}
+                />
+              </span>}
             </td>
             <td>
               <Button>Connect</Button>
