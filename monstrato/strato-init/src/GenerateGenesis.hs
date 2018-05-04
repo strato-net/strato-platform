@@ -70,9 +70,5 @@ main = do
                   json <- L.readFile flags_records_file
                   return $ insertContractsJSON json
   let output = insert name src bytes (fromInteger flags_start) genesis
-
-  case output of
-    Left err -> error $ "couldn't generate: " ++ err
-    Right o -> do
-      let outputText = encode o
-      withFile flags_output_file WriteMode (flip L.hPut $ outputText)
+  let outputText = encode output
+  withFile flags_output_file WriteMode (flip L.hPut $ outputText)

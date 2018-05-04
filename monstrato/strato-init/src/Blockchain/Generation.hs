@@ -59,55 +59,52 @@ hash :: Word256 -> Word256
 hash x = let SHA w = superProprietaryStratoSHAHash . BS.pack . word256ToBytes $ x
          in w
 
-encodeSequentially :: Word256 -> [Type] -> Either String ([(Word256, Word256)], Word256)
-encodeSequentially k [] = return ([], k)
-encodeSequentially k (t:ts) = do
-  (tSlots, k') <- encodeType k t
-  (tsSlots, k'') <- encodeSequentially k' ts
-  return (tSlots ++ tsSlots, k'')
+encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
+encodeSequentially k [] = ([], k)
+encodeSequentially k (t:ts) =
+  let (tSlots, k') = encodeType k t
+      (tsSlots, k'') = encodeSequentially k' ts
+  in (tSlots ++ tsSlots, k'')
 
 -- First return value is the slots for this value, and the second return value
 -- is the next available slot.
-encodeType :: Word256 -> Type -> Either String ([(Word256, Word256)], Word256)
-encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = Right ([(k, fromIntegral n)], k + 1)
-                        | otherwise = Left "unimplemented for negative numbers"
+encodeType :: Word256 -> Type -> ([(Word256, Word256)], Word256)
+encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = ([(k, fromIntegral n)], k + 1)
+                        | otherwise = error "unimplemented for negative numbers"
 encodeType k (Stryng s) =
   if length payload < 32
       then let pad = replicate (31 - length payload) 0
                size = [fromIntegral $ length payload `shiftL` 1]
-           in Right ([(k, bytesToWord256 $ payload ++ pad ++ size)], k+1)
+           in ([(k, bytesToWord256 $ payload ++ pad ++ size)], k+1)
       else let size = fromIntegral $ (length payload `shiftL` 1) .|. 1
                pointer = (k, size)
                start = hash k
                packets = zip (map (start+) [0..]) . map bytesToWord256 . equalChunksOf 32 $ payload
-           in Right (pointer:packets, k + 1)
+           in (pointer:packets, k + 1)
   where payload = BS.unpack . encodeUtf8 $ s
 encodeType k (List payload) =
   let size = fromIntegral . length $ payload
       pointer = (k, size)
       start = hash k
-  in do
-      (packets, _) <- encodeSequentially start (V.toList payload)
-      return (pointer:packets, k + 1)
+      (packets, _) = encodeSequentially start (V.toList payload)
+  in (pointer:packets, k + 1)
 encodeType k (Struct ts) = encodeSequentially k ts
 
-encodeRecord :: Word256 -> [Type] -> Either String [(Word256, Word256)]
-encodeRecord k ts = fst <$> encodeSequentially k ts
+encodeRecord :: Word256 -> [Type] -> [(Word256, Word256)]
+encodeRecord k = fst . encodeSequentially k
 
-encodeAllRecords :: Records -> Either String [[(Word256, Word256)]]
-encodeAllRecords (Records recs) = mapM (encodeRecord 0) recs
+encodeAllRecords :: Records -> [[(Word256, Word256)]]
+encodeAllRecords (Records recs) = map (encodeRecord 0) recs
 
-encodeJSON :: L.ByteString -> Either String [[(Word256, Word256)]]
+encodeJSON :: L.ByteString -> [[(Word256, Word256)]]
 encodeJSON = encodeAllRecords . Records . JS.parseLazyByteString (JS.arrayOf (JS.value))
 
-insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsCount n name src code start gi = return $ insertContracts (replicate n []) name src code start gi
+insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContractsCount n name src code start gi = insertContracts (replicate n []) name src code start gi
 
 
-insertContractsJSON :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsJSON rawJSON name src code start gi = do
-  slotss <- encodeJSON rawJSON
-  return $ insertContracts slotss name src code start gi
+insertContractsJSON :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContractsJSON rawJSON name src code start gi = insertContracts (encodeJSON rawJSON) name src code start gi
 
 insertContracts :: [[(Word256, Word256)]] -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
 insertContracts slotss name src code start gi =
