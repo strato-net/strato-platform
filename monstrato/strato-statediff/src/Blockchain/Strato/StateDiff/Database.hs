@@ -64,7 +64,8 @@ createAccount blockNumber addressSource addressContractName address diff = do
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefSource = source,
-      addressStateRefContractName = name
+      addressStateRefContractName = name,
+      addressStateRefChainId = Nothing -- TODO: Feed real chainId into createAccount
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a
