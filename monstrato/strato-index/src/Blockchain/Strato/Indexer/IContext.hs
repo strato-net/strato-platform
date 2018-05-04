@@ -32,6 +32,7 @@ import qualified Blockchain.Strato.RedisBlockDB  as RBDB
 import qualified Database.Redis                  as Redis
 
 import           Network.Kafka
+import           Network.KafkaExt
 import           Network.Kafka.Protocol
 
 import           Blockchain.Strato.Indexer.Kafka

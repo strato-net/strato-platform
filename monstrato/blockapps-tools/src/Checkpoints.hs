@@ -16,7 +16,7 @@ import qualified Text.Read.Lex                   as L
 import           Blockchain.EthConf
 
 import qualified Network.Kafka                   as K
-import qualified Network.Kafka.Consumer          as KC
+import qualified Network.Kafka.ConsumerExt       as KC
 import qualified Network.Kafka.Protocol          as KP
 
 import qualified Blockchain.Sequencer.Constants  as SeqConst

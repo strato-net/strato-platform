@@ -17,6 +17,7 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka
+import           Network.KafkaExt
 import           Network.Kafka.Protocol
 import           Prelude                        hiding (lookup)
 import           System.CPUTime

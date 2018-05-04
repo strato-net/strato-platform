@@ -32,8 +32,8 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 
 import qualified Database.LevelDB                          as LDB
 
-import qualified Network.Kafka                             as K
-import qualified Network.Kafka.Consumer                    as KC
+import qualified Network.KafkaExt                          as K
+import qualified Network.Kafka.ConsumerExt                 as KC
 import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()

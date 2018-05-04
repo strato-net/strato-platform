@@ -9,22 +9,22 @@ import           Control.Applicative
 import           Control.Exception           (IOException)
 import           Control.Exception.Lifted    (catch)
 import           Control.Lens
-import           Control.Monad.Except        (ExceptT (..), MonadError (..), runExceptT)
-import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.State.Class   (MonadState)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.Except        (ExceptT (..), MonadError (..), runExceptT)
 import           Control.Monad.Trans.State
+import           Control.Monad.State.Class   (MonadState)
 import           Data.ByteString.Char8       (ByteString)
 import           Data.List.NonEmpty          (NonEmpty (..))
 import qualified Data.List.NonEmpty          as NE
-import qualified Data.Map                    as M
 import           Data.Monoid                 ((<>))
 import qualified Data.Pool                   as Pool
+import           System.IO
+import qualified Data.Map                    as M
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import qualified Network
 import           Prelude
-import           System.IO
 
 import           Network.Kafka.Protocol
 
@@ -55,10 +55,6 @@ data KafkaState = KafkaState { -- | Name to use as a client ID.
                              } deriving (Show)
 
 makeLenses ''KafkaState
-
-class HasKafkaState m where
-    getKafkaState :: m KafkaState
-    putKafkaState :: KafkaState -> m ()
 
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)
@@ -159,17 +155,6 @@ addKafkaAddress a s = s {_stateAddresses = consed}
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafka s k = runExceptT $ evalStateT k s
-
-withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
-withKafkaViolently k = do
-    s <- getKafkaState
-    r <- liftIO . runExceptT $ runStateT k s
-    case r of
-        Left err -> error $ show err
-        Right (a, newS) -> do
-            putKafkaState newS
-            return a
-
 
 -- | Catch 'IOException's and wrap them in 'KafkaIOException's.
 tryKafka :: Kafka m => m a -> m a

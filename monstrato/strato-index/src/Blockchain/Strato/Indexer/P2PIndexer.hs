@@ -8,7 +8,8 @@ import           Control.Monad
 import           Control.Monad.Logger
 import qualified Data.Text                          as T
 import           Network.Kafka
-import           Network.Kafka.Consumer
+import           Network.KafkaExt
+import           Network.Kafka.ConsumerExt
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB

@@ -30,6 +30,7 @@ import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as SQL
 import qualified Database.Redis                     as Redis
 import qualified Network.Kafka                      as K
+import qualified Network.KafkaExt                   as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 

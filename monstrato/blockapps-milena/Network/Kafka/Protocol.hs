@@ -41,7 +41,7 @@ doRequest' correlationId h r = do
     B.hPut h $ requestBytes r
     hFlush h
     B.hGet h 4
-  case runGet (liftM fromIntegral getWord32be) rawLength of
+  case runGet (fmap fromIntegral getWord32be) rawLength of
     Left s -> return $ Left s
     Right dataLength -> do
       responseBytes <- liftIO $ B.hGet h dataLength

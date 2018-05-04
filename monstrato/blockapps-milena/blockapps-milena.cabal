@@ -24,7 +24,9 @@ library
   default-language: Haskell2010
   ghc-options:         -Wall -fwarn-incomplete-uni-patterns
   exposed-modules:     Network.Kafka,
+                       Network.KafkaExt,
                        Network.Kafka.Consumer,
+                       Network.Kafka.ConsumerExt,
                        Network.Kafka.Protocol,
                        Network.Kafka.Producer
   build-depends:       base          >=4.7      && <5,

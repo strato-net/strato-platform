@@ -25,7 +25,7 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
-import           Network.Kafka                         as K
+import           Network.KafkaExt                      as K
 
 import           Blockchain.Colors
 import           Blockchain.Context

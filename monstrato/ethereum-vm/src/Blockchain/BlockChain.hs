@@ -38,7 +38,7 @@ import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
-import           Network.Kafka                           (withKafkaViolently)
+import           Network.KafkaExt                        (withKafkaViolently)
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 
