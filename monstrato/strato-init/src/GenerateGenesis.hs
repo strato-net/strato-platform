@@ -3,7 +3,7 @@
 import HFlags
 import System.Environment (getProgName)
 import System.Exit        (die)
-import System.IO (withFile, IOMode(..))
+import System.IO (readFile, withFile, IOMode(..))
 
 import Control.Monad (when)
 import Data.Aeson (encode)
@@ -47,12 +47,19 @@ readBS path = do
   when (null path) usage
   withFile path ReadMode hGetContents
 
+readS :: FilePath -> IO String
+readS path = do
+  when (null path) usage
+  readFile path
+
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Genesis Generation flags"
+  bytes <- readBS flags_bytecode_file
   genesisText <- readBS flags_genesis_file
   let name = flags_contract_name
   when (null name) usage
+  src <- readS flags_source_file
   let genesis = case eitherDecodeStrict genesisText of
                     Right g -> g
                     Left err -> error ("couldn't parse genesis: " ++ err)
@@ -62,7 +69,7 @@ main = do
               else do
                   json <- L.readFile flags_records_file
                   return $ insertContractsJSON json
-  let output = insert (fromInteger flags_start) genesis
+  let output = insert name src bytes (fromInteger flags_start) genesis
 
   case output of
     Left err -> error $ "couldn't generate: " ++ err

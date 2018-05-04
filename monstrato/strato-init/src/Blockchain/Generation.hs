@@ -100,23 +100,25 @@ encodeAllRecords (Records recs) = mapM (encodeRecord 0) recs
 encodeJSON :: L.ByteString -> Either String [[(Word256, Word256)]]
 encodeJSON = encodeAllRecords <=< Ae.eitherDecode
 
-insertContractsCount :: Int -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsCount n start gi = return $ insertContracts (replicate n []) start gi
+insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsCount n name src code start gi = return $ insertContracts (replicate n []) name src code start gi
 
 
-insertContractsJSON :: L.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsJSON rawJSON start gi = do
+insertContractsJSON :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsJSON rawJSON name src code start gi = do
   slotss <- encodeJSON rawJSON
-  return $ insertContracts slotss start gi
+  return $ insertContracts slotss name src code start gi
 
-insertContracts :: [[(Word256, Word256)]] -> Address -> GenesisInfo -> GenesisInfo
-insertContracts slotss start gi =
+insertContracts :: [[(Word256, Word256)]] -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContracts slotss name src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
-      (decoded, extra) = B16.decode "44a1a11bbc76f8a745c188aabc717ff6ea4fcad279600eb5cb15ec0d297cbb56"
+      initialCode = genesisInfoCodeInfo gi
+      (decoded, extra) = B16.decode code
       codeHash = if extra /= "" && extra /= "\n"
-                   then error ("bytecode not encoded in base16:")
+                   then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
       mkContract (addr, slots) = ContractWithStorage addr 0 codeHash slots
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss
-  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots}
+  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
+         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded name src]}
