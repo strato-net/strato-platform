@@ -14,6 +14,7 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.JsonStream.Parser               as JS
+import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
 
 import           Blockchain.Database.MerklePatricia
@@ -95,16 +96,23 @@ initializeStateDB addressInfo = do
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
 
+zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
+zipSourceInfo accounts codes =
+  let hashPair c@(CodeInfo bs _ _) = (hash bs, c)
+      codeMap = Map.fromList . map hashPair $ codes
+      findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
+      findCodeFor (NonContract _ _) = Nothing
+      findCodeFor acc@(ContractNoStorage _ _ hsh) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
+  in catMaybes . map findCodeFor $ accounts
+
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
                           -> m ([(AccountInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    let sourceInfo = case codes of
-                    [] -> []
-                    [c] -> zip accounts (repeat c)
-                    _ -> error "not equipped to seed for multiple contract types"
+    let sourceInfo = zipSourceInfo accounts codes
     initializeCodeDB codes
     initializeStateDB accounts
     db <- getStateDB
