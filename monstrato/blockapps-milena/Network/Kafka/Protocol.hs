@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
@@ -11,20 +11,20 @@ module Network.Kafka.Protocol
 import           Control.Applicative
 import           Control.Category       (Category (..))
 import           Control.Lens
-import           Control.Monad          (liftM, liftM2, liftM3, liftM4, liftM5, replicateM, unless)
+import           Control.Monad          (replicateM, liftM2, liftM3, liftM4, liftM5, unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.ByteString.Char8  (ByteString)
-import qualified Data.ByteString.Char8  as B
 import           Data.ByteString.Lens   (unpackedChars)
 import           Data.Digest.CRC32
 import           Data.Int
 import           Data.Serialize.Get
 import           Data.Serialize.Put
 import           GHC.Exts               (IsString (..))
-import qualified Network
-import           Numeric.Lens
-import           Prelude                hiding (id, (.))
 import           System.IO
+import           Numeric.Lens
+import           Prelude                hiding ((.), id)
+import qualified Data.ByteString.Char8  as B
+import qualified Network
 
 data ReqResp a where
   MetadataRR       :: MonadIO m => MetadataRequest         -> ReqResp (m MetadataResponse)
@@ -158,6 +158,8 @@ newtype Offset = Offset Int64 deriving (Show, Eq, Serializable, Deserializable, 
 newtype Message =
   Message { _messageFields :: (Crc, MagicByte, Attributes, Key, Value) }
   deriving (Show, Eq, Deserializable)
+
+data CompressionCodec = NoCompression | Gzip deriving (Show, Eq)
 
 newtype Crc = Crc Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
 newtype MagicByte = MagicByte Int8 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
@@ -420,10 +422,10 @@ instance (Deserializable a, Deserializable b, Deserializable c, Deserializable d
 instance (Deserializable a, Deserializable b, Deserializable c, Deserializable d, Deserializable e) => Deserializable ((,,,,) a b c d e) where
   deserialize = liftM5 (,,,,) deserialize deserialize deserialize deserialize deserialize
 
-instance Deserializable Int64 where deserialize = liftM fromIntegral getWord64be
-instance Deserializable Int32 where deserialize = liftM fromIntegral getWord32be
-instance Deserializable Int16 where deserialize = liftM fromIntegral getWord16be
-instance Deserializable Int8  where deserialize = liftM fromIntegral getWord8
+instance Deserializable Int64 where deserialize = fmap fromIntegral getWord64be
+instance Deserializable Int32 where deserialize = fmap fromIntegral getWord32be
+instance Deserializable Int16 where deserialize = fmap fromIntegral getWord16be
+instance Deserializable Int8  where deserialize = fmap fromIntegral getWord8
 
 -- * Generated lenses
 
