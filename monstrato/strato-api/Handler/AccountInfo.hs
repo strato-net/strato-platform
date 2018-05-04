@@ -26,6 +26,8 @@ accountInfo :: [(Text, Text)] -> Handler Value
 accountInfo params = do
     limit <- liftIO $ myFetchLimit
 
+    chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+
     let index'   = fromIntegral $ (maybe 0 id $ extractPage "index" params) :: Int64
     let paramMap = Map.fromList params
         paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap accountQueryParams
@@ -38,7 +40,7 @@ accountInfo params = do
               E.from $ \(accStateRef) -> do
 
               let criteria = P.map (getAccFilter (accStateRef)) $ params
-              let allCriteria = ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
+              let allCriteria = (accStateRef E.^. AddressStateRefChainId E.==. E.val chainId) : ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
 
               E.where_ (P.foldl1 (E.&&.) allCriteria)
 
