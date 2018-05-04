@@ -26,7 +26,9 @@ class AddEntity extends Component {
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      this.props.addEntity(values);
+      const entity = values;
+      entity.status = 'Connected';
+      this.props.addEntity(entity);
       this.props.reset();
       this.props.handleNextStep();
     }
@@ -37,7 +39,11 @@ class AddEntity extends Component {
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      this.props.createConsortiumRequest(values);
+      const entity = values;
+      entity.status = 'Connected';
+      const currentConsortium = this.props.currentConsortium;
+      currentConsortium.entities.push(entity);
+      this.props.createConsortiumRequest(currentConsortium);
       this.props.history.replace('/consortium');
       this.props.reset();
     }
@@ -197,6 +203,7 @@ export function mapStateToProps(state) {
   return {
     spinning: state.createConsortium.spinning,
     serverError: state.createConsortium.error,
+    currentConsortium: state.createConsortium.newConsortium,
   };
 }
 

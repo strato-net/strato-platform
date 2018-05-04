@@ -8,10 +8,10 @@ class InviteEntity extends Component {
   render() {
     return (
       <div>
-        <Button onClick={() => {
+        {this.props.consortiumExists && <Button onClick={() => {
           this.props.openInviteEntityModal()
         }} className="pt-intent-primary pt-icon-add"
-          text="Invite Entity" />
+          text="Invite Entity" />}
 
         <Dialog
           isOpen={this.props.isOpen}
@@ -30,7 +30,8 @@ class InviteEntity extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.entites.isOpen
+    isOpen: state.entites.isOpen,
+    consortiumExists: (state.createConsortium.consortium.length > 0),
   }
 }
 

@@ -63,7 +63,7 @@ import watchFetchApplications from './components/Applications/applications.saga'
 import watchAppUpload from './components/LaunchPad/launchPad.saga';
 import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
-import watchCreateConsoritumRequest from './components/Consortium/components/CreateConsortium/createConsortium.saga';
+import watchConsoritumActions from './components/Consortium/components/CreateConsortium/createConsortium.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -132,7 +132,7 @@ const rootSaga = function* startForeman() {
     fork(watchFetchUser),
     fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
-    fork(watchCreateConsoritumRequest)
+    fork(watchConsoritumActions)
   ])
 };
 

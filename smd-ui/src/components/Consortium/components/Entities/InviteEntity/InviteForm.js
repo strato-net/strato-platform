@@ -6,6 +6,7 @@ import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../../lib/mixpanelWrapper';
 import { closeInviteEntityModal } from '../entities.actions';
 import { validate } from './validate';
+import { inviteEntityRequest } from '../../CreateConsortium/createConsortium.actions';
 
 class InviteForm extends Component {
 
@@ -14,10 +15,22 @@ class InviteForm extends Component {
     this.state = { errors: null };
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (this.props.numberOfEntities < nextProps.numberOfEntities) {
+      this.props.reset();
+      this.props.closeInviteEntityModal();
+    }
+  }
+
   submit = (values) => {
     let errors = validate(values);
     this.setState({ errors });
-    // TODO to submit values
+
+    if (JSON.stringify(errors) === JSON.stringify({})) {
+      const entity = values;
+      entity.status = 'Pending';
+      this.props.inviteEntityRequest(entity);
+    }
   }
 
   errorMessageFor = (fieldName) => {
@@ -30,127 +43,131 @@ class InviteForm extends Component {
   render() {
     return (
       <div>
-        <div className="pt-dialog-body">
-          <div className="pt-form-group">
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-a">
-                Entity Name
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="entityName"
-                  className="pt-input form-width smd-full-width"
-                  placeholder="Entity Name"
-                  component="input"
-                  type="input"
-                  required
-                />
-                <div className="error-text">{this.errorMessageFor('entityName')}</div>
+        <form>
+          <div className="pt-dialog-body">
+            <div className="pt-form-group">
+              <p className="error-text">{this.props.serverError}</p>
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-a">
+                  Entity Name
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="name"
+                    className="pt-input form-width smd-full-width"
+                    placeholder="Entity Name"
+                    component="input"
+                    type="text"
+                    required
+                  />
+                  <div className="error-text">{this.errorMessageFor('entityName')}</div>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                E-Node URL
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="nodeUrl"
-                  className="pt-input form-width"
-                  placeholder="E-Node URL"
-                  component="input"
-                  type="input"
-                  required
-                />
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  E-Node URL
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="eNodeUrl"
+                    className="pt-input form-width"
+                    placeholder="E-Node URL"
+                    component="input"
+                    type="text"
+                    required
+                  />
+                </div>
+                <div className="error-text">{this.errorMessageFor('nodeUrl')}</div>
               </div>
-              <div className="error-text">{this.errorMessageFor('nodeUrl')}</div>
-            </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Admin Ethereum Address
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="adminEtheriumAddress"
-                  className="pt-input form-width"
-                  placeholder="Admin Ethereum Address"
-                  component="input"
-                  type="input"
-                  required
-                />
-                <div className="error-text">{this.errorMessageFor('adminEtheriumAddress')}</div>
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Admin Ethereum Address
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="adminEthereumAddress"
+                    className="pt-input form-width"
+                    placeholder="Admin Ethereum Address"
+                    component="input"
+                    type="text"
+                    required
+                  />
+                  <div className="error-text">{this.errorMessageFor('adminEthereumAddress')}</div>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Admin Name
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="adminName"
-                  className="pt-input form-width"
-                  placeholder="Admin Name"
-                  component="input"
-                  type="input"
-                  required
-                />
-                <div className="error-text">{this.errorMessageFor('adminName')}</div>
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Admin Name
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="adminName"
+                    className="pt-input form-width"
+                    placeholder="Admin Name"
+                    component="input"
+                    type="text"
+                    required
+                  />
+                  <div className="error-text">{this.errorMessageFor('adminName')}</div>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Admin Email
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="adminEmail"
-                  className="pt-input form-width"
-                  placeholder="Admin Email"
-                  component="input"
-                  type="input"
-                  required
-                />
-                <div className="error-text">{this.errorMessageFor('adminEmail')}</div>
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Admin Email
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="adminEmail"
+                    className="pt-input form-width"
+                    placeholder="Admin Email"
+                    component="input"
+                    type="text"
+                    required
+                  />
+                  <div className="error-text">{this.errorMessageFor('adminEmail')}</div>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Send Token Amount
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="tokenAmount"
-                  className="pt-input form-width"
-                  placeholder="Send Token Amount"
-                  component="input"
-                  type="input"
-                  required
-                />
-                <div className="error-text">{this.errorMessageFor('tokenAmount')}</div>
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Send Token Amount
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="tokenAmount"
+                    className="pt-input form-width"
+                    placeholder="Send Token Amount"
+                    component="input"
+                    type="number"
+                    required
+                  />
+                  <div className="error-text">{this.errorMessageFor('tokenAmount')}</div>
+                </div>
               </div>
-            </div>
 
+            </div>
           </div>
-        </div>
 
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions button-center">
-            <Button onClick={() => {
-              mixpanelWrapper.track('cancel_invite_entity');
-              this.props.closeInviteEntityModal();
-            }} text="Cancel" />
-            <Button
-              type="button"
-              onClick={this.props.handleSubmit(this.submit)}
-              text='Invite'
-              className="pt-intent-primary"
-            />
+          <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer-actions button-center">
+              <Button onClick={() => {
+                mixpanelWrapper.track('cancel_invite_entity');
+                this.props.closeInviteEntityModal();
+              }} text="Cancel" />
+              <Button
+                type="submit"
+                onClick={this.props.handleSubmit(this.submit)}
+                text='Invite'
+                className="pt-intent-primary"
+                disabled={this.props.spinning}
+              />
+            </div>
           </div>
-        </div>
+        </form>
       </div>
     )
   }
@@ -160,12 +177,17 @@ const formed = reduxForm({ form: 'invite-entity' })(InviteForm);
 
 export function mapStateToProps(state) {
   return {
-
+    spinning: state.createConsortium.spinning,
+    serverError: state.createConsortium.error,
+    numberOfEntities: state.createConsortium.consortium[0]
+      ? state.createConsortium.consortium[0].entities.length
+      : 0,
   };
 }
 
 const connected = connect(mapStateToProps, {
-  closeInviteEntityModal
+  closeInviteEntityModal,
+  inviteEntityRequest,
 })(formed);
 
 export default withRouter(connected);

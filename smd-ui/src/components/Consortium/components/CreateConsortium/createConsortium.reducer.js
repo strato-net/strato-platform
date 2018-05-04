@@ -4,6 +4,9 @@ import {
   CREATE_CONSORTIUM_REQUEST,
   CREATE_CONSORTIUM_SUCCESS,
   CREATE_CONSORTIUM_FAILURE,
+  INVITE_ENTITY_REQUEST,
+  INVITE_ENTITY_SUCCESS,
+  INVITE_ENTITY_FAILURE,
 } from './createConsortium.actions';
 
 const initialState = {
@@ -53,7 +56,27 @@ const reducer = function (state = initialState, action) {
         error: action.error,
         spinning: false,
       }
-
+    case INVITE_ENTITY_REQUEST:
+      return {
+        ...state,
+        spinning: true,
+        error: null,
+      }
+    case INVITE_ENTITY_SUCCESS:
+      consortium = state.consortium;
+      consortium[0].entities.push(action.entity);
+      return {
+        ...state,
+        spinning: false,
+        error: null,
+        consortium,
+      }
+    case INVITE_ENTITY_FAILURE:
+      return {
+        ...state,
+        spinning: false,
+        error: action.error,
+      }
     default:
       return state;
   }

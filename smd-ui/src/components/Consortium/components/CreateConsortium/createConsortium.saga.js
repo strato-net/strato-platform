@@ -5,8 +5,11 @@ import {
 } from 'redux-saga/effects';
 import {
   CREATE_CONSORTIUM_REQUEST,
+  INVITE_ENTITY_REQUEST,
   createConsortiumSuccess,
   createConsortiumFailure,
+  inviteEntitySuccess,
+  inviteEntityFailure,
 } from './createConsortium.actions';
 
 function todo() {
@@ -29,6 +32,23 @@ function* makeNewConsortiumRequest(action) {
   }
 }
 
-export default function* watchCreateConsoritumRequest() {
-  yield takeEvery(CREATE_CONSORTIUM_REQUEST, makeNewConsortiumRequest);
+function* inviteEntityAPICall(consortium) {
+  return yield call(todo);
+}
+
+function* makeInviteEntityRequest(action) {
+  try {
+    yield inviteEntityAPICall(action.entity);
+    yield put(inviteEntitySuccess(action.entity));
+  }
+  catch (error) {
+    yield put(inviteEntityFailure(error.message));
+  }
+}
+
+export default function* watchConsoritumActions() {
+  yield [
+    takeEvery(CREATE_CONSORTIUM_REQUEST, makeNewConsortiumRequest),
+    takeEvery(INVITE_ENTITY_REQUEST, makeInviteEntityRequest),
+  ];
 }

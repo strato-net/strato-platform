@@ -1,28 +1,30 @@
 export function validate(values) {
   const errors = {};
 
-  if (!values.entityName) {
-    errors.entityName = "Please Enter entity name";
+  if (!values.name) {
+    errors.name = "Please enter entity name";
   }
 
-  if (!values.nodeUrl) {
-    errors.nodeUrl = "Please enter node URL";
+  if (!values.eNodeUrl) {
+    errors.eNodeUrl = "Please enter node URL";
   }
 
-  if (!values.adminEtheriumAddress) {
-    errors.adminEtheriumAddress = "Please enter etherium address";
+  if (!values.adminEthereumAddress) {
+    errors.adminEthereumAddress = "Please enter etherium address";
   }
 
   if (!values.adminName) {
-    errors.adminName = "please enter admin name";
+    errors.adminName = "Please enter admin name";
   }
 
   if (!values.adminEmail) {
-    errors.adminEmail = "please enter admin email";
+    errors.adminEmail = "Please enter admin email";
+  } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(values.adminEmail)) {
+    errors.adminEmail = 'Please enter a valid admin email';
   }
 
   if (!values.tokenAmount) {
-    errors.tokenAmount = "please enter token amount";
+    errors.tokenAmount = "Please enter token amount";
   }
 
   return errors;

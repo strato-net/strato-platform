@@ -1,33 +1,30 @@
 import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
+import { connect } from 'react-redux';
 import InviteEntity from './InviteEntity';
 
 class Entities extends Component {
 
-  constructor(props) {
-    super(props);
-    this.state = {
-      data: []
-    }
-  }
-
   tableData() {
-    if (this.state.data && this.state.data.length) {
-      return this.state.data.map((data, key) => {
+    const entities = this.props.createConsortium.consortium[0]
+      ? this.props.createConsortium.consortium[0].entities
+      : []
+    if (entities.length) {
+      return entities.map((entity, key) => {
         return (
           <tr key={key}>
             <td>
-              {data.one}
+              {entity.name}
             </td>
             <td>
-              {data.two}
+              {entity.nodes ? entity.nodes.length : 0}
             </td>
             <td>
-              {data.three}
+              {entity.users ? entity.users.length : 0}
             </td>
             <td>
-              {data.four}
-              <Button>Vote</Button>
+              {entity.status}
+              {entity.status === 'Pending' && <Button>Vote</Button>}
             </td>
             <td>
               <Button>Connect</Button>
@@ -69,4 +66,11 @@ class Entities extends Component {
   }
 }
 
-export default Entities;
+export function mapStateToProps(state) {
+  return {
+    createConsortium: state.createConsortium
+  };
+}
+const connected = connect(mapStateToProps)(Entities);
+
+export default connected;
