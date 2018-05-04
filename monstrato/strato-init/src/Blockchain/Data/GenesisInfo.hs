@@ -10,14 +10,17 @@ module Blockchain.Data.GenesisInfo (
   GenesisInfo(..),
   AccountInfo(..),
   CodeInfo(..),
-  defaultGenesisInfo
+  defaultGenesisInfo,
+  genesisParser,
   ) where
 
+import           Control.Applicative               (many)
 import           GHC.Generics (Generic)
 import           Data.Aeson
 import           Data.Aeson.TH                      as AT
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
+import qualified Data.JsonStream.Parser             as JS
 import           Data.Monoid ((<>))
 import           Data.Time
 import           Data.Word
@@ -123,3 +126,28 @@ instance ToJSON GenesisInfo where
       "nonce" .= genesisInfoNonce x <>
       "accountInfo" .= genesisInfoAccountInfo x
     )
+
+genesisParser :: JS.Parser GenesisInfo
+genesisParser = GenesisInfo
+            <$> "parentHash" JS..: JS.value
+            <*> "unclesHash" JS..: JS.value
+            <*> "coinbase" JS..: JS.value
+            <*> accountExtractor
+            <*> ("codeInfo" JS..: JS.value JS..| [])
+            <*> "transactionRoot" JS..: JS.value
+            <*> "receiptsRoot" JS..: JS.value
+            <*> "logBloom" JS..: JS.value
+            <*> "difficulty" JS..: JS.value
+            <*> "number" JS..: JS.value
+            <*> "gasLimit" JS..: JS.value
+            <*> "gasUsed" JS..: JS.value
+            <*> "timestamp" JS..: JS.value
+            <*> "extraData" JS..: JS.value
+            <*> "mixHash" JS..: JS.value
+            <*> "nonce" JS..: JS.value
+
+accountExtractor :: JS.Parser [AccountInfo]
+accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)
+
+accountInfo :: JS.Parser AccountInfo
+accountInfo = JS.value

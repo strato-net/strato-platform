@@ -11,9 +11,9 @@ module Blockchain.Data.GenesisBlock (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.JsonStream.Parser               as JS
 import           Data.List.Split                      (chunksOf)
 
 import           Blockchain.Database.MerklePatricia
@@ -136,7 +136,7 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let theJSON = either error id (eitherDecode theJSONString)
+    let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
     genesisInfoToGenesisBlock theJSON
 
 data BackupType = NoBackup | BlockBackup | MPBackup
