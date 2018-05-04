@@ -2,8 +2,9 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { Button, Intent } from '@blueprintjs/core';
 import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import { validate } from './validate';
-import { addEntity } from '../createConsortium.actions';
+import { addEntity, createConsortiumRequest } from '../createConsortium.actions';
 import './addEntity.css';
 
 class AddEntity extends Component {
@@ -36,7 +37,9 @@ class AddEntity extends Component {
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      console.log(values)
+      this.props.createConsortiumRequest(values);
+      this.props.history.replace('/consortium');
+      this.props.reset();
     }
   }
 
@@ -45,6 +48,7 @@ class AddEntity extends Component {
       <div className="add-entity-wrapper">
         <h4 className="title">Starting entitites {this.props.index}:</h4>
         <form>
+          <p className="error-text">{this.props.serverError}</p>
           <div className="row">
             <div className="col-sm-4 text-left">
               <label className="pt-label smd-pad-4">
@@ -171,12 +175,15 @@ class AddEntity extends Component {
               text={this.props.canFinish ? "Add more" : "Continue"}
               type="submit"
               onClick={this.props.handleSubmit(this.addEntity)}
+              disabled={this.props.spinning}
             />
             {this.props.canFinish && <Button
               intent={Intent.PRIMARY}
               text="Finish"
               type="submit"
               onClick={this.props.handleSubmit(this.finish)}
+              className="finish-btn"
+              disabled={this.props.spinning}
             />}
           </div>
         </form>
@@ -186,6 +193,13 @@ class AddEntity extends Component {
 
 }
 
+export function mapStateToProps(state) {
+  return {
+    spinning: state.createConsortium.spinning,
+    serverError: state.createConsortium.error,
+  };
+}
+
 const formed = reduxForm({ form: 'add-entity' })(AddEntity);
-const connected = connect(null, { addEntity })(formed);
-export default connected;
+const connected = connect(mapStateToProps, { addEntity, createConsortiumRequest })(formed);
+export default withRouter(connected);

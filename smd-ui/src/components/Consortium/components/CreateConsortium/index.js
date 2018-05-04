@@ -16,8 +16,8 @@ class CreateConsortium extends Component {
   }
 
   renderComponent = () => {
-    const { step }= this.state;
-    switch(step) {
+    const { step } = this.state;
+    switch (step) {
       case 0:
         return <ConsortiumDetail handleNextStep={this.handleNextStep} />
       default:

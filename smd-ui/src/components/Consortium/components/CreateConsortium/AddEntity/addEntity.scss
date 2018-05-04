@@ -2,7 +2,17 @@ h4.title {
   margin-bottom: 30px;
 }
 
+p.error-text {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .add-entity-wrapper .footer {
   display: flex;
   justify-content: flex-end;
+}
+
+.add-entity-wrapper .finish-btn {
+  margin-left: 15px; 
 }

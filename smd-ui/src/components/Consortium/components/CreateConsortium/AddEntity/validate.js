@@ -1,10 +1,10 @@
 export function validate(values) {
 
   const errors = {};
-  
+
   if (!values.name) {
     errors.name = 'Please enter the entity name';
-  } 
+  }
   if (!values.eNodeUrl) {
     errors.eNodeUrl = 'Please enter the e-node URL';
   }
