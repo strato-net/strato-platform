@@ -208,7 +208,7 @@ services:
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
-    image: wurstmeister/kafka:0.10.1.0
+    image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
