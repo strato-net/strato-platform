@@ -636,7 +636,7 @@ calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractNa
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
+    diffs <- stateDiff (blockHeaderChainId newHeader) newNumber newHash oldStateRoot newStateRoot
     when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs

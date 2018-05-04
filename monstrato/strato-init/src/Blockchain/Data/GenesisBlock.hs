@@ -233,7 +233,9 @@ initializeGenesisBlock backupType genesisBlockName = do
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
-    let diff = StateDiff {
+    let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
+        diff = StateDiff {
+        chainId   = genesisChainId,
         blockNumber         = 0,
         StateDiff.blockHash = blockHash genesisBlock,
         createdAccounts     = accountDiffs,
@@ -243,8 +245,8 @@ initializeGenesisBlock backupType genesisBlockName = do
     commitSqlDiffs diff (const (return "")) (const (return ""))
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
-            ContractNoStorage addr _ _ -> updateSource addr name src
-            ContractWithStorage addr _ _ _ -> updateSource addr name src
+            ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
+            ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
 
     forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"

@@ -43,6 +43,7 @@ import           GHC.Generics
 -- database in a given block.
 data StateDiff =
   StateDiff {
+    chainId         :: Maybe Word256,
     blockNumber     :: Integer,
     blockHash       :: SHA,
     -- | The 'Eventual value is the initial state of the contract
@@ -145,13 +146,14 @@ instance Detailed (Diff SHA) where
   incrementalToEventual x        = Value $ newValue x
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
-             Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
-stateDiff blockNumber blockHash oldRoot newRoot = do
+             Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
+stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   db <- getStateDB
   diffs <- Diff.dbDiff db oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
       StateDiff{
+        chainId,
         blockNumber,
         blockHash,
         createdAccounts,
