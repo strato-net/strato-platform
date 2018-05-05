@@ -38,4 +38,3 @@ fetch o p topic = do
 fetchMessages :: FetchResponse -> [TopicAndMessage]
 fetchMessages fr = (fr ^.. fetchResponseFields . folded) >>= tam
     where tam a = TopicAndMessage (a ^. _1) <$> a ^.. _2 . folded . _4 . messageSetMembers . folded . setMessage
-

@@ -167,7 +167,7 @@ data CompressionCodec = NoCompression | Gzip deriving (Show, Eq)
 
 newtype Crc = Crc Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
 newtype MagicByte = MagicByte Int8 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
-data Attributes = Attributes { _compressionCodec :: CompressionCodec } deriving (Show, Eq) -- , Deserializable, Num, Integral, Ord, Real, Enum)
+data Attributes = Attributes { _compressionCodec :: CompressionCodec } deriving (Show, Eq)
 
 newtype Key = Key { _keyBytes :: Maybe KafkaBytes } deriving (Show, Eq)
 newtype Value = Value { _valueBytes :: Maybe KafkaBytes } deriving (Show, Eq)
@@ -186,13 +186,13 @@ newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Sh
 newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable)
 newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable)
 newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Eq, Serializable, Deserializable, IsString)
+newtype Metadata = Metadata { _kMetadata :: KafkaString } deriving (Show, Eq, Serializable, Deserializable, IsString)
 
 instance Show ConsumerGroup where
     show (ConsumerGroup g) = "ConsumerGroup " ++ show (_kString g)
 
 newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
 newtype ConsumerId = ConsumerId KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
-newtype Metadata = Metadata { _kMetadata :: KafkaString } deriving (Show, Eq, Serializable, Deserializable, IsString)
 
 errorKafka :: KafkaError -> Int16
 errorKafka NoError                             = 0
@@ -347,8 +347,6 @@ instance Serializable Attributes where
           codecValue NoCompression = 0
           codecValue Gzip = 1
 
-
-
 instance Serializable KafkaBytes where
   serialize (KBytes bs) = do
     let l = fromIntegral (B.length bs) :: Int32
@@ -398,8 +396,6 @@ instance Deserializable MessageSet where
               if wasEmpty
               then return []
               else liftM2 (:) deserialize getMembers <|> (remaining >>= getBytes >> return [])
-
-
 
             decompress :: MessageSetMember -> Get [MessageSetMember]
             decompress m = if isCompressed m

@@ -1,17 +1,17 @@
 {-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Network.Kafka where
 
 import           Control.Applicative
-import           Control.Exception           (IOException)
+import           Control.Exception           (Exception, IOException)
 import           Control.Exception.Lifted    (catch)
 import           Control.Lens
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), MonadError (..), runExceptT)
+import           Control.Monad.Except        (ExceptT (..), runExceptT, MonadError (..))
 import           Control.Monad.Trans.State
 import           Control.Monad.State.Class   (MonadState)
 import           Data.ByteString.Char8       (ByteString)
