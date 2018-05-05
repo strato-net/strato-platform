@@ -258,6 +258,8 @@ instance Deserializable KafkaError where
       16   -> return NotCoordinatorForConsumerCode
       _    -> fail $ "invalid error code: " ++ show x
 
+instance Exception KafkaError
+
 newtype Request = Request (CorrelationId, ClientId, RequestMessage) deriving (Show, Eq)
 
 instance Serializable Request where
