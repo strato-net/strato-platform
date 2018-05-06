@@ -85,13 +85,13 @@ ethereumVM = void . execContextM $ do
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
-        let pending = B.pending state
+        let pending = B.unsafeGetPublic B.pending state -- TODO: Grab pending txs for private chains
         let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- Bagger.makeNewBlock
+            newBlock <- Bagger.makeNewBlock Nothing -- TODO: Make blocks for private chains as well
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
