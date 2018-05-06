@@ -67,8 +67,8 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextCodeDB              :: CodeDB
                        , contextBlockSummaryDB      :: BlockSummaryDB
                        , contextSQLDB               :: SQLDB
-                       , contextAddressStateDBMap   :: M.Map Address AddressStateModification
-                       , contextStorageMap          :: M.Map (Address, Word256) Word256
+                       , contextAddressStateDBMap   :: M.Map (Maybe Word256, Address) AddressStateModification
+                       , contextStorageMap          :: M.Map (Maybe Word256, Address, Word256) Word256
                        , contextBaggerState         :: !BaggerState
                        , contextKafkaState          :: K.KafkaState
                        , contextBestBlockInfo       :: ContextBestBlockInfo
@@ -211,23 +211,23 @@ evalContextM f = fst <$> runContextM f
 execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
-incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
-incrementNonce address = do
-  addressState <- getAddressState address
-  putAddressState address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
+incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Maybe Word256 -> Address -> m ()
+incrementNonce chainId address = do
+  addressState <- getAddressState chainId address
+  putAddressState chainId address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m Address
-getNewAddress address = do
-  addressState <- getAddressState address
+getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Maybe Word256 -> Address -> m Address
+getNewAddress chainId address = do
+  addressState <- getAddressState chainId address
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
   let newAddress = getNewAddress_unsafe address (addressStateNonce addressState)
-  incrementNonce address
+  incrementNonce chainId address
   return newAddress
 
-purgeStorageMap :: HasStorageDB m => Address -> m ()
-purgeStorageMap address = do
+purgeStorageMap :: HasStorageDB m => Maybe Word256 -> Address -> m ()
+purgeStorageMap chainId address = do
   (_, storageMap) <- getStorageDB
-  putStorageMap $ M.filterWithKey (\key _ -> fst key /= address) storageMap
+  putStorageMap $ M.filterWithKey (\(c,a,_) _ -> (c /= chainId) && (a /= address)) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

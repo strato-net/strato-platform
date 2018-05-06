@@ -121,5 +121,5 @@ checkValidity isHomestead parentBSum b = do
 isNonceValid :: OutputTx -> ContextM Bool
 isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} = do
   let txNonce = transactionNonce base
-  addressState <- getAddressState txAddr
+  addressState <- getAddressState (transactionChainId base) txAddr
   return $ addressStateNonce addressState == txNonce

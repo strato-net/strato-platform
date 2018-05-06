@@ -9,28 +9,29 @@ module Blockchain.DB.ModifyStateDB (
 import           Control.Monad.Logger
 import           Control.Monad.Trans
 
+import           Blockchain.ExtWord              (Word256)
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
-addToBalance::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
-              Address->Integer->m Bool
-addToBalance address val = do
-  addressState <- getAddressState address
+addToBalance :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m) =>
+              Maybe Word256 -> Address -> Integer -> m Bool
+addToBalance chainId address val = do
+  addressState <- getAddressState chainId address
 
   let newVal = addressStateBalance addressState + val
 
   if newVal < 0
     then return False
     else do
-    putAddressState address addressState{addressStateBalance = newVal}
+    putAddressState chainId address addressState{addressStateBalance = newVal}
     return True
 
-pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m)=>
-     String->Address->Address->Integer->m Bool
-pay _description fromAddr toAddr val = do
+pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m) =>
+     String -> Maybe Word256 -> Address -> Address -> Integer -> m Bool
+pay _description chainId fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.
   {-
@@ -44,10 +45,10 @@ pay _description fromAddr toAddr val = do
         $logDebugS "pay" "insufficient funds"
   -}
 
-  fromAddressState <- getAddressState fromAddr
+  fromAddressState <- getAddressState chainId fromAddr
   if addressStateBalance fromAddressState < val
     then return False
     else do
-    _ <- addToBalance fromAddr (-val)
-    _ <- addToBalance toAddr val
+    _ <- addToBalance chainId fromAddr (-val)
+    _ <- addToBalance chainId toAddr val
     return True

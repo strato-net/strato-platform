@@ -18,6 +18,7 @@ data Environment =
       envValue       :: Integer,
       envCode        :: Code,
       envJumpDests   :: [Word256],
-      envBlockHeader :: BlockData
+      envBlockHeader :: BlockData,
+      envChainId     :: Maybe Word256
     }
 

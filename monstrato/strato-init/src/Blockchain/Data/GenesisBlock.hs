@@ -37,8 +37,8 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
-import           Blockchain.Strato.StateDiff          hiding (StateDiff (blockHash))
-import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
@@ -71,30 +71,31 @@ initializeBlankStateDB = do
     setStateDBStateRoot emptyTriePtr
 
 putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
-                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
-putStorageTrie address slots = do
+                  Maybe Ext.Word256 -> Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
+putStorageTrie chainId address slots = do
     let slotss = chunksOf 10000 slots
     forM_ slotss (\ss ->  do
-      mapM_ (\(k, v) -> putStorageKeyVal' address k v) ss
+      mapM_ (\(k, v) -> putStorageKeyVal' chainId address k v) ss
       flushMemStorageDB
-      Mem.flushMemAddressStateDB)
+      Mem.flushMemAddressStateDB
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
-                  => [AccountInfo]
+                  => Maybe Ext.Word256
+                  -> [AccountInfo]
                   -> String
                   -> m ()
-initializeStateDB addressInfo genesisBlockName = do
+initializeStateDB chainId addressInfo genesisBlockName = do
     initializeBlankStateDB
     let putAccount acc = case acc of
                               NonContract address balance' ->
-                                putAddressState address blankAddressState{addressStateBalance=balance'}
+                                putAddressState chainId address blankAddressState{addressStateBalance=balance'}
                               ContractNoStorage address balance' codeHash' -> do
-                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                putAddressState chainId address blankAddressState{addressStateBalance=balance',
                                                                           addressStateCodeHash=codeHash'}
                               ContractWithStorage address balance' codeHash' slots -> do
-                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                putAddressState chainId address blankAddressState{addressStateBalance=balance',
                                                                           addressStateCodeHash=codeHash'}
-                                putStorageTrie address slots
+                                putStorageTrie chainId address slots
     mapM_ putAccount addressInfo
 
     let accountInfoFilename = genesisBlockName ++ "AccountInfo"
@@ -162,7 +163,7 @@ genesisInfoToGenesisBlock gi gn = do
     let accounts = genesisInfoAccountInfo gi
     let sourceInfo = zipSourceInfo accounts codes
     initializeCodeDB codes
-    initializeStateDB accounts gn
+    initializeStateDB (genesisInfoChainId gi) accounts gn
     db <- getStateDB
     return (sourceInfo, Block {
         blockBlockData = BlockData {
@@ -232,10 +233,10 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    return (gb, undefined)
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
+    accountDiffs <- mapM eventualAccountState . Map.fromList $ map (\(_,a,s) -> (a,s)) genAddrStates
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {
-        chainId   = genesisChainId,
+        StateDiff.chainId   = genesisChainId,
         blockNumber         = 0,
         StateDiff.blockHash = blockHash genesisBlock,
         createdAccounts     = accountDiffs,

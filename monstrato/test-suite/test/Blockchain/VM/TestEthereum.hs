@@ -65,14 +65,14 @@ import           Blockchain.VM.TestFiles
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
 
-populateAndConvertAddressState::Address->AddressState'->ContextM AddressState
-populateAndConvertAddressState owner addressState' = do
+populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
+populateAndConvertAddressState cid owner addressState' = do
   addCode . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
-    \(key, val) -> do putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
+    \(key, val) -> do putStorageKeyVal' cid owner (fromIntegral key) (fromIntegral val)
 
-  addressState <- getAddressState owner
+  addressState <- getAddressState cid owner
 
   return $
     AddressState
@@ -80,7 +80,7 @@ populateAndConvertAddressState owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
-      (Nothing)
+      (cid)
 
 showHexInt::Integer->String
 showHexInt x
@@ -140,8 +140,8 @@ showInfo _ = undefined
 addressStates::ContextM [(Address, AddressState')]
 addressStates = do
   addrStates <- getAllAddressStates
-  let addrs = map fst addrStates
-      states = map snd addrStates
+  let addrs = map (\(_,a,_) -> a) addrStates
+      states = map (\(_,_,s) -> s) addrStates
   states' <- mapM (uncurry getDataAndRevertAddressState) $ zip addrs states
   return $ zip addrs states'
 
@@ -150,14 +150,15 @@ txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
 runTest::Test->ContextM (Either String String)
 runTest test = do
+  let cid = chainId $ env test
 
   MP.initializeBlank =<< getStateDB
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $
     \(addr, s) -> do
-      state' <- populateAndConvertAddressState addr s
-      putAddressState addr state'
+      state' <- populateAndConvertAddressState cid addr s
+      putAddressState cid addr state'
 
   beforeAddressStates <- addressStates
 
@@ -180,7 +181,7 @@ runTest test = do
              blockDataExtraData = 0, --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
              blockDataMixHash=SHA 0, --error "mixHash not set"
-             blockDataChainId = Nothing -- TODO: Add chainId to test environment
+             blockDataChainId = cid
              },
           blockReceiptTransactions = [], --error "receiptTransactions not set",
           blockBlockUncles = [] --error "blockUncles not set"
@@ -200,7 +201,8 @@ runTest test = do
                 envSender = caller exec,
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
-                envJumpDests = getValidJUMPDESTs $ code exec
+                envJumpDests = getValidJUMPDESTs $ code exec,
+                envChainId = cid
                 }
 
         cxt <- get
@@ -216,7 +218,7 @@ runTest test = do
               liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
                                 intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
 
-            forM_ (suicideList vmState2) $ deleteAddressState
+            forM_ (suicideList vmState2) $ deleteAddressState cid
 
         put $ dbs vmState1
 

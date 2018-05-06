@@ -94,8 +94,8 @@ data SetupDBs =
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: Redis.Connection,
-    localStorage :: Map.Map (Address, Word256) Word256,
-    localAddressState :: Map.Map Address AddressStateModification
+    localStorage :: Map.Map (Maybe Word256, Address, Word256) Word256,
+    localAddressState :: Map.Map (Maybe Word256, Address) AddressStateModification
     }
 
 type SetupDBM = StateT SetupDBs (ResourceT IO)

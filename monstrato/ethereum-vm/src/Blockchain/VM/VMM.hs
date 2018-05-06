@@ -219,28 +219,33 @@ addGas gas = do
 
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
-  success <- pay reason from to val
+  chainId <- getEnvVar envChainId
+  success <- pay reason chainId from to val
   unless success $ left InsufficientFunds
 
 addToBalance'::Address->Integer->VMM ()
 addToBalance' address' val = do
-  success <- addToBalance address' val
+  chainId <- getEnvVar envChainId
+  success <- addToBalance chainId address' val
   unless success $ left InsufficientFunds
 
 getStorageKeyVal::Word256->VMM Word256
 getStorageKeyVal key = do
   owner <- getEnvVar envOwner
-  getStorageKeyVal' owner key
+  chainId <- getEnvVar envChainId
+  getStorageKeyVal' chainId owner key
 
 getAllStorageKeyVals::VMM [(MP.Key, Word256)]
 getAllStorageKeyVals = do
   owner <- getEnvVar envOwner
-  getAllStorageKeyVals' owner
+  chainId <- getEnvVar envChainId
+  getAllStorageKeyVals' chainId owner
 
 putStorageKeyVal::Word256->Word256->VMM ()
 putStorageKeyVal key val = do
   owner <- getEnvVar envOwner
-  putStorageKeyVal' owner key val
+  chainId <- getEnvVar envChainId
+  putStorageKeyVal' chainId owner key val
 
 vmTrace::String->VMM ()
 vmTrace msg = do

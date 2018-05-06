@@ -29,6 +29,8 @@ import           Blockchain.ExtWord
 import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 
+-- TODO: Add private chain functionality to JSON RPC commands
+
 produceResponse::String->B.ByteString->IO ()
 produceResponse id theData = do
     ret <-
@@ -40,13 +42,13 @@ produceResponse id theData = do
         Right _ -> return ()
 
 
-runJsonRpcCommand::(MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m)=>
-                   JsonRpcCommand->m ()
+runJsonRpcCommand :: (MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m) =>
+                   JsonRpcCommand -> m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
   setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
-  addressState <- getAddressState address
+  addressState <- getAddressState Nothing address
   let response = show $ addressStateBalance addressState
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
@@ -55,7 +57,7 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
   setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
-  addressState <- getAddressState address
+  addressState <- getAddressState Nothing address
   maybeCode <- getCode $ addressStateCodeHash addressState
   case maybeCode of
    Just code -> liftIO $ produceResponse id code
@@ -65,7 +67,7 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
   setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
-  addressState <- getAddressState address
+  addressState <- getAddressState Nothing address
   let response = show $ addressStateNonce addressState
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
@@ -74,7 +76,7 @@ runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = 
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
   setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
-  value <- getStorageKeyVal' address $ bytesToWord256 $ B.unpack key
+  value <- getStorageKeyVal' Nothing address $ bytesToWord256 $ B.unpack key
   liftIO $ produceResponse id $ B.pack $ word256ToBytes value
   liftIO $ putStrLn $ show value
 runJsonRpcCommand (JRCCall _ _ _) = error "unsupported RPC command call"

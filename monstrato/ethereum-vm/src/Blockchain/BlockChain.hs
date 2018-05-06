@@ -117,13 +117,13 @@ instance Bagger.MonadBagger ContextM where
             Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
-    rewardCoinbases sr us uncles ourNumber = do
+    rewardCoinbases chainId sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        _ <- addToBalance us $ rewardBase flags_testnet
+        _ <- addToBalance chainId us $ rewardBase flags_testnet
         forM_ uncles $ \uncle -> do
-            _ <- addToBalance us (rewardBase flags_testnet `quot` 32)
-            _ <- addToBalance (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
+            _ <- addToBalance chainId us (rewardBase flags_testnet `quot` 32)
+            _ <- addToBalance chainId (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
             return ()
         flushMemStorageDB
         flushMemAddressStateDB
@@ -259,14 +259,15 @@ addBlock :: OutputBlock -> ContextM () -- change Block to OutputBlock
 addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
     bSum <- setParentStateRoot b
     when (blockDataNumber bd == 1920000) runTheDAOFork
-    s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
+    s1 <- addToBalance (blockDataChainId bd) (blockDataCoinbase bd) (rewardBase flags_testnet)
     unless s1 $ error "addToBalance failed even after a check in addBlock"
 
     forM_ uncles $ \uncle -> do
-        s2 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet `quot` 32)
+        s2 <- addToBalance (blockDataChainId bd) (blockDataCoinbase bd) (rewardBase flags_testnet `quot` 32)
         unless s2 $ error "addToBalance failed even after a check in addBlock"
 
         s3 <- addToBalance
+              (blockDataChainId bd)
               (blockDataCoinbase uncle)
             ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
         unless s3 $ error "addToBalance failed even after a check in addBlock"
@@ -338,9 +339,17 @@ blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
 
 addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> EitherT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
+    unless (blockDataChainId b == transactionChainId bt) $
+      error $ unlines
+                [ "Somehow we're trying to add a transaction to a block on the wrong chain!"
+                , "Block chainId: " ++ show (blockDataChainId b)
+                , "Transaction chainId: " ++ show (transactionChainId bt)
+                ]
+
     nonceValid <- lift $ isNonceValid t
 
-    let isHomestead   = blockIsHomestead $ blockDataNumber b
+    let chainId = blockDataChainId b
+        isHomestead   = blockIsHomestead $ blockDataNumber b
         intrinsicGas' = intrinsicGas isHomestead t
 
     when flags_debug . lift $ do
@@ -348,7 +357,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
         $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-    addressState <- lift $ getAddressState tAddr
+    addressState <- lift $ getAddressState chainId tAddr
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
@@ -360,18 +369,18 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     let availableGas = transactionGasLimit bt - intrinsicGas'
 
     theAddress <- if isContractCreationTX bt
-                  then lift $ getNewAddress tAddr
+                  then lift $ getNewAddress chainId tAddr
                   else do
-                      lift $ incrementNonce tAddr
+                      lift $ incrementNonce chainId tAddr
                       return (transactionTo bt)
-    success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
+    success <- lift $ addToBalance chainId tAddr (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug . lift $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then ctr_vm_tx_creation else ctr_vm_tx_call
     lift $ tick txTypeCounter
     if success
         then do
             (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (transactionGasLimit bt - intrinsicGas') tAddr theAddress t
-            s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
+            s1 <- lift $ addToBalance chainId (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ tick ctr_vm_txs_processed
             case result of
@@ -391,13 +400,13 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        }
                 Right _ -> do
                     let realRefund = min (refund newVMState') ((transactionGasLimit bt - vmGasRemaining newVMState') `div` 2)
-                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + vmGasRemaining newVMState') * transactionGasPrice bt)
+                    success' <- lift $ pay "VM refund fees" chainId (blockDataCoinbase b) tAddr ((realRefund + vmGasRemaining newVMState') * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
 
                     when flags_debug . lift . $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
                     forM_ (S.toList $ suicideList newVMState') $ \address' -> do
-                        lift $ purgeStorageMap address'
-                        lift $ deleteAddressState address'
+                        lift $ purgeStorageMap chainId address'
+                        lift $ deleteAddressState chainId address'
                     lift $ tick ctr_vm_txs_successful
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
                                        , erRemainingTxGas     = vmGasRemaining newVMState'
@@ -408,9 +417,9 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Nothing
                                        }
         else do
-            s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
+            s1 <- lift $ addToBalance chainId (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
-            addressState' <- lift $ getAddressState tAddr
+            addressState' <- lift $ getAddressState chainId tAddr
             lift . $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return ExecResults { erRemainingBlockGas=remainingBlockGas
                                , erRemainingTxGas=transactionGasLimit bt
@@ -485,10 +494,11 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
     etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   when flags_createTransactionResults $ do
-      let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
-          beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
-          afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
-          afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
+      let chainId = transactionChainId t
+          beforeAddresses = S.fromList [ x | ((cid, x), ASModification _) <-  M.toList beforeMap , cid == chainId ]
+          beforeDeletes = S.fromList [ x | ((cid, x), ASDeleted) <-  M.toList beforeMap , cid == chainId ]
+          afterAddresses = S.fromList [ x | ((cid, x), ASModification _) <-  M.toList afterMap , cid == chainId ]
+          afterDeletes = S.fromList [ x | ((cid, x), ASDeleted) <-  M.toList afterMap , cid == chainId ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
 
       --mpdb <- getStateDB
@@ -507,7 +517,8 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
       newAddresses <-
           case result of
               Left _ -> return []
-              Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
+              Right erResult -> filterM (fmap not . NoCache.addressStateExists chainId) $ moveToFront $ erNewContractAddress erResult
+
       let ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
@@ -527,7 +538,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultDeletedStorage   = ""
                                , transactionResultStatus           = Just txrStatus
                                , transactionResultMiningStatus     = mined
-                               , transactionResultChainId          = transactionChainId t
+                               , transactionResultChainId          = chainId
                                }
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()

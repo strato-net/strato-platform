@@ -72,6 +72,7 @@ library
                    Blockchain.Data.BlockHeader
                    Blockchain.Data.BlockOffset
                    Blockchain.Data.BlockSummary
+                   Blockchain.Data.ChainId
                    Blockchain.Data.Code
                    Blockchain.Data.DataDefs
                    Blockchain.Data.Extra

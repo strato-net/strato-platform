@@ -24,49 +24,49 @@ import           Blockchain.ExtWord
 import qualified Data.NibbleString                           as N
 
 class MonadResource m => HasStorageDB m where
-  getStorageDB  :: m (DB.DB, M.Map (Address, Word256) Word256)
-  putStorageMap :: M.Map (Address, Word256) Word256->m ()
+  getStorageDB  :: m (DB.DB, M.Map (Maybe Word256, Address, Word256) Word256)
+  putStorageMap :: M.Map (Maybe Word256, Address, Word256) Word256 -> m ()
 
 
 
-putStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                  Address->Word256->Word256->m ()
+putStorageKeyVal' :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                  Maybe Word256 -> Address -> Word256 -> Word256 -> m ()
 putStorageKeyVal' = putStorageKeyValMC
 
-getStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                   Address->Word256->m Word256
+getStorageKeyVal' :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                   Maybe Word256 -> Address -> Word256 -> m Word256
 getStorageKeyVal' = getStorageKeyValMC
 
-getAllStorageKeyVals'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                       Address->m [(MP.Key, Word256)]
+getAllStorageKeyVals' :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                       Maybe Word256 -> Address -> m [(MP.Key, Word256)]
 getAllStorageKeyVals' = getAllStorageKeyValsMC
 
 --The following are the memory cache versions of the functions
 
-putStorageKeyValMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                  Address->Word256->Word256->m ()
-putStorageKeyValMC owner key val = do
+putStorageKeyValMC :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                  Maybe Word256 -> Address -> Word256 -> Word256 -> m ()
+putStorageKeyValMC chainId owner key val = do
   theMap <- fmap snd getStorageDB
-  putStorageMap $ M.insert (owner, key) val theMap
+  putStorageMap $ M.insert (chainId, owner, key) val theMap
 
-getStorageKeyValMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                   Address->Word256->m Word256
-getStorageKeyValMC owner key = do
+getStorageKeyValMC :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                   Maybe Word256 -> Address -> Word256 -> m Word256
+getStorageKeyValMC chainId owner key = do
   theMap <- fmap snd getStorageDB
-  case M.lookup (owner, key) theMap of
+  case M.lookup (chainId, owner, key) theMap of
    Just val -> return val
-   Nothing  -> getStorageKeyValDB owner key
+   Nothing  -> getStorageKeyValDB chainId owner key
 
-getAllStorageKeyValsMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                       Address->m [(MP.Key, Word256)]
+getAllStorageKeyValsMC :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                       Maybe Word256 -> Address -> m [(MP.Key, Word256)]
 getAllStorageKeyValsMC = getAllStorageKeyValsDB
 
-flushMemStorageDB::(HasMemAddressStateDB m, HasStateDB m, HasStorageDB m, HasHashDB m)=>
+flushMemStorageDB :: (HasMemAddressStateDB m, HasStateDB m, HasStorageDB m, HasHashDB m) =>
                    m ()
 flushMemStorageDB = do
   theMap <- fmap snd getStorageDB
-  forM_ (M.toList theMap) $ \((address, key), val) ->
-     putStorageKeyValDB address key val
+  forM_ (M.toList theMap) $ \((chainId, address, key), val) ->
+     putStorageKeyValDB chainId address key val
   putStorageMap M.empty
 
 
@@ -79,28 +79,28 @@ flushMemStorageDB = do
 --The following are the DB versions of the functions
 
 
-putStorageKeyValDB::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                  Address->Word256->Word256->m ()
-putStorageKeyValDB owner key 0 = do --when val=0, we actually delete the key from the database
-  addressState <- getAddressState owner
+putStorageKeyValDB :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                  Maybe Word256 -> Address -> Word256 -> Word256 -> m ()
+putStorageKeyValDB chainId owner key 0 = do --when val=0, we actually delete the key from the database
+  addressState <- getAddressState chainId owner
   db <- fmap fst getStorageDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
   newContractRoot <- fmap MP.stateRoot $ MP.deleteKey mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
-  putAddressState owner addressState{addressStateContractRoot=newContractRoot}
+  putAddressState chainId owner addressState{addressStateContractRoot=newContractRoot}
 
-putStorageKeyValDB owner key val = do
+putStorageKeyValDB chainId owner key val = do
   hashDBPut storageKeyNibbles
-  addressState <- getAddressState owner
+  addressState <- getAddressState chainId owner
   db <- fmap fst getStorageDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
   newContractRoot <- fmap MP.stateRoot $ MP.putKeyVal mpdb storageKeyNibbles (rlpEncode $ rlpSerialize $ rlpEncode val)
-  putAddressState owner addressState{addressStateContractRoot=newContractRoot}
+  putAddressState chainId owner addressState{addressStateContractRoot=newContractRoot}
   where storageKeyNibbles = N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key
 
-getStorageKeyValDB::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                   Address->Word256->m Word256
-getStorageKeyValDB owner key = do
-  addressState <- getAddressState owner
+getStorageKeyValDB :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                   Maybe Word256 -> Address -> Word256 -> m Word256
+getStorageKeyValDB chainId owner key = do
+  addressState <- getAddressState chainId owner
   db <- fmap fst getStorageDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
   maybeVal <- MP.getKeyVal mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
@@ -108,10 +108,10 @@ getStorageKeyValDB owner key = do
     Nothing -> return 0
     Just x  -> return $ fromInteger $ rlpDecode $ rlpDeserialize $ rlpDecode x
 
-getAllStorageKeyValsDB::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                       Address->m [(MP.Key, Word256)]
-getAllStorageKeyValsDB owner = do
-  addressState <- getAddressState owner
+getAllStorageKeyValsDB :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
+                       Maybe Word256 -> Address -> m [(MP.Key, Word256)]
+getAllStorageKeyValsDB chainId owner = do
+  addressState <- getAddressState chainId owner
   db <- fmap fst getStorageDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
   kvs <- MP.unsafeGetAllKeyVals mpdb

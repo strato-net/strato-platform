@@ -164,13 +164,14 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack::Address->VMM ()
+accountCreationHack :: Address -> VMM ()
 accountCreationHack address' = do
-  exists <- addressStateExists address'
+  chainId <- getEnvVar envChainId
+  exists <- addressStateExists chainId address'
   when (not exists) $ do
     vmState <- lift get
     when (not $ isNothing $ debugCallCreates vmState) $
-      putAddressState address' blankAddressState
+      putAddressState chainId address' blankAddressState
 
 
 
@@ -255,11 +256,12 @@ runOperation SHA3 = do
 runOperation ADDRESS = pushEnvVar envOwner
 
 runOperation BALANCE = do
+  chainId <- getEnvVar envChainId
   address' <- pop
-  exists <- addressStateExists address'
+  exists <- addressStateExists chainId address'
   if exists
     then do
-    addressState <- getAddressState address'
+    addressState <- getAddressState chainId address'
     push $ addressStateBalance addressState
     else do
     accountCreationHack address' --needed hack to get the tests working
@@ -303,20 +305,22 @@ runOperation GASPRICE = pushEnvVar envGasPrice
 
 
 runOperation EXTCODESIZE = do
+  chainId <- getEnvVar envChainId
   address' <- pop
   accountCreationHack address' --needed hack to get the tests working
-  addressState <- getAddressState address'
+  addressState <- getAddressState chainId address'
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
+  chainId <- getEnvVar envChainId
   address' <- pop
   accountCreationHack address' --needed hack to get the tests working
   memOffset <- pop
   codeOffset <- pop
   size <- pop
 
-  addressState <- getAddressState address'
+  addressState <- getAddressState chainId address'
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
@@ -470,6 +474,7 @@ runOperation SWAP16 = swapn 16
 
 runOperation CREATE = do
   guardStorage
+  chainId <- getEnvVar envChainId
   value <- pop::VMM Word256
   input <- pop
   size <- pop
@@ -488,7 +493,7 @@ runOperation CREATE = do
       (True, _) -> return Nothing
       (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
       (_, Just _) -> do
-        addressState' <- getAddressState owner
+        addressState' <- getAddressState chainId owner
 
         let newAddress = getNewAddress_unsafe owner $ addressStateNonce addressState'
 
@@ -519,6 +524,7 @@ runOperation CALL = do
   outSize <- pop::VMM Word256
 
   owner <- getEnvVar envOwner
+  chainId <- getEnvVar envChainId
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -527,7 +533,7 @@ runOperation CALL = do
 
   let stipend = if value > 0 then fromIntegral gCALLSTIPEND  else 0
 
-  addressState <- getAddressState owner
+  addressState <- getAddressState chainId owner
 
   callDepth' <- getCallDepth
 
@@ -572,6 +578,7 @@ runOperation CALLCODE = do
   outSize <- pop::VMM Word256
 
   owner <- getEnvVar envOwner
+  chainId <- getEnvVar envChainId
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -586,7 +593,7 @@ runOperation CALLCODE = do
 
 --  useGas $ fromIntegral newAccountCost
 
-  addressState <- getAddressState owner
+  addressState <- getAddressState chainId owner
 
   callDepth' <- getCallDepth
 
@@ -708,12 +715,13 @@ runOperation SUICIDE = do
   guardStorage
   address' <- pop
   owner <- getEnvVar envOwner
-  addressState <- getAddressState $ owner
+  chainId <- getEnvVar envChainId
+  addressState <- getAddressState chainId owner
 
   let allFunds = addressStateBalance addressState
   pay' "transferring all funds upon suicide" owner address' allFunds
 
-  putAddressState owner addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
+  putAddressState chainId owner addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
 
 
   addSuicideList owner
@@ -769,7 +777,8 @@ opGasPriceAndRefund CALL = do
 
   let toAddr = Address $ fromIntegral to
 
-  toAccountExists <- addressStateExists toAddr
+  chainId <- getEnvVar envChainId
+  toAccountExists <- addressStateExists chainId toAddr
 
   self <- getEnvVar envOwner -- if an account being created calls itself, the go client doesn't charge the gCALLNEWACCOUNT fee, so we need to check if that case is occurring here
 
@@ -991,7 +1000,8 @@ create :: Bool
        -> Code
        -> ContextM (Either VMException Code, VMState)
 create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender origin value' gasPrice' availableGas newAddress init' = do
-  let env =
+  let chainId = blockDataChainId b
+      env =
         Environment{
           envGasPrice=gasPrice',
           envBlockHeader=b,
@@ -1001,7 +1011,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
           envSender = sender,
           envValue = value',
           envCode = init',
-          envJumpDests = getValidJUMPDESTs init'
+          envJumpDests = getValidJUMPDESTs init',
+          envChainId = chainId
           }
 
   dbs' <- get
@@ -1015,12 +1026,12 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
     --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
     --but clean out storage.
     --This will never actually matter, but I add it to pass the tests.
-    newAddressState <- getAddressState newAddress
-    putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr}
+    newAddressState <- getAddressState chainId newAddress
+    putAddressState chainId newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr}
     --This next line will actually create the account addressState data....
     --In the extremely unlikely even that the address already exists, it will preserve
     --the existing balance.
-    pay "transfer value" sender newAddress $ fromIntegral value'
+    pay "transfer value" chainId sender newAddress $ fromIntegral value'
     else return True
 
   ret <-
@@ -1033,10 +1044,10 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
       --have the value, and I can revert without checking for success.
-      _ <- pay "revert value transfer" newAddress sender (fromIntegral value')
+      _ <- pay "revert value transfer" chainId newAddress sender (fromIntegral value')
 
-      purgeStorageMap newAddress
-      deleteAddressState newAddress
+      purgeStorageMap chainId newAddress
+      deleteAddressState chainId newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
     _ -> do
 
@@ -1079,9 +1090,10 @@ create' = do
   where
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes' address' = do
+      chainId <- getEnvVar envChainId
       addCode codeBytes'
-      newAddressState <- getAddressState address'
-      putAddressState address' newAddressState{addressStateCodeHash=hash codeBytes'}
+      newAddressState <- getAddressState chainId address'
+      putAddressState chainId address' newAddressState{addressStateCodeHash=hash codeBytes'}
 
 call :: Bool
      -> Bool
@@ -1100,7 +1112,8 @@ call :: Bool
      -> ContextM (Either VMException B.ByteString, VMState)
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth' receiveAddress (Address codeAddress) sender value' gasPrice' theData availableGas origin = do
 
-  addressState <- getAddressState $ Address codeAddress
+  let chainId = blockDataChainId b
+  addressState <- getAddressState chainId $ Address codeAddress
 
   code <-
     if 0 < codeAddress && codeAddress < 5
@@ -1117,7 +1130,8 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
           envSender = sender,
           envValue = fromIntegral value',
           envCode = code,
-          envJumpDests = getValidJUMPDESTs code
+          envJumpDests = getValidJUMPDESTs code,
+          envChainId = chainId
           }
 
   runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas $ call' noValueTransfer
@@ -1127,10 +1141,11 @@ call' noValueTransfer = do
   value' <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
+  chainId <- getEnvVar envChainId
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" sender receiveAddress (fromIntegral value')
+    _ <- pay "call value transfer" chainId sender receiveAddress (fromIntegral value')
     return ()
 
   runCodeFromStart
@@ -1148,12 +1163,13 @@ call' noValueTransfer = do
 create_debugWrapper :: BlockData -> Address -> Word256 -> B.ByteString -> VMM (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
 
-  addressState <- getAddressState owner
+  chainId <- getEnvVar envChainId
+  addressState <- getAddressState chainId owner
 
   if fromIntegral value > addressStateBalance addressState
     then return Nothing
     else do
-      newAddress <- getNewAddress owner
+      newAddress <- getNewAddress chainId owner
 
       let initCode = Code initCodeBytes
 

@@ -102,7 +102,7 @@ spec = do
           txInit = Code i
 
         _ <- create isRunningTests isHomestead S.empty blockData 0 tAddr tAddr txValue txGasPrice availableGas newAddress txInit
-        addressState <- getAddressState newAddress
+        addressState <- getAddressState Nothing newAddress
         liftIO . putStrLn $ show addressState
         code <- fromMaybe C8.empty <$> getCode (addressStateCodeHash addressState)
         liftIO . putStrLn $ show $ B16.encode code
