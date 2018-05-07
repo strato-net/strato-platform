@@ -27,6 +27,7 @@ import           System.IO                          (BufferMode (..),
 
 import qualified BlockApps.Bloc22.API as Bloc22
 import qualified BlockApps.Bloc22.Database.Create as Bloc22
+import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
 
@@ -59,8 +60,9 @@ main = do
 
   doesNotExist22 <- null <$>
     (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
-  when doesNotExist22 . void $
-    execute_ dbCreateConn Bloc22.createDatabase
+  if doesNotExist22
+    then void $ execute_ dbCreateConn Bloc22.createDatabase
+    else void $ Bloc22.runBlocMigrations dbCreateConn
   close dbCreateConn
 
   conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}

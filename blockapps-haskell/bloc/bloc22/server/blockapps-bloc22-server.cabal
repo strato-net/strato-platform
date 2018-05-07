@@ -16,6 +16,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     BlockApps.Bloc22.Database.Create
+    BlockApps.Bloc22.Database.Migration
     BlockApps.Bloc22.Database.Queries
     BlockApps.Bloc22.Database.Solc
     BlockApps.Bloc22.Database.Tables
