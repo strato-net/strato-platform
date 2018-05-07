@@ -5,4 +5,6 @@ docker exec -i strato_postgres_1 bash -c 'mkdir -p /tmp/backup && pg_dump -U pos
 mkdir -p ~/db_backups/
 docker cp strato_postgres_1:/tmp/backup ~/db_backups/
 docker exec -i strato_postgres_1 bash -c 'rm -rf /tmp/backup/'
-echo "backed up to ~/db_backups/"
+output_dir=~/db_backups/timestamp-$(date +%s)
+mv ~/db_backups/backup ${output_dir}
+echo "backed up to ${output_dir}"
