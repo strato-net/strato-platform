@@ -3,6 +3,18 @@ module BlockApps.Bloc22.Database.Tables where
 import Data.Profunctor.Product
 import Opaleye
 
+schemaVersionTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGInt4
+  )
+schemaVersionTable = Table "bloc_schema_version" $ p2
+  ( optional "id"
+  , required "schema_version"
+  )
+
 usersTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
