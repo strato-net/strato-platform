@@ -24,11 +24,8 @@ class Entities extends Component {
   }
 
   tableData() {
-    const entities = this.props.createConsortium.consortium[0]
-      ? this.props.createConsortium.consortium[0].entities
-      : []
-    if (entities.length) {
-      return entities.map((entity, key) => {
+    if (this.props.entities.length) {
+      return this.props.entities.map((entity, key) => {
         return (
           <tr key={key}>
             <td>
@@ -101,7 +98,7 @@ class Entities extends Component {
 
 export function mapStateToProps(state) {
   return {
-    createConsortium: state.createConsortium
+    entities: state.createConsortium.consortium[0] ? state.createConsortium.consortium[0].entities : []
   };
 }
 const connected = connect(mapStateToProps)(Entities);

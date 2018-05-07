@@ -23,10 +23,10 @@ class Nodes extends Component {
               {data.owner}
             </td>
             <td>
-              {data.IP}
+              {data.public}
             </td>
             <td>
-              {data.public}
+              {data.IP}
             </td>
             <td>
               {data.tcp}
@@ -60,8 +60,8 @@ class Nodes extends Component {
         <thead>
           <tr>
             <th><h5>Owner</h5></th>
-            <th><h5>IP</h5></th>
             <th><h5>Public Key</h5></th>
+            <th><h5>IP</h5></th>
             <th><h5>TCP Port</h5></th>
             <th><h5>UDP Port</h5></th>
             <th><h5>Invited By</h5></th>

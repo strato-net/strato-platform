@@ -42,7 +42,7 @@ const reducer = function (state = initialState, action) {
         error: null,
       }
     case CREATE_CONSORTIUM_SUCCESS:
-      consortium = state.consortium;
+      consortium = state.consortium.slice();
       consortium.push(action.consortium);
       return {
         error: null,
@@ -63,7 +63,7 @@ const reducer = function (state = initialState, action) {
         error: null,
       }
     case INVITE_ENTITY_SUCCESS:
-      consortium = state.consortium;
+      consortium = JSON.parse(JSON.stringify(state.consortium));
       consortium[0].entities.push(action.entity);
       return {
         ...state,
