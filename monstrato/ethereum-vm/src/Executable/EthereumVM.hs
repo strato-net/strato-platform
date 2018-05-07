@@ -17,7 +17,7 @@ import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataChainId, blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -49,7 +49,7 @@ ethereumVM = void . execContextM $ do
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
-    putContextBestBlockInfo cpBBI
+    putContextBestBlockInfo (blockDataChainId cpHead) cpBBI
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart

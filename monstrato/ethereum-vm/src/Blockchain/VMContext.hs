@@ -71,7 +71,7 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextStorageMap          :: M.Map (Maybe Word256, Address, Word256) Word256
                        , contextBaggerState         :: !BaggerState
                        , contextKafkaState          :: K.KafkaState
-                       , contextBestBlockInfo       :: ContextBestBlockInfo
+                       , contextBestBlockInfo       :: M.Map (Maybe Word256) ContextBestBlockInfo
                        , contextRedisPool           :: Redis.Connection
                        , contextInsertTxResultQueue :: [TransactionResult]
                        , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
@@ -200,7 +200,7 @@ runContextM f = do
                         M.empty
                         defaultBaggerState
                         initialKafkaState
-                        Unspecified
+                        (M.insert Nothing Unspecified M.empty)
                         redisPool
                         [] [] [])
 
@@ -229,10 +229,10 @@ purgeStorageMap chainId address = do
   (_, storageMap) <- getStorageDB
   putStorageMap $ M.filterWithKey (\(c,a,_) _ -> (c /= chainId) && (a /= address)) storageMap
 
-getContextBestBlockInfo :: ContextM ContextBestBlockInfo
-getContextBestBlockInfo = contextBestBlockInfo <$> get
+getContextBestBlockInfo :: Maybe Word256 -> ContextM ContextBestBlockInfo
+getContextBestBlockInfo chainId = maybe Unspecified id . M.lookup chainId . contextBestBlockInfo <$> get
 
-putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
-putContextBestBlockInfo new = do
+putContextBestBlockInfo :: Maybe Word256 -> ContextBestBlockInfo -> ContextM ()
+putContextBestBlockInfo chainId new = do
     ctx <- get
-    put ctx { contextBestBlockInfo = new }
+    put ctx { contextBestBlockInfo = M.update (const $ Just new) chainId (contextBestBlockInfo ctx) }
