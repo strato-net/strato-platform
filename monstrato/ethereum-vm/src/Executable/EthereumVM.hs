@@ -12,6 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
+import           Data.Maybe                            (isJust)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -20,6 +21,7 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataChainId, blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.TransactionDef        (transactionChainId)
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.EthConf
@@ -72,7 +74,18 @@ ethereumVM = void . execContextM $ do
         $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
         unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
 
-        let blocks = [b | OEBlock b <- seqEvents]
+        -- TODO: wrap private transactions in their own blocks
+        -- TODO: Run some sort of consensus on private chains once their sent via P2P
+        let privateChainIds = filter isJust . map fst . Bagger.partitionWith (transactionChainId . otBaseTx) $ poolableNewTxs
+        privateBlocks <- forM privateChainIds $ \chainId -> do
+          newChainBlock <- Bagger.makeNewBlock chainId
+          Bagger.processNewBestBlock
+            (outputBlockHash newChainBlock)
+            (obBlockData newChainBlock)
+            (map otHash $ obReceiptTransactions newChainBlock)
+          return newChainBlock
+
+        let blocks = [b | OEBlock b <- seqEvents] ++ privateBlocks
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
         forM_ blocks $ \b -> do
             let number = blockDataNumber . obBlockData $ b

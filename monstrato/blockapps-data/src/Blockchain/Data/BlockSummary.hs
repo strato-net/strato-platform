@@ -11,12 +11,14 @@ module Blockchain.Data.BlockSummary (
     blockHeaderToBSum
   ) where
 
+import           Data.Maybe                         (maybeToList)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.ExtWord                 (Word256)
 import           Blockchain.SHA
 
 data BlockSummary = BlockSummary {
@@ -27,7 +29,8 @@ data BlockSummary = BlockSummary {
                       bSumGasLimit        :: Integer,
                       bSumTimestamp       :: UTCTime,
                       bSumNumber          :: Integer,
-                      bSumTxCount         :: Integer
+                      bSumTxCount         :: Integer,
+                      bSumChainId         :: Maybe Word256
   }
 
 blockHeaderToBSum :: BlockData->Difficulty->Integer->BlockSummary
@@ -40,12 +43,13 @@ blockHeaderToBSum b totalDiff txCount =
       bSumGasLimit = blockDataGasLimit b,
       bSumTimestamp = blockDataTimestamp b,
       bSumNumber = blockDataNumber b,
-      bSumTxCount = txCount
+      bSumTxCount = txCount,
+      bSumChainId = blockDataChainId b
     }
 
 instance RLPSerializable BlockSummary where
-  rlpEncode (BlockSummary p d td sr gl ts n txcnt) =
-    RLPArray [
+  rlpEncode (BlockSummary p d td sr gl ts n txcnt cid) =
+    RLPArray $ [
       rlpEncode p,
       rlpEncode d,
       rlpEncode td,
@@ -54,7 +58,19 @@ instance RLPSerializable BlockSummary where
       rlpEncode (round $ utcTimeToPOSIXSeconds ts :: Integer),
       rlpEncode n,
       rlpEncode txcnt
-      ]
+      ] ++ (maybeToList $ fmap rlpEncode cid)
+  rlpDecode (RLPArray [p, d, td, sr, gl, ts, n, txcnt, cid]) =
+    BlockSummary {
+      bSumParentHash = rlpDecode p,
+      bSumDifficulty = rlpDecode d,
+      bSumTotalDifficulty = rlpDecode td,
+      bSumStateRoot = rlpDecode sr,
+      bSumGasLimit = rlpDecode gl,
+      bSumTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+      bSumNumber = rlpDecode n,
+      bSumTxCount = rlpDecode txcnt,
+      bSumChainId = Just $ rlpDecode cid
+      }
   rlpDecode (RLPArray [p, d, td, sr, gl, ts, n, txcnt]) =
     BlockSummary {
       bSumParentHash = rlpDecode p,
@@ -64,6 +80,7 @@ instance RLPSerializable BlockSummary where
       bSumGasLimit = rlpDecode gl,
       bSumTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
       bSumNumber = rlpDecode n,
-      bSumTxCount = rlpDecode txcnt
+      bSumTxCount = rlpDecode txcnt,
+      bSumChainId = Nothing
       }
   rlpDecode x = error $ "rlpDecode for BlockSummary called with data of wrong format: " ++ show x
