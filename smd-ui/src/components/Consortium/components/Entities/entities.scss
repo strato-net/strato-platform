@@ -1,3 +1,40 @@
 .vote-btn {
   margin-left: 5px;
 }
+
+.heading {
+  padding-left: 0 !important;
+}
+
+.filter-btn {
+  margin-left: -145px;
+  margin-top: 10px;
+}
+
+.no-record, .entity-list {
+  margin-top: 15px;
+}
+
+.entity-list, .entity-list .entity-content ul {
+  list-style-type: none;
+}
+
+.entity-list>li {
+  margin-top: 20px;
+}
+
+.entity-name {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.entity-list .entity-content li {
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.entity-content {
+  padding-top: 10px;
+  padding-left: 0px;
+  padding-bottom: 50px;
+}
