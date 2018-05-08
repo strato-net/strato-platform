@@ -279,6 +279,7 @@ data AccountState = AccountState
   , accountStateBalance     :: Wei
   , accountStateStorageRoot :: Keccak256
   , accountStateCodeHash    :: Keccak256
+  , accountStateChainId     :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
@@ -288,6 +289,7 @@ data Transaction = Transaction
   , transactionTo         :: Maybe Address
   , transactionValue      :: Wei
   , transactionInitOrData :: ByteString
+  , transactionChainId    :: Maybe Word256
   , transactionV          :: Word8
   , transactionR          :: Word256
   , transactionS          :: Word256
@@ -296,31 +298,42 @@ data Transaction = Transaction
 instance NFData Transaction
 
 instance RLPEncodable Transaction where
-  rlpEncode Transaction{..} = rlpEncode
-    ( transactionNonce
-    , transactionGasPrice
-    , transactionGasLimit
-    , transactionTo
-    , transactionValue
-    , transactionInitOrData
-    , transactionV
-    , transactionR
-    , transactionS
-    )
-  rlpDecode x = do
-    (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
-      <- rlpDecode x
-    return Transaction
-      { transactionNonce = nonce
-      , transactionGasPrice = gasPrice
-      , transactionGasLimit = gasLimit
-      , transactionTo = toAddr
-      , transactionValue = value
-      , transactionInitOrData = initOrData
-      , transactionV = v
-      , transactionR = r
-      , transactionS = s
-      }
+  rlpEncode Transaction{..} = Array $
+    [ rlpEncode transactionNonce
+    , rlpEncode transactionGasPrice
+    , rlpEncode transactionGasLimit
+    , rlpEncode transactionTo
+    , rlpEncode transactionValue
+    , rlpEncode transactionInitOrData
+    , rlpEncode transactionV
+    , rlpEncode transactionR
+    , rlpEncode transactionS
+    ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
+  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s', cid]) =
+    Transaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> (Just <$> rlpDecode cid)
+      <*> rlpDecode v'
+      <*> rlpDecode r'
+      <*> rlpDecode s'
+  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s']) =
+    Transaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> pure Nothing
+      <*> rlpDecode v'
+      <*> rlpDecode r'
+      <*> rlpDecode s'
+  rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
 
 data UnsignedTransaction = UnsignedTransaction
   { unsignedTransactionNonce      :: Nonce
@@ -329,6 +342,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionTo         :: Maybe Address
   , unsignedTransactionValue      :: Wei
   , unsignedTransactionInitOrData :: ByteString
+  , unsignedTransactionChainId    :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
 instance RLPEncodable UnsignedTransaction where
@@ -339,6 +353,7 @@ instance RLPEncodable UnsignedTransaction where
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionInitOrData = unsignedTransactionInitOrData
+    , transactionChainId = unsignedTransactionChainId
     , transactionV = 0
     , transactionR = 0
     , transactionS = 0
@@ -354,6 +369,7 @@ instance RLPEncodable UnsignedTransaction where
         , unsignedTransactionTo = transactionTo
         , unsignedTransactionValue = transactionValue
         , unsignedTransactionInitOrData = transactionInitOrData
+        , unsignedTransactionChainId = transactionChainId
         }
 
 rlpMsg :: RLPEncodable x => x -> Msg
@@ -377,29 +393,33 @@ signTransaction sk UnsignedTransaction{..} = Transaction
   , transactionR = r
   , transactionS = s
   , transactionInitOrData = unsignedTransactionInitOrData
+  , transactionChainId = unsignedTransactionChainId
   }
   where
     CompactRecSig r s testV =
-      exportCompactRecSig . signRecMsg sk $ rlpMsg
-        ( unsignedTransactionNonce
-        , unsignedTransactionGasPrice
-        , unsignedTransactionGasLimit
-        , unsignedTransactionTo
-        , unsignedTransactionValue
-        , unsignedTransactionInitOrData
-        )
+      exportCompactRecSig
+      . signRecMsg sk
+      . rlpMsg
+      . Array
+      $ [ rlpEncode unsignedTransactionNonce
+        , rlpEncode unsignedTransactionGasPrice
+        , rlpEncode unsignedTransactionGasLimit
+        , rlpEncode unsignedTransactionTo
+        , rlpEncode unsignedTransactionValue
+        , rlpEncode unsignedTransactionInitOrData
+        ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
 
 verifyTransaction :: PubKey -> Transaction -> Bool
 verifyTransaction pk Transaction{..} =
   let
-    message = rlpMsg
-      ( transactionNonce
-      , transactionGasPrice
-      , transactionGasLimit
-      , transactionTo
-      , transactionValue
-      , transactionInitOrData
-      )
+    message = rlpMsg . Array $
+      [ rlpEncode transactionNonce
+      , rlpEncode transactionGasPrice
+      , rlpEncode transactionGasLimit
+      , rlpEncode transactionTo
+      , rlpEncode transactionValue
+      , rlpEncode transactionInitOrData
+      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
   in
     case importCompactSig (CompactSig transactionR transactionS) of
       Nothing  -> False
@@ -408,14 +428,14 @@ verifyTransaction pk Transaction{..} =
 recoverTransaction :: Transaction -> Maybe PubKey
 recoverTransaction Transaction{..} = do
   let
-    message = rlpMsg
-      ( transactionNonce
-      , transactionGasPrice
-      , transactionGasLimit
-      , transactionTo
-      , transactionValue
-      , transactionInitOrData
-      )
+    message = rlpMsg . Array $
+      [ rlpEncode transactionNonce
+      , rlpEncode transactionGasPrice
+      , rlpEncode transactionGasLimit
+      , rlpEncode transactionTo
+      , rlpEncode transactionValue
+      , rlpEncode transactionInitOrData
+      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
     testV = transactionV - 27
     compactRecSig = CompactRecSig transactionR transactionS testV
   recSig <- importCompactRecSig compactRecSig
@@ -445,6 +465,7 @@ data BlockHeader = BlockHeader
   , blockHeaderExtraData        :: Word256
   , blockHeaderMixHash          :: Keccak256
   , blockHeaderNonce            :: Nonce
+  , blockHeaderChainId          :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)

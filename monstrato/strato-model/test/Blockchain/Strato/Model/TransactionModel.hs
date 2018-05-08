@@ -149,24 +149,24 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
 partialRLPEncode :: Transaction->RLPObject
-partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
-      RLPArray [
+partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid} =
+      RLPArray $ [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode to',
         rlpEncode v,
         rlpEncode d
-        ]
-partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init'} =
-      RLPArray [
+        ] ++ (maybeToList $ fmap rlpEncode cid)
+partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init', transactionChainId=cid} =
+      RLPArray $ [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode (0 :: Integer),
         rlpEncode v,
         rlpEncode init'
-        ]
+        ] ++ (maybeToList $ fmap rlpEncode cid)
 
 instance TransactionLike Transaction where
     txHash        = transactionHash

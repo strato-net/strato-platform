@@ -7,6 +7,7 @@ module BlockApps.Strato.API
 where
 
 import           BlockApps.Strato.Types
+import           Data.LargeWord         (Word256)
 import           Numeric.Natural
 import           Servant.API
 
@@ -26,10 +27,12 @@ type API =
     :> QueryParam "mingaslimit" Natural
     :> QueryParam "blocknumber" Natural
     :> QueryParam "hash" Keccak256
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> "last"
     :> Capture "integer" Natural
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> ReqBody '[JSON] PostTransaction
@@ -39,9 +42,11 @@ type API =
       :> Post '[JSON] [Keccak256]
   :<|> "transactionResult"
     :> Capture "hash" Keccak256
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [TransactionResult]
   :<|> "transactionResult"
     :> "batch"
+    :> QueryParam "chainid" Word256
     :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
   :<|> "block"
@@ -61,10 +66,12 @@ type API =
     :> QueryParam "address" Address
     :> QueryParam "coinbase" Address
     :> QueryParam "hash" Keccak256
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [WithNext Block]
   :<|> "block"
     :> "last"
     :> Capture "integer" Natural
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [WithNext Block]
   :<|> "account"
     :> QueryParam "address" Address
@@ -74,6 +81,7 @@ type API =
     :> QueryParam "nonce" Natural
     :> QueryParam "minnonce" Natural
     :> QueryParam "maxnonce" Natural
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [Account]
   :<|> "stats"
     :> "difficulty"
@@ -89,8 +97,10 @@ type API =
     :> QueryParam "value" Natural
     :> QueryParam "minvalue" Natural
     :> QueryParam "maxvalue" Natural
+    :> QueryParam "chainid" Word256
     :> Get '[JSON] [Storage]
   :<|> "faucet"
+    :> QueryParam "chainid" Word256
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
   :<|> "solc"

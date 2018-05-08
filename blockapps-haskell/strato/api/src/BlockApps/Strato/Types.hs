@@ -51,6 +51,7 @@ import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
+import           Data.Monoid                  ((<>))
 import           Data.Proxy
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
@@ -164,6 +165,7 @@ instance ToSchema Transaction where
           , transactionV               = Hex 0x1c
           , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
           , transactionOrigin          = "API"
+          , transactionChainId         = Nothing
           }
 
 instance ToSchema TransactionType
@@ -183,6 +185,7 @@ instance ToSchema Account where
           , accountKind           = "AddressStateRef"
           , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
+          , accountChainId        = Nothing
           , accountLatestBlockNum = 23
           , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
           , accountContractName   = Just "SimpleStorage"
@@ -205,6 +208,17 @@ instance ToSchema Src where
 instance ToSchema SolcResponse
 instance ToSchema AbiBin
 instance ToSchema ExtabiResponse
+
+instance ToParamSchema Word256 where
+  toParamSchema _ = mempty & type_ .~ SwaggerInteger
+
+instance ToHttpApiData Word256 where
+  toUrlPiece = Text.pack . flip showHex ""
+
+instance FromHttpApiData Word256 where
+  parseUrlPiece text = case readMaybe ("0x" ++ Text.unpack text) of
+    Nothing      -> Left $ "Could not decode Word256: " <> text
+    Just (Hex w256) -> Right w256
 
 instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
@@ -261,6 +275,7 @@ data Transaction = Transaction
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
   , transactionOrigin          :: Text
+  , transactionChainId         :: Maybe (Hex Word256)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Transaction where
@@ -281,6 +296,7 @@ data PostTransaction = PostTransaction
   , posttransactionS          :: Hex Natural
   , posttransactionV          :: Hex Word8
   , posttransactionNonce      :: Natural
+  , posttransactionChainId    :: Maybe (Hex Word256)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -305,6 +321,7 @@ instance ToSample PostTransaction where
     , posttransactionS = Hex 1 -- make valid examples
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
+    , posttransactionChainId = Nothing
     }
 
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
@@ -320,6 +337,7 @@ defaultPostTx = PostTransaction
     , posttransactionS = Hex 1 -- make valid examples
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
+    , posttransactionChainId = Nothing
     }
 
 instance ToSchema PostTransaction where
@@ -340,6 +358,7 @@ instance ToSchema PostTransaction where
         , posttransactionS = Hex 1 -- make valid examples
         , posttransactionV = Hex 0x1c
         , posttransactionNonce = 0
+        , posttransactionChainId = Nothing
         }
 
 
@@ -356,6 +375,7 @@ toPostTx Transaction{..} = PostTransaction
   , posttransactionS = transactionS
   , posttransactionV = transactionV
   , posttransactionNonce = unStrung transactionNonce
+  , posttransactionChainId = transactionChainId
   }
 
 
@@ -375,6 +395,7 @@ data BlockData = BlockData
   , blockdataNonce            :: Word64
   , blockdataStateRoot        :: Keccak256
   , blockdataTransactionsRoot :: Keccak256
+  , blockdataChainId          :: Maybe (Hex Word256)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON BlockData where
@@ -404,6 +425,7 @@ data Account = Account
   , accountContractRoot   :: Keccak256
   , accountCode           :: Text
   , accountCodeHash       :: Keccak256
+  , accountChainId        :: Maybe (Hex Word256)
   , accountLatestBlockNum :: Natural
   , accountSource         :: Text
   , accountContractName   :: Maybe Text
@@ -439,6 +461,7 @@ data Storage = Storage
   { storageAddress :: Address
   , storageKey     :: Hex Word256
   , storageValue   :: Hex Word256
+  , storageChainId :: Maybe (Hex Word256)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Storage where
@@ -528,6 +551,7 @@ data TransactionResult = TransactionResult
   , transactionresultTime             :: Double
   , transactionresultNewStorage       :: Text
   , transactionresultDeletedStorage   :: Text
+  , transactionresultChainId          :: Maybe (Hex Word256)
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
@@ -561,7 +585,7 @@ instance ToSchema TransactionResult where
     where ex = exampleTxResult
 
 exampleTxResult :: TransactionResult
-exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage"
+exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage" Nothing
 
 stratoSchemaOptions :: SchemaOptions
 stratoSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}

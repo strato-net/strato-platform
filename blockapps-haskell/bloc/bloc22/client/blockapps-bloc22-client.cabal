@@ -23,6 +23,7 @@ library
     , blockapps-solidity
     , blockapps-strato-api
     , containers
+    , largeword
     , servant-client
     , text
 
@@ -58,6 +59,7 @@ test-suite blockapps-bloc22-client-test
     , generic-random
     , hspec
     , http-client
+    , largeword
     , QuickCheck
     , quickcheck-instances
     -- , servant-aeson-specs

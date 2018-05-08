@@ -29,6 +29,7 @@ module BlockApps.Strato.Client
   ) where
 
 import           Data.Proxy
+import           Data.LargeWord  (Word256)
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
@@ -52,12 +53,13 @@ data TxsFilterParams = TxsFilterParams
   , qtMinGasLimit :: Maybe Natural
   , qtBlockNumber :: Maybe Natural
   , qtHash        :: Maybe Keccak256
+  , qtChainId     :: Maybe Word256
   } deriving (Eq, Show, Generic)
 
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data BlocksFilterParams = BlocksFilterParams
   { qbNumber     :: Maybe Natural
@@ -76,12 +78,14 @@ data BlocksFilterParams = BlocksFilterParams
   , qbAddress    :: Maybe Address
   , qbCoinbase   :: Maybe Address
   , qbHash       :: Maybe Keccak256
+  , qbChainId    :: Maybe Word256
   } deriving (Eq, Show, Generic)
 
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams = BlocksFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing
 
 data AccountsFilterParams = AccountsFilterParams
   { qaAddress    :: Maybe Address
@@ -91,11 +95,12 @@ data AccountsFilterParams = AccountsFilterParams
   , qaNonce      :: Maybe Natural
   , qaMinNonce   :: Maybe Natural
   , qaMaxNonce   :: Maybe Natural
+  , qaChainId    :: Maybe Word256
   } deriving (Eq, Show, Generic)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data StorageFilterParams = StorageFilterParams
   { qsAddress  :: Maybe Address
@@ -105,25 +110,26 @@ data StorageFilterParams = StorageFilterParams
   , qsValue    :: Maybe Natural
   , qsMinValue :: Maybe Natural
   , qsMaxValue :: Maybe Natural
+  , qsChainId  :: Maybe Word256
   }
 
 storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
-getTxsLast :: Natural -> ClientM [WithNext Transaction]
+getTxsLast :: Natural -> Maybe Word256 -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256
 postTxList :: [PostTransaction] -> ClientM [Keccak256]
-getTxResult :: Keccak256 -> ClientM [TransactionResult]
-postTxResultBatch :: [Keccak256] -> ClientM BatchTransactionResult
+getTxResult :: Keccak256 -> Maybe Word256 -> ClientM [TransactionResult]
+postTxResultBatch :: Maybe Word256 -> [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
-getBlocksLast :: Natural -> ClientM [WithNext Block]
+getBlocksLast :: Natural -> Maybe Word256 -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
-postFaucet :: Address -> ClientM Keccak256
+postFaucet :: Maybe Word256 -> Address -> ClientM Keccak256
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
@@ -176,14 +182,14 @@ getTxsFilter
     uncurryTxsFilterParams f TxsFilterParams{..} = f
       qtFrom qtTo qtAddress qtValue qtMaxValue qtMinValue qtGasPrice
       qtMaxGasPrice qtMinGasPrice qtGasLimit qtMaxGasLimit qtMinGasLimit
-      qtBlockNumber qtHash
+      qtBlockNumber qtHash qtChainId
     uncurryBlocksFilterParams f BlocksFilterParams{..} = f
       qbNumber qbMinNumber qbMaxNumber qbGasLim qbMinGasLim
       qbMaxGasLim qbGasUsed qbMinGasUsed qbMaxGasUsed qbDiff qbMinDiff
-      qbMaxDiff qbTxAddress qbAddress qbCoinbase qbHash
+      qbMaxDiff qbTxAddress qbAddress qbCoinbase qbHash qbChainId
     uncurryAccountsFilterParams f AccountsFilterParams{..} = f
       qaAddress qaBalance qaMinBalance qaMaxBalance
-      qaNonce qaMinNonce qaMaxNonce
+      qaNonce qaMinNonce qaMaxNonce qaChainId
     uncurryStorageFilterParams f StorageFilterParams{..} = f
       qsAddress qsKey qsMinKey qsMaxKey
-      qsValue qsMinValue qsMaxValue
+      qsValue qsMinValue qsMaxValue qsChainId

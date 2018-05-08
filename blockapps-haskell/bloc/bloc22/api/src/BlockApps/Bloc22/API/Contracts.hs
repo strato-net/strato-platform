@@ -13,6 +13,7 @@ import           Control.Lens                     (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Int                         (Int64)
+import           Data.LargeWord                   (Word256)
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import           Data.Proxy
@@ -111,20 +112,24 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
+  :> QueryParam "chainid" Word256
   :> QueryParam "name" Text
   :> QueryParam "count" Int
   :> QueryParam "offset" Int
   :> QueryFlag "length"
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
+instance ToParam (QueryParam "chainid" Word256) where
+  toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal
+
 instance ToParam (QueryParam "name" Text) where
-  toParam _ = DocQueryParam "name" ["id","value"] "Names of contract variables" List
+  toParam _ = DocQueryParam "name" [] "Names of contract variables" Normal
 
 instance ToParam (QueryParam "count" Int) where
-  toParam _ = DocQueryParam "count" ["id","value"] "Length of contract array slice" List
+  toParam _ = DocQueryParam "count" [] "Length of contract array slice" Normal
 
 instance ToParam (QueryParam "offset" Int) where
-  toParam _ = DocQueryParam "offset" ["id","value"] "Starting index of contract array slice" List
+  toParam _ = DocQueryParam "offset" [] "Starting index of contract array slice" Normal
 
 instance ToParam (QueryFlag "length") where
   toParam _ =
