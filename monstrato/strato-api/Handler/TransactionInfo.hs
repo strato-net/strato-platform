@@ -145,7 +145,10 @@ getTransactionR = do
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getTransFilter (rawTx)) $ getParameters ))
 
                                         let criteria = P.map (getTransFilter rawTx) $ getParameters
-                                        let allCriteria = (rawTx E.^. RawTransactionChainId E.==. E.val chainId) : ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
+                                        let chainCriteria = case chainId of
+                                              Nothing -> (E.isNothing $ rawTx E.^. RawTransactionChainId)
+                                              Just c -> ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val c))
+                                        let allCriteria = chainCriteria : ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
 
                                         -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
                                         E.where_ (P.foldl1 (E.&&.) allCriteria)

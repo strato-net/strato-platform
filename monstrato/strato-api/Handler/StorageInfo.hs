@@ -46,7 +46,11 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        E.on ( ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId ) E.&&. (addrStRef E.^. AddressStateRefChainId E.==. E.val chainId) )
+                                        let chainCriteria = case chainId of
+                                              Nothing -> (E.isNothing $ addrStRef E.^. AddressStateRefChainId)
+                                              Just c -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val c))
+
+                                        E.on ( ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId ) E.&&. chainCriteria )
 
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
 

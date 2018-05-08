@@ -8,6 +8,7 @@ import           Data.Aeson.Encoding
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 import           Handler.Common
+import           Handler.Filters (fromHexText)
 import           Import
 import           Numeric         (readHex)
 import qualified Prelude         as P
@@ -30,11 +31,12 @@ instance ToJSONKey StrungSHA where
 
 postBatchTransactionResultR :: Handler Value
 postBatchTransactionResultR = do
+  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
   hashesR <- parseJsonBody :: Handler (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
-        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes) ] [] :: Handler [Entity TransactionResult]
+        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes) , TransactionResultChainId ==. chainId ] [] :: Handler [Entity TransactionResult]
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m
                 Just vs -> M.insert k (v:vs) m

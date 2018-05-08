@@ -33,7 +33,7 @@ lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend) => Add
 lookupNonce addr' = do
   addrSt <- runDB $ E.select $
                       E.from $ \(accStateRef) -> do
-                      E.where_ (accStateRef E.^. AddressStateRefAddress E.==. (E.val addr'))
+                      E.where_ ((E.isNothing $ accStateRef E.^. AddressStateRefChainId) E.&&. accStateRef E.^. AddressStateRefAddress E.==. (E.val addr'))
                       return accStateRef
   case addrSt of
     []      -> return 0

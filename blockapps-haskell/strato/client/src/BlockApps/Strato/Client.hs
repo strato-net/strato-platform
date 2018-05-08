@@ -129,7 +129,7 @@ getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
-postFaucet :: Maybe Word256 -> Address -> ClientM Keccak256
+postFaucet :: Address -> ClientM Keccak256
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter

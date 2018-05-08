@@ -51,7 +51,10 @@ getBlockInfoR = do
                     E.on ( blk E.^. BlockId E.==. bdRef E.^. BlockDataRefBlockId )
 
                     let criteria = P.map (getBlkFilter (bdRef, accStateRef, rawTX, blk)) $ getParameters
-                    let allCriteria = (bdRef E.^. BlockDataRefChainId E.==. E.val chainId) : ((bdRef E.^. BlockDataRefNumber) E.>=. E.val index') : criteria
+                    let chainCriteria = case chainId of
+                          Nothing -> (E.isNothing $ bdRef E.^. BlockDataRefChainId)
+                          Just c -> ((bdRef E.^. BlockDataRefChainId) E.==. (E.just $ E.val c))
+                    let allCriteria = chainCriteria : ((bdRef E.^. BlockDataRefNumber) E.>=. E.val index') : criteria
 
                     E.where_ (P.foldl1 (E.&&.) allCriteria)
 

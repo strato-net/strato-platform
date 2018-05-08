@@ -100,7 +100,6 @@ type API =
     :> QueryParam "chainid" Word256
     :> Get '[JSON] [Storage]
   :<|> "faucet"
-    :> QueryParam "chainid" Word256
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
   :<|> "solc"

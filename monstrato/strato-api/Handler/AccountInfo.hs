@@ -40,7 +40,10 @@ accountInfo params = do
               E.from $ \(accStateRef) -> do
 
               let criteria = P.map (getAccFilter (accStateRef)) $ params
-              let allCriteria = (accStateRef E.^. AddressStateRefChainId E.==. E.val chainId) : ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
+              let chainCriteria = case chainId of
+                    Nothing -> (E.isNothing $ accStateRef E.^. AddressStateRefChainId)
+                    Just c -> ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val c))
+              let allCriteria = chainCriteria : ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
 
               E.where_ (P.foldl1 (E.&&.) allCriteria)
 

@@ -92,10 +92,10 @@ postUsersUser (UserName name) pass = blocTransaction $ do
   unless createdUser (throwError (DBError "failed to create user"))
   return $ keystoreAcctAddress keyStore
 
-postUsersFill :: UserName -> Address -> Maybe Word256 -> Bool -> Bloc BlocTransactionResult
-postUsersFill _ addr chainId resolve = blocTransaction $ do
+postUsersFill :: UserName -> Address -> Bool -> Bloc BlocTransactionResult
+postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
-  hash <- blocStrato $ postFaucet chainId addr
+  hash <- blocStrato $ postFaucet addr
   void . blocModify $ \conn -> runInsert conn hashNameTable
     ( Nothing
     , constant hash
@@ -103,7 +103,7 @@ postUsersFill _ addr chainId resolve = blocTransaction $ do
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
     )
-  getBlocTransactionResult' chainId hash resolve
+  getBlocTransactionResult' Nothing hash resolve
 
 postUsersSend :: UserName -> Address -> Maybe Word256 -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr chainId resolve

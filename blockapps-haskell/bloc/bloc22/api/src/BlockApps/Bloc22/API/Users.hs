@@ -202,7 +202,6 @@ type PostUsersFill = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "fill"
-  :> QueryParam "chainid" Word256
   :> QueryFlag "resolve"
   :> Post '[JSON] BlocTransactionResult
 
