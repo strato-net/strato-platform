@@ -55,7 +55,7 @@ class Entities extends Component {
                 </td>
                 <td>
                   {entity.status}
-                  {entity.status === 'Pending' && <span>
+                  {entity.status === 'Invited' && <span>
                     <Button
                       className="vote-btn pt-intent-primary pt-icon-thumbs-up"
                       onClick={() => this.handleVoteClick('in favor', entity.name)}
@@ -116,7 +116,7 @@ class Entities extends Component {
     const { showAll } = this.state;
     const entities = this.state.showAll
       ? this.props.entities
-      : this.props.entities.filter(entity => entity.status === 'Pending');
+      : this.props.entities.filter(entity => entity.status === 'Invited');
     return (
       <div>
         <h4 className="col-md-2 heading">Entities</h4>

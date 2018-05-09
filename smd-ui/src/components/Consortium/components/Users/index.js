@@ -7,9 +7,9 @@ class Users extends Component {
     super(props);
     this.state = {
       data: [
-        { address: '03943893439220392', status: 'invited', privacy: "connect" },
-        { address: '0394389343922', status: 'pending', privacy: "connect" },
-        { address: '039438934392292', status: 'member', privacy: "connect" }
+        { address: '03943893439220392', status: 'Invited', privacy: "connect" },
+        { address: '0394389343922', status: 'Pending', privacy: "connect" },
+        { address: '039438934392292', status: 'Member', privacy: "connect" }
       ]
     }
   }
@@ -24,7 +24,7 @@ class Users extends Component {
             </td>
             <td>
               {data.status}
-              <Button>Approve</Button>
+              {data.status === 'Invited' && <Button>Approve</Button>}
             </td>
             <td>
               {data.privacy}

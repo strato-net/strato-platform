@@ -28,7 +28,7 @@ class InviteForm extends Component {
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
       const entity = values;
-      entity.status = 'Pending';
+      entity.status = 'Invited';
       this.props.inviteEntityRequest(entity);
     }
   }
