@@ -17,7 +17,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/e2e/load/contracts/Vehicle.sol`;
+const contractFilename = process.cwd() + `/contracts/Vehicle.sol`;
 
 describe('Throughput - upload', function () {
   this.timeout(999999 * 1000);
@@ -47,7 +47,7 @@ describe('Throughput - upload', function () {
       // set the data
       // each call sets 4 fields - do it 2 times
       const setDataResults1 = yield setData(admin, uploadResults.data, batchIndex);
-      //const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
+      const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
       // console.log(uploadResults);
 
       // stop the clock, print timing
@@ -113,10 +113,24 @@ function factory_createUploadList(batchSize, batchIndex) {
 function* waitResults(uploadReceipts) {
   // create a promise for each hash - process in parallel
   // WARNING - NodeJS might break on too many promises in parallel
-  console.log('Resolving Upload receipts');
-  const hashes = uploadReceipts.map((r) => {return r.hash;});
-  const txResults = yield resolveTxs(hashes);
-  console.log('Resolved Upload receipts');
+
+  const getBlockResultPromises = [];
+  uploadReceipts.map(receipt => {
+    console.log('receipt', receipt.status, receipt.hash);
+    // FIXME recover gracefuly
+    // for now - bail
+    if (receipt.status != 'Pending') {
+      throw new Error(receipt.status + ':' + receipt.status);
+    }
+    const resolve = true;
+    const promise = api.bloc.result(receipt.hash, resolve).catch(function(err) {
+      return {status: err.status};
+    });
+    getBlockResultPromises.push(promise);
+  });
+
+  // block until all promises are fullfiled.
+  const txResults = yield getBlockResultPromises;
   //console.log('txResults', txResults); // process.exit();
   const errors = [];
   const data = [];
@@ -131,8 +145,6 @@ function* waitResults(uploadReceipts) {
       errors.push({index:i, uploadReceipt: uploadReceipt, txResult:txResult});
     }
   }
-  console.log('### Data:', data.length);
-  console.log('### Errors:', errors.length);
   return {errors: errors, data: data};
 }
 
@@ -163,13 +175,10 @@ function* getBlocResults(uploadReceipts) {
 function* setData(admin, uploadResults, batchIndex) {
   const nonce = yield getNonce(admin);
   const setDataTxs = yield createSetDataTxs(nonce, uploadResults, batchIndex);
-  const doNotResolve = true;
-  const receipts = yield rest.callList(admin, setDataTxs, doNotResolve);
-  console.log('### Receipts:', receipts);
-  const results = yield resolveTxs(receipts);
+  const results = yield rest.callList(admin, setDataTxs);
   const data = [], errors = [];
   for (var i = 0; i < results.length; i++) {
-    const uploadResult = uploadResults[i % uploadResults.length];
+    const uploadResult = uploadResults[i];
     data.push({index:i, uploadResult: uploadResult, address: uploadResult.address});
   }
   return {data: data, errors: errors};
@@ -191,22 +200,7 @@ function* createSetDataTxs(nonceStart, uploadResults, batchIndex) {
       'txParams': { nonce: nonceStart++ },
     }
   });
-  const txs2 = uploadResults.map((uploadResult, i) => {
-    return {
-      'contractName': contractName,
-      'contractAddress': uploadResult.address,
-      'methodName': 'set',
-      'value': 0,
-      'args': {
-        _s4: `s4_${batchIndex}_${i}`,
-        _s5: `s5_${batchIndex}_${i}`,
-        _s6: `s6_${batchIndex}_${i}`,
-        _s7: `s7_${batchIndex}_${i}`,
-      },
-      'txParams': { nonce: nonceStart++ },
-    }
-  });
-  return txs.concat(txs2);
+  return txs;
 }
 //
 // function* createSetDataTxs(nonceStart, uploadResults) {
@@ -259,7 +253,6 @@ function*  rest_uploadContractList(user, txs, doNotResolve, node){
 function* getNonce(admin) {
   const accounts = yield rest.getAccount(admin.address);
   const nonce = accounts[0].nonce;
-  console.log('Nonce:', nonce);
   return nonce;
 }
 
@@ -268,20 +261,4 @@ function printTiming(startTime, batchCount, batchSize, loopIndex) {
   const seconds = endTime.diff(startTime, 'seconds');
   console.log(`Loop index: ${loopIndex}  Batch count: ${batchCount}  Batch size: ${batchSize}`);
   console.log(`Total:  seconds: ${seconds},  TPS ${batchSize/seconds}, 1 TX: ${seconds/batchSize} seconds `);
-}
-
-function promiseTimeout(timeout) {
-  return new Promise(function(resolve, reject) {
-    setTimeout(function() {
-      resolve();
-    }, timeout);
-  });
-}
-
-function * resolveTxs(hashes) {
-  const resolve = true;
-  const txResults = yield api.bloc.results(hashes, resolve).catch(function(err) {
-        return {status: err.status};
-      });
-  return txResults;
 }
