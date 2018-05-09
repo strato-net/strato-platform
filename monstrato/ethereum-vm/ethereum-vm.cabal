@@ -50,6 +50,7 @@ library
                  , transformers
                  , vector
                  , ansi-wl-pprint
+                 , strato-genesis
                  , strato-model
                  , strato-index
                  , strato-statediff

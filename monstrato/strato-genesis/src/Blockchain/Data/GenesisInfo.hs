@@ -26,19 +26,20 @@ import           Data.Time
 import           Data.Word
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 
 data CodeInfo = CodeInfo B.ByteString String String
-  deriving (Show, Eq, Generic)
+  deriving (Show, Read, Eq, Generic)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
-   deriving (Show, Eq)
+   deriving (Show, Read, Eq)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
 
@@ -61,7 +62,7 @@ data GenesisInfo =
     genesisInfoMixHash          :: SHA,
     genesisInfoNonce            :: Word64,
     genesisInfoChainId          :: Maybe Word256
-} deriving (Show, Eq, Generic)
+} deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
 nullStateRoot = StateRoot . fst . B16.decode $

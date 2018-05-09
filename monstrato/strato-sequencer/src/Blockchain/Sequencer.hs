@@ -86,6 +86,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
     where unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> emitBlocks bk (ingestBlockToSequencedBlock bk)
+                                  IEGenesis g -> return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)] -- TODO: yeah buddy
 
           emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
             case wrappedTx of

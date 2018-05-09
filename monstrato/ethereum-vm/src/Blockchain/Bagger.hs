@@ -162,7 +162,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
               !nb <- makeNewBlock
               return nb
 
-
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 

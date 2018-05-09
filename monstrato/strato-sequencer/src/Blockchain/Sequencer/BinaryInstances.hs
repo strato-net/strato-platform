@@ -5,6 +5,7 @@ import           Data.Binary
 
 import           Blockchain.Data.Address     ()
 import qualified Blockchain.Data.DataDefs    as DD
+import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.Transaction as TX
 import           Blockchain.Data.TXOrigin    ()
 import           GHC.Generics                ()
@@ -64,4 +65,61 @@ instance Binary DD.BlockData where
             difficulty number gasLimit gasUsed timestamp extraData
             nonce mixHash chainId
 
+instance Binary GI.GenesisInfo where
+    put gi = sequence_ $ map ($ gi) $
+        [ put . GI.genesisInfoParentHash
+        , put . GI.genesisInfoUnclesHash
+        , put . GI.genesisInfoCoinbase
+        , put . GI.genesisInfoAccountInfo
+        , put . GI.genesisInfoCodeInfo
+        , put . GI.genesisInfoTransactionsRoot
+        , put . GI.genesisInfoReceiptsRoot
+        , put . GI.genesisInfoLogBloom
+        , put . GI.genesisInfoDifficulty
+        , put . GI.genesisInfoNumber
+        , put . GI.genesisInfoGasLimit
+        , put . GI.genesisInfoGasUsed
+        , put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds . GI.genesisInfoTimestamp
+        , put . GI.genesisInfoExtraData
+        , put . GI.genesisInfoMixHash
+        , put . GI.genesisInfoNonce
+        , put . GI.genesisInfoChainId
+        ]
+    get = do
+        parentHash       <- get
+        unclesHash       <- get
+        coinbase         <- get
+        accountInfo      <- get
+        codeInfo         <- get
+        transactionsRoot <- get
+        receiptsRoot     <- get
+        logBloom         <- get
+        difficulty       <- get
+        number           <- get
+        gasLimit         <- get
+        gasUsed          <- get
+        timestamp        <- (posixSecondsToUTCTime . fromInteger) <$> get
+        extraData        <- get
+        mixHash          <- get
+        nonce            <- get
+        chainId          <- get
+        return $ GI.GenesisInfo parentHash unclesHash coinbase
+            accountInfo codeInfo transactionsRoot receiptsRoot logBloom
+            difficulty number gasLimit gasUsed timestamp extraData
+            mixHash nonce chainId
 
+instance Binary GI.CodeInfo where
+  put (GI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2
+  get = GI.CodeInfo <$> get <*> get <*> get
+
+instance Binary GI.AccountInfo where
+  put (GI.NonContract a n) = putWord8 0 >> put a >> put n
+  put (GI.ContractNoStorage a n s) = putWord8 1 >> put a >> put n >> put s
+  put (GI.ContractWithStorage a n s ws) = putWord8 2 >> put a >> put n >> put s >> put ws
+  get = do
+    w8 <- getWord8
+    case w8 of
+      0 -> GI.NonContract <$> get <*> get
+      1 -> GI.ContractNoStorage <$> get <*> get <*> get
+      2 -> GI.ContractWithStorage <$> get <*> get <*> get <*> get
+      n -> error $ "Binary GI.AccountInfo: Expected 0, 1, or 2, got: " ++ show n

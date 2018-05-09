@@ -118,7 +118,7 @@ initializeGenesisBlockFromInfo :: ( MonadResource m
                                   , HasStorageDB m
                                   )
                                => GenesisInfo
-                               -> m ()
+                               -> m Block
 initializeGenesisBlockFromInfo genesisInfo = do
     (srcInfo, genesisBlock) <- genesisInfoToGenesisBlock genesisInfo
     _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
@@ -143,6 +143,6 @@ initializeGenesisBlockFromInfo genesisInfo = do
     mErr <- liftIO . runKafkaConfigured "strato-init" $ do
       splitWriteStateDiffs [diff]
     case filterResponse <$> mErr of
-       Right [] -> return ()
+       Right [] -> return genesisBlock
        Right errs -> error . show $ errs
        Left err -> error . show $ err

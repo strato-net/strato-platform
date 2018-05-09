@@ -20,6 +20,7 @@ import qualified Network.Kafka.Protocol                as KP
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataChainId, blockDataNumber)
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionDef        (transactionChainId)
 import           Blockchain.Data.TransactionResult
@@ -40,6 +41,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Strato.Model.Class         (blockHeader, blockHeaderHash)
 
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
@@ -60,9 +62,13 @@ ethereumVM = void . execContextM $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
-        
+
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
+
+        let newGenesisBlocks = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
+        gBlocks <- forM newGenesisBlocks initializeGenesisBlockFromInfo
+        forM_ gBlocks (\gb -> Bagger.processNewBestBlock (blockHeaderHash $ blockHeader gb) (blockHeader gb) [])
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
