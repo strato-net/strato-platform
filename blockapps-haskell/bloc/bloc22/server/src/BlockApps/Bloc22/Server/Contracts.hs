@@ -76,7 +76,7 @@ translateStorageMap storage' =
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
-                  -> Maybe Word256
+                  -> Maybe Int
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
@@ -142,7 +142,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId
+                           , qsChainId = fromIntegral <$> chainId
                            }
 
 

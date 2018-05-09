@@ -41,7 +41,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-import           Blockchain.Strato.Model.Class         (blockHeader, blockHeaderHash)
+import           Blockchain.Strato.Model.Class
 
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
@@ -67,8 +67,16 @@ ethereumVM = void . execContextM $ do
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
         let newGenesisBlocks = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
-        gBlocks <- forM newGenesisBlocks initializeGenesisBlockFromInfo
-        forM_ gBlocks (\gb -> Bagger.processNewBestBlock (blockHeaderHash $ blockHeader gb) (blockHeader gb) [])
+        forM_ newGenesisBlocks $ \ gi -> do
+          gb <- initializeGenesisBlockFromInfo gi
+          let header = blockHeader gb
+              hash = blockHeaderHash header
+              chainId = blockHeaderChainId header
+              diff = blockHeaderDifficulty header
+          Bagger.processNewBestBlock hash header []
+          putContextBestBlockInfo chainId (ContextBestBlockInfo (hash, header, diff, 0, 0))
+          putBSum hash (blockHeaderToBSum header diff 0)
+          return gb
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
@@ -84,6 +92,7 @@ ethereumVM = void . execContextM $ do
         -- TODO: Run some sort of consensus on private chains once their sent via P2P
         let privateChainIds = filter isJust . map fst . Bagger.partitionWith (transactionChainId . otBaseTx) $ poolableNewTxs
         privateBlocks <- forM privateChainIds $ \chainId -> do
+          $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
           newChainBlock <- Bagger.makeNewBlock chainId
           Bagger.processNewBestBlock
             (outputBlockHash newChainBlock)

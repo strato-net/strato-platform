@@ -49,7 +49,8 @@ blockQueryParams = [ "txaddress",
                      "number",
                      "minnumber",
                      "maxnumber",
-                     "index" ]
+                     "index",
+                     "chainid"]
 
 -- todo: eliminate the Entity Block from this function
 getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction), expr (Entity Block))-> (Text, Text) -> expr (E.Value Bool)
@@ -91,6 +92,7 @@ getBlkFilter (_, accStateRef, _, _) ("address", v)   = accStateRef E.^. AddressS
 getBlkFilter (bdRef, _, _, blk) ("blockid", v)   = bdRef E.^. BlockDataRefBlockId E.==. E.val (toBlockId v)
                                                               E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
 getBlkFilter (bdRef, _, _, blk) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
+getBlkFilter (bdRef, _, _, _) ("chainid", v)    = ((bdRef E.^. BlockDataRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
 
 
 getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
@@ -108,7 +110,8 @@ accountQueryParams = [ "address",
                        "maxnumber",
                        "code",
                        "index",
-                       "codeHash"]
+                       "codeHash",
+                       "chainid"]
 
 
 getAccFilter :: (E.Esqueleto query expr backend) => (expr (Entity AddressStateRef))-> (Text, Text) -> expr (E.Value Bool)
@@ -131,6 +134,7 @@ getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefA
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
+getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
 
 getAccFilter _             _                 = P.undefined ("no match in getAccFilter"::String)
 
@@ -150,7 +154,8 @@ transactionQueryParams = [ "address",
                            "maxvalue",
                            "blocknumber",
                            "index",
-                           "rejected"]
+                           "rejected",
+                           "chainid"]
 
 getTransFilter :: (E.Esqueleto query expr backend) => (expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
 getTransFilter  _          ("rejected", _)     = E.val True
@@ -182,6 +187,7 @@ getTransFilter (rawTx)     ("minvalue", v)     = rawTx E.^. RawTransactionValue 
 getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue E.<=. E.val (toInteger' v)
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
+getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
 getTransFilter _           _                   = P.undefined ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
@@ -209,6 +215,9 @@ getStorageFilter (storage,_) ("addressid", v)
   = storage E.^. StorageAddressStateRefId E.==. E.val (toAddrId v)
 getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
   = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+getStorageFilter (_,addrStRef) ("chainid", v)
+  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
+
 getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)

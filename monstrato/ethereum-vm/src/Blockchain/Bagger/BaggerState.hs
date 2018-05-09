@@ -60,7 +60,7 @@ fromMempool :: (Mempool -> a) -> Maybe Word256 -> BaggerState -> Maybe a
 fromMempool f c b = f <$> M.lookup c (mempool b)
 
 unsafeFromMempool :: (Mempool -> a) -> Maybe Word256 -> BaggerState -> a
-unsafeFromMempool f c = fromJust . fromMempool f c
+unsafeFromMempool f c = maybe (error $ "unsafeFromMempool you loco!" ++ show c) id . fromMempool f c
 
 getPublic :: (Mempool -> a) -> BaggerState -> Maybe a
 getPublic f = fromMempool f Nothing
@@ -69,7 +69,7 @@ unsafeGetPublic :: (Mempool -> a) -> BaggerState -> a
 unsafeGetPublic f = fromJust . getPublic f
 
 updateMempool :: (Mempool -> Mempool) -> Maybe Word256 -> BaggerState -> BaggerState
-updateMempool f c b = b{mempool = M.update (Just . f) c (mempool b)}
+updateMempool f c b = b{mempool = M.alter (Just . f . maybe defaultMempool id) c (mempool b)}
 
 updatePublicMempool :: (Mempool -> Mempool) -> BaggerState -> BaggerState
 updatePublicMempool f = updateMempool f Nothing

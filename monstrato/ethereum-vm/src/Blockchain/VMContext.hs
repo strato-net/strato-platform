@@ -235,4 +235,4 @@ getContextBestBlockInfo chainId = maybe Unspecified id . M.lookup chainId . cont
 putContextBestBlockInfo :: Maybe Word256 -> ContextBestBlockInfo -> ContextM ()
 putContextBestBlockInfo chainId new = do
     ctx <- get
-    put ctx { contextBestBlockInfo = M.update (const $ Just new) chainId (contextBestBlockInfo ctx) }
+    put ctx { contextBestBlockInfo = M.alter (const $ Just new) chainId (contextBestBlockInfo ctx) }

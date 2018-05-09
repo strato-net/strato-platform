@@ -101,15 +101,25 @@ instance RLPSerializable Transaction where
           partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
-  rlpEncode t =
-      RLPArray $ [
-        n, gp, gl, toAddr, val, i,
-        rlpEncode $ toInteger $ transactionV t,
-        rlpEncode $ transactionR t,
-        rlpEncode $ transactionS t
-        ] ++ (maybeToList . fmap rlpEncode $ transactionChainId t)
+  rlpEncode t = case r of
+      RLPArray [n, gp, gl, toAddr, val, i, cid] ->
+        RLPArray [
+          n, gp, gl, toAddr, val, i,
+          rlpEncode $ toInteger $ transactionV t,
+          rlpEncode $ transactionR t,
+          rlpEncode $ transactionS t,
+          cid
+          ]
+      RLPArray [n, gp, gl, toAddr, val, i] ->
+        RLPArray [
+          n, gp, gl, toAddr, val, i,
+          rlpEncode $ toInteger $ transactionV t,
+          rlpEncode $ transactionR t,
+          rlpEncode $ transactionS t
+          ]
+      _ -> error "wow I really am stupid"
       where
-        (RLPArray [n, gp, gl, toAddr, val, i]) = partialRLPEncode t
+        r = partialRLPEncode t
 
 
 --partialRLP(De|En)code are used for the signing algorithm

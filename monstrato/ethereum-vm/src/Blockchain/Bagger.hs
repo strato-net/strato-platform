@@ -49,11 +49,14 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     getCheckpointableState :: Maybe Word256 -> m (SHA, DD.BlockData, [SHA])
     getCheckpointableState cid = do
         state <- getBaggerState
-        let miningCache = B.unsafeFromMempool B.miningCache cid state
-            bestSHA     = B.bestBlockSHA miningCache
-            bestHeader  = B.bestBlockHeader miningCache
-            txShas      = B.bestBlockTxHashes miningCache
-        return (bestSHA, bestHeader, txShas)
+        let mMiningCache = B.fromMempool B.miningCache cid state
+        case mMiningCache of
+          Nothing -> error "getCheckpointableState: couldn't find mining cache"
+          Just miningCache -> do
+            let bestSHA     = B.bestBlockSHA miningCache
+                bestHeader  = B.bestBlockHeader miningCache
+                txShas      = B.bestBlockTxHashes miningCache
+            return (bestSHA, bestHeader, txShas)
 
     updateBaggerState :: (B.BaggerState -> B.BaggerState) -> m ()
     updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
@@ -63,11 +66,15 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         forM_ (partitionWith (TD.transactionChainId . otBaseTx) ts') $ \(cid, ts) -> do
           $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs to chain " ++ show cid
           existingStateDbStateRoot <- getStateRoot
-          stateRoot <- B.unsafeFromMempool (B.lastExecutedStateRoot . B.miningCache) cid <$> getBaggerState
-          setStateDBStateRoot stateRoot
-          sequence_ (addToQueued Insertion <$> ts)
-          promoteExecutables cid
-          setStateDBStateRoot existingStateDbStateRoot
+          mStateRoot <- B.fromMempool (B.lastExecutedStateRoot . B.miningCache) cid <$> getBaggerState
+          case mStateRoot of
+            Nothing -> do
+              $logInfoS "Bagger.addTransactionsToMempool" . T.pack $ "couldn't find state root for " ++ show cid
+            Just stateRoot -> do
+              setStateDBStateRoot stateRoot
+              sequence_ (addToQueued Insertion <$> ts)
+              promoteExecutables cid
+              setStateDBStateRoot existingStateDbStateRoot
 
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
     processNewBestBlock blockHash bd txShas = do
@@ -97,70 +104,73 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     makeNewBlock cid = do
         state <- getBaggerState
         let seen'       = B.seen state
-        let cache       = B.unsafeFromMempool B.miningCache cid state
-        let lastExec    = B.lastExecutedTxs cache
-        let lastExecLen = length lastExec
-        let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `M.member` seen']
-        let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        if noCachedTxsCulled then do
-            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
-            if null (B.promotedTransactions cache) then do
-                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
-                    !build <- buildFromMiningCache cid
-                    return build
-                else do
-                    $logInfoS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-                    existingStateDbStateRoot <- getStateRoot
-                    let lastSR          = B.lastExecutedStateRoot cache
-                    let lastSHA         = B.bestBlockSHA cache
-                    let lastHead        = B.bestBlockHeader cache
-                    let promoted        = B.promotedTransactions cache
-                    let time            = B.startTimestamp cache
-                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
-                    let remGas          = B.remainingGas cache
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
-                    !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
-                    (newSR, newGas, newExec, newUnexec, newTxs, newUpdates) <- case run of
-                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [], newRR', lastExec)
-                            Left e -> do
-                                logRAE e
-                                case e of
-                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx, rtx, lastExec)
-                                    (RecoverableFailure f rtx urtx nsr nbg) -> do
-                                        txsDroppedCallback [f] []
-                                        let theRejectedTx = rejectedTx f
-                                        purgeFromPending theRejectedTx
-                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx, rtx, lastExec)
-                                    x                                       -> error (show x)
+        let mCache       = B.fromMempool B.miningCache cid state
+        case mCache of
+          Nothing -> error $ "Bagger.makeNewBlock: Couldn't find mining cache for " ++ show cid
+          Just cache -> do
+            let lastExec    = B.lastExecutedTxs cache
+            let lastExecLen = length lastExec
+            let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `M.member` seen']
+            let noCachedTxsCulled = lastExecLen == lastExecGuardLen
+            if noCachedTxsCulled then do
+                $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
+                if null $ B.promotedTransactions cache then do
+                        $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
+                        !build <- buildFromMiningCache cid
+                        return build
+                    else do
+                        $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
+                        existingStateDbStateRoot <- getStateRoot
+                        let lastSR          = B.lastExecutedStateRoot cache
+                        let lastSHA         = B.bestBlockSHA cache
+                        let lastHead        = B.bestBlockHeader cache
+                        let promoted        = B.promotedTransactions cache
+                        let time            = B.startTimestamp cache
+                        let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
+                        let remGas          = B.remainingGas cache
+                        $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+                        $logInfoS "Bagger.makeNewBlock" $ T.pack $ "Running block for chain " ++ show cid
+                        !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
+                        (newSR, newGas, newExec, newUnexec, newTxs, newUpdates) <- case run of
+                                Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [], newRR', lastExec)
+                                Left e -> do
+                                    logRAE e
+                                    case e of
+                                        (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx, rtx, lastExec)
+                                        (RecoverableFailure f rtx urtx nsr nbg) -> do
+                                            txsDroppedCallback [f] []
+                                            let theRejectedTx = rejectedTx f
+                                            purgeFromPending theRejectedTx
+                                            return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx, rtx, lastExec)
+                                        x                                       -> error (show x)
 
-                    let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
-                                                , B.remainingGas          = newGas
-                                                , B.lastExecutedTxs       = newExec
-                                                , B.promotedTransactions  = newUnexec
-                                                }
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
-                    putBaggerState $ B.updateMempool (\m -> m{ B.miningCache = newMiningCache}) cid state
-                    updateBaggerState (B.updateMempool (\m -> m{ B.miningCache = newMiningCache}) cid)
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "Calling buildFromMiningCache with stateRoot " ++ show newSR
-                    !build <- buildFromMiningCache cid
-                    !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
-                    $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
-                    setStateDBStateRoot lastSR
-                    newTxRanCallback newTxs (obBlockData build)
-                    updateTxCallback newUpdates
-                                     (BDB.blockHeaderPartialHash tempRewarded)
-                                     (BDB.blockHeaderPartialHash $ obBlockData build)
-                                     Unmined
-                    setStateDBStateRoot existingStateDbStateRoot
-                    return build
-          else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
-              $logInfoS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
-              let sha    = B.bestBlockSHA cache
-              let header = B.bestBlockHeader cache
-              let txShas = B.bestBlockTxHashes cache
-              processNewBestBlock sha header txShas
-              !nb <- makeNewBlock
-              return nb
+                        let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
+                                                    , B.remainingGas          = newGas
+                                                    , B.lastExecutedTxs       = newExec
+                                                    , B.promotedTransactions  = newUnexec
+                                                    }
+                        $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
+                        putBaggerState $ B.updateMempool (\m -> m{ B.miningCache = newMiningCache}) cid state
+                        updateBaggerState (B.updateMempool (\m -> m{ B.miningCache = newMiningCache}) cid)
+                        !build <- buildFromMiningCache cid
+                        !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
+                        $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
+                        setStateDBStateRoot lastSR
+                        newTxRanCallback newTxs (obBlockData build)
+                        updateTxCallback newUpdates
+                                         (BDB.blockHeaderPartialHash tempRewarded)
+                                         (BDB.blockHeaderPartialHash $ obBlockData build)
+                                         Unmined
+                        setStateDBStateRoot existingStateDbStateRoot
+                        return build
+            else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
+                $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
+                let sha    = B.bestBlockSHA cache
+                let header = B.bestBlockHeader cache
+                let txShas = B.bestBlockTxHashes cache
+                processNewBestBlock sha header txShas
+                !nb <- makeNewBlock cid
+                return nb
 
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
@@ -226,114 +236,143 @@ addToQueued :: MonadBagger m => BaggerStage -> OutputTx -> m ()
 addToQueued stage t@OutputTx{otSigner = signer, otBaseTx = otx} =
     unlessM (wasSeen t) $ do
         state <- getBaggerState
-        let txShas = B.unsafeFromMempool (B.bestBlockTxHashes . B.miningCache) (TD.transactionChainId otx) state
-        validation <- isValidForPool t
-        $logDebugS "Bagger.addToQueued" . T.pack $ "validation :: " ++ show validation
-        case validation of
-            Left rejection -> do
-                $logDebugS "Bagger.addToQueued/Left" . T.pack $ "rejection :: " ++ show rejection
-                txsDroppedCallback [rejection] txShas
-            Right _ -> do
-                -- $logDebugS "Bagger.addToQueued/Right" "non-rejection "
-                !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
-                putBaggerState newState
-                -- $logDebugS "Bagger.addToQueued/Right" . T.pack $show newState
-                forM_ toDiscard $ \d -> do
-                    removeFromSeen d
-                    logDiscard' "addToQueued" signer d
-                    txsDroppedCallback [LessLucrative stage Queued t d] txShas
-                addToSeen t
+        let mtxShas = B.fromMempool (B.bestBlockTxHashes . B.miningCache) (TD.transactionChainId otx) state
+        case mtxShas of
+          Nothing -> do
+            $logInfoS "Bagger.addToQueued" . T.pack $ "couldn't find txs for chainId " ++ (show $ TD.transactionChainId otx)
+          Just txShas -> do
+            validation <- isValidForPool t
+            $logDebugS "Bagger.addToQueued" . T.pack $ "validation :: " ++ show validation
+            case validation of
+                Left rejection -> do
+                    $logDebugS "Bagger.addToQueued/Left" . T.pack $ "rejection :: " ++ show rejection
+                    txsDroppedCallback [rejection] txShas
+                Right _ -> do
+                    -- $logDebugS "Bagger.addToQueued/Right" "non-rejection "
+                    !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
+                    putBaggerState newState
+                    -- $logDebugS "Bagger.addToQueued/Right" . T.pack $show newState
+                    forM_ toDiscard $ \d -> do
+                        removeFromSeen d
+                        logDiscard' "addToQueued" signer d
+                        txsDroppedCallback [LessLucrative stage Queued t d] txShas
+                    addToSeen t
 
 promoteExecutables :: MonadBagger m => Maybe Word256 -> m ()
 promoteExecutables chainId = do
     preState <- getBaggerState
-    let txShas      = B.unsafeFromMempool (B.bestBlockTxHashes . B.miningCache) chainId preState
-        queued'     = B.unsafeFromMempool (M.keysSet . B.queued) chainId preState
-    forM_ queued' $ \address -> do
-        state <- getBaggerState
-        (addressNonce, addressBalance) <- getAddressNonceAndBalance chainId address
+    $logInfoS "Bagger.promoteExecutables" "pulling from mempool"
+    let mTxShas   = B.fromMempool (B.bestBlockTxHashes . B.miningCache) chainId preState
+        mQueued' = B.fromMempool (M.keysSet . B.queued) chainId preState
+    case mTxShas of
+      Nothing -> do
+        $logInfoS "Bagger.promoteExecutables" "txShas was null"
+        return ()
+      Just txShas -> case mQueued' of
+        Nothing -> do
+          $logInfoS "Bagger.promoteExecutables" "queued' was null"
+          return ()
+        Just queued' -> do
+          forM_ queued' $ \address -> do
+              state <- getBaggerState
+              (addressNonce, addressBalance) <- getAddressNonceAndBalance chainId address
 
-        let !(discardedByNonce, state') = B.trimBelowNonceFromQueued address addressNonce chainId state
-        putBaggerState state'
-        forM_ discardedByNonce $ \d -> do
-            removeFromSeen d
-            logDiscard "promoteExecutables Queued Nonce" address addressNonce d
+              let !(discardedByNonce, state') = B.trimBelowNonceFromQueued address addressNonce chainId state
+              putBaggerState state'
+              forM_ discardedByNonce $ \d -> do
+                  removeFromSeen d
+                  logDiscard "promoteExecutables Queued Nonce" address addressNonce d
 
-        let !(discardedByCost, state'') = B.trimAboveCostFromQueued address addressBalance chainId state'
-        putBaggerState state''
-        forM_ discardedByCost $ \d -> do
-            removeFromSeen d
-            logDiscard "promoteExecutables Queued Balance" address addressBalance d
+              let !(discardedByCost, state'') = B.trimAboveCostFromQueued address addressBalance chainId state'
+              putBaggerState state''
+              forM_ discardedByCost $ \d -> do
+                  removeFromSeen d
+                  logDiscard "promoteExecutables Queued Balance" address addressBalance d
 
-        let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce chainId state''
-        putBaggerState state'''
-        forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
+              let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce chainId state''
+              putBaggerState state'''
+              forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
 
-        calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
-        -- todo callback per promotion call instead of per-address?
-        let nonceDrops = NonceTooLow Promotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = (\t -> BalanceTooLow Promotion Queued (calcFee t) addressBalance t) <$> discardedByCost
-        txsDroppedCallback (nonceDrops ++ costDrops) txShas
-        forM_ readyToMine promoteTx
+              calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
+              -- todo callback per promotion call instead of per-address?
+              let nonceDrops = NonceTooLow Promotion Queued addressNonce     <$> discardedByNonce
+              let costDrops  = (\t -> BalanceTooLow Promotion Queued (calcFee t) addressBalance t) <$> discardedByCost
+              txsDroppedCallback (nonceDrops ++ costDrops) txShas
+              forM_ readyToMine promoteTx
 
 promoteTx :: MonadBagger m => OutputTx -> m ()
 promoteTx tx@OutputTx{otSigner=signer, otBaseTx = otx} = do
     state <- getBaggerState
-    let txShas = B.unsafeFromMempool (B.bestBlockTxHashes . B.miningCache) (TD.transactionChainId otx) state
+    $logInfoS "Bagger.promoteTx" "pulling from mempool"
+    let mTxShas = B.fromMempool (B.bestBlockTxHashes . B.miningCache) (TD.transactionChainId otx) state
         !(evicted, state') = B.addToPending tx state
-    putBaggerState state'
-    forM_ evicted $ \e -> do
-        removeFromSeen e
-        logDiscard' "promoteTx" signer e
-        txsDroppedCallback [LessLucrative Promotion Pending tx e] txShas
-    addToPromotionCache tx
+    case mTxShas of
+      Nothing -> do
+        $logInfoS "Bagger.promoteTx" "txShas was null"
+      Just txShas -> do
+        putBaggerState state'
+        forM_ evicted $ \e -> do
+            removeFromSeen e
+            logDiscard' "promoteTx" signer e
+            txsDroppedCallback [LessLucrative Promotion Pending tx e] txShas
+        addToPromotionCache tx
 
 demoteUnexecutables :: MonadBagger m => Maybe Word256 -> m ()
 demoteUnexecutables chainId = do
     preState <- getBaggerState
-    let txShas   = B.unsafeFromMempool (B.bestBlockTxHashes . B.miningCache) chainId preState
-        pending' = B.unsafeFromMempool (M.keysSet . B.pending) chainId preState
-    forM_ pending' $ \address -> do
-        state <- getBaggerState
-        (addressNonce, addressBalance) <- getAddressNonceAndBalance chainId address
+    $logInfoS "Bagger.demoteUnexecutables" "pulling from mempool"
+    let mTxShas   = B.fromMempool (B.bestBlockTxHashes . B.miningCache) chainId preState
+        mPending' = B.fromMempool (M.keysSet . B.pending) chainId preState
+    case mTxShas of
+      Nothing -> do
+        $logInfoS "Bagger.demoteUnexecutables" "txShas was null"
+        return ()
+      Just txShas -> case mPending' of
+        Nothing -> do
+          $logInfoS "Bagger.demoteUnexecutables" "pending' was null"
+          return ()
+        Just pending' -> do
+          forM_ pending' $ \address -> do
+              state <- getBaggerState
+              (addressNonce, addressBalance) <- getAddressNonceAndBalance chainId address
 
-        let !(pDiscardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce chainId state
-        putBaggerState state'
-        forM_ pDiscardedByNonce removeFromSeen
-        forM_ pDiscardedByNonce $ logDiscard "demoteUnexecutables Pending Nonce" address addressNonce
+              let !(pDiscardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce chainId state
+              putBaggerState state'
+              forM_ pDiscardedByNonce removeFromSeen
+              forM_ pDiscardedByNonce $ logDiscard "demoteUnexecutables Pending Nonce" address addressNonce
 
-        let !(pDiscardedByCost, state'') = B.trimAboveCostFromPending address addressBalance chainId state'
-        putBaggerState state''
-        forM_ pDiscardedByCost removeFromSeen
-        forM_ pDiscardedByCost $ logDiscard "demoteUnexecutables Pending Balance" address addressBalance
+              let !(pDiscardedByCost, state'') = B.trimAboveCostFromPending address addressBalance chainId state'
+              putBaggerState state''
+              forM_ pDiscardedByCost removeFromSeen
+              forM_ pDiscardedByCost $ logDiscard "demoteUnexecutables Pending Balance" address addressBalance
 
-        state'''' <- getBaggerState
-        let !(qDiscardedByNonce, state''''') = B.trimBelowNonceFromPending address addressNonce chainId state''''
-        putBaggerState state'''''
-        forM_ qDiscardedByNonce removeFromSeen
-        forM_ qDiscardedByNonce $ logDiscard "demoteUnexecutables Queued Nonce" address addressNonce
+              state'''' <- getBaggerState
+              let !(qDiscardedByNonce, state''''') = B.trimBelowNonceFromPending address addressNonce chainId state''''
+              putBaggerState state'''''
+              forM_ qDiscardedByNonce removeFromSeen
+              forM_ qDiscardedByNonce $ logDiscard "demoteUnexecutables Queued Nonce" address addressNonce
 
-        let !(qDiscardedByCost, state'''''') = B.trimAboveCostFromPending address addressBalance chainId state'''''
-        putBaggerState state''''''
-        forM_ qDiscardedByCost removeFromSeen
-        forM_ qDiscardedByCost $ logDiscard "demoteUnexecutables Queued Balance" address addressBalance
+              let !(qDiscardedByCost, state'''''') = B.trimAboveCostFromPending address addressBalance chainId state'''''
+              putBaggerState state''''''
+              forM_ qDiscardedByCost removeFromSeen
+              forM_ qDiscardedByCost $ logDiscard "demoteUnexecutables Queued Balance" address addressBalance
 
-        calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
+              calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
 
-        -- todo callback per demotion call instead of per-address?
-        let pNonceDrops = NonceTooLow Demotion Pending addressNonce <$> pDiscardedByNonce
-        let pCostDrops  = (\t -> BalanceTooLow Demotion Pending (calcFee t) addressBalance t) <$> pDiscardedByCost
-        let qNonceDrops = NonceTooLow Demotion Queued addressNonce <$> qDiscardedByNonce
-        let qCostDrops  = (\t -> BalanceTooLow Demotion Queued (calcFee t) addressBalance t) <$> qDiscardedByCost
-        txsDroppedCallback (pNonceDrops ++ pCostDrops ++ qNonceDrops ++ qCostDrops) txShas
+              -- todo callback per demotion call instead of per-address?
+              let pNonceDrops = NonceTooLow Demotion Pending addressNonce <$> pDiscardedByNonce
+              let pCostDrops  = (\t -> BalanceTooLow Demotion Pending (calcFee t) addressBalance t) <$> pDiscardedByCost
+              let qNonceDrops = NonceTooLow Demotion Queued addressNonce <$> qDiscardedByNonce
+              let qCostDrops  = (\t -> BalanceTooLow Demotion Queued (calcFee t) addressBalance t) <$> qDiscardedByCost
+              txsDroppedCallback (pNonceDrops ++ pCostDrops ++ qNonceDrops ++ qCostDrops) txShas
 
-        -- drop all existing pending transactions, and try to see if they're
-        -- still valid to add to the (likely new) queued pool
-        let !(remainingPending, state''') = B.popAllPending chainId state''
-        putBaggerState state'''
-        forM_ remainingPending $ \p -> do
-            removeFromSeen p
-            addToQueued Demotion p
+              -- drop all existing pending transactions, and try to see if they're
+              -- still valid to add to the (likely new) queued pool
+              let !(remainingPending, state''') = B.popAllPending chainId state''
+              putBaggerState state'''
+              forM_ remainingPending $ \p -> do
+                  removeFromSeen p
+                  addToQueued Demotion p
 
 wasSeen :: MonadBagger m => OutputTx -> m Bool
 wasSeen OutputTx{otHash=sha} = do
@@ -385,6 +424,7 @@ nextGasLimit g = g + q - (if d == 0 then 1 else 0) where (q,d) = g `quotRem` 102
 
 buildFromMiningCache :: MonadBagger m => Maybe Word256 -> m OutputBlock
 buildFromMiningCache chainId = do
+    $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     cache <- B.unsafeFromMempool B.miningCache chainId <$> getBaggerState
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache

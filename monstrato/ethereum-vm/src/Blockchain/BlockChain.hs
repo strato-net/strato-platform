@@ -104,6 +104,7 @@ instance Bagger.MonadBagger ContextM where
     runFromStateRoot sr remainingGas theBlockHeader txs = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
+        $logInfoS "Bagger.runFromStateRoot" $ T.pack $ "Running block for chain " ++ show (blockHeaderChainId theBlockHeader)
         (TxMiningResult res ranTxs unranTxs newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
         flushMemStorageDB
         flushMemAddressStateDB
@@ -331,6 +332,7 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
+    $logInfoS "Blockchain.mineTransactions'" $ T.pack $ "Running block for chain " ++ show (blockHeaderChainId header)
     beforeMap <- getAddressStateDBMap
     (time', !result) <- timeIt . runEitherT $ addTransaction False header remGas tx
     afterMap <- getAddressStateDBMap
@@ -346,6 +348,7 @@ blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
 
 addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> EitherT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
+    lift $ $logInfoS "Blockchain.addTransaction" $ T.pack $ "Running transaction for chain " ++ show (transactionChainId bt)
     unless (blockDataChainId b == transactionChainId bt) $
       error $ unlines
                 [ "Somehow we're trying to add a transaction to a block on the wrong chain!"
@@ -614,7 +617,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     bbi <- getContextBestBlockInfo chainId
 
     case bbi of
-      Unspecified -> return (False, error "Why are you trying to read this?")
+      Unspecified -> error $ "Trying to replace an Unspecified Best Block on chain " ++ show chainId
       ContextBestBlockInfo (oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) -> do
 
         let newNumber     = blockDataNumber bd
