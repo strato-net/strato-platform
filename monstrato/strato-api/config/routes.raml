@@ -4,6 +4,19 @@ baseUri: 'http://hacknet.blockapps.net/eth/{version}'
 version: v1.2
 protocols: [ HTTP ]
 
+/chain:
+  description: |
+    handler: ChainR
+  post:
+    description: Submit the genesis info of a new private chain
+    queryParameters:
+      address:
+        description: the hex encoded address
+        required: true
+        type: string
+        example:
+      responses:
+
 /faucet:
   description: |
     handler: FaucetR

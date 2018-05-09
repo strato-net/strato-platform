@@ -26,6 +26,7 @@ library
                      Handler.AccountInfo
                      Handler.BlockInfo
                      Handler.BlkLast
+                     Handler.ChainInfo
                      Handler.Demo
                      Handler.Filters
                      Handler.Help
@@ -113,6 +114,7 @@ library
                  , shakespeare                   >= 2.0
                  , solidity-abi
                  , strato-conf
+                 , strato-genesis
                  , strato-model
                  , strato-sequencer
                  , template-haskell

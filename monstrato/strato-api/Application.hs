@@ -35,6 +35,7 @@ import           Handler.AppCreate
 import           Handler.BatchTransactionResult
 import           Handler.BlkLast
 import           Handler.BlockInfo
+import           Handler.ChainInfo
 import           Handler.Coinbase
 import           Handler.Common
 import           Handler.Demo
