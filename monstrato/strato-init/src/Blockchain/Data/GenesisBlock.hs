@@ -8,6 +8,7 @@ module Blockchain.Data.GenesisBlock (
   BackupType(..)
 ) where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -80,8 +81,9 @@ putStorageTrie address slots = do
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
+                  -> String
                   -> m ()
-initializeStateDB addressInfo = do
+initializeStateDB addressInfo genesisBlockName = do
     initializeBlankStateDB
     let putAccount acc = case acc of
                               NonContract address balance' ->
@@ -94,8 +96,14 @@ initializeStateDB addressInfo = do
                                                                           addressStateCodeHash=codeHash'}
                                 putStorageTrie address slots
     mapM_ putAccount addressInfo
+
+    let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+
+    liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
     
-    accountInfoString <- liftIO $ BLC.readFile "accountInfo"
+    accountInfoString <-
+      liftIO $
+      fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
     let accountInfo = BLC.lines accountInfoString
 
     let accountInfoBatches = chunksOf 10000 accountInfo
@@ -147,13 +155,14 @@ zipSourceInfo accounts codes =
 
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
+                          -> String
                           -> m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi = do
+genesisInfoToGenesisBlock gi gn = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
     let sourceInfo = zipSourceInfo accounts codes
     initializeCodeDB codes
-    initializeStateDB accounts
+    initializeStateDB accounts gn
     db <- getStateDB
     return (sourceInfo, Block {
         blockBlockData = BlockData {
@@ -184,7 +193,7 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
-    genesisInfoToGenesisBlock theJSON
+    genesisInfoToGenesisBlock theJSON genesisBlockName
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 

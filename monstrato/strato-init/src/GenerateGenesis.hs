@@ -26,6 +26,7 @@ defineFlag "source_file" ("" :: String) "Filename pointing to the contract sourc
 defineFlag "contract_name" ("" :: String) "Name of the contract being uploaded"
 defineFlag "n:number" (0 :: Int) "Number of copies to seed"
 defineFlag "o:output_file" ("genesisWithContracts.json" :: String) "Name of output file to write"
+defineFlag "o:output_account_info_file" ("accountInfo" :: String) "Name of output account info file to write"
 defineFlag "r:records_file" ("" :: String) "Filename containing CSV records of data to insert.\
                                            \Only ints and strings are accepted (for now only \
                                            \ small strings as well). Little validation is \
@@ -79,13 +80,9 @@ main = do
   let output = insert name src bytes (fromInteger flags_start) genesis
   let outputText = encode output{genesisInfoAccountInfo=[]}
   withFile flags_output_file WriteMode (flip L.hPut $ outputText)
-  putStrLn $ unlines $ map showAccountInfo $ genesisInfoAccountInfo output
-{-
-data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer SHA
-                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
-   deriving (Show, Eq)
--}
+  writeFile flags_output_account_info_file $ unlines $ map showAccountInfo $ genesisInfoAccountInfo output
+
+
 
 showAccountInfo::AccountInfo->String
 showAccountInfo (NonContract (Address address) balance) =
