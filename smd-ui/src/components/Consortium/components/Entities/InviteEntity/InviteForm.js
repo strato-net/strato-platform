@@ -29,6 +29,9 @@ class InviteForm extends Component {
     if (JSON.stringify(errors) === JSON.stringify({})) {
       const entity = values;
       entity.status = 'Invited';
+      // Mock Data
+      entity.users = [{ address: entity.adminEthereumAddress, status: 'Member' }]
+      entity.nodes = [{ owner: entity.name, IP: '172.16.254.1', public: '2', tcp: 8080, udp: 10001, invitedBy: 'Company 2', status: 'In-Sync', options: 'remove' }]
       this.props.inviteEntityRequest(entity);
     }
   }

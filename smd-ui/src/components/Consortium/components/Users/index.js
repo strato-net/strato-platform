@@ -1,33 +1,23 @@
 import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
+import { connect } from 'react-redux';
 
 class Users extends Component {
 
-  constructor(props) {
-    super(props);
-    this.state = {
-      data: [
-        { address: '03943893439220392', status: 'Invited', privacy: "connect" },
-        { address: '0394389343922', status: 'Pending', privacy: "connect" },
-        { address: '039438934392292', status: 'Member', privacy: "connect" }
-      ]
-    }
-  }
-
   tableData() {
-    if (this.state.data && this.state.data.length) {
-      return this.state.data.map((data, key) => {
+    if (this.props.users.length) {
+      return this.props.users.map((user, key) => {
         return (
           <tr key={key}>
             <td>
-              {data.address}
+              {user.address}
             </td>
             <td>
-              {data.status}
-              {data.status === 'Invited' && <Button>Approve</Button>}
+              {user.status}
+              {user.status === 'Invited' && <Button>Approve</Button>}
             </td>
             <td>
-              {data.privacy}
+              <Button>Connect</Button>
             </td>
           </tr>
         )
@@ -59,4 +49,17 @@ class Users extends Component {
   }
 }
 
-export default Users;
+export function mapStateToProps(state) {
+  let users = [];
+  if (state.createConsortium.consortium[0]) {
+    state.createConsortium.consortium[0].entities.map(entity => {
+      users.push(...entity.users);
+    });
+  }
+  return {
+    users
+  };
+}
+const connected = connect(mapStateToProps)(Users);
+
+export default connected;

@@ -1,47 +1,37 @@
 import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
+import { connect } from 'react-redux';
 
 class Nodes extends Component {
 
-  constructor(props) {
-    super(props);
-    this.state = {
-      data: [
-        { owner: 'microsoft', IP: '3', public: '2', tcp: 8080, udp: 10001, invitedBy: 'Company 2', status: 'In-Sync', options: 'remove' },
-        { owner: 'microsoft', IP: '3', public: '2', tcp: 8080, udp: 10001, invitedBy: 'Company 2', status: 'In-Sync', options: 'remove' },
-        { owner: 'microsoft', IP: '3', public: '2', tcp: 8080, udp: 10001, invitedBy: 'Company 2', status: 'In-Sync', options: 'remove' },
-      ]
-    }
-  }
-
   tableData() {
-    if (this.state.data && this.state.data.length) {
-      return this.state.data.map((data, key) => {
+    if (this.props.nodes.length) {
+      return this.props.nodes.map((node, key) => {
         return (
           <tr key={key}>
             <td>
-              {data.owner}
+              {node.owner}
             </td>
             <td>
-              {data.public}
+              {node.public}
             </td>
             <td>
-              {data.IP}
+              {node.IP}
             </td>
             <td>
-              {data.tcp}
+              {node.tcp}
             </td>
             <td>
-              {data.udp}
+              {node.udp}
             </td>
             <td>
-              {data.invitedBy}
+              {node.invitedBy}
             </td>
             <td>
-              {data.status}
+              {node.status}
             </td>
             <td>
-              <Button>{data.options}</Button>
+              <Button>Remove</Button>
             </td>
           </tr>
         )
@@ -79,4 +69,17 @@ class Nodes extends Component {
 
 }
 
-export default Nodes;
+export function mapStateToProps(state) {
+  let nodes = [];
+  if (state.createConsortium.consortium[0]) {
+    state.createConsortium.consortium[0].entities.map(entity => {
+      nodes.push(...entity.nodes);
+    });
+  }
+  return {
+    nodes
+  };
+}
+const connected = connect(mapStateToProps)(Nodes);
+
+export default connected;
