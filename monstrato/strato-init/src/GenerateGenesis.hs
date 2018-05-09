@@ -11,9 +11,13 @@ import Data.Aeson.Extra (eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
+import Numeric
 
+import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
-import Blockchain.Strato.Model.Address ()
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.SHA
+
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
 defineFlag "s:start" (0xfeb1989bbbea7000000000000000000000000000 :: Integer) "Starting address for seeding contract"
@@ -73,5 +77,27 @@ main = do
                              then insertContractsJSONHashMaps json
                              else insertContractsJSON json
   let output = insert name src bytes (fromInteger flags_start) genesis
-  let outputText = encode output
+  let outputText = encode output{genesisInfoAccountInfo=[]}
   withFile flags_output_file WriteMode (flip L.hPut $ outputText)
+  putStrLn $ unlines $ map showAccountInfo $ genesisInfoAccountInfo output
+{-
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer SHA
+                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
+   deriving (Show, Eq)
+-}
+
+showAccountInfo::AccountInfo->String
+showAccountInfo (NonContract (Address address) balance) =
+  "a " ++ showHex address "" ++ " " ++ show balance
+showAccountInfo (ContractNoStorage (Address address) balance code) =
+  "a " ++ showHex address "" ++ " " ++ show balance ++ show code
+showAccountInfo (ContractWithStorage (Address address) balance (SHA code) storage) =
+  "a " ++ addressString ++ " " ++ show balance ++ " " ++ showHex code "" ++ "\n"
+  ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
+  where addressString = showHex address ""
+
+
+
+  
+  

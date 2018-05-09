@@ -16,6 +16,7 @@ import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.JsonStream.Parser               as JS
 import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
+import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
@@ -31,6 +32,7 @@ import qualified Blockchain.DB.MemAddressStateDB as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
@@ -92,6 +94,43 @@ initializeStateDB addressInfo = do
                                                                           addressStateCodeHash=codeHash'}
                                 putStorageTrie address slots
     mapM_ putAccount addressInfo
+    
+    accountInfoString <- liftIO $ BLC.readFile "accountInfo"
+    let accountInfo = BLC.lines accountInfoString
+
+    let accountInfoBatches = chunksOf 10000 accountInfo
+
+    forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
+      forM_ batch $ \theLine -> do
+        case words $ BLC.unpack theLine of
+         [] -> return ()
+         ["s", a, k, v]  -> do
+           let address = Ad.Address $ parseHex a
+           putStorageKeyVal' address (parseHex k) (parseHex v)
+         ["a", a, b]  -> do
+           let address = Ad.Address $ parseHex a
+           liftIO $ putStrLn $ "adding account: " ++ format address
+           putAddressState address blankAddressState{addressStateBalance= read b}
+         ["a", a, b, c]  -> do
+           let address = Ad.Address $ parseHex a
+           liftIO $ putStrLn $ "adding account: " ++ format address
+           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=SHA $ parseHex c}
+         _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
+
+      liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
+      flushMemStorageDB
+      Mem.flushMemAddressStateDB
+    
+    forM_ addressInfo $ \account -> do
+      liftIO $ print account
+      putAccount account
+
+
+parseHex::(Num a, Eq a)=>String->a
+parseHex theString =
+  case readHex theString of
+   [(value, "")] -> value
+   _ -> error $ "parseHex: error parsing string: " ++ theString
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
