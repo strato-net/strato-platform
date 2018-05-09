@@ -49,13 +49,13 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
+                 , strato-genesis
                  , strato-model
                  , strato-statediff
                  , split
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
-                   Blockchain.Data.GenesisBlock
-                   Blockchain.Data.GenesisInfo
+                   Blockchain.GenesisBlock
                    Blockchain.Setup
                    Paths_strato_init
     buildable: True
@@ -96,32 +96,6 @@ executable strato-block-backup
     main-is: BlockBackup.hs
     hs-source-dirs: src
 
-
-executable genesis-setup
-    default-language: Haskell98
-    ghc-options: -Wall -O2 -threaded
-    build-depends:
-                   base >= 4 && < 5
-                 , aeson
-                 , base16-bytestring
-                 , binary
-                 , blockapps-data
-                 , blockapps-util
-                 , bytestring
-                 , directory
-                 , entropy
-                 , blockapps-haskoin
-                 , hflags
-                 , strato-init
-                 , merkle-patricia-db
-                 , time
-                 , json-stream
-    other-modules: Blockchain.GenesisBlockSetup
-                   Blockchain.Data.GenesisInfo
-    buildable: True
-    main-is: GenesisSetup.hs
-    hs-source-dirs: src
-
 executable strato-ez-restore
     main-is: RestoreTool.hs
     hs-source-dirs: src
@@ -140,88 +114,3 @@ executable strato-ez-restore
                  , blockapps-milena
                  , resourcet
                  , monad-control
-
-library
-    hs-source-dirs: src
-    exposed-modules: Blockchain.Data.GenesisInfo
-                     Blockchain.Generation
-
-    default-language: Haskell2010
-    buildable: True
-    ghc-options: -Wall -O2 -threaded
-    build-depends: base
-                 , aeson
-                 , base16-bytestring
-                 , blockapps-data
-                 , blockapps-util
-                 , bytestring
-                 , containers
-                 , cryptonite
-                 , csv
-                 , json-stream
-                 , memory
-                 , merkle-patricia-db
-                 , scientific
-                 , split
-                 , strato-model
-                 , text
-                 , time
-                 , unordered-containers
-                 , vector
-                 , utf8-string
-
-executable generate-genesis
-    main-is: GenerateGenesis.hs
-    hs-source-dirs: src
-    default-language: Haskell2010
-    buildable: True
-    ghc-options: -Wall -O2 -threaded
-    build-depends: base
-                 , aeson
-                 , aeson-extra
-                 , aeson-pretty
-                 , base16-bytestring
-                 , blockapps-data
-                 , blockapps-util
-                 , bytestring
-                 , containers
-                 , csv
-                 , hflags
-                 , json-stream
-                 , merkle-patricia-db
-                 , scientific
-                 , strato-init
-                 , strato-model
-                 , text
-                 , time
-                 , unordered-containers
-                 , vector
-                 , utf8-string
-
-test-suite strato-init-test
-    type: exitcode-stdio-1.0
-    hs-source-dirs: test
-    main-is: Main.hs
-    other-modules: GenerationSpec
-                   JsonSpec
-                   Spec
-    build-depends: aeson
-                 , aeson-diff
-                 , base
-                 , base16-bytestring
-                 , blockapps-data
-                 , bytestring
-                 , containers
-                 , hspec
-                 , json-stream
-                 , merkle-patricia-db
-                 , scientific
-                 , strato-init
-                 , strato-model
-                 , text
-                 , time
-                 , vector
-                 , unordered-containers
-                 , utf8-string
-    ghc-options: -Wall
-    default-language: Haskell2010

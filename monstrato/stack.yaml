@@ -15,6 +15,7 @@ packages:
 - blockapps-util/
 - strato-api/
 - blockapps-tools/
+- strato-genesis/
 - strato-adit/
 - strato-index/
 - strato-sequencer/
@@ -91,6 +92,7 @@ ghc-options:
   ethereum-discovery:      -Wall -Werror -fno-warn-warnings-deprecations
   ethereum-encryption:     -Wall -Werror -fno-warn-warnings-deprecations
   merkle-patricia-db:      -Wall -Werror -fno-warn-warnings-deprecations
+  strato-genesis:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-init:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-p2p:              -Wall -Werror -fno-warn-warnings-deprecations
   strato-redis-blockdb:    -Wall -Werror -fno-warn-warnings-deprecations
