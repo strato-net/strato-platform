@@ -7,8 +7,11 @@
 }
 
 .filter-btn {
-  margin-left: -145px;
   margin-top: 10px;
+}
+
+.filter-btn button:focus {
+  outline-style: none !important;
 }
 
 .no-record, .entity-list {
