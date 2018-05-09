@@ -24,12 +24,14 @@ module BlockApps.Strato.Client
   , getTotalTx
   , getStorage
   , postFaucet
+  , postChain
   , postSolc
   , postExtabi
   ) where
 
 import           Data.Proxy
 import           Data.LargeWord  (Word256)
+import           Data.Text       (Text)
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
@@ -130,6 +132,7 @@ getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
+postChain :: GenesisInfo -> ClientM Text
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
@@ -145,6 +148,7 @@ getTxsFilter
   :<|> getTotalTx
   :<|> getStorage
   :<|> postFaucet
+  :<|> postChain
   :<|> postSolc
   :<|> postExtabi =
     uncurryTxsFilterParams getTxsFilter'
@@ -160,6 +164,7 @@ getTxsFilter
     :<|> getTotalTx'
     :<|> uncurryStorageFilterParams getStorage'
     :<|> postFaucet'
+    :<|> postChain'
     :<|> postSolc'
     :<|> postExtabi'
   where
@@ -176,6 +181,7 @@ getTxsFilter
       :<|> getTotalTx'
       :<|> getStorage'
       :<|> postFaucet'
+      :<|> postChain'
       :<|> postSolc'
       :<|> postExtabi' =
         client (Proxy @ API)

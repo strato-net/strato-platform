@@ -6,7 +6,9 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -37,6 +39,9 @@ module BlockApps.Strato.Types
   , SolcResponse (..)
   , AbiBin (..)
   , exampleTxResult
+  , CodeInfo (..)
+  , AccountInfo (..)
+  , GenesisInfo (..)
   ) where
 
 import           Control.Applicative
@@ -44,6 +49,7 @@ import           Control.Lens                 (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import qualified Data.Aeson.TH                as AT
 import qualified Data.Binary                  as Binary
 import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
@@ -599,3 +605,108 @@ instance ToJSON BatchTransactionResult where
 
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
+
+data CodeInfo = CodeInfo String String String
+  deriving (Show, Read, Eq, Generic)
+
+instance FromJSON CodeInfo where
+  parseJSON (Object o) =
+    CodeInfo
+    <$> o .: "code"
+    <*> o .: "src"
+    <*> o .: "name"
+  parseJSON _ = error "parseJSON CodeInfo: expected Object"
+
+instance ToJSON CodeInfo where
+  toEncoding (CodeInfo bs s1 s2) =
+    pairs (
+      "code" .= bs <>
+      "src"  .= s1 <>
+      "name" .= s2
+    )
+
+instance ToSchema CodeInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "CodeInfo"
+    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
+
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer Keccak256
+                 | ContractWithStorage Address Integer Keccak256 [(Hex Word256, Hex Word256)]
+   deriving (Show, Eq, Generic)
+
+$(AT.deriveJSON defaultOptions{AT.sumEncoding = AT.UntaggedValue} ''AccountInfo)
+
+instance ToSchema AccountInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "AccountInfo"
+    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
+
+data GenesisInfo =
+  GenesisInfo {
+    genesisInfoParentHash       :: Keccak256,
+    genesisInfoUnclesHash       :: Keccak256,
+    genesisInfoCoinbase         :: Address,
+    genesisInfoAccountInfo      :: [AccountInfo],
+    genesisInfoCodeInfo         :: [CodeInfo],
+    genesisInfoTransactionsRoot :: Keccak256,
+    genesisInfoReceiptsRoot     :: Keccak256,
+    genesisInfoLogBloom         :: String,
+    genesisInfoDifficulty       :: Integer,
+    genesisInfoNumber           :: Integer,
+    genesisInfoGasLimit         :: Integer,
+    genesisInfoGasUsed          :: Integer,
+    genesisInfoTimestamp        :: UTCTime,
+    genesisInfoExtraData        :: Integer,
+    genesisInfoMixHash          :: Keccak256,
+    genesisInfoNonce            :: Word64,
+    genesisInfoChainId          :: Maybe (Hex Word256)
+} deriving (Show, Eq, Generic)
+
+instance FromJSON GenesisInfo where
+  parseJSON (Object o) =
+    GenesisInfo <$>
+    o .: "parentHash" <*>
+    o .: "unclesHash" <*>
+    o .: "coinbase" <*>
+    o .: "accountInfo" <*>
+    o .:? "codeInfo" .!= [] <*>
+    o .: "transactionRoot" <*>
+    o .: "receiptsRoot" <*>
+    o .: "logBloom" <*>
+    o .: "difficulty" <*>
+    o .: "number" <*>
+    o .: "gasLimit" <*>
+    o .: "gasUsed" <*>
+    o .: "timestamp" <*>
+    o .: "extraData" <*>
+    o .: "mixHash" <*>
+    o .: "nonce" <*>
+    o .:? "chainId"
+  parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
+
+instance ToJSON GenesisInfo where
+  toEncoding x = pairs (
+      "parentHash" .= genesisInfoParentHash x <>
+      "unclesHash" .= genesisInfoUnclesHash x <>
+      "coinbase" .= genesisInfoCoinbase x <>
+      "codeInfo" .= genesisInfoCodeInfo x <>
+      "transactionRoot" .= genesisInfoTransactionsRoot x <>
+      "receiptsRoot" .= genesisInfoReceiptsRoot x <>
+      "logBloom" .= genesisInfoLogBloom x <>
+      "difficulty" .= genesisInfoDifficulty x <>
+      "number" .= genesisInfoNumber x <>
+      "gasLimit" .= genesisInfoGasLimit x <>
+      "gasUsed" .= genesisInfoGasUsed x <>
+      "timestamp" .= genesisInfoTimestamp x <>
+      "extraData" .= genesisInfoExtraData x <>
+      "mixHash" .= genesisInfoMixHash x <>
+      "nonce" .= genesisInfoNonce x <>
+      "accountInfo" .= genesisInfoAccountInfo x <>
+      "chainId" .= genesisInfoChainId x
+    )
+
+instance ToSchema GenesisInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "GenesisInfo"
+    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"

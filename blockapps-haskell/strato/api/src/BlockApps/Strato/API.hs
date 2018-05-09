@@ -8,6 +8,7 @@ where
 
 import           BlockApps.Strato.Types
 import           Data.LargeWord         (Word256)
+import           Data.Text              (Text)
 import           Numeric.Natural
 import           Servant.API
 
@@ -102,6 +103,9 @@ type API =
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
+  :<|> "chain"
+    :> ReqBody '[JSON] GenesisInfo
+    :> Post '[PlainText] Text
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse
