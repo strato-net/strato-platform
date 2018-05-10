@@ -72,7 +72,7 @@ class Nodes extends Component {
 export function mapStateToProps(state) {
   let nodes = [];
   if (state.createConsortium.consortium[0]) {
-    state.createConsortium.consortium[0].entities.map(entity => {
+    state.createConsortium.consortium[0].entities.forEach(entity => {
       nodes.push(...entity.nodes);
     });
   }

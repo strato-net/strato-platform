@@ -147,7 +147,6 @@ class Entities extends Component {
 
     return (
       <div>
-        <h4 className="col-md-2 heading">Entities</h4>
         <div className="text-right">
           <InviteEntity />
         </div>
@@ -178,10 +177,10 @@ class Entities extends Component {
         {entities.length > 0 ? (
           this.tableData(entities)
         ) : (
-          <div className="col-md-12 no-record">
-            <span>No records found</span>
-          </div>
-        )}
+            <div className="col-md-12 no-record">
+              <span>No records found</span>
+            </div>
+          )}
       </div>
     );
   }

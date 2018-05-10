@@ -1,13 +1,14 @@
-import React, { Component } from 'react';
-import { Button, Tabs2, Tab2 } from '@blueprintjs/core';
-import Nodes from './components/Nodes';
-import Users from './components/Users';
-import Entities from './components/Entities';
+import React, { Component } from "react";
+import { Button, Tabs2, Tab2 } from "@blueprintjs/core";
+import Nodes from "./components/Nodes";
+import Users from "./components/Users";
+import Entities from "./components/Entities";
+import ConsortiumList from "./components/ConsourtimList";
 
 class Consortium extends Component {
   constructor(props) {
     super(props);
-    this.state = { navbarTab: 'entities' };
+    this.state = { navbarTab: "entities" };
     this.handleClick = this.handleClick.bind(this);
   }
 
@@ -17,17 +18,19 @@ class Consortium extends Component {
 
   renderComponent() {
     switch (this.state.navbarTab) {
-      case 'nodes':
-        return <Nodes />
-      case 'users':
-        return <Users />
+      case "consortium":
+        return <ConsortiumList />;
+      case "nodes":
+        return <Nodes />;
+      case "users":
+        return <Users />;
       default:
-        return <Entities />
+        return <Entities />;
     }
   }
 
   handleClick() {
-    this.props.history.push('/consortium/new');
+    this.props.history.push("/consortium/new");
   }
 
   render() {
@@ -38,11 +41,15 @@ class Consortium extends Component {
             <h3>Consortium</h3>
           </div>
           <div className="col-md-8 text-right">
-            <Button text="Create New Consortium" className="smd-margin-16" onClick={this.handleClick} />
+            <Button
+              text="Create New Consortium"
+              className="smd-margin-16"
+              onClick={this.handleClick}
+            />
           </div>
           <br />
         </div>
-        <div className="row" >
+        <div className="row">
           <div className="col-md-12 smd-margin-16">
             <Tabs2
               animate
@@ -50,6 +57,7 @@ class Consortium extends Component {
               onChange={this.handleNavbarTabChange.bind(this)}
               selectedTabId={this.state.navbarTab}
             >
+              <Tab2 id="consortium" title="Consortium" />
               <Tab2 id="entities" title="Entities" />
               <Tab2 id="nodes" title="Nodes" />
               <Tab2 id="users" title="Users" />
@@ -59,7 +67,7 @@ class Consortium extends Component {
           </div>
         </div>
       </div>
-    )
+    );
   }
 }
 

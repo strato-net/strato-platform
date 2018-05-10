@@ -52,7 +52,7 @@ class Users extends Component {
 export function mapStateToProps(state) {
   let users = [];
   if (state.createConsortium.consortium[0]) {
-    state.createConsortium.consortium[0].entities.map(entity => {
+    state.createConsortium.consortium[0].entities.forEach(entity => {
       users.push(...entity.users);
     });
   }
