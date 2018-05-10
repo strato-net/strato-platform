@@ -8,6 +8,7 @@ const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
+const consortiumController = require('../controllers/consortium');
 
 router.post('/dapps', dappController.upload);
 
@@ -19,6 +20,11 @@ router.post('/users', authController.create);
 router.post('/logout', authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', authController.verifyEmail);
 router.post('/verify-temporary-password', authController.verifyTemporaryPassword);
+
+router.get('/entities', consortiumController.fetchEntities);
+router.post('/entities', consortiumController.createEntity);
+router.post('/entities/:id/vote', consortiumController.voteEntity);
+
 
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);

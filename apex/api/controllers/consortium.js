@@ -1,0 +1,76 @@
+const co = require('co');
+const models = require('../models');
+
+module.exports = {
+  fetchEntities: function (req, res) {
+    co(function* () {
+      try {
+        const entities = yield models.Entities.find();
+        res.status(200).json(entities);
+      } catch (error) {
+        let err = new Error('could not fetch entities: ', error);
+        err.status = 500;
+        return next(err);
+      }
+    })
+  },
+  createEntity: function (req, res, next) {
+    co(function* () {
+      if (!req.body.name || !req.body.enodeUrl || !req.body.adminName || !req.body.adminEmail
+        || !req.body.adminEthereumAddress) {
+        let err = new Error("wrong params");
+        err.status = 400;
+        return next(err);
+      }
+
+      let user, newEntity;
+      try {
+        user = yield models.User.findOne({
+          where: { accountAddress: req.body.adminEthereumAddress, username: req.body.adminName }
+        });
+      } catch (error) {
+        let err = new Error('could not create entity: ', error);
+        err.status = 500;
+        return next(err);
+      }
+
+      try {
+        newEntity = yield models.Entity.create({
+          name: req.body.name,
+          enodeUrl: req.body.enodeUrl,
+          status: req.body.status || undefined
+        });
+      } catch (error) {
+        let err;
+        if (error.name === "SequelizeUniqueConstraintError") {
+          err = new Error("Entity already exists");
+          err.status = 409;
+          return next(err);
+        }
+        err = new Error('could not create entity: ', error);
+        err.status = 500;
+        return next(err);
+      }
+
+      try {
+        const entityId = newEntity.id;
+        const admin = {
+          email: req.body.adminEmail,
+          EntityId: entityId,
+          admin: true,
+          UserId: user.id
+        };
+        const newEntityAdmin = yield models.EntityUser.create(admin);
+      } catch (error) {
+        newEntity.destroy();
+        let err = new Error('could not create entity: ', error);
+        err.status = 500;
+        return next(err);
+      }
+      res.status(200).json({ success: true });
+    })
+  },
+  voteEntity: function (req, res) {
+
+  }
+}
