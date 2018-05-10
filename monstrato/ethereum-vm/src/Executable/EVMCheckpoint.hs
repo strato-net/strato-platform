@@ -14,6 +14,7 @@ import           Blockchain.SHA
 
 import           Blockchain.VMContext     (ContextBestBlockInfo (..))
 import qualified Network.Kafka.Protocol   as KP
+import qualified Network.Kafka.Tools      as KP
 
 import           Control.Arrow            ((>>>))
 

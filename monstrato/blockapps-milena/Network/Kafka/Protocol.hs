@@ -186,7 +186,7 @@ newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Sh
 newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable)
 newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable)
 newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Eq, Serializable, Deserializable, IsString)
-newtype Metadata = Metadata { _kMetadata :: KafkaString } deriving (Show, Eq, Serializable, Deserializable, IsString)
+newtype Metadata = Metadata KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
 
 instance Show ConsumerGroup where
     show (ConsumerGroup g) = "ConsumerGroup " ++ show (_kString g)

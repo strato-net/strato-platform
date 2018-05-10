@@ -73,6 +73,8 @@ data KafkaClientError = -- | A response did not contain an offset.
                       | KafkaIOException IOException
                         deriving (Eq, Show)
 
+instance Exception KafkaClientError
+
 -- | An abstract form of Kafka's time. Used for querying offsets.
 data KafkaTime = -- | The latest time on the broker.
                  LatestTime
