@@ -26,7 +26,7 @@ import           System.Directory                          (createDirectoryIfMis
 
 import qualified Database.LevelDB                          as LDB
 import qualified Network.Kafka                             as K
-import qualified Network.KafkaExt                          as K
+import qualified Network.Kafka.MilenaTools                 as K
 import qualified Network.Kafka.Protocol                    as KP
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))

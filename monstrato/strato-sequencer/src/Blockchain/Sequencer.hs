@@ -32,8 +32,7 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 
 import qualified Database.LevelDB                          as LDB
 
-import qualified Network.KafkaExt                          as K
-import qualified Network.Kafka.ConsumerExt                 as KC
+import qualified Network.Kafka.MilenaTools                 as K
 import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()
@@ -164,7 +163,7 @@ writeSeqEvents' events = void $ do
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
-  ret <- K.withKafkaViolently (KC.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
+  ret <- K.withKafkaViolently (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
@@ -177,7 +176,7 @@ setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
     tick ctr_sequencer_kafka_checkpoint_writes
-    op <- K.withKafkaViolently $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
+    op <- K.withKafkaViolently $ K.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err

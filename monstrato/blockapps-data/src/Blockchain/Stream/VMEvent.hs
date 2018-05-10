@@ -28,7 +28,7 @@ import qualified Data.ByteString.Lazy        as BL
 
 
 import           Network.Kafka
-import           Network.KafkaExt
+import           Network.Kafka.MilenaTools
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 

@@ -12,7 +12,7 @@ import           Control.Monad
 import           Control.Monad.Logger
 import qualified Data.Text                  as T
 import qualified Network.Kafka              as K
-import qualified Network.KafkaExt           as K
+import qualified Network.Kafka.MilenaTools  as K
 import qualified Network.Kafka.Protocol     as KP
 
 import           Blockchain.Sequencer.Event

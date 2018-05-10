@@ -10,7 +10,7 @@ import           Control.Monad.Trans.Resource
 
 import           Blockchain.EthConf           (mkConfiguredKafkaState)
 import           Network.Kafka
-import           Network.KafkaExt
+import           Network.Kafka.MilenaTools
 
 data AditState = AditState {
     aditKafkaState  :: KafkaState

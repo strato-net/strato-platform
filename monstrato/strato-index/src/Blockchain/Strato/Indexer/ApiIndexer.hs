@@ -15,8 +15,7 @@ import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
 import qualified Data.Text                          as T
 import           Network.Kafka
-import           Network.KafkaExt
-import           Network.Kafka.ConsumerExt
+import           Network.Kafka.MilenaTools
 import           Network.Kafka.Protocol
 import           System.Clock
 

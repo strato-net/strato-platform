@@ -27,7 +27,7 @@ import           Data.Conduit.Network
 import           Data.Maybe
 import qualified Data.Text                             as T
 
-import           Network.KafkaExt
+import           Network.Kafka.MilenaTools
 
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context

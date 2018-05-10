@@ -14,8 +14,8 @@ import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
 import qualified Network.Kafka                         as K
-import qualified Network.KafkaExt                      as K
-import qualified Network.Kafka.ConsumerExt             as KC
+import qualified Network.Kafka.MilenaTools             as K
+import qualified Network.Kafka.MilenaTools             as KC
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
