@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE FlexibleContexts  #-}
 
-module Network.Kafka.MilenaTools where
+module Blockchain.MilenaTools where
 
 
 import           Control.Applicative

@@ -32,7 +32,7 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 
 import qualified Database.LevelDB                          as LDB
 
-import qualified Network.Kafka.MilenaTools                 as K
+import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()

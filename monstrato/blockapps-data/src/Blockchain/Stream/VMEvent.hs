@@ -28,7 +28,6 @@ import qualified Data.ByteString.Lazy        as BL
 
 
 import           Network.Kafka
-import           Network.Kafka.MilenaTools
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 
@@ -41,7 +40,9 @@ import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.Format
 import           Blockchain.KafkaTopics
+import           Blockchain.MilenaTools
 import           Blockchain.Stream.Raw
+
 
 import           Control.Monad.State
 

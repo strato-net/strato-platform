@@ -8,7 +8,7 @@ import           Control.Monad
 import           Control.Monad.Logger
 import qualified Data.Text                          as T
 import           Network.Kafka
-import           Network.Kafka.MilenaTools
+import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB

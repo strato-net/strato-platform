@@ -14,8 +14,7 @@ import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
 import qualified Network.Kafka                         as K
-import qualified Network.Kafka.MilenaTools             as K
-import qualified Network.Kafka.MilenaTools             as KC
+import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
@@ -145,7 +144,7 @@ getCheckpoint = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (KC.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, md) -> do
@@ -159,7 +158,7 @@ getCheckpointNoMetadata = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (KC.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, _) -> do
@@ -170,14 +169,14 @@ setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    ret  <- K.withKafkaViolently $ KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
     either (error . show) return ret
 
 setCheckpointNoMetadata :: KP.Offset -> ContextM ()
 setCheckpointNoMetadata ofs = do
     $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
     let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-    ret  <- K.withKafkaViolently $ KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs emptyMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]

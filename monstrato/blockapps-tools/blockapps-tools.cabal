@@ -9,7 +9,7 @@ synopsis: A Haskell version of an Ethereum client
 category:      Data Structures
 license: Apache-2.0
 description:
-	      Tool to query the ethereum databases
+              Tool to query the ethereum databases
 
 executable queryStrato
     default-language: Haskell2010
