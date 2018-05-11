@@ -38,7 +38,6 @@ fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> 
 fetchBytes' :: Kafka k => TopicName -> Offset -> k [(Offset, B.ByteString)]
 fetchBytes' topic offset = do
   fetched <- fetch offset 0 topic
-  liftIO $ print fetched
   
   let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. fetchResponseFields)
   --If the Kafka fetch fails, this is a critical error, we have no choice but to halt the program.
