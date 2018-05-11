@@ -178,6 +178,7 @@ services:
     environment:
     - authBasic=${authBasic}
     - blockTime=${blockTime}
+    - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}
     - uiPassword=${uiPassword}

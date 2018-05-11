@@ -1,0 +1,25 @@
+-- configruation for AAD
+local opts = {
+  redirect_uri_path          = "/auth/openidc/return",
+  discovery                  = "https://login.microsoftonline.com/2ec6965f-17c7-47c0-80c8-98e1a0c7b66a/v2.0/.well-known/openid-configuration",
+  client_id                  = <CLIENT_ID_PLACEHOLDER>, -- "bec8ad68-9e10-4c31-ab08-eac305f160c2"
+  client_secret              = <CLIENT_SECRET_PLACEHOLDER>, -- "WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo="
+  scope                      = "openid",
+  token_endpoint_auth_method = "client_secret_post",
+  ssl_verify                 = <IS_SSL_PLACEHOLDER_YES_NO>, -- "no"
+  redirect_uri_scheme        = <REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>,-- "http"
+  session_contents           = {id_token=true},
+  logout_path                = "/auth/openidc/logout",
+  redirect_after_logout_uri  = "https://login.microsoftonline.com/common/oauth2/logout", -- ?post_logout_redirect_uri=http://localhost/"
+  redirect_after_logout_with_id_token_hint = true,
+}
+
+-- call opendic for microsoft azure
+local res, err = require("resty.openidc").authenticate(opts)
+
+-- error handling needs to be polished
+if err then
+  ngx.status = 500
+  ngx.say(err)
+  ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
