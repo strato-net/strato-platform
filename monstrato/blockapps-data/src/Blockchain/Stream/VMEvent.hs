@@ -40,7 +40,9 @@ import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.Format
 import           Blockchain.KafkaTopics
+import           Blockchain.MilenaTools
 import           Blockchain.Stream.Raw
+
 
 import           Control.Monad.State
 

@@ -13,6 +13,7 @@ library
                      , Blockchain.Error
                      , Blockchain.ExtWord
                      , Blockchain.Format
+                     , Blockchain.MilenaTools
                      , Blockchain.MiscJSON
                      , Blockchain.Output
                      , Blockchain.SHA
@@ -21,15 +22,24 @@ library
                      , aeson
                      , base16-bytestring
                      , binary
+                     , blockapps-milena
                      , bytestring
+                     , containers
                      , cryptohash
                      , ethereum-rlp
                      , fast-logger
                      , global-lock
                      , hflags
+                     , lens
+                     , lifted-base
+                     , monad-control
                      , monad-logger
+                     , mtl
+                     , network
                      , nibblestring
                      , path-pieces
+                     , resource-pool
+                     , transformers
                      , http-api-data
                      , text
                      , unix

@@ -58,7 +58,7 @@ import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-import           Network.Kafka.Consumer               (commitSingleOffset)
+import           Blockchain.MilenaTools               (commitSingleOffset)
 
 initializeBlankStateDB :: HasStateDB m => m ()
 initializeBlankStateDB = do

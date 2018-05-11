@@ -38,7 +38,7 @@ import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
-import           Network.Kafka                           (withKafkaViolently)
+import           Blockchain.MilenaTools                  (withKafkaViolently)
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 
@@ -639,7 +639,7 @@ calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractNa
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newStateRoot
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
     when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
     when flags_diffPublish $
