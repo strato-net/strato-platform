@@ -1,15 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts  #-}
-
 module Network.Kafka.Consumer where
 
-import           Control.Applicative
-import           Control.Lens
-import           System.IO
-import           Prelude
+import Control.Applicative
+import Control.Lens
+import System.IO
+import Prelude
 
-import           Network.Kafka
-import           Network.Kafka.Protocol
+import Network.Kafka
+import Network.Kafka.Protocol
 
 -- * Fetching
 

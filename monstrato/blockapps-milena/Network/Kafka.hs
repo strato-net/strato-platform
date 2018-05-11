@@ -1,58 +1,54 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Network.Kafka where
 
-import           Control.Applicative
-import           Control.Exception           (Exception, IOException)
-import           Control.Exception.Lifted    (catch)
-import           Control.Lens
-import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), runExceptT, MonadError (..))
-import           Control.Monad.Trans.State
-import           Control.Monad.State.Class   (MonadState)
-import           Data.ByteString.Char8       (ByteString)
-import           Data.List.NonEmpty          (NonEmpty (..))
-import qualified Data.List.NonEmpty          as NE
-import           Data.Monoid                 ((<>))
-import qualified Data.Pool                   as Pool
-import           System.IO
-import qualified Data.Map                    as M
-import           Data.Set                    (Set)
-import qualified Data.Set                    as Set
+import Control.Applicative
+import Control.Exception (Exception, IOException)
+import Control.Exception.Lifted (catch)
+import Control.Lens
+import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Except (ExceptT(..), runExceptT, MonadError(..))
+import Control.Monad.Trans.State
+import Control.Monad.State.Class (MonadState)
+import Data.ByteString.Char8 (ByteString)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
+import Data.Monoid ((<>))
+import qualified Data.Pool as Pool
+import GHC.Generics (Generic)
+import System.IO
+import qualified Data.Map as M
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Network
-import           Prelude
+import Prelude
 
-import           Network.Kafka.Protocol
+import Network.Kafka.Protocol
 
 type KafkaAddress = (Host, Port)
 
 data KafkaState = KafkaState { -- | Name to use as a client ID.
-                               _stateName           :: KafkaString
+                               _stateName :: KafkaString
                                -- | How many acknowledgements are required for producing.
-                             , _stateRequiredAcks   :: RequiredAcks
+                             , _stateRequiredAcks :: RequiredAcks
                                -- | Time in milliseconds to wait for messages to be produced by broker.
                              , _stateRequestTimeout :: Timeout
                                -- | Minimum size of response bytes to block for.
-                             , _stateWaitSize       :: MinBytes
+                             , _stateWaitSize :: MinBytes
                                -- | Maximum size of response bytes to retrieve.
-                             , _stateBufferSize     :: MaxBytes
+                             , _stateBufferSize :: MaxBytes
                                -- | Maximum time in milliseconds to wait for response.
-                             , _stateWaitTime       :: MaxWaitTime
+                             , _stateWaitTime :: MaxWaitTime
                                -- | An incrementing counter of requests.
-                             , _stateCorrelationId  :: CorrelationId
+                             , _stateCorrelationId :: CorrelationId
                                -- | Broker cache
-                             , _stateBrokers        :: M.Map Leader Broker
+                             , _stateBrokers :: M.Map Leader Broker
                                -- | Connection cache
-                             , _stateConnections    :: M.Map KafkaAddress (Pool.Pool Handle)
+                             , _stateConnections :: M.Map KafkaAddress (Pool.Pool Handle)
                                -- | Topic metadata cache
-                             , _stateTopicMetadata  :: M.Map TopicName TopicMetadata
+                             , _stateTopicMetadata :: M.Map TopicName TopicMetadata
                                -- | Address cache
-                             , _stateAddresses      :: NonEmpty KafkaAddress
-                             } deriving (Show)
+                             , _stateAddresses :: NonEmpty KafkaAddress
+                             } deriving (Generic, Show)
 
 makeLenses ''KafkaState
 
@@ -71,7 +67,7 @@ data KafkaClientError = -- | A response did not contain an offset.
                       | KafkaFailedToFetchMetadata
                       | KafkaFailedToFetchGroupCoordinator KafkaError
                       | KafkaIOException IOException
-                        deriving (Eq, Show)
+                        deriving (Eq, Generic, Show)
 
 instance Exception KafkaClientError
 
@@ -82,25 +78,26 @@ data KafkaTime = -- | The latest time on the broker.
                | EarliestTime
                  -- | A specific time.
                | OtherTime Time
+               deriving (Eq, Generic)
 
-data PartitionAndLeader = PartitionAndLeader { _palTopic     :: TopicName
+data PartitionAndLeader = PartitionAndLeader { _palTopic :: TopicName
                                              , _palPartition :: Partition
-                                             , _palLeader    :: Leader
+                                             , _palLeader :: Leader
                                              }
-                                             deriving (Show, Eq, Ord)
+                                             deriving (Show, Generic, Eq, Ord)
 
 makeLenses ''PartitionAndLeader
 
-data TopicAndPartition = TopicAndPartition { _tapTopic     :: TopicName
+data TopicAndPartition = TopicAndPartition { _tapTopic :: TopicName
                                            , _tapPartition :: Partition
                                            }
-                         deriving (Eq, Ord, Show)
+                         deriving (Eq, Generic, Ord, Show)
 
 -- | A topic with a serializable message.
-data TopicAndMessage = TopicAndMessage { _tamTopic   :: TopicName
+data TopicAndMessage = TopicAndMessage { _tamTopic :: TopicName
                                        , _tamMessage :: Message
                                        }
-                       deriving (Eq, Show)
+                       deriving (Eq, Generic, Show)
 
 makeLenses ''TopicAndMessage
 
@@ -168,7 +165,7 @@ makeRequest h reqresp = do
   (clientId, correlationId) <- makeIds
   eitherResp <- tryKafka $ doRequest clientId correlationId h reqresp
   case eitherResp of
-    Left s  -> throwError $ KafkaDeserializationError s
+    Left s -> throwError $ KafkaDeserializationError s
     Right r -> return r
   where
     makeIds :: MonadState KafkaState m => m (ClientId, CorrelationId)
@@ -213,13 +210,13 @@ findMetadataOrElse ts s err = do
       updateMetadatas ts
       maybeFound' <- use s
       case maybeFound' of
-        Just x  -> return x
+        Just x -> return x
         Nothing -> throwError err
 
 -- | Convert an abstract time to a serializable protocol value.
 protocolTime :: KafkaTime -> Time
-protocolTime LatestTime    = Time (-1)
-protocolTime EarliestTime  = Time (-2)
+protocolTime LatestTime = Time (-1)
+protocolTime EarliestTime = Time (-2)
 protocolTime (OtherTime o) = o
 
 updateMetadatas :: Kafka m => [TopicName] -> m ()
@@ -305,7 +302,7 @@ withAnyHandle f = do
 -- | Fields to construct an offset request, per topic and partition.
 data PartitionOffsetRequestInfo =
     PartitionOffsetRequestInfo { -- | Time to find an offset for.
-                                 _kafkaTime     :: KafkaTime
+                                 _kafkaTime :: KafkaTime
                                  -- | Number of offsets to retrieve.
                                , _maxNumOffsets :: MaxNumberOfOffsets
                                }
