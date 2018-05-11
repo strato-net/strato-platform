@@ -113,7 +113,6 @@ class Entities extends Component {
                   <Card className="entity-content">
                     <ul>
                       <li>Email Id: {entity.adminEmail}</li>
-                      <li>Invited By:</li>
                     </ul>
                   </Card>
                 </div>
@@ -158,6 +157,10 @@ class Entities extends Component {
           </div>
           <div className="col-md-8 text-right">
             <InviteEntity />
+            <Button
+              className="pt-intent-danger pt-icon-remove"
+              text="Request Removal"
+            /> 
           </div>
         </div>
         <div className="row">

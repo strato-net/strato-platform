@@ -11,6 +11,9 @@ import {
   inviteEntitySuccess,
   inviteEntityFailure,
 } from './createConsortium.actions';
+import { env } from '../../../../env';
+
+const inviteEntityUrl = env.APEX_URL + "/entities";
 
 function todo() {
   new Promise(function (resolve, reject) {
@@ -32,14 +35,36 @@ function* makeNewConsortiumRequest(action) {
   }
 }
 
-function* inviteEntityAPICall(consortium) {
-  return yield call(todo);
+function* inviteEntityAPICall(entity) {
+  return fetch(
+    inviteEntityUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        adminEmail: entity.adminEmail,
+        adminEthereumAddress: entity.adminEthereumAddress,
+        adminName: entity.adminName,
+        enodeUrl: entity.eNodeUrl,
+        name: entity.name,
+        tokenAmount: entity.tokenAmount
+      })
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    })
 }
 
 function* makeInviteEntityRequest(action) {
   try {
-    yield inviteEntityAPICall(action.entity);
-    yield put(inviteEntitySuccess(action.entity));
+    let response = yield inviteEntityAPICall(action.entity);
+    yield put(inviteEntitySuccess(response));
   }
   catch (error) {
     yield put(inviteEntityFailure(error.message));
