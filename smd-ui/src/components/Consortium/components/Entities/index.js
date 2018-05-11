@@ -4,6 +4,7 @@ import { connect } from "react-redux";
 import InviteEntity from "./InviteEntity";
 import VoteConfirmation from "./VoteConfirmation";
 import "./entities.css";
+import { fetchEntities } from "./entities.actions";
 
 class Entities extends Component {
   constructor() {
@@ -23,6 +24,10 @@ class Entities extends Component {
 
   setFilter(filter) {
     this.setState({ showAll: !filter });
+  }
+
+  componentDidMount() {
+    this.props.fetchEntities();
   }
 
   tableData(entities) {
@@ -61,7 +66,7 @@ class Entities extends Component {
                   <td>{entity.users ? entity.users.length : 0}</td>
                   <td>
                     {entity.status}
-                    {entity.status === "Invited" && (
+                    {entity.status === "Pending" && (
                       <span>
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-up"
@@ -139,48 +144,56 @@ class Entities extends Component {
   }
 
   render() {
-    const noOfEntities = this.props.entities.length;
+    const noOfEntities = this.props.entities && this.props.entities.length;
     const { showAll } = this.state;
     const entities = this.state.showAll
       ? this.props.entities
-      : this.props.entities.filter(entity => entity.status === "Invited");
+      : this.props.entities.filter(entity => entity.status === "Pending");
 
     return (
-      <div>
-        <div className="text-right">
-          <InviteEntity />
+      <div className="container-fluid pt-dark consortium">
+        <div className="row">
+          <div className="col-md-4 text-left">
+            <h3>Entities</h3>
+          </div>
+          <div className="col-md-8 text-right">
+            <InviteEntity />
+          </div>
         </div>
-
-        {noOfEntities > 0 && (
-          <ButtonGroup
-            minimal={true}
-            className="filter-btn"
-            style={{ width: "100%" }}
-          >
-            <div>
-              <Button
-                className={showAll ? "pt-active" : ""}
-                onClick={() => this.setFilter(false)}
+        <div className="row">
+          <div className="col-md-12">
+            {noOfEntities > 0 && (
+              <ButtonGroup
+                minimal={true}
+                className="filter-btn"
+                style={{ width: "100%" }}
               >
-                All
-              </Button>
-              <Button
-                className={showAll ? "" : "pt-active"}
-                onClick={() => this.setFilter(true)}
-              >
-                Pending
-              </Button>
-            </div>
-          </ButtonGroup>
-        )}
+                <div>
+                  <Button
+                    className={showAll ? "pt-active" : ""}
+                    onClick={() => this.setFilter(false)}
+                  >
+                    All
+                </Button>
+                  <Button
+                    className={showAll ? "" : "pt-active"}
+                    onClick={() => this.setFilter(true)}
+                  >
+                    Pending
+                </Button>
+                </div>
+              </ButtonGroup>
+            )}
 
-        {entities.length > 0 ? (
-          this.tableData(entities)
-        ) : (
-            <div className="col-md-12 no-record">
-              <span>No records found</span>
-            </div>
-          )}
+            {entities && entities.length > 0 ? (
+              this.tableData(entities)
+            ) : (
+                <div className="col-md-12 no-record">
+                  <span>No records found</span>
+                </div>
+              )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -188,11 +201,9 @@ class Entities extends Component {
 
 export function mapStateToProps(state) {
   return {
-    entities: state.createConsortium.consortium[0]
-      ? state.createConsortium.consortium[0].entities
-      : []
+    entities: state.entities.entities
   };
 }
-const connected = connect(mapStateToProps)(Entities);
+const connected = connect(mapStateToProps, { fetchEntities })(Entities);
 
 export default connected;

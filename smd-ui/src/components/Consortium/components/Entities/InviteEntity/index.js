@@ -1,17 +1,23 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { Dialog, Button } from '@blueprintjs/core';
-import { openInviteEntityModal, closeInviteEntityModal } from '../entities.actions';
-import InviteForm from './InviteForm';
+import React, { Component } from "react";
+import { connect } from "react-redux";
+import { Dialog, Button } from "@blueprintjs/core";
+import {
+  openInviteEntityModal,
+  closeInviteEntityModal
+} from "../entities.actions";
+import InviteForm from "./InviteForm";
 
 class InviteEntity extends Component {
   render() {
     return (
       <div>
-        {this.props.consortiumExists && <Button onClick={() => {
-          this.props.openInviteEntityModal()
-        }} className="pt-intent-primary pt-icon-add"
-          text="Invite Entity" />}
+        <Button
+          onClick={() => {
+            this.props.openInviteEntityModal();
+          }}
+          className="pt-intent-primary pt-icon-add smd-margin-16"
+          text="Invite Entity"
+        />
 
         <Dialog
           isOpen={this.props.isOpen}
@@ -24,15 +30,14 @@ class InviteEntity extends Component {
           <InviteForm />
         </Dialog>
       </div>
-    )
+    );
   }
 }
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.entites.isOpen,
-    consortiumExists: (state.createConsortium.consortium.length > 0),
-  }
+    isOpen: state.entities.isOpen
+  };
 }
 
 export default connect(mapStateToProps, {

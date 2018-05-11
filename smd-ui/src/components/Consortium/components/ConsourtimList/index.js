@@ -1,25 +1,28 @@
 import React, { Component } from "react";
+import { withRouter } from "react-router-dom";
 import { connect } from "react-redux";
+import { fetchEntities } from "../Entities/entities.actions";
 
 class ConsourtimList extends Component {
   list() {
-    if (this.props.consourtimList.length) {
-      return this.props.nodes.map((consourtim, key) => {
+    return (
+      this.props.consourtimList.length &&
+      this.props.consourtimList.map((consourtim, key) => {
         return (
-          <tr key={key}>
+          <tr
+            key={key}
+            onClick={() => {
+              this.props.history.push(`/consortium/${consourtim.networkId}`);
+              this.props.fetchEntities();
+            }}
+          >
             <td>{consourtim.networkId}</td>
             <td>{consourtim.name}</td>
             <td>{consourtim.description}</td>
           </tr>
         );
-      });
-    } else {
-      return (
-        <tr>
-          <td colSpan={3}>No records found</td>
-        </tr>
-      );
-    }
+      })
+    );
   }
 
   render() {
@@ -42,7 +45,13 @@ class ConsourtimList extends Component {
           </tr>
         </thead>
 
-        <tbody>{this.list()}</tbody>
+        <tbody>
+          {this.list() || (
+            <tr>
+              <td colSpan={3}>No records found</td>
+            </tr>
+          )}
+        </tbody>
       </table>
     );
   }
@@ -50,9 +59,11 @@ class ConsourtimList extends Component {
 
 export function mapStateToProps(state) {
   return {
-    consourtimList: []
+    consourtimList: [
+      { networkId: 599, name: 'Google Inc', description: 'Here is the why we are using google' }
+    ]
   };
 }
-const connected = connect(mapStateToProps)(ConsourtimList);
 
-export default connected;
+const connected = connect(mapStateToProps, { fetchEntities })(ConsourtimList);
+export default withRouter(connected);

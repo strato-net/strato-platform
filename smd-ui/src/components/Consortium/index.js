@@ -8,8 +8,7 @@ import ConsortiumList from "./components/ConsourtimList";
 class Consortium extends Component {
   constructor(props) {
     super(props);
-    this.state = { navbarTab: "entities" };
-    this.handleClick = this.handleClick.bind(this);
+    this.state = { navbarTab: "consortium" };
   }
 
   handleNavbarTabChange(navbarTab) {
@@ -29,29 +28,25 @@ class Consortium extends Component {
     }
   }
 
-  handleClick() {
-    this.props.history.push("/consortium/new");
-  }
-
   render() {
     return (
       <div className="container-fluid pt-dark consortium">
         <div className="row">
           <div className="col-md-4 text-left">
-            <h3>Consortium</h3>
+            <h3>Consortiums</h3>
           </div>
           <div className="col-md-8 text-right">
             <Button
               text="Create New Consortium"
-              className="smd-margin-16"
-              onClick={this.handleClick}
+              className="smd-margin-16 pt-intent-primary pt-icon-add"
+              onClick={() => this.props.history.push("/consortium/create")}
             />
           </div>
           <br />
         </div>
         <div className="row">
-          <div className="col-md-12 smd-margin-16">
-            <Tabs2
+          <div className="col-md-12">
+            {/* <Tabs2
               animate
               className="login-tabs"
               onChange={this.handleNavbarTabChange.bind(this)}
@@ -61,9 +56,10 @@ class Consortium extends Component {
               <Tab2 id="entities" title="Entities" />
               <Tab2 id="nodes" title="Nodes" />
               <Tab2 id="users" title="Users" />
-            </Tabs2>
+            </Tabs2> */}
 
-            {this.renderComponent()}
+            {/* {this.renderComponent()} */}
+            <ConsortiumList />
           </div>
         </div>
       </div>

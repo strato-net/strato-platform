@@ -64,6 +64,7 @@ import watchAppUpload from './components/LaunchPad/launchPad.saga';
 import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchConsoritumActions from './components/Consortium/components/CreateConsortium/createConsortium.saga';
+import watchEntitiesActions from './components/Consortium/components/Entities/entites.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -103,7 +104,7 @@ const rootReducer = combineReducers({
   tokenRequest: tokenRequestReducer,
   verifyAccount: verifyAccountReducer,
   createBlocUser: createBlocUserReducer,
-  entites: entitesReducer,
+  entities: entitesReducer,
   createConsortium: createConsortiumReducer
 });
 
@@ -132,7 +133,8 @@ const rootSaga = function* startForeman() {
     fork(watchFetchUser),
     fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
-    fork(watchConsoritumActions)
+    fork(watchConsoritumActions),
+    fork(watchEntitiesActions)
   ])
 };
 

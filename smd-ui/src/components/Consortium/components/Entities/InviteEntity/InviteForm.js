@@ -63,7 +63,7 @@ class InviteForm extends Component {
                     type="text"
                     required
                   />
-                  <div className="error-text">{this.errorMessageFor('entityName')}</div>
+                  <div className="error-text">{this.errorMessageFor('name')}</div>
                 </div>
               </div>
 
@@ -81,7 +81,7 @@ class InviteForm extends Component {
                     required
                   />
                 </div>
-                <div className="error-text">{this.errorMessageFor('nodeUrl')}</div>
+                <div className="error-text">{this.errorMessageFor('eNodeUrl')}</div>
               </div>
 
               <div className="pt-form-group pt-intent-danger">
