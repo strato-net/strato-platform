@@ -35,7 +35,7 @@ function* makeNewConsortiumRequest(action) {
   }
 }
 
-function* inviteEntityAPICall(entity) {
+function inviteEntityAPICall(entity) {
   return fetch(
     inviteEntityUrl,
     {
