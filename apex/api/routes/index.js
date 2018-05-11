@@ -22,6 +22,7 @@ router.post('/verify-email', authController.verifyEmail);
 router.post('/verify-temporary-password', authController.verifyTemporaryPassword);
 
 router.get('/entities', consortiumController.fetchEntities);
+router.get('/entities/:id', consortiumController.fetchEntity);
 router.post('/entities', consortiumController.createEntity);
 router.post('/entities/:id/vote', consortiumController.voteEntity);
 

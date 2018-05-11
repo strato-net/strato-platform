@@ -1,14 +1,51 @@
 const co = require('co');
+const sequelize = require('sequelize');
 const models = require('../models');
 
 module.exports = {
-  fetchEntities: function (req, res) {
+  fetchEntities: function (req, res, next) {
     co(function* () {
       try {
-        const entities = yield models.Entities.find();
+        const entities = yield models.Entity.findAll({
+          attributes: ['id', 'name', 'status', [sequelize.fn('COUNT', sequelize.col('Users')), 'usersCount']],
+          include: [{
+            model: models.EntityUser,
+            as: 'Users',
+            attributes: []
+          }],
+          group: ['Entity.id']
+        });
         res.status(200).json(entities);
       } catch (error) {
         let err = new Error('could not fetch entities: ', error);
+        err.status = 500;
+        return next(err);
+      }
+    })
+  },
+  fetchEntity: function (req, res, next) {
+    co(function* () {
+      try {
+        const entity = yield models.Entity.find({
+          attributes: ['name'],
+          where: { id: req.params.id },
+          include: [{
+            model: models.EntityUser,
+            as: 'Users',
+            include: [{
+              model: models.User
+            }]
+          }]
+        });
+        if (!entity) {
+          let err = new Error('Not found.');
+          err.status = 404;
+          return next(err);
+        }
+        res.status(200).json(entity);
+      } catch (error) {
+        console.log(error)
+        let err = new Error('could not fetch entity: ', error);
         err.status = 500;
         return next(err);
       }
@@ -70,7 +107,7 @@ module.exports = {
       res.status(200).json({ success: true });
     })
   },
-  voteEntity: function (req, res) {
+  voteEntity: function (req, res, next) {
 
   }
 }
