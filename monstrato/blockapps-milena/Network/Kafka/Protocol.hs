@@ -1,36 +1,35 @@
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE Rank2Types                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
-
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
 
-import           Control.Applicative
-import           Control.Category       (Category (..))
-import           Control.Lens
-import           Control.Monad          (liftM, liftM2, liftM3, liftM4, liftM5, replicateM, unless)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.ByteString.Char8  (ByteString)
-import qualified Data.ByteString.Char8  as B
-import           Data.ByteString.Lens   (unpackedChars)
-import           Data.Digest.CRC32
-import           Data.Int
-import           Data.Serialize.Get
-import           Data.Serialize.Put
-import           GHC.Exts               (IsString (..))
+import Control.Applicative
+import Control.Category (Category(..))
+import Control.Exception (Exception)
+import Control.Lens
+import Control.Monad (replicateM, liftM2, liftM3, liftM4, liftM5, unless)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Bits ((.&.))
+import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Lens (unpackedChars)
+import Data.Digest.CRC32
+import Data.Int
+import Data.Serialize.Get
+import Data.Serialize.Put
+import GHC.Exts (IsString(..))
+import GHC.Generics (Generic)
+import System.IO
+import Numeric.Lens
+import Prelude hiding ((.), id)
+import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as LB (fromStrict, toStrict)
+import qualified Codec.Compression.GZip as GZip (compress, decompress)
 import qualified Network
-import           Numeric.Lens
-import           Prelude                hiding (id, (.))
-import           System.IO
 
 data ReqResp a where
-  MetadataRR       :: MonadIO m => MetadataRequest         -> ReqResp (m MetadataResponse)
-  ProduceRR        :: MonadIO m => ProduceRequest          -> ReqResp (m ProduceResponse)
-  FetchRR          :: MonadIO m => FetchRequest            -> ReqResp (m FetchResponse)
-  OffsetRR         :: MonadIO m => OffsetRequest           -> ReqResp (m OffsetResponse)
+  MetadataRR :: MonadIO m => MetadataRequest -> ReqResp (m MetadataResponse)
+  ProduceRR  :: MonadIO m => ProduceRequest  -> ReqResp (m ProduceResponse)
+  FetchRR    :: MonadIO m => FetchRequest    -> ReqResp (m FetchResponse)
+  OffsetRR   :: MonadIO m => OffsetRequest   -> ReqResp (m OffsetResponse)
   CGOffsetFetchRR  :: MonadIO m => OffsetFetchRequest      -> ReqResp (m OffsetFetchResponse)
   CGOffsetCommitRR :: MonadIO m => OffsetCommitRequest     -> ReqResp (m OffsetCommitResponse)
   CGCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
@@ -41,7 +40,7 @@ doRequest' correlationId h r = do
     B.hPut h $ requestBytes r
     hFlush h
     B.hGet h 4
-  case runGet (liftM fromIntegral getWord32be) rawLength of
+  case runGet (fmap fromIntegral getWord32be) rawLength of
     Left s -> return $ Left s
     Right dataLength -> do
       responseBytes <- liftIO $ B.hGet h dataLength
@@ -51,14 +50,13 @@ doRequest' correlationId h r = do
         isolate (dataLength - 4) deserialize
 
 doRequest :: MonadIO m => ClientId -> CorrelationId -> Handle -> ReqResp (m a) -> m (Either String a)
-doRequest clientId correlationId h (MetadataRR req)       = doRequest' correlationId h $ Request (correlationId, clientId, MetadataRequest req)
-doRequest clientId correlationId h (ProduceRR req)        = doRequest' correlationId h $ Request (correlationId, clientId, ProduceRequest req)
-doRequest clientId correlationId h (FetchRR req)          = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
-doRequest clientId correlationId h (OffsetRR req)         = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
+doRequest clientId correlationId h (MetadataRR req) = doRequest' correlationId h $ Request (correlationId, clientId, MetadataRequest req)
+doRequest clientId correlationId h (ProduceRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, ProduceRequest req)
+doRequest clientId correlationId h (FetchRR req)    = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
+doRequest clientId correlationId h (OffsetRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
 doRequest clientId correlationId h (CGOffsetFetchRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
 doRequest clientId correlationId h (CGOffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (CGCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
-
 
 class Serializable a where
   serialize :: a -> Put
@@ -66,12 +64,12 @@ class Serializable a where
 class Deserializable a where
   deserialize :: Get a
 
-newtype GroupCoordinatorResponse = GroupCoordinatorResp (KafkaError, Broker) deriving (Show, Eq, Deserializable)
+newtype GroupCoordinatorResponse = GroupCoordinatorResp (KafkaError, Broker) deriving (Show, Generic, Eq, Deserializable)
 
-newtype ApiKey = ApiKey Int16 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum) -- numeric ID for API (i.e. metadata req, produce req, etc.)
-newtype ApiVersion = ApiVersion Int16 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
-newtype CorrelationId = CorrelationId Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
-newtype ClientId = ClientId KafkaString deriving (Show, Eq, Deserializable, Serializable, IsString)
+newtype ApiKey = ApiKey Int16 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Generic, Enum) -- numeric ID for API (i.e. metadata req, produce req, etc.)
+newtype ApiVersion = ApiVersion Int16 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Generic, Enum)
+newtype CorrelationId = CorrelationId Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Generic, Enum)
+newtype ClientId = ClientId KafkaString deriving (Show, Eq, Deserializable, Serializable, Generic, IsString)
 
 data RequestMessage = MetadataRequest MetadataRequest
                     | ProduceRequest ProduceRequest
@@ -80,91 +78,93 @@ data RequestMessage = MetadataRequest MetadataRequest
                     | OffsetCommitRequest OffsetCommitRequest
                     | OffsetFetchRequest OffsetFetchRequest
                     | GroupCoordinatorRequest GroupCoordinatorRequest
-                    deriving (Show, Eq)
+                    deriving (Show, Generic, Eq)
 
-newtype MetadataRequest = MetadataReq [TopicName] deriving (Show, Eq, Serializable, Deserializable)
-newtype TopicName = TName { _tName :: KafkaString } deriving (Eq, Ord, Deserializable, Serializable, IsString)
+newtype MetadataRequest = MetadataReq [TopicName] deriving (Show, Eq, Serializable, Generic, Deserializable)
+newtype TopicName = TName { _tName :: KafkaString } deriving (Eq, Ord, Deserializable, Serializable, Generic, IsString)
 
 instance Show TopicName where
-    show (TName t) = "TopicName " ++ show (_kString t)
+  show (TName t) = "TopicName " ++ show (_kString t)
 
-newtype KafkaBytes = KBytes { _kafkaByteString :: ByteString } deriving (Show, Eq, IsString)
-newtype KafkaString = KString { _kString :: ByteString } deriving (Show, Eq, Ord, IsString)
+newtype KafkaBytes = KBytes { _kafkaByteString :: ByteString } deriving (Show, Eq, Generic, IsString)
+newtype KafkaString = KString { _kString :: ByteString } deriving (Show, Eq, Ord, Generic, IsString)
 
 newtype ProduceResponse =
   ProduceResp { _produceResponseFields :: [(TopicName, [(Partition, KafkaError, Offset)])] }
-  deriving (Show, Eq, Deserializable, Serializable)
+  deriving (Show, Eq, Deserializable, Serializable, Generic)
 
 newtype OffsetResponse =
   OffsetResp { _offsetResponseFields :: [(TopicName, [PartitionOffsets])] }
-  deriving (Show, Eq, Deserializable)
+  deriving (Show, Eq, Deserializable, Generic)
 
 newtype PartitionOffsets =
   PartitionOffsets { _partitionOffsetsFields :: (Partition, KafkaError, [Offset]) }
-  deriving (Show, Eq, Deserializable)
+  deriving (Show, Eq, Deserializable, Generic)
 
 newtype FetchResponse =
   FetchResp { _fetchResponseFields :: [(TopicName, [(Partition, KafkaError, Offset, MessageSet)])] }
-  deriving (Show, Eq, Serializable, Deserializable)
+  deriving (Show, Eq, Serializable, Deserializable, Generic)
 
-newtype MetadataResponse = MetadataResp { _metadataResponseFields :: ([Broker], [TopicMetadata]) } deriving (Show, Eq, Deserializable)
-newtype Broker = Broker { _brokerFields :: (NodeId, Host, Port) } deriving (Show, Eq, Ord, Deserializable)
-newtype NodeId = NodeId { _nodeId :: Int32 } deriving (Show, Eq, Deserializable, Num, Integral, Ord, Real, Enum)
-newtype Host = Host { _hostKString :: KafkaString } deriving (Show, Eq, Ord, Deserializable, IsString)
-newtype Port = Port { _portInt :: Int32 } deriving (Show, Eq, Deserializable, Num, Integral, Ord, Real, Enum)
-newtype TopicMetadata = TopicMetadata { _topicMetadataFields :: (KafkaError, TopicName, [PartitionMetadata]) } deriving (Show, Eq, Deserializable)
-newtype PartitionMetadata = PartitionMetadata { _partitionMetadataFields :: (KafkaError, Partition, Leader, Replicas, Isr) } deriving (Show, Eq, Deserializable)
-newtype Leader = Leader { _leaderId :: Maybe Int32 } deriving (Show, Eq, Ord)
+newtype MetadataResponse = MetadataResp { _metadataResponseFields :: ([Broker], [TopicMetadata]) } deriving (Show, Eq, Deserializable, Generic)
+newtype Broker = Broker { _brokerFields :: (NodeId, Host, Port) } deriving (Show, Eq, Ord, Deserializable, Generic)
+newtype NodeId = NodeId { _nodeId :: Int32 } deriving (Show, Eq, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
+newtype Host = Host { _hostKString :: KafkaString } deriving (Show, Eq, Ord, Deserializable, IsString, Generic)
+newtype Port = Port { _portInt :: Int32 } deriving (Show, Eq, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
+newtype TopicMetadata = TopicMetadata { _topicMetadataFields :: (KafkaError, TopicName, [PartitionMetadata]) } deriving (Show, Eq, Deserializable, Generic)
+newtype PartitionMetadata = PartitionMetadata { _partitionMetadataFields :: (KafkaError, Partition, Leader, Replicas, Isr) } deriving (Show, Eq, Deserializable, Generic)
+newtype Leader = Leader { _leaderId :: Maybe Int32 } deriving (Show, Eq, Ord, Generic)
 
-newtype Replicas = Replicas [Int32] deriving (Show, Eq, Serializable, Deserializable)
-newtype Isr = Isr [Int32] deriving (Show, Eq, Deserializable)
+newtype Replicas = Replicas [Int32] deriving (Show, Eq, Serializable, Deserializable, Generic)
+newtype Isr = Isr [Int32] deriving (Show, Eq, Deserializable, Generic)
 
-newtype OffsetCommitResponse = OffsetCommitResp [(TopicName, [(Partition, KafkaError)])] deriving (Show, Eq, Deserializable)
-newtype OffsetFetchResponse = OffsetFetchResp [(TopicName, [(Partition, Offset, Metadata, KafkaError)])] deriving (Show, Eq, Deserializable)
+newtype OffsetCommitResponse = OffsetCommitResp [(TopicName, [(Partition, KafkaError)])] deriving (Show, Eq, Deserializable, Generic)
+newtype OffsetFetchResponse = OffsetFetchResp [(TopicName, [(Partition, Offset, Metadata, KafkaError)])] deriving (Show, Eq, Deserializable, Generic)
 
-newtype OffsetRequest = OffsetReq (ReplicaId, [(TopicName, [(Partition, Time, MaxNumberOfOffsets)])]) deriving (Show, Eq, Serializable)
-newtype Time = Time { _timeInt :: Int64 } deriving (Show, Eq, Serializable, Num, Integral, Ord, Real, Enum, Bounded)
-newtype MaxNumberOfOffsets = MaxNumberOfOffsets Int32 deriving (Show, Eq, Serializable, Num, Integral, Ord, Real, Enum)
+newtype OffsetRequest = OffsetReq (ReplicaId, [(TopicName, [(Partition, Time, MaxNumberOfOffsets)])]) deriving (Show, Eq, Serializable, Generic)
+newtype Time = Time { _timeInt :: Int64 } deriving (Show, Eq, Serializable, Num, Integral, Ord, Real, Enum, Bounded, Generic)
+newtype MaxNumberOfOffsets = MaxNumberOfOffsets Int32 deriving (Show, Eq, Serializable, Num, Integral, Ord, Real, Enum, Generic)
 
 newtype FetchRequest =
   FetchReq (ReplicaId, MaxWaitTime, MinBytes,
             [(TopicName, [(Partition, Offset, MaxBytes)])])
-  deriving (Show, Eq, Deserializable, Serializable)
+  deriving (Show, Eq, Deserializable, Serializable, Generic)
 
-newtype ReplicaId = ReplicaId Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable)
-newtype MaxWaitTime = MaxWaitTime Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable)
-newtype MinBytes = MinBytes Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable)
-newtype MaxBytes = MaxBytes Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable)
+newtype ReplicaId = ReplicaId Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable, Generic)
+newtype MaxWaitTime = MaxWaitTime Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable, Generic)
+newtype MinBytes = MinBytes Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable, Generic)
+newtype MaxBytes = MaxBytes Int32 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable, Generic)
 
 newtype ProduceRequest =
   ProduceReq (RequiredAcks, Timeout,
               [(TopicName, [(Partition, MessageSet)])])
-  deriving (Show, Eq, Serializable)
+  deriving (Show, Eq, Serializable, Generic)
 
 newtype RequiredAcks =
-  RequiredAcks Int16 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
+  RequiredAcks Int16 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 newtype Timeout =
-  Timeout Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
+  Timeout Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 newtype Partition =
-  Partition Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
+  Partition Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 
-newtype MessageSet =
-  MessageSet { _messageSetMembers :: [MessageSetMember] } deriving (Show, Eq)
+data MessageSet = MessageSet { _codec :: CompressionCodec, _messageSetMembers :: [MessageSetMember] }
+  deriving (Show, Eq, Generic)
 data MessageSetMember =
-  MessageSetMember { _setOffset :: Offset, _setMessage :: Message } deriving (Show, Eq)
+  MessageSetMember { _setOffset :: Offset, _setMessage :: Message } deriving (Show, Eq, Generic)
 
-newtype Offset = Offset Int64 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
+newtype Offset = Offset Int64 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 
 newtype Message =
   Message { _messageFields :: (Crc, MagicByte, Attributes, Key, Value) }
-  deriving (Show, Eq, Deserializable)
+  deriving (Show, Eq, Deserializable, Generic)
 
-newtype Crc = Crc Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
-newtype MagicByte = MagicByte Int8 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
-newtype Attributes = Attributes Int8 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum)
+data CompressionCodec = NoCompression | Gzip deriving (Show, Eq, Generic)
 
-newtype Key = Key { _keyBytes :: Maybe KafkaBytes } deriving (Show, Eq)
-newtype Value = Value { _valueBytes :: Maybe KafkaBytes } deriving (Show, Eq)
+newtype Crc = Crc Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
+newtype MagicByte = MagicByte Int8 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
+data Attributes = Attributes { _compressionCodec :: CompressionCodec } deriving (Show, Eq, Generic)
+
+newtype Key = Key { _keyBytes :: Maybe KafkaBytes } deriving (Show, Eq, Generic)
+newtype Value = Value { _valueBytes :: Maybe KafkaBytes } deriving (Show, Eq, Generic)
 
 data ResponseMessage = MetadataResponse MetadataResponse
                      | ProduceResponse ProduceResponse
@@ -173,20 +173,20 @@ data ResponseMessage = MetadataResponse MetadataResponse
                      | OffsetCommitResponse OffsetCommitResponse
                      | OffsetFetchResponse OffsetFetchResponse
                      | GroupCoordinatorResponse GroupCoordinatorResponse
-                     deriving (Show, Eq)
+                     deriving (Show, Eq, Generic)
 
-newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Show, Eq, Serializable)
+newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Show, Eq, Serializable, Generic)
 
-newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable)
-newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable)
-newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Eq, Serializable, Deserializable, IsString)
 
-instance Show ConsumerGroup where
-    show (ConsumerGroup g) = "ConsumerGroup " ++ show (_kString g)
+
+newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable, Generic)
 
 newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
 newtype ConsumerId = ConsumerId KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
-newtype Metadata = Metadata { _kMetadata :: KafkaString } deriving (Show, Eq, Serializable, Deserializable, IsString)
+
+newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable, Generic)
+newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString, Generic)
+newtype Metadata = Metadata KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString, Generic)
 
 errorKafka :: KafkaError -> Int16
 errorKafka NoError                             = 0
@@ -224,7 +224,7 @@ data KafkaError = NoError -- ^ @0@ No error--it worked!
                 | OffsetsLoadInProgressCode -- ^ @14@ The broker returns this error code for an offset fetch request if it is still loading offsets (after a leader change for that offsets topic partition).
                 | ConsumerCoordinatorNotAvailableCode -- ^ @15@ The broker returns this error code for consumer metadata requests or offset commit requests if the offsets topic has not yet been created.
                 | NotCoordinatorForConsumerCode -- ^ @16@ The broker returns this error code if it receives an offset fetch or commit request for a consumer group that it is not a coordinator for.
-                deriving (Eq, Show)
+                deriving (Bounded, Enum, Eq, Generic, Show)
 
 instance Serializable KafkaError where
   serialize = serialize . errorKafka
@@ -252,7 +252,9 @@ instance Deserializable KafkaError where
       16   -> return NotCoordinatorForConsumerCode
       _    -> fail $ "invalid error code: " ++ show x
 
-newtype Request = Request (CorrelationId, ClientId, RequestMessage) deriving (Show, Eq)
+instance Exception KafkaError
+
+newtype Request = Request (CorrelationId, ClientId, RequestMessage) deriving (Show, Eq, Generic)
 
 instance Serializable Request where
   serialize (Request (correlationId, clientId, r)) = do
@@ -274,21 +276,21 @@ apiVersion OffsetCommitRequest{} = 2 -- use V2 commit to not deal with Timestamp
 apiVersion _                     = ApiVersion 0 -- everything else is at version 0 right now
 
 apiKey :: RequestMessage -> ApiKey
-apiKey ProduceRequest{}          = ApiKey 0
-apiKey FetchRequest{}            = ApiKey 1
-apiKey OffsetRequest{}           = ApiKey 2
-apiKey MetadataRequest{}         = ApiKey 3
-apiKey OffsetCommitRequest{}     = ApiKey 8
-apiKey OffsetFetchRequest{}      = ApiKey 9
+apiKey ProduceRequest{} = ApiKey 0
+apiKey FetchRequest{} = ApiKey 1
+apiKey OffsetRequest{} = ApiKey 2
+apiKey MetadataRequest{} = ApiKey 3
+apiKey OffsetCommitRequest{} = ApiKey 8
+apiKey OffsetFetchRequest{} = ApiKey 9
 apiKey GroupCoordinatorRequest{} = ApiKey 10
 
 instance Serializable RequestMessage where
-  serialize (ProduceRequest r)          = serialize r
-  serialize (FetchRequest r)            = serialize r
-  serialize (OffsetRequest r)           = serialize r
-  serialize (MetadataRequest r)         = serialize r
-  serialize (OffsetCommitRequest r)     = serialize r
-  serialize (OffsetFetchRequest r)      = serialize r
+  serialize (ProduceRequest r) = serialize r
+  serialize (FetchRequest r) = serialize r
+  serialize (OffsetRequest r) = serialize r
+  serialize (MetadataRequest r) = serialize r
+  serialize (OffsetCommitRequest r) = serialize r
+  serialize (OffsetFetchRequest r) = serialize r
   serialize (GroupCoordinatorRequest r) = serialize r
 
 instance Serializable Int64 where serialize = putWord64be . fromIntegral
@@ -311,11 +313,35 @@ instance Serializable KafkaString where
     putByteString bs
 
 instance Serializable MessageSet where
-  serialize (MessageSet ms) = do
-    let bytes = runPut $ mapM_ serialize ms
+  serialize (MessageSet codec messageSet) = do
+    let bytes = runPut $ mapM_ serialize (compress codec messageSet)
         l = fromIntegral (B.length bytes) :: Int32
     serialize l
     putByteString bytes
+
+    where compress :: CompressionCodec -> [MessageSetMember] -> [MessageSetMember]
+          compress NoCompression ms = ms
+          compress c ms = [MessageSetMember (Offset (-1)) (message c ms)]
+
+          message :: CompressionCodec -> [MessageSetMember] -> Message
+          message c ms = Message (0, 0, Attributes c, Key Nothing, value (compressor c) ms)
+
+          compressor :: CompressionCodec -> (ByteString -> ByteString)
+          compressor c = case c of
+            Gzip -> LB.toStrict . GZip.compress . LB.fromStrict
+            _ -> fail "Unsupported compression codec"
+
+          value :: (ByteString -> ByteString) -> [MessageSetMember] -> Value
+          value c ms = Value . Just . KBytes $ c (runPut $ mapM_ serialize ms)
+
+instance Serializable Attributes where
+  serialize = serialize . bits
+    where bits :: Attributes -> Int8
+          bits = codecValue . _compressionCodec
+
+          codecValue :: CompressionCodec -> Int8
+          codecValue NoCompression = 0
+          codecValue Gzip = 1
 
 instance Serializable KafkaBytes where
   serialize (KBytes bs) = do
@@ -355,13 +381,50 @@ instance Deserializable MessageSet where
   deserialize = do
     l <- deserialize :: Get Int32
     ms <- isolate (fromIntegral l) getMembers
-    return $ MessageSet ms
+
+    decompressed <- mapM decompress ms
+
+    return $ MessageSet NoCompression (concat decompressed)
+
       where getMembers :: Get [MessageSetMember]
             getMembers = do
               wasEmpty <- isEmpty
               if wasEmpty
               then return []
               else liftM2 (:) deserialize getMembers <|> (remaining >>= getBytes >> return [])
+
+            decompress :: MessageSetMember -> Get [MessageSetMember]
+            decompress m = if isCompressed m
+                  then decompressSetMember m
+                  else return [m]
+
+            isCompressed :: MessageSetMember -> Bool
+            isCompressed = messageCompressed . _setMessage
+
+            messageCompressed :: Message -> Bool
+            messageCompressed (Message (_, _, att, _, _)) = _compressionCodec att /= NoCompression
+
+            decompressSetMember :: MessageSetMember -> Get [MessageSetMember]
+            decompressSetMember (MessageSetMember _ (Message (_, _, att, _, Value v))) = case v of
+              Just bytes -> decompressMessage (decompressor att) (_kafkaByteString bytes)
+              Nothing -> fail "Expecting a compressed message set, empty data set received"
+
+            decompressor :: Attributes -> (ByteString -> ByteString)
+            decompressor att = case _compressionCodec att of
+              Gzip -> LB.toStrict . GZip.decompress . LB.fromStrict
+              _ -> fail "Unsupported compression codec."
+
+            decompressMessage :: (ByteString -> ByteString) -> ByteString -> Get [MessageSetMember]
+            decompressMessage f = getDecompressedMembers . f
+
+            getDecompressedMembers :: ByteString -> Get [MessageSetMember]
+            getDecompressedMembers "" = return [] -- a compressed empty message
+            getDecompressedMembers val = do
+              let res = runGetPartial deserialize val :: Result MessageSetMember
+              case res of
+                Fail err _ -> fail err
+                Partial _ -> fail "Could not consume all available data"
+                Done v vv -> fmap (v :) (getDecompressedMembers vv)
 
 instance Deserializable MessageSetMember where
   deserialize = do
@@ -375,6 +438,20 @@ instance Deserializable Leader where
     x <- deserialize :: Get Int32
     let l = Leader $ if x == -1 then Nothing else Just x
     return l
+
+instance Deserializable Attributes where
+  deserialize = do
+    i <- deserialize :: Get Int8
+    codec <- case compressionCodecFromValue i of
+      Just c -> return c
+      Nothing -> fail $ "Unknown compression codec value found in: " ++ show i
+    return $ Attributes codec
+
+compressionCodecFromValue :: Int8 -> Maybe CompressionCodec
+compressionCodecFromValue i | eq 1 = Just Gzip
+                            | eq 0 = Just NoCompression
+                            | otherwise = Nothing
+                            where eq y = i .&. y == y
 
 instance Deserializable KafkaBytes where
   deserialize = do
@@ -420,10 +497,10 @@ instance (Deserializable a, Deserializable b, Deserializable c, Deserializable d
 instance (Deserializable a, Deserializable b, Deserializable c, Deserializable d, Deserializable e) => Deserializable ((,,,,) a b c d e) where
   deserialize = liftM5 (,,,,) deserialize deserialize deserialize deserialize deserialize
 
-instance Deserializable Int64 where deserialize = liftM fromIntegral getWord64be
-instance Deserializable Int32 where deserialize = liftM fromIntegral getWord32be
-instance Deserializable Int16 where deserialize = liftM fromIntegral getWord16be
-instance Deserializable Int8  where deserialize = liftM fromIntegral getWord8
+instance Deserializable Int64 where deserialize = fmap fromIntegral getWord64be
+instance Deserializable Int32 where deserialize = fmap fromIntegral getWord32be
+instance Deserializable Int16 where deserialize = fmap fromIntegral getWord16be
+instance Deserializable Int8  where deserialize = fmap fromIntegral getWord8
 
 -- * Generated lenses
 

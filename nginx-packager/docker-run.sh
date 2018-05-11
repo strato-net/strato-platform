@@ -3,7 +3,8 @@
 set -x
 set -e
 
-MIN_TIMEOUT=60
+MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
+BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
@@ -23,10 +24,10 @@ if [ "$ssl" = true ] ; then
 	sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /etc/nginx/nginx.conf
 fi
 
-BLOC_TIMEOUT=$((blockTime * 5))
-if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT} ]
+BLOC_TIMEOUT=$((blockTime * BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT))
+if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS} ]
 then
-  BLOC_TIMEOUT=${MIN_TIMEOUT}
+  BLOC_TIMEOUT=${MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS}
 fi
 
 sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /etc/nginx/nginx.conf
