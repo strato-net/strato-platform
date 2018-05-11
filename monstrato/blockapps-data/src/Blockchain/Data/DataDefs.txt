@@ -75,7 +75,7 @@ AddressStateRef
     codeHash SHA
     latestBlockDataRefNumber Integer
     source String
-    contractName String Maybe
+    contractName String
     deriving Eq Read Show
 
 RawTransaction

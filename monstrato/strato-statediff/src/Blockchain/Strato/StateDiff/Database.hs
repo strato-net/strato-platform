@@ -50,8 +50,8 @@ createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, Monad
                  Integer -> (Address -> m String) -> (Address -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
 createAccount blockNumber addressSource addressContractName address diff = do
   src <- lift $ addressSource address
-  name <- lift $ addressContractName address
-  addrID <- SQL.insert (addrRef src)
+  name' <- lift $ addressContractName address
+  addrID <- SQL.insert (addrRef src name')
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
 
   where
@@ -108,7 +108,7 @@ updateSource address name source = do
   flip SQL.runSqlPool pool $ do
     addrID <- getAddressStateSQL address "update"
     SQL.update addrID [AddressStateRefSource =. source,
-                       AddressStateRefContractName =. Just name]
+                       AddressStateRefContractName =. name]
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
