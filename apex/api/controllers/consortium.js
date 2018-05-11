@@ -1,6 +1,10 @@
 const co = require('co');
 const sequelize = require('sequelize');
+const bcrypt = require('bcrypt');
+const blockappsRest = require('blockapps-rest').rest;
+
 const models = require('../models');
+const appConfig = require('../config/app.config');
 
 module.exports = {
   fetchEntities: function (req, res, next) {
@@ -63,10 +67,39 @@ module.exports = {
       let user, newEntity;
       try {
         user = yield models.User.findOne({
-          where: { accountAddress: req.body.adminEthereumAddress, username: req.body.adminName }
+          // where: { accountAddress: req.body.adminEthereumAddress, username: req.body.adminName }
+          where: { username: req.body.adminName }
         });
       } catch (error) {
         let err = new Error('could not create entity: ', error);
+        err.status = 500;
+        return next(err);
+      }
+
+      const password = '1234';
+      try {
+        if (!user) {
+          user = yield models.User.create({
+            username: req.body.adminName,
+            passwordHash: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
+          });
+        }
+      } catch (error) {
+        let err = new Error('could not create entity: ', error);
+        err.status = 500;
+        return next(err);
+      }
+
+      // Create blockchain user in bloc
+      let blocUser;
+      try {
+        blocUser = yield blockappsRest.createUser(req.body.adminName, password, true);
+        // Set the account address to user in db
+        user.accountAddress = blocUser.address;
+        yield user.save({ fields: ['accountAddress'] });
+      } catch (blocError) {
+        user.destroy();
+        let err = new Error('could not create entity:', blocError);
         err.status = 500;
         return next(err);
       }
@@ -108,6 +141,18 @@ module.exports = {
     })
   },
   voteEntity: function (req, res, next) {
+    co(function* () {
+      if (!req.body.username || !req.body.password || !req.body.entityUser) {
+        let err = new Error("wrong params");
+        err.status = 400;
+        return next(err);
+      }
 
+      try {
+        const user = yield models.User.findOne({ where: { username: username } })
+      } catch (error) {
+
+      }
+    })
   }
 }

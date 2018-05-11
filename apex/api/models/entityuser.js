@@ -3,7 +3,8 @@ module.exports = (sequelize, DataTypes) => {
   var EntityUser = sequelize.define('EntityUser', {
     email: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
+      unique: true
     },
     admin: {
       type: DataTypes.BOOLEAN,

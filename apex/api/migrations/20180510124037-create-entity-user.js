@@ -11,6 +11,7 @@ module.exports = {
       email: {
         type: Sequelize.STRING,
         allowNull: false,
+        unique: true
       },
       createdAt: {
         allowNull: false,
@@ -27,7 +28,7 @@ module.exports = {
           key: 'id'
         },
         allowNull: false,
-        onDelete: 'cascade',
+        onDelete: 'set null',
         onUpdate: 'cascade'
       },
       admin: {
@@ -42,7 +43,8 @@ module.exports = {
           key: 'id'
         },
         allowNull: false,
-        primaryKey: true,
+        onDelete: 'set null',
+        onUpdate: 'cascade'
       }
     });
   },
