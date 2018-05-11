@@ -137,7 +137,7 @@ purgeFromQueued OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{queued = q}
     where newATL = purgeFromATL sender (TD.transactionNonce tx) q
 
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
-purgeFromPending OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{queued = p} = s { pending= newATL }
+purgeFromPending OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{pending = p} = s { pending= newATL }
     where newATL = purgeFromATL sender (TD.transactionNonce tx) p
 
 

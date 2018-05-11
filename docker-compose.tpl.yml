@@ -42,6 +42,7 @@ services:
     - postgres_user=postgres
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
+    - SMD_MODE=${SMD_MODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
     build: .
@@ -99,7 +100,7 @@ services:
     - SINGLE_NODE=${SINGLE_NODE}
     - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
-    - zookeeper_conn=kafka
+    - zookeeper_conn=zookeeper
     build: .
     image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
     restart: always
@@ -139,7 +140,7 @@ services:
     - statsPrefix=${statsPrefix}
     - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
-    - zkHost=kafka
+    - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -194,10 +195,21 @@ services:
     build: .
     image: ${DOCS_IMAGE:-<REPO_URL>docs:<VERSION>}
     restart: always
-  kafka:
-    command: [/bin/bash, -c, printf "\ndelete.topic.enable=true\nlog.cleaner.enable=false\nLOG_RETENTION_HOURS=2147483647\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n]
-    environment:
-    - ADVERTISED_HOST=kafka
-    - ADVERTISED_PORT=9092
-    image: ${KAFKA_IMAGE:-spotify/kafka:latest}
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
     restart: always
+  kafka:
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 2147483647
+      KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
+      KAFKA_MAX_REQUEST_SIZE: 33554432
+      KAFKA_MESSAGE_MAX_BYTES: 33554432
+    image: wurstmeister/kafka:1.1.0
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
