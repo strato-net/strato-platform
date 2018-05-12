@@ -75,7 +75,7 @@ AddressStateRef
     codeHash SHA
     latestBlockDataRefNumber Integer
     source String
-    contractName String Maybe
+    contractName String
     deriving Eq Read Show
 
 RawTransaction
@@ -117,6 +117,7 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
+    miningStatus MiningStatus
     deriving Eq Read Show Generic
 
 UserN json

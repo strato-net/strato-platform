@@ -2,29 +2,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Blockchain.Data.GenesisBlock (
+module Blockchain.GenesisBlock (
   initializeGenesisBlock,
-  initializeStateDB,
   BackupType(..)
 ) where
 
-import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
+import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
-import qualified Data.JsonStream.Parser               as JS
-import           Data.Maybe                           (catMaybes)
-import           Data.List.Split                      (chunksOf)
-import           Numeric
-
-import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.BackupBlocks
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
+import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
@@ -33,12 +26,11 @@ import qualified Blockchain.DB.MemAddressStateDB as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
-import           Blockchain.Strato.StateDiff          hiding (StateDiff (blockHash))
-import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
@@ -58,133 +50,9 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
-import qualified Blockchain.Strato.Model.Address      as Ad
-import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-import           Blockchain.MilenaTools               (commitSingleOffset)
-
-initializeBlankStateDB :: HasStateDB m => m ()
-initializeBlankStateDB = do
-    db <- getStateDB
-    liftIO . runResourceT $ initializeBlank db
-    setStateDBStateRoot emptyTriePtr
-
-putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
-                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
-putStorageTrie address slots = do
-    let slotss = chunksOf 10000 slots
-    forM_ slotss (\ss ->  do
-      mapM_ (\(k, v) -> putStorageKeyVal' address k v) ss
-      flushMemStorageDB
-      Mem.flushMemAddressStateDB)
-
-initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
-                  => [AccountInfo]
-                  -> String
-                  -> m ()
-initializeStateDB addressInfo genesisBlockName = do
-    initializeBlankStateDB
-    let putAccount acc = case acc of
-                              NonContract address balance' ->
-                                putAddressState address blankAddressState{addressStateBalance=balance'}
-                              ContractNoStorage address balance' codeHash' -> do
-                                putAddressState address blankAddressState{addressStateBalance=balance',
-                                                                          addressStateCodeHash=codeHash'}
-                              ContractWithStorage address balance' codeHash' slots -> do
-                                putAddressState address blankAddressState{addressStateBalance=balance',
-                                                                          addressStateCodeHash=codeHash'}
-                                putStorageTrie address slots
-    mapM_ putAccount addressInfo
-
-    let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-
-    liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
-    
-    accountInfoString <-
-      liftIO $
-      fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
-    let accountInfo = BLC.lines accountInfoString
-
-    let accountInfoBatches = chunksOf 10000 accountInfo
-
-    forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
-      forM_ batch $ \theLine -> do
-        case words $ BLC.unpack theLine of
-         [] -> return ()
-         ["s", a, k, v]  -> do
-           let address = Ad.Address $ parseHex a
-           putStorageKeyVal' address (parseHex k) (parseHex v)
-         ["a", a, b]  -> do
-           let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance= read b}
-         ["a", a, b, c]  -> do
-           let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=SHA $ parseHex c}
-         _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
-
-      liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
-      flushMemStorageDB
-      Mem.flushMemAddressStateDB
-    
-    forM_ addressInfo $ \account -> do
-      liftIO $ print account
-      putAccount account
-
-
-parseHex::(Num a, Eq a)=>String->a
-parseHex theString =
-  case readHex theString of
-   [(value, "")] -> value
-   _ -> error $ "parseHex: error parsing string: " ++ theString
-
-initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
-
-zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
-zipSourceInfo accounts codes =
-  let hashPair c@(CodeInfo bs _ _) = (hash bs, c)
-      codeMap = Map.fromList . map hashPair $ codes
-      findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
-      findCodeFor (NonContract _ _) = Nothing
-      findCodeFor acc@(ContractNoStorage _ _ hsh) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
-  in catMaybes . map findCodeFor $ accounts
-
-genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
-                          => GenesisInfo
-                          -> String
-                          -> m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi gn = do
-    let codes = genesisInfoCodeInfo gi
-    let accounts = genesisInfoAccountInfo gi
-    let sourceInfo = zipSourceInfo accounts codes
-    initializeCodeDB codes
-    initializeStateDB accounts gn
-    db <- getStateDB
-    return (sourceInfo, Block {
-        blockBlockData = BlockData {
-            blockDataParentHash = genesisInfoParentHash gi,
-            blockDataUnclesHash = genesisInfoUnclesHash gi,
-            blockDataCoinbase = genesisInfoCoinbase gi,
-            blockDataStateRoot = stateRoot db,
-            blockDataTransactionsRoot = genesisInfoTransactionsRoot gi,
-            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
-            blockDataLogBloom = genesisInfoLogBloom gi,
-            blockDataDifficulty = genesisInfoDifficulty gi,
-            blockDataNumber = genesisInfoNumber gi,
-            blockDataGasLimit = genesisInfoGasLimit gi,
-            blockDataGasUsed = genesisInfoGasUsed gi,
-            blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = genesisInfoExtraData gi,
-            blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi
-        },
-        blockReceiptTransactions = [],
-        blockBlockUncles         = []
-    })
+import           Network.Kafka.Consumer               (commitSingleOffset)
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
@@ -192,8 +60,8 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
-    genesisInfoToGenesisBlock theJSON genesisBlockName
+    let theJSON = either error id (eitherDecode theJSONString)
+    genesisInfoToGenesisBlock theJSON
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
@@ -231,19 +99,21 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    return (gb, undefined)
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
-    let diff = StateDiff {
+    accountDiffs <- mapM eventualAccountState . Map.fromList $ map (\(_,a,s) -> (a,s)) genAddrStates
+    let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
+        diff = StateDiff {
+        StateDiff.chainId   = genesisChainId,
         blockNumber         = 0,
         StateDiff.blockHash = blockHash genesisBlock,
         createdAccounts     = accountDiffs,
         deletedAccounts     = Map.empty,
         updatedAccounts     = Map.empty
     }
-    commitSqlDiffs diff (const (return "")) (const (return ""))
+    commitSqlDiffs diff Nothing Nothing
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
-            ContractNoStorage addr _ _ -> updateSource addr name src
-            ContractWithStorage addr _ _ _ -> updateSource addr name src
+            ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
+            ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
 
     forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"

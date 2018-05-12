@@ -45,7 +45,7 @@ describe('Strato Load Test', function() {
       const results = yield api.bloc.uploadList({
         password: adminPassword,
         contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
-        resolve: false 
+        resolve: true 
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');

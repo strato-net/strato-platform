@@ -30,6 +30,7 @@ import           Foreign
 import qualified Blockchain.Colors            as CL
 import           Blockchain.ExtWord
 import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMException
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 

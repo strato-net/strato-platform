@@ -44,7 +44,6 @@ library
                  , resourcet
                  , strato-adit
                  , strato-conf
-                 , strato-quarry
                  , strato-sequencer
                  , text
                  , time
@@ -57,8 +56,12 @@ library
                  , strato-redis-blockdb
                  , hedis
                  , statsdi
+                 , extra
     exposed-modules:
                      Blockchain.BlockChain
+                     Blockchain.Bagger
+                     Blockchain.Bagger.BaggerState
+                     Blockchain.Bagger.Transactions
                      Blockchain.Data.ExecResults
                      Blockchain.TheDAOFork
                      Blockchain.VMContext
@@ -69,12 +72,14 @@ library
                      Blockchain.VM.Code
                      Blockchain.VM.Environment
                      Blockchain.VM.Opcodes
+                     Blockchain.VM.VMException
                      Blockchain.VM.VMState
                      Blockchain.VMMetrics
                      Executable.EthereumVM
                      Executable.EVMFlags
                      Executable.EVMCheckpoint
     other-modules:
+                  Blockchain.Bagger.TransactionList
                   Blockchain.DB.ModifyStateDB
                   Blockchain.JsonRpcCommand
                   Blockchain.VM.Memory
@@ -124,7 +129,6 @@ test-suite ethereum-vm-test
                          resourcet,
                          statsdi,
                          strato-model,
-                         strato-quarry,
                          text
     ghc-options:         -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
     default-language:    Haskell2010

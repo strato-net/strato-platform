@@ -59,6 +59,7 @@ import           Blockchain.VM.PrecompiledContracts
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
 bool2Word256::Bool->Word256
@@ -955,6 +956,8 @@ getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__ge
 getFromSelector :: BC.ByteString -> Bool -> BlockData -> Address -> ContextM String
 getFromSelector sel isRunningTests' b contractAddress = do
   let isHomestead = blockDataNumber b >= gHomesteadFirstBlock
+  stateRoot <- getStateRoot
+  setStateDBStateRoot (blockDataStateRoot b)
   (eRes, _) <- call isRunningTests'
                     isHomestead
                     True
@@ -969,6 +972,7 @@ getFromSelector sel isRunningTests' b contractAddress = do
                     (fst $ B16.decode sel)
                     1000000000000000000
                     (Address 0)
+  setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""
     Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
@@ -1226,7 +1230,6 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           addToRefund (refund finalVMState)
           return (1, Just retVal)
         Left RevertException -> do
-          state' <- lift get
           useGas (- vmGasRemaining finalVMState)
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)

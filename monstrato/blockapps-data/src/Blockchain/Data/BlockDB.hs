@@ -12,6 +12,7 @@ module Blockchain.Data.BlockDB (
   BlockData(..),
   blockHash,
   blockHeaderHash,
+  blockHeaderPartialHash,
   getBlock,
   getBlocks,
   putBlocks,
