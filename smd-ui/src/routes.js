@@ -20,6 +20,7 @@ import { isModePublic } from "./lib/checkMode";
 import Consortium from "./components/Consortium";
 import CreateConsortium from "./components/Consortium/components/CreateConsortium";
 import Entities from "./components/Consortium/components/Entities";
+import Details from "./components/Consortium/components/Details";
 
 const CommonRoute = props => {
   const CommonRoute = props.route === "public" ? Route : ProtectedRoute;
@@ -59,7 +60,8 @@ export const routes = isModePublic() ? (
       <Route exact path="/apps" component={Applications} />
       <Route exact path="/consortium" component={Consortium} />
       <Route exact path="/consortium/create" component={CreateConsortium} />
-      <Route exact path="/consortium/:id" component={Entities} />
+      <Route exact path="/consortium/:id/entites" component={Entities} />
+      <Route exact path="/consortium/:id/entites/:id" component={Details} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>

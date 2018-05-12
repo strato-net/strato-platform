@@ -5,6 +5,7 @@ import InviteEntity from "./InviteEntity";
 import VoteConfirmation from "./VoteConfirmation";
 import "./entities.css";
 import { fetchEntities } from "./entities.actions";
+import { fetchEntityRequest } from "../Details/details.actions";
 
 class Entities extends Component {
   constructor() {
@@ -60,10 +61,13 @@ class Entities extends Component {
           <tbody>
             {entities.map((entity, key) => {
               return (
-                <tr key={key}>
+                <tr key={key} onClick={() => {
+                  this.props.history.push(`entites/${entity.id}`);
+                  this.props.fetchEntityRequest(entity.id);
+                }}>
                   <td>{entity.name}</td>
-                  <td>{entity.nodes ? entity.nodes.length : 0}</td>
-                  <td>{entity.users ? entity.users.length : 0}</td>
+                  <td>1</td>
+                  <td>{entity.usersCount}</td>
                   <td>
                     {entity.status}
                     {entity.status === "Pending" && (
@@ -156,11 +160,16 @@ class Entities extends Component {
             <h3>Entities</h3>
           </div>
           <div className="col-md-8 text-right">
+            <Button
+              onClick={(e) => { this.props.history.goBack() }}
+              className="pt-icon-arrow-left back-button"
+              text="Back"
+            />
             <InviteEntity />
             <Button
               className="pt-intent-danger pt-icon-remove"
               text="Request Removal"
-            /> 
+            />
           </div>
         </div>
         <div className="row">
@@ -207,6 +216,6 @@ export function mapStateToProps(state) {
     entities: state.entities.entities
   };
 }
-const connected = connect(mapStateToProps, { fetchEntities })(Entities);
+const connected = connect(mapStateToProps, { fetchEntities, fetchEntityRequest })(Entities);
 
 export default connected;

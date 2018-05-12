@@ -36,6 +36,7 @@ import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reduc
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 import entitesReducer from './components/Consortium/components/Entities/entities.reducer';
 import createConsortiumReducer from './components/Consortium/components/CreateConsortium/createConsortium.reducer';
+import entityReducer from './components/Consortium/components/Details/details.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -65,6 +66,7 @@ import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchConsoritumActions from './components/Consortium/components/CreateConsortium/createConsortium.saga';
 import watchEntitiesActions from './components/Consortium/components/Entities/entites.saga';
+import watchEntitiyActions from './components/Consortium/components/Details/details.sagas';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -105,7 +107,8 @@ const rootReducer = combineReducers({
   verifyAccount: verifyAccountReducer,
   createBlocUser: createBlocUserReducer,
   entities: entitesReducer,
-  createConsortium: createConsortiumReducer
+  createConsortium: createConsortiumReducer,
+  entity: entityReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -134,7 +137,8 @@ const rootSaga = function* startForeman() {
     fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
     fork(watchConsoritumActions),
-    fork(watchEntitiesActions)
+    fork(watchEntitiesActions),
+    fork(watchEntitiyActions)
   ])
 };
 

@@ -12,7 +12,7 @@ class ConsourtimList extends Component {
           <tr
             key={key}
             onClick={() => {
-              this.props.history.push(`/consortium/${consourtim.networkId}`);
+              this.props.history.push(`/consortium/${consourtim.networkId}/entites`);
               this.props.fetchEntities();
             }}
           >
