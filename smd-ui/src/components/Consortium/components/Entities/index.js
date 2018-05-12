@@ -19,7 +19,9 @@ class Entities extends Component {
     this.setState({ isOpen: false });
   }
 
-  handleVoteClick(voteType, votedFor) {
+  handleVoteClick(voteType, votedFor, event) {
+    if (event)
+      event.stopPropagation();
     this.setState({ isOpen: true, voteType, votedFor });
   }
 
@@ -74,21 +76,15 @@ class Entities extends Component {
                       <span>
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-up"
-                          onClick={() =>
-                            this.handleVoteClick("in favor", entity.name)
+                          onClick={(event) =>
+                            this.handleVoteClick("in favor of", entity.name, event)
                           }
                         />
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-down"
-                          onClick={() =>
-                            this.handleVoteClick("against", entity.name)
+                          onClick={(event) =>
+                            this.handleVoteClick("against", entity.name, event)
                           }
-                        />
-                        <VoteConfirmation
-                          isOpen={this.state.isOpen}
-                          handleClose={this.handleClose}
-                          entityName={this.state.votedFor}
-                          voteType={this.state.voteType}
                         />
                       </span>
                     )}
@@ -99,6 +95,12 @@ class Entities extends Component {
                 </tr>
               );
             })}
+            <tr><td><VoteConfirmation
+              isOpen={this.state.isOpen}
+              handleClose={this.handleClose}
+              entityName={this.state.votedFor}
+              voteType={this.state.voteType}
+            /></td></tr>
           </tbody>
         </table>
       );
@@ -131,16 +133,16 @@ class Entities extends Component {
                     className="vote-btn pt-intent-primary pt-icon-thumbs-down"
                     onClick={() => this.handleVoteClick("against", entity.name)}
                   />
-                  <VoteConfirmation
-                    isOpen={this.state.isOpen}
-                    handleClose={this.handleClose}
-                    entityName={this.state.votedFor}
-                    voteType={this.state.voteType}
-                  />
                 </div>
               </li>
             );
           })}
+          <li><VoteConfirmation
+            isOpen={this.state.isOpen}
+            handleClose={this.handleClose}
+            entityName={this.state.votedFor}
+            voteType={this.state.voteType}
+          /></li>
         </ul>
       );
     }

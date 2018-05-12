@@ -2,7 +2,20 @@
   text-align: center;
 }
 
-h5.user {
-  font-weight: 600;
-  font-size: 19px;
+.voting-confirmation label {
+  margin-right: 10px;
+}
+
+.voting-confirmation .pt-form-content {
+  margin-bottom: 10px;
+}
+
+.voting-confirmation input, .voting-confirmation select {
+  width: 180px;
+}
+
+.voting-confirmation .voting-form {
+  width: 300px;
+  margin-left: auto;
+  margin-right: auto;
 }
