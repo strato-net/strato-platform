@@ -149,7 +149,7 @@ module.exports = {
   },
   voteEntity: function (req, res, next) {
     co(function* () {
-      if (!req.body.username || !req.body.password || !req.body.voteType
+      if (!req.body.entity || !req.body.password || !req.body.voteType
         || (req.body.voteType !== 'agree' && req.body.voteType !== 'disagree')) {
         let err = new Error("wrong params");
         err.status = 400;
@@ -171,24 +171,28 @@ module.exports = {
       }
 
       try {
-        const authErrorText = "user does not exist or wrong user-password pair provided";
-        const voter = yield models.EntityUser.findOne({
-          where: { admin: true },
+        const authErrorText = "Unauthorized";
+        const voter = yield models.Entity.find({
+          attributes: ['id'],
+          where: { name: req.body.entity },
           include: [{
-            model: models.User,
-            where: { username: req.body.username }
-          }],
-          attributes: []
-        })
+            model: models.EntityUser,
+            where: { admin: true },
+            as: 'Users',
+            include: [{
+              model: models.User
+            }]
+          }]
+        });
         let err;
-        if (!voter) {
+        if (!voter || (voter.id === Number(req.params.id))) {
           err = new Error(authErrorText);
           err.status = 401;
           return next(err);
         }
 
         const voteExist = yield models.EntityVote.findOne({
-          where: { UserId: voter.User.id, EntityId: req.params.id }
+          where: { UserId: voter.Users[0].User.id, EntityId: req.params.id }
         });
         if (voteExist) {
           err = new Error('Vote already exists');
@@ -196,7 +200,7 @@ module.exports = {
           return next(err);
         }
 
-        const passIsCorrect = yield bcrypt.compare(req.body.password, voter.User.passwordHash);
+        const passIsCorrect = yield bcrypt.compare(req.body.password, voter.Users[0].User.passwordHash);
         if (!passIsCorrect) {
           err = new Error(authErrorText);
           err.status = 401;
@@ -229,7 +233,7 @@ module.exports = {
               yield entity.update({ status: 'Under Review' });
             const vote = yield models.EntityVote.create({
               agree,
-              UserId: voter.User.id,
+              UserId: voter.Users[0].User.id,
               EntityId: entity.id
             });
             res.status(200).json({ success: true })
