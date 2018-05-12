@@ -9,7 +9,7 @@ class Users extends Component {
       return (
         <tr key={key}>
           <td>
-            {user.user && user.user.accountAddress}
+            {user.User && user.User.accountAddress}
           </td>
           <td>
             {user.status ? 'Not Found' : 'Member'}

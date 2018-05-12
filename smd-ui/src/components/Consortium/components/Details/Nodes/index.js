@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import { Button } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 
 class Nodes extends Component {

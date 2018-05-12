@@ -22,8 +22,8 @@ class Details extends Component {
   }
 
   renderComponent() {
-    let node = this.props.entity && this.props.entity.Users[0] ? 
-        [{public: this.props.entity.Users[0].EntityId, IP: `192.168.1.${this.props.entity.Users[0].id}`, tcp: `805${this.props.entity.Users[0].id}`, udp: `808${this.props.entity.Users[0].id}`}] : [];
+    let node = this.props.entity && this.props.entity.Users[0] ?
+      [{ public: this.props.entity.Users[0].EntityId, IP: `192.168.1.${this.props.entity.Users[0].id}`, tcp: `805${this.props.entity.Users[0].id}`, udp: `808${this.props.entity.Users[0].id}` }] : [];
     switch (this.state.navbarTab) {
       case "nodes":
         return <Nodes nodes={node} />;
@@ -33,7 +33,6 @@ class Details extends Component {
   }
 
   render() {
-    console.log(this.props.entity)
     return (
       <div className="container-fluid pt-dark consortium">
         <div className="row">

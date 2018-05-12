@@ -3,19 +3,30 @@ import { connect } from "react-redux";
 import { Dialog, Button } from "@blueprintjs/core";
 import {
   openInviteEntityModal,
-  closeInviteEntityModal
+  closeInviteEntityModal,
+  resetError
 } from "../entities.actions";
 import InviteForm from "./InviteForm";
+import './inviteEntity.css';
+import { toasts } from "../../../../Toasts";
 
 class InviteEntity extends Component {
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.message) {
+      toasts.show({ message: nextProps.message });
+      this.props.resetError();
+    }
+  }
+
   render() {
     return (
-      <div>
+      <span>
         <Button
           onClick={() => {
             this.props.openInviteEntityModal();
           }}
-          className="pt-intent-primary pt-icon-add smd-margin-16"
+          className="pt-intent-primary pt-icon-add invite-button"
           text="Invite Entity"
         />
 
@@ -29,18 +40,20 @@ class InviteEntity extends Component {
         >
           <InviteForm />
         </Dialog>
-      </div>
+      </span>
     );
   }
 }
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.entities.isOpen
+    isOpen: state.entities.isOpen,
+    message: state.entities.message
   };
 }
 
 export default connect(mapStateToProps, {
   openInviteEntityModal,
-  closeInviteEntityModal
+  closeInviteEntityModal,
+  resetError
 })(InviteEntity);

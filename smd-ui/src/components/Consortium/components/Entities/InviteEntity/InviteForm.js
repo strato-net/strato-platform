@@ -4,22 +4,14 @@ import { withRouter } from 'react-router-dom';
 import { Field, reduxForm } from 'redux-form';
 import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../../lib/mixpanelWrapper';
-import { closeInviteEntityModal } from '../entities.actions';
+import { inviteEntityRequest, closeInviteEntityModal } from '../entities.actions';
 import { validate } from './validate';
-import { inviteEntityRequest } from '../../CreateConsortium/createConsortium.actions';
 
 class InviteForm extends Component {
 
   constructor() {
     super();
     this.state = { errors: null };
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (this.props.numberOfEntities < nextProps.numberOfEntities) {
-      this.props.reset();
-      this.props.closeInviteEntityModal();
-    }
   }
 
   submit = (values) => {
@@ -176,11 +168,7 @@ const formed = reduxForm({ form: 'invite-entity' })(InviteForm);
 
 export function mapStateToProps(state) {
   return {
-    spinning: state.createConsortium.spinning,
-    serverError: state.createConsortium.error,
-    numberOfEntities: state.createConsortium.consortium[0]
-      ? state.createConsortium.consortium[0].entities.length
-      : 0,
+    spinning: state.createConsortium.spinning
   };
 }
 
