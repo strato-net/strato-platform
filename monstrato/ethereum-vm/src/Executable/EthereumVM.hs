@@ -13,7 +13,6 @@ import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
-import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
@@ -21,7 +20,6 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.EthConf
