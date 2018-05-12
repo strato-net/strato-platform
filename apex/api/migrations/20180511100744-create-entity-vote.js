@@ -31,15 +31,15 @@ module.exports = {
         onUpdate: 'cascade',
         onDelete: 'set null'
       },
-      EntityUserId: {
+      EntityId: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'EntityUsers',
+          model: 'Entities',
           key: 'id'
         },
         allowNull: false,
         onUpdate: 'cascade',
-        onDelete: 'set null'
+        onDelete: 'cascade'
       }
     });
   },

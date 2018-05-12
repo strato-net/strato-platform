@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {});
   EntityVote.associate = function(models) {
     EntityVote.belongsTo(models.User);    
-    EntityVote.belongsTo(models.EntityUser);    
+    EntityVote.belongsTo(models.Entity);    
   };
   return EntityVote;
 };

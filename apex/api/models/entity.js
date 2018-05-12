@@ -11,13 +11,14 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     status: {
-      type: DataTypes.ENUM('Member', 'Pending', 'Removal Requested'),
+      type: DataTypes.ENUM('Member', 'Pending', 'Under Review'),
       allowNull: false,
       defaultValue: 'Pending'
     }
   }, {});
   Entity.associate = function (models) {
-    Entity.hasMany(models.EntityUser, { as: 'Users' });
+    Entity.hasMany(models.EntityUser, { as: 'Users', onDelete: 'cascade' });
+    Entity.hasMany(models.EntityVote, { as: 'Votes', onDelete: 'cascade' })
   };
   return Entity;
 };

@@ -37,7 +37,8 @@ module.exports = {
             model: models.EntityUser,
             as: 'Users',
             include: [{
-              model: models.User
+              model: models.User,
+              attributes: ['username', 'accountAddress']
             }]
           }]
         });
@@ -156,7 +157,7 @@ module.exports = {
       }
       let entity;
       try {
-        entity = yield models.Entity.findOne({ where: { id: req.params.id } })
+        entity = yield models.Entity.findOne({ where: { id: req.params.id } });
       } catch (error) {
         let err = new Error('could not add vote: ', error);
         err.status = 500;
@@ -171,56 +172,65 @@ module.exports = {
 
       try {
         const authErrorText = "user does not exist or wrong user-password pair provided";
-        // const voter = yield models.User.findOne({ where: { username: req.body.username } });
         const voter = yield models.EntityUser.findOne({
+          where: { admin: true },
           include: [{
             model: models.User,
             where: { username: req.body.username }
           }],
           attributes: []
         })
+        let err;
         if (!voter) {
-          let err = new Error(authErrorText);
+          err = new Error(authErrorText);
           err.status = 401;
           return next(err);
         }
+
+        const voteExist = yield models.EntityVote.findOne({
+          where: { UserId: voter.User.id, EntityId: req.params.id }
+        });
+        if (voteExist) {
+          err = new Error('Vote already exists');
+          err.status = 401;
+          return next(err);
+        }
+
         const passIsCorrect = yield bcrypt.compare(req.body.password, voter.User.passwordHash);
         if (!passIsCorrect) {
-          let err2 = new Error(authErrorText);
-          err2.status = 401;
-          return next(err2);
+          err = new Error(authErrorText);
+          err.status = 401;
+          return next(err);
         } else {
           const agree = (req.body.voteType === 'agree');
           let numberOfVotes = yield models.EntityVote.count({
-            where: { EntityUserId: req.params.id, agree }
+            where: { EntityId: req.params.id, agree }
           });
-          // Add the vote to the existing vote count
+          // Add the current vote to the existing vote count
           numberOfVotes = numberOfVotes + 1;
           let totalMembers = yield models.Entity.count({
             where: { status: 'Member' }
           });
-          // Exclude the chosen entity if it is a Member
+          // Exclude the chosen entity if it is a Member (for removal request)
           if (entity.status !== 'Pending')
             totalMembers = totalMembers - 1;
-          console.log(totalMembers)
-          console.log(numberOfVotes)
           if (numberOfVotes / totalMembers > 0.6) {
             if ((entity.status === 'Pending' && agree)
-              || (entity.status === 'Removal Requested' && !agree)) {
+              || (entity.status === 'Under Review' && !agree)) {
               yield entity.update({ status: 'Member' });
+              models.EntityVote.destroy({ where: { EntityId: entity.id } });
             } else if ((entity.status === 'Pending' && !agree)
-              || (entity.status === 'Removal Requested' && agree)) {
+              || (entity.status === 'Under Review' && agree)) {
               yield entity.destroy();
             }
-            models.EntityVote.destroy({ where: { EntityUserId: entity.id } });
             res.status(200).json({ success: true })
           } else {
-            if (numberOfVotes === 1 && entity.status === 'Member')
-              yield entity.update({ status: 'Removal Requested' });
+            if (entity.status === 'Member')
+              yield entity.update({ status: 'Under Review' });
             const vote = yield models.EntityVote.create({
               agree,
-              UserId: voter.user.id,
-              EntityUserId: entity.id
+              UserId: voter.User.id,
+              EntityId: entity.id
             });
             res.status(200).json({ success: true })
           }

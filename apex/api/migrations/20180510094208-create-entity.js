@@ -18,7 +18,7 @@ module.exports = {
         allowNull: false
       },
       status: {
-        type: Sequelize.ENUM('Member', 'Pending', 'Removal Requested'),
+        type: Sequelize.ENUM('Member', 'Pending', 'Under Review'),
         allowNull: false,
         defaultValue: 'Pending'
       },
