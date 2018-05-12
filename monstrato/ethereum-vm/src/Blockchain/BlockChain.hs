@@ -206,13 +206,13 @@ addBlocks blocks = do
       TO.Quarry -> do
         currentBaggerSR <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
         let blockSR = blockDataStateRoot $ obBlockData block
-        lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ show currentBaggerSR
-        lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ show blockSR
+        lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+        lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
         if (blockSR == currentBaggerSR)
           then do
             _ <- setParentStateRoot block
             updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
-            lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ show (obBlockData block))
+            lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
             Bagger.updateTxCallback
               updates
               (blockHeaderPartialHash $ obBlockData block)
@@ -633,7 +633,7 @@ calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractNa
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newStateRoot
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
     when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
     when flags_diffPublish $
