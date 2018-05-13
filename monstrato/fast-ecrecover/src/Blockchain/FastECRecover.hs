@@ -15,9 +15,9 @@ import qualified Network.Haskoin.Internals         as C
 
 {-# INLINE getPubKeyFromSignature_fast #-}
 getPubKeyFromSignature_fast :: D.ExtendedSignature -> E.Word256 -> Maybe C.PubKey
-getPubKeyFromSignature_fast (D.ExtendedSignature sig yIsOdd) hashWord =
+getPubKeyFromSignature_fast (D.ExtendedSignature sig recId) hashWord =
   do
-    pubKeyBytes <- liftEither (F.recoverUncompressed sigR sigS recId hash)
+    pubKeyBytes <- liftEither (F.recoverUncompressed sigR sigS (fromIntegral recId) hash)
     (_, _, result) <- liftEither (A.decodeOrFail (G.fromStrict pubKeyBytes))
     return result
   where
@@ -27,7 +27,5 @@ getPubKeyFromSignature_fast (D.ExtendedSignature sig yIsOdd) hashWord =
       C.getBigWordInteger (C.sigR sig)
     sigS =
       C.getBigWordInteger (C.sigS sig)
-    recId =
-        if yIsOdd then 1 else 0
     hash =
       C.getBigWordInteger hashWord
