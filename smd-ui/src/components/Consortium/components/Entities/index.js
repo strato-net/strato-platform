@@ -6,6 +6,7 @@ import VoteConfirmation from "./VoteConfirmation";
 import "./entities.css";
 import { fetchEntities } from "./entities.actions";
 import { fetchEntityRequest } from "../Details/details.actions";
+import RequestRemoval from './RequestRemoval';
 
 class Entities extends Component {
   constructor() {
@@ -167,11 +168,12 @@ class Entities extends Component {
               className="pt-icon-arrow-left back-button"
               text="Back"
             />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-md-12 text-right">
             <InviteEntity />
-            <Button
-              className="pt-intent-danger pt-icon-remove"
-              text="Request Removal"
-            />
+            <RequestRemoval />
           </div>
         </div>
         <div className="row">

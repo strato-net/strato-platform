@@ -22,7 +22,7 @@ class VoteConfirmation extends Component {
   submit = (values) => {
     let errors = validate(values);
     this.setState({ errors });
-
+    console.log(values)
     if (JSON.stringify(errors) === JSON.stringify({})) {
       console.log(values)
       console.log(this.props.voteType)

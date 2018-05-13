@@ -6,15 +6,20 @@ import {
   INVITE_ENTITY_REQUEST,
   INVITE_ENTITY_SUCCESS,
   INVITE_ENTITY_FAILURE,
-  RESET_ERROR
+  RESET_ERROR,
+  OPEN_REQUEST_REMOVAL_MODAL,
+  CLOSE_REQUEST_REMOVAL_MODAL,
+  VOTE_SUCCESS,
+  VOTE_FAILURE
 } from "./entities.actions";
 
 const initialState = {
   isOpen: false,
+  isRequestRemovalModalOpen: false,
   entities: [],
   error: null,
   isEntityCreated: false,
-  message: null
+  message: null,
 };
 
 const reducer = function (state = initialState, action) {
@@ -29,6 +34,28 @@ const reducer = function (state = initialState, action) {
         ...state,
         isOpen: false
       };
+    case OPEN_REQUEST_REMOVAL_MODAL:
+      return {
+        ...state,
+        isRequestRemovalModalOpen: true
+      }
+    case CLOSE_REQUEST_REMOVAL_MODAL:
+      return {
+        ...state,
+        isRequestRemovalModalOpen: false
+      }
+    case VOTE_SUCCESS: 
+      return {
+        ...state,
+        isVoted: action.response,
+        message: null
+      }
+    case VOTE_FAILURE: 
+      return {
+        ...state,
+        isVoted: false,
+        message: action.error
+      }
     case FETCH_ENTITES_SUCCESS:
       return {
         ...state,
