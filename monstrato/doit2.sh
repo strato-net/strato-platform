@@ -7,67 +7,29 @@ function newnode {
   initialize=false
   if [[ ! -d .ethereumH ]]
   then initialize=true
-       cleanupDB
-       doInit
+    doInit
   fi
 
   mkdir -p logs/rotation
   echo "Starting Strato processes. All output is logged to $PWD/logs."
 
-  if $mineBlocks
-  then echo "Starting strato-adit"
-      export miningThreads=${miningThreads:-1}
-      runForever strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
-  fi
+  echo "Starting strato-api-indexer"
+  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
-  if $serveBlocks
-  then echo "Starting strato-p2p-server"
-       runForever strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
-       echo "Starting ethereum-discover"
-       runForever ethereum-discover >> logs/ethereum-discover 2>&1
-  fi
-
-  if $receiveBlocks
-  then echo "Starting strato-p2p-client"
-       runForever strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
-  fi
-
-  echo "Starting strato-sequencer"
-  runForever strato-sequencer >> logs/strato-sequencer 2>&1
-
-#  echo "Starting strato-api-indexer"
-#  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
-#
-#  echo "Starting strato-p2p-indexer"
-#  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
-#
-#  echo "Starting strato-txr-indexer"
-#  runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
+  echo "Starting strato-p2p-indexer"
+  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   minLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
       minLogLevel=LevelDebug
   fi
 
-  echo "Starting ethereum-vm"
-  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel >> logs/ethereum-vm 2>&1
-
   echo "Configuring log maintenance"
   runForever cleanupLogs
 
-  echo "Becoming strato-api"
-   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
-}
-
-function cleanupDB {
-  db_conn_params="-U $pgUser -h $pgHost"
-  PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
-    echo "dropping the old db: $line"
-    PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"
-  done
+  echo "Starting strato-txr-indexer"
+  echo "Check logs in /var/lib/strato/logs of the container..."
+  strato-txr-indexer 2>&1 | tee -a logs/strato-txr-indexer
 }
 
 function doInit {
@@ -179,20 +141,16 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
-if [ -z ${postgresIP} ]
+#if [[ ! -d .ethereumH ]]
+#then
+# Override kafka hostname to workaround the behavior when kafka only accepts connection for the hostname it is initially running on
+if [ -z ${kafkaIP} ]
 then
-  echo "postgresIP is unset - using hostname from postgres_host to connect to postgres"
+  echo "kafkaIP is unset - using hostname from kafkaHost var to connect to kafka"
 else
-  echo "${postgresIP} ${postgres_host}" >> /etc/hosts
+  echo "${kafkaIP} ${kafkaHost}" >> /etc/hosts
 fi
-
-if [ -z ${redisIP} ]
-then
-  echo "redisIP is unset - using hostname from redisHost var to connect to redis"
-else
-  echo "${redisIP} ${redisHost}" >> /etc/hosts
-fi
-
+#fi
 
 cd /var/lib/strato
 
@@ -216,4 +174,11 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
 done
 
 global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
+
+until [ -d ".ethereumH" ]
+do
+  echo "Waiting for .ethereumH directory to be copied"
+  sleep 1
+done
+
 newnode
