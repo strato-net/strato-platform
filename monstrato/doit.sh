@@ -36,13 +36,13 @@ function newnode {
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
-  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
+  runForever strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
 
   echo "Starting strato-p2p-indexer"
-  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
+  runForever strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting strato-txr-indexer"
-  runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
+  runForever strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
   minLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -59,7 +59,7 @@ function newnode {
   runForever cleanupLogs
 
   echo "Becoming strato-api"
-   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
+   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api +RTS -N1 2>&1 | tee -a logs/strato-api
 }
 
 function cleanupDB {
