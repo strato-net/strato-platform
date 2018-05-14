@@ -4,6 +4,13 @@ export stratoRoot=http://${stratoHost}/eth/v1.2
 export blocRoot=http://${blocHost}/bloc/v2.2
 export postgrestRoot=http://${postgrestHost}
 
+if [ -z ${kafkaIP} ]
+then
+  echo "kafkaIP is unset - using hostname from zookeeper"
+else
+  echo "${kafkaIP} kafka" >> /etc/hosts
+fi
+
 echo "stratoRoot is: ${stratoRoot}"
 echo "blocRoot is: ${blocRoot}"
 echo "postgrestRoot is: ${postgrestRoot}"
