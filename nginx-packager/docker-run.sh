@@ -8,6 +8,7 @@ BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
+cirrusHist=${cirrusHost:-cirrus:3333}
 
 if [ -z "$uiPassword" ]
 then
@@ -23,6 +24,8 @@ if [ "$ssl" = true ] ; then
 	cp -r /tmp/ssl/* /etc/ssl/
 	sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /etc/nginx/nginx.conf
 fi
+
+sed -i 's/<CIRRUS_HOST>/'"$cirrusHost"'/g' /etc/nginx/nginx.conf
 
 BLOC_TIMEOUT=$((blockTime * BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT))
 if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS} ]
