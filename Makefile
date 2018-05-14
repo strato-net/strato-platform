@@ -28,9 +28,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: apex bloc docs cirrus dappstore strato nginx postgrest smd
+build_all: apex bloc docs cirrus dappstore strato strato-indexers nginx postgrest smd
 
-.PHONY: apex cirrus docs cirrus dappstore strato nginx postgrest smd
+.PHONY: apex cirrus docs cirrus dappstore strato strato-indexers nginx postgrest smd
 
 apex:
 	@echo Now building apex...
@@ -55,6 +55,10 @@ dappstore:
 strato:
 	@echo Now building strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=monstrato/
+
+strato-indexers:
+	@echo Now building strato...
+	BASIL_DOCKER_TAG=${REPO_URL}strato-indexers:${VERSION} make -f Makefile2 --directory=monstrato/
 
 nginx:
 	@echo Now building nginx...
