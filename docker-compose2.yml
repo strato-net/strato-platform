@@ -1,0 +1,95 @@
+version: "2.1"
+volumes:
+  dapps:
+    driver: local
+  pgdata:
+    driver: local
+services:
+  strato-indexers:
+    environment:
+    - addBootnodes=${addBootnodes}
+    - backupblocks=${backupblocks}
+    - blockTime=${blockTime}
+    - bootnode=${bootnode}
+    - debugFail=${debugFail}
+    - evmDebugMode=${evmDebugMode}
+    - evmTraceMode=${evmTraceMode}
+    - genesis=${genesis}
+    - genesisBlock=${genesisBlock}
+    - kafkaHost=kafka
+    - kafkaIP=172.31.61.223
+    - lazyBlocks=${lazyBlocks}
+    - minBlockDifficulty=${minBlockDifficulty}
+    - mineBlocks=${mineBlocks:-true}
+    - miningAlgorithm=${miningAlgorithm}
+    - miningThreads=${miningThreads}
+    - networkID=${networkID}
+    - numMinPeers=${numMinPeers}
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_user=postgres
+    - redisBDBNumber=${redisBDBNumber}
+    - redisHost=redis
+    - redisPort=6379
+    - statsEnable=${statsEnable}
+    - statsFlush=${statsFlush}
+    - statsHost=${statsHost}
+    - statsPort=${statsPort}
+    - statsPrefix=${statsPrefix}
+    - statsSuffix=${statsSuffix}
+    - useSyncMode=${useSyncMode}
+    - zkHost=172.31.61.223
+    image: registry-aws.blockapps.net:5000/blockapps/strato-indexers:3.0.1-a1df5c8
+    restart: always
+  postgres:
+    environment:
+    - POSTGRES_DB=cirrus
+    - POSTGRES_PASSWORD=${postgres_password:-api}
+    image: postgres:9.6
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    restart: always
+    ports:
+    - 5432:5432
+  redis:
+    command: [redis-server, --appendonly, "yes"]
+    image: redis:3.2
+    restart: always
+    ports:
+    - 6379:6379
+  cirrus:
+    depends_on:
+#    - strato
+    - postgres
+    - postgrest
+#    - kafka
+#    - bloc
+    environment:
+    - blocHost=172.31.61.223:8000
+    - postgres_db=cirrus
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgrestHost=postgrest:3001
+    - SINGLE_NODE=${SINGLE_NODE}
+    - stateDiffTopic=${stateDiffTopic}
+    - stratoHost=172.31.61.223:3000
+    - zookeeper_conn=172.31.61.223
+    image: registry-aws.blockapps.net:5000/blockapps/cirrus:3.0.1-3684463
+    restart: always
+    ports:
+    - 3333:3333
+  postgrest:
+    depends_on:
+    - postgres
+    environment:
+    - PG_ENV_POSTGRES_DB=cirrus
+    - PG_ENV_POSTGRES_HOST=postgres
+    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
+    - PG_ENV_POSTGRES_USER=postgres
+    - PG_PORT_5432_TCP_PORT=5432
+    image: registry-aws.blockapps.net:5000/blockapps/postgrest:3.0.1-3684463
+    restart: always
+    ports:
+    - 3001:3001

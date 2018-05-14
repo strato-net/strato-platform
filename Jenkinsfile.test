@@ -27,37 +27,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
-          # TODO: unify for all pipelines by creating the run script file
-          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
-            BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
-            BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
-            STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
-            STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
-            CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
-            APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
-            STRATO_GS_MODE=1 \
-            docker-compose -p strato up -d
-          docker ps
-          counter=0
-          # Few quick tests
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
-          do
-            if [[ "$counter" -gt 300 ]]; then
-              echo "bloc took longer than 5 minutes to initialize! aborting."
-              exit 73
-            fi
-            echo "waiting for bloc to be available through nginx"
-            counter=$((counter+1))
-            sleep 1
-          done
-          echo "bloc is available"
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
-          do
-            echo "waiting for cirrus to be available through nginx"
-            sleep 1
-          done
-          echo "cirrus is available"
+         
         '''
       }
     }
@@ -68,52 +38,11 @@ pipeline {
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
+
             '''
           },
 
-          'E2E-Test': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps BA deploy script and tests'
-              rm -rf blockapps-ba
-              git clone https://github.com/blockapps/blockapps-ba.git -b master
-              cd blockapps-ba
-              npm i
-              SERVER=localhost npm run deploy
-              sleep 5
-              SERVER=localhost npm run test
-            '''
-          },
 
-          'Monstrato tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running monstrato unit tests"
-              cd monstrato
-              ./run_unit_tests.sh
-            '''
-          },
-
-          'Bloch tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps Haskell tests'
-              cd blockapps-haskell
-              ./run_unit_tests.sh
-            '''
-          },
-
-          'SMD tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running SMD tests'
-              cd smd-ui
-              docker build -f Dockerfile.test .
-            '''
-          }
         )
       }
     }
