@@ -187,7 +187,7 @@ services:
 #      - useSyncMode=${useSyncMode}
 #      - zkHost=zookeeper
       build: .
-      image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
+      image: ${STRATO_IMAGE:-<REPO_URL>strato-indexers:<VERSION>}
 #      ports:
 #      - 30303:30303
 #      - 30303:30303/udp

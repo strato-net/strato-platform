@@ -23,7 +23,7 @@ services:
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - STRATO_URL=${STRATO_URL}
     - SMD_MODE=${SMD_MODE}
-    image: registry-aws.blockapps.net:5000/blockapps/smd:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/smd:3.0.1-6f4d5ce
     restart: always
   apex:
     depends_on:
@@ -43,7 +43,7 @@ services:
     - SINGLE_NODE=${SINGLE_NODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
-    image: registry-aws.blockapps.net:5000/blockapps/apex:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/apex:3.0.1-6f4d5ce
     volumes:
     - dapps:/usr/src/app/apps
     restart: always
@@ -56,7 +56,7 @@ services:
     - BLOC_URL=${BLOC_URL}
     - CIRRUS_URL=${CIRRUS_URL}
     - STRATO_URL=${STRATO_URL}
-    image: registry-aws.blockapps.net:5000/blockapps/dappstore:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/dappstore:3.0.1-6f4d5ce
     restart: always
   bloc:
     depends_on:
@@ -71,7 +71,7 @@ services:
     - postgres_user=postgres
     - ssl=${ssl:-false}
     - stratoHost=strato:3000
-    image: registry-aws.blockapps.net:5000/blockapps/bloc:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/bloc:3.0.1-6f4d5ce
     restart: always
     ports:
     - 8000:8000
@@ -114,7 +114,7 @@ services:
     - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
     - zkHost=zookeeper
-    image: registry-aws.blockapps.net:5000/blockapps/strato:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/strato:3.0.1-6f4d5ce
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -137,7 +137,7 @@ services:
     - uiPassword=${uiPassword}
     - cirrusHost=172.31.48.201:3333
     - postgrestHost=172.31.48.201:3333
-    image: registry-aws.blockapps.net:5000/blockapps/nginx:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/nginx:3.0.1-6f4d5ce
     ports:
     - 80:80
     - 443:443
@@ -147,7 +147,7 @@ services:
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
-    image: registry-aws.blockapps.net:5000/blockapps/docs:3.0.1-3684463
+    image: registry-aws.blockapps.net:5000/blockapps/docs:3.0.1-6f4d5ce
     restart: always
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
