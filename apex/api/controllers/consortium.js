@@ -171,7 +171,7 @@ module.exports = {
       }
 
       try {
-        const authErrorText = "Unauthorized";
+        const authErrorText = "Wrong Password";
         const voter = yield models.Entity.find({
           attributes: ['id'],
           where: { name: req.body.entity },

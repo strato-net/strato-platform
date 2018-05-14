@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { Button, ButtonGroup, Card } from "@blueprintjs/core";
+import { Button, ButtonGroup } from "@blueprintjs/core";
 import { connect } from "react-redux";
 import InviteEntity from "./InviteEntity";
 import VoteConfirmation from "./VoteConfirmation";
@@ -35,8 +35,8 @@ class Entities extends Component {
   }
 
   tableData(entities) {
-    if (this.state.showAll) {
-      return (
+    // if (this.state.showAll) {
+      return (<div>
         <table
           className="pt-table pt-interactive pt-condensed pt-striped"
           style={{ width: "100%" }}
@@ -55,6 +55,7 @@ class Entities extends Component {
               <th>
                 <h5>Status</h5>
               </th>
+              <th />
               <th>
                 <h5>Privacy</h5>
               </th>
@@ -73,18 +74,20 @@ class Entities extends Component {
                   <td>{entity.usersCount}</td>
                   <td>
                     {entity.status}
-                    {entity.status === "Pending" && (
+                  </td>
+                  <td>
+                    {entity.status !== "Member" && (
                       <span>
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-up"
                           onClick={(event) =>
-                            this.handleVoteClick("in favor of", entity.name, event)
+                            this.handleVoteClick("in favor of", entity, event)
                           }
                         />
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-down"
                           onClick={(event) =>
-                            this.handleVoteClick("against", entity.name, event)
+                            this.handleVoteClick("against", entity, event)
                           }
                         />
                       </span>
@@ -96,57 +99,57 @@ class Entities extends Component {
                 </tr>
               );
             })}
-            <tr><td><VoteConfirmation
-              isOpen={this.state.isOpen}
-              handleClose={this.handleClose}
-              entityName={this.state.votedFor}
-              voteType={this.state.voteType}
-            /></td></tr>
           </tbody>
         </table>
-      );
-    } else {
-      return (
-        <ul className="entity-list">
-          {entities.map((entity, key) => {
-            return (
-              <li className="row" key={key}>
-                <div className="col-md-4">
-                  <Card className="entity-name">
-                    <h4>{entity.name}</h4>
-                  </Card>
-                </div>
-                <div className="col-md-6">
-                  <Card className="entity-content">
-                    <ul>
-                      <li>Email Id: {entity.adminEmail}</li>
-                    </ul>
-                  </Card>
-                </div>
-                <div className="col-md-2">
-                  <Button
-                    className="vote-btn pt-intent-primary pt-icon-thumbs-up"
-                    onClick={() =>
-                      this.handleVoteClick("in favor", entity.name)
-                    }
-                  />
-                  <Button
-                    className="vote-btn pt-intent-primary pt-icon-thumbs-down"
-                    onClick={() => this.handleVoteClick("against", entity.name)}
-                  />
-                </div>
-              </li>
-            );
-          })}
-          <li><VoteConfirmation
-            isOpen={this.state.isOpen}
-            handleClose={this.handleClose}
-            entityName={this.state.votedFor}
-            voteType={this.state.voteType}
-          /></li>
-        </ul>
-      );
-    }
+        <VoteConfirmation
+          isOpen={this.state.isOpen}
+          handleClose={this.handleClose}
+          entity={this.state.votedFor}
+          voteType={this.state.voteType}
+        />
+      </div>);
+    // } else {
+    //   return (
+    //     <ul className="entity-list">
+    //       {entities.map((entity, key) => {
+    //         return (
+    //           <li className="row" key={key}>
+    //             <div className="col-md-4">
+    //               <Card className="entity-name">
+    //                 <h4>{entity.name}</h4>
+    //               </Card>
+    //             </div>
+    //             <div className="col-md-6">
+    //               <Card className="entity-content">
+    //                 <ul>
+    //                   <li>Email Id: {entity.adminEmail}</li>
+    //                 </ul>
+    //               </Card>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <Button
+    //                 className="vote-btn pt-intent-primary pt-icon-thumbs-up"
+    //                 onClick={() =>
+    //                   this.handleVoteClick("in favor", entity.name)
+    //                 }
+    //               />
+    //               <Button
+    //                 className="vote-btn pt-intent-primary pt-icon-thumbs-down"
+    //                 onClick={() => this.handleVoteClick("against", entity.name)}
+    //               />
+    //             </div>
+    //           </li>
+    //         );
+    //       })}
+    //       <li><VoteConfirmation
+    //         isOpen={this.state.isOpen}
+    //         handleClose={this.handleClose}
+    //         entity={this.state.votedFor}
+    //         voteType={this.state.voteType}
+    //       /></li>
+    //     </ul>
+    //   );
+    // }
   }
 
   render() {

@@ -9,7 +9,12 @@ class RequestRemoval extends Component {
 
   constructor(props) {
     super(props);
-    this.state = { errors: null };
+    this.state = { errors: null, requestedRemovalFor: [] };
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (!this.props.isVoted && nextProps.isVoted)
+      this.props.closeRequestRemovalModal()
   }
 
   submit = (values) => {
@@ -29,17 +34,24 @@ class RequestRemoval extends Component {
     return null;
   }
 
+  handleEntityChange = (event) => {
+    const requestedRemovalFor = this.props.entities.filter(entity => (entity.id !== Number(event.target.value)) && (entity.status === 'Member'))
+    this.setState({ requestedRemovalFor })
+  }
+
   render() {
     let entities = this.props.entities;
     let memberEntities = entities && entities.filter(entity => entity.status !== "Pending");
-    let pendingEntities = entities && entities.filter(entity => entity.status !== "Member");
 
     return (
       <span>
         <Button
           className="pt-intent-danger pt-icon-remove"
           text="Request Removal"
-          onClick={() => this.props.openRequestRemovalModal()}
+          onClick={() => {
+            this.props.reset();
+            this.props.openRequestRemovalModal()
+          }}
         />
         <Dialog
           isOpen={this.props.isRequestRemovalModalOpen}
@@ -95,7 +107,7 @@ class RequestRemoval extends Component {
                     >
                       <option />
                       {
-                        pendingEntities.map((entity, i) => {
+                        this.state.requestedRemovalFor.map((entity, i) => {
                           return (
                             <option key={'entity' + i} value={entity.name}>{entity.name}</option>
                           )
@@ -147,7 +159,8 @@ class RequestRemoval extends Component {
 export function mapStateToProps(state) {
   return {
     isRequestRemovalModalOpen: state.entities.isRequestRemovalModalOpen,
-    entities: state.entities.entities
+    entities: state.entities.entities,
+    isVoted: state.entities.isVoted,
   };
 }
 

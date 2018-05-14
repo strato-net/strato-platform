@@ -10,7 +10,8 @@ import {
   OPEN_REQUEST_REMOVAL_MODAL,
   CLOSE_REQUEST_REMOVAL_MODAL,
   VOTE_SUCCESS,
-  VOTE_FAILURE
+  VOTE_FAILURE,
+  VOTE_REQUEST
 } from "./entities.actions";
 
 const initialState = {
@@ -43,6 +44,12 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         isRequestRemovalModalOpen: false
+      }
+    case VOTE_REQUEST:
+      return {
+        ...state,
+        isVoted: null,
+        message: null
       }
     case VOTE_SUCCESS: 
       return {
