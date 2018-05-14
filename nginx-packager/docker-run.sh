@@ -40,12 +40,14 @@ fi
 
 
 # TODOs
-# replace placeholder for session_secret in nginx.conf with RANDOM string (sha256sum?)
+# WRONG - replace placeholder for session_secret in nginx.conf with RANDOM string (sha256sum?)
+# PROPER WAY - add env var to pass the session_secret string
 # pass all the hardcoded parameters below from docker-compose
 # merge the regular and azure configs and clean with sed when in public mode //nik
+# check if nothing is overwritten on container restart (nginx.conf and random session-secret in it)
 
 if [ "$SMD_MODE" = "enterpise" ] ; then
- sed -i 's/<SESSION_SECRET>/'623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz'/g' /usr/local/openresty/nginx/conf/nginx.conf
+ sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
  sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"bec8ad68-9e10-4c31-ab08-eac305f160c2"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo="'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  if [ "$ssl" = true ] ; then
