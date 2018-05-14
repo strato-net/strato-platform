@@ -60,7 +60,7 @@ class ConsourtimList extends Component {
 export function mapStateToProps(state) {
   return {
     consourtimList: [
-      { networkId: 599, name: 'Google Inc', description: 'Here is the why we are using google' }
+      { networkId: 1, name: 'Phone Manufacturing', description: 'A network of phone Manufacturing and retailers' }
     ]
   };
 }

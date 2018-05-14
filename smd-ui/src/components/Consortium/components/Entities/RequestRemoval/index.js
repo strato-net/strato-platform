@@ -20,7 +20,7 @@ class RequestRemoval extends Component {
   submit = (values) => {
     let errors = validate(values);
     this.setState({ errors });
-
+    
     if (JSON.stringify(errors) === JSON.stringify({})) {
       values.voteType = "agree";
       this.props.vote(values);
@@ -35,7 +35,7 @@ class RequestRemoval extends Component {
   }
 
   handleEntityChange = (event) => {
-    const requestedRemovalFor = this.props.entities.filter(entity => (entity.id !== Number(event.target.value)) && (entity.status === 'Member'))
+    const requestedRemovalFor = this.props.entities.filter(entity => (entity.name !== event.target.value) && (entity.status === 'Member'))
     this.setState({ requestedRemovalFor })
   }
 
@@ -74,19 +74,19 @@ class RequestRemoval extends Component {
                     <Field
                       className="pt-input"
                       component="select"
-                      name="entityID"
+                      name="entity"
                       onChange={this.handleEntityChange}
                     >
                       <option />
                       {
                         memberEntities.map((entity, i) => {
                           return (
-                            <option key={'entity' + i} value={entity.id}>{entity.name}</option>
+                            <option key={'entity' + i} value={entity.name}>{entity.name}</option>
                           )
                         })
                       }
                     </Field>
-                    <div className="error-text">{this.errorMessageFor('entityID')}</div>
+                    <div className="error-text">{this.errorMessageFor('entity')}</div>
                   </div>
                 </div>
               </div>
@@ -102,19 +102,19 @@ class RequestRemoval extends Component {
                     <Field
                       className="pt-input"
                       component="select"
-                      name="entity"
+                      name="entityID"
                       onChange={this.handleUsernameChange}
                     >
                       <option />
                       {
                         this.state.requestedRemovalFor.map((entity, i) => {
                           return (
-                            <option key={'entity' + i} value={entity.name}>{entity.name}</option>
+                            <option key={'entity' + i} value={entity.id}>{entity.name}</option>
                           )
                         })
                       }
                     </Field>
-                    <div className="error-text">{this.errorMessageFor('entity')}</div>
+                    <div className="error-text">{this.errorMessageFor('entityID')}</div>
                   </div>
                 </div>
               </div>
