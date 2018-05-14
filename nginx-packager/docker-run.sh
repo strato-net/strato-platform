@@ -9,7 +9,6 @@ authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
 
-
 if [ -z "$uiPassword" ]
 then
   echo "Using the default password for user \"admin\""
