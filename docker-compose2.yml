@@ -66,6 +66,7 @@ services:
 #    - bloc
     environment:
     - blocHost=172.31.61.223:8000
+    - kafkaIP=172.31.61.223
     - postgres_db=cirrus
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
