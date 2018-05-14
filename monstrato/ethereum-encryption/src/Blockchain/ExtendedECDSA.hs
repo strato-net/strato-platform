@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Blockchain.ExtendedECDSA (
   ExtendedSignature(..),
@@ -80,7 +81,10 @@ unsafeExtSignMsg h d (k,p) = do
     guard (s /= 0)
     -- 4.1.3.7
     --return $ (Signature r s, odd y `xor` (s' > (maxBound `div` 2)))
-    return $ ExtendedSignature (Signature r s) (fromIntegral $ (y `mod` 2) `xor` (if s' > (maxBound `div` 2) then 1 else 0))
+    let (recId :: Word8) = (if (toInteger r) >= curveN then 2 else 0)
+                           + ((fromIntegral (y `mod` 2))
+                             `xor` (if s' > (maxBound `div` 2) then 1 else 0))
+    return $ ExtendedSignature (Signature r s) (fromIntegral recId)
 
 extSignMsg :: Monad m => Word256 -> PrvKey -> SecretT m ExtendedSignature
 --extSignMsg _ (PrvKey  0) = error "signMsg: Invalid private key 0"
