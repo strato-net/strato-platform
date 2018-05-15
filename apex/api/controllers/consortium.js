@@ -27,6 +27,47 @@ module.exports = {
       }
     })
   },
+  fetchEntitiesMembers: function (req, res, next) {
+    co(function* () {
+      try {
+        const currentEntity = yield models.Entity.findAll({
+          attributes: ['id', 'name'],
+          where: { status: { [sequelize.Op.ne]: 'Pending' } },
+          include: [{
+            model: models.EntityUser,
+            as: 'Users',
+            attributes: [],
+            include: [{
+              model: models.User,
+              attributes: [],
+              where: { username: req.query.username }
+            }],
+            where: { admin: true }
+          }]
+        });
+
+        const entities = yield models.Entity.findAll({
+          attributes: ['id', 'name', 'status'],
+          where: { status: { [sequelize.Op.ne]: 'Pending' } },
+          include: [{
+            model: models.EntityUser,
+            as: 'Users',
+            include: [{
+              model: models.User,
+              attributes: ['id', 'username'],
+              where: { username: { [sequelize.Op.ne]: req.query.username } }
+            }],
+            where: { admin: true }
+          }]
+        });
+        res.status(200).json({ entities: entities, currentEntity });
+      } catch (error) {
+        let err = new Error('could not fetch entities: ', error);
+        err.status = 500;
+        return next(err);
+      }
+    })
+  },
   fetchEntity: function (req, res, next) {
     co(function* () {
       try {
