@@ -183,8 +183,7 @@ dataToPacket msg = do
     let r = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 msg
         s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 64 msg
     v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
-    let yIsOdd = v == 1
-        signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
+    let signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) (toRecId v)
         theRest = B.unpack $ B.drop 98 msg
         (rlp, _) = rlpSplit $ B.pack theRest
     theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
@@ -213,9 +212,9 @@ sendPacket sock prv addr packet = do
       theData = B.unpack $ rlpSerialize theRLP
       SHA theMsgHash = hash $ B.pack $ theType' : theData
 
-  ExtendedSignature signature' yIsOdd' <- liftIO $ H.withSource H.devURandom $ extSignMsg theMsgHash prv
+  ExtendedSignature signature' recId' <- liftIO $ H.withSource H.devURandom $ extSignMsg theMsgHash prv
 
-  let v' = if yIsOdd' then 1 else 0
+  let v' = fromRecId recId'
       r' = H.sigR signature'
       s' = H.sigS signature'
       theSignature = word256ToBytes (fromIntegral r') ++ word256ToBytes (fromIntegral s') ++ [v']
@@ -240,8 +239,7 @@ processDataStream'
                           r17,r18,r19,r20,r21,r22,r23,r24,r25,r26,r27,r28,r29,r30,r31,r32]
       s = bytesToWord256 [s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14,s15,s16,
                           s17,s18,s19,s20,s21,s22,s23,s24,s25,s26,s27,s28,s29,s30,s31,s32]
-      yIsOdd = v == 1 -- 0x1c
-      signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
+      signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) (toRecId v)
 
   let (rlp, _) = rlpSplit $ B.pack rest
 
@@ -302,9 +300,9 @@ getServerPubKey myPriv domain port =
           theData = B.unpack $ rlpSerialize theRLP
           SHA theMsgHash = hash $ B.pack $ theType : theData
 
-      ExtendedSignature signature yIsOdd <- H.withSource H.devURandom $ encrypt prvKey' theMsgHash
+      ExtendedSignature signature recId <- H.withSource H.devURandom $ encrypt prvKey' theMsgHash
 
-      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
+      let v = fromRecId recId
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
@@ -334,10 +332,10 @@ findNeighbors myPriv domain port =
           theData = B.unpack $ rlpSerialize theRLP
           SHA theMsgHash = hash $ B.pack (theType : theData)
 
-      ExtendedSignature signature yIsOdd <-
+      ExtendedSignature signature recId <-
         H.withSource H.devURandom $ encrypt prvKey' theMsgHash
 
-      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
+      let v = fromRecId recId
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
