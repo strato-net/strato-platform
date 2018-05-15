@@ -9,16 +9,8 @@ authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
 
-if [ -z "$uiPassword" ]
-then
-  echo "Using the default password for user \"admin\""
-else
-  echo "Setting UI password for user \"admin\""
-  htpasswd -cb /usr/local/openresty/nginx/conf/auth.htpasswd admin ${uiPassword}
-fi
-
-if [ "$SMD_MODE" = "enterpise" ]; then CONF_FILENAME_PREFIX=azure-nginx; else CONF_FILENAME_PREFIX=nginx; fi
-mv /tmp/${CONF_FILENAME_PREFIX}(${ssl:-false} || echo "no")ssl.conf /usr/local/openresty/nginx/conf/nginx.conf
+if [ "$SMD_MODE" != "public" ]; then CONF_FILENAME_PREFIX=azure-nginx-; else CONF_FILENAME_PREFIX=nginx-; fi
+cp /tmp/${CONF_FILENAME_PREFIX}$(${ssl:-false} || echo "no")ssl.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 if [ "$ssl" = true ] ; then
 	cp -r /tmp/ssl/* /etc/ssl/
@@ -35,26 +27,38 @@ sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /usr/local/openresty/nginx/conf/ng
 
 if [ "$authBasic" != true ] ; then
 	sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx/nginx.conf
+else
+ cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
+ if [ -z "$uiPassword" ]
+ then
+   echo "Using the default password for user \"admin\""
+ else
+   echo "Setting UI password for user \"admin\""
+   htpasswd -cb /usr/local/openresty/nginx/conf/auth.htpasswd admin ${uiPassword}
+ fi
 fi
 
 
 # TODOs
-# WRONG - replace placeholder for session_secret in nginx.conf with RANDOM string (sha256sum?)
-# PROPER WAY - add env var to pass the session_secret string
+# replace placeholder for session_secret in nginx.conf with RANDOM string generated and saved to some file in container (sha256sum?)
 # pass all the hardcoded parameters below from docker-compose
 # merge the regular and azure configs and clean with sed when in public mode //nik
 # check if nothing is overwritten on container restart (nginx.conf and random session-secret in it)
+# add the flag (file) showing that container was run before and check for this script
 
-if [ "$SMD_MODE" = "enterpise" ] ; then
+if [ "$SMD_MODE" != "public" ] ; then
+ cp /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
+ opm get zmartzone/lua-resty-openidc
  sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
- sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"bec8ad68-9e10-4c31-ab08-eac305f160c2"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
- sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo="'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+ sed -i 's/<TENANT_ID_PLACEHOLDER>/2ec6965f-17c7-47c0-80c8-98e1a0c7b66a/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+ sed -i 's/<CLIENT_ID_PLACEHOLDER>/bec8ad68-9e10-4c31-ab08-eac305f160c2/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+ sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo=/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  if [ "$ssl" = true ] ; then
-  sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/'"yes"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
-  sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/'"https"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+  sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+  sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  else
-  sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/'"no"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
-  sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/'"http"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+  sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+  sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  fi
 
 fi
@@ -66,6 +70,5 @@ do
 done
 echo 'apex is available'
 
-# TODO: run openresty instead
-openresty || (tail -n 5 /var/log/nginx/error.log && exit 1) # Restart container if nginx failed to start (wait for all upstreams to become available)
-tail -n0 -F /var/log/nginx/*.log
+openresty
+tail -n0 -F /usr/local/openresty/nginx/logs/*.log
