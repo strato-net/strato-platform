@@ -60,14 +60,18 @@ main = do
 
   doesNotExist22 <- null <$>
     (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
-  if doesNotExist22
-    then void $ execute_ dbCreateConn Bloc22.createDatabase
-    else void $ Bloc22.runBlocMigrations dbCreateConn
+  when doesNotExist22 $ void $ execute_ dbCreateConn Bloc22.createDatabase
+
   close dbCreateConn
 
   conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}
 
-  void $ execute_ conn22 Bloc22.createTables
+  if doesNotExist22
+    then do
+         void $ execute_ conn22 Bloc22.createTables
+         void $ execute_ conn22 Bloc22.insertSchemaVersion
+         void $ Bloc22.updateMigrationNumber conn22
+    else void $ Bloc22.runBlocMigrations conn22
   close conn22
 
   -- Not creating pool for bloc21 as it's being deprecated
