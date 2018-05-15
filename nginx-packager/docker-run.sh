@@ -26,7 +26,7 @@ fi
 sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /usr/local/openresty/nginx/conf/nginx.conf
 
 if [ "$authBasic" != true ] ; then
-	sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx/nginx.conf
+	sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx.conf
 else
  cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
  if [ -z "$uiPassword" ]
@@ -49,6 +49,7 @@ fi
 if [ "$SMD_MODE" != "public" ] ; then
  cp /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
  opm get zmartzone/lua-resty-openidc
+ opm get SkyLothar/lua-resty-jwt
  sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
  sed -i 's/<TENANT_ID_PLACEHOLDER>/2ec6965f-17c7-47c0-80c8-98e1a0c7b66a/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  sed -i 's/<CLIENT_ID_PLACEHOLDER>/bec8ad68-9e10-4c31-ab08-eac305f160c2/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
