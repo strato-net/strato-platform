@@ -29,9 +29,9 @@ updateMigrationNumber :: Connection -> IO Int64
 updateMigrationNumber conn = execute conn updateSchemaVersion (Only $ length migrations)
 
 migrations :: [(MigrationErrorBehavior, Query)]
-migrations = [ (Catch, createTables)
-             , (Catch, insertSchemaVersion)
-             , (Catch, dropHashNameTable)
+migrations = [ (Throw, createTables)
+             , (Throw, insertSchemaVersion)
+             , (Throw, dropHashNameTable)
              , (Throw, hashNameTable)
              ]
 
