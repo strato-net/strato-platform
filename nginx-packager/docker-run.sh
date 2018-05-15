@@ -26,7 +26,7 @@ fi
 sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /usr/local/openresty/nginx/conf/nginx.conf
 
 if [ "$authBasic" != true ] ; then
-	sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx/nginx.conf
+	sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx.conf
 else
  cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
  if [ -z "$uiPassword" ]
