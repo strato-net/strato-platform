@@ -89,6 +89,7 @@ readSupplementaryAccounts genesisBlockName = do
   accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
   let parseAccounts :: String -> [AccountInfo]
       parseAccounts line = case words line of
+                              [] -> []
                               "s":_ -> []
                               ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
                               ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
