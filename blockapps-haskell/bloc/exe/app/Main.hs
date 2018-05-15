@@ -66,12 +66,7 @@ main = do
 
   conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}
 
-  if doesNotExist22
-    then do
-         void $ execute_ conn22 Bloc22.createTables
-         void $ execute_ conn22 Bloc22.insertSchemaVersion
-         void $ Bloc22.updateMigrationNumber conn22
-    else void $ Bloc22.runBlocMigrations conn22
+  void $ Bloc22.runBlocMigrations conn22
   close conn22
 
   -- Not creating pool for bloc21 as it's being deprecated
