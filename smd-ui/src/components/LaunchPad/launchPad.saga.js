@@ -24,6 +24,7 @@ export function uploadAppCall(username, userAddress, password, files) {
     url,
     {
       method: 'POST',
+      credentials: "include",
       body: body
     }
   )

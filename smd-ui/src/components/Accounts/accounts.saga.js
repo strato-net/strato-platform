@@ -38,6 +38,7 @@ export function getAccountsApi() {
     usernameUrl,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -55,6 +56,7 @@ export function getUserAddressesApi(username) {
     addressUrl.replace(':user', username),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -73,6 +75,7 @@ export function getAccountDetailApi(address) {
     accountDataUrl.replace(":address", address),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -91,6 +94,7 @@ export function postFaucet(address) {
     faucetUrl,
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },

@@ -19,6 +19,7 @@ export function tokenizeSource(source) {
     compileUrl,
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
       },
@@ -44,6 +45,7 @@ export function compileSource(contractName, source) {
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
+    credentials: "include",
     headers: {
       "accept": "application/json",
       "content-type": "application/json"
