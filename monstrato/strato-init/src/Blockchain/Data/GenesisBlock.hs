@@ -64,6 +64,10 @@ import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 import           Blockchain.MilenaTools               (commitSingleOffset)
 
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
+
 initializeBlankStateDB :: HasStateDB m => m ()
 initializeBlankStateDB = do
     db <- getStateDB
@@ -78,6 +82,20 @@ putStorageTrie address slots = do
       mapM_ (\(k, v) -> putStorageKeyVal' address k v) ss
       flushMemStorageDB
       Mem.flushMemAddressStateDB)
+
+readSupplementaryAccounts :: String -> IO [AccountInfo]
+readSupplementaryAccounts genesisBlockName = do
+  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
+  let parseAccounts :: String -> [AccountInfo]
+      parseAccounts line = case words line of
+                              [] -> []
+                              "s":_ -> []
+                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                              _ -> error $ "invalid AccountInfo line: " ++ line
+  return . concatMap parseAccounts . lines $ accountInfoString
+
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
@@ -100,7 +118,7 @@ initializeStateDB addressInfo genesisBlockName = do
     let accountInfoFilename = genesisBlockName ++ "AccountInfo"
 
     liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
-    
+
     accountInfoString <-
       liftIO $
       fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
@@ -128,7 +146,7 @@ initializeStateDB addressInfo genesisBlockName = do
       liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
       flushMemStorageDB
       Mem.flushMemAddressStateDB
-    
+
     forM_ addressInfo $ \account -> do
       liftIO $ print account
       putAccount account
@@ -156,10 +174,11 @@ zipSourceInfo accounts codes =
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
                           -> String
+                          -> [AccountInfo]
                           -> m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi gn = do
+genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
-    let accounts = genesisInfoAccountInfo gi
+    let accounts = genesisInfoAccountInfo gi ++ as
     let sourceInfo = zipSourceInfo accounts codes
     initializeCodeDB codes
     initializeStateDB accounts gn
@@ -193,7 +212,8 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
-    genesisInfoToGenesisBlock theJSON genesisBlockName
+    extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+    genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
