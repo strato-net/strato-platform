@@ -8,8 +8,12 @@ BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
+azureAD=${azureAD:-false}
 
-if [ "$SMD_MODE" != "public" ]; then CONF_FILENAME_PREFIX=azure-nginx-; else CONF_FILENAME_PREFIX=nginx-; fi
+# TODO
+# check for conflicting flags i.e $azureAD cannot be true for public mode
+
+if [ "$azureAD" = true ]; then CONF_FILENAME_PREFIX=azure-nginx-; else CONF_FILENAME_PREFIX=nginx-; fi
 cp /tmp/${CONF_FILENAME_PREFIX}$(${ssl:-false} || echo "no")ssl.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 if [ "$ssl" = true ] ; then
@@ -45,12 +49,13 @@ fi
 # merge the regular and azure configs and clean with sed when in public mode //nik
 # check if nothing is overwritten on container restart (nginx.conf and random session-secret in it)
 # add the flag (file) showing that container was run before and check for this script
+# for $azureAD = true we have to check for all the variables
 
-if [ "$SMD_MODE" != "public" ] ; then
+if [ "$azureAD" = true ] ; then
  cp /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
  opm get zmartzone/lua-resty-openidc
  opm get SkyLothar/lua-resty-jwt
- sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
+ #sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
  sed -i 's/<TENANT_ID_PLACEHOLDER>/2ec6965f-17c7-47c0-80c8-98e1a0c7b66a/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  sed -i 's/<CLIENT_ID_PLACEHOLDER>/bec8ad68-9e10-4c31-ab08-eac305f160c2/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
  sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo=/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
