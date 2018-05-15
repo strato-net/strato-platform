@@ -111,7 +111,7 @@ getPubKeyFromSignature (ExtendedSignature sig recId) msgHash =
            in Just $ makePubKey $ ((s / r') `mulPoint` bigR) `addPoint` ((fromIntegral curveN - fromIntegral msgHash/r') `mulPoint` curveG)
   where
     r = sigR sig
-    r_N = r - fromIntegral curveN
+    r_N = r + fromIntegral curveN
     s = sigS sig
     y01 = quadraticResidue $ fromIntegral r^(3::Integer)+7
     y23 = quadraticResidue $ fromIntegral r_N ^ (3 :: Integer) + 7
