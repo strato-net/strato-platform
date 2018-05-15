@@ -11,7 +11,7 @@ import           Data.Maybe                        (maybe, listToMaybe)
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           BlockApps.Bloc22.Database.Create  (schemaVersionTable, hashNameTable)
+import           BlockApps.Bloc22.Database.Create  (createTables, hashNameTable)
 
 data MigrationErrorBehavior = Throw | Catch
 
@@ -29,7 +29,7 @@ updateMigrationNumber :: Connection -> IO Int64
 updateMigrationNumber conn = execute conn updateSchemaVersion (Only $ length migrations)
 
 migrations :: [(MigrationErrorBehavior, Query)]
-migrations = [ (Catch, schemaVersionTable)
+migrations = [ (Catch, createTables)
              , (Catch, insertSchemaVersion)
              , (Catch, dropHashNameTable)
              , (Throw, hashNameTable)
