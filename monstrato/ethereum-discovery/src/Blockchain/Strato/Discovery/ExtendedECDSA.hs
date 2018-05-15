@@ -103,12 +103,14 @@ extSignMsg h d = do
 
 getPubKeyFromSignature :: ExtendedSignature -> Word256 -> Maybe PubKey
 getPubKeyFromSignature (ExtendedSignature sig recId) msgHash =
-  case drop (fromIntegral recId) ys of
-    [] -> Nothing
-    (y:_) ->
-      let Just bigR = makePoint (fromIntegral r) y
-       in Just $ makePubKey $ ((s / r) `mulPoint` bigR) `addPoint` ((fromIntegral curveN - fromIntegral msgHash/r) `mulPoint` curveG)
+  let ys = if (recId < 2) then y01 else y23
+   in case drop (fromIntegral $ recId `mod` 2) ys of
+        [] -> Nothing
+        (y:_) ->
+          let Just bigR = makePoint (fromIntegral r) y
+           in Just $ makePubKey $ ((s / r) `mulPoint` bigR) `addPoint` ((fromIntegral curveN - fromIntegral msgHash/r) `mulPoint` curveG)
   where
     r = sigR sig
     s = sigS sig
-    ys = quadraticResidue $ fromIntegral r^(3::Integer)+7
+    y01 = quadraticResidue $ fromIntegral r^(3::Integer)+7
+    y23 = quadraticResidue $ fromIntegral (toInteger r - curveN) ^ (3 :: Integer) + 7
