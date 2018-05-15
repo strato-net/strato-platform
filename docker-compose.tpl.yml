@@ -177,6 +177,7 @@ services:
     - apex
     environment:
     - authBasic=${authBasic}
+    - azureAD=${azureAD}
     - blockTime=${blockTime}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
