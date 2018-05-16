@@ -257,7 +257,7 @@ module.exports = {
             where: { status: 'Member' }
           });
           // Exclude the chosen entity if it is a Member (for removal request)
-          if (entity.status !== 'Pending')
+          if (entity.status === 'Member')
             totalMembers = totalMembers - 1;
           if (numberOfVotes / totalMembers > 0.6) {
             if ((entity.status === 'Pending' && agree)
