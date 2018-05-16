@@ -178,11 +178,11 @@ genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB
                           -> m ([(AccountInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
-    let accounts = genesisInfoAccountInfo gi ++ as
-    let sourceInfo = zipSourceInfo accounts codes
+    let accounts = genesisInfoAccountInfo gi
     initializeCodeDB codes
     initializeStateDB accounts gn
     db <- getStateDB
+    let sourceInfo = zipSourceInfo (accounts ++ as) codes
     return (sourceInfo, Block {
         blockBlockData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
