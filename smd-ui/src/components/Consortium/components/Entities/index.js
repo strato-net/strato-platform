@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { Button, ButtonGroup } from "@blueprintjs/core";
+import { Button, ButtonGroup, Position, Tooltip } from "@blueprintjs/core";
 import { connect } from "react-redux";
 import InviteEntity from "./InviteEntity";
 import VoteConfirmation from "./VoteConfirmation";
@@ -36,78 +36,110 @@ class Entities extends Component {
 
   tableData(entities) {
     // if (this.state.showAll) {
-      return (<div>
-        <table
-          className="pt-table pt-interactive pt-condensed pt-striped"
-          style={{ width: "100%" }}
-        >
-          <thead>
-            <tr>
-              <th>
-                <h5>Member</h5>
-              </th>
-              <th>
-                <h5>Nodes</h5>
-              </th>
-              <th>
-                <h5>Users</h5>
-              </th>
-              <th>
-                <h5>Status</h5>
-              </th>
-              <th />
-              <th>
-                <h5>Privacy</h5>
-              </th>
-            </tr>
-          </thead>
+    return (<div>
+      <table
+        className="pt-table pt-interactive pt-condensed pt-striped"
+        style={{ width: "100%" }}
+      >
+        <thead>
+          <tr>
+            <th>
+              <h5>Member</h5>
+            </th>
+            <th>
+              <h5>Nodes</h5>
+            </th>
+            <th>
+              <h5>Users</h5>
+            </th>
+            <th>
+              <h5>Status</h5>
+            </th>
+            <th />
+            <th>
+              <h5>Privacy</h5>
+            </th>
+          </tr>
+        </thead>
 
-          <tbody>
-            {entities.map((entity, key) => {
-              return (
-                <tr key={key} onClick={() => {
-                  this.props.history.push(`entities/${entity.id}`);
-                  this.props.fetchEntityRequest(entity.id);
-                }}>
-                  <td>{entity.name}</td>
-                  <td>1</td>
-                  <td>{entity.usersCount}</td>
-                  <td>
-                    {entity.status}
-                  </td>
-                  <td>
-                    {entity.status !== "Member" && (
-                      <span>
+        <tbody>
+          {entities.map((entity, key) => {
+            let spanClass;
+            let contentClass;
+
+            switch (entity.status) {
+              case 'Member':
+                spanClass = 'entity-success';
+                contentClass = 'check-circle';
+                break;
+              case 'Pending':
+                spanClass = 'entity-warning';
+                contentClass = 'plus-circle';
+                break;
+              default:
+                spanClass = 'entity-danger';
+                contentClass = 'exclamation-circle';
+                break;
+            }
+
+            return (
+              <tr key={key} onClick={() => {
+                this.props.history.push(`entities/${entity.id}`);
+                this.props.fetchEntityRequest(entity.id);
+              }}>
+                <td>{entity.name}</td>
+                <td>1</td>
+                <td>{entity.usersCount}</td>
+                <td>
+                  <span className={spanClass}>
+                    <i className={`fa fa-${contentClass}`}></i> {entity.status}
+                  </span>
+                </td>
+                <td>
+                  {entity.status !== "Member" && (
+                    <span>
+                      <Tooltip
+                        content={<span> Vote to add this Member </span>}
+                        inline={true}
+                        position={Position.TOP}
+                      >
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-up"
                           onClick={(event) =>
                             this.handleVoteClick("in favor of", entity, event)
                           }
                         />
+                      </Tooltip>
+                      <Tooltip
+                        content={<span> Vote to remove this Member </span>}
+                        inline={true}
+                        position={Position.TOP}
+                      >
                         <Button
                           className="vote-btn pt-intent-primary pt-icon-thumbs-down"
                           onClick={(event) =>
                             this.handleVoteClick("against", entity, event)
                           }
                         />
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <Button>Connect</Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <VoteConfirmation
-          isOpen={this.state.isOpen}
-          handleClose={this.handleClose}
-          entity={this.state.votedFor}
-          voteType={this.state.voteType}
-        />
-      </div>);
+                      </Tooltip>
+                    </span>
+                  )}
+                </td>
+                <td>
+                  <Button>Connect</Button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <VoteConfirmation
+        isOpen={this.state.isOpen}
+        handleClose={this.handleClose}
+        entity={this.state.votedFor}
+        voteType={this.state.voteType}
+      />
+    </div>);
     // } else {
     //   return (
     //     <ul className="entity-list">

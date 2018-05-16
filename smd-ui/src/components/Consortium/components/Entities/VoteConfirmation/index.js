@@ -35,7 +35,11 @@ class VoteConfirmation extends Component {
     this.setState({ errors });
     if (JSON.stringify(errors) === JSON.stringify({})) {
       const vote = values;
-      vote.voteType = (this.props.voteType === 'against') ? 'disagree' : 'agree';
+      if (this.props.voteType === 'against') {
+        vote.voteType = this.props.entity.status === "Pending" ? 'disagree' : 'agree';
+      } else {
+        vote.voteType = this.props.entity.status === "Under Review" ? 'disagree' : 'agree';
+      }
       vote.entityID = this.props.entity.id;
       this.props.vote(vote);
     }
