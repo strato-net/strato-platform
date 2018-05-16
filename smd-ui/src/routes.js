@@ -60,8 +60,8 @@ export const routes = isModePublic() ? (
       <Route exact path="/apps" component={Applications} />
       <Route exact path="/consortium" component={Consortium} />
       <Route exact path="/consortium/create" component={CreateConsortium} />
-      <Route exact path="/consortium/:id/entites" component={Entities} />
-      <Route exact path="/consortium/:id/entites/:id" component={Details} />
+      <Route exact path="/consortium/:id/entities" component={Entities} />
+      <Route exact path="/consortium/:id/entities/:id" component={Details} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>

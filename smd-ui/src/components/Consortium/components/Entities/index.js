@@ -66,7 +66,7 @@ class Entities extends Component {
             {entities.map((entity, key) => {
               return (
                 <tr key={key} onClick={() => {
-                  this.props.history.push(`entites/${entity.id}`);
+                  this.props.history.push(`entities/${entity.id}`);
                   this.props.fetchEntityRequest(entity.id);
                 }}>
                   <td>{entity.name}</td>
