@@ -9,9 +9,14 @@ authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 sslCertFileType=${sslCertFileType:-crt}
 azureAD=${azureAD:-false}
+azureADTenantID=${azureADTenantID:-NULL}
+azureADClientID=${azureADClientID:-NULL}
+azureADClientSecret=${azureADClientSecret:-NULL}
 
-# TODO
-# check for conflicting flags i.e $azureAD cannot be true for public mode
+if [[ $azureAD = true && ${SMD_MODE,,} = public ]] ; then
+ echo 'Azure AD cannot be used with SMD_MODE=public'
+ exit 4
+fi
 
 if [ "$azureAD" = true ]; then CONF_FILENAME_PREFIX=azure-nginx-; else CONF_FILENAME_PREFIX=nginx-; fi
 cp /tmp/${CONF_FILENAME_PREFIX}$(${ssl:-false} || echo "no")ssl.conf /usr/local/openresty/nginx/conf/nginx.conf
@@ -45,20 +50,27 @@ fi
 
 # TODOs
 # replace placeholder for session_secret in nginx.conf with RANDOM string generated and saved to some file in container (sha256sum?)
-# pass all the hardcoded parameters below from docker-compose
 # merge the regular and azure configs and clean with sed when in public mode //nik
 # check if nothing is overwritten on container restart (nginx.conf and random session-secret in it)
 # add the flag (file) showing that container was run before and check for this script
-# for $azureAD = true we have to check for all the variables
 
 if [ "$azureAD" = true ] ; then
+
+ if [[ $azureADTenantID = NULL || $azureADClientID = NULL || $azureADClientSecret = NULL ]] ; then
+  echo 'AzureAD TenantID / ClientID / ClientSecret is required'
+  exit 4
+ fi
+
  cp /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
  opm get zmartzone/lua-resty-openidc
  opm get SkyLothar/lua-resty-jwt
+
  #sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
- sed -i 's/<TENANT_ID_PLACEHOLDER>/2ec6965f-17c7-47c0-80c8-98e1a0c7b66a/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
- sed -i 's/<CLIENT_ID_PLACEHOLDER>/bec8ad68-9e10-4c31-ab08-eac305f160c2/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
- sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/WBSFCpfyuFecMa9DYEZeCKRigRuZBJix1g5QisIUDKo=/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+
+ sed -i 's/<TENANT_ID_PLACEHOLDER>/'"$azureADTenantID"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+ sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"$azureADClientID"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+ sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"$azureADClientSecret"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
+
  if [ "$ssl" = true ] ; then
   sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
   sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
