@@ -142,7 +142,7 @@ instance Bagger.MonadBagger ContextM where
         -- new best block we just mined came in
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
-            $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
+            $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             void $ putInsertTransactionResult
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
