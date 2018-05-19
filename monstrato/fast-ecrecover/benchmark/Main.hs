@@ -30,7 +30,7 @@ transaction =
   (es, hash)
   where
     !es =
-      F.ExtendedSignature signature True
+      F.ExtendedSignature signature (toRecId 0x1c)
       where
         !signature =
           G.Signature sigR sigS

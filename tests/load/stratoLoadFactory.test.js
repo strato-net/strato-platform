@@ -13,7 +13,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const factoryContractName = 'VehicleFactory';
-const factoryContractFilename = 'e2e/load/contracts/VehicleFactory.sol';
+const factoryContractFilename = 'load/contracts/VehicleFactory.sol';
 
 let contractAddress;
 let txs = [];

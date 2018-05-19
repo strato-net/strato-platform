@@ -182,6 +182,7 @@ services:
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}
+    - STRATO_GS_MODE=${STRATO_GS_MODE}
     - uiPassword=${uiPassword}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}

@@ -13,7 +13,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/e2e/load/contracts/Vehicle.sol`;
+const contractFilename = process.cwd() + `/load/contracts/VehicleVitu/Vehicle.sol`;
 
 let txs = [];
 let txResults = [];
@@ -70,11 +70,14 @@ describe('Strato Load Test', function() {
 });
 
 function * waitResult(address, batchSize, batchCount) {
-  let result = yield api.strato.account(address);
+  let result = [{nonce: 0}];
   while(result[0].nonce < batchSize*batchCount) {
     console.log(`Current Nonce is: ${result[0].nonce}`)
     yield promiseTimeout(500);
+    try {
     result = yield api.strato.account(address);
+    } catch (e) {
+    }
   }
 }
 
@@ -98,10 +101,12 @@ function factory_createUploadList(batchSize, batchIndex) {
       contractName: contractName,
       args: {
         _vin: `vin_${batchIndex}_${i}`,
-        _s0: `s0_${batchIndex}_${i}`,
-        _s1: `s1_${batchIndex}_${i}`,
-        _s2: `s2_${batchIndex}_${i}`,
-        _s3: `s3_${batchIndex}_${i}`,
+        _vtype: `vtype_${batchIndex}_${i}`,
+        _year: `year_${batchIndex}_${i}`,
+        _make: `make_${batchIndex}_${i}`,
+        _model: `model_${batchIndex}_${i}`,
+        _style: `style_${batchIndex}_${i}`,
+        _color: `color_${batchIndex}_${i}`,
       },
       txParams: {
         gasLimit: 10000000,

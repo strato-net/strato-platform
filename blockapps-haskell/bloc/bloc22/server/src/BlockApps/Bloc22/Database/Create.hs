@@ -11,6 +11,14 @@ createDatabase = [sql|
 CREATE DATABASE bloc22;
 |]
 
+schemaVersionTable :: Query
+schemaVersionTable = [sql|
+CREATE TABLE IF NOT EXISTS bloc_schema_version(
+  id serial PRIMARY KEY,
+  schema_version int NOT NULL UNIQUE
+);
+|]
+
 usersTable :: Query
 usersTable = [sql|
 CREATE TABLE IF NOT EXISTS users(
@@ -198,7 +206,8 @@ CREATE TABLE IF NOT EXISTS xabi_struct_fields(
 
 createTables :: Query
 createTables = mconcat
-  [ usersTable
+  [ schemaVersionTable
+  , usersTable
   , keyStoreTable
   , contractsTable
   , contractsMetaDataTable

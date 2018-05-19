@@ -29,9 +29,9 @@ ecdsaRecover input =
         v = byteString2Integer $ B.take 32 $ B.drop 32 input
         r = fromInteger $ byteString2Integer $ B.take 32 $ B.drop 64 input
         s = fromInteger $ byteString2Integer $ B.take 32 $ B.drop 96 input
-        maybePubKey = getPubKeyFromSignature (ExtendedSignature (Signature r s) (v == 28)) h
+        maybePubKey = getPubKeyFromSignature (ExtendedSignature (Signature r s) (toRecId (fromInteger v))) h
     in
-     case (v >= 27, v <= 28, maybePubKey) of
+     case (v >= 27, v <= 30, maybePubKey) of
        (True, True, Just pubKey) ->
          B.pack [0,0,0,0,0,0,0,0,0,0,0,0] `B.append` BL.toStrict (encode $ pubKey2Address pubKey)
        _ -> B.empty -- B.pack (replicate 32 0)
