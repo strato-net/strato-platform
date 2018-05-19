@@ -36,6 +36,10 @@ if [ "$authBasic" != true ] ; then
 	sed -i '/auth_basic/d' /etc/nginx/nginx.conf
 fi
 
+if [ "$STRATO_GS_MODE" = 1 ] ; then
+	sed -i '/_track/d' /etc/nginx/nginx.conf
+fi
+
 echo 'Waiting for apex to be available...'
 until curl --silent --output /dev/null --fail --location http://apex:3001/_ping
 do
