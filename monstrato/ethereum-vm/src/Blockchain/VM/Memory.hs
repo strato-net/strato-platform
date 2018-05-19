@@ -154,7 +154,9 @@ mStore::Word256->Word256->VMM ()
 mStore p val = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  liftIO $ sequence_ $ uncurry (V.write $ mVector $ memory state) <$> zip [fromIntegral p..] (word256ToBytes val)
+  let bytes = DV.fromList $ word256ToBytes val
+      ps    = DV.enumFromN (fromIntegral p) (DV.length bytes)
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) ps bytes
 
 mStore8::Word256->Word8->VMM ()
 mStore8 p val = do
