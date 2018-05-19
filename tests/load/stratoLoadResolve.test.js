@@ -13,7 +13,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/e2e/load/contracts/Vehicle.sol`;
+const contractFilename = process.cwd() + `/load/contracts/Vehicle.sol`;
 
 let txs = [];
 let txResults = [];
