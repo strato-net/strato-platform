@@ -22,6 +22,7 @@ import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import           Data.IORef
+import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
@@ -166,5 +167,6 @@ mStoreByteString _ theData | B.null theData = return () --no need to charge gas 
 mStoreByteString p theData = do
   setNewMaxSize (fromIntegral p + fromIntegral (B.length theData))
   state <- lift get
-  liftIO $ sequence_ $ uncurry (V.write $ mVector $ memory state) <$> zip (fromIntegral <$> safeRange p (fromIntegral $ B.length theData)) (B.unpack theData)
-
+  let sr = DV.enumFromN (fromIntegral p) (B.length theData) -- fromIntegral <$> sr'
+      up = DV.fromList $ B.unpack theData
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) sr up
