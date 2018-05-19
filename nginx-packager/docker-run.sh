@@ -47,9 +47,11 @@ else
  fi
 fi
 
+if [ "$STRATO_GS_MODE" = 1 ] ; then
+	sed -i '/_track/d' /usr/local/openresty/nginx/conf/nginx.conf
+fi
 
 # TODOs
-# replace placeholder for session_secret in nginx.conf with RANDOM string generated and saved to some file in container (sha256sum?)
 # merge the regular and azure configs and clean with sed when in public mode //nik
 # check if nothing is overwritten on container restart (nginx.conf and random session-secret in it)
 # add the flag (file) showing that container was run before and check for this script
@@ -65,6 +67,7 @@ if [ "$azureAD" = true ] ; then
  opm get zmartzone/lua-resty-openidc
  opm get SkyLothar/lua-resty-jwt
 
+ # Required with lua_code_cache off
  #sed -i 's/<SESSION_SECRET>/623q4hR325t36VsCD3g567922IC@!QnAoZXpbVc3Oz/g' /usr/local/openresty/nginx/conf/nginx.conf
 
  sed -i 's/<TENANT_ID_PLACEHOLDER>/'"$azureADTenantID"'/g' /usr/local/openresty/nginx/lua/azure-authentication.lua
