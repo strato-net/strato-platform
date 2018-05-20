@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: check before use (not universal)
 set -e
 docker exec -it strato_postgres_1 mkdir -p /tmp/backup
 docker cp /tmp/bloc22.sql strato_postgres_1:/tmp/backup/
