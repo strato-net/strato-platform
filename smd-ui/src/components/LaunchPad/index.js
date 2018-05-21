@@ -185,8 +185,8 @@ class LaunchPad extends Component {
                   <h4>Enter application details</h4>
                 </div>
                 <div className="col-sm-6 text-right">
-                  <Button onClick={this.props.openCLIOverlay} className="pt-button pt-minimal pt-intent-primary">
-                    <i className='fa fa-info smd-margin-right-8'> </i>
+                  <Button onClick={this.props.openCLIOverlay} className="pt-button pt-minimal">
+                    <i className='fa fa-info-circle smd-margin-right-8'> </i>
                     Instructions
                     </Button>
                   <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
@@ -278,7 +278,7 @@ class LaunchPad extends Component {
         <Dialog
           isOpen={this.props.isTokenOpen}
           onClose={this.props.closeCLIOverlay}
-          title="Download CLI Tool"
+          title="Additional Instructions"
           className="pt-dark cli-dialog"
         ><CLI /></Dialog>
       </div>
