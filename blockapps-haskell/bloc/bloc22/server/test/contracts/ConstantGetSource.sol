@@ -5,7 +5,7 @@ contract Constant {
         return "Constant";
     }
     function __getSource__() constant public returns (string) {
-        return "contract Constant {\n  uint constant x = 777777;\n}\n";
-
+        return "contract Constant {\n  uint constant x = 777777;\n}\n";  
+    
     }
 }
