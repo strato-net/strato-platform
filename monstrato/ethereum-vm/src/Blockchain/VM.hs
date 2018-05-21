@@ -248,13 +248,13 @@ runOperation NOT = unaryAction (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 runOperation BYTE = binaryAction getByte
 
 runOperation SHL = binaryAction $ \positions pattern ->
-      shiftL pattern (word256ToWidth  positions)
+      shiftL pattern (word256ToWidth positions)
 
 runOperation SHR = binaryAction $ \positions pattern ->
-      shiftR pattern (word256ToWidth  positions)
+      shiftR pattern (word256ToWidth positions)
 
 runOperation SAR = binaryAction $ \positions pattern ->
-      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth  positions)
+      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth positions)
 
 runOperation SHA3 = do
   p <- pop
