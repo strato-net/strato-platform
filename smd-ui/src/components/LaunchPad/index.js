@@ -3,8 +3,11 @@ import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import { Field, reduxForm } from 'redux-form';
 import Dropzone from 'react-dropzone';
+import { Button, Dialog } from '@blueprintjs/core';
 import { required } from '../../lib/reduxFormsValidations'
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import CLI from '../CLI';
+import { openCLIOverlay, closeCLIOverlay } from '../CLI/cli.actions';
 
 import {
   loadLaunchPad,
@@ -173,102 +176,111 @@ class LaunchPad extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            {!canDeployApps
+            {/*!canDeployApps
               ? <div className="pt-card"><span>Unable to deploy apps when running multinode on localhost</span></div>
-              :
-              <div className="pt-card">
-                <div className="row">
-                  <div className="col-sm-6">
-                    <h4>Enter application details</h4>
-                  </div>
-                  <div className="col-sm-6 text-right">
-                    <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
-                      <button className="pt-button pt-minimal pt-intent-primary">
-                        <i className='fa fa-book smd-margin-right-8'> </i>
-                        Read the docs
+              :*/}
+            <div className="pt-card">
+              <div className="row">
+                <div className="col-sm-6">
+                  <h4>Enter application details</h4>
+                </div>
+                <div className="col-sm-6 text-right">
+                  <Button onClick={this.props.openCLIOverlay} className="pt-button pt-minimal pt-intent-primary">
+                    <i className='fa fa-info smd-margin-right-8'> </i>
+                    Instructions
+                    </Button>
+                  <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
+                    <button className="pt-button pt-minimal pt-intent-primary">
+                      <i className='fa fa-book smd-margin-right-8'> </i>
+                      Read the docs
                     </button>
-                    </a>
+                  </a>
+                </div>
+              </div>
+              <hr />
+              <form>
+                <div className="row smd-pad-top-12">
+                  <div className="col-sm-2 text-right">
+                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                      Username
+                    </label>
+                  </div>
+                  <div className="col-sm-10">
+                    {this.renderUsername(isPublicMode)}
                   </div>
                 </div>
-                <hr />
-                <form>
-                  <div className="row smd-pad-top-12">
-                    <div className="col-sm-2 text-right">
-                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                        Username
+                <div className="row">
+                  <div className="col-sm-2 text-right">
+                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                      User Address
                     </label>
-                    </div>
-                    <div className="col-sm-10">
-                      {this.renderUsername(isPublicMode)}
-                    </div>
                   </div>
-                  <div className="row">
-                    <div className="col-sm-2 text-right">
-                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                        User Address
+                  <div className="col-sm-10">
+                    {this.renderAddress(isPublicMode)}
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-sm-2 text-right">
+                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                      Password
                     </label>
-                    </div>
-                    <div className="col-sm-10">
-                      {this.renderAddress(isPublicMode)}
-                    </div>
                   </div>
-                  <div className="row">
-                    <div className="col-sm-2 text-right">
-                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                        Password
+                  <div className="col-sm-10">
+                    <Field
+                      name="appPassword"
+                      className="pt-input smd-input-width"
+                      component="input"
+                      type="password"
+                      placeholder="User Password"
+                      dir="auto"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-sm-2 text-right">
+                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                      Package
                     </label>
-                    </div>
-                    <div className="col-sm-10">
-                      <Field
-                        name="appPassword"
-                        className="pt-input smd-input-width"
-                        component="input"
-                        type="password"
-                        placeholder="User Password"
-                        dir="auto"
-                        required
-                      />
-                    </div>
                   </div>
-                  <div className="row">
-                    <div className="col-sm-2 text-right">
-                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                        Package
-                    </label>
-                    </div>
-                    <div className="col-sm-10">
-                      <Field
-                        className="pt-input"
-                        name="appPackage"
-                        component={this.renderDropzoneInput}
-                        dir="auto"
-                        title="Package"
-                        required
-                      />
-                    </div>
+                  <div className="col-sm-10">
+                    <Field
+                      className="pt-input"
+                      name="appPackage"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Package"
+                      required
+                    />
                   </div>
-                  <div className="row">
-                    <div className="col-sm-offset-2 col-sm-1">
-                      <button
-                        type="submit"
-                        onClick={handleSubmit(this.submit)}
-                        className="pt-button pt-intent-primary"
-                        disabled={pristine || submitting || !valid}
-                      >
-                        Upload
+                </div>
+                <div className="row">
+                  <div className="col-sm-offset-2 col-sm-1">
+                    <button
+                      type="submit"
+                      onClick={handleSubmit(this.submit)}
+                      className="pt-button pt-intent-primary"
+                      disabled={pristine || submitting || !valid}
+                    >
+                      Upload
                     </button>
-                    </div>
-                    <div className="col-sm-9">
-                      <div className="smd-pad-4 smd-text-warning">
-                        {this.props.launchPad.error}
-                      </div>
+                  </div>
+                  <div className="col-sm-9">
+                    <div className="smd-pad-4 smd-text-warning">
+                      {this.props.launchPad.error}
                     </div>
                   </div>
-                </form>
-              </div>
-            }
+                </div>
+              </form>
+            </div>
           </div>
         </div>
+        <Dialog
+          isOpen={this.props.isTokenOpen}
+          onClose={this.props.closeCLIOverlay}
+          title="Download CLI Tool"
+          className="pt-dark cli-dialog"
+        ><CLI /></Dialog>
       </div>
     );
   }
@@ -300,7 +312,8 @@ export function mapStateToProps(state) {
     initialValues: {
       appUsername: state.user.currentUser.username,
       appUserAddress: state.user.currentUser.accountAddress
-    }
+    },
+    isTokenOpen: state.cli.isTokenOpen
   };
 }
 
@@ -317,7 +330,9 @@ export default withRouter(
       fetchUserAddresses,
       appUploadRequest,
       appSetError,
-      appReset
+      appReset,
+      openCLIOverlay,
+      closeCLIOverlay,
     }
   )(formed)
 );
