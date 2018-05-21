@@ -66,6 +66,8 @@ bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
 
+word256ToWidth :: Word256 -> Int
+word256ToWidth = fromInteger . toInteger . max 256
 {-
 word2562Bool::Word256->Bool
 word2562Bool 1 = True
@@ -244,6 +246,15 @@ runOperation XOR = binaryAction xor
 runOperation NOT = unaryAction (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF `xor`)
 
 runOperation BYTE = binaryAction getByte
+
+runOperation SHL = binaryAction $ \positions pattern ->
+      shiftL pattern (word256ToWidth positions)
+
+runOperation SHR = binaryAction $ \positions pattern ->
+      shiftR pattern (word256ToWidth positions)
+
+runOperation SAR = binaryAction $ \positions pattern ->
+      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth positions)
 
 runOperation SHA3 = do
   p <- pop
