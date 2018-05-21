@@ -176,9 +176,9 @@ class LaunchPad extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            {/*!canDeployApps
+            {!canDeployApps
               ? <div className="pt-card"><span>Unable to deploy apps when running multinode on localhost</span></div>
-              :*/}
+              :
             <div className="pt-card">
               <div className="row">
                 <div className="col-sm-6">
@@ -272,7 +272,7 @@ class LaunchPad extends Component {
                   </div>
                 </div>
               </form>
-            </div>
+            </div>}
           </div>
         </div>
         <Dialog
