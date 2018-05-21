@@ -236,9 +236,9 @@ addBlocks blocks = do
           (theBlock, nbb) <- liftIO (readIORef replacedBest)
           void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
           let b = obBlockData theBlock
-              addressSource = getSource False b
-              addressContractName = getContractName False b
-          calculateAndEmitStateDiffs theBlock oldStateRoot addressSource addressContractName
+              codeSource = getSource False b
+              codeContractName = getContractName False b
+          calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -625,17 +625,22 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> MP.StateRoot
-                           -> (Address -> ContextM String)
-                           -> (Address -> ContextM String)
+                           -> (SHA -> ContextM String)
+                           -> (SHA -> ContextM String)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractName = when (flags_sqlDiff || flags_diffPublish) $ do
+calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
-    when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
+
+    let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
+        codeSource' x = M.findWithDefault (error "missing code hash in codeSource map") x (M.fromList (map (\y -> (y, codeSource y)) allNewCodeHashes))
+        codeContractName' x = M.findWithDefault (error "missing code hash in codeSource map") x (M.fromList (map (\y -> (y, codeContractName y)) allNewCodeHashes))
+    
+    when flags_sqlDiff $ commitSqlDiffs diffs codeSource' codeContractName'
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
          in withKafkaViolently $ do

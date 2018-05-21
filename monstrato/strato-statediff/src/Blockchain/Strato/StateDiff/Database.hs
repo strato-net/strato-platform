@@ -38,7 +38,7 @@ sqlDiff blockNumber blockHash oldRoot newRoot = do
   commitSqlDiffs stateDiffs (const (return "")) (const (return ""))
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> (Address -> m String) -> (Address -> m String) -> m ()
+                  StateDiff -> (SHA -> m String) -> (SHA -> m String) -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} addressSource addressContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
@@ -47,10 +47,10 @@ commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedA
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> (Address -> m String) -> (Address -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
-createAccount blockNumber addressSource addressContractName address diff = do
-  src <- lift $ addressSource address
-  name' <- lift $ addressContractName address
+                 Integer -> (SHA -> m String) -> (SHA -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
+createAccount blockNumber codeSource codeContractName address diff = do
+  src <- lift $ codeSource $ codeHash diff
+  name' <- lift $ codeContractName $ codeHash diff
   addrID <- SQL.insert (addrRef src name')
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
 
