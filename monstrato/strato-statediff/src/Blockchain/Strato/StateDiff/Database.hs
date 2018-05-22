@@ -39,10 +39,10 @@ sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m,
            Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs (const (return "")) (const (return ""))
+  commitSqlDiffs stateDiffs (const "") (const "")
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> (SHA -> m String) -> (SHA -> m String) -> m ()
+                  StateDiff -> (SHA -> String) -> (SHA -> String) -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
@@ -50,13 +50,13 @@ commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedA
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
-createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> (SHA -> m String) -> (SHA -> m String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+createAccount :: MonadIO m =>
+                 Integer -> (SHA -> String) -> (SHA -> String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber codeSource codeContractName addressDiffs = do
   newAccounts <- forM addressDiffs $ \addressDiff -> do
     let (address, diff) = addressDiff
-    src <- lift $ codeSource $ codeHash diff
-    name' <- lift $ codeContractName $ codeHash diff
+        src = codeSource $ codeHash diff
+        name' = codeContractName $ codeHash diff
     return $ addrRef address diff src name'
   addrIDs <- SQL.insertMany newAccounts
   
