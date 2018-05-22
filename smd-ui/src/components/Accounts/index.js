@@ -8,6 +8,7 @@ import Tour from '../Tour';
 import Account from '../Account';
 import CreateBlocUser from '../CreateBlocUser';
 import { isModePublic } from '../../lib/checkMode';
+import AccountDetail from '../AccountDetail';
 import './accounts.css';
 
 const tourSteps = [/* {
@@ -38,8 +39,10 @@ class Accounts extends Component {
   }
 
   componentDidMount() {
-    this.props.fetchAccounts(true, true);
-    mixpanelWrapper.track('accounts_page_load')
+    if (!isModePublic()) {
+      this.props.fetchAccounts(true, true);
+      mixpanelWrapper.track('accounts_page_load')
+    }
   }
 
   updateFilter(filter) {
@@ -102,9 +105,10 @@ class Accounts extends Component {
           steps={tourSteps}
           finalStepSelector='#contracts'
           nextPage='contracts' />
+
         <div className="row">
           <div className="col-sm-4 text-left">
-            <h3>Accounts</h3>
+            <h3>{isModePublic() ? 'Account' : 'Accounts'}</h3>
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
@@ -113,42 +117,44 @@ class Accounts extends Component {
             </div>
           </div>
         </div>
-        <div className="row">
-          <div className="col-sm-4">
-            <div className="pt-input-group pt-dark pt-large">
-              <span className="pt-icon pt-icon-search"></span>
-              <input
-                className="pt-input"
-                type="search"
-                placeholder="Search accounts"
-                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
-                dir="auto" />
-            </div>
-          </div>
-        </div>
-        <div className="container-fluid pt-dark">
+        {isModePublic() ? <AccountDetail address={this.props.currentUser.accountAddress} username={this.props.currentUser.username} /> : < div>
           <div className="row">
-            <div className="col-sm-4 main-div">
-              <div className="accounts-margin-top">
-                {rows.length === 0
-                  ?
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td colSpan={3}>No Accounts</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  : rows}
-              </div>
-            </div>
-            <div className="col-sm-8 account-details">
-              <div>
-                {selectedAddresses.length ? selectedAddresses : null}
+            <div className="col-sm-4">
+              <div className="pt-input-group pt-dark pt-large">
+                <span className="pt-icon pt-icon-search"></span>
+                <input
+                  className="pt-input"
+                  type="search"
+                  placeholder="Search accounts"
+                  onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                  dir="auto" />
               </div>
             </div>
           </div>
-        </div>
+          <div className="container-fluid pt-dark">
+            <div className="row">
+              <div className="col-sm-4 main-div">
+                <div className="accounts-margin-top">
+                  {rows.length === 0
+                    ?
+                    <table>
+                      <tbody>
+                        <tr>
+                          <td colSpan={3}>No Accounts</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    : rows}
+                </div>
+              </div>
+              <div className="col-sm-8 account-details">
+                <div>
+                  {selectedAddresses.length ? selectedAddresses : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>}
       </div>
     );
   }
@@ -157,7 +163,8 @@ class Accounts extends Component {
 export function mapStateToProps(state) {
   return {
     accounts: state.accounts.accounts,
-    filter: state.accounts.filter
+    filter: state.accounts.filter,
+    currentUser: state.user.currentUser
   };
 }
 

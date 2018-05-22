@@ -9,11 +9,14 @@ import {
   FETCH_ACCOUNT_DETAIL_FAILURE,
   RESET_ACCOUNT_ADDRESS,
   BALANCE_SUCCESS,
-  BALANCE_FAILURE
+  BALANCE_FAILURE,
+  FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
+  FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE
 } from './accounts.actions';
 
 const initialState = {
   accounts: {},
+  currentAccountDetail: null,
   filter: '',
   error: null,
 };
@@ -22,41 +25,46 @@ const reducer = function (state = initialState, action) {
   switch (action.type) {
     case FETCH_ACCOUNTS:
       return {
+        ...state,
         accounts: state.accounts,
         filter: state.filter,
         error: null,
         currentUserBalance: state.currentUserBalance
       };
     case FETCH_ACCOUNTS_SUCCESSFULL:
-      const accounts = action.accounts.reduce(function(result, item){
+      const accounts = action.accounts.reduce(function (result, item) {
         result[item] = {};
         return result;
       }, {});
       return {
+        ...state,
         accounts: accounts,
         filter: state.filter,
         error: null,
       };
     case FETCH_ACCOUNTS_FAILED:
       return {
+        ...state,
         accounts: state.accounts,
         filter: state.filter,
         error: action.error
       };
     case CHANGE_ACCOUNT_FILTER:
       return {
+        ...state,
         accounts: state.accounts,
         filter: action.filter,
         error: state.error,
       }
     case FETCH_USER_ADDRESSES_SUCCESSFUL:
-      const addresses = action.addresses.reduce(function(result, address){
+      const addresses = action.addresses.reduce(function (result, address) {
         result[address] = {
           error: null
         }
         return result;
       }, {})
       return {
+        ...state,
         accounts: {
           ...state.accounts,
           [action.name]: addresses
@@ -67,6 +75,7 @@ const reducer = function (state = initialState, action) {
       }
     case FETCH_USER_ADDRESSES_FAILED:
       return {
+        ...state,
         accounts: {
           ...state.accounts,
           [action.name]: {
@@ -79,11 +88,12 @@ const reducer = function (state = initialState, action) {
       }
     case FETCH_ACCOUNT_DETAIL_SUCCESS:
       return {
+        ...state,
         accounts: {
           ...state.accounts,
           [action.name]: {
             ...state.accounts[action.name],
-            [action.address] : {
+            [action.address]: {
               ...action.detail,
               error: null
             }
@@ -93,22 +103,24 @@ const reducer = function (state = initialState, action) {
         error: state.error,
         currentUserBalance: state.currentUserBalance
       }
-    case RESET_ACCOUNT_ADDRESS: 
+    case RESET_ACCOUNT_ADDRESS:
       return {
+        ...state,
         accounts: {
           ...state.accounts,
           [action.name]: {}
         },
         filter: state.filter,
         error: state.error
-      }  
+      }
     case FETCH_ACCOUNT_DETAIL_FAILURE:
       return {
+        ...state,
         accounts: {
           ...state.accounts,
           [action.name]: {
             ...state.accounts[action.name],
-            [action.address] : {
+            [action.address]: {
               error: action.error
             }
           }
@@ -126,6 +138,18 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         currentUserBalance: null
+      }
+    case FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS:
+      return {
+        ...state,
+        currentAccountDetail: action.detail,
+        error: null
+      }
+    case FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE:
+      return {
+        ...state,
+        currentAccountDetail: null,
+        error: action.error
       }
     default:
       return state;

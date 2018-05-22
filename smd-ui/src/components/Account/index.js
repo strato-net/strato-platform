@@ -23,7 +23,7 @@ class Account extends Component {
             </h4>
           </div>
           <div className="col-sm-2 text-right">
-            {!isModePublic() &&
+            {isModePublic() &&
               <button
                 className="pt-button pt-intent-primary pt-small"
                 onClick={(e) => {
