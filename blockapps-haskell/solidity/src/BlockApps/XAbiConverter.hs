@@ -245,7 +245,7 @@ contractToXabi Contract{..} =
                         , funcVisibility = Nothing
                         , funcModifiers = Nothing
                         }
-                        
+
           )
         | (name, (_, TypeFunction _ args rets)) <- OMap.assocs $ fields mainStruct
         ]
@@ -264,7 +264,7 @@ contractToXabi Contract{..} =
       }
 
 fieldToVarType::TypeDefs->(Storage.Position, Type)->Xabi.VarType
-fieldToVarType typeDefs (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) Nothing Nothing $ typeToXabiType typeDefs theType
+fieldToVarType typeDefs (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) Nothing Nothing Nothing $ typeToXabiType typeDefs theType
 
 -- Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
 typeToXabiType::TypeDefs->Type->Xabi.Type

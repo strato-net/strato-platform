@@ -51,8 +51,12 @@ unparseVar (name, theType) =
         Just True -> "public "
         Just False -> "private "
      )
+  <> (case varTypeConstant theType of
+        Just True -> "constant "
+        _ -> ""
+     )
   <> Text.unpack name
-  <> (case varTypeInitialValue theType of 
+  <> (case varTypeInitialValue theType of
         Nothing -> ""
         Just value -> " = " ++ value
      )
