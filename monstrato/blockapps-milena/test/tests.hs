@@ -2,22 +2,22 @@
 
 module Main where
 
-import           Control.Lens
-import           Control.Monad.Except   (catchError, throwError)
-import           Control.Monad.Trans    (liftIO)
-import qualified Data.ByteString.Char8  as B
-import           Data.Either            (isLeft, isRight)
-import           Data.Functor
-import qualified Data.List.NonEmpty     as NE
-import           Network.Kafka
-import           Network.Kafka.Consumer
-import           Network.Kafka.Producer
-import           Network.Kafka.Protocol (KafkaError (..), ProduceResponse (..))
-import           Test.Tasty
-import           Test.Tasty.Hspec
-import           Test.Tasty.QuickCheck
+import Data.Functor
+import Data.Either (isRight, isLeft)
+import qualified Data.List.NonEmpty as NE
+import Control.Lens
+import Control.Monad.Except (catchError, throwError)
+import Control.Monad.Trans (liftIO)
+import Network.Kafka
+import Network.Kafka.Consumer
+import Network.Kafka.Producer
+import Network.Kafka.Protocol (ProduceResponse(..), KafkaError(..), CompressionCodec(..))
+import Test.Tasty
+import Test.Tasty.Hspec
+import Test.Tasty.QuickCheck
+import qualified Data.ByteString.Char8 as B
 
-import           Prelude
+import Prelude
 
 main :: IO ()
 main = testSpec "the specs" specs >>= defaultMain
@@ -37,11 +37,16 @@ specs = do
       result <- run . produceMessages $ byteMessages ms
       result `shouldSatisfy` isRight
 
-    prop "can produce multiple messages" $ \(ms, ms') -> do
+    prop "can produce compressed messages" $ \ms -> do
+      result <- run . produceCompressedMessages Gzip $ byteMessages ms
+      result `shouldSatisfy` isRight
+
+    prop "can produce multiple messages" $ \(ms, ms', ms'') -> do
       result <- run $ do
         r1 <- produceMessages $ byteMessages ms
         r2 <- produceMessages $ byteMessages ms'
-        return $ r1 ++ r2
+        r3 <- produceCompressedMessages Gzip $  byteMessages ms''
+        return $ r1 ++ r2 ++ r3
       result `shouldSatisfy` isRight
 
     prop "can fetch messages" $ do
@@ -55,13 +60,33 @@ specs = do
       result <- run $ do
         requireAllAcks
         info <- brokerPartitionInfo topic
-        let Just PartitionAndLeader { _palLeader = leader, _palPartition = partition } = getPartitionByKey (B.pack key) info
-            payload = [(TopicAndPartition topic partition, groupMessagesToSet messages)]
-            s = stateBrokers . at leader
-        [(_topicName, [(_, NoError, offset)])] <- _produceResponseFields <$> send leader payload
-        broker <- findMetadataOrElse [topic] s (KafkaInvalidBroker leader)
-        resp <- withBrokerHandle broker (\handle -> fetch' handle =<< fetchRequest offset partition topic)
-        return $ fmap tamPayload . fetchMessages $ resp
+
+        case getPartitionByKey (B.pack key) info of
+          Just PartitionAndLeader { _palLeader = leader, _palPartition = partition } -> do
+            let payload = [(TopicAndPartition topic partition, groupMessagesToSet NoCompression messages)]
+                s = stateBrokers . at leader
+            [(_topicName, [(_, NoError, offset)])] <- _produceResponseFields <$> send leader payload
+            broker <- findMetadataOrElse [topic] s (KafkaInvalidBroker leader)
+            resp <- withBrokerHandle broker (\handle -> fetch' handle =<< fetchRequest offset partition topic)
+            return $ fmap tamPayload . fetchMessages $ resp
+
+          Nothing -> fail "Could not deduce partition"
+
+      result `shouldBe` Right (tamPayload <$> messages)
+
+    prop "can roundtrip compressed messages" $ \(NonEmpty ms) -> do
+      let messages = byteMessages ms
+      result <- run $ do
+        requireAllAcks
+        produceResps <- produceCompressedMessages Gzip messages
+
+        case map _produceResponseFields produceResps of
+          [[(_topicName, [(partition, NoError, offset)])]] -> do
+            resp <- fetch offset partition topic
+            return $ fmap tamPayload . fetchMessages $ resp
+
+          _ -> fail "Unexpected produce response"
+
       result `shouldBe` Right (tamPayload <$> messages)
 
     prop "can roundtrip keyed messages" $ \(NonEmpty ms) key -> do
@@ -70,10 +95,14 @@ specs = do
       result <- run $ do
         requireAllAcks
         produceResps <- produceMessages messages
-        let [[(_topicName, [(partition, NoError, offset)])]] = map _produceResponseFields produceResps
 
-        resp <- fetch offset partition topic
-        return $ fmap tamPayload . fetchMessages $ resp
+        case map _produceResponseFields produceResps of
+          [[(_topicName, [(partition, NoError, offset)])]] -> do
+            resp <- fetch offset partition topic
+            return $ fmap tamPayload . fetchMessages $ resp
+
+          _ -> fail "Unexpected produce response"
+
       result `shouldBe` Right (tamPayload <$> messages)
 
   describe "withAddressHandle" $ do

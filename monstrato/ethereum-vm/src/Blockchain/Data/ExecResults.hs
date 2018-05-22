@@ -1,11 +1,10 @@
-
 module Blockchain.Data.ExecResults (
   ExecResults(..)
   ) where
 
 import qualified Data.ByteString         as B
 
-import           Blockchain.VM.VMState
+import           Blockchain.VM.VMException
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 
@@ -18,4 +17,4 @@ data ExecResults =
     erLogs               :: [Log],
     erNewContractAddress :: Maybe Address,
     erException          :: Maybe VMException
-    }
+    } deriving (Show)

@@ -20,6 +20,7 @@ import           Database.Persist.TH
 import           Data.Time
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TransactionResultStatus

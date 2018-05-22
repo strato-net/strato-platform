@@ -13,7 +13,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/e2e/load/contracts/Vehicle.sol`;
+const contractFilename = process.cwd() + `/load/contracts/Vehicle.sol`;
 
 let txs = [];
 let txResults = [];
@@ -70,11 +70,14 @@ describe('Strato Load Test', function() {
 });
 
 function * waitResult(address, batchSize, batchCount) {
-  let result = yield api.strato.account(address);
+  let result = [{nonce: 0}];
   while(result[0].nonce < batchSize*batchCount) {
     console.log(`Current Nonce is: ${result[0].nonce}`)
     yield promiseTimeout(500);
+    try {
     result = yield api.strato.account(address);
+    } catch (e) {
+    }
   }
 }
 

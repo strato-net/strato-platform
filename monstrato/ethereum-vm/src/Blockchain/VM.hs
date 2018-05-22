@@ -59,12 +59,15 @@ import           Blockchain.VM.PrecompiledContracts
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
 bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
 
+word256ToWidth :: Word256 -> Int
+word256ToWidth = fromInteger . toInteger . max 256
 {-
 word2562Bool::Word256->Bool
 word2562Bool 1 = True
@@ -243,6 +246,15 @@ runOperation XOR = binaryAction xor
 runOperation NOT = unaryAction (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF `xor`)
 
 runOperation BYTE = binaryAction getByte
+
+runOperation SHL = binaryAction $ \positions pattern ->
+      shiftL pattern (word256ToWidth positions)
+
+runOperation SHR = binaryAction $ \positions pattern ->
+      shiftR pattern (word256ToWidth positions)
+
+runOperation SAR = binaryAction $ \positions pattern ->
+      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth positions)
 
 runOperation SHA3 = do
   p <- pop
@@ -945,30 +957,34 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> BlockData -> Address -> ContextM String
+getSource :: Bool -> BlockData -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> BlockData -> Address -> ContextM String
+getContractName :: Bool -> BlockData -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
--- TODO: Use the default BlockData instance
-getFromSelector :: BC.ByteString -> Bool -> BlockData -> Address -> ContextM String
-getFromSelector sel isRunningTests' b contractAddress = do
-  let isHomestead = blockDataNumber b >= gHomesteadFirstBlock
-  (eRes, _) <- call isRunningTests'
-                    isHomestead
-                    True
-                    S.empty
-                    b
-                    0
-                    contractAddress
-                    contractAddress
-                    (Address 0)
-                    0
-                    1
-                    (fst $ B16.decode sel)
-                    1000000000000000000
-                    (Address 0)
+getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
+getFromSelector sel isRunningTests' b codeHash = do
+  theCode <- Code . fromMaybe B.empty <$> getCode codeHash
+
+  stateRoot <- getStateRoot
+  setStateDBStateRoot (blockDataStateRoot b)
+  let env = 
+        Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
+          envGasPrice=1,
+          envBlockHeader=error "getFromSelector should only be called on simple contracts that don't use the block header",
+          envOwner = error "getFromSelector should only be called on simple contracts that don't use envOwner",
+          envOrigin = error "getFromSelector should only be called on simple contracts that don't use envOrigin",
+          envInputData = fst $ B16.decode sel,
+          envSender = error "getFromSelector should only be called on simple contracts that don't use envSender",
+          envValue = 0,
+          envCode = theCode,
+          envJumpDests = getValidJUMPDESTs theCode
+          }
+  (eRes, _) <-
+    runVMM False True S.empty 0 env 1000000000000000000 $ call' True
+
+  setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""
     Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
@@ -1226,7 +1242,6 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           addToRefund (refund finalVMState)
           return (1, Just retVal)
         Left RevertException -> do
-          state' <- lift get
           useGas (- vmGasRemaining finalVMState)
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)

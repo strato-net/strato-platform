@@ -27,6 +27,7 @@ import           System.IO                          (BufferMode (..),
 
 import qualified BlockApps.Bloc22.API as Bloc22
 import qualified BlockApps.Bloc22.Database.Create as Bloc22
+import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
 
@@ -59,13 +60,13 @@ main = do
 
   doesNotExist22 <- null <$>
     (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
-  when doesNotExist22 . void $
-    execute_ dbCreateConn Bloc22.createDatabase
+  when doesNotExist22 $ void $ execute_ dbCreateConn Bloc22.createDatabase
+
   close dbCreateConn
 
   conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}
 
-  void $ execute_ conn22 Bloc22.createTables
+  void $ Bloc22.runBlocMigrations conn22
   close conn22
 
   -- Not creating pool for bloc21 as it's being deprecated

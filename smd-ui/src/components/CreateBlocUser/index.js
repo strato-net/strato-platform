@@ -24,7 +24,8 @@ class CreateBlocUser extends Component {
       <div className="smd-pad-16">
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
-          this.props.openOverlay()
+          this.props.reset();
+          this.props.openOverlay();
         }} className="pt-intent-primary pt-icon-add"
           id="accounts-create-user-button"
           text="Create User" />
@@ -106,7 +107,8 @@ class CreateBlocUser extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track('create_user_close_click');
-                  this.props.closeOverlay()
+                  this.props.reset();
+                  this.props.closeOverlay();
                 }} />
                 <Button
                   intent={Intent.PRIMARY}

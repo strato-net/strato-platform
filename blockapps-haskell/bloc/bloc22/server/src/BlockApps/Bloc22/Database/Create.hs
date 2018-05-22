@@ -11,6 +11,14 @@ createDatabase = [sql|
 CREATE DATABASE bloc22;
 |]
 
+schemaVersionTable :: Query
+schemaVersionTable = [sql|
+CREATE TABLE IF NOT EXISTS bloc_schema_version(
+  id serial PRIMARY KEY,
+  schema_version int NOT NULL UNIQUE
+);
+|]
+
 usersTable :: Query
 usersTable = [sql|
 CREATE TABLE IF NOT EXISTS users(
@@ -153,6 +161,7 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
   is_public boolean NOT NULL,
+  is_constant boolean default FALSE,
   value varchar(512),
   UNIQUE (contract_metadata_id, name),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
@@ -198,7 +207,8 @@ CREATE TABLE IF NOT EXISTS xabi_struct_fields(
 
 createTables :: Query
 createTables = mconcat
-  [ usersTable
+  [ schemaVersionTable
+  , usersTable
   , keyStoreTable
   , contractsTable
   , contractsMetaDataTable

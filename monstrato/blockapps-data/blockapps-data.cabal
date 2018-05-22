@@ -78,6 +78,7 @@ library
                    Blockchain.Data.Json
                    Blockchain.Data.Log
                    Blockchain.Data.LogDB
+                   Blockchain.Data.MiningStatus
                    Blockchain.Data.NewBlk
                    Blockchain.Data.PersistTypes
                    Blockchain.Data.RawTransaction

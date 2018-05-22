@@ -23,7 +23,7 @@ class Account extends Component {
             </h4>
           </div>
           <div className="col-sm-2 text-right">
-            { !isModePublic() &&
+            {!isModePublic() &&
               <button
                 className="pt-button pt-intent-primary pt-small"
                 onClick={(e) => {
@@ -31,7 +31,7 @@ class Account extends Component {
                   e.stopPropagation();
                   this.props.faucetRequest(address, name);
                 }}>
-                  Faucet
+                Faucet
               </button>
             }
           </div>
@@ -55,7 +55,7 @@ class Account extends Component {
             </tr>
             <tr>
               <td><strong>Balance</strong></td>
-              <td>{account.balance}</td>
+              <td>{account.balance && `${account.balance} wei`}</td>
             </tr>
             <tr>
               <td><strong>Latest Block Number</strong></td>

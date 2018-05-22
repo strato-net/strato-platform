@@ -17,6 +17,7 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka
+import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 import           Prelude                        hiding (lookup)
 import           System.CPUTime
@@ -70,7 +71,7 @@ doBlock minerNumber n newNonce = do
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
     _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
-    $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"  
+    $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
     return ()
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
@@ -90,36 +91,28 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
       !nnnow <- liftIO getCPUTime
       mineBlock mv nnnow 0 (m,mi)
 
-doConsume :: Offset -> TMVar Block -> Integer -> AditM ()
-doConsume offset c lastNumber = do
+doConsume :: Offset -> TMVar Block -> AditM ()
+doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
     numPeers <- liftIO $ getActivePeers >>= return . length
 
     case reverse blocks of
      [] -> --meh, kafka just timed out or something, no blocks, no big deal
-       doConsume (offset + fromIntegral (length blocks)) c lastNumber
-       
-     (b:_) -> do --b is the last block, because of the reverse above
-       let currentNumber = blockDataNumber $ blockBlockData b
-           quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
-           duplicationCriteria = (flags_aMiner /= Instant) || currentNumber > lastNumber
-        
-       case (quorumSizeCriteria, duplicationCriteria) of
-        (False, _) ->
-          $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
-            ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
-            
-        (_, False) ->
-          $logInfoS "doConsume" . T.pack $
-          "Not mining because lazy mining is on, and the block number hasn't changed"
-          
-        (True, True) -> do -- do the actual mining
-            liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
-            $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
-              ++ (show . blockDataNumber $ blockBlockData b)
+       doConsume (offset + fromIntegral (length blocks)) c
 
-       doConsume (offset + fromIntegral (length blocks)) c currentNumber
+     (b:_) -> do --b is the last block, because of the reverse above
+       let quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
+
+       if quorumSizeCriteria
+         then do
+           liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
+           $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
+             ++ (show . blockDataNumber $ blockBlockData b)
+          else $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
+            ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
+
+       doConsume (offset + fromIntegral (length blocks)) c
 
 stratoAdit :: LoggingT IO ()
 stratoAdit = runAditT $ do
@@ -139,4 +132,4 @@ stratoAdit = runAditT $ do
     offset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
     $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
-    doConsume (max (offset - 1) 0) c 0
+    doConsume (max (offset - 1) 0) c

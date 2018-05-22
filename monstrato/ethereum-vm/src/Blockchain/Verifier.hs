@@ -90,8 +90,8 @@ verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
 verifyOmmersRoot::(MonadResource m, HasStateDB m)=>OutputBlock->m Bool
 verifyOmmersRoot OutputBlock{obBlockData=bd, obBlockUncles=bu} = return $ blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
-checkValidity::Monad m=>Bool->Bool->BlockSummary->OutputBlock->ContextM (m ())
-checkValidity partialBlock isHomestead parentBSum b = do
+checkValidity :: Monad m => Bool -> BlockSummary -> OutputBlock -> ContextM (m ())
+checkValidity isHomestead parentBSum b = do
   when (flags_transactionRootVerification) $ do
            trVerified <- verifyTransactionRoot b
            let trVerifiedMem = verifyTransactionRoot' b
@@ -103,7 +103,7 @@ checkValidity partialBlock isHomestead parentBSum b = do
   ommersVerified <- verifyOmmersRoot b
   when (not ommersVerified) $ error "ommersRoot doesn't match uncles"
   checkParentChildValidity isHomestead b parentBSum
-  when (flags_miningVerification && not partialBlock) $ do
+  when flags_miningVerification $ do
     let miningVerified = (verify verifier) (outputBlockToBlock b) -- todo: dont wanna rewrite adit just yet
     unless miningVerified $ fail "block falsely mined, verification failed"
   --nIsValid <- nonceIsValid' b

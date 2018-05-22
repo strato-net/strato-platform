@@ -8,12 +8,16 @@ module Blockchain.Data.GenesisBlock (
   BackupType(..)
 ) where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.JsonStream.Parser               as JS
+import           Data.Maybe                           (catMaybes)
+import           Data.List.Split                      (chunksOf)
+import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
@@ -29,6 +33,7 @@ import qualified Blockchain.DB.MemAddressStateDB as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
@@ -57,7 +62,11 @@ import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-import           Network.Kafka.Consumer               (commitSingleOffset)
+import           Blockchain.MilenaTools               (commitSingleOffset)
+
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
 
 initializeBlankStateDB :: HasStateDB m => m ()
 initializeBlankStateDB = do
@@ -68,14 +77,31 @@ initializeBlankStateDB = do
 putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
-    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
-    flushMemStorageDB
-    Mem.flushMemAddressStateDB
+    let slotss = chunksOf 10000 slots
+    forM_ slotss (\ss ->  do
+      mapM_ (\(k, v) -> putStorageKeyVal' address k v) ss
+      flushMemStorageDB
+      Mem.flushMemAddressStateDB)
+
+readSupplementaryAccounts :: String -> IO [AccountInfo]
+readSupplementaryAccounts genesisBlockName = do
+  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
+  let parseAccounts :: String -> [AccountInfo]
+      parseAccounts line = case words line of
+                              [] -> []
+                              "s":_ -> []
+                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                              _ -> error $ "invalid AccountInfo line: " ++ line
+  return . concatMap parseAccounts . lines $ accountInfoString
+
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
+                  -> String
                   -> m ()
-initializeStateDB addressInfo = do
+initializeStateDB addressInfo genesisBlockName = do
     initializeBlankStateDB
     let putAccount acc = case acc of
                               NonContract address balance' ->
@@ -89,22 +115,74 @@ initializeStateDB addressInfo = do
                                 putStorageTrie address slots
     mapM_ putAccount addressInfo
 
+    let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+
+    liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
+
+    accountInfoString <-
+      liftIO $
+      fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
+    let accountInfo = BLC.lines accountInfoString
+
+    let accountInfoBatches = chunksOf 10000 accountInfo
+
+    forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
+      forM_ batch $ \theLine -> do
+        case words $ BLC.unpack theLine of
+         [] -> return ()
+         ["s", a, k, v]  -> do
+           let address = Ad.Address $ parseHex a
+           putStorageKeyVal' address (parseHex k) (parseHex v)
+         ["a", a, b]  -> do
+           let address = Ad.Address $ parseHex a
+           liftIO $ putStrLn $ "adding account: " ++ format address
+           putAddressState address blankAddressState{addressStateBalance= read b}
+         ["a", a, b, c]  -> do
+           let address = Ad.Address $ parseHex a
+           liftIO $ putStrLn $ "adding account: " ++ format address
+           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=SHA $ parseHex c}
+         _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
+
+      liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
+      flushMemStorageDB
+      Mem.flushMemAddressStateDB
+
+    forM_ addressInfo $ \account -> do
+      liftIO $ print account
+      putAccount account
+
+
+parseHex::(Num a, Eq a)=>String->a
+parseHex theString =
+  case readHex theString of
+   [(value, "")] -> value
+   _ -> error $ "parseHex: error parsing string: " ++ theString
+
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
 
+zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
+zipSourceInfo accounts codes =
+  let hashPair c@(CodeInfo bs _ _) = (hash bs, c)
+      codeMap = Map.fromList . map hashPair $ codes
+      findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
+      findCodeFor (NonContract _ _) = Nothing
+      findCodeFor acc@(ContractNoStorage _ _ hsh) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
+  in catMaybes . map findCodeFor $ accounts
+
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
+                          -> String
+                          -> [AccountInfo]
                           -> m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi = do
+genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    let sourceInfo = case codes of
-                    [] -> []
-                    [c] -> zip accounts (repeat c)
-                    _ -> error "not equipped to seed for multiple contract types"
     initializeCodeDB codes
-    initializeStateDB accounts
+    initializeStateDB accounts gn
     db <- getStateDB
+    let sourceInfo = zipSourceInfo (accounts ++ as) codes
     return (sourceInfo, Block {
         blockBlockData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
@@ -133,8 +211,9 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let theJSON = either error id (eitherDecode theJSONString)
-    genesisInfoToGenesisBlock theJSON
+    let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
+    extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+    genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
@@ -180,7 +259,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         deletedAccounts     = Map.empty,
         updatedAccounts     = Map.empty
     }
-    commitSqlDiffs diff Nothing Nothing
+    commitSqlDiffs diff (const "") (const "")
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource addr name src

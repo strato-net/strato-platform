@@ -23,9 +23,13 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           Control.Monad
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class                   (lift)
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                                    as Map
+import Data.Time.Clock
+import Data.Time.Clock.POSIX
 
 import           Blockchain.Strato.StateDiff
 
@@ -35,42 +39,47 @@ sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m,
            Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs Nothing Nothing
+  commitSqlDiffs stateDiffs (const "") (const "")
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> Maybe (Address -> m String) -> Maybe (Address -> m String) -> m ()
-commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} addressSource addressContractName = do
+                  StateDiff -> (SHA -> String) -> (SHA -> String) -> m ()
+commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    sequence_ $ Map.mapWithKey (createAccount blockNumber addressSource addressContractName) createdAccounts
+    createAccount blockNumber codeSource codeContractName $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
-createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> Maybe (Address -> m String) -> Maybe (Address -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
-createAccount blockNumber addressSource addressContractName address diff = do
-  src <- case addressSource of
-    Nothing -> return ""
-    Just f -> lift $ f address
-  name <- lift . sequence $ addressContractName <*> pure address
-  addrID <- SQL.insert (addrRef src name)
-  sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
+createAccount :: MonadIO m =>
+                 Integer -> (SHA -> String) -> (SHA -> String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+createAccount blockNumber codeSource codeContractName addressDiffs = do
+  newAccounts <- forM addressDiffs $ \addressDiff -> do
+    let (address, diff) = addressDiff
+        src = codeSource $ codeHash diff
+        name' = codeContractName $ codeHash diff
+    return $ addrRef address diff src name'
+  addrIDs <- SQL.insertMany newAccounts
+  
+  newStorage <- 
+    forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
+      let (_, diff) = addressDiff
+      return [Storage addrID k v | (k, Value v) <- Map.toList $ storage diff]
+  SQL.insertMany_ $ concat newStorage
 
   where
-    addrRef source name = AddressStateRef{
+    addrRef address diff source name = AddressStateRef{
       addressStateRefAddress = address,
-      addressStateRefNonce = getField (theError "nonce") $ nonce diff,
-      addressStateRefBalance = getField (theError "balance") $ balance diff,
-      addressStateRefContractRoot = getField (theError "contractRoot") $ contractRoot diff,
-      addressStateRefCode = getField (theError "code") $ code diff,
+      addressStateRefNonce = getField (theError address "nonce") $ nonce diff,
+      addressStateRefBalance = getField (theError address "balance") $ balance diff,
+      addressStateRefContractRoot = getField (theError address "contractRoot") $ contractRoot diff,
+      addressStateRefCode = getField (theError address "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefSource = source,
       addressStateRefContractName = name
       }
-    makeIncremental (Value x) = Create{newValue = x}
-    theError :: String -> a
-    theError name = error $
+    theError :: Address -> String -> a
+    theError address name = error $
       "Missing field '" ++ name ++
       "' in contract creation diff for address " ++ formatAddressWithoutColor address
 
@@ -110,7 +119,7 @@ updateSource address name source = do
   flip SQL.runSqlPool pool $ do
     addrID <- getAddressStateSQL address "update"
     SQL.update addrID [AddressStateRefSource =. source,
-                       AddressStateRefContractName =. Just name]
+                       AddressStateRefContractName =. name]
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()

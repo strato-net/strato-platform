@@ -16,7 +16,7 @@ import qualified Text.Read.Lex                   as L
 import           Blockchain.EthConf
 
 import qualified Network.Kafka                   as K
-import qualified Network.Kafka.Consumer          as KC
+import qualified Blockchain.MilenaTools          as K
 import qualified Network.Kafka.Protocol          as KP
 
 import qualified Blockchain.Sequencer.Constants  as SeqConst
@@ -85,7 +85,7 @@ makeCheckpointData _ oldMD _ = oldMD
 
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
-    runKafkaConfigured clientId (KC.fetchSingleOffset consumerId topicName 0) >>= \case
+    runKafkaConfigured clientId (K.fetchSingleOffset consumerId topicName 0) >>= \case
         Left err -> error $ "Failed to fetch checkpoint: " ++ show err
         Right (Left KP.UnknownTopicOrPartition) -> lookupByBits bits
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
@@ -97,8 +97,8 @@ showOffset = putStrLn . ("Offset is " ++) . show . fst
 
 -- todo:
 showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM        = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
-showCheckpointData ApiIndexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData EVM        = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
+showCheckpointData ApiIndexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
 showCheckpointData svc        = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
@@ -115,7 +115,7 @@ doCheckpointGet service = do
 
 writeCheckpoint :: KafkaBits -> CPTuple -> IO ()
 writeCheckpoint (clientId, consumerId, topicName) (ofs, md) = void $
-    runKafkaConfigured clientId (KC.commitSingleOffset consumerId topicName 0 ofs md) >>=
+    runKafkaConfigured clientId (K.commitSingleOffset consumerId topicName 0 ofs md) >>=
         either (error . ("Error when committing offset: " ++) . show) return
 
 doCheckpointPut :: CheckpointService -> Maybe KP.Offset -> Maybe String -> IO ()

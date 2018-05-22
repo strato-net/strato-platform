@@ -11,9 +11,13 @@ import Data.Aeson.Extra (eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
+import Numeric
 
-import Blockchain.Generation (insertContractsCount, insertContractsJSON)
-import Blockchain.Strato.Model.Address ()
+import Blockchain.Data.GenesisInfo
+import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.SHA
+
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
 defineFlag "s:start" (0xfeb1989bbbea7000000000000000000000000000 :: Integer) "Starting address for seeding contract"
@@ -22,12 +26,14 @@ defineFlag "source_file" ("" :: String) "Filename pointing to the contract sourc
 defineFlag "contract_name" ("" :: String) "Name of the contract being uploaded"
 defineFlag "n:number" (0 :: Int) "Number of copies to seed"
 defineFlag "o:output_file" ("genesisWithContracts.json" :: String) "Name of output file to write"
+defineFlag "o:output_account_info_file" ("accountInfo" :: String) "Name of output account info file to write"
 defineFlag "r:records_file" ("" :: String) "Filename containing CSV records of data to insert.\
                                            \Only ints and strings are accepted (for now only \
                                            \ small strings as well). Little validation is \
                                            \ performed. Rows with fewer columns will \
                                            \ have fewer columns inserted."
-
+defineFlag "t:hash_maps" (False :: Bool) "Use an alternative JSON parsing scheme, where objects\
+                                          \ are hashmaps instead of structs"
 defineFlag "f:fake_flag" (0:: Integer) "Hflags will ignore this flag."
 
 
@@ -68,11 +74,27 @@ main = do
               then return $ insertContractsCount flags_number
               else do
                   json <- L.readFile flags_records_file
-                  return $ insertContractsJSON json
+                  return $ if flags_hash_maps
+                             then insertContractsJSONHashMaps json
+                             else insertContractsJSON json
   let output = insert name src bytes (fromInteger flags_start) genesis
+  let outputText = encode output{genesisInfoAccountInfo=[]}
+  withFile flags_output_file WriteMode (flip L.hPut $ outputText)
+  writeFile flags_output_account_info_file $ unlines $ map showAccountInfo $ genesisInfoAccountInfo output
 
-  case output of
-    Left err -> error $ "couldn't generate: " ++ err
-    Right o -> do
-      let outputText = encode o
-      withFile flags_output_file WriteMode (flip L.hPut $ outputText)
+
+
+showAccountInfo::AccountInfo->String
+showAccountInfo (NonContract (Address address) balance) =
+  "a " ++ showHex address "" ++ " " ++ show balance
+showAccountInfo (ContractNoStorage (Address address) balance code) =
+  "a " ++ showHex address "" ++ " " ++ show balance ++ show code
+showAccountInfo (ContractWithStorage (Address address) balance (SHA code) storage) =
+  "a " ++ addressString ++ " " ++ show balance ++ " " ++ showHex code "" ++ "\n"
+  ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
+  where addressString = showHex address ""
+
+
+
+  
+  

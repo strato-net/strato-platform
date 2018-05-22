@@ -1,13 +1,13 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {Field, reduxForm, reset} from 'redux-form';
-import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
-import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
-import {withRouter} from 'react-router-dom';
-import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { Field, reduxForm, reset } from 'redux-form';
+import { TRANSACTION_QUERY_TYPES, RESOURCE_TYPES } from '../../../QueryEngine/queryTypes';
+import { updateQuery, clearQuery, executeQuery, removeQuery } from '../../../QueryEngine/queryEngine.actions';
+import { withRouter } from 'react-router-dom';
+import { Text, Position, Tooltip, Button } from '@blueprintjs/core';
 import { parseDateFromString } from '../../../../lib/dateUtils';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import {fetchTx} from '../../../TransactionList/transactionList.actions';
+import { fetchTx } from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
 
 class TransactionTable extends Component {
@@ -44,21 +44,21 @@ class TransactionTable extends Component {
 
   render() {
     const history = this.props.history;
-    const {handleSubmit} = this.props;
+    const { handleSubmit } = this.props;
 
     function handleClick(hash) {
       mixpanelWrapper.track('transactions_row_click');
       history.push('/transactions/' + hash);
     }
 
-    let txRows = this.props.queryResults.map(
+    let txRows = this.props.queryResults.length && this.props.queryResults[0]['transactionType'] && this.props.queryResults.map(
       function (tx, i) {
         return (
           <tr key={i} onClick={() => {
             handleClick(tx.hash)
           }}>
             <td width="40%">
-              <HexText value={tx.hash} classes="small smd-pad-4"/>
+              <HexText value={tx.hash} classes="small smd-pad-4" />
             </td>
             <td width="10%">
               <Text ellipsize={true}>
@@ -128,13 +128,13 @@ class TransactionTable extends Component {
                       }
                     }
                   }
-                  dir="auto"/>
+                  dir="auto" />
               </div>
               <Button type="submit" onClick={() => {
                 //this.dispatchSubmit();
                 mixpanelWrapper.track('transactions_query_submit');
               }}
-                      className="pt-intent-primary pt-icon-arrow-right"/>
+                className="pt-intent-primary pt-icon-arrow-right" />
             </div>
           </form>
         </div>
@@ -145,13 +145,13 @@ class TransactionTable extends Component {
     const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
       const queryValue = query[queryType];
       return (
-        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right-4">
-                  {queryType + ': ' + queryValue}
+        <span key={'tag-' + queryType + '-' + i} className="pt-tag pt-tag-removable smd-margin-right-4">
+          {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
             mixpanelWrapper.track('transactions_query_remove_tag');
-          }} className="pt-tag-remove"/>
-                  </span>
+          }} className="pt-tag-remove" />
+        </span>
       )
     });
 
@@ -172,7 +172,7 @@ class TransactionTable extends Component {
             <span className="h3">Query Builder</span>
           </div>
           <div className="col-sm-1 text-right">
-            <Button onClick={this.refresh} className="pt-intent-primary pt-icon-refresh"/>
+            <Button onClick={this.refresh} className="pt-intent-primary pt-icon-refresh" />
           </div>
         </div>
 
@@ -181,21 +181,21 @@ class TransactionTable extends Component {
         <div className="row">
           <div className="col-sm-12">
             <table className="pt-table pt-interactive pt-condensed pt-striped"
-                   style={{tableLayout: 'fixed', width: "100%"}}>
+              style={{ tableLayout: 'fixed', width: "100%" }}>
               <thead>
-              <tr>
-                <th width="40%"><h5>Hash</h5></th>
-                <th width="10%" className="text-right"><h5>Value</h5></th>
-                <th width="10%"><h5>Block Number</h5></th>
-                <th width="20%"><h5>Timestamp</h5></th>
-                <th width="20%"><h5>Type</h5></th>
-              </tr>
+                <tr>
+                  <th width="40%"><h5>Hash</h5></th>
+                  <th width="10%" className="text-right"><h5>Value</h5></th>
+                  <th width="10%"><h5>Block Number</h5></th>
+                  <th width="20%"><h5>Timestamp</h5></th>
+                  <th width="20%"><h5>Type</h5></th>
+                </tr>
               </thead>
 
               <tbody>
-              {txRows.length === 0 ? <tr>
-                <td colSpan={5}>No Data</td>
-              </tr> : txRows}
+                {!txRows ? <tr>
+                  <td colSpan={5}>No Data</td>
+                </tr> : txRows}
               </tbody>
             </table>
           </div>
@@ -212,7 +212,7 @@ export function mapStateToProps(state) {
     queryResults: state.queryEngine.queryResult,
   };
 }
-const formed = reduxForm({form: 'transaction-query'})(TransactionTable);
+const formed = reduxForm({ form: 'transaction-query' })(TransactionTable);
 const connected = connect(mapStateToProps, {
   updateQuery,
   removeQuery,

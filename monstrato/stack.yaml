@@ -15,7 +15,6 @@ packages:
 - blockapps-util/
 - strato-api/
 - blockapps-tools/
-- strato-quarry/
 - strato-adit/
 - strato-index/
 - strato-sequencer/
@@ -77,6 +76,7 @@ extra-deps:
 - QuickCheck-2.10.1
 - aeson-1.0.0.0
 - csv-0.1.2
+- json-stream-0.4.2.3
 
 resolver: lts-7.18
 compiler: ghc-8.0.2
@@ -100,6 +100,5 @@ ghc-options:
   blockapps-tools:         -Wall -Werror
   strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
   strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
-  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing

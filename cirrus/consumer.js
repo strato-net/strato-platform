@@ -12,7 +12,7 @@ const toSchemaString = util.toSchemaString;
 
 const postgrestRoot = (process.env["postgrestRoot"] || "http://localhost/cirrus/search");
 const blocRoot       = (process.env["blocRoot"]) || "http://localhost/bloc/v2.2";
-const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
+const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper");
 
 const delay         = (process.env.DELAY || 200);
 const totalAttempts = (process.env.ATTEMPTS || 5);

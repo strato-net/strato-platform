@@ -14,11 +14,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
 
--- Data.Either does not export fromRight???
-fromRight :: b -> Either a b -> b
-fromRight _ (Right b) = b
-fromRight b _ = b
-
 start :: GenesisInfo
 start = defaultGenesisInfo
 
@@ -119,13 +114,13 @@ spec = do
     it "Should encode nonegative integers" $
       let input = Records [[Number 0xfffffff, Number 0]]
           want = [[(0, 0xfffffff), (1, 0)]]
-          got = fromRight [] $ encodeAllRecords input
+          got = encodeAllRecords input
       in got `shouldBe` want
 
     it "Should encode short strings" $
       let input = Records [[Stryng "\x30\x31\x42"]]
           want = [[(0, 0x303142 `shiftL` (29 * 8) .|. 3 `shiftL` 1)] :: [(Word256, Word256)]]
-          got = fromRight [] $ encodeAllRecords input
+          got = encodeAllRecords input
       -- Compare in JSON domain just so things are formatted in hex
       in Ae.encode got `shouldBe` Ae.encode want
 
@@ -134,7 +129,7 @@ spec = do
           -- Tip: $ printf "¯|_(ツ)_/¯筋ランキンxyz" | xxd
           want = [[(0, 0xc2af7c5f28e38384295f2fc2afe7ad8be383a9e383b3e382ade383b378797a00
                        .|. 31 `shiftL` 1)]] :: [[(Word256, Word256)]]
-          got = fromRight [] $ encodeAllRecords input
+          got = encodeAllRecords input
       in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should encode long strings properly" $
@@ -150,28 +145,23 @@ spec = do
                    (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5AD1,
                     0x4444444400000000000000000000000000000000000000000000000000000000)]]
                  :: [[(Word256, Word256)]]
-          got = fromRight [] $ encodeAllRecords input
+          got = encodeAllRecords input
       in Ae.encode got `shouldBe` Ae.encode want
 
-    it "Should refuse negative numbers" $
-      let input = Records [[Number (-3)]]
-          want = Left "unimplemented for negative numbers"
-          got = encodeAllRecords input
-      in got `shouldBe` want
     it "Should encode JSON into storage slots" $
       let input = "[[9876,\"This is text\"],\n[200,\n\"More text!\"]]"
-          want = Right [[(0, 9876),
-                         (1, 0x546869732069732074657874 `shiftL` (20 * 8) .|. 12 `shiftL` 1)],
-                        [(0, 200),
-                         (1, 0x4d6f7265207465787421 `shiftL` (22 * 8) .|. 10 `shiftL` 1)]]
-                        :: Either String [[(Word256, Word256)]]
+          want = [[(0, 9876),
+                   (1, 0x546869732069732074657874 `shiftL` (20 * 8) .|. 12 `shiftL` 1)],
+                  [(0, 200),
+                   (1, 0x4d6f7265207465787421 `shiftL` (22 * 8) .|. 10 `shiftL` 1)]]
+                  :: [[(Word256, Word256)]]
           got = encodeJSON input
       in got `shouldBe` want
 
     it "Should encode integer arrays" $
       let input = "[[[1, 2, 3, 4, 5]]]"
           -- NB: keccak(uint256(0)) =  0x290...
-          want = Right [[
+          want = [[
               (0x0000000000000000000000000000000000000000000000000000000000000000,
                0x0000000000000000000000000000000000000000000000000000000000000005),
               (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563,
@@ -192,7 +182,7 @@ spec = do
     let input = "[[7, [[3, 127]]]]"
         -- NB: keccak(uint256(1)) = 0xb10e2d...
         -- NB: kecack(keccak(uint256(1))) = 0xb5d9d8...
-        want = Right $ [[
+        want = [[
             (0x0000000000000000000000000000000000000000000000000000000000000000,
              0x0000000000000000000000000000000000000000000000000000000000000007), -- row[0] = 7
             (0x0000000000000000000000000000000000000000000000000000000000000001,
@@ -209,7 +199,7 @@ spec = do
 
   it "Should encode structs" $
     let input = "[[{\"0\": 255, \"1\": \"unique,newyork\"}]]"
-        want = Right $ [[
+        want = [[
             (0x0000000000000000000000000000000000000000000000000000000000000000,
              0x00000000000000000000000000000000000000000000000000000000000000ff),
             (0x0000000000000000000000000000000000000000000000000000000000000001,
@@ -219,7 +209,7 @@ spec = do
     in got `shouldBe` want
   it "Should encode integers after structs" $
     let input = "[[{\"0\": 65535, \"1\": 16777215, \"2\": 4294967295}, 93, 101]]"
-        want = Right $ [[
+        want = [[
             (0x0000000000000000000000000000000000000000000000000000000000000000,
              0x000000000000000000000000000000000000000000000000000000000000ffff),
             (0x0000000000000000000000000000000000000000000000000000000000000001,
@@ -245,7 +235,7 @@ spec = do
                    \         \"b\": {\"A\": 127,  \
                    \                 \"B\": 255}}}\
                  \]]"
-        want = Right [zip [0..] [1, 3, 7, 15, 31, 63, 127, 255]]
+        want = [zip [0..] [1, 3, 7, 15, 31, 63, 127, 255]]
         got = encodeJSON input
     in got `shouldBe` want
 
@@ -258,7 +248,7 @@ spec = do
                     \{\"x\": 1048575, \
                     \ \"y\": 16777215}\
                 \]]]"
-        want = Right [[
+        want = [[
             (0x0000000000000000000000000000000000000000000000000000000000000000,
              0x0000000000000000000000000000000000000000000000000000000000000003),
             (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563,
@@ -275,4 +265,26 @@ spec = do
              0x0000000000000000000000000000000000000000000000000000000000ffffff)
             ]]
         got = encodeJSON input
+    in got `shouldBe` want
+
+  it "Should encode mapping(bytes32 => uint)" $
+    let input = "[[{\"hello, world\": 255, \
+                 \  \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\":65535, \
+                 \  \"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\": 16777215}]]"
+        want = [[
+            -- Mapping reserved spot
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x0000000000000000000000000000000000000000000000000000000000000000),
+            -- keccak256("hello, world" + '\0' * 20 <> uint256(0)) = 0cfed6...
+            (0x0cfed68a184422f13ee7ec91f5da2bb2308dd2f99b1e970d69a8fe4a32752620,
+             0x00000000000000000000000000000000000000000000000000000000000000ff),
+            -- keccak256('a' * 32 + '\0' * 32) = 31db...
+            (0x31bdf21e71593a7b324dcbb99d5d011856259a09fdda85b2c97448b1bb45c2de,
+             0x000000000000000000000000000000000000000000000000000000000000ffff),
+            -- Strings longer than 32 bytes are truncated to 32
+            -- keccak256('z' * 32 + '\0' * 32) = 4490...
+            (0x4490202cf2d5b5a4a1cc5b09643c81c0a37330a9ec8d1249a2b2febd1150027b,
+             0x0000000000000000000000000000000000000000000000000000000000ffffff)
+            ]]
+        got = encodeJSONHashMaps input
     in got `shouldBe` want

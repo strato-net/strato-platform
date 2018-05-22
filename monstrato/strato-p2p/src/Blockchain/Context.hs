@@ -41,6 +41,7 @@ import qualified Database.Persist.Postgresql           as SQL
 import qualified Database.PostgreSQL.Simple            as PS
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
+import qualified Blockchain.MilenaTools                as K
 
 data Context =
     Context {

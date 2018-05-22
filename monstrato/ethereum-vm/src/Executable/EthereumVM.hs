@@ -13,8 +13,7 @@ import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
-import qualified Network.Kafka                         as K
-import qualified Network.Kafka.Consumer                as KC
+import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
@@ -80,11 +79,7 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
-        addBlocks False blocks
-
-        -- todo: is this the best place to put this?
-        flushLogEntries
-        flushTransactionResults
+        addBlocks blocks
 
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
@@ -99,6 +94,10 @@ ethereumVM = void . execContextM $ do
             newBlock <- Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+
+        -- todo: is this the best place to put this?
+        flushLogEntries
+        flushTransactionResults
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         setCheckpointNoMetadata newOffset
@@ -144,7 +143,7 @@ getCheckpoint = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (KC.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, md) -> do
@@ -158,7 +157,7 @@ getCheckpointNoMetadata = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (KC.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, _) -> do
@@ -169,14 +168,14 @@ setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    ret  <- K.withKafkaViolently $ KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
     either (error . show) return ret
 
 setCheckpointNoMetadata :: KP.Offset -> ContextM ()
 setCheckpointNoMetadata ofs = do
     $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
     let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-    ret  <- K.withKafkaViolently $ KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs emptyMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]

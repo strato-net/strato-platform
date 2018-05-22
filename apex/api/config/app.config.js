@@ -24,5 +24,6 @@ module.exports = {
   mixpanel: {
     token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
   },
-  signup: 'https://signup.blockapps.net'
+  signup: 'https://signup.blockapps.net',
+  SMD_MODE: process.env['SMD_MODE'] || 'enterprise'
 };

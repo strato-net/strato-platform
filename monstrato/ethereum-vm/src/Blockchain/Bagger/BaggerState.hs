@@ -7,6 +7,7 @@ import           Control.Applicative                (Alternative, empty)
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 
+import           Blockchain.Bagger.Transactions
 import           Blockchain.Bagger.TransactionList
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 
@@ -24,8 +25,9 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
                                , bestBlockTxHashes     :: [SHA]
                                , lastExecutedStateRoot :: StateRoot
+                               , lastRewardedStateRoot :: StateRoot
                                , remainingGas          :: Integer
-                               , lastExecutedTxs       :: [OutputTx]
+                               , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
                                , startTimestamp        :: UTCTime
                                } deriving (Show)
@@ -60,6 +62,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , bestBlockHeader       = error "reached defaultMiningCache"
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot
+                                  , lastRewardedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []

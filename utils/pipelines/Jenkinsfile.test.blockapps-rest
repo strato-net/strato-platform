@@ -1,0 +1,133 @@
+pipeline {
+  agent {
+    label "cd9"
+  }
+  options { disableConcurrentBuilds() }
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout([$class: 'GitSCM', branches: [[name: 'origin/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/blockapps/blockapps-rest']]])
+      }
+    }
+
+    stage('Prepare') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+        '''
+      }
+    }
+
+    stage('Run Strato') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          rm -rf strato-getting-started
+          git clone https://github.com/blockapps/strato-getting-started.git 
+          cd strato-getting-started
+          ./strato.sh --single -m 1
+          docker ps
+          counter=0
+          # Few quick tests
+          until curl --silent --output /dev/null --fail --location localhost/bloc/v2.2/users/
+          do
+            if [[ "$counter" -gt 300 ]]; then
+              echo "bloc took longer than 5 minutes to initialize! aborting."
+              exit 73
+            fi
+            echo "waiting for bloc to be available through nginx"
+            counter=$((counter+1))
+            sleep 1
+          done
+          echo "bloc is available"
+          until curl --silent --output /dev/null --fail --location localhost/cirrus/contract/
+          do
+            echo "waiting for cirrus to be available through nginx"
+            sleep 1
+          done
+          echo "cirrus is available"
+        '''
+      }
+    }
+
+    stage('Tests') {
+
+      steps {
+        parallel (
+          'Vitu tests': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
+            ]) {
+              sh '''#!/bin/bash -le
+                set -x
+                echo "Running vitu tests"
+                rm -rf vitu
+                git clone https://github.com/blockapps/vitu.git
+                cd vitu
+                npm i
+                SERVER=localhost npm run test
+              '''
+            }
+          },
+
+          'Blockapps-ba tests': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
+            ]) {
+              sh '''#!/bin/bash -le
+                set -x
+                rm -rf blockapps-ba
+                git clone https://github.com/blockapps/blockapps-ba.git 
+                cd blockapps-ba
+                npm i
+                SERVER=localhost npm run deploy
+                sleep 5
+                SERVER=localhost npm run test
+              '''
+            }
+          },
+
+          'EChO tests': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
+            ]) {
+              sh '''#!/bin/bash -le
+                set -x
+                rm -rf EChO
+                git clone https://github.com/blockapps/EChO.git 
+                cd EChO
+                npm i
+                SERVER=localhost npm run test
+              '''
+            }
+          }
+        )
+      }
+
+    }
+
+  }
+  post {
+    success {
+      slackSend(
+        color: 'good',
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      sh '''
+      echo "Build Successful for Git branch: $BRANCH_NAME"
+    '''
+    }
+
+    failure {
+      slackSend(
+        color: 'danger',
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}

@@ -159,7 +159,7 @@ exports[`Accounts: index render with (enterprise mode) empty values 1`] = `
   </div>
   <div className=\\"container-fluid pt-dark\\">
     <div className=\\"row\\">
-      <div className=\\"col-sm-4\\">
+      <div className=\\"col-sm-4 main-div\\">
         <div className=\\"accounts-margin-top\\">
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
@@ -170,8 +170,8 @@ exports[`Accounts: index render with (enterprise mode) empty values 1`] = `
           </div>
         </div>
       </div>
-      <div className=\\"col-sm-8\\">
-        <div className=\\"account-details\\" />
+      <div className=\\"col-sm-8 account-details\\">
+        <div />
       </div>
     </div>
   </div>
@@ -204,7 +204,7 @@ exports[`Accounts: index render with (enterprise mode) mocked values 1`] = `
   </div>
   <div className=\\"container-fluid pt-dark\\">
     <div className=\\"row\\">
-      <div className=\\"col-sm-4\\">
+      <div className=\\"col-sm-4 main-div\\">
         <div className=\\"accounts-margin-top\\">
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
@@ -383,8 +383,8 @@ exports[`Accounts: index render with (enterprise mode) mocked values 1`] = `
           </div>
         </div>
       </div>
-      <div className=\\"col-sm-8\\">
-        <div className=\\"account-details\\">
+      <div className=\\"col-sm-8 account-details\\">
+        <div>
           <withRouter(Connect(Account)) name=\\"Admin_1085_64667\\" address=\\"d2263b71c14010ff03d8f786670aba691b22b158\\" />
         </div>
       </div>
@@ -418,7 +418,7 @@ exports[`Accounts: index render with (public mode) empty values 1`] = `
   </div>
   <div className=\\"container-fluid pt-dark\\">
     <div className=\\"row\\">
-      <div className=\\"col-sm-4\\">
+      <div className=\\"col-sm-4 main-div\\">
         <div className=\\"accounts-margin-top\\">
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
@@ -429,8 +429,8 @@ exports[`Accounts: index render with (public mode) empty values 1`] = `
           </div>
         </div>
       </div>
-      <div className=\\"col-sm-8\\">
-        <div className=\\"account-details\\" />
+      <div className=\\"col-sm-8 account-details\\">
+        <div />
       </div>
     </div>
   </div>
@@ -462,7 +462,7 @@ exports[`Accounts: index render with (public mode) mocked values 1`] = `
   </div>
   <div className=\\"container-fluid pt-dark\\">
     <div className=\\"row\\">
-      <div className=\\"col-sm-4\\">
+      <div className=\\"col-sm-4 main-div\\">
         <div className=\\"accounts-margin-top\\">
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
@@ -641,8 +641,8 @@ exports[`Accounts: index render with (public mode) mocked values 1`] = `
           </div>
         </div>
       </div>
-      <div className=\\"col-sm-8\\">
-        <div className=\\"account-details\\">
+      <div className=\\"col-sm-8 account-details\\">
+        <div>
           <withRouter(Connect(Account)) name=\\"Admin_1085_64667\\" address=\\"d2263b71c14010ff03d8f786670aba691b22b158\\" />
         </div>
       </div>

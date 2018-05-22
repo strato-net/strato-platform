@@ -36,6 +36,7 @@ executable strato-setup
                  , filepath
                  , hedis
                  , hflags
+                 , json-stream
                  , leveldb-haskell
                  , merkle-patricia-db
                  , blockapps-milena
@@ -114,6 +115,7 @@ executable genesis-setup
                  , strato-init
                  , merkle-patricia-db
                  , time
+                 , json-stream
     other-modules: Blockchain.GenesisBlockSetup
                    Blockchain.Data.GenesisInfo
     buildable: True
@@ -156,6 +158,7 @@ library
                  , containers
                  , cryptonite
                  , csv
+                 , json-stream
                  , memory
                  , merkle-patricia-db
                  , scientific
@@ -184,6 +187,7 @@ executable generate-genesis
                  , containers
                  , csv
                  , hflags
+                 , json-stream
                  , merkle-patricia-db
                  , scientific
                  , strato-init
@@ -209,6 +213,7 @@ test-suite strato-init-test
                  , bytestring
                  , containers
                  , hspec
+                 , json-stream
                  , merkle-patricia-db
                  , scientific
                  , strato-init
