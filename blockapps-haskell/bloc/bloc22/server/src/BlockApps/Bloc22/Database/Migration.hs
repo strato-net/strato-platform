@@ -50,7 +50,7 @@ dropHashNameTable :: Query
 dropHashNameTable = [sql| DROP TABLE IF EXISTS hash_name; |]
 
 addConstantColumn :: Query
-addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
+addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
 
 addValueColumn :: Query
 addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
