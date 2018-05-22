@@ -96,7 +96,6 @@ export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
     isLoggedIn: state.user.isLoggedIn,
-    isTokenOpen: state.cli.isTokenOpen
   };
 }
 

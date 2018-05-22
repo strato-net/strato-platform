@@ -276,7 +276,7 @@ class LaunchPad extends Component {
           </div>
         </div>
         <Dialog
-          isOpen={this.props.isTokenOpen}
+          isOpen={this.props.isOpen}
           onClose={this.props.closeCLIOverlay}
           title="Additional Instructions"
           className="pt-dark cli-dialog"
@@ -313,7 +313,7 @@ export function mapStateToProps(state) {
       appUsername: state.user.currentUser.username,
       appUserAddress: state.user.currentUser.accountAddress
     },
-    isTokenOpen: state.cli.isTokenOpen
+    isOpen: state.cli.isOpen
   };
 }
 
