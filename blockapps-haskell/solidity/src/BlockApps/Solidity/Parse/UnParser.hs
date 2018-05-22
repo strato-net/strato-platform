@@ -94,10 +94,11 @@ unparseFunc (name, Func{..}) =
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
     <> case funcMutability of
+        -- TODO: replace these with the real keywords when solc is upgraded...
         Just Constant -> "constant "
-        Just View -> "view "
-        Just Pure -> "pure "
-        Just Payable -> "payable "
+        Just View -> "constant "
+        Just Pure -> "constant "
+        Just Payable -> ""
         Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
