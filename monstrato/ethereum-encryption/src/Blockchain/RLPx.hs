@@ -143,8 +143,9 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
       r = bytesToWord256 $ B.unpack $ B.take 32 $ signatureBytes
       s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ signatureBytes
       v = head . B.unpack $ B.take 1 $ B.drop 64 signatureBytes
+      yIsOdd = v == 1
 
-      extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) (toRecId v)
+      extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
       otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg
@@ -197,8 +198,9 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
         r = bytesToWord256 $ B.unpack $ B.take 32 $ eciesMsgIBytes
         s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ eciesMsgIBytes
         v = head . B.unpack $ B.take 1 $ B.drop 64 eciesMsgIBytes
+        yIsOdd = v == 1
 
-        extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) (toRecId v)
+        extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
         otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg
