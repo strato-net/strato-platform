@@ -69,7 +69,6 @@ class Account extends Component {
           </tbody>
         </table>
       </div>
-
     );
   }
 }

@@ -35,7 +35,7 @@ class SendTokens extends Component {
   }
 
   submit = (values) => {
-    const toAddress = isModePublic() ? values.fromAddress : (this.state.form.userSelected ? values.toAddress : values.address)
+    const toAddress = isModePublic() ? values.address : (this.state.form.userSelected ? values.toAddress : values.address)
 
     const payload = {
       from: values.from,
