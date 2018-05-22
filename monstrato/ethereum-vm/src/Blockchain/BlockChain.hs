@@ -637,9 +637,23 @@ calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = w
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
 
     let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
-        codeSource' x = M.findWithDefault (error "missing code hash in codeSource map") x (M.fromList (map (\y -> (y, codeSource y)) allNewCodeHashes))
-        codeContractName' x = M.findWithDefault (error "missing code hash in codeSource map") x (M.fromList (map (\y -> (y, codeContractName y)) allNewCodeHashes))
+
     
+    codeSourceMap <- fmap M.fromList $
+      forM allNewCodeHashes $ \codeHash -> do
+        codeSource <- codeSource codeHash
+        return (codeHash, codeSource)
+
+    let codeSource' x =
+          return $ M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap
+
+    codeNameMap <- fmap M.fromList $
+      forM allNewCodeHashes $ \codeHash -> do
+        codeName <- codeContractName codeHash
+        return (codeHash, codeName)
+
+    let codeContractName' x =
+          return $ M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     when flags_sqlDiff $ commitSqlDiffs diffs codeSource' codeContractName'
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs

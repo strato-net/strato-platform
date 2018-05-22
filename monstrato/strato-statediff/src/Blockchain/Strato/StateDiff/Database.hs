@@ -23,9 +23,13 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           Control.Monad
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class                   (lift)
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                                    as Map
+import Data.Time.Clock
+import Data.Time.Clock.POSIX
 
 import           Blockchain.Strato.StateDiff
 
@@ -39,36 +43,43 @@ sqlDiff blockNumber blockHash oldRoot newRoot = do
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
                   StateDiff -> (SHA -> m String) -> (SHA -> m String) -> m ()
-commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} addressSource addressContractName = do
+commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    sequence_ $ Map.mapWithKey (createAccount blockNumber addressSource addressContractName) createdAccounts
+    createAccount blockNumber codeSource codeContractName $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> (SHA -> m String) -> (SHA -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
-createAccount blockNumber codeSource codeContractName address diff = do
-  src <- lift $ codeSource $ codeHash diff
-  name' <- lift $ codeContractName $ codeHash diff
-  addrID <- SQL.insert (addrRef src name')
-  sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
+                 Integer -> (SHA -> m String) -> (SHA -> m String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+createAccount blockNumber codeSource codeContractName addressDiffs = do
+  newAccounts <- forM addressDiffs $ \addressDiff -> do
+    let (address, diff) = addressDiff
+    src <- lift $ codeSource $ codeHash diff
+    name' <- lift $ codeContractName $ codeHash diff
+    return $ addrRef address diff src name'
+  addrIDs <- SQL.insertMany newAccounts
+  
+  newStorage <- 
+    forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
+      let (_, diff) = addressDiff
+      return [Storage addrID k v | (k, Value v) <- Map.toList $ storage diff]
+  SQL.insertMany_ $ concat newStorage
 
   where
-    addrRef source name = AddressStateRef{
+    addrRef address diff source name = AddressStateRef{
       addressStateRefAddress = address,
-      addressStateRefNonce = getField (theError "nonce") $ nonce diff,
-      addressStateRefBalance = getField (theError "balance") $ balance diff,
-      addressStateRefContractRoot = getField (theError "contractRoot") $ contractRoot diff,
-      addressStateRefCode = getField (theError "code") $ code diff,
+      addressStateRefNonce = getField (theError address "nonce") $ nonce diff,
+      addressStateRefBalance = getField (theError address "balance") $ balance diff,
+      addressStateRefContractRoot = getField (theError address "contractRoot") $ contractRoot diff,
+      addressStateRefCode = getField (theError address "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefSource = source,
       addressStateRefContractName = name
       }
-    makeIncremental (Value x) = Create{newValue = x}
-    theError :: String -> a
-    theError name = error $
+    theError :: Address -> String -> a
+    theError address name = error $
       "Missing field '" ++ name ++
       "' in contract creation diff for address " ++ formatAddressWithoutColor address
 
