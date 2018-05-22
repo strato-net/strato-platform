@@ -151,7 +151,6 @@ export function* getAccountDetail(action) {
 }
 
 export function* getCurrentAccountDetail(action) {
-  console.log("calling haye")
   try {
     const response = yield call(getAccountDetailApi, action.address);
     // don't ask about response['0'].

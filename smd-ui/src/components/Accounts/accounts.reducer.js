@@ -132,7 +132,7 @@ const reducer = function (state = initialState, action) {
     case BALANCE_SUCCESS:
       return {
         ...state,
-        currentUserBalance: action.detail.balance
+        currentUserBalance: action.detail && action.detail.balance
       }
     case BALANCE_FAILURE:
       return {
