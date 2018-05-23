@@ -1,10 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Blockchain.ExtendedECDSA (
   ExtendedSignature(..),
-  toRecId,
-  fromRecId,
   extSignMsg,
   getPubKeyFromSignature
   ) where
@@ -13,7 +9,6 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
-import           Data.Word                 (Word8)
 
 import           Network.Haskoin.Constants
 import           Network.Haskoin.Crypto
@@ -49,19 +44,7 @@ genKeyPair = do
 
 -----------------------
 
-recIdOffset :: Word8
-recIdOffset = 0x1b
-
-newtype RecId = RecId Word8 deriving (Show, Eq, Ord, Enum, Num, Real, Integral)
-
-toRecId :: Word8 -> RecId
-toRecId w | w < recIdOffset = error $ "toRecId: value less than recIdOffset. Expected >=" ++ show recIdOffset ++ ", got " ++ show w
-          | otherwise       = RecId (w - recIdOffset)
-
-fromRecId :: RecId -> Word8
-fromRecId (RecId r) = r + recIdOffset
-
-data ExtendedSignature = ExtendedSignature Signature RecId deriving (Show, Eq)
+data ExtendedSignature = ExtendedSignature Signature Bool deriving (Show, Eq)
 
 unsafeExtSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe ExtendedSignature
 unsafeExtSignMsg _ 0 _ = Nothing
@@ -81,10 +64,7 @@ unsafeExtSignMsg h d (k,p) = do
     guard (s /= 0)
     -- 4.1.3.7
     --return $ (Signature r s, odd y `xor` (s' > (maxBound `div` 2)))
-    let (recId :: Word8) = (if (toInteger r) >= curveN then 2 else 0)
-                           + ((fromIntegral (y `mod` 2))
-                             `xor` (if s' > (maxBound `div` 2) then 1 else 0))
-    return $ ExtendedSignature (Signature r s) (fromIntegral recId)
+    return $ ExtendedSignature (Signature r s) (odd y `xor` (s' > (maxBound `div` 2)))
 
 extSignMsg :: Monad m => Word256 -> PrvKey -> SecretT m ExtendedSignature
 --extSignMsg _ (PrvKey  0) = error "signMsg: Invalid private key 0"
@@ -100,21 +80,19 @@ extSignMsg h d = do
 
 -------------------
 
-recoverPoint :: FieldN -> Word8 -> Maybe Point
-recoverPoint r recId = do
-  ys <- case quadraticResidue $ (fromIntegral r)^(3::Integer) + 7 of
+recoverPoint :: FieldN -> Bool -> Maybe Point
+recoverPoint r yIsOdd = do
+  firstY:secondY:_ <- case quadraticResidue $ (fromIntegral r)^(3::Integer) + 7 of
     [] -> Nothing
     l  -> Just l
-  case drop (fromIntegral recId) ys of
-    [] -> Nothing
-    (y:_) -> makePoint (fromIntegral r) y
+  makePoint (fromIntegral r) $ if odd firstY == yIsOdd then firstY else secondY
 
-getPubKeyFromSignature :: ExtendedSignature -> Word256 -> Maybe PubKey
-getPubKeyFromSignature (ExtendedSignature sig recId) msgHash = do
+getPubKeyFromSignature :: ExtendedSignature->Word256-> Maybe PubKey
+getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash = do
   let r = sigR sig
       s = sigS sig
       h = fromIntegral msgHash
-  p <- recoverPoint r (fromIntegral recId)
+  p <- recoverPoint r yIsOdd
   w <- if r == 0 then Nothing else Just $ recip r
   return $ makePubKey $ shamirsTrick (s * w) p (-h * w) curveG
 

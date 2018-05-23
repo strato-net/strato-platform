@@ -259,7 +259,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         deletedAccounts     = Map.empty,
         updatedAccounts     = Map.empty
     }
-    commitSqlDiffs diff (const (return "")) (const (return ""))
+    commitSqlDiffs diff (const "") (const "")
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource addr name src

@@ -22,6 +22,7 @@ import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import           Data.IORef
+import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
@@ -43,10 +44,12 @@ safeRead mem x = do
     then V.read mem (fromIntegral x)
     else return 0
 
---Word256 is too big to use for [first..first+size-1], so use safeRange instead
-safeRange::Word256->Word256->[Word256]
-safeRange _ 0        = []
-safeRange first size = first:safeRange (first+1) (size-1)
+safeReadRange :: V.IOVector Word8 -> Word256 -> Word256 -> IO [Word8]
+safeReadRange v offset count = do
+  let len = V.length v
+  if (offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)
+    then mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
+    else return []
 
 getSizeInWords::VMM Word256
 getSizeInWords = do
@@ -112,18 +115,18 @@ getShow::Memory->IO String
 getShow (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
   --fmap (show . B16.encode . B.pack) $ sequence $ V.read arr <$> fromIntegral <$> [0..fromIntegral msize-1]
-  fmap (show . B16.encode . B.pack) $ sequence $ safeRead arr <$> [0..fromIntegral msize-1]
+  fmap (show . B16.encode . B.pack) $ safeReadRange arr 0 msize
 
 getMemAsByteString::Memory->IO B.ByteString
 getMemAsByteString (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
-  liftIO $ fmap B.pack $ sequence $ safeRead arr <$> [0..fromIntegral msize-1]
+  liftIO $ fmap B.pack $ safeReadRange arr 0 msize
 
 mLoad::Word256->VMM [Word8]
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  liftIO $ sequence $ safeRead (mVector $ memory state) <$> safeRange p 32
+  liftIO $ safeReadRange (mVector $ memory state) p 32
 
 mLoad8::Word256->VMM Word8
 mLoad8 p = do
@@ -136,7 +139,7 @@ mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if n
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
   state <- lift get
-  val <- liftIO $ fmap B.pack $ sequence $ safeRead (mVector $ memory state) <$> fromIntegral <$> safeRange p size
+  val <- liftIO $ fmap B.pack $ safeReadRange (mVector $ memory state) p size
   return val
 
 unsafeSliceByteString::Word256->Word256->VMM B.ByteString
@@ -153,7 +156,9 @@ mStore::Word256->Word256->VMM ()
 mStore p val = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  liftIO $ sequence_ $ uncurry (V.write $ mVector $ memory state) <$> zip [fromIntegral p..] (word256ToBytes val)
+  let bytes = DV.fromList $ word256ToBytes val
+      ps    = DV.enumFromN (fromIntegral p) (DV.length bytes)
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) ps bytes
 
 mStore8::Word256->Word8->VMM ()
 mStore8 p val = do
@@ -166,5 +171,6 @@ mStoreByteString _ theData | B.null theData = return () --no need to charge gas 
 mStoreByteString p theData = do
   setNewMaxSize (fromIntegral p + fromIntegral (B.length theData))
   state <- lift get
-  liftIO $ sequence_ $ uncurry (V.write $ mVector $ memory state) <$> zip (fromIntegral <$> safeRange p (fromIntegral $ B.length theData)) (B.unpack theData)
-
+  let sr = DV.enumFromN (fromIntegral p) (B.length theData) -- fromIntegral <$> sr'
+      up = DV.fromList $ B.unpack theData
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) sr up
