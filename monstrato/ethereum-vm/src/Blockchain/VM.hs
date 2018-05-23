@@ -961,7 +961,9 @@ getSource :: Bool -> BlockData -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
 getContractName :: Bool -> BlockData -> SHA -> ContextM String
-getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
+-- getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
+-- TODO(tim): Make getFromSelector safe against calling missing functions
+getContractName _ _ _ = return "defaultContractName"
 
 getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
 getFromSelector sel isRunningTests' b codeHash = do
@@ -969,7 +971,7 @@ getFromSelector sel isRunningTests' b codeHash = do
 
   stateRoot <- getStateRoot
   setStateDBStateRoot (blockDataStateRoot b)
-  let env = 
+  let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
           envBlockHeader=error "getFromSelector should only be called on simple contracts that don't use the block header",
