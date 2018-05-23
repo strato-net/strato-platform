@@ -33,6 +33,8 @@ migrations = [ (Throw, createTables)
              , (Throw, insertSchemaVersion)
              , (Throw, dropHashNameTable)
              , (Throw, hashNameTable)
+             , (Throw, addConstantColumn)
+             , (Throw, addValueColumn)
              ]
 
 getSchemaVersion :: Query
@@ -46,3 +48,9 @@ updateSchemaVersion = [sql| UPDATE bloc_schema_version SET schema_version=? WHER
 
 dropHashNameTable :: Query
 dropHashNameTable = [sql| DROP TABLE IF EXISTS hash_name; |]
+
+addConstantColumn :: Query
+addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
+
+addValueColumn :: Query
+addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]

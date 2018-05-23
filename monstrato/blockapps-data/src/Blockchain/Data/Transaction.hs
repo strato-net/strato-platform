@@ -168,7 +168,7 @@ createMessageTX n gp gl to' val theData prvKey = do
                      transactionV = 0
                    }
   let SHA theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature recId <- extSignMsg theHash prvKey
+  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
   return
     unsignedTX {
       transactionR =
@@ -179,7 +179,7 @@ createMessageTX n gp gl to' val theData prvKey = do
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
           (val', "") -> byteString2Integer val'
           _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = fromRecId recId
+      transactionV = if yIsOdd then 0x1c else 0x1b
     }
 
 createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code->PrvKey->SecretT m Transaction
@@ -196,7 +196,7 @@ createContractCreationTX n gp gl val init' prvKey = do
                    }
 
   let SHA theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature recId <- extSignMsg theHash prvKey
+  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
   return
     unsignedTX {
       transactionR =
@@ -207,17 +207,17 @@ createContractCreationTX n gp gl val init' prvKey = do
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
           (val', "") -> byteString2Integer val'
           _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = fromRecId recId
+      transactionV = if yIsOdd then 0x1c else 0x1b
     }
 
 
 {-
   Switch to Either?
 -}
-whoSignedThisTransaction :: Transaction -> Maybe Address -- Signatures can be malformed, hence the Maybe
+whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
         where
-          xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (toRecId (transactionV t))
+          xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
 
 isMessageTX::Transaction->Bool
