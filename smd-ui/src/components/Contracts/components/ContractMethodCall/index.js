@@ -296,10 +296,6 @@ export function mapStateToProps(state, ownProps) {
       state.methodCall.modals[ownProps.lookup] : {},
     accounts: state.accounts.accounts,
     currentUser: state.user.currentUser,
-    initialValues: {
-      modalUsername: state.user.currentUser.username,
-      modalAddress: state.user.currentUser.accountAddress
-    },
     modalUsername: selector(state, 'modalUsername')
   };
 }
