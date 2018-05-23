@@ -14,7 +14,7 @@ import           Blockchain.Util
 
 data Operation =
     STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
-    LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE |
+    LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE | SHL | SHR | SAR |
     SHA3 |
     ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
     BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
@@ -74,6 +74,9 @@ opDatas =
     OPData 0x18 XOR 2 1 "Bitwise XOR operation.",
     OPData 0x19 NOT 1 1 "Bitwise not operator.",
     OPData 0x1a BYTE 2 1 "Retrieve single byte from word.",
+    OPData 0x1b SHL 2 1 "Bitwise left shift.",
+    OPData 0x1c SHR 2 1 "Logical bitwise right shift.",
+    OPData 0x1d SAR 2 1 "Arithmetic bitwise right shift.",
 
     OPData 0x20 SHA3 2 1 "Compute SHA3-256 hash.",
 

@@ -23,11 +23,11 @@ import qualified Blockchain.ECIES          as ECIES
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
 
-sigToBytes :: ExtendedSignature -> [Word8]
-sigToBytes (ExtendedSignature signature recId) =
+sigToBytes::ExtendedSignature->[Word8]
+sigToBytes (ExtendedSignature signature yIsOdd) =
   word256ToBytes (fromIntegral $ H.sigR signature) ++
   word256ToBytes (fromIntegral $ H.sigS signature) ++
-  [fromIntegral recId]
+  [if yIsOdd then 1 else 0]
 
 
 data AckMessage = AckMessage {

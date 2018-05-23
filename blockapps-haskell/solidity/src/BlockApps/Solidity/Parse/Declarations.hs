@@ -62,8 +62,8 @@ solidityContract = do
                -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
-                zipWith (\(v, isPublic, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) value) v)
-                [ ((Text.pack n, v), isPublic, value) | (n, VariableDeclaration v isPublic value) <- declarations]
+                zipWith (\(v, isPublic, isConstant, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) (Just isConstant) value) v)
+                [ ((Text.pack n, v), isPublic, isConstant, value) | (n, VariableDeclaration v isPublic isConstant value) <- declarations]
                 [0, 32..]
            , xabiTypes =
              Map.fromList $
@@ -90,7 +90,7 @@ data Declaration =
   | EnumDeclaration Xabi.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
-  | VariableDeclaration Xabitype.Type Bool (Maybe String)
+  | VariableDeclaration Xabitype.Type Bool Bool (Maybe String)
   deriving Show
 
 -- | Parses anything that a contract can declare at the top level: new types,
@@ -113,7 +113,7 @@ structDeclaration = do
   reserved "struct"
   structName <- identifier
   structFields <- braces $ many1 $ do
-    (fieldName, VariableDeclaration decl _ _) <- simpleVariableDeclaration
+    (fieldName, VariableDeclaration decl _ _ _) <- simpleVariableDeclaration
     return (fieldName, decl)
   return
     (
@@ -181,13 +181,13 @@ simpleVariableDeclaration = do
   -- generate accessor functions
   --TODO - deal with the variableVisible flag
 --  (variableVisible, variableIsPublic) <- option (True, False) $
-  (_, variableIsPublic) <- option (True, False) $
-                     (reserved "constant" >> return (False, False)) <|>
-                     (reserved "storage" >> return (True, False)) <|>
-                     (reserved "memory" >> return (False, False)) <|>
-                     (reserved "public" >> return (True, True)) <|>
-                     (reserved "private" >> return (False, False)) <|>
-                     (reserved "internal" >> return (False, False))
+  (_, variableIsPublic, variableIsConstant) <- option (True, False, False) $
+                     (reserved "constant" >> return (False, False, True)) <|>
+                     (reserved "storage" >> return (True, False, False)) <|>
+                     (reserved "memory" >> return (False, False, False)) <|>
+                     (reserved "public" >> return (True, True, False)) <|>
+                     (reserved "private" >> return (False, False, False)) <|>
+                     (reserved "internal" >> return (False, False, False))
   variableName <- identifier
   value <- optionMaybe $ do
     reservedOp "="
@@ -198,7 +198,7 @@ simpleVariableDeclaration = do
 --        then SingleValue variableType
 --        else NoValue
 
-  return (variableName, VariableDeclaration variableType variableIsPublic value)
+  return (variableName, VariableDeclaration variableType variableIsPublic variableIsConstant value)
 
 --  ObjDef{
 --    objName = variableName,
@@ -335,7 +335,7 @@ tupleDeclaration = parens $ commaSep $ do
 -- | Parses all the things that can modify a function declaration,
 -- including return value, explicit function modifiers, visibility and
 -- constant specifiers, and possibly base construtor arguments, in the case
--- of a constructor.  
+-- of a constructor.
 
 data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
                    | VisibilityMod Xabi.Visibility
@@ -352,7 +352,7 @@ functionModifiers = do
              <|>  (OtherMod <$> otherModifiers)
   return $ formatVals vals
   where
-    formatVals vals = 
+    formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
