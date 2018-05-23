@@ -7,45 +7,9 @@ import * as checkMode from '../../lib/checkMode';
 
 describe('Account: index', () => {
 
-  describe('renders correctly in enterprise mode ', () => {
+  describe('renders correctly', () => {
     beforeAll(() => {
       checkMode.isModePublic = jest.fn().mockReturnValue(false);
-    })
-    test('with empty values', () => {
-      const props = {
-        account: accountDetails,
-        name: '',
-        address: '',
-        faucetRequest: jest.fn()
-      };
-
-      const wrapper = shallow(
-        <Account.WrappedComponent {...props} />
-      );
-      expect(wrapper.debug()).toMatchSnapshot();
-    });
-
-    test('with values', () => {
-      const props = {
-        account: accountDetails,
-        name: '',
-        address: '0004537908d44f458acb24b0f2c863ccd2bd3a13',
-        faucetRequest: jest.fn()
-      };
-
-      const wrapper = shallow(
-        <Account.WrappedComponent {...props} />
-      );
-      expect(wrapper.debug()).toMatchSnapshot();
-
-      // Testing that the leading zeroes are not truncated
-      expect(wrapper.find('HexText').first().html()).toContain('<div class="pt-text-overflow-ellipsis">' + props.address)
-    })
-  })
-
-  describe('renders correctly in public mode ', () => {
-    beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
     })
     test('with empty values', () => {
       const props = {
