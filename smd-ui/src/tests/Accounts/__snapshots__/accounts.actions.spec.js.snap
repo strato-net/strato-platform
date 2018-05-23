@@ -116,6 +116,31 @@ Object {
 }
 `;
 
+exports[`Accounts: action fetch current account detail failure 1`] = `
+Object {
+  "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "error": "ERROR",
+  "type": "FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE",
+}
+`;
+
+exports[`Accounts: action fetch current account detail request 1`] = `
+Object {
+  "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "type": "FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST",
+}
+`;
+
+exports[`Accounts: action fetch current account detail success 1`] = `
+Object {
+  "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "detail": Object {
+    "balance": "3000000000000000000000",
+  },
+  "type": "FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS",
+}
+`;
+
 exports[`Accounts: action fetch faucet failure 1`] = `
 Object {
   "error": "ERROR",
