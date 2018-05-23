@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
-import { faucetRequest, fetchCurrentAccountDetail } from '../Accounts/accounts.actions';
+import { fetchCurrentAccountDetail } from '../Accounts/accounts.actions';
 import './accountDetail.css';
 import SendTokens from '../Accounts/components/SendTokens';
 
@@ -88,6 +88,6 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(
     mapStateToProps,
-    { faucetRequest, fetchCurrentAccountDetail }
+    { fetchCurrentAccountDetail }
   )(AccountDetail)
 );
