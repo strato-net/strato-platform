@@ -142,7 +142,6 @@ class SendTokens extends Component {
                 checked={this.state.form.userSelected}
                 onClick={
                   () => {
-                    console.log("asdhasd")
                     this.setState((prevState) => {
                       return { form: { userSelected: !prevState.form.userSelected } };
                     });

@@ -148,7 +148,7 @@ class Accounts extends Component {
               </div>
             </div>
           </div>
-        </div>}
+        </div>
       </div>
     );
   }
@@ -157,8 +157,7 @@ class Accounts extends Component {
 export function mapStateToProps(state) {
   return {
     accounts: state.accounts.accounts,
-    filter: state.accounts.filter,
-    currentUser: state.user.currentUser
+    filter: state.accounts.filter
   };
 }
 

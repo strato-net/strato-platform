@@ -7,7 +7,8 @@ import watchFetchContracts, {
   getUserAddressesApi,
   getAccountDetailApi,
   postFaucet,
-  getBalance
+  getBalance,
+  getCurrentAccountDetail
 } from '../../components/Accounts/accounts.saga';
 import {
   takeEvery,
@@ -43,6 +44,7 @@ import {
   FETCH_ACCOUNT_ADDRESS_REQUEST,
   FETCH_ACCOUNT_DETAIL_REQUEST,
   GET_BALANCE,
+  FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST,
   fetchBalanceSuccess,
   fetchBalanceFailure
 } from '../../components/Accounts/accounts.actions';
@@ -59,6 +61,7 @@ describe('Accounts: saga', () => {
       takeLatest(FETCH_ACCOUNTS, getAccounts),
       takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
       takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
+      takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
       takeLatest(FAUCET_REQUEST, faucetAccount),
       takeEvery(GET_BALANCE, getBalance)
     ]

@@ -428,6 +428,7 @@ Object {
 exports[`Accounts: reducer set initial state 1`] = `
 Object {
   "accounts": Object {},
+  "currentAccountDetail": null,
   "error": null,
   "filter": "",
 }
