@@ -153,13 +153,11 @@ class CreateContract extends Component {
           {isPublicMode && this.props.initialValues.username}
         </option>
         {
-          (!isPublicMode && users) ?
-            users.map((user, i) => {
-              return (
-                <option key={'user' + i} value={user}>{user}</option>
-              )
-            })
-            : ''
+          users.map((user, i) => {
+            return (
+              <option key={'user' + i} value={user}>{user}</option>
+            )
+          })
         }
       </Field>
     </div>)
@@ -168,7 +166,7 @@ class CreateContract extends Component {
   renderAddress = (isPublicMode) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
-      : null;
+      : [];
     return (<div className={isPublicMode ? "" : "pt-select"}>
       <Field
         className="pt-input"
@@ -182,13 +180,11 @@ class CreateContract extends Component {
           {isPublicMode && this.props.initialValues.address}
         </option>
         {
-          (!isPublicMode && userAddresses) ?
-            userAddresses.map((address, i) => {
-              return (
-                <option key={address} value={address}>{address}</option>
-              )
-            })
-            : ''
+          userAddresses.map((address, i) => {
+            return (
+              <option key={address} value={address}>{address}</option>
+            )
+          })
         }
       </Field>
     </div>);
@@ -197,7 +193,7 @@ class CreateContract extends Component {
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    this.props.fetchAccounts(true, false);
+    !isModePublic() && this.props.fetchAccounts(true, false);
   }
 
   compilation() {

@@ -31,11 +31,12 @@ class SendTokens extends Component {
 
   closeModal = () => {
     this.props.sendTokensCloseModal();
-    this.props.fetchAccounts(true, true);
+    !isModePublic() && this.props.fetchAccounts(true, true);
   }
 
   submit = (values) => {
-    const toAddress = this.state.form.userSelected ? values.toAddress : values.address
+    const toAddress = isModePublic() ? values.address : (this.state.form.userSelected ? values.toAddress : values.address)
+
     const payload = {
       from: values.from,
       fromAddress: values.fromAddress,
@@ -43,6 +44,7 @@ class SendTokens extends Component {
       toAddress: toAddress,
       value: values.value
     };
+
     this.props.sendTokens(payload);
     mixpanelWrapper.track('send_ether_submit_click_successful');
     this.props.reset();
@@ -102,6 +104,155 @@ class SendTokens extends Component {
         }
       </Field>
     )
+  }
+
+  checkMode = (users, toUserAddresses) => {
+    if (isModePublic()) {
+      return (<div className="row">
+        <div className="col-sm-4 text-right">
+          <label className="pt-label smd-pad-4">
+            Address
+            </label>
+        </div>
+        <div className="col-sm-8 smd-pad-4">
+          <Field
+            id="address"
+            className="form-width pt-input"
+            placeholder="address"
+            name="address"
+            component="input"
+            dir="auto"
+            title="address"
+            required
+          />
+        </div>
+      </div>)
+    } else {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-4 text-right" />
+            <div className="col-sm-8 smd-pad-4">
+              <Field
+                name="radio"
+                component="input"
+                type="radio"
+                value={0}
+                label='User'
+                checked={this.state.form.userSelected}
+                onClick={
+                  () => {
+                    this.setState((prevState) => {
+                      return { form: { userSelected: !prevState.form.userSelected } };
+                    });
+                  }
+                }
+              /> User
+                    <Field
+                style={{ marginLeft: 25 }}
+                name="radio"
+                component="input"
+                type="radio"
+                value={1}
+                label='Address'
+                checked={!this.state.form.userSelected}
+                onClick={
+                  () => {
+                    this.setState((prevState) => {
+                      return { form: { userSelected: !prevState.form.userSelected } };
+                    });
+                  }
+                }
+              /> Address
+            </div>
+          </div>
+
+
+          {!this.state.form.userSelected && <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                Address
+                  </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <Field
+                id="address"
+                className="form-width pt-input"
+                placeholder="address"
+                name="address"
+                component="input"
+                dir="auto"
+                title="address"
+                required
+              />
+            </div>
+          </div>}
+
+
+
+          {this.state.form.userSelected && <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                To
+                  </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="to"
+                  onChange={
+                    (e) => this.props.fetchUserAddresses(e.target.value, true)
+                  }
+                  required
+                >
+                  <option />
+                  {
+                    users.map((user, i) => {
+                      return (
+                        <option key={'user' + i} value={user}>{user}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>}
+
+
+
+          {this.state.form.userSelected && <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                To Address
+                  </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="toAddress"
+                  required
+                >
+                  <option />
+                  {
+                    toUserAddresses.length ?
+                      toUserAddresses.map((address, i) => {
+                        return (
+                          <option key={address} value={address}>{address}</option>
+                        )
+                      })
+                      : ''
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>}
+        </div >)
+
+    }
   }
 
   render() {
@@ -178,121 +329,7 @@ class SendTokens extends Component {
                 </div>
               </div>
 
-              <div className="row">
-                <div className="col-sm-4 text-right" />
-                <div className="col-sm-8 smd-pad-4">
-                  <Field
-                    name="radio"
-                    component="input"
-                    type="radio"
-                    value={0}
-                    label='User'
-                    checked={this.state.form.userSelected}
-                    onClick={
-                      () => {
-                        this.setState((prevState) => {
-                          return { form: { userSelected: !prevState.form.userSelected } };
-                        });
-                      }
-                    }
-                  /> User
-                    <Field
-                    style={{ marginLeft: 25 }}
-                    name="radio"
-                    component="input"
-                    type="radio"
-                    value={1}
-                    label='Address'
-                    checked={!this.state.form.userSelected}
-                    onClick={
-                      () => {
-                        this.setState((prevState) => {
-                          return { form: { userSelected: !prevState.form.userSelected } };
-                        });
-                      }
-                    }
-                  /> Address
-                </div>
-              </div>
-
-              {!this.state.form.userSelected && <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Address
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <Field
-                    id="address"
-                    className="form-width pt-input"
-                    placeholder="address"
-                    name="address"
-                    component="input"
-                    dir="auto"
-                    title="address"
-                    required
-                  />
-                </div>
-              </div>}
-
-              {this.state.form.userSelected && <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    To
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="to"
-                      onChange={
-                        (e) => this.props.fetchUserAddresses(e.target.value, true)
-                      }
-                      required
-                    >
-                      <option />
-                      {
-                        users.map((user, i) => {
-                          return (
-                            <option key={'user' + i} value={user}>{user}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>}
-
-              {this.state.form.userSelected && <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    To Address
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="toAddress"
-                      required
-                    >
-                      <option />
-                      {
-                        toUserAddresses.length ?
-                          toUserAddresses.map((address, i) => {
-                            return (
-                              <option key={address} value={address}>{address}</option>
-                            )
-                          })
-                          : ''
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>}
+              {this.checkMode(users, toUserAddresses)}
 
               <div className="row">
                 <div className="col-sm-4 text-right">

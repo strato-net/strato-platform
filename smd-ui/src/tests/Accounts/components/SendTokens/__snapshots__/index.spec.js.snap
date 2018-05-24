@@ -265,118 +265,120 @@ exports[`SendTokens: index render enterprise mode with values 1`] = `
             <Field id=\\"password\\" className=\\"form-width pt-input\\" placeholder=\\"Password\\" name=\\"password\\" type=\\"password\\" component=\\"input\\" dir=\\"auto\\" title=\\"Password\\" required={true} />
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\" />
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
-             User
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
-             Address
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"Admin_1085_64667\\">
-                  Admin_1085_64667
-                </option>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-                <option value=\\"Supplier2\\">
-                  Supplier2
-                </option>
-                <option value=\\"Buyer1\\">
-                  Buyer1
-                </option>
-                <option value=\\"Buyer2\\">
-                  Buyer2
-                </option>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-                <option value=\\"Admin_1177_39206\\">
-                  Admin_1177_39206
-                </option>
-                <option value=\\"Admin_1177_31203\\">
-                  Admin_1177_31203
-                </option>
-                <option value=\\"User_1177_14462\\">
-                  User_1177_14462
-                </option>
-                <option value=\\"123456789012345678901234567890123\\">
-                  123456789012345678901234567890123
-                </option>
-                <option value=\\"User_1177_26292\\">
-                  User_1177_26292
-                </option>
-                <option value=\\"User_1177_69645 ?#%!@*\\">
-                  User_1177_69645 ?#%!@*
-                </option>
-                <option value=\\"User_1177_59578\\">
-                  User_1177_59578
-                </option>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"User_1177_59359\\">
-                  User_1177_59359
-                </option>
-                <option value=\\"User_1177_42489\\">
-                  User_1177_42489
-                </option>
-                <option value=\\"User_1177_37717\\">
-                  User_1177_37717
-                </option>
-                <option value=\\"User_1177_52307\\">
-                  User_1177_52307
-                </option>
-                <option value=\\"Buyer1177_18955\\">
-                  Buyer1177_18955
-                </option>
-                <option value=\\"Supplier1177_62701\\">
-                  Supplier1177_62701
-                </option>
-                <option value=\\"Admin_1301_86023\\">
-                  Admin_1301_86023
-                </option>
-                <option value=\\"Admin_1301_62816\\">
-                  Admin_1301_62816
-                </option>
-                <option value=\\"Supplier0_1301_46441\\">
-                  Supplier0_1301_46441
-                </option>
-                <option value=\\"Supplier1_1301_46441\\">
-                  Supplier1_1301_46441
-                </option>
-                <option value=\\"Supplier2_1301_46441\\">
-                  Supplier2_1301_46441
-                </option>
-              </Field>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\" />
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
+               User
+              <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
+               Address
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To Address
-            </label>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                To
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"Admin_1085_64667\\">
+                    Admin_1085_64667
+                  </option>
+                  <option value=\\"Supplier1\\">
+                    Supplier1
+                  </option>
+                  <option value=\\"Supplier2\\">
+                    Supplier2
+                  </option>
+                  <option value=\\"Buyer1\\">
+                    Buyer1
+                  </option>
+                  <option value=\\"Buyer2\\">
+                    Buyer2
+                  </option>
+                  <option value=\\"Admin_1177_49507\\">
+                    Admin_1177_49507
+                  </option>
+                  <option value=\\"Admin_1177_39206\\">
+                    Admin_1177_39206
+                  </option>
+                  <option value=\\"Admin_1177_31203\\">
+                    Admin_1177_31203
+                  </option>
+                  <option value=\\"User_1177_14462\\">
+                    User_1177_14462
+                  </option>
+                  <option value=\\"123456789012345678901234567890123\\">
+                    123456789012345678901234567890123
+                  </option>
+                  <option value=\\"User_1177_26292\\">
+                    User_1177_26292
+                  </option>
+                  <option value=\\"User_1177_69645 ?#%!@*\\">
+                    User_1177_69645 ?#%!@*
+                  </option>
+                  <option value=\\"User_1177_59578\\">
+                    User_1177_59578
+                  </option>
+                  <option value=\\"User_1177_79118\\">
+                    User_1177_79118
+                  </option>
+                  <option value=\\"User_1177_59359\\">
+                    User_1177_59359
+                  </option>
+                  <option value=\\"User_1177_42489\\">
+                    User_1177_42489
+                  </option>
+                  <option value=\\"User_1177_37717\\">
+                    User_1177_37717
+                  </option>
+                  <option value=\\"User_1177_52307\\">
+                    User_1177_52307
+                  </option>
+                  <option value=\\"Buyer1177_18955\\">
+                    Buyer1177_18955
+                  </option>
+                  <option value=\\"Supplier1177_62701\\">
+                    Supplier1177_62701
+                  </option>
+                  <option value=\\"Admin_1301_86023\\">
+                    Admin_1301_86023
+                  </option>
+                  <option value=\\"Admin_1301_62816\\">
+                    Admin_1301_62816
+                  </option>
+                  <option value=\\"Supplier0_1301_46441\\">
+                    Supplier0_1301_46441
+                  </option>
+                  <option value=\\"Supplier1_1301_46441\\">
+                    Supplier1_1301_46441
+                  </option>
+                  <option value=\\"Supplier2_1301_46441\\">
+                    Supplier2_1301_46441
+                  </option>
+                </Field>
+              </div>
+            </div>
           </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
-                <option />
-                <option value=\\"dcbdac4d738461fcf11669b73668211371839c76\\">
-                  dcbdac4d738461fcf11669b73668211371839c76
-                </option>
-              </Field>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                To Address
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
+                  <option />
+                  <option value=\\"dcbdac4d738461fcf11669b73668211371839c76\\">
+                    dcbdac4d738461fcf11669b73668211371839c76
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>
         </div>
@@ -463,43 +465,45 @@ exports[`SendTokens: index render enterprise mode without values 1`] = `
             <Field id=\\"password\\" className=\\"form-width pt-input\\" placeholder=\\"Password\\" name=\\"password\\" type=\\"password\\" component=\\"input\\" dir=\\"auto\\" title=\\"Password\\" required={true} />
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\" />
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
-             User
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
-             Address
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"length\\">
-                  length
-                </option>
-              </Field>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\" />
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
+               User
+              <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
+               Address
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To Address
-            </label>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                To
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"length\\">
+                    length
+                  </option>
+                </Field>
+              </div>
+            </div>
           </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
-                <option />
-              </Field>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                To Address
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
+                  <option />
+                </Field>
+              </div>
             </div>
           </div>
         </div>
@@ -588,118 +592,13 @@ exports[`SendTokens: index render public mode with values 1`] = `
           </div>
         </div>
         <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\" />
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
-             User
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
-             Address
-          </div>
-        </div>
-        <div className=\\"row\\">
           <div className=\\"col-sm-4 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              To
+              Address
             </label>
           </div>
           <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"Admin_1085_64667\\">
-                  Admin_1085_64667
-                </option>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-                <option value=\\"Supplier2\\">
-                  Supplier2
-                </option>
-                <option value=\\"Buyer1\\">
-                  Buyer1
-                </option>
-                <option value=\\"Buyer2\\">
-                  Buyer2
-                </option>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-                <option value=\\"Admin_1177_39206\\">
-                  Admin_1177_39206
-                </option>
-                <option value=\\"Admin_1177_31203\\">
-                  Admin_1177_31203
-                </option>
-                <option value=\\"User_1177_14462\\">
-                  User_1177_14462
-                </option>
-                <option value=\\"123456789012345678901234567890123\\">
-                  123456789012345678901234567890123
-                </option>
-                <option value=\\"User_1177_26292\\">
-                  User_1177_26292
-                </option>
-                <option value=\\"User_1177_69645 ?#%!@*\\">
-                  User_1177_69645 ?#%!@*
-                </option>
-                <option value=\\"User_1177_59578\\">
-                  User_1177_59578
-                </option>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"User_1177_59359\\">
-                  User_1177_59359
-                </option>
-                <option value=\\"User_1177_42489\\">
-                  User_1177_42489
-                </option>
-                <option value=\\"User_1177_37717\\">
-                  User_1177_37717
-                </option>
-                <option value=\\"User_1177_52307\\">
-                  User_1177_52307
-                </option>
-                <option value=\\"Buyer1177_18955\\">
-                  Buyer1177_18955
-                </option>
-                <option value=\\"Supplier1177_62701\\">
-                  Supplier1177_62701
-                </option>
-                <option value=\\"Admin_1301_86023\\">
-                  Admin_1301_86023
-                </option>
-                <option value=\\"Admin_1301_62816\\">
-                  Admin_1301_62816
-                </option>
-                <option value=\\"Supplier0_1301_46441\\">
-                  Supplier0_1301_46441
-                </option>
-                <option value=\\"Supplier1_1301_46441\\">
-                  Supplier1_1301_46441
-                </option>
-                <option value=\\"Supplier2_1301_46441\\">
-                  Supplier2_1301_46441
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
-                <option />
-                <option value=\\"dcbdac4d738461fcf11669b73668211371839c76\\">
-                  dcbdac4d738461fcf11669b73668211371839c76
-                </option>
-              </Field>
-            </div>
+            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
           </div>
         </div>
         <div className=\\"row\\">
@@ -783,43 +682,13 @@ exports[`SendTokens: index render public mode without values 1`] = `
           </div>
         </div>
         <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\" />
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
-             User
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
-             Address
-          </div>
-        </div>
-        <div className=\\"row\\">
           <div className=\\"col-sm-4 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              To
+              Address
             </label>
           </div>
           <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"to\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"length\\">
-                  length
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              To Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"toAddress\\" required={true}>
-                <option />
-              </Field>
-            </div>
+            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
           </div>
         </div>
         <div className=\\"row\\">

@@ -28,7 +28,7 @@ class LaunchPad extends Component {
 
   componentWillMount() {
     if (this.props.launchPad.firstLoad) {
-      if (Object.getOwnPropertyNames(this.props.accounts).length === 0) {
+      if (Object.getOwnPropertyNames(this.props.accounts).length === 0 && !isModePublic()) {
         this.props.fetchAccounts(true, false);
       }
       this.props.loadLaunchPad();
@@ -110,14 +110,11 @@ class LaunchPad extends Component {
         <option value={isPublicMode ? this.props.currentUser.username : null}>
           {isPublicMode && this.props.currentUser.username}
         </option>
-        {
-          (!isPublicMode && users) ?
-            users.map((user, i) => {
-              return (
-                <option key={'user' + i} value={user}>{user}</option>
-              )
-            })
-            : ''
+        {users.map((user, i) => {
+          return (
+            <option key={'user' + i} value={user}>{user}</option>
+          )
+        })
         }
       </Field>
     </div>)
@@ -126,7 +123,7 @@ class LaunchPad extends Component {
   renderAddress = (isPublicMode) => {
     const userAddresses = this.props.accounts && this.props.launchPad.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
-      : null;
+      : [];
     return (<div className={isPublicMode ? "" : "pt-select"}>
       <Field
         className="pt-input"
@@ -140,13 +137,11 @@ class LaunchPad extends Component {
           {isPublicMode && this.props.currentUser.accountAddress}
         </option>
         {
-          (!isPublicMode && userAddresses) ?
-            userAddresses.map((address, i) => {
-              return (
-                <option key={address} value={address}>{address}</option>
-              )
-            })
-            : ''
+          userAddresses.map((address, i) => {
+            return (
+              <option key={address} value={address}>{address}</option>
+            )
+          })
         }
       </Field>
     </div>)
