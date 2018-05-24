@@ -24,61 +24,34 @@ packages:
 - strato-redis-blockdb/
 - strato-statediff/
 - test-suite/
-- location:
-    git: https://github.com/blockapps/blockapps-haskoin
-    commit: 061a2afebae6dc2024e3fd883b250453f4111c7d
-  extra-dep: true
+- blockapps-haskoin/
+- statsdi
 - location:
     git: https://github.com/blockapps/ethereum-rlp
     commit: 6627727a26ee74381d057eccbe458b419ea24c92 # tag '1'
   extra-dep: true
-- location:
-    git: https://github.com/iostat/statsdi
-    commit: 6e009c8b625a8c5253da5d9fd025c2467e387d13
-  extra-dep: true
 extra-deps:
-- alex-3.1.7
 - Crypto-4.2.5.1
-- SHA2-0.2.5
-- leveldb-haskell-0.6.3
-- AES-0.2.9
-- json-rpc-0.2.1.6
+- bytestring-arbitrary-0.1.1
+- containers-0.5.11.0
+- dequeue-0.1.12
+- diagrams-html5-1.4
+- global-lock-0.1
+- hflags-0.4.3
+- json-rpc-client-0.2.5.0
+- json-rpc-server-0.2.6.0
+- monadIO-0.11.0.0
+- murmur3-1.0.3
 - nibblestring-0.0.3
 - pbkdf-1.1.1.1
-- yesod-raml-0.1.4
-- normaldistribution-1.1.0.3
-- global-lock-0.1
-- base-prelude-1.0.1.1
-- contravariant-extras-0.3.3.1
-- fail-4.9.0.0
-- tuple-th-0.2.5
-- bytestring-arbitrary-0.1.1
-- json-rpc-server-0.2.5.0
-- json-rpc-client-0.2.5.0
-- monadIO-0.10.1.4
-- monad-logger-0.3.20.1
-- esqueleto-2.5.1
-- tasty-hunit-adapter-1.1
-- dequeue-0.1.12
-- directory-1.2.7.1
-- aeson-diff-1.1.0.4
-- aeson-extra-0.4.1.0
-- aeson-pretty-0.8.5
-- edit-distance-vector-1.0.0.4
-- hspec-2.3.2
-- hspec-core-2.3.2
-- hspec-discover-2.3.2
-- hspec-expectations-0.8.2
-- quickcheck-io-0.1.4
-- attoparsec-iso8601-1.0.0.0
-- recursion-schemes-5.0.2
-- these-0.7.4
-- QuickCheck-2.10.1
-- aeson-1.0.0.0
-- csv-0.1.2
-- json-stream-0.4.2.3
+- yesod-raml-0.2.0
+- optparse-applicative-0.13.2.0
+- static-canvas-0.2.0.3
+- category-extras-1.0.2
+- monad-logger-0.3.28.1
+- ether-0.4.2.0
 
-resolver: lts-7.18
+resolver: lts-10.10
 compiler: ghc-8.0.2
 compiler-check: newer-minor
 extra-include-dirs:
