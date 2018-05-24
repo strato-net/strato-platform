@@ -35,6 +35,7 @@ migrations = [ (Throw, createTables)
              , (Throw, hashNameTable)
              , (Throw, addConstantColumn)
              , (Throw, addValueColumn)
+             , (Throw, addMutabilityColumn)
              ]
 
 getSchemaVersion :: Query
@@ -54,3 +55,6 @@ addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is
 
 addValueColumn :: Query
 addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
+
+addMutabilityColumn :: Query
+addMutabilityColumn = [sql| ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability state_mutability; |]
