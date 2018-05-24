@@ -93,9 +93,3 @@ type API =
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
-  :<|> "solc"
-    :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] SolcResponse
-  :<|> "extabi"
-    :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] ExtabiResponse

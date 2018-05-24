@@ -1065,8 +1065,6 @@ insertContract parentContr contr bin binRuntime xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source' = do
---  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
---     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   source <- addGetSourceFuncToSource' source'
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
