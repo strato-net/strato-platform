@@ -28,6 +28,7 @@ import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
+import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -972,11 +973,27 @@ getFromSelector sel isRunningTests' b codeHash = do
   let env = 
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
-          envBlockHeader=error "getFromSelector should only be called on simple contracts that don't use the block header",
-          envOwner = error "getFromSelector should only be called on simple contracts that don't use envOwner",
-          envOrigin = error "getFromSelector should only be called on simple contracts that don't use envOrigin",
+          envBlockHeader=BlockData{
+            blockDataParentHash = SHA 0,
+            blockDataUnclesHash = SHA 0,
+            blockDataCoinbase = Address 0,
+            blockDataStateRoot = MP.emptyTriePtr,
+            blockDataTransactionsRoot = MP.emptyTriePtr,
+            blockDataReceiptsRoot = MP.emptyTriePtr,
+            blockDataLogBloom = "",
+            blockDataDifficulty = 0,
+            blockDataNumber = 0,
+            blockDataGasLimit = 10000000000000000000,
+            blockDataGasUsed = 0,
+            blockDataTimestamp = posixSecondsToUTCTime 0,
+            blockDataExtraData = 0,
+            blockDataNonce = 0,
+            blockDataMixHash = SHA 0
+            },
+          envOwner = Address 0,
+          envOrigin = Address 0,
           envInputData = fst $ B16.decode sel,
-          envSender = error "getFromSelector should only be called on simple contracts that don't use envSender",
+          envSender = Address 0,
           envValue = 0,
           envCode = theCode,
           envJumpDests = getValidJUMPDESTs theCode
