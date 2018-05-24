@@ -116,7 +116,10 @@ describe("Launchpad: index", () => {
         "error": null,
         "isOpen": false,
         "spinning": false
-      }
+      },
+      cli: {
+        isOpen: false,
+      },
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
@@ -178,7 +181,7 @@ describe("Launchpad: index", () => {
         </MemoryRouter>
       </Provider>)
 
-    expect(wrapper.find('button').at(2).props().disabled).toBeTruthy()
+    expect(wrapper.find('button').at(3).props().disabled).toBeTruthy()
 
     const fields = wrapper.find('Field')
     fields.at(0).simulate('change', { target: { value: 'Supplier2' } })
@@ -203,8 +206,8 @@ describe("Launchpad: index", () => {
       webkitRelativePath: ""
     }]
     dropZone.simulate('drop', { dataTransfer: { files: testFile } })
-    expect(wrapper.find('button').at(2).props().disabled).toBeFalsy()
-    wrapper.find('button').at(2).simulate('click')
+    expect(wrapper.find('button').at(3).props().disabled).toBeFalsy()
+    wrapper.find('button').at(3).simulate('click')
     expect(props.appUploadRequest).toHaveBeenCalledWith(uploadData)
 
   });

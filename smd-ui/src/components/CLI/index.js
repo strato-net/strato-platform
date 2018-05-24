@@ -27,24 +27,16 @@ class CLI extends Component {
 
         <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions button-center">
-            {this.props.addApp
-              ? <AnchorButton
+            {this.props.closeWalkThroughOverlay && <div>
+              <AnchorButton
                 intent={Intent.PRIMARY}
-                text="Upload an App"
                 href="https://developers.blockapps.net/advanced/launch-dapp/"
                 target="_blank"
+                onClick={this.props.closeWalkThroughOverlay}
+                text="Upload an App"
                 className="read-docs-btn"
               />
-              : <div>
-                <AnchorButton
-                  intent={Intent.PRIMARY}
-                  href="https://developers.blockapps.net/advanced/launch-dapp/"
-                  target="_blank"
-                  onClick={this.props.closeWalkThroughOverlay}
-                  text="Upload an App"
-                  className="read-docs-btn"
-                />
-              </div>
+            </div>
             }
           </div>
         </div>
