@@ -180,7 +180,7 @@ lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` node
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = let r = redisBlockDBConfig ethConf in
-    Redis.ConnInfo {
+    Redis.defaultConnectInfo {
         Redis.connectHost           = redisHost r,
         Redis.connectPort           = Redis.PortNumber $ fromIntegral (redisPort r),
         Redis.connectAuth           = B8.pack <$> redisAuth r,
