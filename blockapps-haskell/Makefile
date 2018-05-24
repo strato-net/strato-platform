@@ -19,10 +19,11 @@ SOLCBRANCH=0.4.8-no-md
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
+SOLCCMAKEFLAGS=-DTESTS=1 -DCMAKE_BUILD_TYPE=Release
 ifeq ($(USE_DOCKER_BUILD_ENV),)
-SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
+SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. $(SOLCCMAKEFLAGS) && make $(SOLCMAKEFLAGS) solc
 else
-SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
+SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr $(SOLCCMAKEFLAGS) .."
 endif
 SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
