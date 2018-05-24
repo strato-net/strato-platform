@@ -19,7 +19,7 @@ SOLCBRANCH=0.4.8-no-md
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
-SOLCCMAKEFLAGS=-DTESTS=1 -DCMAKE_BUILD_TYPE=Release
+SOLCCMAKEFLAGS=-DSOLC_LINK_STATIC=1 -DTESTS=1 -DCMAKE_BUILD_TYPE=Release
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. $(SOLCCMAKEFLAGS) && make $(SOLCMAKEFLAGS) solc
 else
@@ -49,17 +49,17 @@ prebuild:
 	mkdir -p /tmp/docker-dummy
 
 build_solidity: prebuild build_buildbase
-ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
-	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
-else
-ifneq ("$(wildcard $(SOLCWORK)/solidity/.git)","")
-	echo "solidity already cloned, will skip"
-else
+	# Check both branch name and tag name for a match
+ifeq (, $(findstring $(SOLCBRANCH), $(shell git -C $(SOLCWORK)/solidity reflog --decorate -1)))
+	$(info "Solc branch is not up to date, cloning $(SOLCREPOSITORY), checking out $(SOLCBRANCH) and rebuilding")
+	rm -rf $(SOLCWORK)/solidity
 	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
-endif
 	mkdir -p $(SOLCBUILDDIR)
 	$(SOLCCMAKE)
+else
+	echo "Solc branch is up to date, therefore will not recreate solc's Makefile."
 endif
+	echo "Installing solidity"
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 	$(SOLCMAKEINSTALL)
 else
@@ -93,3 +93,6 @@ build_docker: build_deploybase build_solidity build_haskell
 	cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
+
+clean:
+	rm -rf $(BASILWORK)
