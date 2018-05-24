@@ -24,8 +24,8 @@ pipeline {
               git checkout ${REFSPEC}
             else
               cd strato-platform
+              rm -rf docker-compose.push.yml docker-compose.yml
               git fetch
-              git checkout *
               git checkout ${REFSPEC}
             fi
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
@@ -56,7 +56,8 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-platform/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=strato-int.centralus.cloudapp.azure.com ./strato.sh -m 1
+          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0
           # Few quick tests
@@ -70,13 +71,7 @@ pipeline {
             counter=$((counter+1))
             sleep 1
           done
-          echo "bloc is available"
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
-          do
-            echo "waiting for cirrus to be available through nginx"
-            sleep 1
-          done
-          echo "cirrus is available"
+          echo "bloc is available through nginx - node is running"
         '''
       }
     }
@@ -143,8 +138,8 @@ pipeline {
               github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
   
-              # Merge to master
-              git checkout *
+              # Merge to master and change VERSION
+              git checkout VERSION
               git checkout master
               git merge ${REFSPEC}
               echo ${RELEASE_VERSION} > VERSION
@@ -154,7 +149,7 @@ pipeline {
               git tag ${RELEASE_VERSION}
               git push --tags
   
-              # Merge version change back to develop
+              # Merge VERSION change back to develop
               git checkout develop
               git pull
               git merge master
@@ -168,20 +163,19 @@ pipeline {
 
   post {
     success {
-      archive "docker-compose.yml"
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
       sh '''
-        echo "Build Successful for Git branch: $BRANCH_NAME"
+        echo "Release Build Successful"
       '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Release ${env.RELEASE_VERSION} Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }
