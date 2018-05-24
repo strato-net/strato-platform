@@ -1069,7 +1069,9 @@ compileContract source' = do
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
     Error err -> blocError . AnError . Text.pack $ err
-    Success res -> return res
+    -- Starting with 0.4.9, solc prepends a filename to abi keys.
+    -- Bloc should too, but this change is easier :^)
+    Success res -> return . Map.mapKeys (snd . Text.breakOnEnd ":") $ res
   --TODO - clean this up, what should filename be instead of "-"
   --       get rid of error
   --       name nicer, mabye merge with next let
