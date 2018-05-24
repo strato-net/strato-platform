@@ -26,6 +26,7 @@ import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
+import           Web.FormUrlEncoded               hiding (fieldLabelModifier)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Utils
@@ -335,6 +336,68 @@ instance ToSchema PostCompileResponse where
         , postcompileresponseCodeHash = keccak256 "codeHash"
         }
 
+type PostContractsXabi = "contracts"
+  :> "xabi"
+  -- Leave FormUrlEncoded just for backwords compatibility with current extabi users.
+  :> ReqBody '[JSON, FormUrlEncoded] PostXabiRequest
+  :> Post '[JSON] PostXabiResponse
+
+data PostXabiRequest = PostXabiRequest
+  { postxabirequestSrc :: Text
+  } deriving (Eq, Show, Generic)
+
+postXabiOptions :: FormOptions
+postXabiOptions = FormOptions (const "src")
+
+instance ToForm PostXabiRequest where
+  toForm = genericToForm postXabiOptions
+
+instance FromForm PostXabiRequest where
+  fromForm = genericFromForm postXabiOptions
+
+instance ToJSON PostXabiRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostXabiRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample PostXabiRequest where
+  toSamples _ = noSamples
+
+instance Arbitrary PostXabiRequest where
+  arbitrary = genericArbitrary uniform
+
+instance ToSchema PostXabiRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Xabi Request"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostXabiRequest
+      ex = PostXabiRequest "contract x { }"
+
+data PostXabiResponse = PostXabiResponse
+  { postxabiresponseSrc :: Map Text Xabi
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON PostXabiResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostXabiResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample PostXabiResponse where
+  toSamples _ = noSamples
+
+instance Arbitrary PostXabiResponse where
+  arbitrary = genericArbitrary uniform
+
+instance ToSchema PostXabiResponse where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Xabi Response"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostXabiResponse
+      ex = PostXabiResponse Map.empty
 
 --------------------------------------------------------------------------------
 
