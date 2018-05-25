@@ -10,14 +10,19 @@ pipeline {
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
+          docker rmi -f $(docker images -aq)
+          docker images
+          rm -rf strato-platform
+          git clone https://github.com/blockapps/strato-platform -b develop
         '''
-       }
+      }
     }
 
     stage('Build') {
       steps {
         sh '''#!/bin/bash -le
           set -x
+          cd strato-platform
           REPO=private make all
         '''
       }
@@ -127,17 +132,17 @@ pipeline {
       archive "docker-compose.yml"
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+        message: "Nightly develop Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
       sh '''
-        echo "Build Successful for Git branch: $BRANCH_NAME"
+        echo "Nightly develop Build Successful"
       '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Nightly develop Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }
