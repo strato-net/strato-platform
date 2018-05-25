@@ -15,7 +15,7 @@ import {fetchCirrusInstances} from '../Contracts/components/ContractCard/contrac
 import {env} from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract?resolve"
-const compileUrl = env.STRATO_URL + "/extabi";
+const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function createContractApiCall(contract, src, username, address, password, args) {
