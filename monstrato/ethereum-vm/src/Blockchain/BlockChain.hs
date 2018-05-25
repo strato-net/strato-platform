@@ -641,8 +641,8 @@ calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = w
     
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \codeHash -> do
-        codeSource <- codeSource codeHash
-        return (codeHash, codeSource)
+        codeSource' <- codeSource codeHash
+        return (codeHash, codeSource')
 
     let codeSource' x =
           M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap

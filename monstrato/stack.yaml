@@ -75,3 +75,5 @@ ghc-options:
   strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
   strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
+  blockapps-data:          -Wall -Werror
+  ethereum-vm:             -Wall -Werror -fno-warn-warnings-deprecations
