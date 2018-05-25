@@ -22,7 +22,7 @@ import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
-  :<|> getUsers
+  -- :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
   :<|> postUsersFill
