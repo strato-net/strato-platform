@@ -86,7 +86,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running monstrato unit tests"
-              cd monstrato
+              cd strato-platform/monstrato
               ./run_unit_tests.sh
             '''
           },
@@ -95,7 +95,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests'
-              cd blockapps-haskell
+              cd strato-platform/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -104,7 +104,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
-              cd smd-ui
+              cd strato-platform/smd-ui
               docker build -f Dockerfile.test .
             '''
           }
