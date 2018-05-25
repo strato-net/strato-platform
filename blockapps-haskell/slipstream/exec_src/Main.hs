@@ -139,7 +139,7 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
-
+{-
 arrayToString :: [(T.Text, Value)] -> String
 arrayToString [] = []
 arrayToString [(x, y)] = case y of
@@ -148,7 +148,7 @@ arrayToString [(x, y)] = case y of
 arrayToString ((x, y):es) = case y of
   String val -> T.unpack x ++ ": " ++ T.unpack val ++ ", " ++ arrayToString es
   val -> T.unpack x ++ ": " ++ show val ++ ", " ++ arrayToString es
-
+-}
 valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
