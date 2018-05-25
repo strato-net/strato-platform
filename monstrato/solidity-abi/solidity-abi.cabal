@@ -22,7 +22,7 @@ executable solidity-abi
                        containers,
                        aeson-pretty,
                        solidity-abi
-  hs-source-dirs:      bin
+  hs-source-dirs:      exec_src
   default-language:    Haskell2010
 
 library
@@ -55,7 +55,7 @@ library
                        cryptohash,
                        unordered-containers,
                        vector
-  hs-source-dirs:      .
+  hs-source-dirs:      src
                        external
                        layout
                        parse
