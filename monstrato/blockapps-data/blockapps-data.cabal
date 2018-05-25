@@ -21,57 +21,54 @@ library
     default-language: Haskell98
     build-depends:
                    base >= 4 && < 5
-                 , derive
-                 , QuickCheck
-                 , bytestring-arbitrary
-                 , strato-model
                  , aeson
+                 , ansi-wl-pprint
                  , base-unicode-symbols
                  , base16-bytestring
                  , binary
+                 , blockapps-haskoin
+                 , blockapps-milena
                  , blockapps-util
                  , bytestring
+                 , bytestring-arbitrary
                  , clock
                  , containers
                  , crypto-pubkey-types
                  , data-default
                  , deepseq
+                 , derive
                  , esqueleto
                  , ethereum-encryption
                  , ethereum-rlp
                  , fast-ecrecover
                  , filepath
-                 , blockapps-haskoin
                  , lens
                  , leveldb-haskell
                  , lifted-base
                  , merkle-patricia-db
-                 , blockapps-milena
+                 , monad-control
                  , monad-logger
                  , mtl
                  , nibblestring
                  , persistent
                  , persistent-postgresql
                  , persistent-template
+                 , QuickCheck
                  , resourcet
                  , strato-conf
+                 , strato-model
                  , text
                  , time
                  , transformers
-                 , ansi-wl-pprint
-                 , monad-control
-                 , utf8-string
-                 , scientific
 
     exposed-modules:
                    Blockchain.Constants
                    Blockchain.Data.ArbitraryInstances
                    Blockchain.Data.Address
                    Blockchain.Data.AddressStateDB
+                   Blockchain.Data.Blockchain
                    Blockchain.Data.BlockDB
                    Blockchain.Data.BlockHeader
-                   Blockchain.Data.BlockOffset
-                   Blockchain.Data.BlockSummary
                    Blockchain.Data.Code
                    Blockchain.Data.DataDefs
                    Blockchain.Data.Extra
@@ -81,17 +78,13 @@ library
                    Blockchain.Data.MiningStatus
                    Blockchain.Data.NewBlk
                    Blockchain.Data.PersistTypes
-                   Blockchain.Data.RawTransaction
                    Blockchain.Data.Transaction
                    Blockchain.Data.TransactionDef
-                   Blockchain.Data.TransactionReceipt
                    Blockchain.Data.TransactionResult
                    Blockchain.Data.TransactionResultStatus
                    Blockchain.Data.TXOrigin
                    Blockchain.DBM
                    Blockchain.DB.AddressStateDB
-                   Blockchain.DB.BlockDB
-                   Blockchain.DB.BlockSummaryDB
                    Blockchain.DB.CodeDB
                    Blockchain.DB.DetailsDB
                    Blockchain.DB.HashDB
@@ -103,8 +96,9 @@ library
                    Blockchain.Stream.Raw
                    Blockchain.Stream.VMEvent
                    Blockchain.Stream.UnminedBlock
-                   Blockchain.Data.Blockchain
     other-modules: Paths_blockapps_data
+                   Blockchain.Data.BlockOffset
+                   Blockchain.Data.RawTransaction
     ghc-options: -Wall -O2
     extensions: TemplateHaskell
     buildable: True
