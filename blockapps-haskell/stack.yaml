@@ -10,6 +10,7 @@ packages:
 - cirrus/client
 - ethereum
 - ethereum-abi
+- slipstream
 - solidity
 - strato/api
 - strato/client
