@@ -162,7 +162,7 @@ dbInsert insrt = do
 
   conn <- pgConnect PGDatabase
     { pgDBHost = "172.18.0.5"
-    , pgDBPort =  PortNumber 5432
+    , pgDBPort = PortNumber 5432
     , pgDBUser = "postgres"
     , pgDBPass = "api"
     , pgDBName = "postgres"
