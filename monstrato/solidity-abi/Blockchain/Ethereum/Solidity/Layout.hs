@@ -1,9 +1,0 @@
--- |
--- Module: Blockchain.Ethereum.Solidity.Layout
--- Description: Public API for the storage layout calculator
--- Maintainer: Ryan Reich <ryan.reich@gmail.com>
-module Blockchain.Ethereum.Solidity.Layout (makeContractsLayout, module DefnTypes, module LayoutTypes) where
-
-import           DefnTypes
-import           Layout
-import           LayoutTypes hiding (IdentT)
