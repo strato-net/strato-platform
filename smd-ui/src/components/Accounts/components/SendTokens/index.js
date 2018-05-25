@@ -16,7 +16,7 @@ import ValueInput from '../../../ValueInput';
 import validate from './validate';
 import { isModePublic } from '../../../../lib/checkMode';
 
-// TODO: use solc instead of extabi for compile
+// TODO: use solc instead of /contracts/xabi for compile
 
 class SendTokens extends Component {
 
