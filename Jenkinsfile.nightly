@@ -10,8 +10,8 @@ pipeline {
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
-          docker rmi -f $(docker images -aq)
-          docker images
+          docker rmi -f $(docker images -aq) || true
+          docker images -a
           rm -rf strato-platform
           git clone https://github.com/blockapps/strato-platform -b develop
         '''
@@ -36,7 +36,7 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-platform/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=cd9.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0

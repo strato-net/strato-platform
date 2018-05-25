@@ -31,7 +31,7 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=cd10.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0
