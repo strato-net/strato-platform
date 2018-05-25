@@ -60,6 +60,10 @@ import Control.Monad.Trans.State.Lazy    (StateT(..))
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
+import HFlags
+import Options
+import System.IO.Unsafe
+import qualified Data.Vector as V
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -135,11 +139,20 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
-
+{-
+arrayToString :: [(T.Text, Value)] -> String
+arrayToString [] = []
+arrayToString [(x, y)] = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val
+  val -> T.unpack x ++ ": " ++ show val
+arrayToString ((x, y):es) = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val ++ ", " ++ arrayToString es
+  val -> T.unpack x ++ ": " ++ show val ++ ", " ++ arrayToString es
+-}
 valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
-valueToString s (Array x) = "\'Array\'"
+valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
 
 listToValueStatement :: String -> [(a, Value)] -> String
 listToValueStatement s [] = []
@@ -159,13 +172,18 @@ useTPGDatabase (defaultPGDatabase { pgDBName = "postgres", pgDBUser = "postgres"
 
 dbInsert :: String -> IO()
 dbInsert insrt = do
+  let conHost = flags_pghost :: HostName
+  let conPort = PortNumber $ read flags_pgport
+  let conUser = BC.pack flags_pguser :: B.ByteString
+  let conPass = BC.pack flags_password :: B.ByteString
+  let conDB = BC.pack flags_database :: B.ByteString
 
   conn <- pgConnect PGDatabase
-    { pgDBHost = "172.18.0.5"
-    , pgDBPort =  PortNumber 5432
-    , pgDBUser = "postgres"
-    , pgDBPass = "api"
-    , pgDBName = "postgres"
+    { pgDBHost = conHost
+    , pgDBPort = conPort
+    , pgDBUser = conUser
+    , pgDBPass = conPass
+    , pgDBName = conDB
     , pgDBDebug = False
     , pgDBLogMessage = print . PGError
     , pgDBParams = [("Timezone", "UTC")]
@@ -189,8 +207,6 @@ convertRet address x = do
       let list = H.toList $ H.filter isString x
       let contractName = "test"
       let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ")"
-      let keys = "(" ++ listToKeyStatement ", " list ++ ")"
-      let vals = "(" ++ listToValueStatement ", " list ++ ")"
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals
@@ -221,8 +237,8 @@ data KafkaConf =
 
 defaultKafkaConfig  ::  KafkaConf
 defaultKafkaConfig = KafkaConf {
-  kafkaHost = "kafka",
-  kafkaPort = 9092
+  kafkaHost = flags_kafkahost
+  , kafkaPort = flags_kafkaport
   }
 
 instance FromJSON KafkaConf
@@ -263,9 +279,8 @@ convertMsg x =
     Left e -> error $ show e
     Right y -> return (BC.pack $ show y)
 
-
 lookupTopic :: String -> K.TopicName
-lookupTopic label = fromString "stateDiff"
+lookupTopic label = fromString label
 
 getMessages :: IO[B.ByteString]
 getMessages = do
@@ -278,7 +293,7 @@ getMessages = do
     where
     doConsume :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume offset = do
-      let topic = lookupTopic "stateDiff"
+      let topic = lookupTopic "statediff"
       fetched <- fetch offset 0 topic
       let messages = (map tamPayload . fetchMessages) fetched
       rest <- doConsume (offset + fromIntegral (length messages))
@@ -286,18 +301,27 @@ getMessages = do
 
 main::IO ()
 main = do
+  _ <- $initHFlags "Setup Slipstream Variables"
   changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 
-  let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
-                                 , connectPort = 5432
-                                 , connectUser = "postgres"
-                                 , connectPassword = "api"
-                                 , connectDatabase = "postgres"
+  let conHost = flags_pghost
+  let conPort = read flags_pgport
+  let conUser = flags_pguser
+  let conPass = flags_password
+  let conDB = flags_database
+
+  let dbConnectInfo = ConnectInfo { connectHost = conHost
+                                 , connectPort = conPort
+                                 , connectUser = conUser
+                                 , connectPassword = conPass
+                                 , connectDatabase = conDB
                                  }
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
-  stratoUrl <- parseBaseUrl "172.18.0.8:3000/eth/v1.2/"
+  let strato = flags_stratourl
+
+  stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
 
   let env = BlocEnv

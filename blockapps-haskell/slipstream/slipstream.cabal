@@ -23,20 +23,30 @@ executable slipstream
                  , bytestring
                  , containers
                  , http-client
+<<<<<<< 0c9d881a005ea6aa185201f1e06710b3402ebbcc
                  , lens
                  , logging-effect
                  , milena
+=======
+                 , logging-effect
+>>>>>>> Slipstream Initial Commit
                  , monad-control
                  , mtl
                  , network
                  , postgresql-simple
                  , postgresql-typed
                  , resource-pool
+<<<<<<< 0c9d881a005ea6aa185201f1e06710b3402ebbcc
                  , semigroups
                  , servant-client
                  , text
                  , transformers-base
                  , transformers
+=======
+                 , servant-client
+                 , text
+                 , transformers-base
+>>>>>>> Slipstream Initial Commit
                  , unordered-containers
                  , vector
     other-modules: Events
