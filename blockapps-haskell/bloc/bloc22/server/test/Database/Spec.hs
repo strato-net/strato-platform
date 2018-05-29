@@ -115,6 +115,10 @@ solcSpec =
         let solPath = "./test/contracts/Constant.sol"
             expectedPath = "./test/contracts/ConstantGetSource.sol"
         testAugment solPath expectedPath
+      it "should parse nested comments correctly" $ do
+        let solPath = "./test/contracts/Commentary.sol"
+            expectedPath = "./test/contracts/CommentaryGetSource.sol"
+        writeAugment solPath expectedPath
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
