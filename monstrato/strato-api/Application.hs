@@ -39,7 +39,6 @@ import           Handler.Coinbase
 import           Handler.Common
 import           Handler.Demo
 import           Handler.Developer
-import           Handler.ExtABI
 import           Handler.Faucet
 import           Handler.Help
 import           Handler.Home

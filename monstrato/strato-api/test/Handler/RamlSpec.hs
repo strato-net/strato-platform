@@ -8,7 +8,6 @@ spec = withApp $ do
       get ("/eth/v1.2/raml" :: Text)
       statusIs 200
       mapM bodyContains [ "/faucet"
-                        , "/extabi"
                         , "/stats"
                         , "/uuid"
                         , "/block"

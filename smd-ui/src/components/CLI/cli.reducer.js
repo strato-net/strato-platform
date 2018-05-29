@@ -4,18 +4,18 @@ import {
 } from './cli.actions';
 
 const initialState = {
-  isTokenOpen: false,
+  isOpen: false,
 };
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case OPEN_OVERLAY:
       return {
-        isTokenOpen: true,
+        isOpen: true,
       };
     case CLOSE_OVERLAY:
       return {
-        isTokenOpen: false
+        isOpen: false
       };
     default:
       return state;

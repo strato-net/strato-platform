@@ -30,7 +30,7 @@ class ContractMethodCall extends Component {
       this.props.symbolName,
       this.props.lookup
     );
-    this.props.fetchAccounts(false, false);
+    !isModePublic() && this.props.fetchAccounts(false, false);
   }
 
   handleCloseModal = (e) => {
@@ -80,22 +80,21 @@ class ContractMethodCall extends Component {
         <option value={isPublicMode ? this.props.currentUser.username : null}>
           {isPublicMode && this.props.currentUser.username}
         </option>
-        {(!isPublicMode && users) ?
+        {
           users.map((user, i) => {
             return (
               <option key={'user' + i} value={user}>{user}</option>
             )
           })
-          : ''
         }
       </Field>
     </div>)
   }
 
   renderAddress = (isPublicMode) => {
-    const userAddresses = this.props.accounts && this.props.modalUsername ?
+    const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
-      : null;
+      : [];
     return (<div className={isPublicMode ? "" : "pt-select"}>
       <Field
         className="pt-input"
@@ -109,13 +108,11 @@ class ContractMethodCall extends Component {
           {isPublicMode && this.props.currentUser.accountAddress}
         </option>
         {
-          (!isPublicMode && userAddresses) ?
-            userAddresses.map((address, i) => {
-              return (
-                <option key={address} value={address}>{address}</option>
-              )
-            })
-            : ''
+          userAddresses.map((address, i) => {
+            return (
+              <option key={address} value={address}>{address}</option>
+            )
+          })
         }
       </Field>
     </div>)
@@ -299,10 +296,6 @@ export function mapStateToProps(state, ownProps) {
       state.methodCall.modals[ownProps.lookup] : {},
     accounts: state.accounts.accounts,
     currentUser: state.user.currentUser,
-    initialValues: {
-      modalUsername: state.user.currentUser.username,
-      modalAddress: state.user.currentUser.accountAddress
-    },
     modalUsername: selector(state, 'modalUsername')
   };
 }

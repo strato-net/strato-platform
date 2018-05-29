@@ -28,6 +28,7 @@ import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
+import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -66,6 +67,8 @@ bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
 
+word256ToWidth :: Word256 -> Int
+word256ToWidth = fromInteger . toInteger . max 256
 {-
 word2562Bool::Word256->Bool
 word2562Bool 1 = True
@@ -244,6 +247,15 @@ runOperation XOR = binaryAction xor
 runOperation NOT = unaryAction (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF `xor`)
 
 runOperation BYTE = binaryAction getByte
+
+runOperation SHL = binaryAction $ \positions pattern ->
+      shiftL pattern (word256ToWidth positions)
+
+runOperation SHR = binaryAction $ \positions pattern ->
+      shiftR pattern (word256ToWidth positions)
+
+runOperation SAR = binaryAction $ \positions pattern ->
+      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth positions)
 
 runOperation SHA3 = do
   p <- pop
@@ -946,32 +958,49 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> BlockData -> Address -> ContextM String
+getSource :: Bool -> BlockData -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> BlockData -> Address -> ContextM String
+getContractName :: Bool -> BlockData -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
--- TODO: Use the default BlockData instance
-getFromSelector :: BC.ByteString -> Bool -> BlockData -> Address -> ContextM String
-getFromSelector sel isRunningTests' b contractAddress = do
-  let isHomestead = blockDataNumber b >= gHomesteadFirstBlock
+getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
+getFromSelector sel isRunningTests' b codeHash = do
+  theCode <- Code . fromMaybe B.empty <$> getCode codeHash
+
   stateRoot <- getStateRoot
   setStateDBStateRoot (blockDataStateRoot b)
-  (eRes, _) <- call isRunningTests'
-                    isHomestead
-                    True
-                    S.empty
-                    b
-                    0
-                    contractAddress
-                    contractAddress
-                    (Address 0)
-                    0
-                    1
-                    (fst $ B16.decode sel)
-                    1000000000000000000
-                    (Address 0)
+  let env = 
+        Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
+          envGasPrice=1,
+          envBlockHeader=BlockData{
+            blockDataParentHash = SHA 0,
+            blockDataUnclesHash = SHA 0,
+            blockDataCoinbase = Address 0,
+            blockDataStateRoot = MP.emptyTriePtr,
+            blockDataTransactionsRoot = MP.emptyTriePtr,
+            blockDataReceiptsRoot = MP.emptyTriePtr,
+            blockDataLogBloom = "",
+            blockDataDifficulty = 0,
+            blockDataNumber = 0,
+            blockDataGasLimit = 10000000000000000000,
+            blockDataGasUsed = 0,
+            blockDataTimestamp = posixSecondsToUTCTime 0,
+            blockDataExtraData = 0,
+            blockDataNonce = 0,
+            blockDataMixHash = SHA 0
+            },
+          envOwner = Address 0,
+          envOrigin = Address 0,
+          envInputData = fst $ B16.decode sel,
+          envSender = Address 0,
+          envValue = 0,
+          envCode = theCode,
+          envJumpDests = getValidJUMPDESTs theCode
+          }
+  (eRes, _) <-
+    runVMM False True S.empty 0 env 1000000000000000000 $ call' True
+
   setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""

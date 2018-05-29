@@ -11,7 +11,6 @@ endif
 BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
-SOLCWORK=$(BASILWORK)/solc
 NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
@@ -19,17 +18,6 @@ LIBHOME=$(FAKEROOT)/var/lib
 BUILDER_HOME=$(BASIL_HOME)/blockapps/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
-
-SOLCBRANCH=0.4.8-no-md
-SOLCREPOSITORY=https://github.com/blockapps/solidity.git
-SOLCBUILDDIR=$(SOLCWORK)/solidity/build
-SOLCMAKEFLAGS=-j4
-ifeq ($(USE_DOCKER_BUILD_ENV),)
-SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
-else
-SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
-endif
-SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
 EXTRADEPS=doit.sh mkCoinbase
 ifeq ($(USE_DOCKER_BUILD_ENV),)
@@ -44,30 +32,11 @@ all: build_docker
 prebuild:
 	mkdir -p $(BASILWORK)
 	mkdir -p $(STACKWORK)
-	mkdir -p $(SOLCWORK)
 	mkdir -p $(NPMWORK)
 	mkdir -p $(FAKEROOT)/usr/lib
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(STRATOHOME)
 	mkdir -p /tmp/docker-dummy
-
-build_solidity: prebuild build_buildbase
-ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
-	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
-else
-ifneq ("$(wildcard $(SOLCWORK)/solidity/.git)","")
-	echo "solidity already cloned, will skip"
-else
-	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
-endif
-	mkdir -p $(SOLCBUILDDIR)
-	$(SOLCCMAKE)
-endif
-ifeq ($(USE_DOCKER_BUILD_ENV),)
-	$(SOLCMAKEINSTALL)
-else
-	$(DOCKER_SHELL) "$(SOLCMAKEINSTALL)"
-endif
 
 build_haskell: build_buildbase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
@@ -99,7 +68,7 @@ pull_blockapps_js: prebuild
 		npm install blockapps-js yaml-parser    \
 	)
 
-build_docker: build_deploybase build_haskell build_solidity pull_blockapps_js
+build_docker: build_deploybase build_haskell pull_blockapps_js
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f $(EXTRADEPS) $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules

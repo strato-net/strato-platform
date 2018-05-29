@@ -6,54 +6,7 @@ import * as checkMode from '../../lib/checkMode';
 
 describe('Accounts: index', () => {
 
-  describe('render with (public mode)', () => {
-
-    beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
-    })
-    test('empty values', () => {
-      const props = {
-        accounts: [],
-        filter: '',
-        history: {},
-        fetchAccounts: jest.fn(),
-        changeAccountFilter: jest.fn(),
-        faucetRequest: jest.fn(),
-        resetUserAddress: jest.fn(),
-        fetchUserAddresses: jest.fn()
-      }
-      const wrapper = shallow(
-        <Accounts.WrappedComponent {...props} />
-      );
-
-      expect(wrapper.debug()).toMatchSnapshot();
-    });
-
-    test('mocked values', () => {
-      const props = {
-        accounts: indexAccountsMock,
-        filter: '',
-        history: {},
-        fetchAccounts: jest.fn(),
-        changeAccountFilter: jest.fn(),
-        faucetRequest: jest.fn(),
-        resetUserAddress: jest.fn(),
-        fetchUserAddresses: jest.fn()
-      }
-      const wrapper = shallow(
-        <Accounts.WrappedComponent {...props} />
-      );
-
-      expect(wrapper.debug()).toMatchSnapshot();
-    });
-
-  });
-
-  describe('render with (enterprise mode)', () => {
-
-    beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
-    });
+  describe('render with', () => {
     test('empty values', () => {
       const props = {
         accounts: [],

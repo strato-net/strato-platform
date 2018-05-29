@@ -35,4 +35,4 @@ if [ "$STRATO_GS_MODE" = "3" ]; then
   curl http://api.mixpanel.com/track/?data=ewogICAgImV2ZW50IjogInNtZF9jb250YWluZXJfc3RhcnRlZF9hd3MiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRva2VuIjogImRhZjE3MWU5MDMwYWJiM2UzMDJkZjlkNzhiNmIxYWEwIgogICAgfQp9&ip=1
 fi
 
-serve --port 3002 build
+serve -l 3002 build

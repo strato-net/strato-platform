@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
 import { faucetRequest } from '../Accounts/accounts.actions';
-import { isModePublic } from '../../lib/checkMode';
 
 class Account extends Component {
   //TODO: add an option to faucet the account. Tell user to faucet if account does not exist.
@@ -23,17 +22,15 @@ class Account extends Component {
             </h4>
           </div>
           <div className="col-sm-2 text-right">
-            {!isModePublic() &&
-              <button
-                className="pt-button pt-intent-primary pt-small"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  this.props.faucetRequest(address, name);
-                }}>
-                Faucet
+            <button
+              className="pt-button pt-intent-primary pt-small"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.props.faucetRequest(address, name);
+              }}>
+              Faucet
               </button>
-            }
           </div>
         </div>
 
@@ -72,7 +69,6 @@ class Account extends Component {
           </tbody>
         </table>
       </div>
-
     );
   }
 }

@@ -7,7 +7,6 @@ import SendTokens from './components/SendTokens';
 import Tour from '../Tour';
 import Account from '../Account';
 import CreateBlocUser from '../CreateBlocUser';
-import { isModePublic } from '../../lib/checkMode';
 import './accounts.css';
 
 const tourSteps = [/* {
@@ -102,6 +101,7 @@ class Accounts extends Component {
           steps={tourSteps}
           finalStepSelector='#contracts'
           nextPage='contracts' />
+
         <div className="row">
           <div className="col-sm-4 text-left">
             <h3>Accounts</h3>
@@ -109,7 +109,7 @@ class Accounts extends Component {
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
               <SendTokens />
-              {!isModePublic() && <CreateBlocUser />}
+              <CreateBlocUser />
             </div>
           </div>
         </div>

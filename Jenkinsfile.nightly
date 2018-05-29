@@ -10,14 +10,19 @@ pipeline {
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
+          docker rmi -f $(docker images -aq) || true
+          docker images -a
+          rm -rf strato-platform
+          git clone https://github.com/blockapps/strato-platform -b develop
         '''
-       }
+      }
     }
 
     stage('Build') {
       steps {
         sh '''#!/bin/bash -le
           set -x
+          cd strato-platform
           REPO=private make all
         '''
       }
@@ -29,7 +34,7 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started
-          cp docker-compose.yml strato-getting-started/
+          cp strato-platform/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=cd10.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
@@ -81,7 +86,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running monstrato unit tests"
-              cd monstrato
+              cd strato-platform/monstrato
               ./run_unit_tests.sh
             '''
           },
@@ -90,7 +95,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests'
-              cd blockapps-haskell
+              cd strato-platform/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -99,7 +104,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
-              cd smd-ui
+              cd strato-platform/smd-ui
               docker build -f Dockerfile.test .
             '''
           }
@@ -127,17 +132,17 @@ pipeline {
       archive "docker-compose.yml"
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+        message: "Nightly develop Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
       sh '''
-        echo "Build Successful for Git branch: $BRANCH_NAME"
+        echo "Nightly develop Build Successful"
       '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Nightly develop Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }

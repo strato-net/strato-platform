@@ -10,7 +10,9 @@ import {
   fetchAccountDetailFailure,
   resetUserAddress,
   fetchBalanceSuccess,
-  fetchBalanceFailure
+  fetchBalanceFailure,
+  fetchCurrentAccountDetailSuccess,
+  fetchCurrentAccountDetailFailure
 } from '../../components/Accounts/accounts.actions';
 import { deepClone } from '../helper/testHelper';
 import { accountsMock, reducerAccounts, filter, error, accountDetail, indexAccountsMock } from "./accountsMock";
@@ -172,6 +174,44 @@ describe('Accounts: reducer', () => {
       const action = fetchBalanceFailure("error");
       const initialState = {
         accounts: reducerAccounts,
+        filter: '',
+        error: null
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+  });
+
+  describe('fetch current account details', () => {
+
+    // FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS
+    test('on success', () => {
+      const data = {
+        name: 'tanuj',
+        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03',
+        detail: { balance: "3000000000000000000000" }
+      }
+      const action = fetchCurrentAccountDetailSuccess(data.address, data.detail);
+      const initialState = {
+        accounts: reducerAccounts,
+        currentAccountDetail: null,
+        filter: '',
+        error: null
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    // FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE
+    test('on failure', () => {
+      const data = {
+        name: 'tanuj',
+        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03',
+        error
+      }
+      const action = fetchCurrentAccountDetailFailure(data.address, data.error);
+      const initialState = {
+        accounts: reducerAccounts,
+        currentAccountDetail: { balance: "3000000000000000000000" },
         filter: '',
         error: null
       };

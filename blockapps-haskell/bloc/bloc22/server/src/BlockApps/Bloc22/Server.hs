@@ -44,6 +44,7 @@ bloc = getHomepage
   :<|> getContractsStates
   :<|> getContractsEnum
   :<|> postContractsCompile
+  :<|> postContractsXabi
   :<|> getSearchContract
   :<|> getSearchContractState
   :<|> getSearchContractStateReduced
