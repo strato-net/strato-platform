@@ -18,6 +18,29 @@ const appConfig = require('../config/app.config');
 const checkMode = require('../lib/checkMode');
 
 
+const waitFaucet = async function(address) {
+    const res = await chai.request(process.env.stratoRoot)
+      .post('/faucet')
+      .field('address', address);
+    assert.equal(res.status, '200');
+    const sleep = function(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    };
+    let text = "[]";
+    do {
+      await sleep(400);
+      let res = await chai.request(process.env.stratoRoot)
+        .get('/account')
+        .query({
+          'address': address
+        })
+        .catch((err) => {
+          throw err;
+        });
+      text = res.text;
+    } while (text === "[]");
+}
+
 chai.use(chaiHttp);
 
 describe('App', function () {
@@ -155,23 +178,8 @@ describe('App', function () {
         assert.equal(res1.status, '200');
         const address = JSON.parse(res1.text).user.accountAddress;
         assert.notEqual(address, undefined);
-        const res2 = await chai.request(process.env.stratoRoot)
-          .post('/faucet')
-          .field('address', address);
-        assert.equal(res2.status, '200');
 
-        let text = "[]";
-        do {
-          let res = await chai.request(process.env.stratoRoot)
-            .get('/account')
-            .query({
-              'address': address
-            })
-            .catch((err) => {
-              throw err;
-            });
-          text = res.text;
-        } while (text === "[]");
+        await waitFaucet(address);
 
         const res3 = await chai.request(app)
           .post('/dapps')
@@ -217,10 +225,8 @@ describe('App', function () {
 
         const address = JSON.parse(res1.text).user.accountAddress;
         console.log("about to faucet user");
-        const res2 = await chai.request(process.env.stratoRoot)
-          .post('/faucet')
-          .field('address', address);
-        assert.equal(res2.status, '200');
+        await waitFaucet(address);
+        console.log("faucet successful.");
 
         const creds = {
           name: "john_wayne@test.com",
