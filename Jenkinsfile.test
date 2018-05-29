@@ -91,10 +91,7 @@ pipeline {
               set -x
               echo 'Running BlockApps Haskell tests'
               cd blockapps-haskell
-              # Use the same solc version that's bundled in the docker image.
-              PATH=$PWD/.basil-work/fakeroot/usr/bin:$PATH \
-                LD_LIBRARY_PATH=$PWD/.basil-work/fakeroot/usr/lib:$LD_LIBRARY_PATH \
-                ./run_unit_tests.sh
+              ./run_unit_tests.sh
             '''
           },
 
