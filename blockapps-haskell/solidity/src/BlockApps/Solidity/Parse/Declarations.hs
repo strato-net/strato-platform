@@ -60,11 +60,7 @@ solidityContract = do
                                  (allFunctions Map.! (Text.pack contractName'))
                             else Map.empty
                -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
-           , xabiVars =
-                Map.fromList $
-                zipWith (\(v, isPublic, isConstant, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) (Just isConstant) value) v)
-                [ ((Text.pack n, v), isPublic, isConstant, value) | (n, VariableDeclaration v isPublic isConstant value) <- declarations]
-                [0, 32..]
+           , xabiVars = (constants declarations) `Map.union`(variables declarations)
            , xabiTypes =
              Map.fromList $
              [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
@@ -79,6 +75,15 @@ solidityContract = do
         map (Text.pack . fst) baseConstrs
       )
     )
+  where constants :: [(String, Declaration)] -> Map.Map Text Xabitype.VarType
+        constants d = Map.fromList $
+                map (\(v, isPublic, isConstant, value) -> fmap (Xabitype.VarType 0 (if isPublic then Just True else Nothing) (Just isConstant) value) v)
+                [ ((Text.pack n, v), isPublic, isConstant, value) | (n, VariableDeclaration v isPublic isConstant value) <- d, isConstant == True]
+        variables :: [(String, Declaration)] -> Map.Map Text Xabitype.VarType
+        variables d = Map.fromList $
+                zipWith (\(v, isPublic, isConstant, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) (Just isConstant) value) v)
+                [ ((Text.pack n, v), isPublic, isConstant, value) | (n, VariableDeclaration v isPublic isConstant value) <- d, isConstant == False]
+                [0, 32..]
 
 
 
