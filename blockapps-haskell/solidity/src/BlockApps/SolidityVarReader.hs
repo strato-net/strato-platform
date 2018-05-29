@@ -36,6 +36,7 @@ import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
+import           Debug.Trace
 import           Text.Printf
 import           Text.Read
 
@@ -469,7 +470,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     let
       SimpleValue (ValueBytes bytes) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeBytes
     in
-      SimpleValue $ ValueString $ Text.decodeUtf8 bytes
+      SimpleValue $ ValueString $ trace ("ofs: " ++ show ofs ++ ", cnt: " ++ show cnt ++ ", len: " ++ show len ++ ", position: " ++ show position ++ ", decodeUtf8: ") $ Text.decodeUtf8 (traceShowId bytes)
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
