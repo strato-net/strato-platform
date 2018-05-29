@@ -2,6 +2,7 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -174,6 +175,26 @@ spec = do
       unparsedStruct `shouldBe` structString
       structName' `shouldBe` structName
       struct' `shouldBe` struct
+
+  describe "Declarations - solidityContract" $ do
+    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    it "should parse an empty contract" $ do
+      let contractString = "contract a {}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("a", (xempty, []))
+    it "should parse a commented contract" $ do
+      let contractString = "contract b { // don't dead open inside \n}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("b", (xempty, []))
+    it "should parse nested a nested comments contract" $ do
+      let contractString = "contract c { \
+                           \  /* this is how \
+                           \  function hidden () { \
+                           \  // bam! double comment \
+                           \ */ }"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("c", (xempty, []))
+
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
