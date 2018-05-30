@@ -44,7 +44,7 @@ do
 done
 echo 'strato is available'
 
-#TODO: commented out in slipstream branch - might need the check for postgrest container instead (URI /cirrus/search) or both
+#TODO: commented out in slipstream branch, replace with slipstream when it has API
 #echo 'Waiting for cirrus to be available...'
 #until curl --silent --output /dev/null --fail --location ${cirrusRoot}
 #do
