@@ -12,12 +12,11 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle_Packed';
-const contractFilename = process.cwd() + `/load/contracts/Vehicle_Packed.sol`;
+const contractFilename = path.join(config.contractsPath,`Vehicle_Packed.sol`);
 
 describe('Throughput - upload', function () {
   this.timeout(999999 * 1000);

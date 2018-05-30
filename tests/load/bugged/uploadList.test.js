@@ -12,13 +12,13 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const titleManagerJs = require(`../titleManager`);
-const contractName = 'TitleHeavy';
+const titleManagerJs = require(`./titleManager`);
+const contractName = 'Title';
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
-describe('LOAD TEST: Batch upload of heavy contract', function() {
+describe('LOAD TEST: Upload List', function() {
   this.timeout(999999 * 1000);
 
   let admin, contract;
@@ -49,6 +49,23 @@ describe('LOAD TEST: Batch upload of heavy contract', function() {
     console.log(`Total:  seconds: ${seconds}  txs: ${batchCount*batchSize}  TPS ${(batchCount*batchSize)/seconds}`);
   });
 
+  it.skip(`Upload plain.  Batch count ${batchCount}`, function * () {
+    console.log(`Upload plain, Batch count ${batchCount}`);
+    const contractName = 'TitleManager';
+    const contractFilename = path.join(config.contractsPath,"TitleManager.sol");
+
+    const startTime = moment();
+    for (var i = 0; i < batchCount; i++) {
+      console.log( 'batch ' + i);
+      const args = {_creator: admin.address};
+      const temp = yield rest.uploadContract(admin, contractName, contractFilename, args);
+    }
+    const endTime = moment();
+    const seconds = endTime.diff(startTime, 'seconds');
+    console.log(`Batch count: ${batchCount}  Batch size: ${batchSize}`);
+    console.log(`Total:  seconds: ${seconds}  txs: ${batchCount*batchSize}  TPS ${(batchCount*batchSize)/seconds}`);
+  })
+
 
   function createTxsBatch(uid, batchId, batchSize) {
     const txs = [];
@@ -56,16 +73,7 @@ describe('LOAD TEST: Batch upload of heavy contract', function() {
       txs.push({
         contractName: contractName,
         args: {
-          _s0: `s0_${uid}_${batchId}_${i}`,
-          _s1: `s1_${uid}_${batchId}_${i}`,
-          _s2: `s2_${uid}_${batchId}_${i}`,
-          _s3: `s3_${uid}_${batchId}_${i}`,
-          _s4: `s4_${uid}_${batchId}_${i}`,
-          _s5: `s5_${uid}_${batchId}_${i}`,
-          _s6: `s6_${uid}_${batchId}_${i}`,
-          _s7: `s7_${uid}_${batchId}_${i}`,
-          _s8: `s8_${uid}_${batchId}_${i}`,
-          _s9: `s9_${uid}_${batchId}_${i}`,
+          _vin: `Vin_${uid}_${batchId}_${i}`,
         }
       });
     }

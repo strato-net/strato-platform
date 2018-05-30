@@ -17,7 +17,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/load/contracts/Vehicle.sol`;
+const contractFilename = path.join(config.contractsPath, "Vehicle.sol");
 
 describe('Unique addresses', function () {
   this.timeout(60 * 1000);
