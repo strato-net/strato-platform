@@ -8,15 +8,15 @@ const assert = common.assert;
 const BigNumber = common.BigNumber;
 const path = require('path');
 
-describe('uint data type', function () {
+describe('string data type', function () {
   this.timeout(config.timeout);
 
   const adminName = util.uid('Admin');
   const adminPassword = '1234';
 
-  const contractName = "DataTypeUint";
-  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeUint.sol");
-  const constructorArgs = {_storedData: 4};
+  const contractName = "DataTypeString";
+  const contractFilename = path.join(config.contractsPath, "DataTypeString.sol");
+  const constructorArgs = {_storedData: 'test'};
 
   var adminUser;
   var contract;
@@ -26,84 +26,111 @@ describe('uint data type', function () {
     contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
   });
 
-  it('should upload the uint storage contract with constructor arguments', function* () {
+  it('should upload the string storage contract with constructor arguments', function* () {
     const state = yield rest.getState(contract);
     assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
 
-  it('get() returns (uint)', function* () {
+  it('get() returns (string)', function* () {
     const methodName = 'get';
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
     const result = returnsArray[0];
-    assert.equal(constructorArgs._storedData, result, 'uint returned from get()');
+    assert.equal(constructorArgs._storedData, result, 'string returned from get()');
   });
 
-  it('set (uint)', function* () {
+  it('set (string)', function* () {
     const methodName = 'set';
-    const args = {value: 10};
+    const args = {value: 'test2'};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    assert.equal(state.storedData, args.value, 'uint returned from get()');
+    assert.equal(state.storedData, args.value, 'string returned from get()');
   });
 
-  it('setArray (uint[]) / getArray() returns (uint[])', function* () {
+
+  it('setArray (string, count) / getArray(index) returns (string)', function* () {
     // set array
     const methodName = 'setArray';
-    const args = {values: [10,11,12]};
+    const resultArray = ['test', 'test', 'test'];
+    const args = {
+      value: 'test',
+      count: 3
+    };
+
     yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    const storedDatum = parseIntArray(state.storedDatum);
-    assert.deepEqual(storedDatum, args.values, 'after calling setArray (uint[])');
+    const storedDatum = state.storedDatum;
+    assert.deepEqual(storedDatum, resultArray, 'after calling setArray (string[])');
     // get array
-    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
-    const result = parseIntArray(returnsArray[0]);
-    assert.deepEqual(result, args.values, 'after calling getArray()');
+    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray', {index: 1});
+    const result = returnsArray[0];
+    assert.deepEqual(result, resultArray[1], 'after calling getArray()');
   });
 
-  it('getTuple(uint, uint, uint) returns (uint, uint, uint)', function* () {
+  it('getTuple(string, string, string) returns (string, string, string)', function* () {
     const methodName = 'getTuple';
-    const args = {v1: 1, v2: 2, v3: 3};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const result = parseIntArray(returnsArray);
-    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'uint,uint,uint returned from getTuple()');
+    const args = {v1: 'test4', v2: 'test5', v3: 'test6'};
+    const result = yield rest.callMethod(adminUser, contract, methodName, args);
+    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'string,string,string returned from getTuple()');
   });
 
-  it('setStruct(uint value, uint[] values) return (uint, uint[])', function* () {
-    // function setStruct(uint value, uint[] values) returns (uint, uint[])
+
+  it('setStruct(string value, string arrayValue, uint index) return (string, string)', function* () {
+    // function setStruct(string value, string[] values) returns (string, string[])
     const methodName = 'setStruct';
-    const args = {value: 100, values: [101,102,103]};
+    const args = {
+      value: 'namaste',
+      arrayValue: 'ola',
+      count: 3
+    };
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    // check the returned tuple
     assert.equal(returnsArray[0], args.value);
-    assert.deepEqual(parseIntArray(returnsArray[1]), args.values);
+    assert.equal(returnsArray[1], args.count);
+
     // check the struct state
     const state = yield rest.getState(contract);
     assert.equal(state.storedStruct.value, args.value);
-    assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
+    assert.deepEqual(state.storedStruct.values, ['ola','ola','ola']);
   });
 
-  it('setStructArray(uint value, uint[] values)', function* () {
-    // function setStructArray(uint value, uint[] values)
+  it('setStructArray(string, string, int)', function* () {
     const methodName = 'setStructArray';
-    const args = {value: 200, values: [201,202,203]};
+    const args = {
+      value: 'namaste',
+      arrayValue: 'ola',
+      count: 3
+    };
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
+
     const state = yield rest.getState(contract);
-    assert.equal(state.storedStructs.length, 3, "Struct Array should have expected # of elements");
-    state.storedStructs.map(function(storedStruct) {
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
+    state.storedStructs.map(function(storedStruct, i) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
-      assert.deepEqual(parseIntArray(storedStruct.values), args.values);
-    })
+      assert.deepEqual(storedStruct.values, ['ola','ola','ola']);
+    });
   });
 
-  it('setMapping(uint value, uint key)', function* () {
-    // function setMapping(uint value, uint key) returns (uint value)
+  it('setMapping(string value, string key)', function* () {
+    // function setMapping(string value, string key) returns (string value)
     const methodName = 'setMapping';
-    const args = {value: 300, key: 301};
+    const args = {value: '300', key: '301'};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const result = parseInt(returnsArray[0]);
+    const result = returnsArray[0];
     assert.equal(result, args.value);
+  });
+
+  it('should be able to store and retrieve large strings', function* () {
+    const methodName = 'set';
+    const value = '0123456789ABCDEF';
+    const args = { value };
+
+    while(args.value.length <= 256) {
+      const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      const state = yield rest.getState(contract);
+      assert.equal(state.storedData, args.value, 'successfully set and read string of length ' + args.value.length);
+      args.value += value;
+    }
   });
 
   it('call method with value', function*() {
@@ -123,9 +150,3 @@ describe('uint data type', function () {
     assert.isOk(expectedBalance.equals(contractBalance), "contract balance should equal value from method call");
   });
 });
-
-function parseIntArray(arrayOfStrings) {
-  return arrayOfStrings.map(function(member) {
-    return parseInt(member);
-  });
-}

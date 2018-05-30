@@ -19,7 +19,7 @@ const adminPassword = '1234';
 const contractName = 'Vehicle';
 const contractFilename = process.cwd() + `/load/contracts/Vehicle.sol`;
 
-describe('Throughput - upload', function () {
+describe('Unique addresses', function () {
   this.timeout(60 * 1000);
 
   let admin;
@@ -31,7 +31,7 @@ describe('Throughput - upload', function () {
     yield rest.compileSearch([contractName], contractName, contractFilename);
   });
 
-  it('Upload List: the old way (api.bloc.result)', function * () {
+  it('should upload a list of contracts and receive a list of unique addresses', function * () {
     const txs = factory_createUploadList(batchSize);
 
     const doNotResolve = true;

@@ -15,7 +15,7 @@ describe('bytes data type', function () {
   const adminPassword = '1234';
 
   const contractName = "DataTypeBytes";
-  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeBytes.sol");
+  const contractFilename = path.join(config.contractsPath, "DataTypeBytes.sol");
   const constructorArgs = {_storedData: util.toBytes32('test')};
 
   var adminUser;

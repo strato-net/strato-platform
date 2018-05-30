@@ -5,129 +5,104 @@ const common = ba.common;
 const util = common.util;
 const config = common.config;
 const assert = common.assert;
-const BigNumber = common.BigNumber;
 const path = require('path');
+const BigNumber = common.BigNumber;
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
-const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
 
-const contractName = "DataTypeEnum";
-const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
-const constructorArgs = {_storedData: ErrorCodes.ERROR};
+const contractName = "DataTypeBool";
+const contractFilename = path.join(config.contractsPath, "DataTypeBool.sol");
+const constructorArgs = {_storedData: true};
 
-describe('enum data type: positive case:', function () {
+describe.skip('bool data type', function () {
   this.timeout(config.timeout);
 
   var adminUser;
   var contract;
 
-  before(function* () {
+  before(function*() {
     adminUser = yield rest.createUser(adminName, adminPassword);
     contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
   });
 
-  it('should upload the storage contract with constructor arguments', function* () {
+  it('should upload the bool storage contract with constructor arguments', function*() {
     const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)]; //
     assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
 
-  it('get() returns (enum)', function* () {
+  it('get() returns (bool)', function*() {
     const methodName = 'get';
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
     const result = returnsArray[0];
-    assert.equal(constructorArgs._storedData, result, 'enum returned from get()');
+    assert.equal(constructorArgs._storedData, result, 'bool returned from get()');
   });
 
-  it('set (enum)', function* () {
+  it('set (bool)', function*() {
     const methodName = 'set';
-    const args = {value: ErrorCodes.EXISTS};
+    const args = {value: false};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
-    assert.equal(state.storedData, args.value, 'enum returned from get()');
+    assert.equal(state.storedData, args.value, 'bool returned from get()');
   });
 
-  it('set (enum) string', function* () {
-    const methodName = 'set';
-    const args = {value: ' ' + ErrorCodes.EXISTS};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
-    assert.equal(state.storedData, args.value, 'enum returned from get()');
-  });
-
-  it('setArray (enum[]) / getArray() returns (enum[])', function* () {
+  it('setArray (bool[]) / getArray() returns (bool[])', function*() {
     // set array
     const methodName = 'setArray';
-    const args = {values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.EXISTS]};
+    const args = {values: [false, true, false]};
     yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    const storedDatum = state.storedDatum.map(function(member) {
-      return ErrorCodes[util.parseEnum(member)];
-    });
-    assert.deepEqual(storedDatum, args.values, 'after calling setArray (enum[])');
+    const storedDatum = state.storedDatum;
+    assert.deepEqual(storedDatum, args.values, 'after calling setArray (bool[])');
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
-    const result = parseIntArray(returnsArray[0]);
+    const result = returnsArray[0];
     assert.deepEqual(result, args.values, 'after calling getArray()');
   });
 
-  it('getTuple(enum, enum, enum) returns (enum, enum, enum)', function* () {
+  it('getTuple(bool, bool, bool) returns (bool, bool, bool)', function*() {
     const methodName = 'getTuple';
-    const args = {v1: ErrorCodes.SUCCESS, v2: ErrorCodes.ERROR, v3: ErrorCodes.NOT_FOUND};
+    const args = {v1: true, v2: true, v3: false};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const result = parseIntArray(returnsArray);
-    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'enum,enum,enum returned from getTuple()');
+    const result = returnsArray;
+    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'bool,bool,bool returned from getTuple()');
   });
 
-  it('setStruct(enum value, enum[] values) return (enum, enum[])', function* () {
-    // function setStruct(enum value, enum[] values) returns (enum, enum[])
+  it('setStruct(bool value, bool[] values) return (bool, bool[])', function*() {
+    // function setStruct(bool value, bool[] values) returns (bool, bool[])
     const methodName = 'setStruct';
-    const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
+    const args = {value: false, values: [true, false, true]};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     // check the returned tuple
     assert.equal(returnsArray[0], args.value);
-    assert.deepEqual(parseIntArray(returnsArray[1]), args.values);
+    assert.deepEqual(returnsArray[1], args.values);
     // check the struct state
     const state = yield rest.getState(contract);
-    const value = ErrorCodes[util.parseEnum(state.storedStruct.value)];
-    const values = state.storedStruct.values.map(function(member) {
-      return ErrorCodes[util.parseEnum(member)];
-    });
-    assert.equal(value, args.value);
-    assert.deepEqual(values, args.values);
+    assert.equal(state.storedStruct.value, args.value);
+    assert.deepEqual(state.storedStruct.values, args.values);
   });
 
-  it('setStructArray(enum value, enum[] values)', function* () {
-    // function setStructArray(enum value, enum[] values)
+  it('setStructArray(bool value, bool[] values)', function*() {
+    // function setStructArray(bool value, bool[] values)
     const methodName = 'setStructArray';
-    const args = {
-      value: ErrorCodes.INSUFFICIENT_BALANCE,
-      values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND],
-      count: 3 };
+    const args = {value: true, values: [false, false, true]};
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
-    assert.equal(state.storedStructs.length, args.count, 'count');
-    state.storedStructs.map(function(storedStruct) {
-      const value = ErrorCodes[util.parseEnum(storedStruct.value)];
-      assert.equal(value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
-      const values = storedStruct.values.map(function(member) {
-        return ErrorCodes[util.parseEnum(member)];
-      });
-      assert.deepEqual(values, args.values, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
+    assert.equal(state.storedStructs.length, 3, "Struct Array should have expected # of elements");
+    state.storedStructs.map(function (storedStruct) {
+      assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
+      assert.deepEqual(storedStruct.values, args.values);
     })
   });
 
-  it('setMapping(enum value, enum key)', function* () {
-    // function setMapping(enum value, enum key) returns (enum value)
+  it('setMapping(bool value, bool key)', function* () {
+    // function setMapping(bool value, bool key) returns (bool value)
     const methodName = 'setMapping';
-    const args = {value: ErrorCodes.EXISTS, key: 666};
+    const args = {value: false, key: true};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const result = parseInt(returnsArray[0]);
+    const result = parseBool(returnsArray[0]);
     assert.equal(result, args.value);
   });
 
@@ -149,7 +124,17 @@ describe('enum data type: positive case:', function () {
   });
 });
 
-describe.skip('enum data type: illegal values:', function () {
+function parseBool(string) {
+  return string === "true";
+}
+
+function parseBoolArray(arrayOfStrings) {
+  return arrayOfStrings.map(function (member) {
+    return member === "true";
+  });
+}
+
+describe('enum data type: illegal values:', function () {
   this.timeout(config.timeout);
 
   var adminUser;
@@ -160,11 +145,11 @@ describe.skip('enum data type: illegal values:', function () {
     contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
   });
 
-  const illegalValue = [ -1, '-1', 12, '12', 'zzz'];
+  const illegalValue = [ 'zzz', 'true 1'];
   const expectedStatus = 400;
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
       // upload with bad agrs
       const args = {_storedData: illegalValue};
       try {
@@ -180,7 +165,7 @@ describe.skip('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
       const methodName = 'set';
       const args = {value: illegalValue};
       try {
@@ -196,7 +181,7 @@ describe.skip('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
       // set array
       const methodName = 'setArray';
       const args = {values: [illegalValue, illegalValue, illegalValue]};
@@ -211,12 +196,51 @@ describe.skip('enum data type: illegal values:', function () {
       assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
     });
   });
-
 });
 
+describe.skip('enum data type: legal values:', function () {
+  this.timeout(config.timeout);
 
-function parseIntArray(arrayOfStrings) {
-  return arrayOfStrings.map(function(member) {
-    return parseInt(member);
+  var adminUser;
+  var contract;
+
+  before(function* () {
+    adminUser = yield rest.createUser(adminName, adminPassword);
+    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
   });
-}
+
+  const values = [ 0, 1, '0', '1', 111, -1, '-1'];
+
+  values.map(function(value) {
+    it(`constructor args: '${typeof value} ${value}'`, function* () {
+      const args = {_storedData: value};
+      contract = yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+      const state = yield rest.getState(contract);
+      assert.equal(state.storedData, value, 'storedData');
+    });
+  });
+
+  values.map(function(value) {
+    it(`set (bool) '${typeof value} ${value}' `, function*() {
+      const methodName = 'set';
+      const args = {value: value};
+      const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      const state = yield rest.getState(contract);
+      assert.equal(state.storedData, args.value, 'bool returned from get()');
+    });
+  });
+
+  it('setArray (bool[]) / getArray() returns (bool[])', function*() {
+    // set array
+    const methodName = 'setArray';
+    const args = {values: values};
+    yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    const storedDatum = state.storedDatum;
+    assert.deepEqual(storedDatum, args.values, 'after calling setArray (bool[])');
+    // get array
+    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
+    const result = returnsArray[0];
+    assert.deepEqual(result, args.values, 'after calling getArray()');
+  });
+});
