@@ -8,8 +8,10 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
-        script {
-          currentBuild.description = "${env.PLATFORM_BRANCH_NAME}"
+        wrap([$class: 'BuildUser']) {
+          script {
+            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+          }
         }
         sh '''#!/bin/bash -le
           set -x
