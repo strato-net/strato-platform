@@ -44,13 +44,14 @@ do
 done
 echo 'strato is available'
 
-echo 'Waiting for cirrus to be available...'
-until curl --silent --output /dev/null --fail --location ${cirrusRoot}
-do
-  echo "Check at $(date)"
-  sleep 1
-done
-echo 'cirrus is available'
+#TODO: commented out in slipstream branch, replace with slipstream when it has API
+#echo 'Waiting for cirrus to be available...'
+#until curl --silent --output /dev/null --fail --location ${cirrusRoot}
+#do
+#  echo "Check at $(date)"
+#  sleep 1
+#done
+#echo 'cirrus is available'
 
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}
