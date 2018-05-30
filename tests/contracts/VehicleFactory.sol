@@ -1,6 +1,6 @@
 pragma solidity ^0.4.8;
 
-import "../../load/contracts/Util.sol";
+import "./Util.sol";
 
 contract VehicleFactory {
   function createVehicle(string _vin, string _s0, string _s1, string _s2, string _s3) public {
