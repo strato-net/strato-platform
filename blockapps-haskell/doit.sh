@@ -46,8 +46,12 @@ done
 
 $stratoserver &
 
-$blocserver --pghost="$postgres_host" --pgport="$postgres_port" \
-            --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --cirrusurl="$cirrusRoot" \
-            --loglevel="${loglevel:-4}" --publicmode=${isPublic} \
-            +RTS -N1 2>&1
+$blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
+
+mkdir -p logs/slipstream
+echo 'Starting Slipstream'
+/usr/bin/slipstream  >> logs/slipstream 2>&1 &
+
+slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+            --database="$postgres_db"
