@@ -12,7 +12,7 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const titleManagerJs = require(`../titleManager`);
+const titleManagerJs = require(`./titleManager`);
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
