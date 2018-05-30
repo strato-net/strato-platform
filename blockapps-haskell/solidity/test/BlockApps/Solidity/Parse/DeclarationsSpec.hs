@@ -194,6 +194,14 @@ spec = do
                            \ */ }"
           eRes = runParser solidityContract "" "" contractString
       eRes `shouldBe` Right ("c", (xempty, []))
+    it "should parse unbalanced braces inside a string" $ do
+      let contractString = "contract d { \
+                           \  function x() constant returns (string) { \
+                           \    return \"{\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("d", (xempty, []))
 
 
 printLeft :: Either String a -> IO ()
