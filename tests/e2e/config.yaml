@@ -2,7 +2,7 @@ apiDebug: false
 password: '1234'
 timeout: 600000
 libPath: ./
-contractsPath: ./contracts/
+contractsPath: ../contracts/
 
 # WARNING - extra strict syntax
 # DO NOT change the nodes order
