@@ -74,11 +74,15 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
+<<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
 <<<<<<< 483e77a7f0dcefeecb2284cebc0a59e3ea56a6f1
     - postgres_slipstream_db=cirrus
 =======
     - postgres_slipstream_db=slipstream
 >>>>>>> slipstream added to bloc container; cirrus off (step 1); tests temporary off
+=======
+    - postgres_slipstream_db=cirrus
+>>>>>>> slipstream with postgrest on
     - postgres_user=postgres
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
@@ -156,22 +160,21 @@ services:
     - 30303:30303
     - 30303:30303/udp
     restart: always
-#  postgrest:
-#    depends_on:
-#    - postgres
-#    environment:
-#    - PG_ENV_POSTGRES_DB=cirrus
-#    - PG_ENV_POSTGRES_HOST=postgres
-#    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
-#    - PG_ENV_POSTGRES_USER=postgres
-#    - PG_PORT_5432_TCP_PORT=5432
-#    build: .
-#    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
-#    restart: always
+  postgrest:
+    depends_on:
+    - postgres
+    environment:
+    - PG_ENV_POSTGRES_DB=cirrus
+    - PG_ENV_POSTGRES_HOST=postgres
+    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
+    - PG_ENV_POSTGRES_USER=postgres
+    - PG_PORT_5432_TCP_PORT=5432
+    build: .
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+    restart: always
   postgres:
     environment:
-#    - POSTGRES_DB=cirrus
-    - POSTGRES_DB=slipstream
+    - POSTGRES_DB=cirrus
     - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
@@ -181,7 +184,7 @@ services:
     depends_on:
     - bloc
 #    - cirrus
-#    - postgrest
+    - postgrest
     - smd
     - strato
     - apex
