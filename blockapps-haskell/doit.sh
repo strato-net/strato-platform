@@ -12,6 +12,17 @@ if [ "${SMD_MODE}" == public ]; then
 fi
 
 echo "Environment variables:
+slipstream:
+--pghost=postgres_host=${postgres_host}
+--pgport=postgres_port=${postgres_port}
+--pguser=postgres_user=${postgres_user}
+--password=postgres_password=${postgres_password}
+--database=postgres_slipstream_db=${postgres_slipstream_db}
+
+strato-server:
+no vars/flags set
+
+bloc:
 stratoHost=${stratoHost}
 --cirrusurl=cirrusHost=${cirrusHost}
 --stratourl=stratoRoot=${stratoRoot}
@@ -23,8 +34,6 @@ stratoHost=${stratoHost}
 --publicmode=isPublic=${isPublic}
 "
 
-blocserver="/usr/bin/blockapps-bloc"
-stratoserver="/usr/bin/blockapps-strato-server"
 locale-gen "en_US.UTF-8"
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
@@ -44,14 +53,15 @@ while true; do
     sleep 0.5
 done
 
-$stratoserver &
+mkdir logs
 
-$blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+# TODO: refactor bloc (and monstrato) dockerization using supervisord for more process control, log aggregation and health monitoring
+
+/usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
+
+# TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
+/usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+            --database="$postgres_db" >> logs/slipstream 2>&1 &
+
+/usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
-
-mkdir -p logs/slipstream
-echo 'Starting Slipstream'
-/usr/bin/slipstream  >> logs/slipstream 2>&1 &
-
-slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --database="$postgres_db"

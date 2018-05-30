@@ -9,13 +9,13 @@ services:
     depends_on:
     - apex
     - bloc
-    - cirrus
+#    - cirrus
     - strato
     environment:
     - APEX_URL=${APEX_URL}
     - BLOC_DOC_URL=${BLOC_DOC_URL}
     - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=${CIRRUS_URL}
+#    - CIRRUS_URL=${CIRRUS_URL}
     - NODE_NAME=${NODE_NAME}
     - SINGLE_NODE=${SINGLE_NODE}
     - ssl=${ssl:-false}
@@ -29,12 +29,12 @@ services:
   apex:
     depends_on:
     - bloc
-    - cirrus
+#    - cirrus
     - postgres
     - strato
     environment:
     - blocHost=bloc:8000
-    - cirrusHost=cirrus:3333
+#    - cirrusHost=cirrus:3333
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -53,11 +53,11 @@ services:
   dappstore:
     depends_on:
     - bloc
-    - cirrus
+#    - cirrus
     - strato
     environment:
     - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=${CIRRUS_URL}
+#    - CIRRUS_URL=${CIRRUS_URL}
     - STRATO_URL=${STRATO_URL}
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
@@ -67,15 +67,19 @@ services:
     - strato
     - postgres
     environment:
+    # cirrusHost is temporary here to be able to run bloc server, to be removed
     - cirrusHost=cirrus:3333
     - loglevel=${loglevel}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
+    - postgres_slipstream_db=slipstream
     - postgres_user=postgres
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
+#    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+#    - zookeeper_conn=zookeeper
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
@@ -83,28 +87,28 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
-  cirrus:
-    depends_on:
-    - strato
-    - postgres
-    - postgrest
-    - kafka
-    - bloc
-    environment:
-    - blocHost=bloc:8000
-    - postgres_db=cirrus
-    - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
-    - postgres_port=5432
-    - postgres_user=postgres
-    - postgrestHost=postgrest:3001
-    - SINGLE_NODE=${SINGLE_NODE}
-    - stateDiffTopic=${stateDiffTopic}
-    - stratoHost=strato:3000
-    - zookeeper_conn=zookeeper
-    build: .
-    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
-    restart: always
+#  cirrus:
+#    depends_on:
+#    - strato
+#    - postgres
+#    - postgrest
+#    - kafka
+#    - bloc
+#    environment:
+#    - blocHost=bloc:8000
+#    - postgres_db=cirrus
+#    - postgres_host=postgres
+#    - postgres_password=${postgres_password:-api}
+#    - postgres_port=5432
+#    - postgres_user=postgres
+#    - postgrestHost=postgrest:3001
+#    - SINGLE_NODE=${SINGLE_NODE}
+#    - stateDiffTopic=${stateDiffTopic}
+#    - stratoHost=strato:3000
+#    - zookeeper_conn=zookeeper
+#    build: .
+#    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
+#    restart: always
   strato:
     depends_on:
     - kafka
@@ -148,21 +152,22 @@ services:
     - 30303:30303
     - 30303:30303/udp
     restart: always
-  postgrest:
-    depends_on:
-    - postgres
-    environment:
-    - PG_ENV_POSTGRES_DB=cirrus
-    - PG_ENV_POSTGRES_HOST=postgres
-    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
-    - PG_ENV_POSTGRES_USER=postgres
-    - PG_PORT_5432_TCP_PORT=5432
-    build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
-    restart: always
+#  postgrest:
+#    depends_on:
+#    - postgres
+#    environment:
+#    - PG_ENV_POSTGRES_DB=cirrus
+#    - PG_ENV_POSTGRES_HOST=postgres
+#    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
+#    - PG_ENV_POSTGRES_USER=postgres
+#    - PG_PORT_5432_TCP_PORT=5432
+#    build: .
+#    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+#    restart: always
   postgres:
     environment:
-    - POSTGRES_DB=cirrus
+#    - POSTGRES_DB=cirrus
+    - POSTGRES_DB=slipstream
     - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
@@ -171,7 +176,7 @@ services:
   nginx:
     depends_on:
     - bloc
-    - cirrus
+#    - cirrus
     - postgrest
     - smd
     - strato
@@ -220,26 +225,3 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-  slipstream:
-    depends_on:
-    - strato
-    - postgres
-    - postgrest
-    - kafka
-    - bloc
-    environment:
-      - loglevel=${loglevel}
-      - blocHost=bloc:8000
-      - postgres_db=cirrus
-      - postgres_host=postgres
-      - postgres_password=${postgres_password:-api}
-      - postgres_port=5432
-      - postgres_user=postgres
-      - postgrestHost=postgrest:3001
-      - SINGLE_NODE=${SINGLE_NODE}
-      - stateDiffTopic=${stateDiffTopic}
-      - stratoHost=strato:3000
-      - zookeeper_conn=zookeeper
-    build: .
-    restart: always
-    image: #${SLIPSTREAM_IMAGE:-<REPO_URL>slipstream:<VERSION>}
