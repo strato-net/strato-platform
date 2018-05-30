@@ -201,8 +201,57 @@ spec = do
                            \  } \
                            \}"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("d", (xempty, []))
+      fst <$> eRes `shouldBe` Right "d"
 
+    it "should parse unbalanced parens inside a string" $ do
+      let contractString = "contract e { \
+                           \  function x() constant returns (string) { \
+                           \    return \"(\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "e"
+
+    xit "should parse unbalanced strings inside a comment" $ do
+      let contractString = "contract f { \
+                           \  function x() constant returns (string) { \
+                           \    return // \"  \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "f"
+
+  let isLeft (Right _) = False
+      isLeft (Left _) = True
+  describe "Declarations - bracedCode" $ do
+    let braceParse = runParser bracedCode "" ""
+    it "works in the easy case" $
+      braceParse "{x}" `shouldBe` Right "x"
+    it "drops an extra after brace" $
+      braceParse "{y}}" `shouldBe` Right "y"
+    it "fails with extra leading brace" $
+      braceParse "{{z}" `shouldSatisfy` isLeft
+    it "fails if end is commented out" $
+      braceParse "{//whoops}" `shouldSatisfy` isLeft
+    it "fails if the end is inside a string" $
+      braceParse "{ return \"he}llo\"" `shouldSatisfy` isLeft
+    it "parses braces inside string constants correctly" $
+      braceParse "{\"}\"}" `shouldBe` Right "\"}\""
+    it "ignores commented out quotation marks" $
+      braceParse "{/*\"*/z}" `shouldBe` Right "z"
+    it "ignores commented out quotation marks v2" $
+      braceParse "{//\"\nzz}" `shouldBe` Right "zz"
+    it "ignores commented out quotation marks v3" $
+      braceParse "{aa//\"\n  zz}" `shouldBe` Right "aa\n  zz"
+    it "ignores braces in comments" $
+      braceParse "{/* { */ }" `shouldBe` Right ""
+
+  describe "Declarations - parensCode" $ do
+    let parenParse = runParser parensCode "" ""
+    it "works in the easy case" $
+      parenParse "(x)" `shouldBe` Right "x"
+    it "ignores parens in comments" $
+      parenParse "(/*  ( */ )" `shouldBe` Right ""
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg

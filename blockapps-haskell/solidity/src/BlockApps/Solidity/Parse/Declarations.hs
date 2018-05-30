@@ -16,6 +16,7 @@ import qualified Data.Text                            as Text
 --import           Data.Char
 
 import           Text.Parsec
+import           Text.Parsec.Token                    (GenLanguageDef(..))
 -- import           Text.Parsec.Perm
 --import           Text.Parsec.Number
 
@@ -386,3 +387,87 @@ functionModifiers = do
       name <- identifier
       args <- optionMaybe parensCode
       return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
+
+-- | A common pattern: code enclosed in braces, allowing nested braces.
+bracedCode :: SolidityParser String
+bracedCode = braces . fmap concat . many $
+        (("\""++) . (++"\"") <$> try stringLiteral)
+    <|> (comment >> return "")
+    <|> ((:[]) <$> noneOf "{}\"/")
+    <|> do
+        innerBraces <- bracedCode
+        return $ "{" ++ innerBraces ++ "}"
+
+-- | Similar parser for parenthesized expressions
+parensCode :: SolidityParser String
+parensCode = parens . fmap concat . many $
+        (("\""++) . (++"\"") <$> try stringLiteral)
+    <|> (comment >> return "")
+    <|> ((:[]) <$> noneOf "()\"/")
+    <|> do
+        innerBraces <- bracedCode
+        return $ "(" ++ innerBraces ++ ")"
+
+comment :: SolidityParser ()
+comment = oneLineComment <|> multiLineComment
+
+-- Stolen directly from Text.Parsec.Token because those jerks couldn't be
+-- bothered to export them.
+-- License pertains solely to code beneath this line.
+-- Copyright 1999-2000, Daan Leijen; 2007, Paolo Martini. All rights reserved.
+
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+
+-- * Redistributions of source code must retain the above copyright notice,
+--   this list of conditions and the following disclaimer.
+-- * Redistributions in binary form must reproduce the above copyright
+--   notice, this list of conditions and the following disclaimer in the
+--   documentation and/or other materials provided with the distribution.
+
+-- This software is provided by the copyright holders "as is" and any express or
+-- implied warranties, including, but not limited to, the implied warranties of
+-- merchantability and fitness for a particular purpose are disclaimed. In no
+-- event shall the copyright holders be liable for any direct, indirect,
+-- incidental, special, exemplary, or consequential damages (including, but not
+-- limited to, procurement of substitute goods or services; loss of use, data,
+-- or profits; or business interruption) however caused and on any theory of
+-- liability, whether in contract, strict liability, or tort (including
+-- negligence or otherwise) arising in any way out of the use of this software,
+-- even if advised of the possibility of such damage.
+oneLineComment :: SolidityParser ()
+oneLineComment =
+        do{ try (string (commentLine solidityLanguage))
+          ; skipMany (satisfy (/= '\n'))
+          ; return ()
+          }
+
+multiLineComment :: SolidityParser ()
+multiLineComment =
+  do { try (string (commentStart solidityLanguage))
+     ; inComment
+     }
+
+inComment :: SolidityParser ()
+inComment
+  | nestedComments solidityLanguage  = inCommentMulti
+  | otherwise                = inCommentSingle
+
+inCommentMulti :: SolidityParser ()
+inCommentMulti
+  =   do{ try (string (commentEnd solidityLanguage)) ; return () }
+  <|> do{ multiLineComment                     ; inCommentMulti }
+  <|> do{ skipMany1 (noneOf startEnd)          ; inCommentMulti }
+  <|> do{ oneOf startEnd                       ; inCommentMulti }
+  <?> "end of comment"
+  where
+    startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
+
+inCommentSingle :: SolidityParser ()
+inCommentSingle
+  =   do{ try (string (commentEnd solidityLanguage)); return () }
+  <|> do{ skipMany1 (noneOf startEnd)         ; inCommentSingle }
+  <|> do{ oneOf startEnd                      ; inCommentSingle }
+  <?> "end of comment"
+  where
+    startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
