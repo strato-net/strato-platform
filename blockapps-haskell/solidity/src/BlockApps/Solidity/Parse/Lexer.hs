@@ -69,5 +69,6 @@ solidityLanguage = javaStyle {
     "=>", "="
     ],
   P.caseSensitive = True,
-  P.identStart = letter <|> char '_'
+  P.identStart = letter <|> char '_',
+  P.nestedComments = False
   }
