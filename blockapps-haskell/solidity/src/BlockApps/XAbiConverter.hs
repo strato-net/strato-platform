@@ -211,7 +211,8 @@ xAbiToContract::Xabi->Either String Contract
 xAbiToContract contractXabi@Xabi{..} = mdo
   typeDefs' <- xabiToTypeDefs typeDefs' contractXabi
 
-  let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
+  -- The contract datatype doesn't have a notion of constants, so it's ok to filter them out here
+  let vars' = sortOn (Xabi.varTypeAtBytes . snd) . filter ((maybe True not) . Xabi.varTypeConstant . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
     return (name, var')

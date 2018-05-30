@@ -60,11 +60,7 @@ solidityContract = do
                                  (allFunctions Map.! (Text.pack contractName'))
                             else Map.empty
                -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
-           , xabiVars =
-                Map.fromList $
-                zipWith (\(v, isPublic, isConstant, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) (Just isConstant) value) v)
-                [ ((Text.pack n, v), isPublic, isConstant, value) | (n, VariableDeclaration v isPublic isConstant value) <- declarations]
-                [0, 32..]
+           , xabiVars = (constants declarations) `Map.union`(variables declarations)
            , xabiTypes =
              Map.fromList $
              [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
@@ -79,7 +75,22 @@ solidityContract = do
         map (Text.pack . fst) baseConstrs
       )
     )
+  where constants = byMutability True (repeat 0)
 
+        variables = byMutability False [0,32..]
+
+        byMutability isConst ns = Map.fromList . flip (zipWith mapVarTypes) ns . varTypesOf isConst
+
+        mapVarTypes (v, isPub, isConst, val) i =
+          fmap (Xabitype.VarType i (visibility isPub) (Just isConst) val) v
+
+        varTypesOf isConstant = map (\(n, VariableDeclaration v isPub isConst val) ->
+                                   ((Text.pack n, v), isPub, isConst, val))
+                           . filter (\(_, decl) -> case decl of
+                                        (VariableDeclaration _ _ c _) -> isConstant == c
+                                        _ -> False)
+
+        visibility isPub = if isPub then Just True else Nothing
 
 
 
