@@ -9,8 +9,9 @@
 module Main where
 
 import           Control.Monad
+import           Control.Monad.Log                  (Severity(..))
 import           Database.PostgreSQL.Simple
-import Data.Pool
+import           Data.Pool
 import           HFlags
 import           Network.HTTP.Client hiding (Proxy)
 import           Network.Wai.Handler.Warp
@@ -84,7 +85,7 @@ dbExistsQuery22 = "SELECT 1 FROM pg_database WHERE datname='bloc22';"
 
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-  logStdout
+  (if Bloc22.logLevel env22 >= Informational then logStdoutDev else logStdout)
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)
   . serve (Proxy @ (

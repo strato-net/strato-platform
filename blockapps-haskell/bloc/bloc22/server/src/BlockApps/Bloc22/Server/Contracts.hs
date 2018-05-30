@@ -222,15 +222,13 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
     compileOneContract PostCompileRequest{..} = do
       idsAndDetails <- compileContract postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
-        contractDetails <-
-          getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
-        let eBlockappsjsXabi = completeXabi . contractdetailsXabi $ contractDetails
+        let eBlockappsjsXabi = completeXabi . contractdetailsXabi $ details
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
           Right blockappsjsXabi ->
-            void . blocCirrusFireForget $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
-        return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
+            void . blocCirrusFireForget $ postContract details{contractdetailsXabi=blockappsjsXabi}
+        return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =
