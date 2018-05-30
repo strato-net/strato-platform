@@ -8,6 +8,9 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
+        script {
+          currentBuild.description = "${env.PLATFORM_BRANCH_NAME}"
+        }
         sh '''#!/bin/bash -le
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
@@ -125,12 +128,6 @@ pipeline {
   }
 
   post {
-    always{
-      script {
-        currentBuild.description = "${env.PLATFORM_BRANCH_NAME}"
-      }
-    }
-
     success {
       archive "docker-compose.yml"
       slackSend (
