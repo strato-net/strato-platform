@@ -223,3 +223,26 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+  slipstream:
+    depends_on:
+    - strato
+    - postgres
+    - postgrest
+    - kafka
+    - bloc
+    environment:
+      - loglevel=${loglevel}
+      - blocHost=bloc:8000
+      - postgres_db=cirrus
+      - postgres_host=postgres
+      - postgres_password=${postgres_password:-api}
+      - postgres_port=5432
+      - postgres_user=postgres
+      - postgrestHost=postgrest:3001
+      - SINGLE_NODE=${SINGLE_NODE}
+      - stateDiffTopic=${stateDiffTopic}
+      - stratoHost=strato:3000
+      - zookeeper_conn=zookeeper
+    build: .
+    restart: always
+    image: #${SLIPSTREAM_IMAGE:-<REPO_URL>slipstream:<VERSION>}
