@@ -180,7 +180,7 @@ services:
     depends_on:
     - bloc
 #    - cirrus
-    - postgrest
+#    - postgrest
     - smd
     - strato
     - apex
