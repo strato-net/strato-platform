@@ -61,9 +61,10 @@ xabiMerge x y =
     xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
-    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
+    bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
     bumpAtBytes n varType =
       varType {varTypeAtBytes = varTypeAtBytes varType + n}
+    variables = Map.filter (maybe True not . varTypeConstant)
 
 
 
