@@ -13,7 +13,7 @@ DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 BUILDBASE_NAME=bloch-buildbase
 DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
-
+SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
 
 SOLCBRANCH=0.4.8-no-md
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
