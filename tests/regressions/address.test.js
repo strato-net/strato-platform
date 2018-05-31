@@ -15,7 +15,7 @@ describe('address data type', function () {
   const adminPassword = '1234';
 
   const contractName = "DataTypeAddress";
-  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeAddress.sol");
+  const contractFilename = path.join(config.contractsPath, "DataTypeAddress.sol");
   const constructorArgs = {_storedData: '1'};
 
   var adminUser;
