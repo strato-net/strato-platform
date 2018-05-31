@@ -6,19 +6,14 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Declarations where
 
---import Data.Either
 import           Data.List
 import qualified Data.Map as Map
---import Data.Map (Map)
 import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
---import           Data.Char
 
 import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
--- import           Text.Parsec.Perm
---import           Text.Parsec.Number
 
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
@@ -47,31 +42,24 @@ solidityContract = do
   declarations <-
     braces (many solidityDeclaration)
 
-  let allFunctions = Map.fromList
-                     [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+  let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+  let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
+  allCtors <- if length ctorList > 1
+                  then fail "multiple constructors defined"
+                  else return . Map.fromList $ ctorList
 
   return
     (
       Text.pack contractName',
       (
-        Xabi { xabiFuncs = Map.delete (Text.pack contractName') allFunctions
-             , xabiConstr = if Map.member (Text.pack contractName') allFunctions
-                            then Map.singleton
-                                 (Text.pack contractName')
-                                 (allFunctions Map.! (Text.pack contractName'))
-                            else Map.empty
-               -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
-           , xabiVars = (constants declarations) `Map.union`(variables declarations)
-           , xabiTypes =
-             Map.fromList $
-             [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
-             ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-           , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
-
---    contractName = contractName',
---    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
---    contractTypes = contractTypes',
---    contractBaseNames = baseConstrs
+        Xabi { xabiFuncs = allFunctions
+             , xabiConstr = allCtors
+             , xabiVars = (constants declarations) `Map.union`(variables declarations)
+             , xabiTypes =
+               Map.fromList $
+               [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
+               ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+             , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
            },
         map (Text.pack . fst) baseConstrs
       )
@@ -97,6 +85,7 @@ solidityContract = do
 
 data Declaration =
   FuncDeclaration Xabi.Func
+  | ConstructorDeclaration Xabi.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration Xabi.Def
   | EnumDeclaration Xabi.Def
@@ -223,30 +212,27 @@ simpleVariableDeclaration = do
 {- Functions and function-like -}
 
 -- | Parses a function definition.
+--
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
-  reserved "function"
-  functionName <- fromMaybe "" <$> optionMaybe identifier
-  functionArgs <- tupleDeclaration
---  (functionRet, functionVisible, _, _) <- functionModifiers
-  -- TODO - deal with funcitonVisible
-  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
---  functionBody <- bracedCode <|> (semi >> return "")
-  contents <- bracedCode <|> (semi >> return "")
-  --TODO - deal with contractName
---  contractName' <- getContractName
-  _ <- getContractName
---  let objValueType' = case () of
---  let _ = case () of
---        _ | null functionName || not functionVisible -> NoValue
---        _ | functionName == contractName' -> SingleValue $ Typedef contractName'
---        _ -> functionRet
-  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
+  functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+                  -- Starting with 0.4.22, constructor() <mods> { <body> } is
+                  -- the preferred syntax for defining a constructor
+                  (reserved "constructor" >> getContractName)
+  cName <- getContractName
+  xabi <- functionXabi
+  let tipe = if cName == functionName
+                then ConstructorDeclaration
+                else FuncDeclaration
+  return (functionName, tipe xabi)
 
-  return
-    (
-      functionName,
-      FuncDeclaration Xabi.Func{
+functionXabi :: SolidityParser Xabi.Func
+functionXabi = do
+  functionArgs <- tupleDeclaration
+  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
+  contents <- bracedCode <|> (semi >> return "")
+  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
+  return Xabi.Func{
         Xabi.funcArgs =
            Map.fromList $
            zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) functionArgs [0..]
@@ -254,21 +240,11 @@ functionDeclaration = do
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
       , Xabi.funcContents = Just $ Text.pack contents
-
-      -- TODO: Get these values from parser
       , Xabi.funcMutable  = Just mutable
       , Xabi.funcPayable  = Just payable
       , Xabi.funcVisibility = Just visibility
       , Xabi.funcModifiers = Just modifiers
-
-
---    objName = functionName,
---    objValueType = objValueType',
---    objArgType = functionArgs,
---    objDefn = functionBody,
---    objIsPublic = False -- We only care about public variables
       }
-    )
 
 -- | Parses an event definition.  At the moment we don't do anything with
 -- it, but this prevents the parser from rejecting contracts that use

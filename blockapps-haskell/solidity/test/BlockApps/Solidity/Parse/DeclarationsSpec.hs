@@ -182,6 +182,13 @@ spec = do
       let contractString = "contract a {}"
           eRes = runParser solidityContract "" "" contractString
       eRes `shouldBe` Right ("a", (xempty, []))
+    it "should parse a basic contract" $ do
+      let contractString = "\
+            \contract q {\
+            \    function r() {}\
+            \}"
+          eRes = runParser solidityContract "" "" contractString
+      (fst <$> eRes) `shouldBe` Right "q"
     it "should parse a commented contract" $ do
       let contractString = "contract b { // don't dead open inside \n}"
           eRes = runParser solidityContract "" "" contractString
@@ -254,6 +261,16 @@ spec = do
       parenParse "(x)" `shouldBe` Right "x"
     it "ignores parens in comments" $
       parenParse "(/*  ( */ )" `shouldBe` Right ""
+
+  describe "Declarations - functions" $ do
+    it "should parse a basic function" $ do
+      let funcString = "function z(){}"
+          eRes = runParser functionDeclaration "" "" funcString
+      (fst <$> eRes) `shouldBe` Right "z"
+    it "should parse a constructor" $ do
+      let funcString = "constructor(){}"
+          eRes = runParser functionDeclaration "Contract" "" funcString
+      (fst <$> eRes) `shouldBe` Right "Contract"
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
