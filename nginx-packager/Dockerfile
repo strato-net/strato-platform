@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua
 
-COPY azure-nginx-nossl.conf azure-nginx-ssl.conf nginx-nossl.conf nginx-ssl.conf auth.htpasswd azure-authentication.lua /tmp/
+COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
 
 COPY docker-run.sh /
 
