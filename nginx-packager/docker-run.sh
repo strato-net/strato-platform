@@ -48,7 +48,7 @@ else
 fi
 
 if [ "$STRATO_GS_MODE" = 1 ] ; then
-	sed -i '/_track/d' /usr/local/openresty/nginx/conf/nginx.conf
+	sed -i '/#TEMPLATE_MARK_TRACK/d' /usr/local/openresty/nginx/conf/nginx.conf
 fi
 
 # TODOs
