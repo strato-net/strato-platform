@@ -292,7 +292,7 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
    Just (Right position, theType) ->
      Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
    Just (Left text, theType) -> case (textToValue text theType) of
-      Left err -> error $ "fieldsToStruct: textToValue failed to parse with: " ++ (Text.unpack err) -- Solidity is a "strongly typed" "language"
+      Left err -> error $ "decodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
       Right val -> Just val
 
 
