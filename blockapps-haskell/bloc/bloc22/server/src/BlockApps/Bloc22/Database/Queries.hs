@@ -21,6 +21,7 @@ import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..),fromJSON)
+import qualified Data.Aeson                      as Ae
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
@@ -681,11 +682,11 @@ getXabiFunctionsQuery :: HasCallStack =>
                          Int32 -> Bloc (Map Text Func)
 getXabiFunctionsQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (xfId,contractmetadataId,isConstr,name) <-
+    (xfId,contractmetadataId,isConstr,name,mut) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& Opaleye.not isConstr
-    returnA -< (name,xfId)
-  for funcsWithIds $ \ xfId -> do --TODO remove the selector from the DB
+    returnA -< (name,(xfId, mut))
+  for funcsWithIds $ \ (xfId, mut) -> do --TODO remove the selector from the DB
     args <- getXabiFunctionsArgsQuery xfId
     let
       valMap valList = Map.fromList
@@ -696,8 +697,7 @@ getXabiFunctionsQuery cmId = do
     return  Func { funcArgs = args
                  , funcVals = vals
                  , funcContents = Nothing
-                 , funcMutable = Nothing
-                 , funcPayable = Nothing
+                 , funcMutability = mut
                  , funcVisibility = Nothing
                  , funcModifiers = Nothing
                  }
@@ -714,7 +714,7 @@ getXabiConstrQuery :: HasCallStack =>
                          Int32 -> Bloc (Map Text Func)
 getXabiConstrQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (xfId,contractmetadataId,isConstr,name) <-
+    (xfId,contractmetadataId,isConstr,name, _) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& isConstr
     returnA -< (name,xfId)
@@ -731,9 +731,8 @@ getXabiConstrQuery cmId = do
       vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
       let func = Func { funcArgs = args
                       , funcVals = vals
+                      , funcMutability = Nothing
                       , funcContents = Nothing
-                      , funcMutable = Nothing
-                      , funcPayable = Nothing
                       , funcVisibility = Nothing
                       , funcModifiers = Nothing
                       }
@@ -741,7 +740,7 @@ getXabiConstrQuery cmId = do
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do
-  (_,cmid,isc,name) <-
+  (_,cmid,isc,name,_) <-
     queryTable xabiFunctionsTable -< ()
   restrict -< cmid .== constant metadataId .&& Opaleye.not isc
   returnA -< name
@@ -953,6 +952,14 @@ instance Default Constant PubKey (Column PGBytea) where
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
+instance Default Constant StateMutability (Column PGText) where
+  def = lmap (undefined :: a -> StateMutability) def
+
+instance QueryRunnerColumnDefault PGText (Maybe StateMutability) where
+  queryRunnerColumnDefault = queryRunnerColumn id
+    (Ae.decodeStrict . Text.encodeUtf8)
+    queryRunnerColumnDefault
+
 instance QueryRunnerColumnDefault PGBytea Keccak256 where
   queryRunnerColumnDefault =
     queryRunnerColumn id toKecc queryRunnerColumnDefault
@@ -1011,7 +1018,7 @@ insertXabiFunction
   -> Bloc ()
 insertXabiFunction metadataId (name,Func{..}) = do
   funcIds :: [Int32] <- blocQuery $ proc () -> do
-    (fId,cmId,_,fname) <- queryTable xabiFunctionsTable -< ()
+    (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
     restrict -< cmId .== constant metadataId
       .&& fname .== constant name
     returnA -< fId
@@ -1021,8 +1028,9 @@ insertXabiFunction metadataId (name,Func{..}) = do
       , constant metadataId
       , constant False
       , constant name
+      , constant funcMutability
       )
-      (\ (xfId,_,_,_) -> xfId)
+      (\ (xfId,_,_,_,_) -> xfId)
     void $ insertXabiFunctionArg funcId funcArgs
     void $ insertXabiFunctionRet funcId (toList funcVals)
 
@@ -1037,8 +1045,9 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
     , constant metadataId
     , constant True
     , constant contractName
+    , constant (Nothing :: Maybe StateMutability)
     )
-    (\ (xfId,_,_,_) -> xfId)
+    (\ (xfId,_,_,_, _) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
@@ -1516,7 +1525,7 @@ getContractMetadataAndBin contract = blocTransaction $ do
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
 getConstructorId cmId = do
   functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_)
+    (xfId,contractMetaDataId,isConstr,_,_)
       <- queryTable xabiFunctionsTable -< ()
     restrict -< contractMetaDataId .== constant cmId .&& isConstr
     returnA -< xfId
@@ -1524,7 +1533,7 @@ getConstructorId cmId = do
 
 getFunctionId :: Int32 -> Text -> Bloc Int32
 getFunctionId cmId funcName = blocQuery1 $ proc () -> do
-  (xfId,contractMetaDataId,isConstr,name)
+  (xfId,contractMetaDataId,isConstr,name,_)
     <- queryTable xabiFunctionsTable -< ()
   restrict -< contractMetaDataId .== constant cmId
     .&& name .== constant funcName

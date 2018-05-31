@@ -62,16 +62,14 @@ instance ToSchema Xabi where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcMutability  = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcMutability  = Just Pure
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
@@ -83,19 +81,43 @@ instance ToSchema Xabi where
         }
 --------------------------------------------------------------------------------
 
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+
+instance ToJSON StateMutability where
+  toJSON = genericToJSON (aesonDrop 0 camelCase)
+
+instance FromJSON StateMutability where
+  parseJSON = genericParseJSON (aesonDrop 0 camelCase)
+
+instance Arbitrary StateMutability where
+  arbitrary = genericArbitrary uniform
+instance ToSchema StateMutability where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "State Mutability"
+    & mapped.schema.description ?~ "Reserved keywords for function state mutability"
+    & mapped.schema.example ?~ toJSON View
+
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
   , funcVals :: Map Text Xabi.IndexedType
+  , funcMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
   , funcContents :: Maybe Text
-  , funcMutable :: Maybe Bool
-  , funcPayable :: Maybe Bool
   , funcVisibility :: Maybe Visibility
   , funcModifiers :: Maybe [String]
   } deriving (Eq,Show,Generic)
+
+funcPayable :: Func -> Bool
+funcPayable Func{funcMutability = Just Payable} = True
+funcPayable _ = False
+
+funcConstant :: Func -> Bool
+funcConstant Func{funcMutability = Nothing} = False
+funcConstant Func{funcMutability = Just Payable} = False
+funcConstant _ = True
 
 instance ToJSON Func where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -116,8 +138,7 @@ instance ToSchema Func where
         { funcArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcContents = Just "return userAddress;"
-        , funcMutable  = Nothing
-        , funcPayable  = Nothing
+        , funcMutability = Just View
         , funcVisibility = Nothing
         , funcModifiers = Nothing
         }
@@ -230,16 +251,14 @@ instance ToSchema ContractDetails where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
