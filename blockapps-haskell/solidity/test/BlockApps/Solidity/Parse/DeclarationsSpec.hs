@@ -101,6 +101,11 @@ spec = do
       let Right (rets, _, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
+    it "should parse a function with nested comments" $ do
+      let functionString = "function nestedComments(uint a)\n    { /*\n      /* nested comment\n    */\n    }"
+          eRes = showError $ runParser functionDeclaration "" "" functionString
+          Right (functionName, _) = eRes
+      functionName `shouldBe` "nestedComments"
 
   describe "Declarations - structDeclaration" $ do
     it "should parse and unparse a struct with two fields" $ do
