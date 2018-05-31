@@ -11,21 +11,6 @@ import           BlockApps.Solidity.Parse.Parser
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
 
-contractBody :: String
-contractBody = unlines [
-          "",
-          "",
-          "contract SimpleStoragePragma {",
-          "    uint storedData;",
-          "    function set(uint x) {",
-          "        storedData = x;",
-          "    }",
-          "    function get() returns (uint retVal) {",
-          "        return storedData;",
-          "    }",
-          "}"
-          ]
-
 spec :: Spec
 spec = do
   let
@@ -172,4 +157,4 @@ spec = do
       parsedXabi `shouldSatisfy` isRight
 
 sol :: String -> Either String [(Text, Xabi)]
-sol = parseXabi "-" . (++ contractBody)
+sol = parseXabi "-"

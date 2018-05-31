@@ -27,19 +27,22 @@ import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 
-
-fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
+fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
   let
+    constants = filter (isJust . snd) vars
+    variables = map fst $ filter (isNothing . snd) vars
     (positionAfter, positions) = addPositions typeDefs' (Storage.positionAt 0)
-                                 $ map snd vars
+                                 $ map snd variables
   in
    Struct {
      fields=OMap.fromList
-            $ zipWith (\(n, t) p -> (n, (p, t))) vars positions,
+            $ (map (\((n,t),c) -> (n, (constantValue c, t))) constants)
+            ++ zipWith (\(n, t) p -> (n, (Right p, t))) variables positions,
      size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
      }
-
+  where
+    constantValue mval = maybe (error "fieldsToStruct: You must supply a value to a constant") Left mval
 
 addPositions::TypeDefs->Storage.Position -> [Type] -> (Storage.Position, [Storage.Position])
 addPositions _ p [] = (p, [])
@@ -198,7 +201,7 @@ xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
 
   structDefs' <- for xabiStructs $ \(name, fields) -> do
       theStruct <-
-        fmap (fieldsToStruct typeDefs') $ xabiFieldsToFields xabi
+        fmap (fieldsToStruct typeDefs' . map (flip (,) Nothing)) $ xabiFieldsToFields xabi
         $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
       return (name, theStruct)
 
@@ -212,20 +215,18 @@ xAbiToContract contractXabi@Xabi{..} = mdo
   typeDefs' <- xabiToTypeDefs typeDefs' contractXabi
 
   -- The contract datatype doesn't have a notion of constants, so it's ok to filter them out here
-  let vars' = sortOn (Xabi.varTypeAtBytes . snd) . filter ((maybe True not) . Xabi.varTypeConstant . snd) $ Map.toList xabiVars
+  let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
-    return (name, var')
+    return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
   funcs <-
-    fmap Map.fromList $
     for (Map.toList xabiFuncs) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
-      return (name, theFunction)
-
+      return ((name, theFunction), Nothing)
 
   return Contract{
-    mainStruct=fieldsToStruct typeDefs' $ vars ++ Map.toList funcs,
+    mainStruct=fieldsToStruct typeDefs' $ vars ++ funcs,
     typeDefs=typeDefs'
     }
 
@@ -250,7 +251,7 @@ contractToXabi Contract{..} =
           )
         | (name, (_, TypeFunction _ args rets)) <- OMap.assocs $ fields mainStruct
         ]
-    vars = filter (not . isFunction . snd . snd) $ OMap.assocs $ fields mainStruct::[(Text, (Storage.Position, Type))]
+    vars = filter (not . isFunction . snd . snd) $ OMap.assocs $ fields mainStruct::[(Text, (Either Text Storage.Position, Type))]
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
     isFunction _ = False
@@ -264,8 +265,21 @@ contractToXabi Contract{..} =
       xabiModifiers = Map.empty
       }
 
-fieldToVarType::TypeDefs->(Storage.Position, Type)->Xabi.VarType
-fieldToVarType typeDefs (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) Nothing Nothing Nothing $ typeToXabiType typeDefs theType
+fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType
+fieldToVarType typeDefs (Right Storage.Position{..}, theType) =
+  Xabi.VarType
+    (fromIntegral $ 32*offset+fromIntegral byte)
+    Nothing
+    Nothing
+    Nothing
+    $ typeToXabiType typeDefs theType
+fieldToVarType typeDefs (Left text, theType) =
+  Xabi.VarType
+    0
+    Nothing
+    (Just True)
+    (Just $ Text.unpack text)
+    $ typeToXabiType typeDefs theType
 
 -- Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
 typeToXabiType::TypeDefs->Type->Xabi.Type

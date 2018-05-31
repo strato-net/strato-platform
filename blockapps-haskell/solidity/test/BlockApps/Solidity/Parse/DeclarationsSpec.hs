@@ -2,6 +2,7 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -100,6 +101,11 @@ spec = do
       let Right (rets, _, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
+    it "should parse a function with nested comments" $ do
+      let functionString = "function nestedComments(uint a)\n    { /*\n      /* nested comment\n    */\n    }"
+          eRes = showError $ runParser functionDeclaration "" "" functionString
+          Right (functionName, _) = eRes
+      functionName `shouldBe` "nestedComments"
 
   describe "Declarations - structDeclaration" $ do
     it "should parse and unparse a struct with two fields" $ do
@@ -174,6 +180,123 @@ spec = do
       unparsedStruct `shouldBe` structString
       structName' `shouldBe` structName
       struct' `shouldBe` struct
+
+  describe "Declarations - solidityContract" $ do
+    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    it "should parse an empty contract" $ do
+      let contractString = "contract a {}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("a", (xempty, []))
+    it "should parse a basic contract" $ do
+      let contractString = "\
+            \contract q {\
+            \    function r() {}\
+            \}"
+          eRes = runParser solidityContract "" "" contractString
+      (fst <$> eRes) `shouldBe` Right "q"
+    it "should parse a commented contract" $ do
+      let contractString = "contract b { // don't dead open inside \n}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("b", (xempty, []))
+    it "should parse nested a nested comments contract" $ do
+      let contractString = "contract c { \
+                           \  /* this is how \
+                           \  function hidden () { \
+                           \  // bam! double comment \
+                           \ */ }"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("c", (xempty, []))
+    it "should parse unbalanced braces inside a string" $ do
+      let contractString = "contract d { \
+                           \  function x() constant returns (string) { \
+                           \    return \"{\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "d"
+
+    it "should parse unbalanced parens inside a string" $ do
+      let contractString = "contract e { \
+                           \  function x() constant returns (string) { \
+                           \    return \"(\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "e"
+
+    it "should parse unbalanced strings inside a comment" $ do
+      let contractString = unlines ["contract f { ",
+                                    "  function x() { ",
+                                    "    return // \"  ",
+                                    "  } ",
+                                    "}"]
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "f"
+
+  let isLeft (Right _) = False
+      isLeft (Left _) = True
+  describe "Declarations - bracedCode" $ do
+    let braceParse = runParser bracedCode "" ""
+    it "works in the easy case" $
+      braceParse "{x}" `shouldBe` Right "x"
+    it "drops an extra after brace" $
+      braceParse "{y}}" `shouldBe` Right "y"
+    it "fails with extra leading brace" $
+      braceParse "{{z}" `shouldSatisfy` isLeft
+    it "fails if end is commented out" $
+      braceParse "{//whoops}" `shouldSatisfy` isLeft
+    it "fails if the end is inside a string" $
+      braceParse "{ return \"he}llo\"" `shouldSatisfy` isLeft
+    it "parses braces inside string constants correctly" $
+      braceParse "{\"}\"}" `shouldBe` Right "\"}\""
+    it "ignores commented out quotation marks" $
+      braceParse "{/*\"*/z}" `shouldBe` Right "z"
+    it "ignores commented out quotation marks v2" $
+      braceParse "{//\"\nzz}" `shouldBe` Right "zz"
+    it "ignores commented out quotation marks v3" $
+      braceParse "{aa//\"\n  zz}" `shouldBe` Right "aa\n  zz"
+    it "ignores braces in comments" $
+      braceParse "{/* { */ }" `shouldBe` Right ""
+    it "shouldn't remove levels of escaping" $
+      braceParse "{\"multi\\nlines\\n\"}" `shouldBe` Right "\"multi\\nlines\\n\""
+
+  describe "Declarations - parensCode" $ do
+    let parenParse = runParser parensCode "" ""
+    it "works in the easy case" $
+      parenParse "(x)" `shouldBe` Right "x"
+    it "ignores parens in comments" $
+      parenParse "(/*  ( */ )" `shouldBe` Right ""
+
+  describe "Declarations - functions" $ do
+    it "should parse a basic function" $ do
+      let funcString = "function z(){}"
+          eRes = runParser functionDeclaration "" "" funcString
+      (fst <$> eRes) `shouldBe` Right "z"
+    it "should parse a constructor" $ do
+      let funcString = "constructor(){}"
+          eRes = runParser functionDeclaration "Contract" "" funcString
+      (fst <$> eRes) `shouldBe` Right "Contract"
+
+  describe "Declarations - variableDeclaration" $ do
+    let parseVarName = fmap fst . runParser variableDeclaration "" ""
+    it "should parse a uint variable" $
+      parseVarName "uint aeon;" `shouldBe` Right "aeon"
+    it "should parse a constant variable" $
+      parseVarName "uint constant flux;" `shouldBe` Right "flux"
+    it "should parse a public variable" $
+      parseVarName "uint private x;" `shouldBe` Right "x"
+    it "should parse a public variable" $
+      parseVarName "uint public z;" `shouldBe` Right "z"
+    it "should fail a public private variable -- which is nonsense" $
+      parseVarName "uint public private mixture;" `shouldSatisfy` isLeft
+    it "should parse public constant -- which is sensible" $
+      parseVarName "uint public constant change;" `shouldBe` Right "change"
+    it "should parse constant public -- which is sensible" $
+      parseVarName "uint public constant herd;" `shouldBe` Right "herd"
+    it "should parse initialized constants" $
+      parseVarName "uint constant start = 0xfff;" `shouldBe` Right "start"
+    it "should parse initialized public public constants" $
+      parseVarName "uint public public constant nothing = 0x0;" `shouldBe` Right "nothing"
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
