@@ -106,9 +106,3 @@ type API =
   :<|> "chain"
     :> ReqBody '[JSON] GenesisInfo
     :> Post '[PlainText] Text
-  :<|> "solc"
-    :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] SolcResponse
-  :<|> "extabi"
-    :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] ExtabiResponse

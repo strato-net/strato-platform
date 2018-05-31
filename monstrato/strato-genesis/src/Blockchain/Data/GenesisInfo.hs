@@ -150,6 +150,7 @@ genesisParser = GenesisInfo
             <*> "extraData" JS..: JS.value
             <*> "mixHash" JS..: JS.value
             <*> "nonce" JS..: JS.value
+            <*> "chainId" JS..:? JS.value
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)

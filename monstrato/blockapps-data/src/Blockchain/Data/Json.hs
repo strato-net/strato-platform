@@ -258,11 +258,11 @@ data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Sh
 
 instance ToJSON AddressStateRef' where
     toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum src name) next) =
-        in object $ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
-                     "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
-                     "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
-                     "latestBlockNum" .= bNum, "source" .= src, "contractName" .= name]
-                     ++ (("chainId" .=) <$> (maybeToList cid))
+        object $ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
+                  "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
+                  "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
+                  "latestBlockNum" .= bNum, "source" .= src, "contractName" .= name]
+                  ++ (("chainId" .=) <$> (maybeToList cid))
 
 instance FromJSON AddressStateRef' where
     parseJSON (Object s) = do

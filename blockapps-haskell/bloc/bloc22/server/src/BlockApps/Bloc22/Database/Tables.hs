@@ -3,6 +3,18 @@ module BlockApps.Bloc22.Database.Tables where
 import Data.Profunctor.Product
 import Opaleye
 
+schemaVersionTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGInt4
+  )
+schemaVersionTable = Table "bloc_schema_version" $ p2
+  ( optional "id"
+  , required "schema_version"
+  )
+
 usersTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
@@ -232,6 +244,7 @@ xabiVariablesTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGBool
+  , Column PGBool
   , Column (Nullable PGText)
   )
   ( Column PGInt4
@@ -240,15 +253,17 @@ xabiVariablesTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGBool
+  , Column PGBool
   , Column (Nullable PGText)
   )
-xabiVariablesTable = Table "xabi_variables" $ p7
+xabiVariablesTable = Table "xabi_variables" $ p8
   ( optional "id"
   , required "contract_metadata_id"
   , required "type_id"
   , required "name"
   , required "at_bytes"
   , required "is_public"
+  , required "is_constant"
   , required "value"
   )
 

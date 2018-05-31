@@ -814,18 +814,18 @@ WHERE XV.contract_metadata_id = $1;
 getXabiVariablesQuery :: Int32 -> Bloc (Map Text Xabi.VarType)
 getXabiVariablesQuery cmId = do
   varsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (_,cmid,typeid,name,atbytes,ispublic,value)
+    (_,cmid,typeid,name,atbytes,ispublic,isconstant,value)
       <- queryTable xabiVariablesTable -< ()
     restrict -< cmid .== constant cmId
-    returnA -< (name,(atbytes,ispublic,value,typeid))
-  for varsWithIds $ \ (atbytes,ispublic,value,typeid) -> do
+    returnA -< (name,(atbytes,ispublic,isconstant,value,typeid))
+  for varsWithIds $ \ (atbytes,ispublic,isconstant, value,typeid) -> do
     ty <- getXabiType typeid
-    return $ Xabi.VarType atbytes (Just ispublic) value ty
+    return $ Xabi.VarType atbytes (Just ispublic) (Just isconstant) value ty
 
 
 getXabiVariableNamesQuery :: Int32 -> Query ( Column PGText )
 getXabiVariableNamesQuery metadataId = proc () -> do
-  (_,cmid,_,varName,_,_,_) <-
+  (_,cmid,_,varName,_,_,_,_) <-
     queryTable xabiVariablesTable -< ()
   restrict -< cmid .== constant metadataId
   returnA -< varName
@@ -970,16 +970,16 @@ insertXabiVariables
   -> Map Text Xabi.VarType
   -> Bloc Int64
 insertXabiVariables metadataId vars = do
-  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic value xt) -> do
+  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic isconstant value xt) -> do
     varIds :: [Int32] <- blocQuery $ proc () -> do
-      (vId,cmId,_,vname,_,_,_) <- queryTable xabiVariablesTable -< ()
+      (vId,cmId,_,vname,_,_,_,_) <- queryTable xabiVariablesTable -< ()
       restrict -< cmId .== constant metadataId
         .&& vname .== constant name
       returnA -< vId
     if null varIds
     then do
       xtid <- insertXabiType xt
-      return $ Just (name,atBytes,ispublic,value,xtid)
+      return $ Just (name,atBytes,ispublic,isconstant,value,xtid)
     else
       return Nothing
   blocModify $ \conn ->
@@ -990,9 +990,10 @@ insertXabiVariables metadataId vars = do
         , constant name
         , constant atBytes
         , constant (fromMaybe False ispublic)
+        , constant (fromMaybe False isconstant)
         , constant value
         )
-      | Just (name,atBytes,ispublic, value, xtid) <- varsWithIds
+      | Just (name,atBytes,ispublic,isconstant,value,xtid) <- varsWithIds
       ]
 
 {- |
@@ -1064,13 +1065,13 @@ insertContract parentContr contr bin binRuntime xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source' = do
---  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
---     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   source <- addGetSourceFuncToSource' source'
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
     Error err -> blocError . AnError . Text.pack $ err
-    Success res -> return res
+    -- Starting with 0.4.9, solc prepends a filename to abi keys.
+    -- Bloc should too, but this change is easier :^)
+    Success res -> return . Map.mapKeys (snd . Text.breakOnEnd ":") $ res
   --TODO - clean this up, what should filename be instead of "-"
   --       get rid of error
   --       name nicer, mabye merge with next let

@@ -4,7 +4,6 @@ packages:
 - strato-conf/
 - miner-ethash/
 - merkle-patricia-db/
-- solidity-abi/
 - blockapps-data/
 - ecrecover/
 - fast-ecrecover/

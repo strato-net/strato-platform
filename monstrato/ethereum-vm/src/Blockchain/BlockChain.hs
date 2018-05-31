@@ -143,7 +143,7 @@ instance Bagger.MonadBagger ContextM where
         -- new best block we just mined came in
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
-            $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
+            $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             void $ putInsertTransactionResult
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
@@ -160,7 +160,7 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
                                        , transactionResultMiningStatus     = Unmined
-                                       , transactionResultChainId          = transactionChainId . otBaseTx $ Bagger.rejectedTx rejection
+                                       , transactionResultChainId          = transactionChainId . otBaseTx $ rejectedTx rejection
                                        }
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, BaggerStage, BaggerTxQueue, SHA) -- pretty, queue, txHash
@@ -245,9 +245,9 @@ addBlocks blocks = do
                 (theBlock, nbb) <- liftIO (readIORef replacedBest)
                 void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
                 let b = obBlockData theBlock
-                    addressSource = getSource False b
-                    addressContractName = getContractName False b
-                calculateAndEmitStateDiffs theBlock oldStateRoot addressSource addressContractName
+                    codeSource = getSource False b
+                    codeContractName = getContractName False b
+                calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -628,43 +628,62 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
             oldStateRoot  = blockDataStateRoot oldBestBlock
             bH            = outputBlockHash b
             bTHs          = otHash <$> txs
-    
+
         let shouldReplace =     newNumber == 0
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
-    
+
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
-    
+
         when shouldReplace $ do
             Bagger.processNewBestBlock bH bd bTHs
-            putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
-    
+            putContextBestBlockInfo chainId $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount)
+
         -- we're replaying SeqEvents, and need to notify the mempool
         when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
             Bagger.processNewBestBlock bH bd bTHs
-    
+
         let bestBlockInfo = (bestSha, bestNum, bestTdiff)
             bestSha       = if shouldReplace then bH        else oldBestSha
             bestNum       = if shouldReplace then newNumber else oldNumber
             bestTdiff     = if shouldReplace then td        else oldBestDifficulty
-    
+
         return (shouldReplace, Just b, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> MP.StateRoot
-                           -> (Address -> ContextM String)
-                           -> (Address -> ContextM String)
+                           -> (SHA -> ContextM String)
+                           -> (SHA -> ContextM String)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractName = when (flags_sqlDiff || flags_diffPublish) $ do
+calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
     diffs <- stateDiff (blockHeaderChainId newHeader) newNumber newHash oldStateRoot newStateRoot
-    when flags_sqlDiff $ commitSqlDiffs diffs addressSource addressContractName
+
+    let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
+
+    
+    codeSourceMap <- fmap M.fromList $
+      forM allNewCodeHashes $ \codeHash -> do
+        codeSrc <- codeSource codeHash
+        return (codeHash, codeSrc)
+
+    let codeSource' x =
+          M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap
+
+    codeNameMap <- fmap M.fromList $
+      forM allNewCodeHashes $ \codeHash -> do
+        codeName <- codeContractName codeHash
+        return (codeHash, codeName)
+
+    let codeContractName' x =
+          M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
+    when flags_sqlDiff $ commitSqlDiffs diffs codeSource' codeContractName'
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
          in withKafkaViolently $ do

@@ -23,6 +23,7 @@ module.exports = [
   '/bloc/v2.2/contracts/:contractName/all/states',
   '/bloc/v2.2/contracts/:contractName/:contractAddress/enum/:enumName',
   '/bloc/v2.2/contracts/compile',
+  '/bloc/v2.2/contracts/xabi',
   '/bloc/v2.2/search/:contractName',
   '/bloc/v2.2/search/:contractName/state',
   '/bloc/v2.2/search/:contractName/state/reduced(?:query)',
@@ -40,5 +41,4 @@ module.exports = [
   '/strato-api/eth/v1.2/storage(?:query)',
   '/strato-api/eth/v1.2/faucet',
   '/strato-api/eth/v1.2/solc',
-  '/strato-api/eth/v1.2/extabi',
 ];

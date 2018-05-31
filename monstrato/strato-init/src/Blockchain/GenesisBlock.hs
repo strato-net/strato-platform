@@ -35,12 +35,14 @@ import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
+import           Blockchain.MilenaTools               (commitSingleOffset)
 import           Blockchain.Output                    (printLogMsg)
 import           Blockchain.Sequencer                 (bootstrap)
 import qualified Blockchain.Sequencer.Constants       as SeqConstants
 import           Blockchain.Sequencer.Event           (OutputBlock)
 import           Blockchain.Sequencer.Monad
 import           Control.Monad.Logger                 (runLoggingT)
+import qualified Network.Kafka                        as K
 import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
@@ -52,7 +54,6 @@ import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-import           Network.Kafka.Consumer               (commitSingleOffset)
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
@@ -109,7 +110,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         deletedAccounts     = Map.empty,
         updatedAccounts     = Map.empty
     }
-    commitSqlDiffs diff Nothing Nothing
+    commitSqlDiffs diff (const "") (const "")
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
@@ -148,10 +149,10 @@ bootstrapIndexer key obGB =
                     IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
                 putStrLn "bootstrapIndex genesis seed successful!"
             Right (Left l) -> do
-                putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show l
+                putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
                 runner
-            l -> do
-                putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show l
+            (Left l) -> do
+                putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
                 runner
     in runner
 

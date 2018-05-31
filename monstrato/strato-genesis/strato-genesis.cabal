@@ -31,6 +31,7 @@ executable genesis-setup
                  , entropy
                  , blockapps-haskoin
                  , hflags
+                 , json-stream
                  , merkle-patricia-db
                  , time
     other-modules: Blockchain.GenesisBlockSetup
@@ -57,6 +58,7 @@ library
                  , containers
                  , cryptonite
                  , csv
+                 , json-stream
                  , memory
                  , merkle-patricia-db
                  , scientific
@@ -97,6 +99,7 @@ executable generate-genesis
                  , containers
                  , csv
                  , hflags
+                 , json-stream
                  , merkle-patricia-db
                  , scientific
                  , strato-model
@@ -121,6 +124,7 @@ test-suite strato-genesis-test
                  , bytestring
                  , containers
                  , hspec
+                 , json-stream
                  , merkle-patricia-db
                  , scientific
                  , strato-model

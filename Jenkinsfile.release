@@ -5,35 +5,46 @@ pipeline {
   options { disableConcurrentBuilds() }
   parameters {
     string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"')
-    string(name: 'REFSPEC', defaultValue: 'v0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
+    string(name: 'REFSPEC', defaultValue: '0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
+    string(name: 'RELEASE_VERSION', defaultValue: '0.0.0', description: 'The version tag for the future release')
   }
   stages {
     stage('Prepare') {
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-          docker ps
-          if [ "$BUILD_TYPE" == "full" ]; then
-            # revert changes
-            git checkout .
-            # revert to remote state
-            git reset
-            # remove untracked files
-            git clean -f
-            # remove untracked directories
-            git clean -fd
-          fi
-        '''
-       }
+        withEnv([
+          "REFSPEC=${env.REFSPEC}",
+          "BUILD_TYPE=${env.BUILD_TYPE}"
+        ]) {
+          sh '''#!/bin/bash -le
+            set -x
+            if [ "$BUILD_TYPE" == "full" ]; then
+              rm -rf strato-platform
+              git clone https://github.com/blockapps/strato-platform -b develop
+              cd strato-platform
+              git checkout ${REFSPEC}
+            else
+              cd strato-platform
+              rm -rf docker-compose.push.yml docker-compose.yml
+              git fetch
+              git checkout ${REFSPEC}
+            fi
+            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+            docker ps
+          '''
+        }
+      }
     }
 
     stage('Build') {
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          REPO=public make all
-          '''
+        withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
+          sh '''#!/bin/bash -le
+            set -x
+            cd strato-platform
+            echo ${RELEASE_VERSION} > VERSION
+            REPO=public make all
+            '''
+        }
       }
     }
 
@@ -41,41 +52,31 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
-          # TODO: unify for all pipelines by creating the run script file
-          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
-            BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
-            BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
-            STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
-            STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
-            CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
-            APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
-            STRATO_GS_MODE=1 \
-            docker-compose -p strato up -d
+          rm -rf strato-getting-started
+          git clone https://github.com/blockapps/strato-getting-started
+          cp strato-platform/docker-compose.yml strato-getting-started/
+          cd strato-getting-started
+          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0
           # Few quick tests
           until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
           do
-            if [[ "$counter" -gt 300 ]]; then
-              echo "bloc took longer than 5 minutes to initialize! aborting."
+            if [[ "$counter" -gt 120 ]]; then
+              echo "bloc took longer than 2 minutes to initialize! aborting."
               exit 73
             fi
             echo "waiting for bloc to be available through nginx"
             counter=$((counter+1))
             sleep 1
           done
-          echo "bloc is available"
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
-          do
-            echo "waiting for cirrus to be available through nginx"
-            sleep 1
-          done
-          echo "cirrus is available"
+          echo "bloc is available through nginx - node is running"
         '''
       }
     }
-    stage('Test') {
+
+    stage('Unit-tests') {
       steps {
         parallel(
           "Apex tests": {
@@ -102,14 +103,14 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running monstrato unit tests"
-              cd monstrato
+              cd strato-platform/monstrato
               ./run_unit_tests.sh
             '''},
           "Bloch tests": {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests to verify the build to be healthy'
-              cd blockapps-haskell
+              cd strato-platform/blockapps-haskell
               ./run_unit_tests.sh
             '''
           }
@@ -119,31 +120,40 @@ pipeline {
 
     stage('Release') {
       steps {
-        withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}"]) {
+        withEnv(["REFSPEC=${env.REFSPEC}"]) {
           withCredentials([
             usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
           ]) {
             sh '''#!/bin/bash -le
               set -x
+              cd strato-platform
+              RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose -f docker-compose.push.yml push
-
-              # TODO: Get rid of latest/stable - rewrite strato-getting-started script to use just one docker-compose.yml
-
-              RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
-
-              # Release as latest
-              STRATOGS_RELEASE_DETAILS_LATEST="--user blockapps --repo strato-getting-started --tag build-latest"
-              github-release delete $STRATOGS_RELEASE_DETAILS_LATEST || true
-              github-release release --pre-release $STRATOGS_RELEASE_DETAILS_LATEST --name "master @ $RELEASE_DATE"
-              github-release upload $STRATOGS_RELEASE_DETAILS_LATEST --name "docker-compose.latest.yml" --file ./docker-compose.yml
-
-              # Release as stable
-              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag $TAG_NAME"
+  
+              # Release to strato-getting-started
+              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
-              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "$TAG_NAME"
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.release.yml" --file ./docker-compose.yml
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
+  
+              # Merge to master and change VERSION
+              git checkout VERSION
+              git checkout master
+              git merge ${REFSPEC}
+              echo ${RELEASE_VERSION} > VERSION
+              git add VERSION
+              git commit VERSION -m "${RELEASE_VERSION}"
+              git push
+              git tag ${RELEASE_VERSION}
+              git push --tags
+  
+              # Merge VERSION change back to develop
+              git checkout develop
+              git pull
+              git merge master
+              git push
             '''
           }
         }
@@ -153,20 +163,19 @@ pipeline {
 
   post {
     success {
-      archive "docker-compose.yml"
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+        message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
       sh '''
-        echo "Build Successful for Git branch: $BRANCH_NAME"
+        echo "Release Build Successful"
       '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Release ${env.RELEASE_VERSION} Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }

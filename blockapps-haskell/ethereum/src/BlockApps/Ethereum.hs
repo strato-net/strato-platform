@@ -149,7 +149,7 @@ instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
 
 instance RLPEncodable Address where
-  rlpEncode (Address addr) = rlpEncode $ toInteger addr
+  rlpEncode addr = rlpEncode . fst . Base16.decode . Char8.pack $ addressString addr
   rlpDecode obj = Address . fromInteger <$> rlpDecode obj
 
 instance RLPEncodable (Maybe Address) where

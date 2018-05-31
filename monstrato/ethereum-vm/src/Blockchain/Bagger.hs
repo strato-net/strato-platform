@@ -163,14 +163,14 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                          Unmined
                         setStateDBStateRoot existingStateDbStateRoot
                         return build
-            else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
-                $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
-                let sha    = B.bestBlockSHA cache
-                let header = B.bestBlockHeader cache
-                let txShas = B.bestBlockTxHashes cache
-                processNewBestBlock sha header txShas
-                !nb <- makeNewBlock cid
-                return nb
+              else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
+                  $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
+                  let sha    = B.bestBlockSHA cache
+                  let header = B.bestBlockHeader cache
+                  let txShas = B.bestBlockTxHashes cache
+                  processNewBestBlock sha header txShas
+                  !nb <- makeNewBlock cid
+                  return nb
 
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
@@ -425,7 +425,8 @@ nextGasLimit g = g + q - (if d == 0 then 1 else 0) where (q,d) = g `quotRem` 102
 buildFromMiningCache :: MonadBagger m => Maybe Word256 -> m OutputBlock
 buildFromMiningCache chainId = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
-    cache <- B.unsafeFromMempool B.miningCache chainId <$> getBaggerState
+    state <- getBaggerState
+    let cache        = B.unsafeFromMempool B.miningCache chainId state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
     let parentHeader = B.bestBlockHeader cache
@@ -438,7 +439,7 @@ buildFromMiningCache chainId = do
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
-    putBaggerState $ B.updateMempool (\m{B.miningCache = mc} -> m{ B.miningCache = mc{B.lastRewardedStateRoot = DD.blockDataStateRoot rewardedBlockData}}) chainId state
+    putBaggerState $ B.updateMempool (\m@B.Mempool{B.miningCache = mc} -> m{ B.miningCache = mc{B.lastRewardedStateRoot = DD.blockDataStateRoot rewardedBlockData}}) chainId state
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles

@@ -8,10 +8,6 @@ Object {
     "id": 6,
     "username": "tanuj41",
   },
-  "initialValues": Object {
-    "modalAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
-    "modalUsername": "tanuj41",
-  },
   "modal": Object {},
   "modalUsername": undefined,
 }
@@ -240,7 +236,9 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
           <div className=\\"col-sm-9\\">
             <div className=\\"\\">
               <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} validate={[Function: required]} disabled={true} required={true}>
-                <option value=\\"\\" />
+                <option value=\\"Supplier1\\">
+                  Supplier1
+                </option>
               </Field>
             </div>
           </div>

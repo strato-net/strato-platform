@@ -2,17 +2,15 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { Position, Tooltip, Button, Dialog } from '@blueprintjs/core';
+import { Position, Tooltip, Button } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
-import { openCLIOverlay } from '../CLI/cli.actions';
+import { openCLIOverlay, closeCLIOverlay } from '../CLI/cli.actions';
 import { openTokenRequestOverlay } from '../TokenRequest/tokenRequest.actions';
 import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
 import { env } from '../../env';
-import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
-import { closeCLIOverlay } from '../CLI/cli.actions';
 import qs from 'query-string';
 import { isModePublic } from '../../lib/checkMode';
 
@@ -56,9 +54,6 @@ class Applications extends Component {
             {this.props.isLoggedIn &&
               <Button text="Request Token" onClick={this.props.openTokenRequestOverlay} className="right-align" />}
             {this.props.isLoggedIn &&
-              <Button onClick={this.props.openCLIOverlay} text="Add App" className="pt-icon-add right-align" />}
-
-            {this.props.isLoggedIn &&
               <Tooltip
                 content={<span>Unable to deploy apps when running multinode on localhost</span>}
                 inline={true}
@@ -90,14 +85,6 @@ class Applications extends Component {
               </div>
           }
         </div>
-        <Dialog
-          isOpen={this.props.isTokenOpen}
-          onClose={this.props.closeCLIOverlay}
-          title="Download CLI Tool"
-          className="pt-dark cli-dialog"
-        >
-        <CLI addApp />
-        </Dialog>
         <TokenRequest />
       </div>
     );
@@ -109,7 +96,6 @@ export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
     isLoggedIn: state.user.isLoggedIn,
-    isTokenOpen: state.cli.isTokenOpen
   };
 }
 

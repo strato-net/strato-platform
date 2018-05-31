@@ -15,7 +15,10 @@ import {
   resetUserAddress,
   fetchBalanceRequest,
   fetchBalanceSuccess,
-  fetchBalanceFailure
+  fetchBalanceFailure,
+  fetchCurrentAccountDetail,
+  fetchCurrentAccountDetailSuccess,
+  fetchCurrentAccountDetailFailure
 } from '../../components/Accounts/accounts.actions';
 import { accountsMock, accountDetail, error } from './accountsMock';
 
@@ -143,6 +146,26 @@ describe('Accounts: action', () => {
 
     test('failure', () => {
       expect(fetchBalanceFailure(error)).toMatchSnapshot();
+    });
+
+  });
+
+  describe('fetch current account detail', () => {
+
+    test('request', () => {
+      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
+      expect(fetchCurrentAccountDetail(address)).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
+      let detail = { balance: "3000000000000000000000" };
+      expect(fetchCurrentAccountDetailSuccess(address, detail)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
+      expect(fetchCurrentAccountDetailFailure(address, error)).toMatchSnapshot();
     });
 
   });

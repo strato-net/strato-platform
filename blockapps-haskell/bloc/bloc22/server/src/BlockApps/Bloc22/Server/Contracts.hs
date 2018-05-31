@@ -31,6 +31,7 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.Storage               as S
@@ -223,25 +224,34 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
     compileOneContract PostCompileRequest{..} = do
       idsAndDetails <- compileContract postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
-        contractDetails <-
-          getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
-        let eBlockappsjsXabi = completeXabi . contractdetailsXabi $ contractDetails
+        let eBlockappsjsXabi = completeXabi . contractdetailsXabi $ details
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
           Right blockappsjsXabi ->
-            void . blocCirrusFireForget $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
-        return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
+            void . blocCirrusFireForget $ postContract details{contractdetailsXabi=blockappsjsXabi}
+        return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+
+postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
+postContractsXabi PostXabiRequest{..} =
+   let xabis :: Either String (Map.Map Text Xabi)
+       xabis = do
+         partialXabis <- Map.fromList <$> parseXabi "src" (Text.unpack postxabirequestSrc)
+         traverse completeXabi partialXabis
+   in case xabis of
+        Left msg -> throwError . AnError .
+            ("contract compilation for xabi failed: " <>) . Text.pack $msg
+        Right xs -> return . PostXabiResponse $ xs
 
 
 completeContractDetailXabi :: ContractDetails -> ContractDetails
-completeContractDetailXabi cd = 
+completeContractDetailXabi cd =
   let eXabi = xAbiToContract $ contractdetailsXabi cd in
   case eXabi of
-    Right xabi -> cd { contractdetailsXabi = contractToXabi xabi } 
+    Right xabi -> cd { contractdetailsXabi = contractToXabi xabi }
     Left _ -> cd
-  
-  
+
+
 completeXabi :: Xabi -> Either String Xabi
 completeXabi xabi = do
   c <- xAbiToContract xabi
