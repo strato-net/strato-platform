@@ -9,20 +9,6 @@ import           Text.Parsec
 import           Text.Parsec.Language                 (javaStyle)
 import qualified Text.Parsec.Token                    as P
 
-import           BlockApps.Solidity.Parse.ParserTypes
-
--- | A common pattern: code enclosed in braces, allowing nested braces.
-bracedCode :: SolidityParser String
-bracedCode = braces $ fmap concat $ many $ many1 (noneOf "{}") <|> do
-  innerBraces <- bracedCode
-  return $ "{" ++ innerBraces ++ "}"
-
--- | Similar parser for parenthesized expressions
-parensCode :: SolidityParser String
-parensCode = parens $ fmap concat $ many $ many1 (noneOf "()") <|> do
-  innerParens <- parensCode
-  return $ "(" ++ innerParens ++ ")"
-
 reserved = P.reserved solidityLexer
 reservedOp = P.reservedOp solidityLexer
 identifier = P.identifier solidityLexer

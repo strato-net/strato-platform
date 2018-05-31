@@ -2,6 +2,7 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -174,6 +175,85 @@ spec = do
       unparsedStruct `shouldBe` structString
       structName' `shouldBe` structName
       struct' `shouldBe` struct
+
+  describe "Declarations - solidityContract" $ do
+    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    it "should parse an empty contract" $ do
+      let contractString = "contract a {}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("a", (xempty, []))
+    it "should parse a commented contract" $ do
+      let contractString = "contract b { // don't dead open inside \n}"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("b", (xempty, []))
+    it "should parse nested a nested comments contract" $ do
+      let contractString = "contract c { \
+                           \  /* this is how \
+                           \  function hidden () { \
+                           \  // bam! double comment \
+                           \ */ }"
+          eRes = runParser solidityContract "" "" contractString
+      eRes `shouldBe` Right ("c", (xempty, []))
+    it "should parse unbalanced braces inside a string" $ do
+      let contractString = "contract d { \
+                           \  function x() constant returns (string) { \
+                           \    return \"{\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "d"
+
+    it "should parse unbalanced parens inside a string" $ do
+      let contractString = "contract e { \
+                           \  function x() constant returns (string) { \
+                           \    return \"(\"; \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "e"
+
+    xit "should parse unbalanced strings inside a comment" $ do
+      let contractString = "contract f { \
+                           \  function x() constant returns (string) { \
+                           \    return // \"  \
+                           \  } \
+                           \}"
+          eRes = runParser solidityContract "" "" contractString
+      fst <$> eRes `shouldBe` Right "f"
+
+  let isLeft (Right _) = False
+      isLeft (Left _) = True
+  describe "Declarations - bracedCode" $ do
+    let braceParse = runParser bracedCode "" ""
+    it "works in the easy case" $
+      braceParse "{x}" `shouldBe` Right "x"
+    it "drops an extra after brace" $
+      braceParse "{y}}" `shouldBe` Right "y"
+    it "fails with extra leading brace" $
+      braceParse "{{z}" `shouldSatisfy` isLeft
+    it "fails if end is commented out" $
+      braceParse "{//whoops}" `shouldSatisfy` isLeft
+    it "fails if the end is inside a string" $
+      braceParse "{ return \"he}llo\"" `shouldSatisfy` isLeft
+    it "parses braces inside string constants correctly" $
+      braceParse "{\"}\"}" `shouldBe` Right "\"}\""
+    it "ignores commented out quotation marks" $
+      braceParse "{/*\"*/z}" `shouldBe` Right "z"
+    it "ignores commented out quotation marks v2" $
+      braceParse "{//\"\nzz}" `shouldBe` Right "zz"
+    it "ignores commented out quotation marks v3" $
+      braceParse "{aa//\"\n  zz}" `shouldBe` Right "aa\n  zz"
+    it "ignores braces in comments" $
+      braceParse "{/* { */ }" `shouldBe` Right ""
+    it "shouldn't remove levels of escaping" $
+      braceParse "{\"multi\\nlines\\n\"}" `shouldBe` Right "\"multi\\nlines\\n\""
+
+  describe "Declarations - parensCode" $ do
+    let parenParse = runParser parensCode "" ""
+    it "works in the easy case" $
+      parenParse "(x)" `shouldBe` Right "x"
+    it "ignores parens in comments" $
+      parenParse "(/*  ( */ )" `shouldBe` Right ""
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
