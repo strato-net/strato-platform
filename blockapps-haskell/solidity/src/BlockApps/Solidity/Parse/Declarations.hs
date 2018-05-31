@@ -398,15 +398,11 @@ bracedCode = braces . fmap concat . many $
         innerBraces <- bracedCode
         return $ "{" ++ innerBraces ++ "}"
 
--- | Similar parser for parenthesized expressions
+-- | Parses arguments and their types in parentheses.
 parensCode :: SolidityParser String
 parensCode = parens . fmap concat . many $
-        (show <$> try stringLiteral)
-    <|> (comment >> return "")
-    <|> ((:[]) <$> noneOf "()\"/")
-    <|> do
-        innerBraces <- bracedCode
-        return $ "(" ++ innerBraces ++ ")"
+        (comment >> return "")
+    <|> ((:[]) <$> noneOf "()/")
 
 comment :: SolidityParser ()
 comment = oneLineComment <|> multiLineComment
