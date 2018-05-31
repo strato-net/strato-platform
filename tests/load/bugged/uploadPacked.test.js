@@ -12,12 +12,11 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
-const contractName = 'Vehicle';
-const contractFilename = process.cwd() + `/load/contracts/Vehicle.sol`;
+const contractName = 'Vehicle_Packed';
+const contractFilename = path.join(config.contractsPath,`Vehicle_Packed.sol`);
 
 describe('Throughput - upload', function () {
   this.timeout(999999 * 1000);
@@ -35,7 +34,7 @@ describe('Throughput - upload', function () {
   });
 
   for(var index = 0; index < batchCount; index++) {
-    it.skip('Upload List: the old way (api.bloc.result)', function * () {
+    it('Upload List', function * () {
       const txs = factory_createUploadList(batchSize, batchIndex);
 
       const startTime = moment();
@@ -43,12 +42,14 @@ describe('Throughput - upload', function () {
       const uploadReceipts = yield rest_uploadContractList(admin, txs, doNotResolve);
       // wait for the hashes to resolve
       const uploadResults = yield waitResults(uploadReceipts);
-      // console.log(uploadResults);
-      // set the data
-      // each call sets 4 fields - do it 2 times
-      const setDataResults1 = yield setData(admin, uploadResults.data, batchIndex);
-      //const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
-      // console.log(uploadResults);
+      for(let r of zip(txs, uploadResults.data)) {
+        const state = yield api.bloc.state(r.fst.contractName, r.snd.address);
+        const _x = `${state.vin};${state.vehicleType};${state.vehicleYear}`;
+        const _y = `${state.vehicleMake};${state.vehicleModel};${state.vehicleStyle}`;
+        
+        assert.equal(_x, r.fst.args.x, "Contract x is not correct");
+        assert.equal(_y, r.fst.args.y, "Contract y is not correct");
+      }
 
       // stop the clock, print timing
       printTiming(startTime, batchCount, batchSize, index);
@@ -62,34 +63,17 @@ describe('Throughput - upload', function () {
       }
     });
   }
-
-  it.only('Upload List: getBlocResults', function * () {
-    const txs = factory_createUploadList(batchSize, batchIndex);
-
-    const startTime = moment();
-    const doNotResolve = true;
-    const uploadReceipts = yield rest_uploadContractList(admin, txs, doNotResolve);
-    // wait for the hashes to resolve
-    const uploadResults = yield getBlocResults(uploadReceipts);
-    // console.log(uploadResults);
-    // set the data
-    // each call sets 4 fields - do it 2 times
-    const setDataResults1 = yield setData(admin, uploadResults.data, batchIndex);
-    const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
-    // console.log(uploadResults);
-
-    // stop the clock, print timing
-    printTiming(startTime, batchCount, batchSize, index);
-    batchIndex++ ; // batch is done
-
-    if (search != 0) {
-      const addresses = uploadResults.data.map(r => {return r.address} );
-      const csv = util.toCsv(addresses); // generate csv string
-      const searchResult = yield rest.query(`${contractName}?address=in.${csv}`);
-      console.log(JSON.stringify(searchResult, null, 2));
-    }
-  });
 });
+
+function zip(a,b) {
+  const c = [];
+  var i = 0;
+  while(i < a.length && i < b.length) {
+    c.push({fst: a[i], snd: b[i]});
+    i++;
+  }
+  return c;
+}
 
 function factory_createUploadList(batchSize, batchIndex) {
   const txs = [];
@@ -98,11 +82,8 @@ function factory_createUploadList(batchSize, batchIndex) {
     txs.push({
       contractName: contractName,
       args: {
-        _vin: `vin_${batchIndex}_${i}`,
-        _s0: `s0_${batchIndex}_${i}`,
-        _s1: `s1_${batchIndex}_${i}`,
-        _s2: `s2_${batchIndex}_${i}`,
-        _s3: `s3_${batchIndex}_${i}`,
+        x: `vin_${batchIndex}_${i};s0_${batchIndex}_${i};s2_${batchIndex}_${i}`,
+        y: `van_${batchIndex}_${i};s1_${batchIndex}_${i};s3_${batchIndex}_${i}`
       },
     });
   }
@@ -133,30 +114,6 @@ function* waitResults(uploadReceipts) {
   }
   console.log('### Data:', data.length);
   console.log('### Errors:', errors.length);
-  return {errors: errors, data: data};
-}
-
-function* getBlocResults(uploadReceipts) {
-  // extract the hases
-  const hashes = uploadReceipts.map(receipt => {
-    console.log('receipt', receipt.status, receipt.hash);
-    return receipt.hash;
-  });
-  const resolve = true;
-  const results = yield api.bloc.results(hashes, resolve);
-
-  const errors = [];
-  const data = [];
-  for (var i = 0 ; i < results.length; i++) {
-    const result = results[i];
-    const uploadReceipt = uploadReceipts[i];
-    console.log(i, result.status);
-    if (result.status == 'Success') {
-      data.push({index:i, uploadReceipt: uploadReceipt, address: result.data.contents.address});
-    } else {
-      errors.push({index:i, uploadReceipt: uploadReceipt, txResult:result});
-    }
-  }
   return {errors: errors, data: data};
 }
 

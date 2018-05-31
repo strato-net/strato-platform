@@ -12,17 +12,16 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const titleManagerJs = require(`../titleManager`);
+const titleManagerJs = require(`./titleManager`);
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
-describe('LOAD TEST: state', function() {
+describe('LOAD TEST: mapping', function() {
   this.timeout(999999 * 1000);
 
   let admin, contract;
-  const batchSize = util.getArgInt('--batchSize', 80);
-  const batchCount = util.getArgInt('--batchCount', 30);
-  const readState = util.getArgInt('--readState', 0);
+  const batchSize = util.getArgInt('--batchSize', 3);
+  const batchCount = util.getArgInt('--batchCount', 1);
 
   before(function*() {
     console.log(`Creating admin user and contract`);
@@ -32,23 +31,18 @@ describe('LOAD TEST: state', function() {
     console.log(contract);
   });
 
-  it(`Call a method that fills up an array: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
-    for (var i = 0; i < batchCount; i++) {
-      const args = {count: batchSize};
-      const method = 'testState';
-      const results = yield call(admin, contract, method, args);
-      console.log(results);
-      const [length, value] = results;
-      const total = (i+1) * batchSize;
-      assert.equal(length-1, total, 'pushed');
-      assert.equal(parseInt(value, 16), total, 'value');
-      if (readState) {
-        const state = yield rest.getStateVar(contract, 'titles', null, null, true);
-        assert.equal(state.titles - 1, total, 'all created');
-      }
+  it(`Call a method that fills up an mapping: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+    for (var batchIndex = 0; batchIndex < batchCount; batchIndex++) {
+      const args = {batchSize: batchSize, batchIndex: batchIndex};
+      const method = 'testMapping';
+      const result = yield call(admin, contract, method, args);
+      const actualHex = result[0];
+      const actual = parseInt(actualHex, 16);
+      const expected = (batchIndex+1)*batchSize-1; // the last value of this batch
+      assert.equal(actual, expected, `${batchIndex}`);
+      console.log('mapped total:', (batchIndex+1)*batchSize, 'last value:', result);
     }
   });
-
 
 });
 

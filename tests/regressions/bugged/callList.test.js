@@ -12,8 +12,8 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const ErrorCodes = rest.getEnums(`${config.libPath}/contracts/ErrorCodes.sol`).ErrorCodes;
-const titleManagerJs = require(`../titleManager`);
+const ErrorCodes = rest.getEnums(path.join(config.contractsPath, "ErrorCodes.sol")).ErrorCodes;
+const titleManagerJs = require(`./titleManager`);
 const contractName = 'Title';
 
 const adminName = util.uid('Admin');

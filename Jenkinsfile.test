@@ -3,15 +3,22 @@ pipeline {
     label "cd10"
   }
   options { disableConcurrentBuilds() }
+  parameters {string(name: 'PLATFORM_BRANCH_NAME', defaultValue: 'develop', description: 'blockapps/strato-platform git branch name to build upon. Skip the "origin/" part.\n' +
+    'This job will build using the pipeline from Jenkinsfile.test and all the code in this branch.')}
   stages {
     stage('Prepare') {
       steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+          }
+        }
         sh '''#!/bin/bash -le
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
         '''
-       }
+      }
     }
 
     stage('Build') {
@@ -128,7 +135,7 @@ pipeline {
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+      )
       sh '''
         echo "Build Successful for Git branch: $BRANCH_NAME"
       '''

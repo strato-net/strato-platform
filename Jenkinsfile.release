@@ -167,9 +167,6 @@ pipeline {
         color: 'good',
         message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
-      sh '''
-        echo "Release Build Successful"
-      '''
     }
 
     failure {

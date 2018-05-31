@@ -12,7 +12,7 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const titleManagerJs = require(`../titleManager`);
+const titleManagerJs = require(`./titleManager`);
 const contractName = 'Title';
 
 const adminName = util.uid('Admin');
@@ -34,7 +34,7 @@ describe('LOAD TEST: Upload from string', function() {
   it.skip(`Upload simple - search test:`, function * () {
     const uid = util.uid();
     const contractName = 'TitleMo';
-    const contractFilename = `${config.libPath}/contracts/TitleMo.sol`;
+    const contractFilename = path.join(config.contractsPath, "TitleMo.sol");
 
     const args = {_vin: 'Vin_' + uid };
     const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
@@ -45,7 +45,7 @@ describe('LOAD TEST: Upload from string', function() {
   it.only(`Stack Depth 1:`, function * () {
     const uid = util.uid();
     const contractName = 'StackDepth';
-    const contractFilename = `${config.libPath}/contracts/StackDepth.sol`;
+    const contractFilename = path.join(config.contractsPath, "StackDepth.sol");
 
     const args = {
       _s0: 's0_' + uid,

@@ -12,7 +12,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const contractName = "DataTypeBool";
-const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeBool.sol");
+const contractFilename = path.join(config.contractsPath, "DataTypeBool.sol");
 const constructorArgs = {_storedData: true};
 
 describe.skip('bool data type', function () {

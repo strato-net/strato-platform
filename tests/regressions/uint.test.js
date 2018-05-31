@@ -15,7 +15,7 @@ describe('uint data type', function () {
   const adminPassword = '1234';
 
   const contractName = "DataTypeUint";
-  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeUint.sol");
+  const contractFilename = path.join(config.contractsPath, "DataTypeUint.sol");
   const constructorArgs = {_storedData: 4};
 
   var adminUser;

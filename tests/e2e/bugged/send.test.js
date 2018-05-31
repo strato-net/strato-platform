@@ -66,6 +66,7 @@ describe("Send Transaction Test", function() {
 
     assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending wei");
     const receipt = yield rest.send(alice, bob, value);
+    console.log(receipt.hash)
     const txResult = yield rest.transactionResult(receipt.hash);
     assert.equal(txResult[0].status, 'success', 'tx status');
     // check balances

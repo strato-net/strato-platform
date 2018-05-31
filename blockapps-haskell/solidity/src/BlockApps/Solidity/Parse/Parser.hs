@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 -- |
 -- Module: Parser
 -- Description: The Solidity source parser function
@@ -46,7 +48,8 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
     `orError`
     ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
   parentXabi <- parentXabiOrError
-  addInheritedDeclarations xabisWithInheritedDeclarations (xabiMerge xabi parentXabi, rest)
+  !mergedXabis <- addInheritedDeclarations xabisWithInheritedDeclarations (xabi, rest)
+  return (xabiMerge mergedXabis parentXabi)
 
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
@@ -58,9 +61,10 @@ xabiMerge x y =
     xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
-    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
+    bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
     bumpAtBytes n varType =
       varType {varTypeAtBytes = varTypeAtBytes varType + n}
+    variables = Map.filter (maybe True not . varTypeConstant)
 
 
 

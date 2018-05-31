@@ -20,6 +20,13 @@ curl -sSL https://get.haskellstack.org/ | sh
 sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf libleveldb-dev
 ```
 
+#### Centos/RHEL/Amazon linux 2
+
+```
+sudo yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
+sudo yum install libsodium libsodium-devel postgresql-devel cmake3 gcc-c++ libleveldb-devel
+```
+
 #### Mac people:
 
 TBD
@@ -29,7 +36,7 @@ TBD
 ### Config vars
 1. `REPO` env var is required for the build.
 
-    Possible values: 
+    Possible values:
     - `local` (empty docker registry url)
     - `private` (`registry-aws.blockapps.net:5000/blockapps/` - BlockApps' private registry)
     - `public` (`registry-aws.blockapps.net:5000/blockapps-repo/` - BlockApps' public registry)
