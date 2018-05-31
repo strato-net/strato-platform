@@ -27,23 +27,21 @@ import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 
-fieldsToStruct::TypeDefs->[(Text, Type, Maybe Text)]->Struct
+fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
   let
-    constants = filter (isJust . thd) vars
-    variables = map dropThird $ filter (isNothing . thd) vars
+    constants = filter (isJust . snd) vars
+    variables = map fst $ filter (isNothing . snd) vars
     (positionAfter, positions) = addPositions typeDefs' (Storage.positionAt 0)
                                  $ map snd variables
   in
    Struct {
      fields=OMap.fromList
-            $ (map (\(n,t,c) -> (n, (constantValue c, t))) constants)
+            $ (map (\((n,t),c) -> (n, (constantValue c, t))) constants)
             ++ zipWith (\(n, t) p -> (n, (Right p, t))) variables positions,
      size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
      }
   where
-    thd (_,_,c) = c
-    dropThird (a,b,_) = (a,b)
     constantValue mval = maybe (error "fieldsToStruct: You must supply a value to a constant") Left mval
 
 addPositions::TypeDefs->Storage.Position -> [Type] -> (Storage.Position, [Storage.Position])
@@ -203,15 +201,13 @@ xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
 
   structDefs' <- for xabiStructs $ \(name, fields) -> do
       theStruct <-
-        fmap (fieldsToStruct typeDefs' . map (addThird Nothing)) $ xabiFieldsToFields xabi
+        fmap (fieldsToStruct typeDefs' . map (flip (,) Nothing)) $ xabiFieldsToFields xabi
         $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
       return (name, theStruct)
 
   return TypeDefs { enumDefs   = Map.fromList $ fmap (Bimap.fromList . zip [0..]) <$> xabiEnums
                   , structDefs = Map.fromList structDefs'::Map.Map Text Struct
                   }
-  where
-    addThird c (a,b) = (a,b,c)
 
 
 xAbiToContract::Xabi->Either String Contract
@@ -222,13 +218,12 @@ xAbiToContract contractXabi@Xabi{..} = mdo
   let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
-    return (name, var', Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
+    return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
   funcs <-
     for (Map.toList xabiFuncs) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
-      return (name, theFunction, Nothing)
-
+      return ((name, theFunction), Nothing)
 
   return Contract{
     mainStruct=fieldsToStruct typeDefs' $ vars ++ funcs,
