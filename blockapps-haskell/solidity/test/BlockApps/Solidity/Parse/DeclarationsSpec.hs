@@ -219,12 +219,12 @@ spec = do
           eRes = runParser solidityContract "" "" contractString
       fst <$> eRes `shouldBe` Right "e"
 
-    xit "should parse unbalanced strings inside a comment" $ do
-      let contractString = "contract f { \
-                           \  function x() constant returns (string) { \
-                           \    return // \"  \
-                           \  } \
-                           \}"
+    it "should parse unbalanced strings inside a comment" $ do
+      let contractString = unlines ["contract f { ",
+                                    "  function x() { ",
+                                    "    return // \"  ",
+                                    "  } ",
+                                    "}"]
           eRes = runParser solidityContract "" "" contractString
       fst <$> eRes `shouldBe` Right "f"
 
@@ -271,6 +271,27 @@ spec = do
       let funcString = "constructor(){}"
           eRes = runParser functionDeclaration "Contract" "" funcString
       (fst <$> eRes) `shouldBe` Right "Contract"
+
+  describe "Declarations - variableDeclaration" $ do
+    let parseVarName = fmap fst . runParser variableDeclaration "" ""
+    it "should parse a uint variable" $
+      parseVarName "uint aeon;" `shouldBe` Right "aeon"
+    it "should parse a constant variable" $
+      parseVarName "uint constant flux;" `shouldBe` Right "flux"
+    it "should parse a public variable" $
+      parseVarName "uint private x;" `shouldBe` Right "x"
+    it "should parse a public variable" $
+      parseVarName "uint public z;" `shouldBe` Right "z"
+    it "should fail a public private variable -- which is nonsense" $
+      parseVarName "uint public private mixture;" `shouldSatisfy` isLeft
+    it "should parse public constant -- which is sensible" $
+      parseVarName "uint public constant change;" `shouldBe` Right "change"
+    it "should parse constant public -- which is sensible" $
+      parseVarName "uint public constant herd;" `shouldBe` Right "herd"
+    it "should parse initialized constants" $
+      parseVarName "uint constant start = 0xfff;" `shouldBe` Right "start"
+    it "should parse initialized public public constants" $
+      parseVarName "uint public public constant nothing = 0x0;" `shouldBe` Right "nothing"
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg

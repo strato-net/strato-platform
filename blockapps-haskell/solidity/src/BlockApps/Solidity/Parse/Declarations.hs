@@ -14,6 +14,7 @@ import qualified Data.Text                            as Text
 
 import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
+import           Text.Printf                          (printf)
 
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
@@ -167,9 +168,28 @@ usingDeclaration = do
 
 -- | Parses a variable definition
 variableDeclaration :: SolidityParser (String, Declaration)
-variableDeclaration = do
-  vDecl <- simpleVariableDeclaration
-  return vDecl
+variableDeclaration = simpleVariableDeclaration
+
+data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal
+  deriving (Eq, Show, Enum, Ord)
+
+stateVariableKeyword :: SolidityParser StateVariableKeyword
+stateVariableKeyword =
+     (try (reserved "constant") >> return KConstant) <|>
+     (try (reserved "public") >> return KPublic) <|>
+     (try (reserved "private") >> return KPrivate) <|>
+     (try (reserved "internal") >> return KInternal)
+
+public :: [StateVariableKeyword] -> SolidityParser Bool
+public keywords =
+  let visibilities = nub . filter (/= KConstant) $ keywords
+  in case visibilities of
+        (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
+        [KPublic] -> return True
+        _ -> return False
+
+constant :: [StateVariableKeyword] -> Bool
+constant = any (KConstant ==)
 
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
@@ -180,34 +200,16 @@ simpleVariableDeclaration = do
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
-  --TODO - deal with the variableVisible flag
---  (variableVisible, variableIsPublic) <- option (True, False) $
-  (_, variableIsPublic, variableIsConstant) <- option (True, False, False) $
-                     (reserved "constant" >> return (False, False, True)) <|>
-                     (reserved "storage" >> return (True, False, False)) <|>
-                     (reserved "memory" >> return (False, False, False)) <|>
-                     (reserved "public" >> return (True, True, False)) <|>
-                     (reserved "private" >> return (False, False, False)) <|>
-                     (reserved "internal" >> return (False, False, False))
+  keywords <- many stateVariableKeyword
+  let isConstant = constant keywords
+  isPublic <- public keywords
   variableName <- identifier
   value <- optionMaybe $ do
     reservedOp "="
     many $ noneOf ";"
   semi
---  let objValueType' =
---        if variableVisible
---        then SingleValue variableType
---        else NoValue
 
-  return (variableName, VariableDeclaration variableType variableIsPublic variableIsConstant value)
-
---  ObjDef{
---    objName = variableName,
---    objValueType = objValueType',
---    objArgType = NoValue,
---    objDefn = "",
---    objIsPublic = variableIsPublic
---    }
+  return (variableName, VariableDeclaration variableType isPublic isConstant value)
 
 {- Functions and function-like -}
 
