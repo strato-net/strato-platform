@@ -107,10 +107,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   if [ "$authBasic" = true ] ; then
-   cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
    if [ -z "$uiPassword" ]
    then
      echo "Using the default password for user \"admin\""
+     cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
    else
      echo "Setting UI password for user \"admin\""
      htpasswd -cb /usr/local/openresty/nginx/conf/auth.htpasswd admin ${uiPassword}
