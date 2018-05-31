@@ -26,7 +26,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     fi
 
     if [[ $azureADTenantID = NULL || $azureADClientID = NULL || $azureADClientSecret = NULL ]] ; then
-      echo 'AzureAD TenantID / ClientID / ClientSecret is required for azureAD'
+      echo 'AzureAD TenantID / ClientID / ClientSecret are required for azureAD'
       exit 4
     fi
   fi
@@ -41,6 +41,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_AZUREAD/d' /tmp/nginx.conf
   else
     sed -i '/#TEMPLATE_MARK_NO_AZUREAD/d' /tmp/nginx.conf
+    # Required with lua_code_cache off
+    #sed -i 's/<SESSION_SECRET>/mySessionSecretKeyHash/g' /tmp/nginx.conf
   fi
 
   # Remove SSL lines if deployment is not SSL-enabled
@@ -66,31 +68,26 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # Remove auth_basic line if deployment is not authBasic-enabled
   if [ "$authBasic" != true ] ; then
-    sed -i '/auth_basic/d' /usr/local/openresty/nginx/conf/nginx.conf
+    sed -i '/auth_basic/d' /tmp/nginx.conf
   fi
 
   ########
   ### Generate azure-authentication.lua from template according to configuration provided
   ########
   if [ "$azureAD" = true ] ; then
+    cp /tmp/azure-authentication.tpl.lua /tmp/azure-authentication.lua
 
-   cp /tmp/azure-authentication.tpl.lua /tmp/azure-authentication.lua
+    sed -i 's/<TENANT_ID_PLACEHOLDER>/'"$azureADTenantID"'/g' /tmp/azure-authentication.lua
+    sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"$azureADClientID"'/g' /tmp/azure-authentication.lua
+    sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"$azureADClientSecret"'/g' /tmp/azure-authentication.lua
 
-   # Required with lua_code_cache off
-   #sed -i 's/<SESSION_SECRET>/mySessionSecretKeyHash/g' /tmp/nginx.conf
-
-   sed -i 's/<TENANT_ID_PLACEHOLDER>/'"$azureADTenantID"'/g' /tmp/azure-authentication.lua
-   sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"$azureADClientID"'/g' /tmp/azure-authentication.lua
-   sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"$azureADClientSecret"'/g' /tmp/azure-authentication.lua
-
-   if [ "$ssl" = true ] ; then
-    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/azure-authentication.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/azure-authentication.lua
-   else
-    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/azure-authentication.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/azure-authentication.lua
-   fi
-
+    if [ "$ssl" = true ] ; then
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/azure-authentication.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/azure-authentication.lua
+    else
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/azure-authentication.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/azure-authentication.lua
+    fi
   fi
 
   ########
