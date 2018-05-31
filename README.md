@@ -60,3 +60,39 @@ TBD
     ```
     <CONFIG_VARS> make docker-compose
     ```
+
+### Testing commands
+-  To run general platform tests (not specific to a functional unit):
+    ```
+    cd tests/
+    npm install
+    npm run test
+    ```
+
+- E2E and Regression Tests:
+
+    After switching to the tests/ folder and installing node modules, to specifically run only tests that are earmarked as "e2e" tests, run the following:
+    ```
+    npm run test:e2e
+    ```
+    As e2e tests are developed, additional tests will be located under tests/e2e.
+
+    There are also a small number of regression tests specifically for testing data types.  You can run those specifically by the following:
+    ```
+    npm run test:dataTypes
+    ```
+
+    As more regression tests are developed, additional tests will be located under tests/regressions.
+
+- Performance tests
+
+    After switching to the tests/ folder and installing node modules, you can run a set of generic load tests (which use a batch size 20, batch count 20) 
+    ```
+    npm run test:load
+    ```
+    A set of general upload tests are also available (batch size = 10, batch count = 10) using the following:
+    ```
+    npm run test:upload
+    ```
+
+    Performance tests are located under tests/load and most take two parameters to indicate the number of batches and the size of batches being uploaded: ```--batchSize=NUMBER``` and -```-batchCount=NUMBER```
