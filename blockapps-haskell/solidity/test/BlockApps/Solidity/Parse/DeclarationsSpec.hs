@@ -245,6 +245,8 @@ spec = do
       braceParse "{aa//\"\n  zz}" `shouldBe` Right "aa\n  zz"
     it "ignores braces in comments" $
       braceParse "{/* { */ }" `shouldBe` Right ""
+    it "shouldn't remove levels of escaping" $
+      braceParse "{\"multi\\nlines\\n\"}" `shouldBe` Right "\"multi\\nlines\\n\""
 
   describe "Declarations - parensCode" $ do
     let parenParse = runParser parensCode "" ""

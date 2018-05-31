@@ -391,7 +391,7 @@ functionModifiers = do
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
 bracedCode = braces . fmap concat . many $
-        (("\""++) . (++"\"") <$> try stringLiteral)
+        (show <$> try stringLiteral)
     <|> (comment >> return "")
     <|> ((:[]) <$> noneOf "{}\"/")
     <|> do
@@ -401,7 +401,7 @@ bracedCode = braces . fmap concat . many $
 -- | Similar parser for parenthesized expressions
 parensCode :: SolidityParser String
 parensCode = parens . fmap concat . many $
-        (("\""++) . (++"\"") <$> try stringLiteral)
+        (show <$> try stringLiteral)
     <|> (comment >> return "")
     <|> ((:[]) <$> noneOf "()\"/")
     <|> do
