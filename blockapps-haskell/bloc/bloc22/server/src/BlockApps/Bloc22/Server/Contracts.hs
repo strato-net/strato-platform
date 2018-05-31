@@ -33,7 +33,6 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
-import qualified BlockApps.Solidity.Xabi.Type    as X
 import           BlockApps.SolidityVarReader
 import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
@@ -84,12 +83,9 @@ getContractsState :: ContractName
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId mName mCount mOffset mLength = do
-  xabi <- getContractXabi contract contractId
-  -- TODO: if anyone actually cares that constants are shown in the state, figure out how to represent them correctly
-  let filteredXabi = xabi{ xabiVars = Map.filter (maybe True Prelude.not . X.varTypeConstant) (xabiVars xabi) }
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
-      $ return (xAbiToContract filteredXabi)
+      $ xAbiToContract <$> getContractXabi contract contractId
 
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'

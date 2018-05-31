@@ -216,7 +216,8 @@ decodeStorageKey _ _ [] _ _ _ _ = []
 decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len =
   case OMap.lookup varName (fields struct') of
     Nothing -> []
-    Just (Storage.Position{..}, theType) ->
+    Just (Left _, _) -> []
+    Just (Right Storage.Position{..}, theType) ->
       case theType of
         SimpleType ty -> decodeStorageKeySimple ty offset
         TypeArrayDynamic ty -> do
@@ -288,8 +289,11 @@ decodeValue
   -> Maybe Value
 decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.lookup varName fields of
    Nothing -> Nothing
-   Just (position, theType) ->
+   Just (Right position, theType) ->
      Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
+   Just (Left text, theType) -> case (textToValue text theType) of
+      Left err -> error $ "fieldsToStruct: textToValue failed to parse with: " ++ (Text.unpack err) -- Solidity is a "strongly typed" "language"
+      Right val -> Just val
 
 
 decodeValue'
@@ -528,7 +532,12 @@ decodeMapValue
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
 decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
-  (position, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
+  (eTxtPos, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
+
+  position <-
+    case eTxtPos of
+      Right pos -> return pos
+      Left txt -> throwError $ Text.unpack mappingName ++ " is a constant with value \"" ++ show txt ++ "\", which is not allowed."
 
   (fromType, toType) <-
     case maybeMappingType of
