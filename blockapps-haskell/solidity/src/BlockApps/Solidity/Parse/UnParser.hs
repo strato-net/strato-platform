@@ -98,7 +98,7 @@ unparseFunc (name, Func{..}) =
         Just Constant -> "constant "
         Just View -> "constant "
         Just Pure -> "constant "
-        Just Payable -> ""
+        Just Payable -> "payable "
         Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
