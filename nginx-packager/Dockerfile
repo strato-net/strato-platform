@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y apache2-utils curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    mkdir -p /usr/local/openresty/nginx/lua
+    mkdir -p /usr/local/openresty/nginx/lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf
 
 COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
