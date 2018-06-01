@@ -24,6 +24,7 @@ executable slipstream
                  , containers
                  , hflags
                  , http-client
+<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 <<<<<<< 0c9d881a005ea6aa185201f1e06710b3402ebbcc
                  , lens
                  , logging-effect
@@ -31,12 +32,18 @@ executable slipstream
 =======
                  , logging-effect
 >>>>>>> Slipstream Initial Commit
+=======
+                 , lens
+                 , logging-effect
+                 , milena
+>>>>>>> Added Kafka Consumer
                  , monad-control
                  , mtl
                  , network
                  , postgresql-simple
                  , postgresql-typed
                  , resource-pool
+<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 <<<<<<< 0c9d881a005ea6aa185201f1e06710b3402ebbcc
                  , semigroups
                  , servant-client
@@ -48,6 +55,13 @@ executable slipstream
                  , text
                  , transformers-base
 >>>>>>> Slipstream Initial Commit
+=======
+                 , semigroups
+                 , servant-client
+                 , text
+                 , transformers-base
+                 , transformers
+>>>>>>> Added Kafka Consumer
                  , unordered-containers
                  , vector
     other-modules: Events
