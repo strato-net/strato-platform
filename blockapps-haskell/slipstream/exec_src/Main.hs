@@ -6,6 +6,7 @@
     , ScopedTypeVariables
     , DataKinds
     , TemplateHaskell
+    , FlexibleContexts
 #-}
 
 import           Control.Monad.Except
@@ -52,6 +53,13 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import Network
+import Network.Kafka
+import Network.Kafka.Consumer
+import qualified Network.Kafka.Protocol as K hiding (Message)
+import Control.Monad.Trans.State.Lazy    (StateT(..))
+import qualified Data.List.NonEmpty as NE
+import Data.String
+import Control.Lens
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -128,15 +136,15 @@ listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
 
-valueToString :: Value -> String
-valueToString (String x) = "\'" ++ T.unpack x ++ "\'"
-valueToString (Number x) = "\'" ++ show x ++ "\'"
-valueToString (Array x) = "\'Array\'"
+valueToString :: String -> Value -> String
+valueToString s (String x) = s ++ T.unpack x ++ s
+valueToString s (Number x) = s ++ show x ++ s
+valueToString s (Array x) = "\'Array\'"
 
 listToValueStatement :: String -> [(a, Value)] -> String
 listToValueStatement s [] = []
-listToValueStatement s [(x, y)] = valueToString y
-listToValueStatement s ((x, y):es) = valueToString y ++ s ++ (listToValueStatement s es)
+listToValueStatement s [(x, y)] = valueToString "\'" y
+listToValueStatement s ((x, y):es) = valueToString "\'" y ++ s ++ (listToValueStatement s es)
 
 valueToText :: Value -> String
 valueToText (Number y) = "bigint"
@@ -154,7 +162,7 @@ dbInsert insrt = do
 
   conn <- pgConnect PGDatabase
     { pgDBHost = "172.18.0.5"
-    , pgDBPort = PortNumber 5432
+    , pgDBPort =  PortNumber 5432
     , pgDBUser = "postgres"
     , pgDBPass = "api"
     , pgDBName = "postgres"
@@ -192,10 +200,110 @@ convertRet address x = do
   -- case x of
   --  Left ex  -> return "Caught exception: " ++ show ex
     --Right val -> return "Result: " ++ show val
+{-}
+getContractName :: BLC.ByteString -> String
+getContractName x =
+  case decode x of
+    Nothing -> "No contract information found"
+    Just (Object y) -> do
+      let list = H.toList y
+      let mapVal = Map.lookup "name" y
+      case mapVal of
+        Nothing -> "No name found"
+        Just z -> valueToString "" z
+-}
+
+data KafkaConf =
+    KafkaConf {
+        kafkaHost :: String,
+        kafkaPort :: Int
+    } deriving (Generic)
+
+defaultKafkaConfig  ::  KafkaConf
+defaultKafkaConfig = KafkaConf {
+  kafkaHost = "kafka",
+  kafkaPort = 9092
+  }
+
+instance FromJSON KafkaConf
+instance ToJSON KafkaConf
+
+makKafkaState :: KafkaClientId -> KafkaAddress -> KafkaState
+makKafkaState cid addy =
+    KafkaState cid
+               defaultRequiredAcks
+               defaultRequestTimeout
+               defaultMinBytes
+               defaultMaxBytes
+               defaultMaxWaitTime
+               defaultCorrelationId
+               M.empty
+               M.empty
+               M.empty
+               (addy NE.:| [])
+
+mkConfiguredKafkaState :: KafkaClientId -> KafkaState
+mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
+    where k = defaultKafkaConfig --KafkaConf
+          kh = fromString $ kafkaHost k
+          kp = fromIntegral $ kafkaPort k
+
+runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
+runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
+
+fetchBytes :: Kafka k => K.TopicName -> K.Offset -> k [B.ByteString]
+fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
+
+fetchBytes' :: Kafka k => K.TopicName -> K.Offset -> k [(K.Offset, B.ByteString)]
+fetchBytes' topic offset = do
+  fetched <- fetch offset 0 topic
+  {-}
+  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
+  case find (/= NoError) errorStatuses of
+   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
+   _ -> return ()
+   -}
+  let datas = (map tamPayload . fetchMessages) fetched
+  return $ zip [offset..] datas
+
+setDefaultKafkaState :: Kafka k => k ()
+setDefaultKafkaState = do
+    stateRequiredAcks Control.Lens..= -1
+    stateWaitSize     Control.Lens..= 1
+    stateWaitTime     Control.Lens..= 100000
+
+convertMsg :: Either KafkaClientError a -> IO[BLC.ByteString]
+convertMsg x =
+  case x of
+    Left e -> error $ show e
+    Right x -> return [(BLC.pack $ show x)]
+
+
+lookupTopic :: String -> K.TopicName
+lookupTopic label = fromString "stateDiff"
+
+getMessages :: IO[BLC.ByteString]
+getMessages = do
+  let offset = 0
+  let kafkaID = "queryStrato" :: KafkaClientId
+  let kafkaSt = makKafkaState kafkaID
+  let state = mkConfiguredKafkaState kafkaID
+
+  -- Output of runKafka -> Expected type: IO [BLC.ByteString], Actual type: IO (Either KafkaClientError a0)
+  runKafka state $ (doConsume' offset)
+    where
+    doConsume' offset = do
+      let topic = lookupTopic "stateDiff"
+      -- Output of fetchBytes -> Couldn't match type ‘[]’ with ‘IO’
+      messages <- fetchBytes topic offset
+      -- Output of doConsume -> Expected type: K.Offset -> [[B.ByteString]], Actual type: K.Offset -> [[[B.ByteString]]]
+      let rest = doConsume' (offset + fromIntegral (length messages))
+      return $ messages ++ rest
 
 main::IO ()
 main = do
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 
   let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
                                  , connectPort = 5432
@@ -244,6 +352,10 @@ main = do
               Right c -> do
                 liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
                 return c
+
+        --let hexadd = readHex address
+        --let addr = Address hexadd
+        --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
 
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $

@@ -23,16 +23,20 @@ executable slipstream
                  , bytestring
                  , containers
                  , http-client
+                 , lens
                  , logging-effect
+                 , milena
                  , monad-control
                  , mtl
                  , network
                  , postgresql-simple
                  , postgresql-typed
                  , resource-pool
+                 , semigroups
                  , servant-client
                  , text
                  , transformers-base
+                 , transformers
                  , unordered-containers
                  , vector
     other-modules: Events
