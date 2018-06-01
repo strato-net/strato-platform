@@ -291,6 +291,7 @@ mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
+<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 =======
 fetchBytes :: Kafka k => K.TopicName -> K.Offset -> k [B.ByteString]
@@ -309,12 +310,15 @@ fetchBytes' topic offset = do
   return $ zip [offset..] datas
 
 >>>>>>> Added Kafka Consumer
+=======
+>>>>>>> Modified getMessages and convertMsg Functions
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
     stateRequiredAcks Control.Lens..= -1
     stateWaitSize     Control.Lens..= 1
     stateWaitTime     Control.Lens..= 100000
 
+<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
 <<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
@@ -351,8 +355,13 @@ convertMsg x = do
   y <- x
   case y of
 >>>>>>> Resolved Some Kafka Consumer Errors
+=======
+convertMsg :: Either KafkaClientError a -> [BLC.ByteString]
+convertMsg x =
+  case x of
+>>>>>>> Modified getMessages and convertMsg Functions
     Left e -> error $ show e
-    Right x -> return [(BLC.pack $ show x)]
+    Right y -> return (BLC.pack $ show y)
 
 
 lookupTopic :: String -> K.TopicName
@@ -362,14 +371,15 @@ getMessages :: IO[BLC.ByteString]
 getMessages = do
   let offset = 0
   let kafkaID = "queryStrato" :: KafkaClientId
-  let kafkaSt = makKafkaState kafkaID
   let state = mkConfiguredKafkaState kafkaID
 
-  -- Output of doConsume' -> Expected type: StateT KafkaState (ExceptT KafkaClientError IO) a1, Actual type: [a0]
-  convertMsg $ runKafka state $ (doConsume' offset)
+  -- runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
+  return $ convertMsg $ runKafka state $ (doConsume' offset)
     where
+    doConsume' :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume' offset = do
       let topic = lookupTopic "stateDiff"
+<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
       let messages = print $ fetchBytes topic offset
       let rest = doConsume' (offset + fromIntegral (length messages))
 <<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
@@ -398,8 +408,12 @@ main = do
   changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 =======
       -- Couldn't match expected type ‘[a]’ with actual type ‘IO ()’
+=======
+      -- fetch :: Kafka m => Offset -> Partition -> TopicName -> m FetchResponse
+      messages <- fetch offset 0 topic >>= (\ts -> return $ snd <$> ts)
+      rest <- doConsume' (offset + fromIntegral (length messages))
+>>>>>>> Modified getMessages and convertMsg Functions
       messages ++ rest
-
 
 main::IO ()
 main = do
