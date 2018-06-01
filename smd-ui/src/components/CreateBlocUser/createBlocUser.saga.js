@@ -22,6 +22,7 @@ export function createBlocUserApiCall(username, password) {
     url.replace(":user", username),
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json'
       },

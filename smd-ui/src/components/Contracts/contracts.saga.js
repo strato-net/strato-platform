@@ -18,6 +18,7 @@ export function getContracts() {
     contractsUrl,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },

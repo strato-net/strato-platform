@@ -23,6 +23,7 @@ export function getArgs(contractName, contractAddress, symbol) {
     contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -44,6 +45,7 @@ export function postMethodCall(payload) {
       .replace(":contractAddress", payload.contractAddress),
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'

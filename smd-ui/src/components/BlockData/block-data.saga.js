@@ -18,6 +18,7 @@ export function getBlockData() {
     url,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
     },

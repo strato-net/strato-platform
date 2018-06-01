@@ -1,4 +1,4 @@
-FROM nginx:1.13
+FROM openresty/openresty:1.13.6.1-xenial
 MAINTAINER BlockApps Inc.
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -7,9 +7,10 @@ RUN apt-get update && \
     apt-get install -y apache2-utils curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    mkdir -p /etc/nginx
+    mkdir -p /usr/local/openresty/nginx/lua && \
+    rm /usr/local/openresty/nginx/conf/nginx.conf
 
-COPY nginx-nossl.conf nginx-ssl.conf auth.htpasswd /etc/nginx/
+COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
 
 COPY docker-run.sh /
 

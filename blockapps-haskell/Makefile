@@ -15,8 +15,8 @@ DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
 
 
-SOLCBRANCH=0.4.8-no-md
-SOLCREPOSITORY=https://github.com/blockapps/solidity.git
+SOLCBRANCH=v0.4.24
+SOLCREPOSITORY=https://github.com/ethereum/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
 SOLCCMAKEFLAGS=-DSOLC_LINK_STATIC=1 -DTESTS=1 -DCMAKE_BUILD_TYPE=Release
