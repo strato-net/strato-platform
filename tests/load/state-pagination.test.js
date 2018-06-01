@@ -83,4 +83,3 @@ describe('State pagination', function () {
   }
 
 });
-
