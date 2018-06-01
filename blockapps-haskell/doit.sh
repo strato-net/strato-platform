@@ -87,6 +87,7 @@ mkdir logs
 
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+<<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
 <<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
             --database="$postgres_slipstream_db"  --topicname="$topic_name" >> logs/slipstream 2>&1 &
 
@@ -105,6 +106,9 @@ mkdir logs
 =======
             --database="$postgres_slipstream_db" >> logs/slipstream 2>&1 &
 >>>>>>> slipstream with postgrest on
+=======
+            --database="$postgres_slipstream_db"  --topicname="$topic_name" >> logs/slipstream 2>&1 &
+>>>>>>> Fixed getMessages
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
