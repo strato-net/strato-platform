@@ -251,33 +251,17 @@ mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
-fetchBytes :: Kafka k => K.TopicName -> K.Offset -> k [B.ByteString]
-fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
-
-fetchBytes' :: Kafka k => K.TopicName -> K.Offset -> k [(K.Offset, B.ByteString)]
-fetchBytes' topic offset = do
-  fetched <- fetch offset 0 topic
-  {-}
-  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
-  case find (/= NoError) errorStatuses of
-   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
-   _ -> return ()
-   -}
-  let datas = (map tamPayload . fetchMessages) fetched
-  return $ zip [offset..] datas
-
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
     stateRequiredAcks Control.Lens..= -1
     stateWaitSize     Control.Lens..= 1
     stateWaitTime     Control.Lens..= 100000
 
-convertMsg :: IO(Either KafkaClientError a) -> IO[BLC.ByteString]
-convertMsg x = do
-  y <- x
-  case y of
+convertMsg :: Either KafkaClientError a -> [BLC.ByteString]
+convertMsg x =
+  case x of
     Left e -> error $ show e
-    Right x -> return [(BLC.pack $ show x)]
+    Right y -> return (BLC.pack $ show y)
 
 
 lookupTopic :: String -> K.TopicName
@@ -287,19 +271,18 @@ getMessages :: IO[BLC.ByteString]
 getMessages = do
   let offset = 0
   let kafkaID = "queryStrato" :: KafkaClientId
-  let kafkaSt = makKafkaState kafkaID
   let state = mkConfiguredKafkaState kafkaID
 
-  -- Output of doConsume' -> Expected type: StateT KafkaState (ExceptT KafkaClientError IO) a1, Actual type: [a0]
-  convertMsg $ runKafka state $ (doConsume' offset)
+  -- runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
+  return $ convertMsg $ runKafka state $ (doConsume' offset)
     where
+    doConsume' :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume' offset = do
       let topic = lookupTopic "stateDiff"
-      let messages = print $ fetchBytes topic offset
-      let rest = doConsume' (offset + fromIntegral (length messages))
-      -- Couldn't match expected type ‘[a]’ with actual type ‘IO ()’
+      -- fetch :: Kafka m => Offset -> Partition -> TopicName -> m FetchResponse
+      messages <- fetch offset 0 topic >>= (\ts -> return $ snd <$> ts)
+      rest <- doConsume' (offset + fromIntegral (length messages))
       messages ++ rest
-
 
 main::IO ()
 main = do
