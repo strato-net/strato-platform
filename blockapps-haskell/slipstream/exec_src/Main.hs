@@ -318,6 +318,7 @@ setDefaultKafkaState = do
     stateWaitSize     Control.Lens..= 1
     stateWaitTime     Control.Lens..= 100000
 
+<<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
 <<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
 <<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
@@ -357,28 +358,32 @@ convertMsg x = do
 >>>>>>> Resolved Some Kafka Consumer Errors
 =======
 convertMsg :: Either KafkaClientError a -> [BLC.ByteString]
+=======
+convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
+>>>>>>> Fixed getMessages
 convertMsg x =
   case x of
 >>>>>>> Modified getMessages and convertMsg Functions
     Left e -> error $ show e
-    Right y -> return (BLC.pack $ show y)
+    Right y -> return (BC.pack $ show y)
 
 
 lookupTopic :: String -> K.TopicName
 lookupTopic label = fromString "stateDiff"
 
-getMessages :: IO[BLC.ByteString]
+getMessages :: IO[B.ByteString]
 getMessages = do
   let offset = 0
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  -- runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
-  return $ convertMsg $ runKafka state $ (doConsume' offset)
+  msg <- runKafka state $ (doConsume offset)
+  return $ convertMsg $ msg
     where
-    doConsume' :: Kafka a => K.Offset -> a [B.ByteString]
-    doConsume' offset = do
+    doConsume :: Kafka a => K.Offset -> a [B.ByteString]
+    doConsume offset = do
       let topic = lookupTopic "stateDiff"
+<<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
 <<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
       let messages = print $ fetchBytes topic offset
       let rest = doConsume' (offset + fromIntegral (length messages))
@@ -420,6 +425,16 @@ main = do
   changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
   --changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 >>>>>>> Resolved Some Kafka Consumer Errors
+=======
+      fetched <- fetch offset 0 topic
+      let messages = (map tamPayload . fetchMessages) fetched
+      rest <- doConsume (offset + fromIntegral (length messages))
+      return $ messages ++ rest
+
+main::IO ()
+main = do
+  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
+>>>>>>> Fixed getMessages
 
   let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
                                  , connectPort = 5432
