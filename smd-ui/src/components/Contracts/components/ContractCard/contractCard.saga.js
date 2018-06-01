@@ -25,6 +25,7 @@ export function getState(contractName, contractAddress) {
     contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -42,6 +43,7 @@ export function getCirrusInstances(contractName) {
     cirrusUrl.replace(':contractName', contractName),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -62,6 +64,7 @@ export function getAccount(address) {
     accountUrl.replace(":address", address),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
