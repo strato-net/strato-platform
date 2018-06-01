@@ -9,6 +9,7 @@ const dappController = require('../controllers/dapp');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
 const checkMode = require('../lib/checkMode').checkMode;
+const fileController = require('../controllers/file');
 
 router.post('/dapps', dappController.upload);
 
@@ -20,6 +21,8 @@ router.post('/logout', checkMode, authHandler.validateRequest(), authController.
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
+router.post('/postFile', fileController.postFile);
+router.get('/verifyFile', fileController.verifyFile);
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);
 // app.get('/_auth', authController.checkAuthenticated); // see https://github.com/nikitamendelbaum/blockapps-task/blob/strato-auth-poc/

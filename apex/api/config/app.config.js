@@ -1,5 +1,5 @@
 module.exports = {
-  passwordSaltRounds : 10,
+  passwordSaltRounds: 10,
   jwtConfig: {
     jwtSecret: 'JWT_SECRET_PLACEHOLDER', // random string
     jwtAlgorithm: 'HS512',
@@ -24,5 +24,12 @@ module.exports = {
     token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
   },
   signup: 'https://signup.blockapps.net',
-  SMD_MODE: process.env['SMD_MODE'] || 'enterprise'
+  SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
+  s3: {
+    bucket: {
+      Bucket: "smd-external-storage"
+    },
+    accessKeyId: "AKIAJWOO7U4OR4YY6ZOA",
+    secretAccessKey: "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"
+  }
 };
