@@ -286,8 +286,7 @@ getMessages = do
 
 main::IO ()
 main = do
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
-  --changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
+  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 
   let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
                                  , connectPort = 5432
