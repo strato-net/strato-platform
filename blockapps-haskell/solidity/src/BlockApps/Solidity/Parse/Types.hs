@@ -49,8 +49,7 @@ simpleType =
       string base
       let sizesS = reverse $ map show [8::Int, 16 .. 256]
       sizeM <- optionMaybe $ choice $ map (try . string) sizesS
-      let size = read <$> sizeM
-      return . baseType $ (`quot` 8) <$> size -- in bytes
+      return . baseType $ (`quot` 8) . read <$> sizeM -- in bytes
 
 -- | Parses array types, allowing arithmetic expressions to specify the
 -- array length so long as they only reference explicit numbers.  Note that
