@@ -178,6 +178,9 @@ services:
     environment:
     - authBasic=${authBasic}
     - azureAD=${azureAD}
+    - azureADClientID=${azureADClientID}
+    - azureADClientSecret=${azureADClientSecret}
+    - azureADTenantID=${azureADTenantID}
     - blockTime=${blockTime}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
