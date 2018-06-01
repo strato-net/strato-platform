@@ -267,6 +267,21 @@ mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
+fetchBytes :: Kafka k => K.TopicName -> K.Offset -> k [B.ByteString]
+fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
+
+fetchBytes' :: Kafka k => K.TopicName -> K.Offset -> k [(K.Offset, B.ByteString)]
+fetchBytes' topic offset = do
+  fetched <- fetch offset 0 topic
+  {-}
+  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
+  case find (/= NoError) errorStatuses of
+   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
+   _ -> return ()
+   -}
+  let datas = (map tamPayload . fetchMessages) fetched
+  return $ zip [offset..] datas
+
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
     stateRequiredAcks Control.Lens..= -1
