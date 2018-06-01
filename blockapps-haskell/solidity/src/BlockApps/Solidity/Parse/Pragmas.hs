@@ -50,7 +50,7 @@ toVersion :: Int -> Int -> Int -> Version
 toVersion mj mn pt = Version (Just mj) (Just mn) (Just pt)
 
 currentSolidityVersion :: Version
-currentSolidityVersion = toVersion 0 4 8
+currentSolidityVersion = toVersion 0 4 24
 
 minVersion :: Version
 minVersion = toVersion 0 0 0
