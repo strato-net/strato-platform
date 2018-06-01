@@ -35,6 +35,7 @@ extra-deps:
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
   - parsec3-numbers-0.1.0
+  - milena-0.5.2.1
 flags: {}
 extra-package-dbs: []
 
