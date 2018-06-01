@@ -315,6 +315,7 @@ setDefaultKafkaState = do
     stateWaitSize     Control.Lens..= 1
     stateWaitTime     Control.Lens..= 100000
 
+<<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
 convertMsg x =
@@ -344,6 +345,12 @@ getMessages = do
 convertMsg :: Either KafkaClientError a -> IO[BLC.ByteString]
 convertMsg x =
   case x of
+=======
+convertMsg :: IO(Either KafkaClientError a) -> IO[BLC.ByteString]
+convertMsg x = do
+  y <- x
+  case y of
+>>>>>>> Resolved Some Kafka Consumer Errors
     Left e -> error $ show e
     Right x -> return [(BLC.pack $ show x)]
 
@@ -358,15 +365,14 @@ getMessages = do
   let kafkaSt = makKafkaState kafkaID
   let state = mkConfiguredKafkaState kafkaID
 
-  -- Output of runKafka -> Expected type: IO [BLC.ByteString], Actual type: IO (Either KafkaClientError a0)
-  runKafka state $ (doConsume' offset)
+  -- Output of doConsume' -> Expected type: StateT KafkaState (ExceptT KafkaClientError IO) a1, Actual type: [a0]
+  convertMsg $ runKafka state $ (doConsume' offset)
     where
     doConsume' offset = do
       let topic = lookupTopic "stateDiff"
-      -- Output of fetchBytes -> Couldn't match type ‘[]’ with ‘IO’
-      messages <- fetchBytes topic offset
-      -- Output of doConsume -> Expected type: K.Offset -> [[B.ByteString]], Actual type: K.Offset -> [[[B.ByteString]]]
+      let messages = print $ fetchBytes topic offset
       let rest = doConsume' (offset + fromIntegral (length messages))
+<<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
 >>>>>>> Added Kafka Consumer
       return $ messages ++ rest
 
@@ -390,6 +396,16 @@ main = do
 =======
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
   changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
+=======
+      -- Couldn't match expected type ‘[a]’ with actual type ‘IO ()’
+      messages ++ rest
+
+
+main::IO ()
+main = do
+  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  --changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
+>>>>>>> Resolved Some Kafka Consumer Errors
 
   let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
                                  , connectPort = 5432
