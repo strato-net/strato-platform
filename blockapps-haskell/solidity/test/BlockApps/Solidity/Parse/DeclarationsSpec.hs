@@ -106,7 +106,6 @@ spec = do
           eRes = showError $ runParser functionDeclaration "" "" functionString
           Right (functionName, _) = eRes
       functionName `shouldBe` "nestedComments"
-
   describe "Declarations - structDeclaration" $ do
     it "should parse and unparse a struct with two fields" $ do
       let structString = "struct SampleStruct {\n      uint _field1;\n      string _field2;\n    }"
@@ -173,6 +172,15 @@ spec = do
       struct' `shouldBe` struct
     it "should parse and unparse a struct with three fields (fields rotated)" $ do
       let structString = "struct SampleStruct {\n      string _field2;\n      address _field3;\n      uint _field1;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with a uint8 field" $ do
+      let structString = "struct Tile {\n      address owner;\n      address descriptorContract;\n      uint8 elevation;\n    }"
           eRes = showError $ runParser structDeclaration "" "" structString
           Right (structName, StructDeclaration struct) = eRes
           unparsedStruct = unparseTypes (Text.pack structName, struct)

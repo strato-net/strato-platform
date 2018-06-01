@@ -5,7 +5,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Types where
 
-import           Data.Maybe
 import           Text.Parsec
 
 import           BlockApps.Solidity.Parse.Expression
@@ -26,8 +25,8 @@ simpleType =
   simple "address" Xabitype.Address <|>
   simple "string" (Xabitype.String $ Just True) <|>
   bytes' <|>
-  intSuffixed "uint"  (Xabitype.Int (Just False) . Just) <|>
-  intSuffixed "int"  (Xabitype.Int (Just True) . Just) <|>
+  intSuffixed "uint"  (Xabitype.Int (Just False)) <|>
+  intSuffixed "int"  (Xabitype.Int (Just True)) <|>
   Xabitype.Label <$>
     choice [
       identifier,
@@ -50,8 +49,8 @@ simpleType =
       string base
       let sizesS = reverse $ map show [8::Int, 16 .. 256]
       sizeM <- optionMaybe $ choice $ map (try . string) sizesS
-      let size = read $ fromMaybe (head sizesS) sizeM
-      return $ baseType (size `quot` 8) -- in bytes
+      let size = read <$> sizeM
+      return . baseType $ (`quot` 8) <$> size -- in bytes
 
 -- | Parses array types, allowing arithmetic expressions to specify the
 -- array length so long as they only reference explicit numbers.  Note that
