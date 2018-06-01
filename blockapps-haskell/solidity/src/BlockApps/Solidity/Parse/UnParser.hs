@@ -79,6 +79,7 @@ unparseVarType (Enum _ name _) = Text.unpack name
 unparseVarType (Array (Just True) _ t) = (unparseVarType t) <> "[]"
 unparseVarType (Array (Just False) (Just n) t) = (unparseVarType t) <> ("[" <> show n <> "]")
 unparseVarType (Array Nothing _ t) = (unparseVarType t) <> "[]"
+unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (Contract contractName) = Text.unpack contractName
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
