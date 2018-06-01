@@ -94,6 +94,8 @@ bytesTypes = Vector.fromList
 xabiTypeToSimpleType::Xabi.Type->SimpleType
 xabiTypeToSimpleType Xabi.String{} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
+xabiTypeToSimpleType Xabi.Int {Xabi.signed = Just True, Xabi.bytes = Nothing} = TypeInt
+xabiTypeToSimpleType Xabi.Int {Xabi.signed = _, Xabi.bytes = Nothing} = TypeUInt
 xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
   case signed of
    Just True -> intTypes Vector.! fromIntegral (b-1)
