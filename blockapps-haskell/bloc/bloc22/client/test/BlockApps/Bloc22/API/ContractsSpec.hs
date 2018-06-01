@@ -92,7 +92,8 @@ spec = do
         )
         (ClientEnv mgr blocUrl)
       contracts `shouldBe` Map.fromList
-          [ ("__getSource__",SolidityValueAsString "function () returns (String)")
+          [ ("__getContractName__",SolidityValueAsString "function () returns (String)")
+          , ("__getSource__",SolidityValueAsString "function () returns (String)")
           , ("get",SolidityValueAsString "function () returns (UInt256)")
           , ("set",SolidityValueAsString "function (UInt256) returns ()")
           , ("storedData",SolidityValueAsString "0")

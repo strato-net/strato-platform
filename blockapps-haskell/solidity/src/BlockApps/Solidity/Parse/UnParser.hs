@@ -63,19 +63,25 @@ unparseVar (name, theType) =
   <> ";"
 
 unparseVarType :: Type -> String
-unparseVarType (Int (Just True) _) = "int"
-unparseVarType (Int (Just False) _) = "uint"
-unparseVarType (Int Nothing _) = "uint"
+unparseVarType (Int (Just True) (Just n)) = "int" <> show (8*n)
+unparseVarType (Int (Just True) Nothing) = "int"
+unparseVarType (Int (Just False) (Just n)) = "uint" <> show (8*n)
+unparseVarType (Int (Just False) Nothing) = "uint"
+unparseVarType (Int Nothing (Just n)) = "uint" <> show (8*n)
+unparseVarType (Int Nothing Nothing) = "uint"
+unparseVarType (Bool) = "bool"
 unparseVarType (String _) = "string"
-unparseVarType Bool    = "bool"
-unparseVarType Address = "address"
+unparseVarType (Address) = "address"
+unparseVarType (Bytes (Just True) _ ) = "bytes"
+unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (Label str) = str
-unparseVarType (Bytes _ (Just n)) = "bytes" <> (show n)
-unparseVarType (Bytes _ Nothing)  = "bytes"
-unparseVarType (Array _ (Just len) entry) = (unparseVarType entry) <> "[" <> (show len) <> "]"
-unparseVarType (Array _ Nothing    entry) = (unparseVarType entry) <> "[]"
+unparseVarType (Enum _ name _) = Text.unpack name
+unparseVarType (Array (Just True) _ t) = (unparseVarType t) <> "[]"
+unparseVarType (Array (Just False) (Just n) t) = (unparseVarType t) <> ("[" <> show n <> "]")
+unparseVarType (Array Nothing _ t) = (unparseVarType t) <> "[]"
 unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
-unparseVarType _ = "int"
+unparseVarType (Contract contractName) = Text.unpack contractName
+unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
 unparseFunc (name, Func{..}) =
@@ -159,29 +165,7 @@ unparseVals (name, theType) =
      else " " <> name
 
 unparseIndexedType :: IndexedType -> Text
--- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) (Just n)} = Text.pack $ "int" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) Nothing} = "int"
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) (Just n)} = Text.pack $ "uint" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) Nothing} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = Int Nothing (Just n)} = Text.pack $ "uint" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int Nothing Nothing} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = Bool} = "bool"
-unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
-unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
-unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
-unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
-  "bytes" <> (Text.pack . show $ bytes)
-unparseIndexedType IndexedType{indexedTypeType = Label str} = Text.pack str
-unparseIndexedType IndexedType{indexedTypeType = Enum _ name _} = name
-unparseIndexedType IndexedType{indexedTypeType = Array (Just True) _ t} = (unparseIndexedType (IndexedType undefined t))
-                                                                       <> "[]"
-unparseIndexedType IndexedType{indexedTypeType = Array (Just False) (Just n) t} = (unparseIndexedType (IndexedType undefined t))
-                                                                               <> Text.pack ("[" <> show n <> "]")
-unparseIndexedType IndexedType{indexedTypeType = Array Nothing _ t} = (unparseIndexedType (IndexedType undefined t))
-                                                                   <> "[]"
-unparseIndexedType IndexedType{indexedTypeType = Contract contractName} = contractName
-unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
+unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
 
 addFunction :: (Text, String) -> Xabi -> Xabi
 addFunction (name, contents) c =
