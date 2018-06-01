@@ -27,7 +27,17 @@ describe('LOAD TEST: state', function() {
   before(function*() {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
+    yield rest.fill(admin, true); // add Ether
+    yield rest.fill(admin, true); // add Ether
+    console.log('created user');
     console.log(admin);
+    let balance;
+    console.log('waiting for the block');
+    do {
+      balance = yield rest.getBalance(admin.address);
+      yield new Promise(resolve => setTimeout(resolve, 1000));
+    } while (balance < 1);
+    console.log('Uploading the TitleManager contract');
     contract = yield titleManagerJs.uploadContract(admin);
     console.log(contract);
   });
