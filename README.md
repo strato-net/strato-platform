@@ -26,6 +26,17 @@ sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf lib
 sudo yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
 sudo yum install libsodium libsodium-devel postgresql-devel cmake3 gcc-c++ libleveldb-devel
 ```
+There are some addition awkward steps to have `cmake` under a name that solidity can build with
+and to install a compatible version of boost:
+```
+sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake
+wget http://sourceforge.net/projects/boost/files/boost/1.54.0/boost_1_67_0.tar.gz
+tar -xvzf boost_1_67_0.tar.gz
+cd boost_1_67_0/
+./bootstrap.sh
+./b2
+sudo ./b2 install
+```
 
 #### Mac people:
 
