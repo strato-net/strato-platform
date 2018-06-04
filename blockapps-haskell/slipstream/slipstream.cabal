@@ -22,6 +22,7 @@ executable slipstream
                  , blockapps-strato-api
                  , bytestring
                  , containers
+                 , hflags
                  , http-client
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 <<<<<<< 0c9d881a005ea6aa185201f1e06710b3402ebbcc
@@ -64,6 +65,7 @@ executable slipstream
                  , unordered-containers
                  , vector
     other-modules: Events
+                  , Options
     main-is: Main.hs
     ghc-options: -Wall -O2 -threaded
     buildable: True
