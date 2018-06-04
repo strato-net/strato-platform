@@ -60,6 +60,7 @@ import Control.Monad.Trans.State.Lazy    (StateT(..))
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 import HFlags
 import Options
@@ -67,6 +68,10 @@ import System.IO.Unsafe
 import qualified Data.Vector as V
 =======
 >>>>>>> Added Kafka Consumer
+=======
+import HFlags
+import Options
+>>>>>>> Added HFlags
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -142,6 +147,7 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 {-
 arrayToString :: [(T.Text, Value)] -> String
@@ -159,6 +165,14 @@ valueToString s (Number x) = s ++ show x ++ s
 valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
 =======
 
+=======
+{-}
+arrayToString :: [(T.Text, Value)] -> String
+arrayToString [] = []
+arrayToString [(x, y)] = z
+arrayToString ((x, y):es) =
+-}
+>>>>>>> Added HFlags
 valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
@@ -190,12 +204,16 @@ dbInsert insrt = do
   let conDB = BC.pack flags_database :: B.ByteString
 
   conn <- pgConnect PGDatabase
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
+=======
+>>>>>>> Added HFlags
     { pgDBHost = conHost
     , pgDBPort = conPort
     , pgDBUser = conUser
     , pgDBPass = conPass
     , pgDBName = conDB
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 =======
     { pgDBHost = "172.18.0.5"
     , pgDBPort =  PortNumber 5432
@@ -203,6 +221,8 @@ dbInsert insrt = do
     , pgDBPass = "api"
     , pgDBName = "postgres"
 >>>>>>> Added Kafka Consumer
+=======
+>>>>>>> Added HFlags
     , pgDBDebug = False
     , pgDBLogMessage = print . PGError
     , pgDBParams = [("Timezone", "UTC")]
@@ -256,6 +276,7 @@ data KafkaConf =
 
 defaultKafkaConfig  ::  KafkaConf
 defaultKafkaConfig = KafkaConf {
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
   kafkaHost = flags_kafkahost
   , kafkaPort = flags_kafkaport
@@ -263,6 +284,10 @@ defaultKafkaConfig = KafkaConf {
   kafkaHost = "kafka",
   kafkaPort = 9092
 >>>>>>> Added Kafka Consumer
+=======
+  kafkaHost = flags_kafkahost
+  , kafkaPort = flags_kafkaport
+>>>>>>> Added HFlags
   }
 
 instance FromJSON KafkaConf
@@ -369,7 +394,7 @@ convertMsg x =
 
 
 lookupTopic :: String -> K.TopicName
-lookupTopic label = fromString "stateDiff"
+lookupTopic label = fromString label
 
 getMessages :: IO[B.ByteString]
 getMessages = do
@@ -382,6 +407,7 @@ getMessages = do
     where
     doConsume :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume offset = do
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
       let topic = lookupTopic "stateDiff"
 <<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
 <<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
@@ -426,6 +452,9 @@ main = do
   --changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 >>>>>>> Resolved Some Kafka Consumer Errors
 =======
+=======
+      let topic = lookupTopic flags_topicname
+>>>>>>> Added HFlags
       fetched <- fetch offset 0 topic
       let messages = (map tamPayload . fetchMessages) fetched
       rest <- doConsume (offset + fromIntegral (length messages))
@@ -433,20 +462,39 @@ main = do
 
 main::IO ()
 main = do
+  _ <- $initHFlags "Setup Slipstream Variables"
   changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 >>>>>>> Fixed getMessages
 
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
   let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
                                  , connectPort = 5432
                                  , connectUser = "postgres"
                                  , connectPassword = "api"
                                  , connectDatabase = "postgres"
 >>>>>>> Added Kafka Consumer
+=======
+  let conHost = flags_pghost
+  let conPort = read flags_pgport
+  let conUser = flags_pguser
+  let conPass = flags_password
+  let conDB = flags_database
+
+  let dbConnectInfo = ConnectInfo { connectHost = conHost
+                                 , connectPort = conPort
+                                 , connectUser = conUser
+                                 , connectPassword = conPass
+                                 , connectDatabase = conDB
+>>>>>>> Added HFlags
                                  }
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
+<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
   let strato = flags_stratourl
+=======
+  let strato = flags_stratourl ++ "/eth/v1.2/"
+>>>>>>> Added HFlags
 
   stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
