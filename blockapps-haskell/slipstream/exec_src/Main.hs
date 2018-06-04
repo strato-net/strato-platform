@@ -62,8 +62,11 @@ import Data.String
 import Control.Lens
 import HFlags
 import Options
+<<<<<<< e08f45a4b60bb47ce11f8f13ff63afd7c1abf4d6
 import System.IO.Unsafe
 import qualified Data.Vector as V
+=======
+>>>>>>> Added HFlags
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -302,8 +305,7 @@ getMessages = do
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  -- changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
