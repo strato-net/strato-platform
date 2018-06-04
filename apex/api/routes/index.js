@@ -21,7 +21,7 @@ router.post('/logout', checkMode, authHandler.validateRequest(), authController.
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
-router.post('/postFile', fileController.postFile);
+router.post('/uploadFile', fileController.uploadFile);
 router.get('/verifyFile', fileController.verifyFile);
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);

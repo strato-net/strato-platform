@@ -9,14 +9,15 @@ const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 const s3 = require('../lib/s3');
+const externalStorage = require('../lib/externalStorage/externalStorage');
 
 module.exports = {
-  postFile: function (req, res, next) {
+  uploadFile: function (req, res, next) {
     const content = req.body.content;
     const provider = req.body.provider;
-    const description = req.body.description;
+    const metadata = req.body.metadata;
 
-    if (!content || !provider || !description) {
+    if (!content || !provider || !metadata) {
       let err = new Error('something went wrong');
       err.status = 400;
       return next(err);
@@ -37,6 +38,17 @@ module.exports = {
         res.status(200).end();
       }
     });
+
+    // Register contract with it's default vlaues
+    const args = {};
+    const userCredentials = {
+      name: username,
+      address: address,
+      password: password
+    };
+
+    yield externalStorage.uploadContract(userCredentials, args);
+    // -------------------------------------------------------
 
     res.status(200).json({ user: 'Nice job' });
   },
