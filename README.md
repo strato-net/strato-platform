@@ -30,7 +30,7 @@ There are some addition awkward steps to have `cmake` under a name that solidity
 and to install a compatible version of boost:
 ```
 sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake
-wget http://sourceforge.net/projects/boost/files/boost/1.54.0/boost_1_67_0.tar.gz
+wget http://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz
 tar -xvzf boost_1_67_0.tar.gz
 cd boost_1_67_0/
 ./bootstrap.sh
