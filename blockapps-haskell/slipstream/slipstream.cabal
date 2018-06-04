@@ -22,6 +22,7 @@ executable slipstream
                  , blockapps-strato-api
                  , bytestring
                  , containers
+                 , hflags
                  , http-client
                  , lens
                  , logging-effect
@@ -40,6 +41,7 @@ executable slipstream
                  , unordered-containers
                  , vector
     other-modules: Events
+                  , Options
     main-is: Main.hs
     ghc-options: -Wall -O2 -threaded
     buildable: True
