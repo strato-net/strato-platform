@@ -79,7 +79,7 @@ runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
     solcCompileOpts = List.concat [
-      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--evm-version=homestead"]
+      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--metadata-disable"]
       ]
     solcLinkOpts = List.concat [solcLinkParam, solcLibsParam]
 
