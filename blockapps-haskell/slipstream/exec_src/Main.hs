@@ -62,11 +62,8 @@ import Data.String
 import Control.Lens
 import HFlags
 import Options
-<<<<<<< e08f45a4b60bb47ce11f8f13ff63afd7c1abf4d6
 import System.IO.Unsafe
 import qualified Data.Vector as V
-=======
->>>>>>> Added HFlags
 
 
 data ActionType = Create | Delete | Update deriving (Show)
