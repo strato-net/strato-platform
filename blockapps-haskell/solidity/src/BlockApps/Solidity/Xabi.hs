@@ -11,6 +11,8 @@ import           Control.Lens                 (mapped, (&), (?~), (.~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
+import           Data.Aeson.Types
+import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Proxy
@@ -62,14 +64,14 @@ instance ToSchema Xabi where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutability  = Just View
+                         , funcStateMutability  = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutability  = Just Pure
+                         , funcStateMutability  = Just Pure
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
@@ -84,10 +86,21 @@ instance ToSchema Xabi where
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
 instance ToJSON StateMutability where
-  toJSON = genericToJSON (aesonDrop 0 camelCase)
+  toJSON sm = case sm of
+                  Pure -> String "pure"
+                  Constant -> String "constant"
+                  View -> String "view"
+                  Payable -> String "payable"
 
 instance FromJSON StateMutability where
-  parseJSON = genericParseJSON (aesonDrop 0 camelCase)
+  parseJSON = withText "StateMutability" $ \t ->
+      case t of
+          "pure" -> pure Pure
+          "constant" -> pure Constant
+          "view" -> pure View
+          "payable" -> pure Payable
+          t' -> fail $ "invalid StateMutability: " ++ show t'
+
 
 instance Arbitrary StateMutability where
   arbitrary = genericArbitrary uniform
@@ -100,7 +113,7 @@ instance ToSchema StateMutability where
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
   , funcVals :: Map Text Xabi.IndexedType
-  , funcMutability :: Maybe StateMutability
+  , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
@@ -111,19 +124,41 @@ data Func = Func
   } deriving (Eq,Show,Generic)
 
 funcPayable :: Func -> Bool
-funcPayable Func{funcMutability = Just Payable} = True
+funcPayable Func{funcStateMutability = Just Payable} = True
 funcPayable _ = False
 
 funcConstant :: Func -> Bool
-funcConstant Func{funcMutability = Nothing} = False
-funcConstant Func{funcMutability = Just Payable} = False
+funcConstant Func{funcStateMutability = Nothing} = False
+funcConstant Func{funcStateMutability = Just Payable} = False
 funcConstant _ = True
 
 instance ToJSON Func where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON f = case genericToJSON (aesonPrefix camelCase) f of
+                 Object o -> Object
+                        . Hash.insert "payable" (Bool . funcPayable $ f)
+                        . Hash.insert "constant" (Bool . funcConstant $ f)
+                        $ o
+                 x -> x
+
+-- constant and payable are a deprecated way of specifying state mutability
+fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
+fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
+    let constant = Hash.lookup "constant" obj
+        payable = Hash.lookup "payable" obj
+    in case (constant, payable) of
+           (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
+           (Just (Bool True), _) -> pure . Just $ Constant
+           (_, Just (Bool True)) -> pure . Just $ Payable
+           _ -> pure Nothing
 
 instance FromJSON Func where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON val = do
+    func <- genericParseJSON (aesonPrefix camelCase) val
+    case funcStateMutability func of
+      Just _ -> return func
+      Nothing -> do
+          mut <- fallbackConstantPayable val
+          return func{funcStateMutability = mut}
 
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 
@@ -138,7 +173,7 @@ instance ToSchema Func where
         { funcArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcContents = Just "return userAddress;"
-        , funcMutability = Just View
+        , funcStateMutability = Just View
         , funcVisibility = Nothing
         , funcModifiers = Nothing
         }
@@ -251,14 +286,14 @@ instance ToSchema ContractDetails where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutability = Just View
+                         , funcStateMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutability = Just View
+                         , funcStateMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })

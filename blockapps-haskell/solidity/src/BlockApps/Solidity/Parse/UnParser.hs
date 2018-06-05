@@ -93,7 +93,7 @@ unparseFunc (name, Func{..}) =
     <> "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
-    <> case funcMutability of
+    <> case funcStateMutability of
         -- TODO: replace these with the real keywords when solc is upgraded...
         Just Constant -> "constant "
         Just View -> "constant "
@@ -177,7 +177,7 @@ addFunction (name, contents) c =
                                                              , indexedTypeIndex=0
                                                              }
                   , funcContents = Just $ Text.pack contents
-                  , funcMutability = Just View
+                  , funcStateMutability = Just View
                   , funcVisibility = Nothing
                   , funcModifiers = Nothing
                   }

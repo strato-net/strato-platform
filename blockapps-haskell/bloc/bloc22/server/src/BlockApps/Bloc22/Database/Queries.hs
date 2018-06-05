@@ -697,7 +697,7 @@ getXabiFunctionsQuery cmId = do
     return  Func { funcArgs = args
                  , funcVals = vals
                  , funcContents = Nothing
-                 , funcMutability = mut
+                 , funcStateMutability = mut
                  , funcVisibility = Nothing
                  , funcModifiers = Nothing
                  }
@@ -731,7 +731,7 @@ getXabiConstrQuery cmId = do
       vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
       let func = Func { funcArgs = args
                       , funcVals = vals
-                      , funcMutability = Nothing
+                      , funcStateMutability = Nothing
                       , funcContents = Nothing
                       , funcVisibility = Nothing
                       , funcModifiers = Nothing
@@ -1028,7 +1028,7 @@ insertXabiFunction metadataId (name,Func{..}) = do
       , constant metadataId
       , constant False
       , constant name
-      , constant funcMutability
+      , constant funcStateMutability
       )
       (\ (xfId,_,_,_,_) -> xfId)
     void $ insertXabiFunctionArg funcId funcArgs

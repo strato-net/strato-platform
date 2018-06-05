@@ -240,7 +240,7 @@ functionXabi = do
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
       , Xabi.funcContents = Just $ Text.pack contents
       , Xabi.funcVisibility = Just visibility
-      , Xabi.funcMutability = mutability
+      , Xabi.funcStateMutability = mutability
       , Xabi.funcModifiers = Just modifiers
       }
 
