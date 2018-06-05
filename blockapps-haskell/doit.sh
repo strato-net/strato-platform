@@ -107,6 +107,7 @@ mkdir logs
 
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+<<<<<<< 2fd8abdcc895b286428b5c70c4c182fbc5646d54
 <<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 <<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
@@ -145,6 +146,9 @@ mkdir logs
             --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
 >>>>>>> Removed Topic Name Suffixes
 =======
+=======
+            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+>>>>>>> slipstream stratourl fix
             --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
 >>>>>>> slipstream kafka config
 
