@@ -66,12 +66,15 @@ import HFlags
 import Options
 import System.IO.Unsafe
 import qualified Data.Vector as V
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 =======
 >>>>>>> Added Kafka Consumer
 =======
 import HFlags
 import Options
 >>>>>>> Added HFlags
+=======
+>>>>>>> Removed Topic Name Suffixes
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -147,6 +150,7 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 <<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 {-
@@ -178,6 +182,22 @@ valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
 valueToString s (Array x) = "\'Array\'"
 >>>>>>> Added Kafka Consumer
+=======
+
+arrayToString :: [(T.Text, Value)] -> String
+arrayToString [] = []
+arrayToString [(x, y)] = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val
+  val -> T.unpack x ++ ": " ++ show val
+arrayToString ((x, y):es) = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val ++ ", " ++ arrayToString es
+  val -> T.unpack x ++ ": " ++ show val ++ ", " ++ arrayToString es
+
+valueToString :: String -> Value -> String
+valueToString s (String x) = s ++ T.unpack x ++ s
+valueToString s (Number x) = s ++ show x ++ s
+valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
+>>>>>>> Removed Topic Name Suffixes
 
 listToValueStatement :: String -> [(a, Value)] -> String
 listToValueStatement s [] = []
@@ -353,6 +373,7 @@ convertMsg x =
     Left e -> error $ show e
     Right y -> return (BC.pack $ show y)
 
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 lookupTopic :: String -> K.TopicName
 lookupTopic label = fromString label
 
@@ -393,6 +414,8 @@ convertMsg x =
     Right y -> return (BC.pack $ show y)
 
 
+=======
+>>>>>>> Removed Topic Name Suffixes
 lookupTopic :: String -> K.TopicName
 lookupTopic label = fromString label
 
@@ -407,6 +430,7 @@ getMessages = do
     where
     doConsume :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume offset = do
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 <<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
       let topic = lookupTopic "stateDiff"
 <<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
@@ -455,6 +479,9 @@ main = do
 =======
       let topic = lookupTopic flags_topicname
 >>>>>>> Added HFlags
+=======
+      let topic = lookupTopic "statediff"
+>>>>>>> Removed Topic Name Suffixes
       fetched <- fetch offset 0 topic
       let messages = (map tamPayload . fetchMessages) fetched
       rest <- doConsume (offset + fromIntegral (length messages))
