@@ -32,8 +32,11 @@ slipstream:
 --stratourl\$stratoRoot="${stratoRoot}"
 --kafkahost=\$kafka_host="${kafkahost}"
 --kafkaport=\$kafka_port="${kafkaport}"
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 --topicname=\$kafka_topic="${topicname}"
 >>>>>>> Modified Config
+=======
+>>>>>>> Removed Topic Name Suffixes
 
 strato-server:
 no vars/flags set
@@ -94,6 +97,7 @@ mkdir logs
 
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 <<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
 <<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
 <<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
@@ -125,6 +129,10 @@ mkdir logs
 =======
             --stratourl="$stratourl" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
 >>>>>>> Modified Config
+=======
+            --database="$postgres_slipstream_db"  --stratourl="$stratourl" \
+            --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
+>>>>>>> Removed Topic Name Suffixes
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1

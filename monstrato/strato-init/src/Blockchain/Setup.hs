@@ -396,7 +396,9 @@ oneTimeSetup genesisBlockName = do
 
       {- CONFIG: create kafka topics -}
 
-      let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      --Replace this to re-enable unique topic names
+      --let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      let uniqueTopicMap = Map.fromList [(topic, topic) | topic <- topics]
       encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
       {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
