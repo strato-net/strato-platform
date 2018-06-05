@@ -5,6 +5,7 @@ set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
 cirrusRoot=http://${cirrusHost}
+kafkaPort=9092
 
 echo "Environment variables:
 slipstream:
@@ -30,6 +31,7 @@ slipstream:
 >>>>>>> slipstream with postgrest on
 =======
 --stratourl\$stratoRoot="${stratoRoot}"
+<<<<<<< dae5cb4044bcd91dab6748652964c4d9d7464d07
 --kafkahost=\$kafka_host="${kafkahost}"
 --kafkaport=\$kafka_port="${kafkaport}"
 <<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
@@ -37,6 +39,10 @@ slipstream:
 >>>>>>> Modified Config
 =======
 >>>>>>> Removed Topic Name Suffixes
+=======
+--kafkahost=\$kafkaHost="${kafkaHost}"
+--kafkaport=${kafkaPort}"
+>>>>>>> slipstream kafka config
 
 strato-server:
 no vars/flags set
@@ -131,8 +137,12 @@ mkdir logs
 >>>>>>> Modified Config
 =======
             --database="$postgres_slipstream_db"  --stratourl="$stratourl" \
+<<<<<<< dae5cb4044bcd91dab6748652964c4d9d7464d07
             --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
 >>>>>>> Removed Topic Name Suffixes
+=======
+            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+>>>>>>> slipstream kafka config
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
