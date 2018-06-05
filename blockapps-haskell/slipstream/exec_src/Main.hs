@@ -62,6 +62,8 @@ import Data.String
 import Control.Lens
 import HFlags
 import Options
+import System.IO.Unsafe
+import qualified Data.Vector as V
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -137,16 +139,20 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
-{-}
+
 arrayToString :: [(T.Text, Value)] -> String
 arrayToString [] = []
-arrayToString [(x, y)] = z
-arrayToString ((x, y):es) =
--}
+arrayToString [(x, y)] = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val
+  val -> T.unpack x ++ ": " ++ show val
+arrayToString ((x, y):es) = case y of
+  String val -> T.unpack x ++ ": " ++ T.unpack val ++ ", " ++ arrayToString es
+  val -> T.unpack x ++ ": " ++ show val ++ ", " ++ arrayToString es
+
 valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
-valueToString s (Array x) = "\'Array\'"
+valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
 
 listToValueStatement :: String -> [(a, Value)] -> String
 listToValueStatement s [] = []
@@ -273,7 +279,6 @@ convertMsg x =
     Left e -> error $ show e
     Right y -> return (BC.pack $ show y)
 
-
 lookupTopic :: String -> K.TopicName
 lookupTopic label = fromString label
 
@@ -288,7 +293,7 @@ getMessages = do
     where
     doConsume :: Kafka a => K.Offset -> a [B.ByteString]
     doConsume offset = do
-      let topic = lookupTopic flags_topicname
+      let topic = lookupTopic "statediff"
       fetched <- fetch offset 0 topic
       let messages = (map tamPayload . fetchMessages) fetched
       rest <- doConsume (offset + fromIntegral (length messages))
