@@ -313,7 +313,7 @@ main = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
-  let strato = flags_stratourl ++ "/eth/v1.2/"
+  let strato = flags_stratourl
 
   stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
