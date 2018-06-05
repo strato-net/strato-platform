@@ -490,11 +490,15 @@ main = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
+<<<<<<< ace13098df5d7782d6f03348411e9e3b6b40a0fb
 <<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
   let strato = flags_stratourl
 =======
   let strato = flags_stratourl ++ "/eth/v1.2/"
 >>>>>>> Added HFlags
+=======
+  let strato = flags_stratourl
+>>>>>>> Modified Config
 
   stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
