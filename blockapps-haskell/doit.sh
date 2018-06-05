@@ -41,8 +41,12 @@ slipstream:
 >>>>>>> Removed Topic Name Suffixes
 =======
 --kafkahost=\$kafkaHost="${kafkaHost}"
+<<<<<<< fd1d7384efc1840461c3b67b4a8495b7be03a991
 --kafkaport=${kafkaPort}"
 >>>>>>> slipstream kafka config
+=======
+--kafkaport=${kafkaPort}
+>>>>>>> slipstream kafka config, fix
 
 strato-server:
 no vars/flags set
