@@ -6,11 +6,7 @@ set -x
 stratoRoot=http://${stratoHost}/eth/v1.2
 cirrusRoot=http://${cirrusHost}
 kafkaPort=9092
-
-isPublic=false
-if [ "${SMD_MODE}" == public ]; then
-  isPublic=true
-fi
+kafkaHost="kafka"
 
 echo "Environment variables:
 slipstream:
@@ -19,13 +15,11 @@ slipstream:
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
---stratourl\$stratoRoot="${stratoRoot}"
---kafkahost=\$kafkaHost="${kafkaHost}"
+--stratourl=\$stratoRoot="${stratoRoot}"
+--kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
-
 strato-server:
 no vars/flags set
-
 bloc:
 stratoHost="${stratoHost}"
 --cirrusurl=\$cirrusHost="${cirrusHost}"
@@ -62,9 +56,15 @@ mkdir logs
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
+until nc -z $kafkaHost 9092 >&/dev/null
+do  echo "Waiting for Kafka to become available"
+    sleep 1
+done
+
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --database="$postgres_slipstream_db" stratourl="$stratourl" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
+            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
