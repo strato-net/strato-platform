@@ -1467,7 +1467,7 @@ getContractContractByMetadataId metadataId = do
   -- Impatient clients may have submitted a contract and immediately issued
   -- a function call against it. Here we give a basic defense against it.
   -- A much nicer way to handle that is to return cookies to the client
-  -- after rights, and use that cookie on subsequent calls to block until
+  -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
   let sleeps = [0, 40, 80, 160, 320, 640, 1280]
       getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
