@@ -14,7 +14,7 @@ slipstream:
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
---stratourl\$stratoRoot="${stratoRoot}"
+--stratourl=\$stratoRoot="${stratoRoot}"
 --kafkahost=\$kafkaHost="${kafkaHost}"
 --kafkaport=${kafkaPort}
 
