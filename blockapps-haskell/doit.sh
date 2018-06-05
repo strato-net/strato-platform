@@ -18,6 +18,10 @@ slipstream:
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
+--stratourl\$stratoRoot="${stratoRoot}"
+--kafkahost=\$kafka_host="${kafkahost}"
+--kafkaport=\$kafka_port="${kafkaport}"
+--topicname=\$kafka_topic="${topicname}"
 
 strato-server:
 no vars/flags set
@@ -61,7 +65,7 @@ mkdir logs
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --database="$postgres_slipstream_db"  --topicname="$topicname" \
-            --stratourl="$stratoHost" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
+            --stratourl="$stratourl" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
