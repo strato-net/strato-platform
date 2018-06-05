@@ -48,7 +48,7 @@ contract ErrorCodes {
     bytes32 public pwHash;
     uint public id;
     UserRole public role;
-    function User(address _account, string _username, bytes32 _pwHash, uint256 _id, UserRole _role) public {
+    function User(address _account, string _username, bytes32 _pwHash, uint _id, UserRole _role) public {
         account = _account;
     username = _username;
     pwHash = _pwHash;
