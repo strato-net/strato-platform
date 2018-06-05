@@ -17,6 +17,7 @@ slipstream:
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
+<<<<<<< ace13098df5d7782d6f03348411e9e3b6b40a0fb
 <<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
 =======
 --pghost=postgres_host=${postgres_host}
@@ -27,6 +28,12 @@ slipstream:
 >>>>>>> slipstream added to bloc container; cirrus off (step 1); tests temporary off
 =======
 >>>>>>> slipstream with postgrest on
+=======
+--stratourl\$stratoRoot="${stratoRoot}"
+--kafkahost=\$kafka_host="${kafkahost}"
+--kafkaport=\$kafka_port="${kafkaport}"
+--topicname=\$kafka_topic="${topicname}"
+>>>>>>> Modified Config
 
 strato-server:
 no vars/flags set
@@ -93,6 +100,7 @@ mkdir logs
             --database="$postgres_slipstream_db"  --topicname="$topic_name" >> logs/slipstream 2>&1 &
 =======
             --database="$postgres_slipstream_db"  --topicname="$topicname" \
+<<<<<<< ace13098df5d7782d6f03348411e9e3b6b40a0fb
             --stratourl="$stratoHost" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
 >>>>>>> Added HFlags
 
@@ -114,6 +122,9 @@ mkdir logs
 =======
             --database="$postgres_slipstream_db"  --topicname="$topic_name" >> logs/slipstream 2>&1 &
 >>>>>>> Fixed getMessages
+=======
+            --stratourl="$stratourl" --kafkahost="$kafkahost" --kafkaport="$kafkaport" >> logs/slipstream 2>&1 &
+>>>>>>> Modified Config
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
