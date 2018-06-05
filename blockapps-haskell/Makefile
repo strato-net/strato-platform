@@ -15,11 +15,11 @@ DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
 
 
-SOLCBRANCH=v0.4.24
-SOLCREPOSITORY=https://github.com/ethereum/solidity.git
+SOLCBRANCH=0.4.8-no-md
+SOLCREPOSITORY=https://github.com/blockapps/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
-SOLCCMAKEFLAGS=-DSOLC_LINK_STATIC=1 -DTESTS=1 -DCMAKE_BUILD_TYPE=Release
+SOLCCMAKEFLAGS=-DTESTS=1 -DCMAKE_BUILD_TYPE=Release
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. $(SOLCCMAKEFLAGS) && make $(SOLCMAKEFLAGS) solc
 else
