@@ -98,7 +98,11 @@ CREATE TABLE IF NOT EXISTS contracts_lookup(
 
 xabiFunctionsTable :: Query
 xabiFunctionsTable = [sql|
-CREATE TYPE state_mutability IF NOT EXISTS AS ENUM ('pure', 'constant', 'view', 'payable');
+DO $$ BEGIN
+  CREATE TYPE state_mutability AS ENUM ('pure', 'constant', 'view', 'payable');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 CREATE TABLE IF NOT EXISTS xabi_functions(
   id serial PRIMARY KEY,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),

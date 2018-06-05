@@ -57,4 +57,10 @@ addValueColumn :: Query
 addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
 
 addMutabilityColumn :: Query
-addMutabilityColumn = [sql| ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability state_mutability; |]
+addMutabilityColumn = [sql|
+DO $$ BEGIN
+  CREATE TYPE state_mutability AS ENUM ('pure', 'constant', 'view', 'payable');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability state_mutability; |]
