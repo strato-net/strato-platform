@@ -23,11 +23,11 @@ module.exports = {
   mixpanel: {
     token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
   },
-  signup: 'https://signup.blockapps.net',
-  SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
+  signup: 'http://localhost:5000',
+  SMD_MODE: process.env['SMD_MODE'] || 'public',
   s3: {
     bucket: {
-      Bucket: "smd-external-storage"
+      Bucket: "strato-external-storage"
     },
     accessKeyId: "AKIAJWOO7U4OR4YY6ZOA",
     secretAccessKey: "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"

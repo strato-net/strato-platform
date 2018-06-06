@@ -10,47 +10,48 @@ const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 const s3 = require('../lib/s3');
 const externalStorage = require('../lib/externalStorage/externalStorage');
+const multer = require('multer');
 
 module.exports = {
   uploadFile: function (req, res, next) {
     const content = req.body.content;
     const provider = req.body.provider;
     const metadata = req.body.metadata;
-
+    
     if (!content || !provider || !metadata) {
       let err = new Error('something went wrong');
       err.status = 400;
       return next(err);
     }
 
-    var params = {
-      Key: 'file.originalFilename', //file.name doesn't exist as a property
-      Body: 'data'
-    };
+    // var params = {
+    //   Key: 'file.originalFilename',
+    //   Body: 'data'
+    // };
 
-    s3bucket.upload(params, function (err, data) {
-      console.log("PRINT FILE:", file);
-      if (err) {
-        console.log('ERROR MSG: ', err);
-        res.status(500).send(err);
-      } else {
-        console.log('Successfully uploaded data');
-        res.status(200).end();
-      }
-    });
+    // s3.upload(params, function (err, data) {
+    //   console.log("PRINT FILE:", file);
+    //   if (err) {
+    //     console.log('ERROR MSG: ', err);
+    //     res.status(500).send(err);
+    //   } else {
+    //     console.log('Successfully uploaded data');
+    //     res.status(200).end();
+    //   }
+    // });
 
-    // Register contract with it's default vlaues
-    const args = {};
-    const userCredentials = {
-      name: username,
-      address: address,
-      password: password
-    };
+    // // Register contract with it's default vlaues
+    // const args = {};
+    // const userCredentials = {
+    //   name: username,
+    //   address: address,
+    //   password: password
+    // };
 
-    yield externalStorage.uploadContract(userCredentials, args);
+    // yield externalStorage.uploadContract(userCredentials, args);
     // -------------------------------------------------------
 
-    res.status(200).json({ user: 'Nice job' });
+    res.status(200).json({ user: 'upload file' });
   },
 
   verifyFile: function (req, res, next) {
