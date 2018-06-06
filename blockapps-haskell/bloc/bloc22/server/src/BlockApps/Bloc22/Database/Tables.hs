@@ -162,7 +162,7 @@ xabiFunctionsTable = Table "xabi_functions" $ p5
   , required "contract_metadata_id"
   , required "is_constructor"
   , required "name"
-  , optional"mutability"
+  , optional "mutability"
   )
 
 xabiTypesTable :: Table
