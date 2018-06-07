@@ -20,7 +20,6 @@ slipstream:
 
 strato-server:
 no vars/flags set
-
 bloc:
 stratoHost="${stratoHost}"
 --cirrusurl=\$cirrusHost="${cirrusHost}"

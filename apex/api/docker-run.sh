@@ -44,15 +44,7 @@ do
 done
 echo 'strato is available'
 
-<<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
-<<<<<<< 483e77a7f0dcefeecb2284cebc0a59e3ea56a6f1
 #TODO: commented out in slipstream branch - might need the check for postgrest container instead (URI /cirrus/search) or both
-=======
-#TODO: commented out in slipstream branch, replace with slipstream when it has API
->>>>>>> slipstream added to bloc container; cirrus off (step 1); tests temporary off
-=======
-#TODO: commented out in slipstream branch - might need the check for postgrest container instead (URI /cirrus/search) or both
->>>>>>> slipstream with postgrest on
 #echo 'Waiting for cirrus to be available...'
 #until curl --silent --output /dev/null --fail --location ${cirrusRoot}
 #do
