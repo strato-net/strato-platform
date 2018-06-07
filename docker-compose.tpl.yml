@@ -68,21 +68,13 @@ services:
     - postgres
     environment:
     # cirrusHost is temporary here to be able to run bloc server, to be removed
-    - cirrusHost=cirrus:3333
+    - cirrusHost=cirrus:3333 #Commenting this one out makes Bloc restart
     - loglevel=${loglevel}
     - kafkaHost=${kafkaHost}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
-<<<<<<< 5a0e9ef6fe7ec52c47d851b8a5693462e679754a
-<<<<<<< 483e77a7f0dcefeecb2284cebc0a59e3ea56a6f1
     - postgres_slipstream_db=cirrus
-=======
-    - postgres_slipstream_db=slipstream
->>>>>>> slipstream added to bloc container; cirrus off (step 1); tests temporary off
-=======
-    - postgres_slipstream_db=cirrus
->>>>>>> slipstream with postgrest on
     - postgres_user=postgres
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
