@@ -60,21 +60,10 @@ import Control.Monad.Trans.State.Lazy    (StateT(..))
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 import HFlags
 import Options
 import System.IO.Unsafe
 import qualified Data.Vector as V
-<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
-=======
->>>>>>> Added Kafka Consumer
-=======
-import HFlags
-import Options
->>>>>>> Added HFlags
-=======
->>>>>>> Removed Topic Name Suffixes
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -150,9 +139,6 @@ listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement s [] = []
 listToKeyStatement s [(x, y)] = T.unpack x
 listToKeyStatement s ((x,y):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
-<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 {-
 arrayToString :: [(T.Text, Value)] -> String
 arrayToString [] = []
@@ -167,37 +153,6 @@ valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
 valueToString s (Number x) = s ++ show x ++ s
 valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
-=======
-
-=======
-{-}
-arrayToString :: [(T.Text, Value)] -> String
-arrayToString [] = []
-arrayToString [(x, y)] = z
-arrayToString ((x, y):es) =
--}
->>>>>>> Added HFlags
-valueToString :: String -> Value -> String
-valueToString s (String x) = s ++ T.unpack x ++ s
-valueToString s (Number x) = s ++ show x ++ s
-valueToString s (Array x) = "\'Array\'"
->>>>>>> Added Kafka Consumer
-=======
-
-arrayToString :: [(T.Text, Value)] -> String
-arrayToString [] = []
-arrayToString [(x, y)] = case y of
-  String val -> T.unpack x ++ ": " ++ T.unpack val
-  val -> T.unpack x ++ ": " ++ show val
-arrayToString ((x, y):es) = case y of
-  String val -> T.unpack x ++ ": " ++ T.unpack val ++ ", " ++ arrayToString es
-  val -> T.unpack x ++ ": " ++ show val ++ ", " ++ arrayToString es
-
-valueToString :: String -> Value -> String
-valueToString s (String x) = s ++ T.unpack x ++ s
-valueToString s (Number x) = s ++ show x ++ s
-valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
->>>>>>> Removed Topic Name Suffixes
 
 listToValueStatement :: String -> [(a, Value)] -> String
 listToValueStatement s [] = []
@@ -224,25 +179,11 @@ dbInsert insrt = do
   let conDB = BC.pack flags_database :: B.ByteString
 
   conn <- pgConnect PGDatabase
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
-=======
->>>>>>> Added HFlags
     { pgDBHost = conHost
     , pgDBPort = conPort
     , pgDBUser = conUser
     , pgDBPass = conPass
     , pgDBName = conDB
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-=======
-    { pgDBHost = "172.18.0.5"
-    , pgDBPort =  PortNumber 5432
-    , pgDBUser = "postgres"
-    , pgDBPass = "api"
-    , pgDBName = "postgres"
->>>>>>> Added Kafka Consumer
-=======
->>>>>>> Added HFlags
     , pgDBDebug = False
     , pgDBLogMessage = print . PGError
     , pgDBParams = [("Timezone", "UTC")]
@@ -296,18 +237,8 @@ data KafkaConf =
 
 defaultKafkaConfig  ::  KafkaConf
 defaultKafkaConfig = KafkaConf {
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
   kafkaHost = flags_kafkahost
   , kafkaPort = flags_kafkaport
-=======
-  kafkaHost = "kafka",
-  kafkaPort = 9092
->>>>>>> Added Kafka Consumer
-=======
-  kafkaHost = flags_kafkahost
-  , kafkaPort = flags_kafkaport
->>>>>>> Added HFlags
   }
 
 instance FromJSON KafkaConf
@@ -336,44 +267,18 @@ mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
-<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
-=======
-fetchBytes :: Kafka k => K.TopicName -> K.Offset -> k [B.ByteString]
-fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
-
-fetchBytes' :: Kafka k => K.TopicName -> K.Offset -> k [(K.Offset, B.ByteString)]
-fetchBytes' topic offset = do
-  fetched <- fetch offset 0 topic
-  {-}
-  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
-  case find (/= NoError) errorStatuses of
-   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
-   _ -> return ()
-   -}
-  let datas = (map tamPayload . fetchMessages) fetched
-  return $ zip [offset..] datas
-
->>>>>>> Added Kafka Consumer
-=======
->>>>>>> Modified getMessages and convertMsg Functions
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
     stateRequiredAcks Control.Lens..= -1
     stateWaitSize     Control.Lens..= 1
     stateWaitTime     Control.Lens..= 100000
 
-<<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
-<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
-<<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
 convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
 convertMsg x =
   case x of
     Left e -> error $ show e
     Right y -> return (BC.pack $ show y)
 
-<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
 lookupTopic :: String -> K.TopicName
 lookupTopic label = fromString label
 
@@ -392,115 +297,14 @@ getMessages = do
       fetched <- fetch offset 0 topic
       let messages = (map tamPayload . fetchMessages) fetched
       rest <- doConsume (offset + fromIntegral (length messages))
-=======
-convertMsg :: Either KafkaClientError a -> IO[BLC.ByteString]
-convertMsg x =
-  case x of
-=======
-convertMsg :: IO(Either KafkaClientError a) -> IO[BLC.ByteString]
-convertMsg x = do
-  y <- x
-  case y of
->>>>>>> Resolved Some Kafka Consumer Errors
-=======
-convertMsg :: Either KafkaClientError a -> [BLC.ByteString]
-=======
-convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
->>>>>>> Fixed getMessages
-convertMsg x =
-  case x of
->>>>>>> Modified getMessages and convertMsg Functions
-    Left e -> error $ show e
-    Right y -> return (BC.pack $ show y)
-
-
-=======
->>>>>>> Removed Topic Name Suffixes
-lookupTopic :: String -> K.TopicName
-lookupTopic label = fromString label
-
-getMessages :: IO[B.ByteString]
-getMessages = do
-  let offset = 0
-  let kafkaID = "queryStrato" :: KafkaClientId
-  let state = mkConfiguredKafkaState kafkaID
-
-  msg <- runKafka state $ (doConsume offset)
-  return $ convertMsg $ msg
-    where
-    doConsume :: Kafka a => K.Offset -> a [B.ByteString]
-    doConsume offset = do
-<<<<<<< 3f730be9ec2443c949c35334466f0c604b431554
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-      let topic = lookupTopic "stateDiff"
-<<<<<<< 134aebe64f1f11f164cf8f819921c6758fbedad0
-<<<<<<< a548ae0fd6e61a3a04941dd5f167b0d716a9ae9d
-      let messages = print $ fetchBytes topic offset
-      let rest = doConsume' (offset + fromIntegral (length messages))
-<<<<<<< 028fed905fe0529a525061a1f5e4e86612821cca
->>>>>>> Added Kafka Consumer
       return $ messages ++ rest
 
 main::IO ()
 main = do
-<<<<<<< f95facd282c22b070dfd9e901b6cab39dcb185ce
   _ <- $initHFlags "Setup Slipstream Variables"
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
-
-  let conHost = flags_pghost
-  let conPort = read flags_pgport
-  let conUser = flags_pguser
-  let conPass = flags_password
-  let conDB = flags_database
-
-  let dbConnectInfo = ConnectInfo { connectHost = conHost
-                                 , connectPort = conPort
-                                 , connectUser = conUser
-                                 , connectPassword = conPass
-                                 , connectDatabase = conDB
-=======
-  --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
-  changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
-=======
-      -- Couldn't match expected type ‘[a]’ with actual type ‘IO ()’
-=======
-      -- fetch :: Kafka m => Offset -> Partition -> TopicName -> m FetchResponse
-      messages <- fetch offset 0 topic >>= (\ts -> return $ snd <$> ts)
-      rest <- doConsume' (offset + fromIntegral (length messages))
->>>>>>> Modified getMessages and convertMsg Functions
-      messages ++ rest
-
-main::IO ()
-main = do
+  -- changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
   changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
-  --changes <- (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
->>>>>>> Resolved Some Kafka Consumer Errors
-=======
-=======
-      let topic = lookupTopic flags_topicname
->>>>>>> Added HFlags
-=======
-      let topic = lookupTopic "statediff"
->>>>>>> Removed Topic Name Suffixes
-      fetched <- fetch offset 0 topic
-      let messages = (map tamPayload . fetchMessages) fetched
-      rest <- doConsume (offset + fromIntegral (length messages))
-      return $ messages ++ rest
 
-main::IO ()
-main = do
-  _ <- $initHFlags "Setup Slipstream Variables"
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
->>>>>>> Fixed getMessages
-
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
-  let dbConnectInfo = ConnectInfo { connectHost = "172.18.0.5"
-                                 , connectPort = 5432
-                                 , connectUser = "postgres"
-                                 , connectPassword = "api"
-                                 , connectDatabase = "postgres"
->>>>>>> Added Kafka Consumer
-=======
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -512,20 +316,11 @@ main = do
                                  , connectUser = conUser
                                  , connectPassword = conPass
                                  , connectDatabase = conDB
->>>>>>> Added HFlags
                                  }
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
-<<<<<<< ace13098df5d7782d6f03348411e9e3b6b40a0fb
-<<<<<<< 0366ad58ccf58dde76d447c4d62f57dc30e11016
   let strato = flags_stratourl
-=======
-  let strato = flags_stratourl ++ "/eth/v1.2/"
->>>>>>> Added HFlags
-=======
-  let strato = flags_stratourl
->>>>>>> Modified Config
 
   stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
