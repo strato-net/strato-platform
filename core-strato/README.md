@@ -1,7 +1,7 @@
 
 ![logo](http://blockapps.net/wp-content/uploads/2016/12/blockapps-logo-horizontal-blue-for-web-transparent.png)
 
-# monstrato build guide
+# core-strato build guide
 
 Note: If you are running through this guide and find something doesn't work, please update it.
 
@@ -62,7 +62,7 @@ To build the docker image for it:
 > sudo BASIL_BUILD_TAG=your_tag make
 ```
 If instead you want a system installation, the `Dockerfile.build` has references to the appropriate package versions and where to acquire them.
-This does it for dependencies. At the top level of the `monstrato` repo you should be able to run `stack install`.
+This does it for dependencies. At the top level of the `core-strato` directory you should be able to run `stack install`.
 
 #Setting Up a Client Node
 
@@ -72,7 +72,7 @@ Make sure you are running Zookeeper, then start your kafka server. On Mac this w
 > brew services start kafka
 ```
 
-Make  directory called nodes, and inside of this directory make a node named with the current monstrato branch you are working on, e.g.
+Make  directory called nodes, and inside of this directory make a node named with the current `strato-platform` branch you are working on, e.g.
 ```
 > mkdir -p nodes/master-node
 > cd nodes/master-node

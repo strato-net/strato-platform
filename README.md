@@ -4,7 +4,7 @@
 
 ## Prerequisites to build
 
-```TODO: build monstrato and bloch with `docker: true` in stack.yaml to remove dependency on environment setup (both ubuntu/mac)```
+```TODO: build core-strato and bloch with `docker: true` in stack.yaml to remove dependency on environment setup (both ubuntu/mac)```
 
 ### Stack
 Most unix systems (incl. ubuntu and mac):

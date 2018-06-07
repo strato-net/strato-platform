@@ -99,11 +99,11 @@ pipeline {
               sleep 5
               SERVER=localhost npm run test
             '''},
-          "Monstrato tests": {
+          "Core Strato tests": {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running monstrato unit tests"
-              cd strato-platform/monstrato
+              echo "Running core-strato unit tests"
+              cd strato-platform/core-strato
               ./run_unit_tests.sh
             '''},
           "Bloch tests": {
@@ -131,13 +131,13 @@ pipeline {
               RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose -f docker-compose.push.yml push
-  
+
               # Release to strato-getting-started
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
               github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
-  
+
               # Merge to master and change VERSION
               git checkout VERSION
               git checkout master
@@ -148,7 +148,7 @@ pipeline {
               git push
               git tag ${RELEASE_VERSION}
               git push --tags
-  
+
               # Merge VERSION change back to develop
               git checkout develop
               git pull
