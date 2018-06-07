@@ -267,6 +267,8 @@ spec = do
       braceParse "{/* { */ }" `shouldBe` Right ""
     it "shouldn't remove levels of escaping" $
       braceParse "{\"multi\\nlines\\n\"}" `shouldBe` Right "\"multi\\nlines\\n\""
+    it "allows single slash for division" $
+      braceParse "{x = y / 2;}" `shouldBe` Right "x = y / 2;"
 
   describe "Declarations - parensCode" $ do
     let parenParse = runParser parensCode "" ""
