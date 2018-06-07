@@ -371,7 +371,7 @@ bracedCode :: SolidityParser String
 bracedCode = braces . fmap concat . many $
         (show <$> try stringLiteral)
     <|> (comment >> return "")
-    <|> ((:[]) <$> noneOf "{}\"/")
+    <|> ((:[]) <$> noneOf "{}\"")
     <|> do
         innerBraces <- bracedCode
         return $ "{" ++ innerBraces ++ "}"
