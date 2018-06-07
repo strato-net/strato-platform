@@ -302,8 +302,7 @@ getMessages = do
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  -- changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
 
   let conHost = flags_pghost
   let conPort = read flags_pgport

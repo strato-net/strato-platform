@@ -68,7 +68,11 @@ services:
     - postgres
     environment:
     # cirrusHost is temporary here to be able to run bloc server, to be removed
+<<<<<<< HEAD
     - cirrusHost=cirrus:3333 #Commenting this one out makes Bloc restart
+=======
+    - cirrusHost=cirrus:3333
+>>>>>>> 71d7f94fccd5175c8c5280e4548f383b2650ca8e
     - loglevel=${loglevel}
     - kafkaHost=${kafkaHost}
     - postgres_host=postgres
