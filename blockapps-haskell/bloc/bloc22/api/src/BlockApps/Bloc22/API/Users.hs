@@ -199,7 +199,7 @@ type GetUsersKeyStore = "users"
   :> Capture "address" Address
   :> "keystore"
   :> ReqBody '[JSON, FormUrlEncoded] Password
-  :> Get '[JSON] KeyStore
+  :> Post '[JSON] KeyStore
 
 
 type PostUsersKeyStore = "users"
