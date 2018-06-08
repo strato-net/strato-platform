@@ -62,7 +62,7 @@ blocSwagger :: Swagger
 blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.2"
-    & info.description ?~ "I'm in the right place, right?"
+    & info.description ?~ "This is the V2.2 API for the BlocH"
     & basePath ?~ "/bloc/v2.2"
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
