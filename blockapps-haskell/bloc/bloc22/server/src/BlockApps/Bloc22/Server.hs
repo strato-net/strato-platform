@@ -1,12 +1,14 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module BlockApps.Bloc22.Server where
 
-import           Control.Lens             ((&), (.~), (?~))
+import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
+import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
 import           Data.Swagger
 import           Servant
@@ -16,7 +18,6 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Addresses
 import           BlockApps.Bloc22.Server.Contracts
-import           BlockApps.Bloc22.Server.Git
 import           BlockApps.Bloc22.Server.Search
 import           BlockApps.Bloc22.Server.Users
 
@@ -61,14 +62,11 @@ blocSwagger :: Swagger
 blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.2"
-    & info.description ?~ "This is the V2.2 API for the BlocH"
+    & info.description ?~ "I'm in the right place, right?"
     & basePath ?~ "/bloc/v2.2"
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
-serveBlocAndDocs
-  :: BlocEnv
-  -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
-serveBlocAndDocs blocEnv = serveBloc blocEnv
-  :<|> getGitInfo
-  :<|> return blocSwagger
+makeLenses ''Swagger
+filterEnterprisePaths :: Swagger -> Swagger
+filterEnterprisePaths = over swaggerPaths $ filterWithKey (\k _ -> k /= "/users")

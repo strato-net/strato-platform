@@ -93,6 +93,8 @@ appBloc env22 =
          :<|> "bloc" :> "v2.2" :> Bloc22.BlocDocsAPI
               ))
   $ Bloc22.serveBloc env22
-     :<|> return Bloc22.blocSwagger
+     :<|> return . if flags_publicmode
+                     then Bloc22.filterEnterprisePaths
+                     else id $ Bloc22.blocSwagger
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
