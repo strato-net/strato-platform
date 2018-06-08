@@ -143,14 +143,14 @@ instance GToSchema (K1 i ByteString) where
   gdeclareNamedSchema _ _ _ = pure $ NamedSchema Nothing byteSchema
 
 instance ToSchema SecretBox.Nonce where
-  declareNamedSchema proxy = declareNamedSchema proxy
-    & mapped.name ?~ "Secretbox Nonce"
-    & mapped.schema.example ?~ ""
+  declareNamedSchema _ = pure . NamedSchema (Just "SecretBox.Nonce") $
+      mempty
+      & description ?~ "Nonce used is secretbox projection of privatekey"
 
 instance ToSchema PubKey where
-  declareNamedSchema proxy = declareNamedSchema proxy
-    & mapped.name ?~ "Secp256k1 Public Key"
-    & mapped.schema.example ?~ ""
+  declareNamedSchema _ = pure . NamedSchema (Just "PubKey") $
+    mempty
+    & description ?~ "Secp256k1 Public Key"
 
 instance ToSchema KeyStore where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
