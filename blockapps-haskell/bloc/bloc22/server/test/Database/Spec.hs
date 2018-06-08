@@ -119,6 +119,11 @@ solcSpec =
         let solPath = "./test/contracts/Commentary.sol"
             expectedPath = "./test/contracts/CommentaryGetSource.sol"
         testAugment solPath expectedPath
+      it "should leave pragmas alone!" $ do
+        let solPath = "./test/contracts/Pragma.sol"
+        soliditySrc <- pack <$> readFile solPath
+        augmentedSrc <- fromEither $ augment soliditySrc
+        soliditySrc `shouldBe` augmentedSrc
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"

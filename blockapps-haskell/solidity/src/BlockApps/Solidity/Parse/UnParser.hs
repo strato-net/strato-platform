@@ -14,8 +14,9 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
+import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Xabi.Type
+import           BlockApps.Solidity.Xabi.Type
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
 
 
@@ -23,11 +24,12 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
-unparse :: [(Text, (Xabi, [Text]))] -> String
-unparse contracts = List.concat $ List.map unparseContract contracts
+unparse :: File -> String
+unparse File{..} = List.concat $ List.map unparseSourceUnit unsourceUnits
 
-unparseContract :: (Text, (Xabi, [Text])) -> String
-unparseContract (name, (contract,inherited)) =
+unparseSourceUnit :: SourceUnit -> String
+unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
+unparseSourceUnit (NamedXabi name (contract,inherited)) =
      "contract "
   <> Text.unpack name
   <> (case inherited of

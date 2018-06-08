@@ -24,14 +24,15 @@ import           BlockApps.Solidity.Xabi.Type         (VarType(..))
 -- 'Parsec'.
 parseXabi :: FileName -> String -> Either String [(Text, Xabi)]
 parseXabi filename input = do
-  xabis <- showError $ runParser solidityFile "" filename input
+  File units <- showError $ runParser solidityFile "" filename input
+  let xabis = [(name, pair) | NamedXabi name pair <- units]
   let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
   xabis' <- traverse sequence inheritanceFullXabis
 
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
-parseXabiNoInheritanceMerge :: FileName -> String -> Either String [(Text, (Xabi, [Text]))]
+parseXabiNoInheritanceMerge :: FileName -> String -> Either String File
 parseXabiNoInheritanceMerge filename input = do
   showError $ runParser solidityFile "" filename input
 

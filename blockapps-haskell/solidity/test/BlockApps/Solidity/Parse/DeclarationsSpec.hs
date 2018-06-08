@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
 import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Parse.Declarations
 import BlockApps.Solidity.Parse.UnParser
@@ -191,21 +192,23 @@ spec = do
 
   describe "Declarations - solidityContract" $ do
     let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    let nameOf (NamedXabi n _) = n
+        nameOf _ = error "unexpected pragma"
     it "should parse an empty contract" $ do
       let contractString = "contract a {}"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("a", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\
             \    function r() {}\
             \}"
           eRes = runParser solidityContract "" "" contractString
-      (fst <$> eRes) `shouldBe` Right "q"
+      (nameOf <$> eRes) `shouldBe` Right "q"
     it "should parse a commented contract" $ do
       let contractString = "contract b { // don't dead open inside \n}"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("b", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "b" (xempty, []))
     it "should parse nested a nested comments contract" $ do
       let contractString = "contract c { \
                            \  /* this is how \
@@ -213,7 +216,7 @@ spec = do
                            \  // bam! double comment \
                            \ */ }"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("c", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "c" (xempty, []))
     it "should parse unbalanced braces inside a string" $ do
       let contractString = "contract d { \
                            \  function x() constant returns (string) { \
@@ -221,7 +224,7 @@ spec = do
                            \  } \
                            \}"
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "d"
+      nameOf <$> eRes `shouldBe` Right "d"
 
     it "should parse unbalanced parens inside a string" $ do
       let contractString = "contract e { \
@@ -230,7 +233,7 @@ spec = do
                            \  } \
                            \}"
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "e"
+      nameOf <$> eRes `shouldBe` Right "e"
 
     it "should parse unbalanced strings inside a comment" $ do
       let contractString = unlines ["contract f { ",
@@ -239,7 +242,7 @@ spec = do
                                     "  } ",
                                     "}"]
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "f"
+      nameOf<$> eRes `shouldBe` Right "f"
 
   let isLeft (Right _) = False
       isLeft (Left _) = True
