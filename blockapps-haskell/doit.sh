@@ -6,6 +6,7 @@ set -x
 stratoRoot=http://${stratoHost}/eth/v1.2
 cirrusRoot=http://${cirrusHost}
 kafkaPort=9092
+kafkaHost="kafka"
 
 echo "Environment variables:
 slipstream:
@@ -15,7 +16,7 @@ slipstream:
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
 --stratourl=\$stratoRoot="${stratoRoot}"
---kafkahost=\$kafkaHost="${kafkaHost}"
+--kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
 
 strato-server:

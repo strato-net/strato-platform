@@ -28,6 +28,7 @@ executable slipstream
                  , logging-effect
                  , milena
                  , monad-control
+                 , monad-logger
                  , mtl
                  , network
                  , postgresql-simple
@@ -35,6 +36,7 @@ executable slipstream
                  , resource-pool
                  , semigroups
                  , servant-client
+                 , template-haskell
                  , text
                  , transformers-base
                  , transformers

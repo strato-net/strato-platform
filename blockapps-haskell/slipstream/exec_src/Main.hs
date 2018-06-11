@@ -64,6 +64,8 @@ import HFlags
 import Options
 import System.IO.Unsafe
 import qualified Data.Vector as V
+import Language.Haskell.TH.Syntax
+import qualified Control.Monad.Logger as L
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -173,6 +175,7 @@ useTPGDatabase (defaultPGDatabase { pgDBName = "postgres", pgDBUser = "postgres"
 dbInsert :: String -> IO()
 dbInsert insrt = do
   let conHost = flags_pghost :: HostName
+  --let conHost = "172.18.0.6" :: HostName
   let conPort = PortNumber $ read flags_pgport
   let conUser = BC.pack flags_pguser :: B.ByteString
   let conPass = BC.pack flags_password :: B.ByteString
@@ -190,8 +193,8 @@ dbInsert insrt = do
     }
 
   let qry = rawPGSimpleQuery $ BC.pack insrt
-  let testIns = pgRunQuery conn qry
-  p <- testIns
+  let ins = pgRunQuery conn qry
+  p <- ins
   print p
   case p of
     (-1, _) -> putStrLn "Error writing to the database"
@@ -204,6 +207,8 @@ convertRet address x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
+      --Debug
+      --putStrLn $ show x
       let list = H.toList $ H.filter isString x
       let contractName = "test"
       let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ")"
@@ -301,11 +306,13 @@ getMessages = do
 
 main::IO ()
 main = do
+  --Debug
   _ <- $initHFlags "Setup Slipstream Variables"
   changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
 
   let conHost = flags_pghost
+  --let conHost = "172.18.0.6"
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -321,6 +328,7 @@ main = do
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
   let strato = flags_stratourl
+  --let strato = "172.18.0.8:3000/eth/v1.2/"
 
   stratoUrl <- parseBaseUrl strato
   mgr <- newManager defaultManagerSettings
