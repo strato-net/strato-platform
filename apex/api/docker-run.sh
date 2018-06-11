@@ -2,7 +2,7 @@
 set -e
 set -x
 
-cirrusRoot=http://${cirrusHost}
+#cirrusRoot=http://${cirrusHost}
 export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
