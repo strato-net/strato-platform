@@ -139,12 +139,12 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
 
               # Merge to master and change VERSION
-              git checkout $VERSION
+              git checkout VERSION
               git checkout master
               git merge ${REFSPEC}
               echo ${RELEASE_VERSION} > VERSION
-              git add $VERSION
-              git commit $VERSION -m "${RELEASE_VERSION}"
+              git add VERSION
+              git commit VERSION -m "${RELEASE_VERSION}" --allow-empty
               git push
               git tag ${RELEASE_VERSION}
               git push --tags
