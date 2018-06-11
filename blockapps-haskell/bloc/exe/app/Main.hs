@@ -70,8 +70,6 @@ main = do
   void $ Bloc22.runBlocMigrations conn22
   close conn22
 
-  -- Not creating pool for bloc21 as it's being deprecated
-
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
@@ -93,8 +91,8 @@ appBloc env22 =
          :<|> "bloc" :> "v2.2" :> Bloc22.BlocDocsAPI
               ))
   $ Bloc22.serveBloc env22
-     :<|> return . if flags_publicmode
-                     then Bloc22.filterEnterprisePaths
-                     else id $ Bloc22.blocSwagger
+     :<|> return (if flags_publicmode
+                     then Bloc22.filterEnterprisePaths Bloc22.blocSwagger
+                     else Bloc22.blocSwagger)
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
