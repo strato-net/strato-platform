@@ -376,7 +376,7 @@ getContractDetailsByAddressOnly contractAddr = do
     [] -> do
       mDetails <- addContractMetaDatafromStrato
       case mDetails of
-        Nothing -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+        Nothing -> throwError $ UserError "getContractDetailsByAddressOnly: couldn't find contract metadata id"
         Just (cmId,details) -> do
           xs::[Int32] <- blocQuery $ proc () -> do
             (cmId',_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr -< ()
