@@ -25,7 +25,7 @@ sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
 unparse :: File -> String
-unparse File{..} = List.concat $ List.map unparseSourceUnit unsourceUnits
+unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
