@@ -29,7 +29,7 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
 -- | Parses an entire Solidity contract
-solidityContract :: SolidityParser (Text, (Xabi, [Text]))
+solidityContract :: SolidityParser SourceUnit
 solidityContract = do
   reserved "contract" <|> reserved "library"
   contractName' <- identifier
@@ -49,10 +49,7 @@ solidityContract = do
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
 
-  return
-    (
-      Text.pack contractName',
-      (
+  return $ NamedXabi (Text.pack contractName') (
         Xabi { xabiFuncs = allFunctions
              , xabiConstr = allCtors
              , xabiVars = (constants declarations) `Map.union`(variables declarations)
@@ -64,7 +61,7 @@ solidityContract = do
            },
         map (Text.pack . fst) baseConstrs
       )
-    )
+
   where constants = byMutability True (repeat 0)
 
         variables = byMutability False [0,32..]
