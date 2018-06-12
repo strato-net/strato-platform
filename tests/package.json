@@ -3,7 +3,11 @@
   "version": "0.0.1",
   "description": "platform tests",
   "scripts": {
-    "test": "node_modules/mocha/bin/mocha --config config.yaml e2e/ -b"
+    "test": "npm run test:e2e && npm run test:dataTypes",
+    "test:e2e": "mocha e2e/compile.test.js && mocha e2e/createUser.test.js && mocha e2e/import.constructor.test.js && mocha e2e/import.test.js",
+    "test:dataTypes": "mocha regressions/address.test.js && mocha regressions/bool.test.js && mocha regressions/bytes.test.js && mocha regressions/enum.test.js && mocha regressions/string.test.js && mocha regressions/uint.test.js",
+    "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
+    "test:upload": "mocha load/uploadString.test.js --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.js --batchCount 10 --batchSize 10"
   },
   "dependencies": {
     "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",

@@ -8,8 +8,10 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
-        script {
-          currentBuild.description = "${env.PLATFORM_BRANCH_NAME}"
+        wrap([$class: 'BuildUser']) {
+          script {
+            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+          }
         }
         sh '''#!/bin/bash -le
           set -x
@@ -82,11 +84,11 @@ pipeline {
             '''
           },
 
-          'Monstrato tests': {
+          'Core Strato tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running monstrato unit tests"
-              cd monstrato
+              echo "Running core-strato unit tests"
+              cd core-strato
               ./run_unit_tests.sh
             '''
           },

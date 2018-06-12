@@ -13,6 +13,7 @@ module BlockApps.Bloc22.Database.Queries where
 
 
 import           Control.Arrow
+import           Control.Concurrent              (threadDelay)
 import           Control.Monad
 import           Control.Monad.Except
 import           Crypto.Hash
@@ -23,6 +24,7 @@ import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
+import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
@@ -48,12 +50,14 @@ import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
 import           BlockApps.Strato.Types
 import           BlockApps.Strato.Client
+import           BlockApps.XAbiConverter
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -372,7 +376,7 @@ getContractDetailsByAddressOnly contractAddr = do
     [] -> do
       mDetails <- addContractMetaDatafromStrato
       case mDetails of
-        Nothing -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+        Nothing -> throwError $ UserError "getContractDetailsByAddressOnly: couldn't find contract metadata id"
         Just (cmId,details) -> do
           xs::[Int32] <- blocQuery $ proc () -> do
             (cmId',_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr -< ()
@@ -1457,6 +1461,24 @@ getContractXabiByMetadataId metadataId = do
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
   return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
+
+getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
+getContractContractByMetadataId metadataId = do
+  -- Impatient clients may have submitted a contract and immediately issued
+  -- a function call against it. Here we give a basic defense against it.
+  -- A much nicer way to handle that is to return cookies to the client
+  -- after writes, and use that cookie on subsequent calls to block until
+  -- their write will be visible.
+  let sleeps = [0, 40, 80, 160, 320, 640, 1280]
+      getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
+  xabis <- zipWithM getWait (repeat metadataId) sleeps
+  let ctracts = map xAbiToContract xabis
+  case rights ctracts of
+    (ctract:_) -> return ctract
+    _ -> throwError . UserError .
+            ("getContractContractByMetadataId: invalid types in contract: " <>) .
+            Text.pack . show . head $ ctracts
+
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi

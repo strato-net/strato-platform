@@ -301,10 +301,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
           (contract', cmIds') <- case Map.lookup mapKey cmIds of
             Just entry -> return (entry, cmIds)
             Nothing -> do
-              xabi' <- lift $ getContractXabiByMetadataId mapKey
-              let eitherErrorOrContract = xAbiToContract xabi'
-              contract'' <- lift $ either (throwError . UserError . Text.pack) return eitherErrorOrContract
-              let mapValue = contract''
+              mapValue <- lift $ getContractContractByMetadataId mapKey
               return (mapValue, Map.insert mapKey mapValue cmIds)
           let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
@@ -367,11 +364,7 @@ postUsersContractMethod
     txParams <- getAccountTxParams userAddr chainId mTxParams
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
 
-    xabi <- getContractXabiByMetadataId cmId
-    let eitherErrorOrContract = xAbiToContract xabi
-
-    contract' <-
-      either (throwError . UserError . Text.pack) return eitherErrorOrContract
+    contract' <- getContractContractByMetadataId cmId
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
 

@@ -47,7 +47,7 @@ contract ErrorCodes {
     string public addressState;
     string public addressZip;
     ProjectState public state;
-    function Project(string _name, string _buyer, string _description, string _spec, uint256 _price, uint256 _created, uint256 _targetDelivery) public {
+    function Project(string _name, string _buyer, string _description, string _spec, uint _price, uint _created, uint _targetDelivery) public {
         name = _name;
     buyer = _buyer;
     description = _description;

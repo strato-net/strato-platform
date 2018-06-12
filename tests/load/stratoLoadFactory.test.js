@@ -5,15 +5,17 @@ const co = require('co');
 require('co-mocha');
 const rest = ba.rest;
 const common = ba.common;
+const config = common.config;
 const util = common.util;
 const api = common.api;
 const moment = require('moment');
+const path = require('path');
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 const factoryContractName = 'VehicleFactory';
-const factoryContractFilename = 'load/contracts/VehicleFactory.sol';
+const factoryContractFilename = path.join(config.contractsPath,"VehicleFactory.sol");
 
 let contractAddress;
 let txs = [];

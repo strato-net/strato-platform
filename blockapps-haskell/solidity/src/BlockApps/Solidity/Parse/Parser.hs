@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 -- |
 -- Module: Parser
 -- Description: The Solidity source parser function
@@ -22,14 +24,15 @@ import           BlockApps.Solidity.Xabi.Type         (VarType(..))
 -- 'Parsec'.
 parseXabi :: FileName -> String -> Either String [(Text, Xabi)]
 parseXabi filename input = do
-  xabis <- showError $ runParser solidityFile "" filename input
+  File units <- showError $ runParser solidityFile "" filename input
+  let xabis = [(name, pair) | NamedXabi name pair <- units]
   let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
   xabis' <- traverse sequence inheritanceFullXabis
 
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
-parseXabiNoInheritanceMerge :: FileName -> String -> Either String [(Text, (Xabi, [Text]))]
+parseXabiNoInheritanceMerge :: FileName -> String -> Either String File
 parseXabiNoInheritanceMerge filename input = do
   showError $ runParser solidityFile "" filename input
 
@@ -46,7 +49,8 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
     `orError`
     ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
   parentXabi <- parentXabiOrError
-  addInheritedDeclarations xabisWithInheritedDeclarations (xabiMerge xabi parentXabi, rest)
+  !mergedXabis <- addInheritedDeclarations xabisWithInheritedDeclarations (xabi, rest)
+  return (xabiMerge mergedXabis parentXabi)
 
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
@@ -58,9 +62,10 @@ xabiMerge x y =
     xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
-    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
+    bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
     bumpAtBytes n varType =
       varType {varTypeAtBytes = varTypeAtBytes varType + n}
+    variables = Map.filter (maybe True not . varTypeConstant)
 
 
 

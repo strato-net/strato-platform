@@ -82,11 +82,11 @@ pipeline {
             '''
           },
 
-          'Monstrato tests': {
+          'Core Strato tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running monstrato unit tests"
-              cd strato-platform/monstrato
+              echo "Running core-strato unit tests"
+              cd strato-platform/core-strato
               ./run_unit_tests.sh
             '''
           },
@@ -120,6 +120,7 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+            cd strato-platform
             docker-compose -f docker-compose.push.yml push
           '''
         }
@@ -129,20 +130,17 @@ pipeline {
 
   post {
     success {
-      archive "docker-compose.yml"
+      archive "strato-platform/docker-compose.yml"
       slackSend (
         color: 'good',
-        message: "Nightly develop Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
-      sh '''
-        echo "Nightly develop Build Successful"
-      '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Nightly develop Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }

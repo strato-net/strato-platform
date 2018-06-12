@@ -15,6 +15,7 @@ const verify = env.APEX_URL + '/verify-temporary-password';
 export function verifyTempPasswordRequest(tempPassword, email) {
   return fetch(verify, {
     method: 'POST',
+    credentials: "include",
     headers: {
       'Content-Type': 'application/json'
     },

@@ -21,6 +21,7 @@ const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 export function createContractApiCall(contract, src, username, address, password, args) {
   return fetch(url.replace(":user", username).replace(":address", address), {
     method: 'POST',
+    credentials: "include",
     headers: {
       'Content-Type': 'application/json'
     },
@@ -37,6 +38,7 @@ export function compileContractApiCall(contractName, source, s) {
   if (s) {
     fetch(blocCompileUrl, {
       method: 'POST',
+      credentials: "include",
       headers: {
         "accept": "application/json",
         "content-type": "application/json"
@@ -63,6 +65,7 @@ export function compileContractApiCall(contractName, source, s) {
 
   return fetch(compileUrl, {
     method: 'POST',
+    credentials: "include",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
     },

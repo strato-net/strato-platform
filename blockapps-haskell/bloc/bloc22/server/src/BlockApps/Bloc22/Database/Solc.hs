@@ -5,7 +5,6 @@
 module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
-import           Control.Arrow              (first)
 import           Data.Aeson hiding (String)
 import Data.Monoid ((<>))
 import qualified Data.List                  as List
@@ -31,6 +30,7 @@ import qualified Data.Text.Encoding         as Text
 
 import BlockApps.Bloc22.Monad
 import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Parse.UnParser
 
 
@@ -79,7 +79,7 @@ runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
     solcCompileOpts = List.concat [
-      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--metadata-disable"]
+      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--evm-version=homestead"]
       ]
     solcLinkOpts = List.concat [solcLinkParam, solcLibsParam]
 
@@ -212,10 +212,12 @@ getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
-  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
+  File units <- parseXabiNoInheritanceMerge "" (unpack src)
   let src' = formatSrc src
-      modifiedContents = List.map (fmap (first (addF src'))) fileContents
-  return . pack . unparse $ modifiedContents
+      addGetSource (NamedXabi name (xabi, ts)) = NamedXabi name (addF src' xabi, ts)
+      addGetSource prag = prag
+      modifiedContents = List.map addGetSource units
+  return . pack . unparse . File $ modifiedContents
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
     formatSrc = replace "\"" "\\\""
@@ -225,10 +227,11 @@ addGetSourceFuncToSource src = do
 -- TODO: Merge with addGetSourceFunc if stable
 addGetNameFuncToSource :: Text -> Either String Text
 addGetNameFuncToSource src = do
-  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
-  let addGetName (name, (xabi, ts)) =
-       (name, (addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts))
-  return . pack . unparse . List.map addGetName $ fileContents
+  File units <- parseXabiNoInheritanceMerge "" (unpack src)
+  let addGetName (NamedXabi name (xabi, ts)) = NamedXabi name (
+          addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts)
+      addGetName prag = prag
+  return . pack . unparse . File . List.map addGetName $ units
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines
