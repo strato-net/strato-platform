@@ -149,20 +149,20 @@ xabiFunctionsTable :: Table
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Maybe (Column PGText)
+  , Column (Nullable PGText)
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Column PGText
+  , Column (Nullable PGText)
   )
 xabiFunctionsTable = Table "xabi_functions" $ p5
   ( optional "id"
   , required "contract_metadata_id"
   , required "is_constructor"
   , required "name"
-  , optional "mutability"
+  , required "mutability"
   )
 
 xabiTypesTable :: Table

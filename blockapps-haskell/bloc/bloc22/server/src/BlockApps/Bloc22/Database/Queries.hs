@@ -956,10 +956,12 @@ instance Default Constant UserName (Column PGText) where
 instance Default Constant StateMutability (Column PGText) where
   def = lmap (Text.decodeUtf8 . toStrict . Ae.encode) def
 
-instance QueryRunnerColumnDefault PGText (Maybe StateMutability) where
+instance QueryRunnerColumnDefault PGText StateMutability where
   queryRunnerColumnDefault = queryRunnerColumn id
-    (Ae.decodeStrict . Text.encodeUtf8)
-    queryRunnerColumnDefault
+    ( fromMaybe (error "could not decode mutability")
+    .  Ae.decodeStrict
+    . Text.encodeUtf8
+    ) queryRunnerColumnDefault
 
 instance QueryRunnerColumnDefault PGBytea Keccak256 where
   queryRunnerColumnDefault =
