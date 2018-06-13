@@ -11,6 +11,7 @@
 
 module BlockApps.Bloc22.Database.Queries where
 
+
 import           Control.Arrow
 import           Control.Concurrent              (threadDelay)
 import           Control.Monad
@@ -20,6 +21,7 @@ import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..),fromJSON)
+import qualified Data.Aeson                      as Ae
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
@@ -950,11 +952,13 @@ instance Default Constant PubKey (Column PGBytea) where
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
-instance Default Constant StateMutability (Column PGInt4) where
-  def = lmap fromEnum def
+instance Default Constant StateMutability (Column PGText) where
+  def = lmap (undefined :: a -> StateMutability) def
 
-instance QueryRunnerColumnDefault PGInt4 (Maybe StateMutability) where
-  queryRunnerColumnDefault = queryRunnerColumn id safeToEnum queryRunnerColumnDefault
+instance QueryRunnerColumnDefault PGText (Maybe StateMutability) where
+  queryRunnerColumnDefault = queryRunnerColumn id
+    (Ae.decodeStrict . Text.encodeUtf8)
+    queryRunnerColumnDefault
 
 instance QueryRunnerColumnDefault PGBytea Keccak256 where
   queryRunnerColumnDefault =
@@ -1012,15 +1016,13 @@ insertXabiFunction
   :: Int32
   -> (Text, Func)
   -> Bloc ()
-insertXabiFunction metadataId a@(name,Func{..}) = do
-  liftIO . putStrLn $ "Func insertion starting" ++ show metadataId ++ show a
+insertXabiFunction metadataId (name,Func{..}) = do
   funcIds :: [Int32] <- blocQuery $ proc () -> do
     (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
     restrict -< cmId .== constant metadataId
       .&& fname .== constant name
     returnA -< fId
   when (null funcIds) $ do
-    liftIO $ putStrLn "Bout to lock up"
     funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
       ( Nothing
       , constant metadataId
@@ -1029,12 +1031,8 @@ insertXabiFunction metadataId a@(name,Func{..}) = do
       , constant funcStateMutability
       )
       (\ (xfId,_,_,_,_) -> xfId)
-    liftIO $ putStrLn "Just finished xabiFunctionsTable insertion"
     void $ insertXabiFunctionArg funcId funcArgs
-    liftIO $ putStrLn "Just finished xabiFunctionsArgTable insertion"
     void $ insertXabiFunctionRet funcId (toList funcVals)
-    liftIO $ putStrLn "Just finished xabiFunctionsRetTable insertion"
-  liftIO . putStrLn $ "Func insertion ending" ++ show metadataId ++ show a
 
 insertXabiConstr
   :: Int32

@@ -83,15 +83,7 @@ instance ToSchema Xabi where
         }
 --------------------------------------------------------------------------------
 
-data StateMutability = Pure | Constant | View | Payable
-  deriving (Eq, Ord, Show, Generic, Enum)
-
--- I gave Prelude.SafeEnum a good try, but it doesn't
--- have automatic deriving...
-safeToEnum :: Int -> Maybe StateMutability
-safeToEnum x | x < 0 = Nothing
-             | x >= 4 = Nothing
-             | otherwise = Just . toEnum $ x
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
 instance ToJSON StateMutability where
   toJSON sm = case sm of
