@@ -247,12 +247,4 @@ partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, 
         rlpEncode v,
         rlpEncode init'
         ] ++ (maybeToList $ fmap rlpEncode cid)
-partialRLPEncode _ = -- PrivateHashTX
-      RLPArray $ [
-        rlpEncode (0 :: Integer),
-        rlpEncode (0 :: Integer),
-        rlpEncode (0 :: Integer),
-        rlpEncode (0 :: Integer),
-        rlpEncode (0 :: Integer),
-        rlpEncode (0 :: Integer)
-        ]
+partialRLPEncode _ = RLPArray . map rlpEncode $ replicate 6 (0 :: Integer) -- PrivateHashTX

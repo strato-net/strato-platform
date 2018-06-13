@@ -272,7 +272,9 @@ createChainContractCreationTX n gp gl val init' cid prvKey = do
   Switch to Either?
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
+whoSignedThisTransaction tx = case tx of
+  PrivateHashTX{} -> Just (Address (-1))
+  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t

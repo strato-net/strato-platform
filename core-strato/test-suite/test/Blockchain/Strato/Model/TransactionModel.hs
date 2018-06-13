@@ -1,5 +1,6 @@
 {-# OPTIONS  -fno-warn-orphans          #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -60,42 +61,98 @@ data Transaction =
     transactionR        ::  Integer,
     transactionS        ::  Integer,
     transactionV        ::  Word8
+    } |
+  PrivateHashTX {
+    transactionTxHash    ::  Word256,
+    transactionChainHash ::  Word256
     } deriving (Show, Read, Eq, Ord, Generic)
 
 instance RLPSerializable Transaction where
-  rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, cid, vVal, rVal, sVal]) =
-    partial {
-      transactionV = fromInteger $ rlpDecode vVal,
-      transactionR = rlpDecode rVal,
-      transactionS = rlpDecode sVal,
-      transactionChainId = Just $ rlpDecode cid
-      }
-        where
-          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
+  rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal, cid]) =
+    case partial of
+      PrivateHashTX{..} -> error "rlpDecode Transaction: PrivateHashTX transactions can't have a chainId"
+      p@MessageTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Just $ rlpDecode cid
+        }
+      p@ContractCreationTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Just $ rlpDecode cid
+        }
+    where
+      partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal]) =
-    partial {
-      transactionV = fromInteger $ rlpDecode vVal,
-      transactionR = rlpDecode rVal,
-      transactionS = rlpDecode sVal,
-      transactionChainId = Nothing
-      }
-        where
-          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
+    case partial of
+      PrivateHashTX{..} -> PrivateHashTX (rlpDecode rVal) (rlpDecode sVal)
+      p@MessageTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Nothing
+        }
+      p@ContractCreationTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Nothing
+        }
+    where
+      partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
-  rlpEncode t =
-      RLPArray $ [
-        n, gp, gl, toAddr, val, i,
-        rlpEncode $ toInteger $ transactionV t,
-        rlpEncode $ transactionR t,
-        rlpEncode $ transactionS t
-        ] ++ (maybeToList . fmap rlpEncode $ transactionChainId t)
+  rlpEncode t = case r of
+      RLPArray [n, gp, gl, toAddr, val, i, cid] ->
+        case t of
+          PrivateHashTX{..} -> error "rlpEncode Transaction: PrivateHashTX transactions can't have a chainId"
+          MessageTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS,
+              cid
+              ]
+          ContractCreationTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS,
+              cid
+              ]
+      RLPArray [n, gp, gl, toAddr, val, i] ->
+        case t of
+          PrivateHashTX{..} -> RLPArray [(rlpEncode transactionTxHash), (rlpEncode transactionChainHash)]
+          MessageTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS
+              ]
+          ContractCreationTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS
+              ]
+      _ -> error "wow I really am stupid"
       where
-        (RLPArray [n, gp, gl, toAddr, val, i]) = partialRLPEncode t
+        r = partialRLPEncode t
 
 
 --partialRLP(De|En)code are used for the signing algorithm
 partialRLPDecode  ::  RLPObject->Transaction
+partialRLPDecode (RLPArray [RLPString "", RLPString "", RLPString "", RLPString "", RLPString "", RLPString "", _, _, _]) = -- empty strings and the number 0 rlpEncode to (RLPString "")
+    PrivateHashTX {
+      transactionTxHash = error "transactionTxHash not initialized in partialRLPDecode",
+      transactionChainHash = error "transactionChainHash not initialized in partialRLPDecode"
+      }
 partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
     ContractCreationTX {
       transactionNonce = rlpDecode n,
@@ -167,34 +224,51 @@ partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, 
         rlpEncode v,
         rlpEncode init'
         ] ++ (maybeToList $ fmap rlpEncode cid)
+partialRLPEncode _ = RLPArray . map rlpEncode $ replicate 6 (0 :: Integer) -- PrivateHashTX
 
 instance TransactionLike Transaction where
     txHash        = transactionHash
     txPartialHash = partialTransactionHash
     txSigner      = whoSignedThisTransaction
-    txNonce       = transactionNonce
-    txSignature t = (transactionR t, transactionS t, transactionV t)
-    txValue       = transactionValue
-    txGasPrice    = transactionGasPrice
-    txGasLimit    = transactionGasLimit
-    txChainId     = transactionChainId
+    txNonce       = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionNonce t
+    txSignature   = \case
+                       PrivateHashTX{..} -> (fromIntegral transactionTxHash, fromIntegral transactionChainHash, 0)
+                       t -> (transactionR t, transactionS t, transactionV t)
+    txValue       = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionValue t
+    txGasPrice    = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionGasPrice t
+    txGasLimit    = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionGasLimit t
+    txChainId     = \case
+                       PrivateHashTX{} -> Nothing
+                       t -> transactionChainId t
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation
+    txType PrivateHashTX{}      = PrivateHash
 
     txDestination MessageTX{..}        = Just transactionTo
     txDestination ContractCreationTX{} = Nothing
+    txDestination PrivateHashTX{}      = Nothing
 
     txCode MessageTX{}            = Nothing
     txCode ContractCreationTX{..} = Just transactionInit
+    txCode PrivateHashTX{}      = Nothing
 
     txData MessageTX{..}        = Just transactionData
     txData ContractCreationTX{} = Nothing
+    txData PrivateHashTX{}      = Nothing
 
     morphTx t = case type' of
         Message          -> MessageTX n gp gl dest val dat cid r s v
         ContractCreation -> ContractCreationTX n gp gl val code cid r s v
-        PrivateHash      -> undefined -- TODO: do it later
+        PrivateHash      -> PrivateHashTX (fromInteger r) (fromInteger s)
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -291,11 +365,13 @@ createChainContractCreationTX n gp gl val init' chainId prvKey = do
     }
 
 whoSignedThisTransaction  ::  Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature' xSignature theHash
-        where
-          xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
-          SHA theHash = partialTransactionHash t
-          getPubKeyFromSignature' = getPubKeyFromSignature_fast
+whoSignedThisTransaction tx = case tx of
+  PrivateHashTX{} -> Just (Address (-1))
+  t -> pubKey2Address <$> getPubKeyFromSignature' xSignature theHash
+    where
+      xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
+      SHA theHash = partialTransactionHash t
+      getPubKeyFromSignature' = getPubKeyFromSignature_fast
 
 isMessageTX  ::  Transaction->Bool
 isMessageTX MessageTX{} = True
@@ -306,9 +382,13 @@ isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False
 
 transactionHash  ::  Transaction->SHA
-transactionHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+transactionHash = \case
+                     PrivateHashTX{..} -> SHA transactionTxHash
+                     t -> superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode t
 
 partialTransactionHash  ::  Transaction->SHA
-partialTransactionHash = superProprietaryStratoSHAHash . rlpSerialize . partialRLPEncode
+partialTransactionHash = \case
+                            PrivateHashTX{..} -> SHA transactionTxHash
+                            t -> superProprietaryStratoSHAHash . rlpSerialize $ partialRLPEncode t
 
 
