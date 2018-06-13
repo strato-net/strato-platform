@@ -1480,8 +1480,14 @@ getContractContractByMetadataId metadataId = do
   -- A much nicer way to handle that is to return cookies to the client
   -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
-  let sleeps = [0, 40, 80, 160, 320, 640, 1280]
-      getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
+  -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
+  let powUp :: Int -> Int
+      powUp n = 5 * (2^n)
+      sleeps = 0:map powUp [0..9]
+      mYield t = case t of
+                    0 -> return ()
+                    _ -> liftIO . threadDelay . (1000*) $ t
+      getWait mid sleep = mYield sleep >> getContractXabiByMetadataId mid
   xabis <- zipWithM getWait (repeat metadataId) sleeps
   let ctracts = map xAbiToContract xabis
   case rights ctracts of
