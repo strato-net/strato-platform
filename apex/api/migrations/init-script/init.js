@@ -11,14 +11,41 @@ const models = require('../../models');
 const createInitialData = () =>
   new Promise(resolve => {
     models.Role.count().then(count => {
-      console.log("Count is " + count);
       if (count) {
         return resolve();
       }
       console.log('Default data is being created...');
-      resolve();
 
+      // Create default roles
+      models.Role.bulkCreate([{name: "admin"}, {name: "developer"}], {individualHooks: true}).then((createdRoles) => {
+        return resolve();
+        //// Create initial users
+        // if (!process.env['USER_NAME'] || !process.env['USER_PASSWORD']) {
+        //   console.log(`User name and password pair was not provided - not creating the initial user, generating USERKEY file`);
+        //   const userkey = randToken.uid(64);
+        //   // Create USERKEY file
+        //   fs.writeFile("USERKEY", userkey, function(err) {
+        //     if(err) {
+        //       return console.log(err);
+        //     }
+        //     console.log("Generated USERKEY file");
+        //     return resolve();
+        //   });
+        //
+        // } else {
+        //   // Create user with admin role
+        //   const initialUser = {
+        //     username: process.env['USER_NAME'],
+        //     passwordHash: bcrypt.hashSync(process.env['USER_PASSWORD'], appConfig.passwordSaltRounds),
+        //   };
+        //   models.User.create(initialUser).then(function (newUser) {
+        //     newUser.addRole(createdRoles[0]).then(() => {
+        //       return resolve();
+        //     })
+        //   })
+        // }
       });
     });
+  });
 
 module.exports = createInitialData;
