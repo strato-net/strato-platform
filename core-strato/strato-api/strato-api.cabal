@@ -52,7 +52,6 @@ library
                      Handler.Version
                      Handler.Coinbase
                      Handler.LogInfo
-                     Handler.SolidityCommon
                      Handler.UUIDInfo
                      Handler.Peers
                      Versioning
