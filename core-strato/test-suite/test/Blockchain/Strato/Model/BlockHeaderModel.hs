@@ -4,6 +4,7 @@
 module Blockchain.Strato.Model.BlockHeaderModel where
 
 import qualified Data.ByteString                      as B
+import           Data.Maybe                           (maybeToList)
 import           Data.String
 import           Data.Time
 import           Data.Time.Clock.POSIX

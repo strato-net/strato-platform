@@ -234,25 +234,25 @@ addBlocks blocks = do
                   return [block]
                 else return []
             _ -> addBlock block >> return [block]
-          forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
-                                                                --       build the canonical chain. However, running each new
-                                                                --       block could be inefficient, and inadvertently spam
-                                                                --       the network with NewBestBlock messages.
-            (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
-            when didReplaceThisTime . liftIO $ do
-                let Just nbb = newBestBlock
-                writeIORef didReplaceBest True
-                writeIORef replacedBest (nbb, replacedBits)
-            didReplaceBest' <- liftIO (readIORef didReplaceBest)
-            void . withKafkaViolently $ writeIndexEvents (RanBlock <$> filtered)
-            when didReplaceBest' $ do
-                $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-                (theBlock, nbb) <- liftIO (readIORef replacedBest)
-                void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-                let b = obBlockData theBlock
-                    codeSource = getSource False b
-                    codeContractName = getContractName False b
-                calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+        forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
+                                                              --       build the canonical chain. However, running each new
+                                                              --       block could be inefficient, and inadvertently spam
+                                                              --       the network with NewBestBlock messages.
+          (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
+          when didReplaceThisTime . liftIO $ do
+              let Just nbb = newBestBlock
+              writeIORef didReplaceBest True
+              writeIORef replacedBest (nbb, replacedBits)
+          didReplaceBest' <- liftIO (readIORef didReplaceBest)
+          void . withKafkaViolently $ writeIndexEvents (RanBlock <$> filtered)
+          when didReplaceBest' $ do
+              $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+              (theBlock, nbb) <- liftIO (readIORef replacedBest)
+              void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+              let b = obBlockData theBlock
+                  codeSource = getSource False b
+                  codeContractName = getContractName False b
+              calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
