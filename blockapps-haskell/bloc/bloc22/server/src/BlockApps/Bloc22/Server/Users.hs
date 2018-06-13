@@ -77,7 +77,11 @@ forStateT s (a:as) run = do
   return (b:bs,s'')
 
 getUsers :: Bloc [UserName]
-getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
+getUsers = do
+  gtfoMyLawn <- asks deployMode
+  case gtfoMyLawn of
+    Public -> throwError (CouldNotFind "no /users endpoint. thank.")
+    Enterprise -> blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
 getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $
