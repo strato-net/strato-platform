@@ -85,21 +85,27 @@ instance ToSchema Xabi where
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
+tShow :: StateMutability -> Text
+tShow Pure = "pure"
+tShow Constant = "constant"
+tShow View = "view"
+tShow Payable = "payable"
+
+tRead :: Text -> Maybe StateMutability
+tRead "pure" = Just Pure
+tRead "constant" = Just Constant
+tRead "view" = Just View
+tRead "payable" = Just Payable
+tRead _ = Nothing
+
 instance ToJSON StateMutability where
-  toJSON sm = case sm of
-                  Pure -> String "pure"
-                  Constant -> String "constant"
-                  View -> String "view"
-                  Payable -> String "payable"
+  toJSON = String . tShow
 
 instance FromJSON StateMutability where
   parseJSON = withText "StateMutability" $ \t ->
-      case t of
-          "pure" -> pure Pure
-          "constant" -> pure Constant
-          "view" -> pure View
-          "payable" -> pure Payable
-          t' -> fail $ "invalid StateMutability: " ++ show t'
+      case tRead t of
+          Just sm -> pure sm
+          Nothing -> fail $ "invalid StateMutability: " ++ show t
 
 
 instance Arbitrary StateMutability where

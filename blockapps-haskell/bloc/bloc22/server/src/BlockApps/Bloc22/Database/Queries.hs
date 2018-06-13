@@ -21,11 +21,9 @@ import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..),fromJSON)
-import qualified Data.Aeson                      as Ae
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
-import           Data.ByteString.Lazy            (toStrict)
 import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
@@ -954,14 +952,12 @@ instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
 instance Default Constant StateMutability (Column PGText) where
-  def = lmap (Text.decodeUtf8 . toStrict . Ae.encode) def
+  def = lmap tShow def
 
 instance QueryRunnerColumnDefault PGText StateMutability where
   queryRunnerColumnDefault = queryRunnerColumn id
-    ( fromMaybe (error "could not decode mutability")
-    .  Ae.decodeStrict
-    . Text.encodeUtf8
-    ) queryRunnerColumnDefault
+    (fromMaybe (error "could not decode mutability") . tRead)
+    queryRunnerColumnDefault
 
 instance QueryRunnerColumnDefault PGBytea Keccak256 where
   queryRunnerColumnDefault =

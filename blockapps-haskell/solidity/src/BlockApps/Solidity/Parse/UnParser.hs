@@ -93,11 +93,8 @@ unparseFunc (name, Func{..}) =
     <> "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
-    <> case funcMutability of
-        Just Constant -> "constant "
-        Just View -> "view "
-        Just Pure -> "pure "
-        Just Payable -> "payable "
+    <> case funcStateMutability of
+        Just sm -> tShow sm <> " "
         Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
