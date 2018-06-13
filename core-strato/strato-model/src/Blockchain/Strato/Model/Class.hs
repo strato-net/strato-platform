@@ -73,7 +73,7 @@ class RLPSerializable h => BlockHeaderLike h where
       , rlpEncode $ blockHeaderExtraData        h
       ]
 
-data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
+data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Ord, Read, Show)
 
 -- todo: newtype all these vague Integers
 class (RLPSerializable t) => TransactionLike t where

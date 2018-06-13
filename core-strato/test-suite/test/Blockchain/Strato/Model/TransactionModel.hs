@@ -194,6 +194,7 @@ instance TransactionLike Transaction where
     morphTx t = case type' of
         Message          -> MessageTX n gp gl dest val dat cid r s v
         ContractCreation -> ContractCreationTX n gp gl val code cid r s v
+        PrivateHash      -> undefined -- TODO: do it later
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t

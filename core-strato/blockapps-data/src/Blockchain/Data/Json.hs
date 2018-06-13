@@ -149,26 +149,36 @@ instance ToJSON Transaction' where
                   "hash" .= transactionHash tx,
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
+    toJSON (Transaction' tx@(PrivateHashTX th tch)) =
+        object ["r" .= showHex th "",
+                "s" .= showHex tch "",
+                "transactionType" .= (show $ transactionSemantics $ tx)]
+
 
 instance FromJSON Transaction' where
     parseJSON (Object t) = do
-      tto <- (t .:? "to")
-      tnon <- (t .: "nonce")
-      tgp <- (t .: "gasPrice")
-      tgl <- (t .: "gasLimit")
-      tval <- (t .: "value")
-      tcid <- (t .:? "chainId")
-      tr <- parseHexStr (t .: "r")
-      ts <- parseHexStr (t .: "s")
-      tv <- parseHexStr (t .: "v")
+      th <- (t .:? "transactionHash")
+      tch <- (t .:? "chainHash")
+      case (th, tch) of
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX h ch))
+        _ -> do
+          tto <- (t .:? "to")
+          tnon <- (t .: "nonce")
+          tgp <- (t .: "gasPrice")
+          tgl <- (t .: "gasLimit")
+          tval <- (t .: "value")
+          tcid <- (t .:? "chainId")
+          tr <- parseHexStr (t .: "r")
+          ts <- parseHexStr (t .: "s")
+          tv <- parseHexStr (t .: "v")
 
-      case tto of
-        Nothing -> do
-          (ti :: Code) <- (t .: "init")
-          return (Transaction' (ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv))
-        (Just to') -> do
-          td <- (t .: "data")
-          return (Transaction' (MessageTX tnon tgp tgl to' tval td tcid tr ts tv))
+          case tto of
+            Nothing -> do
+              (ti :: Code) <- (t .: "init")
+              return (Transaction' (ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv))
+            (Just to') -> do
+              td <- (t .: "data")
+              return (Transaction' (MessageTX tnon tgp tgl to' tval td tcid tr ts tv))
     parseJSON _ = error "bad param when calling parseJSON for Transaction'"
 
 

@@ -50,9 +50,19 @@ data Transaction =
     transactionR        :: Integer,
     transactionS        :: Integer,
     transactionV        :: Word8
+    } |
+  PrivateHashTX {
+    transactionTxHash    :: Word256,
+    transactionChainHash :: Word256
     } deriving (Show, Read, Eq, Ord, Generic)
 
 instance Format Transaction where
+  format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
+    CL.blue "Private Transaction Hash" ++
+    tab (
+      "\n" ++
+      "Transaction Hash:       " ++ show h ++ "\n" ++
+      "Transaction Chain Hash: " ++ show ch ++ "\n")
   format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid} =
     CL.blue "Message Transaction" ++
     tab (
@@ -82,41 +92,78 @@ instance Format Transaction where
 
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal, cid]) =
-    partial {
-      transactionV = fromInteger $ rlpDecode vVal,
-      transactionR = rlpDecode rVal,
-      transactionS = rlpDecode sVal,
-      transactionChainId = Just $ rlpDecode cid
-      }
-        where
-          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
+    case partial of
+      PrivateHashTX{..} -> error "rlpDecode Transaction: PrivateHashTX transactions can't have a chainId"
+      p@MessageTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Just $ rlpDecode cid
+        }
+      p@ContractCreationTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Just $ rlpDecode cid
+        }
+    where
+      partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal]) =
-    partial {
-      transactionV = fromInteger $ rlpDecode vVal,
-      transactionR = rlpDecode rVal,
-      transactionS = rlpDecode sVal,
-      transactionChainId = Nothing
-      }
-        where
-          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
+    case partial of
+      PrivateHashTX{..} -> PrivateHashTX (rlpDecode rVal) (rlpDecode sVal)
+      p@MessageTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Nothing
+        }
+      p@ContractCreationTX{} -> p {
+        transactionV = fromInteger $ rlpDecode vVal,
+        transactionR = rlpDecode rVal,
+        transactionS = rlpDecode sVal,
+        transactionChainId = Nothing
+        }
+    where
+      partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
   rlpEncode t = case r of
       RLPArray [n, gp, gl, toAddr, val, i, cid] ->
-        RLPArray [
-          n, gp, gl, toAddr, val, i,
-          rlpEncode $ toInteger $ transactionV t,
-          rlpEncode $ transactionR t,
-          rlpEncode $ transactionS t,
-          cid
-          ]
+        case t of
+          PrivateHashTX{..} -> error "rlpEncode Transaction: PrivateHashTX transactions can't have a chainId"
+          MessageTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS,
+              cid
+              ]
+          ContractCreationTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS,
+              cid
+              ]
       RLPArray [n, gp, gl, toAddr, val, i] ->
-        RLPArray [
-          n, gp, gl, toAddr, val, i,
-          rlpEncode $ toInteger $ transactionV t,
-          rlpEncode $ transactionR t,
-          rlpEncode $ transactionS t
-          ]
+        case t of
+          PrivateHashTX{..} -> RLPArray [(rlpEncode transactionTxHash), (rlpEncode transactionChainHash)]
+          MessageTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS
+              ]
+          ContractCreationTX{..} ->
+            RLPArray [
+              n, gp, gl, toAddr, val, i,
+              rlpEncode $ toInteger transactionV,
+              rlpEncode $ transactionR,
+              rlpEncode $ transactionS
+              ]
       _ -> error "wow I really am stupid"
       where
         r = partialRLPEncode t
@@ -124,6 +171,11 @@ instance RLPSerializable Transaction where
 
 --partialRLP(De|En)code are used for the signing algorithm
 partialRLPDecode :: RLPObject->Transaction
+partialRLPDecode (RLPArray [RLPString "", RLPString "", RLPString "", RLPString "", RLPString "", RLPString "", _, _, _]) = -- empty strings and the number 0 rlpEncode to (RLPString "")
+    PrivateHashTX {
+      transactionTxHash = error "transactionTxHash not initialized in partialRLPDecode",
+      transactionChainHash = error "transactionChainHash not initialized in partialRLPDecode"
+      }
 partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
     ContractCreationTX {
       transactionNonce = rlpDecode n,
@@ -195,3 +247,12 @@ partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, 
         rlpEncode v,
         rlpEncode init'
         ] ++ (maybeToList $ fmap rlpEncode cid)
+partialRLPEncode _ = -- PrivateHashTX
+      RLPArray $ [
+        rlpEncode (0 :: Integer),
+        rlpEncode (0 :: Integer),
+        rlpEncode (0 :: Integer),
+        rlpEncode (0 :: Integer),
+        rlpEncode (0 :: Integer),
+        rlpEncode (0 :: Integer)
+        ]

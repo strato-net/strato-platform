@@ -32,7 +32,6 @@ import           Data.List
 import qualified Data.Map                           as M
 import           Data.Maybe
 import qualified Data.Set                           as S
-import qualified Data.Text                          as T
 
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
