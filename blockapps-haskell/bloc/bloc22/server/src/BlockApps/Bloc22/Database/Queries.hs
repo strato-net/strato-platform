@@ -25,6 +25,7 @@ import qualified Data.Aeson                      as Ae
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
+import           Data.ByteString.Lazy            (toStrict)
 import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
@@ -953,7 +954,7 @@ instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
 instance Default Constant StateMutability (Column PGText) where
-  def = lmap (undefined :: a -> StateMutability) def
+  def = lmap (Text.decodeUtf8 . toStrict . Ae.encode) def
 
 instance QueryRunnerColumnDefault PGText (Maybe StateMutability) where
   queryRunnerColumnDefault = queryRunnerColumn id
