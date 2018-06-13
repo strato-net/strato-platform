@@ -149,13 +149,13 @@ xabiFunctionsTable :: Table
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Maybe (Column PGText)
+  , Maybe (Column PGInt4)
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Column PGText
+  , Column PGInt4
   )
 xabiFunctionsTable = Table "xabi_functions" $ p5
   ( optional "id"
