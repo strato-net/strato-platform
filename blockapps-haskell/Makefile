@@ -5,7 +5,6 @@ endif
 BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
-SOLCWORK=$(BASILWORK)/solc
 FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
@@ -14,18 +13,7 @@ BUILDBASE_NAME=bloch-buildbase
 DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
 
-
-SOLCBRANCH=v0.4.24
-SOLCREPOSITORY=https://github.com/ethereum/solidity.git
-SOLCBUILDDIR=$(SOLCWORK)/solidity/build
-SOLCMAKEFLAGS=-j4
-SOLCCMAKEFLAGS=-DTESTS=1 -DCMAKE_BUILD_TYPE=Release
-ifeq ($(USE_DOCKER_BUILD_ENV),)
-SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. $(SOLCCMAKEFLAGS) && make $(SOLCMAKEFLAGS) solc
-else
-SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr $(SOLCCMAKEFLAGS) .."
-endif
-SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
+SOLC_VERSION=0.4.24
 
 EXTRADEPS=doit.sh
 
@@ -42,29 +30,13 @@ all: build_docker
 prebuild:
 	mkdir -p $(BASILWORK)
 	mkdir -p $(STACKWORK)
-	mkdir -p $(SOLCWORK)
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(BLOCHOME)
 	mkdir -p $(BUILDER_HOME)
 	mkdir -p /tmp/docker-dummy
 
 build_solidity: prebuild build_buildbase
-	# Check both branch name and tag name for a match
-ifeq (, $(findstring $(SOLCBRANCH), $(shell git -C $(SOLCWORK)/solidity reflog --decorate -1)))
-	$(info "Solc branch is not up to date, cloning $(SOLCREPOSITORY), checking out $(SOLCBRANCH) and rebuilding")
-	rm -rf $(SOLCWORK)/solidity
-	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
-	mkdir -p $(SOLCBUILDDIR)
-	$(SOLCCMAKE)
-else
-	echo "Solc branch is up to date, therefore will not recreate solc's Makefile."
-endif
-	echo "Installing solidity"
-ifeq ($(USE_DOCKER_BUILD_ENV),)
-	$(SOLCMAKEINSTALL)
-else
-	$(DOCKER_SHELL) "$(SOLCMAKEINSTALL)"
-endif
+	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin
 
 build_haskell: build_buildbase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
