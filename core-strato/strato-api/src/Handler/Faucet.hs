@@ -22,10 +22,12 @@ import           Handler.Common
 import           Handler.Filters
 import           Import
 
+import qualified Data.ByteString.Lazy as BL
+
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
 retrievePrvKey path = do
   keyBytes <- readFile path
-  let intVal = BN.decode $ keyBytes :: Integer
+  let intVal = BN.decode $ BL.fromStrict $ keyBytes :: Integer
   return $ H.makePrvKey intVal
 
 

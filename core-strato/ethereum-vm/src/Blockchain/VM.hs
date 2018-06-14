@@ -28,7 +28,6 @@ import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
-import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -970,7 +969,7 @@ getFromSelector sel isRunningTests' b codeHash = do
 
   stateRoot <- getStateRoot
   setStateDBStateRoot (blockDataStateRoot b)
-  let env = 
+  let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
           envBlockHeader=BlockData{
@@ -999,7 +998,7 @@ getFromSelector sel isRunningTests' b codeHash = do
           envJumpDests = getValidJUMPDESTs theCode
           }
   (eRes, _) <-
-    runVMM False True S.empty 0 env 1000000000000000000 $ call' True
+    runVMM isRunningTests' True S.empty 0 env 1000000000000000000 $ call' True
 
   setStateDBStateRoot stateRoot
   case eRes of

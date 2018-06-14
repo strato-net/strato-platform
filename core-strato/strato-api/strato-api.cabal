@@ -12,7 +12,7 @@ Flag library-only
     Default:       False
 
 library
-    hs-source-dirs: ., app
+    hs-source-dirs: src, exec_src
     exposed-modules: Application
                      Foundation
                      Import
@@ -132,7 +132,7 @@ executable         strato-api
         Buildable: False
 
     main-is:           main.hs
-    hs-source-dirs:    app
+    hs-source-dirs:    exec_src
     build-depends:     base, strato-api
     extra-libraries: pthread
     ghc-options:       -threaded -O2 -rtsopts -with-rtsopts=-N
