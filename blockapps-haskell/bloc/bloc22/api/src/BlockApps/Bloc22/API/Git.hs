@@ -21,7 +21,7 @@ import           Test.QuickCheck
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type GetHomepage = Get '[PlainText, JSON] GitInfo
+type GetHomepage = Get '[JSON, PlainText] GitInfo
 
 gitInfo :: GitInfo
 gitInfo = GitInfo
