@@ -5,7 +5,18 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module BlockApps.Solidity.Parse.ParserTypes where
 
+import           Data.Text                            (Text)
 import           Text.Parsec
+
+import           BlockApps.Solidity.Xabi
+
+data SourceUnit = Pragma Identifier String
+                | NamedXabi Text (Xabi, [Text])
+                deriving (Eq, Show)
+
+data File = File {
+  unsourceUnits :: [SourceUnit]
+}
 
 -- | Source file names; also source file /paths/.
 type FileName = SourceName

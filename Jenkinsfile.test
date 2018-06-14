@@ -84,11 +84,11 @@ pipeline {
             '''
           },
 
-          'Monstrato tests': {
+          'Core Strato tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running monstrato unit tests"
-              cd monstrato
+              echo "Running core-strato unit tests"
+              cd core-strato
               ./run_unit_tests.sh
             '''
           },

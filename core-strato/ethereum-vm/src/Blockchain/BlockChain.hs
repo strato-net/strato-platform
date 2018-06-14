@@ -67,6 +67,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import qualified Blockchain.Mining                       as Mining
 import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
 import           Blockchain.Verifier
@@ -208,10 +209,13 @@ addBlocks blocks = do
         let blockSR = blockDataStateRoot $ obBlockData block
         lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
         lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
-        if (blockSR == currentBaggerSR)
+        if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
           then do
             _ <- setParentStateRoot block
-            updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+            lastRun <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+            let updates = if (flags_miner == Mining.Instant)
+                            then lastRun
+                            else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
             lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
             Bagger.updateTxCallback
               updates

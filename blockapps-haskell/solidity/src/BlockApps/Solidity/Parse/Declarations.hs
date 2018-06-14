@@ -6,18 +6,15 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Declarations where
 
---import Data.Either
 import           Data.List
 import qualified Data.Map as Map
---import Data.Map (Map)
 import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
---import           Data.Char
 
 import           Text.Parsec
--- import           Text.Parsec.Perm
---import           Text.Parsec.Number
+import           Text.Parsec.Token                    (GenLanguageDef(..))
+import           Text.Printf                          (printf)
 
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
@@ -32,7 +29,7 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
 -- | Parses an entire Solidity contract
-solidityContract :: SolidityParser (Text, (Xabi, [Text]))
+solidityContract :: SolidityParser SourceUnit
 solidityContract = do
   reserved "contract" <|> reserved "library"
   contractName' <- identifier
@@ -46,35 +43,25 @@ solidityContract = do
   declarations <-
     braces (many solidityDeclaration)
 
-  let allFunctions = Map.fromList
-                     [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+  let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+  let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
+  allCtors <- if length ctorList > 1
+                  then fail "multiple constructors defined"
+                  else return . Map.fromList $ ctorList
 
-  return
-    (
-      Text.pack contractName',
-      (
-        Xabi { xabiFuncs = Map.delete (Text.pack contractName') allFunctions
-             , xabiConstr = if Map.member (Text.pack contractName') allFunctions
-                            then Map.singleton
-                                 (Text.pack contractName')
-                                 (allFunctions Map.! (Text.pack contractName'))
-                            else Map.empty
-               -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
-           , xabiVars = (constants declarations) `Map.union`(variables declarations)
-           , xabiTypes =
-             Map.fromList $
-             [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
-             ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-           , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
-
---    contractName = contractName',
---    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
---    contractTypes = contractTypes',
---    contractBaseNames = baseConstrs
+  return $ NamedXabi (Text.pack contractName') (
+        Xabi { xabiFuncs = allFunctions
+             , xabiConstr = allCtors
+             , xabiVars = (constants declarations) `Map.union`(variables declarations)
+             , xabiTypes =
+               Map.fromList $
+               [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
+               ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+             , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
            },
         map (Text.pack . fst) baseConstrs
       )
-    )
+
   where constants = byMutability True (repeat 0)
 
         variables = byMutability False [0,32..]
@@ -96,6 +83,7 @@ solidityContract = do
 
 data Declaration =
   FuncDeclaration Xabi.Func
+  | ConstructorDeclaration Xabi.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration Xabi.Def
   | EnumDeclaration Xabi.Def
@@ -177,9 +165,28 @@ usingDeclaration = do
 
 -- | Parses a variable definition
 variableDeclaration :: SolidityParser (String, Declaration)
-variableDeclaration = do
-  vDecl <- simpleVariableDeclaration
-  return vDecl
+variableDeclaration = simpleVariableDeclaration
+
+data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal
+  deriving (Eq, Show, Enum, Ord)
+
+stateVariableKeyword :: SolidityParser StateVariableKeyword
+stateVariableKeyword =
+     (try (reserved "constant") >> return KConstant) <|>
+     (try (reserved "public") >> return KPublic) <|>
+     (try (reserved "private") >> return KPrivate) <|>
+     (try (reserved "internal") >> return KInternal)
+
+public :: [StateVariableKeyword] -> SolidityParser Bool
+public keywords =
+  let visibilities = nub . filter (/= KConstant) $ keywords
+  in case visibilities of
+        (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
+        [KPublic] -> return True
+        _ -> return False
+
+constant :: [StateVariableKeyword] -> Bool
+constant = any (KConstant ==)
 
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
@@ -190,62 +197,41 @@ simpleVariableDeclaration = do
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
-  --TODO - deal with the variableVisible flag
---  (variableVisible, variableIsPublic) <- option (True, False) $
-  (_, variableIsPublic, variableIsConstant) <- option (True, False, False) $
-                     (reserved "constant" >> return (False, False, True)) <|>
-                     (reserved "storage" >> return (True, False, False)) <|>
-                     (reserved "memory" >> return (False, False, False)) <|>
-                     (reserved "public" >> return (True, True, False)) <|>
-                     (reserved "private" >> return (False, False, False)) <|>
-                     (reserved "internal" >> return (False, False, False))
+  keywords <- many stateVariableKeyword
+  let isConstant = constant keywords
+  isPublic <- public keywords
   variableName <- identifier
   value <- optionMaybe $ do
     reservedOp "="
     many $ noneOf ";"
   semi
---  let objValueType' =
---        if variableVisible
---        then SingleValue variableType
---        else NoValue
 
-  return (variableName, VariableDeclaration variableType variableIsPublic variableIsConstant value)
-
---  ObjDef{
---    objName = variableName,
---    objValueType = objValueType',
---    objArgType = NoValue,
---    objDefn = "",
---    objIsPublic = variableIsPublic
---    }
+  return (variableName, VariableDeclaration variableType isPublic isConstant value)
 
 {- Functions and function-like -}
 
 -- | Parses a function definition.
+--
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
-  reserved "function"
-  functionName <- fromMaybe "" <$> optionMaybe identifier
-  functionArgs <- tupleDeclaration
---  (functionRet, functionVisible, _, _) <- functionModifiers
-  -- TODO - deal with funcitonVisible
-  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
---  functionBody <- bracedCode <|> (semi >> return "")
-  contents <- bracedCode <|> (semi >> return "")
-  --TODO - deal with contractName
---  contractName' <- getContractName
-  _ <- getContractName
---  let objValueType' = case () of
---  let _ = case () of
---        _ | null functionName || not functionVisible -> NoValue
---        _ | functionName == contractName' -> SingleValue $ Typedef contractName'
---        _ -> functionRet
-  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
+  functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+                  -- Starting with 0.4.22, constructor() <mods> { <body> } is
+                  -- the preferred syntax for defining a constructor
+                  (reserved "constructor" >> getContractName)
+  cName <- getContractName
+  xabi <- functionXabi
+  let tipe = if cName == functionName
+                then ConstructorDeclaration
+                else FuncDeclaration
+  return (functionName, tipe xabi)
 
-  return
-    (
-      functionName,
-      FuncDeclaration Xabi.Func{
+functionXabi :: SolidityParser Xabi.Func
+functionXabi = do
+  functionArgs <- tupleDeclaration
+  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
+  contents <- bracedCode <|> (semi >> return "")
+  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
+  return Xabi.Func{
         Xabi.funcArgs =
            Map.fromList $
            zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) functionArgs [0..]
@@ -253,21 +239,11 @@ functionDeclaration = do
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
       , Xabi.funcContents = Just $ Text.pack contents
-
-      -- TODO: Get these values from parser
       , Xabi.funcMutable  = Just mutable
       , Xabi.funcPayable  = Just payable
       , Xabi.funcVisibility = Just visibility
       , Xabi.funcModifiers = Just modifiers
-
-
---    objName = functionName,
---    objValueType = objValueType',
---    objArgType = functionArgs,
---    objDefn = functionBody,
---    objIsPublic = False -- We only care about public variables
       }
-    )
 
 -- | Parses an event definition.  At the moment we don't do anything with
 -- it, but this prevents the parser from rejecting contracts that use
@@ -386,3 +362,83 @@ functionModifiers = do
       name <- identifier
       args <- optionMaybe parensCode
       return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
+
+-- | A common pattern: code enclosed in braces, allowing nested braces.
+bracedCode :: SolidityParser String
+bracedCode = braces . fmap concat . many $
+        (show <$> try stringLiteral)
+    <|> (comment >> return "")
+    <|> ((:[]) <$> noneOf "{}\"")
+    <|> do
+        innerBraces <- bracedCode
+        return $ "{" ++ innerBraces ++ "}"
+
+-- | Parses arguments and their types in parentheses.
+parensCode :: SolidityParser String
+parensCode = parens . fmap concat . many $
+        (comment >> return "")
+    <|> ((:[]) <$> noneOf "()/")
+
+comment :: SolidityParser ()
+comment = oneLineComment <|> multiLineComment
+
+-- Stolen directly from Text.Parsec.Token because those jerks couldn't be
+-- bothered to export them.
+-- License pertains solely to code beneath this line.
+-- Copyright 1999-2000, Daan Leijen; 2007, Paolo Martini. All rights reserved.
+
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+
+-- * Redistributions of source code must retain the above copyright notice,
+--   this list of conditions and the following disclaimer.
+-- * Redistributions in binary form must reproduce the above copyright
+--   notice, this list of conditions and the following disclaimer in the
+--   documentation and/or other materials provided with the distribution.
+
+-- This software is provided by the copyright holders "as is" and any express or
+-- implied warranties, including, but not limited to, the implied warranties of
+-- merchantability and fitness for a particular purpose are disclaimed. In no
+-- event shall the copyright holders be liable for any direct, indirect,
+-- incidental, special, exemplary, or consequential damages (including, but not
+-- limited to, procurement of substitute goods or services; loss of use, data,
+-- or profits; or business interruption) however caused and on any theory of
+-- liability, whether in contract, strict liability, or tort (including
+-- negligence or otherwise) arising in any way out of the use of this software,
+-- even if advised of the possibility of such damage.
+oneLineComment :: SolidityParser ()
+oneLineComment =
+        do{ try (string (commentLine solidityLanguage))
+          ; skipMany (satisfy (/= '\n'))
+          ; return ()
+          }
+
+multiLineComment :: SolidityParser ()
+multiLineComment =
+  do { try (string (commentStart solidityLanguage))
+     ; inComment
+     }
+
+inComment :: SolidityParser ()
+inComment
+  | nestedComments solidityLanguage  = inCommentMulti
+  | otherwise                = inCommentSingle
+
+inCommentMulti :: SolidityParser ()
+inCommentMulti
+  =   do{ try (string (commentEnd solidityLanguage)) ; return () }
+  <|> do{ multiLineComment                     ; inCommentMulti }
+  <|> do{ skipMany1 (noneOf startEnd)          ; inCommentMulti }
+  <|> do{ oneOf startEnd                       ; inCommentMulti }
+  <?> "end of comment"
+  where
+    startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
+
+inCommentSingle :: SolidityParser ()
+inCommentSingle
+  =   do{ try (string (commentEnd solidityLanguage)); return () }
+  <|> do{ skipMany1 (noneOf startEnd)         ; inCommentSingle }
+  <|> do{ oneOf startEnd                      ; inCommentSingle }
+  <?> "end of comment"
+  where
+    startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)

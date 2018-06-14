@@ -177,7 +177,12 @@ services:
     - apex
     environment:
     - authBasic=${authBasic}
+    - azureAD=${azureAD}
+    - azureADClientID=${azureADClientID}
+    - azureADClientSecret=${azureADClientSecret}
+    - azureADTenantID=${azureADTenantID}
     - blockTime=${blockTime}
+    - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}
     - STRATO_GS_MODE=${STRATO_GS_MODE}

@@ -24,11 +24,11 @@ export function createUserApiCall(username, password) {
     url,
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ username, password }),
-      credentials: 'include'
     }
   )
     .then(function (response) {

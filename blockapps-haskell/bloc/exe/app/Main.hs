@@ -70,13 +70,12 @@ main = do
   void $ Bloc22.runBlocMigrations conn22
   close conn22
 
-  -- Not creating pool for bloc21 as it's being deprecated
-
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
-  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 $ toEnum flags_loglevel
+  let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
+  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 (toEnum flags_loglevel) mode
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv)
 
@@ -93,6 +92,8 @@ appBloc env22 =
          :<|> "bloc" :> "v2.2" :> Bloc22.BlocDocsAPI
               ))
   $ Bloc22.serveBloc env22
-     :<|> return Bloc22.blocSwagger
+     :<|> return (case Bloc22.deployMode env22 of
+                    Bloc22.Public -> Bloc22.filterEnterprisePaths Bloc22.blocSwagger
+                    Bloc22.Enterprise -> Bloc22.blocSwagger)
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}

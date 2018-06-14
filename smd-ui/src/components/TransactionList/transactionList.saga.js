@@ -18,6 +18,7 @@ export function getTx(last) {
     url + last.toString(),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
