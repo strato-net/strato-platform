@@ -24,6 +24,7 @@ library
                   BlockApps.Solidity.Parse.Declarations
                   BlockApps.Solidity.Parse.Pragmas
                   BlockApps.Solidity.Parse.Selector
+                  BlockApps.Solidity.Parse.Types
                   BlockApps.Solidity.SolidityValue
                   BlockApps.Solidity.Storage
                   BlockApps.Solidity.Struct
@@ -39,7 +40,6 @@ library
   other-modules: BlockApps.Solidity.Parse.Expression
                  BlockApps.Solidity.Parse.File
                  BlockApps.Solidity.Parse.Lexer
-                 BlockApps.Solidity.Parse.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -84,6 +84,7 @@ test-suite blockapps-solidity-test
     BlockApps.Solidity.Parse.DeclarationsSpec
     BlockApps.Solidity.Parse.SelectorSpec
     BlockApps.Solidity.Parse.PragmaSpec
+    BlockApps.Solidity.Parse.TypesSpec
     BlockApps.Solidity.Parse.UnParserSpec
     BlockApps.XAbiConverterSpec
   build-depends: base >=4 && < 5
