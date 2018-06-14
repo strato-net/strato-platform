@@ -119,13 +119,13 @@ instance Bagger.MonadBagger ContextM where
             Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
-    rewardCoinbases chainId sr us uncles ourNumber = do
+    rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        _ <- addToBalance chainId us $ rewardBase flags_testnet
+        _ <- addToBalance Nothing us $ rewardBase flags_testnet
         forM_ uncles $ \uncle -> do
-            _ <- addToBalance chainId us (rewardBase flags_testnet `quot` 32)
-            _ <- addToBalance chainId (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
+            _ <- addToBalance Nothing us (rewardBase flags_testnet `quot` 32)
+            _ <- addToBalance Nothing (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
             return ()
         flushMemStorageDB
         flushMemAddressStateDB
@@ -213,7 +213,7 @@ addBlocks blocks = do
         potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
           case (obOrigin block) of
             TO.Quarry -> do
-              cache <- Bagger.unsafeFromMempool Bagger.miningCache chainId <$> Bagger.getBaggerState
+              cache <- Bagger.miningCache <$> Bagger.getBaggerState
               let currentBaggerSR = Bagger.lastRewardedStateRoot cache
                   blockSR = blockDataStateRoot $ obBlockData block
               lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR

@@ -93,7 +93,7 @@ ethereumVM = void . execContextM $ do
         let privateChainIds = filter isJust . map fst . Bagger.partitionWith (transactionChainId . otBaseTx) $ poolableNewTxs
         privateBlocks <- forM privateChainIds $ \chainId -> do
           $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
-          newChainBlock <- Bagger.makeNewBlock chainId
+          newChainBlock <- Bagger.makeNewBlock
           Bagger.processNewBestBlock
             (outputBlockHash newChainBlock)
             (obBlockData newChainBlock)
@@ -113,13 +113,13 @@ ethereumVM = void . execContextM $ do
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
-        let pending = B.unsafeGetPublic B.pending state -- TODO: Grab pending txs for private chains
+        let pending = B.pending state
         let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- Bagger.makeNewBlock Nothing -- TODO: Make blocks for private chains as well
+            newBlock <- Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
