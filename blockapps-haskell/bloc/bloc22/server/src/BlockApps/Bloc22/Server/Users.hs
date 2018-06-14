@@ -13,6 +13,7 @@ import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy    (StateT(..), get, put, runStateT)
 import           Crypto.Secp256k1
 import qualified Data.Aeson                        as Aeson
@@ -44,6 +45,7 @@ import           BlockApps.Bloc22.Crypto
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
+import qualified BlockApps.Bloc22.Monad            as M
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
@@ -79,7 +81,11 @@ forStateT s (a:as) run = do
   return (b:bs,s'')
 
 getUsers :: Bloc [UserName]
-getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
+getUsers = do
+  gtfoMyLawn <- asks deployMode
+  case gtfoMyLawn of
+    M.Public -> throwError (CouldNotFind "no /users endpoint. thank.")
+    M.Enterprise -> blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
 getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $

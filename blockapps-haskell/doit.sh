@@ -6,6 +6,11 @@ set -x
 stratoRoot=http://${stratoHost}/eth/v1.2
 cirrusRoot=http://${cirrusHost}
 
+isPublic=false
+if [ "${SMD_MODE}" == public ]; then
+  isPublic=true
+fi
+
 echo "Environment variables:
 stratoHost=${stratoHost}
 --cirrusurl=cirrusHost=${cirrusHost}
@@ -15,6 +20,7 @@ stratoHost=${stratoHost}
 --pguser=postgres_user=${postgres_user}
 --password=postgres_password=${postgres_password}
 --loglevel=loglevel=${loglevel:-4}
+--publicmode=isPublic=${isPublic}
 "
 
 blocserver="/usr/bin/blockapps-bloc"
@@ -40,5 +46,8 @@ done
 
 $stratoserver &
 
-$blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
+$blocserver --pghost="$postgres_host" --pgport="$postgres_port" \
+            --pguser="$postgres_user" --password="$postgres_password" \
+            --stratourl="$stratoRoot" --cirrusurl="$cirrusRoot" \
+            --loglevel="${loglevel:-4}" --publicmode=${isPublic} \
+            +RTS -N1 2>&1
