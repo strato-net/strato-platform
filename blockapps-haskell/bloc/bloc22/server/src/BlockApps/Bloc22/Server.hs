@@ -22,7 +22,7 @@ import           BlockApps.Bloc22.Server.Search
 import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
-bloc = getHomepage
+bloc = (return gitInfo)
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
@@ -51,9 +51,6 @@ bloc = getHomepage
   :<|> getSearchContractStateReduced
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
-
-getHomepage :: Bloc Homepage
-getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
