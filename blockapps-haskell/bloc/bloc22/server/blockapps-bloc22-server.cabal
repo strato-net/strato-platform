@@ -104,7 +104,7 @@ test-suite blockapps-bloc22-server-test
   hs-source-dirs: test
   ghc-options: -Wall -Werror
   main-is: Spec.hs
-  other-modules:
+  other-modules: Database.Spec
   build-depends: base >=4 && < 5
     , aeson
     , blockapps-bloc22-api
