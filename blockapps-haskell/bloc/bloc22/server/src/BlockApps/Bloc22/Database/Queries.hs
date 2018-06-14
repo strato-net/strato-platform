@@ -1256,14 +1256,14 @@ insertXabiType = \case
     --       )
     --     | (name,value) <- zip names [(0::Int32)..]]
     -- return tyid
-  Xabi.Array dynamic len entry -> do
+  Xabi.Array entry len -> do
     entryId <- insertXabiType entry
     blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Array"::Text)
         , Opaleye.null
-        , constant $ fromMaybe False dynamic
+        , constant $ isNothing len
         , constant False
         , Opaleye.null
         , constant (fmap fromIntegral len :: Maybe Int32)
@@ -1349,7 +1349,7 @@ getXabiType typeId = do
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
-      return $ Xabi.Array (Just xtdy) (fmap fromIntegral (xtlen :: Maybe Int32))  xtet
+      return $ Xabi.Array xtet (fmap fromIntegral (xtlen :: Maybe Int32))
     "Contract" -> do
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
       return $ Xabi.Contract xttd'

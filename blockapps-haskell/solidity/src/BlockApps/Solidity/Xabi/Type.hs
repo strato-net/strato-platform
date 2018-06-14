@@ -29,7 +29,7 @@ data Type
   | Label String
   | Struct { bytes::Maybe Int32, typedef::Text}
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
-  | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
+  | Array { entry:: Type, length :: Maybe Integer }
   | Contract {typedef::Text}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)
 

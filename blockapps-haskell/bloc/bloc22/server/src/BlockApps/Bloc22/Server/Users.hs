@@ -640,7 +640,7 @@ constructArgValues args argNamesTypes = do
               textToArgType "Struct" False ""
             Xabi.Enum{} ->
               textToArgType "Enum" False ""
-            Xabi.Array dy len ety ->
+            Xabi.Array ety len ->
               let
                 ettyty = case ety of
                   Xabi.Int{} -> "Int"
@@ -656,7 +656,7 @@ constructArgValues args argNamesTypes = do
                   Xabi.Mapping{} -> "Mapping"
                   Xabi.Label{} -> "Int" -- since Enums are converted to Ints
               in
-                textToArgType ("Array" <> maybe "" (Text.pack . show) len) (fromMaybe False dy) ettyty
+                textToArgType ("Array" <> maybe "" (Text.pack . show) len) (isNothing len) ettyty
             Xabi.Contract{} ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
