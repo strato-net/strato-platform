@@ -99,12 +99,15 @@ instance MonadBaseControl IO Bloc where
   liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
   restoreM = Bloc . restoreM
 
+data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
+
 data BlocEnv = BlocEnv
   { urlStrato    :: BaseUrl
   , urlCirrus    :: BaseUrl
   , httpManager  :: Manager
   , dbPool       :: Pool Connection
   , logLevel     :: Severity
+  , deployMode   :: DeployMode
   }
 
 data BlocError
@@ -337,7 +340,7 @@ blocCirrusFireForget client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   case resultEither of
-    Left err -> do 
+    Left err -> do
       logWith logError (Text.pack $ show err ++ "\n  Cirrus returned an error")
       return False
     Right _ -> return True
