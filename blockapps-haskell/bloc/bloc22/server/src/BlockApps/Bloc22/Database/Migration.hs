@@ -17,11 +17,11 @@ data MigrationErrorBehavior = Throw | Catch
 
 runBlocMigrations :: Connection -> IO Int64
 runBlocMigrations conn = do
-  dbsvs <- (query_ conn getSchemaVersion :: IO [Only Int]) `catch` (\(SqlError{..}) -> return [Only 0])
+  dbsvs <- (query_ conn getSchemaVersion :: IO [Only Int]) `catch` (\e@SqlError{..} -> putStrLn "Error getting schema version" >> print e >> return [Only 0])
   let dbSchemaVersion = maybe 0 fromOnly $ listToMaybe dbsvs
   forM_ (drop dbSchemaVersion migrations) $ \(meb,q) -> do
     case meb of
-      Catch -> (execute_ conn q) `catch` (\SqlError{..} -> return 0)
+      Catch -> (execute_ conn q) `catch` (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
       Throw -> execute_ conn q
   updateMigrationNumber conn
 
@@ -35,6 +35,7 @@ migrations = [ (Throw, createTables)
              , (Throw, hashNameTable)
              , (Throw, addConstantColumn)
              , (Throw, addValueColumn)
+             , (Throw, addMutabilityColumn)
              ]
 
 getSchemaVersion :: Query
@@ -54,3 +55,7 @@ addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is
 
 addValueColumn :: Query
 addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
+
+addMutabilityColumn :: Query
+addMutabilityColumn = [sql|
+ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]

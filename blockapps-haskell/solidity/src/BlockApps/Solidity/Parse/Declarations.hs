@@ -228,7 +228,7 @@ functionDeclaration = do
 functionXabi :: SolidityParser Xabi.Func
 functionXabi = do
   functionArgs <- tupleDeclaration
-  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
+  (functionRet, visibility, mutability, modifiers) <- functionModifiers
   contents <- bracedCode <|> (semi >> return "")
   let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
   return Xabi.Func{
@@ -239,9 +239,8 @@ functionXabi = do
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
       , Xabi.funcContents = Just $ Text.pack contents
-      , Xabi.funcMutable  = Just mutable
-      , Xabi.funcPayable  = Just payable
       , Xabi.funcVisibility = Just visibility
+      , Xabi.funcStateMutability = mutability
       , Xabi.funcModifiers = Just modifiers
       }
 
@@ -326,26 +325,23 @@ tupleDeclaration = parens $ commaSep $ do
 
 data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
                    | VisibilityMod Xabi.Visibility
-                   | MutableMod Bool
-                   | PayableMod Bool
+                   | MutabilityMod Xabi.StateMutability
                    | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Xabi.Visibility, Bool, Bool, [String])
+functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Xabi.Visibility, Maybe Xabi.StateMutability, [String])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
-             <|>  (MutableMod <$> mutabilityModifier)
-             <|>  (PayableMod <$> payableModifier)
+             <|>  (MutabilityMod <$> mutabilityModifier)
              <|>  (OtherMod <$> otherModifiers)
   return $ formatVals vals
   where
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
-          mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
-          payable = fromMaybe False $ listToMaybe [v | PayableMod v <- vals]
+          mutability = listToMaybe [v | MutabilityMod v <- vals]
           otherMods = [v | OtherMod v <- vals]
-      in (returns, visibility, mutable, payable, otherMods)
+      in (returns, visibility, mutability, otherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
@@ -355,9 +351,12 @@ functionModifiers = do
       <|> (reserved "internal" >> return Xabi.Internal)
       )
     mutabilityModifier =
-      reserved "constant" >> return False
-    payableModifier =
-      reserved "payable" >> return True
+      (
+          (reserved "constant" >> return Xabi.Constant)
+      <|> (reserved "pure"     >> return Xabi.Pure)
+      <|> (reserved "view"     >> return Xabi.View)
+      <|> (reserved "payable"  >> return Xabi.Payable)
+      )
     otherModifiers = do
       name <- identifier
       args <- optionMaybe parensCode

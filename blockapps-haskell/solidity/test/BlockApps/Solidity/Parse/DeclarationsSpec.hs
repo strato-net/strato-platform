@@ -22,84 +22,93 @@ spec = do
     it "should parse function as private" $ do
       let eRes = showError $ runParser functionModifiers "" "" "private returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Private
     it "should parse function as public" $ do
       let eRes = showError $ runParser functionModifiers "" "" "public returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Public
     it "should parse function as internal" $ do
       let eRes = showError $ runParser functionModifiers "" "" "internal returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Internal
     it "should parse function as external" $ do
       let eRes = showError $ runParser functionModifiers "" "" "external returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility, _, _) = eRes
       visibility `shouldBe` External
     it "should parse function as public by default" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Public
     it "should parse function as constant" $ do
       let eRes = showError $ runParser functionModifiers "" "" "constant returns (address) {}"
       printLeft eRes
-      let Right (_, _, mutable, _, _) = eRes
-      mutable `shouldBe` False
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Constant
     it "should parse function as a function mutates state" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (address) {}"
       printLeft eRes
-      let Right (_, _, mutable, _, _) = eRes
-      mutable `shouldBe` True
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Nothing
     it "should parse function with modifier onlyOwner" $ do
       let eRes = showError $ runParser functionModifiers "" "" "onlyOwner returns (address) {}"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["onlyOwner"]
     it "should parse function with multiple modifiers" $ do
       let eRes = showError $ runParser functionModifiers "" "" "one ring to mod them all returns (address) {}"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["one","ring","to","mod","them","all"]
     it "should parse function with correct modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "private onlyOwner constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, _, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
+      mutability `shouldBe` Just Constant
       modifiers `shouldBe` ["onlyOwner"]
     it "should parse function with correct base constructor" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(uint a) returns (address)"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["Base(uint a)"]
     it "should parse function with correct base constructor, modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(string a) private onlyOwner constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, _, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
+      mutability `shouldBe` Just Constant
       modifiers `shouldBe` ["Base(string a)", "onlyOwner"]
     it "should parse function with correct payable modifier" $ do
       let eRes = showError $ runParser functionModifiers "" "" "payable returns (address)"
       printLeft eRes
-      let Right (_, _, _, payable, _) = eRes
-      payable `shouldBe` True
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Payable
+    it "should parse function with view modifier" $ do
+      let eRes = showError $ runParser functionModifiers "" "" "view returns (uint)"
+      printLeft eRes
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just View
+    it "should parse function with pure modifier" $ do
+      let eRes = showError $ runParser functionModifiers "" "" "pure returns (string)"
+      printLeft eRes
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Pure
     it "should parse function with correct base constructor, payable, modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(string a) private onlyOwner payable constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, payable, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
-      payable `shouldBe` True
+      mutability `shouldBe` Just Payable
       modifiers `shouldBe` ["Base(string a)", "onlyOwner"]
     it "should parse function that returns two values" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (ErrorCodes, ProjectState) {}"
       printLeft eRes
-      let Right (rets, _, _, _, _) = eRes
+      let Right (rets, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
     it "should parse a function with nested comments" $ do

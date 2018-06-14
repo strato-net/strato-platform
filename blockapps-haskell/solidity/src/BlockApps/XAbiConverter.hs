@@ -244,8 +244,7 @@ contractToXabi Contract{..} =
         [ ( name , Func { funcArgs = (Map.fromList $ zipWith (argToIndexedTypes typeDefs) [0..] args)
                         , funcVals = (Map.fromList $ zipWith (varToIndexedTypes typeDefs) [0..] rets)
                         , funcContents = Nothing
-                        , funcMutable = Nothing
-                        , funcPayable = Nothing
+                        , funcStateMutability = Nothing
                         , funcVisibility = Nothing
                         , funcModifiers = Nothing
                         }
