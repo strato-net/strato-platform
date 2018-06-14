@@ -78,6 +78,9 @@ import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
                                                keccak256, keccak256lazy,
                                                stringAddress)
 
+instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
+  arbitrary = LargeKey <$> arbitrary <*> arbitrary
+
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
