@@ -32,7 +32,7 @@ import           BlockApps.Bloc22.Crypto
 
 type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
-  GetHomepage
+  GetGitInfo
   -- /users endpoints
   :<|> GetUsers
   :<|> PostUsersUser

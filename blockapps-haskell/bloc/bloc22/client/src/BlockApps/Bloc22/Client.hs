@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module BlockApps.Bloc22.Client
-  ( getHomepage
+  ( getGitInfo
   , getAddresses
   , getContracts
   , getContractsData
@@ -44,8 +44,8 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types()
 
-getHomepage :: ClientM GitInfo
-getHomepage = client (Proxy @ GetHomepage)
+getGitInfo :: ClientM GitInfo
+getGitInfo = client (Proxy @ GetGitInfo)
 
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)
