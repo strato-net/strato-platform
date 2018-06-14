@@ -9,7 +9,7 @@ fi
 VERSION=$1
 TARGET_DIR=$2
 
-CONTAINER=$(docker run --rm -d --entrypoint=sleep "ethereum/solc:${VERSION}" 10000)
-trap "docker stop ${CONTAINER}" EXIT
+CONTAINER=$(docker run -d --entrypoint=sleep "ethereum/solc:${VERSION}" 10000)
+trap "docker rm -f ${CONTAINER}" EXIT
 
 docker cp "${CONTAINER}:/usr/bin/solc" "${TARGET_DIR}"
