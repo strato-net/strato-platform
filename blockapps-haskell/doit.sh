@@ -57,6 +57,11 @@ mkdir logs
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
+until nc -z $kafkaHost 9092 >&/dev/null
+do  echo "Waiting for Kafka to become available"
+    sleep 1
+done
+
 # TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \

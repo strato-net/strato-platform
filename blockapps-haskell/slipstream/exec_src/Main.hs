@@ -65,7 +65,7 @@ import Options
 import System.IO.Unsafe
 import qualified Data.Vector as V
 import Language.Haskell.TH.Syntax
-import qualified Control.Monad.Logger as L
+import Language.Haskell.TH.Lib
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -75,9 +75,9 @@ data Action = Action ActionType String String (Maybe [(String, String)])
 
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
-  (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  (map (\(x, y) -> Action Create x (show $ codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> Action Delete x (show $ codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> Action Update x (show $ codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -100,8 +100,11 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
+emptyHash :: String
+emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+
 getContract::String->String->Bloc (Either String Contract)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ Left "Blank contract"
+getContract _ emptyHash = return $ Left "Blank contract"
 getContract address _ = do
   qqqq <-
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
@@ -249,8 +252,8 @@ defaultKafkaConfig = KafkaConf {
 instance FromJSON KafkaConf
 instance ToJSON KafkaConf
 
-makKafkaState :: KafkaClientId -> KafkaAddress -> KafkaState
-makKafkaState cid addy =
+makeKafkaState :: KafkaClientId -> KafkaAddress -> KafkaState
+makeKafkaState cid addy =
     KafkaState cid
                defaultRequiredAcks
                defaultRequestTimeout
@@ -264,52 +267,44 @@ makKafkaState cid addy =
                (addy NE.:| [])
 
 mkConfiguredKafkaState :: KafkaClientId -> KafkaState
-mkConfiguredKafkaState cid = makKafkaState cid (kh, kp)
+mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
     where k = defaultKafkaConfig --KafkaConf
           kh = fromString $ kafkaHost k
           kp = fromIntegral $ kafkaPort k
 
-runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
-runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
+lookupTopic :: K.TopicName
+lookupTopic = fromString "statediff"
 
-setDefaultKafkaState :: Kafka k => k ()
-setDefaultKafkaState = do
-    stateRequiredAcks Control.Lens..= -1
-    stateWaitSize     Control.Lens..= 1
-    stateWaitTime     Control.Lens..= 100000
-
-convertMsg :: Show a => Either KafkaClientError a -> [B.ByteString]
-convertMsg x =
-  case x of
-    Left e -> error $ show e
-    Right y -> return (BC.pack $ show y)
-
-lookupTopic :: String -> K.TopicName
-lookupTopic label = fromString label
-
-getMessages :: IO[B.ByteString]
-getMessages = do
-  let offset = 0
-  let kafkaID = "queryStrato" :: KafkaClientId
-  let state = mkConfiguredKafkaState kafkaID
-
-  msg <- runKafka state $ (doConsume offset)
-  return $ convertMsg $ msg
-    where
-    doConsume :: Kafka a => K.Offset -> a [B.ByteString]
-    doConsume offset = do
-      let topic = lookupTopic "statediff"
-      fetched <- fetch offset 0 topic
-      let messages = (map tamPayload . fetchMessages) fetched
-      rest <- doConsume (offset + fromIntegral (length messages))
-      return $ messages ++ rest
+getAndProcessMessages :: Kafka a => K.Offset -> a [B.ByteString]
+getAndProcessMessages offset = do
+  fetched <- fetch offset 0 lookupTopic
+  let ret = (map tamPayload . fetchMessages) fetched
+  return ret
 
 main::IO ()
 main = do
   --Debug
+  liftIO $ putStrLn "SLIPSTREAM MAIN"
   _ <- $initHFlags "Setup Slipstream Variables"
-  changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode)) Main.getMessages
+  liftIO $ putStrLn "SLIPSTREAM VARIABLES"
+
+  let kafkaID = "queryStrato" :: KafkaClientId
+  let state = mkConfiguredKafkaState kafkaID
+
+  let offset = 0
+
+  msg <- runKafka state $ (getAndProcessMessages offset)
+
+  messages <- case msg of
+    Left e -> error $ show e
+    Right y -> return y
+
+  -- lastOffset <- getLastOffset LatestTime 0 lookupTopic
+
+  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+  liftIO $ putStrLn $ "SLIPSTREAM POST CHANGES: " ++ (show changes)
+
 
   let conHost = flags_pghost
   --let conHost = "172.18.0.6"
@@ -378,4 +373,4 @@ main = do
               decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
         liftIO $ convertRet address $ encode ret
 
-  return ()
+  main--return ()
