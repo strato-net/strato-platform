@@ -110,7 +110,7 @@ xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ sh
 
 xabiTypeToType::Xabi->Xabi.Type->Either String Type
 xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=(Just l)} =
-  TypeArrayFixed (fromIntegral l) <$> xabiTypeToType xabi var
+  TypeArrayFixed l <$> xabiTypeToType xabi var
 xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=Nothing} =
   TypeArrayDynamic <$> xabiTypeToType xabi var
 xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
@@ -289,7 +289,7 @@ typeToXabiType _ (SimpleType x) = simpleTypeToXabiType x
 typeToXabiType typeDefs (TypeArrayDynamic theType) =
     Xabi.Array (typeToXabiType typeDefs theType) Nothing
 typeToXabiType typeDefs (TypeArrayFixed size theType) =
-    Xabi.Array (typeToXabiType typeDefs theType) (Just . fromIntegral $ size)
+    Xabi.Array (typeToXabiType typeDefs theType) (Just size)
 typeToXabiType typeDefs (TypeMapping from to) =
     Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType typeDefs to)
 typeToXabiType _ (TypeStruct structName) = Xabi.Struct Nothing structName

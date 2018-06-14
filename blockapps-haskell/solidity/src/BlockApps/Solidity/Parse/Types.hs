@@ -60,7 +60,7 @@ arrayType = do
   baseElemType <- simpleType <|> mappingType
   sizeList <- many1 $ brackets $ optionMaybe intExpr
   return $ combine baseElemType sizeList
-    where combine :: Xabitype.Type -> [Maybe Integer] -> Xabitype.Type
+    where combine :: Xabitype.Type -> [Maybe Word] -> Xabitype.Type
           combine t [] = t
           combine t (l:ls) = combine (Xabitype.Array t l) ls
 
