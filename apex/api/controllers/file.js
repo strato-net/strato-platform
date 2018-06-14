@@ -2,14 +2,12 @@
 const bcrypt = require('bcrypt');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
-const moment = require('moment');
-var rp = require('request-promise');
 
 const appConfig = require('../config/app.config');
-const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 const s3 = require('../lib/s3');
 const externalStorage = require('../lib/externalStorage/externalStorage');
+const crypto = require('crypto');
 
 module.exports = {
   upload: function (req, res, next) {
@@ -28,9 +26,29 @@ module.exports = {
         return next(err);
       }
 
-      // Register contract with it's default vlaues
+      var params = {
+        Bucket: appConfig.s3.bucket.Bucket,
+        Key: `${Date.now()}-${req.file.originalname}`,
+        Body: req.file.buffer,
+      };
 
-      // const args = {};
+      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
+
+      // s3.upload(params, function (err, data) {
+      //   if (err) {
+      //     console.log('error in callback');
+      //     console.log(err);
+      //   }
+      //   console.log('success');
+      //   console.log(data);
+      // });
+
+      // const args = {
+      //   _uri: req.file.originalname,
+      //   _host: provider,
+      //   _hash: '0x12345678'
+      // };
+
       // const userCredentials = {
       //   name: username,
       //   address: address,
@@ -38,13 +56,15 @@ module.exports = {
       // };
 
       // try {
-      //   yield externalStorage.uploadContract(userCredentials, args);
+      //   let temp = yield externalStorage.uploadContract(userCredentials, args);
+      //   console.log("---------------------------", temp)
       // } catch (error) {
-      //   console.warn('appMetadata contract upload error:', error);
+      //   console.log('-------------------------------');
+      //   console.warn('externalstorage contract upload error:', error);
       // }
 
-      // will return contractAddress, Uri, metadata
-      res.status(200).json({ contractAddress: "0xsdfsdf", uri: 'uri of the video', metadata: 'a sample video on s3' });
+      res.status(200).json({ contractAddress: req.body });
+      // res.status(200).json({ contractAddress: "0xsdfsdf", uri: 'uri of the video', metadata: 'a sample video on s3' });
     });
   },
 
@@ -79,24 +99,21 @@ module.exports = {
     co(function* () {
       const contractAddress = req.query.contractAddress;
 
-      if (!contractAddress) {
-        let err = new Error('something went wrong');
-        err.status = 400;
-        return next(err);
-      }
+      // if (!contractAddress) {
+      //   let err = new Error('something went wrong');
+      //   err.status = 400;
+      //   return next(err);
+      // }
 
       // TODO: Will get fileName form contract
       var options = {
         Bucket: appConfig.s3.bucket.Bucket,
-        Key: '1528717272380-soap-bubble-1958650_960_720.jpg',
+        Key: '1528970375737-SampleVideo_1280x720_1mb.flv',
       };
 
       res.attachment(options.Key);
       var fileStream = s3.getObject(options).createReadStream();
       fileStream.pipe(res);
-
-      // Download file URI using contractAddress as a request
-      res.status(200).json({ resource: 'URI Of the image or video etc', metadata: 'top secret file stored on s3 and tracked on blockchain' });
     })
   }
 };

@@ -15,20 +15,20 @@ const multerS3 = require('multer-s3');
 const appConfig = require('../config/app.config');
 const s3 = require('../lib/s3');
 
-var upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: appConfig.s3.bucket.Bucket,
-    metadata: (req, file, cb) => {
-      cb(null, { fieldName: file.fieldname });
-    },
-    key: (req, file, cb) => {
-      const key = `${Date.now()}-${file.originalname}`
-      cb(null, key);
-    }
-  })
-});
+var upload = multer({ storage: multer.memoryStorage() });
 
+
+
+const multerMiddleware = (req, res, next) => {
+    upload.single('metadata')(req, res, (error) => {
+        if (error) {
+            if (error.status)
+                return res.status(error.status).send({ reason: error.message });
+            return res.status(400).send({ reason: error.message });
+        }
+        next();
+    })
+}
 
 router.post('/dapps', dappController.upload);
 
@@ -40,7 +40,7 @@ router.post('/logout', checkMode, authHandler.validateRequest(), authController.
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
-router.post('/bloc/file/upload', upload.single('metadata'), fileController.upload);
+router.post('/bloc/file/upload', multerMiddleware, fileController.upload);
 router.get('/bloc/file/attest', fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);

@@ -1,42 +1,22 @@
-contract owned {
-    function owned() { owner = msg.sender; }
-    address owner;
+pragma solidity ^0.4.8;
 
-    modifier onlyOwner {
-        if (msg.sender != owner)
-            throw;
-        _;
-    }
-}
-
-contract ExternalStorage is owned {
-
+contract ExternalStorage {
     string public uri;
-    string public s3path;
-    string public hash;
     string public host;
-    string public publicKey;
-    string public timeStamp;
+    string public tempHash;
+    address[] public signers;
+    uint public timeStamp;
 
-    function ExternalStorage(string _uri, string _s3path, string _hash, string _host, string _publicKey, string _timeStamp) public {
+    function ExternalStorage(string _uri, string _host, string _hash) public {
         uri = _uri;
-        s3path = _s3path;
-        hash = _hash;
         host = _host;
-        publicKey = _publicKey;
-        timeStamp = _timeStamp;
-        owner = msg.sender;
+        tempHash = _hash;
+        signers = [msg.sender];
+        timeStamp = now;
     }
 
-    function verifyHash(string _hash) public view onlyOwner {
-        if (_hash == hash) {
-            return true;
-        }
+    function attest() public returns(address[]) {
+        signers.push(msg.sender);
+        return(signers);
     }
-
-    function viewHash() public view onlyOwner returns (string, string, string) {
-      // returns the timestamp of the upload and the public key of the uploader. 
-        return (timeStamp, publicKey, hash);
-    }
-
 }

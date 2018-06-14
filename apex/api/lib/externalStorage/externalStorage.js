@@ -31,27 +31,17 @@ function* compileSearch() {
 }
 
 // ================== contract methods ====================
-function* verifyHash(admin, contract, args, user) {
-  rest.verbose('verifyHash', args);
+function* attest(admin, contract, args, user) {
+  rest.verbose('attest', args);
   const signer = (user) ? user : admin;
 
-  // function verifyHash(string _hash) public view onlyOwner {  
-  const method = 'verifyHash';
-  const result = yield rest.callMethod(signer, contract, method, args);
-}
-
-function* viewHash(admin, contract, args, user) {
-  rest.verbose('viewHash', args);
-  const signer = (user) ? user : admin;
-
-  // function viewHash() public view onlyOwner returns (string, string, string) {
-  const method = 'viewHash';
+  // function attest(bytes32 _signature) public view returns(bytes32[]) {
+  const method = 'attest';
   const result = yield rest.callMethod(signer, contract, method, args);
 }
 
 module.exports = {
   compileSearch: compileSearch,
   uploadContract: uploadContract,
-  verifyHash: verifyHash,
-  viewHash: viewHash
+  attest: attest
 };
