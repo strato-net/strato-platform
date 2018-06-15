@@ -1,4 +1,4 @@
-resolver: nightly-2017-04-21
+resolver: lts-10.10
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
@@ -29,7 +29,7 @@ packages:
     commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
   extra-dep: true
 extra-deps:
-  - hflags-0.4.2
+  - hflags-0.4.3
   - ordered-containers-0.1.0
   - saltine-0.0.0.4
   - servant-options-0.1.0.0

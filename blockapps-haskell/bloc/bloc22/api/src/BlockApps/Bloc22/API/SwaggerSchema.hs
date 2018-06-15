@@ -7,14 +7,10 @@ module BlockApps.Bloc22.API.SwaggerSchema
   , module Data.Swagger
   ) where
 
-import           Control.Lens                 ((&), (.~), (?~))
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
-import           Data.Monoid                  ()
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
-import           Data.Swagger.SchemaOptions   (SchemaOptions (..),
-                                               defaultSchemaOptions)
-import           Numeric.Natural
+import           Data.Swagger.SchemaOptions   (SchemaOptions (..))
 
 -- | The model's field modifiers will match the JSON instances
 blocSchemaOptions :: SchemaOptions
@@ -25,12 +21,3 @@ blocSchemaOptions = SchemaOptions
   , allNullaryToStringTag = True
   , unwrapUnaryRecords = True
   }
-
---------------------------------------------------------------------------------
--- | Orphans
---------------------------------------------------------------------------------
-
-instance ToParamSchema Natural where
-  toParamSchema _ =  mempty
-    & type_ .~ SwaggerInteger
-    & minimum_ ?~ 0
