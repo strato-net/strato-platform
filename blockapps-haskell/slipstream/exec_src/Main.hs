@@ -75,9 +75,9 @@ data Action = Action ActionType String String (Maybe [(String, String)])
 
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
-  (map (\(x, y) -> Action Create x (show $ codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> Action Delete x (show $ codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (show $ codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -278,7 +278,13 @@ lookupTopic = fromString "statediff"
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
 
-  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages
+  --liftIO $ putStrLn $ "map(B16.decode) messages____: " ++ (show $ map(B16.decode) messages)
+  --liftIO $ putStrLn $ "map(fst . B16.decode) messages______: " ++ (show $ map(fst . B16.decode) messages)
+  liftIO $ putStrLn $ "map(BL.fromStrict) messages______: " ++ (show $ map(BL.fromStrict) messages)
+  liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages______: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
+  liftIO $ putStrLn $ "map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages______: " ++ (show $ map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages)
+
+  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
 
   liftIO $ putStrLn $ "changes: " ++ (show changes)
@@ -353,19 +359,20 @@ processTheMessages messages = do
 
 getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
 getTheMessages offset = do
-  liftIO $ putStrLn "getAndProcessMessages"
+  liftIO $ putStrLn "getTheMessages"
   fetched <- fetch offset 0 lookupTopic
   -- unlines $ (BC.unpack . B16.encode) <$> result
   liftIO $ putStrLn $ "FETCHED_________: " ++ show (fetched)
   let ret = (map tamPayload . fetchMessages) fetched
-  liftIO $ putStrLn $ "RET_________: " ++ show (ret)
   return ret
 
 getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
+  liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
   getAndProcessMessages $ (offset + fromIntegral (length messages))
+
 
 main::IO ()
 main = do
@@ -381,4 +388,5 @@ main = do
         Left e -> error $ show e
         Right y -> return y
   liftIO $ putStrLn "END OF MAIN"
+
   return ()
