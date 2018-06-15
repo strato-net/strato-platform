@@ -30,7 +30,7 @@ build_solidity: prebuild
 build_haskell: prebuild
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
 	docker build --build-arg BASE_IMAGE=${STACK_BASE_IMAGE} --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
-	stack setup && stack install --local-bin-path=$(FAKEROOT)/usr/bin
+	stack setup --allow-different-user && stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy
