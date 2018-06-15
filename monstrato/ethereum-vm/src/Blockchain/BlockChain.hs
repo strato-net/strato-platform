@@ -67,6 +67,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import qualified Blockchain.Mining                       as Mining
 import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
 import           Blockchain.Verifier
@@ -208,10 +209,13 @@ addBlocks blocks = do
         let blockSR = blockDataStateRoot $ obBlockData block
         lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
         lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
-        if (blockSR == currentBaggerSR)
+        if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
           then do
             _ <- setParentStateRoot block
-            updates <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+            lastRun <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
+            let updates = if (flags_miner == Mining.Instant)
+                            then lastRun
+                            else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
             lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
             Bagger.updateTxCallback
               updates
@@ -221,9 +225,10 @@ addBlocks blocks = do
             return [block]
           else return []
       _ -> addBlock block >> return [block]
-  case getBestBlockInList (concat potentialBestBlocks) of
-    Nothing -> return ()
-    Just bestBlock -> do
+  forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
+                                                        --       build the canonical chain. However, running each new
+                                                        --       block could be inefficient, and inadvertently spam
+                                                        --       the network with NewBestBlock messages.
       (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
       when didReplaceThisTime . liftIO $ do
           let Just nbb = newBestBlock
@@ -570,22 +575,6 @@ formatAddress :: Address->String
 formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
-
-getBestBlockInList :: [OutputBlock] -> Maybe OutputBlock
-getBestBlockInList [] = Nothing
-getBestBlockInList (b:bs) = Just $ foldl' compareBlocks b bs
-  where compareBlocks b1 b2 =
-          if ((blockDataNumber $ obBlockData b1) /= (blockDataNumber $ obBlockData b2))
-            then if ((blockDataNumber $ obBlockData b1) > (blockDataNumber $ obBlockData b2))
-                    then b1
-                    else b2
-            else if (obTotalDifficulty b1 /= obTotalDifficulty b2)
-                    then if (obTotalDifficulty b1 > obTotalDifficulty b2)
-                            then b1
-                            else b2
-                    else if ((length $ obReceiptTransactions b1) >= (length $ obReceiptTransactions b2))
-                            then b1
-                            else b2
 
 replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do

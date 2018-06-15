@@ -20,6 +20,7 @@ export function getApplications() {
     applicationsUrl,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -37,6 +38,7 @@ export function launchApp(url) {
     url,
     {
       method: 'GET',
+      credentials: "include",
       redirect: 'follow',
       headers: {
         'Accept': 'application/json'

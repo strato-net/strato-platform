@@ -6,10 +6,10 @@ contract UserRole {
       BUYER,
       SUPPLIER
     }
-    function __getContractName__() constant returns (string) {
+    function __getContractName__() view returns (string) {
         return "UserRole";
     }
-    function __getSource__() constant public returns (string) {
+    function __getSource__() view public returns (string) {
         return "contract UserRole {\n\n    enum UserRole {\n        NULL,\n        ADMIN,\n        BUYER,\n        SUPPLIER\n    }\n}";  
     
     }

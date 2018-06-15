@@ -18,6 +18,7 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password)
     url.replace(":user", from).replace(":address", fromAddress),
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
       },

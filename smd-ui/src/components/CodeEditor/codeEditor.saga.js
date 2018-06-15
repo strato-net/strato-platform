@@ -11,7 +11,7 @@ import {
 
 import { env } from '../../env';
 
-const compileUrl = env.STRATO_URL + "/extabi";
+const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function tokenizeSource(source) {
@@ -19,6 +19,7 @@ export function tokenizeSource(source) {
     compileUrl,
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
       },
@@ -40,10 +41,11 @@ export function tokenizeSource(source) {
 }
 
 export function compileSource(contractName, source) {
-  
+
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
+    credentials: "include",
     headers: {
       "accept": "application/json",
       "content-type": "application/json"

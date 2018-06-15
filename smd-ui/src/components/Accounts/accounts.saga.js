@@ -22,7 +22,10 @@ import {
   faucetSuccess,
   faucetFailure,
   fetchBalanceSuccess,
-  fetchBalanceFailure
+  fetchBalanceFailure,
+  fetchCurrentAccountDetailSuccess,
+  fetchCurrentAccountDetailFailure,
+  FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -38,6 +41,7 @@ export function getAccountsApi() {
     usernameUrl,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -55,6 +59,7 @@ export function getUserAddressesApi(username) {
     addressUrl.replace(':user', username),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -73,6 +78,7 @@ export function getAccountDetailApi(address) {
     accountDataUrl.replace(":address", address),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -91,6 +97,7 @@ export function postFaucet(address) {
     faucetUrl,
     {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
@@ -147,6 +154,17 @@ export function* getAccountDetail(action) {
   }
 }
 
+export function* getCurrentAccountDetail(action) {
+  try {
+    const response = yield call(getAccountDetailApi, action.address);
+    // don't ask about response['0'].
+    yield put(fetchCurrentAccountDetailSuccess(action.address, response['0']));
+  }
+  catch (err) {
+    yield put(fetchCurrentAccountDetailFailure(action.address, err));
+  }
+}
+
 export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
@@ -176,6 +194,7 @@ export default function* watcAccountActions() {
     takeLatest(FETCH_ACCOUNTS, getAccounts),
     takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
     takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
+    takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
     takeLatest(FAUCET_REQUEST, faucetAccount),
     takeEvery(GET_BALANCE, getBalance)
   ];

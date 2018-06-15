@@ -3,8 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module BlockApps.Bloc22.Client
-  ( getHomepage
-  , getGitInfo
+  ( getGitInfo
   , getAddresses
   , getContracts
   , getContractsData
@@ -16,6 +15,7 @@ module BlockApps.Bloc22.Client
   , getContractsStateMapping
   , getContractsStates
   , postContractsCompile
+  , postContractsXabi
   , getSearchContract
   , getSearchContractState
   , getSearchContractStateReduced
@@ -43,9 +43,6 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types()
-
-getHomepage :: ClientM Homepage
-getHomepage = client (Proxy @ GetHomepage)
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @ GetGitInfo)
@@ -97,6 +94,9 @@ getContractsStates = client (Proxy @ GetContractsStates)
 postContractsCompile :: [PostCompileRequest] -> ClientM [PostCompileResponse]
 postContractsCompile = client (Proxy @ PostContractsCompile)
 
+postContractsXabi :: PostXabiRequest -> ClientM PostXabiResponse
+postContractsXabi = client (Proxy @ PostContractsXabi)
+
 getSearchContract :: ContractName -> ClientM [MaybeNamed Address]
 getSearchContract = client (Proxy @ GetSearchContract)
 
@@ -130,7 +130,7 @@ postUsersContract = client (Proxy @ PostUsersContract)
 postUsersUploadList
   :: UserName
   -> Address
-  -> Bool 
+  -> Bool
   -> UploadListRequest
   -> ClientM [BlocTransactionResult]
 postUsersUploadList = client (Proxy @ PostUsersUploadList)

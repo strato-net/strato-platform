@@ -13,6 +13,7 @@ if [ "$NODE_ENV" == development ]; then
   export SINGLE_NODE=true
   export NODE_HOST=localhost
   export stratoRoot=http://localhost/strato-api/eth/v1.2/
+  export blocRoot=http://localhost/bloc/v2.2/
 
   export PG_HOST=localhost
   export PG_PORT=5432
@@ -46,5 +47,6 @@ fi
 # For jenkins, we expect a running environment
 if [ "$NODE_ENV" == test ]; then
   export stratoRoot="http://${stratoHost}/eth/v1.2"
+  export blocRoot="http://${blocHost}/bloc/v2.2"
   ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION --config=config-prod.yaml test/
 fi

@@ -45,12 +45,12 @@ describe('ContractMethodCall: index', () => {
   test('renders contracts card (public mode)', () => {
     const props = {
       modal: {},
-      accounts: indexAccountsMock,
+      accounts: {},
       modalUsername: 'Buyer1',
       currentUser: {
         "id": '',
-        "username": '',
-        "address": ''
+        "username": 'Supplier1',
+        "address": '370adf114257cb0e0025eedf0a96261b51af23e3'
       },
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),

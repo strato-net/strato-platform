@@ -12,6 +12,7 @@ Object {
     "appUserAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
     "appUsername": "tanuj41",
   },
+  "isOpen": false,
   "launchPad": Object {
     "appPackage": null,
     "error": "",
@@ -51,6 +52,12 @@ exports[`Launchpad: index render component with initial (enterprise mode) 1`] = 
             </h4>
           </div>
           <div className=\\"col-sm-6 text-right\\">
+            <Blueprint.Button onClick={[undefined]} className=\\"pt-button pt-minimal\\">
+              <i className=\\"fa fa-info-circle smd-margin-right-8\\">
+                 
+              </i>
+              Instructions
+            </Blueprint.Button>
             <a href=\\"https://developers.blockapps.net/advanced/launch-dapp/\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
               <button className=\\"pt-button pt-minimal pt-intent-primary\\">
                 <i className=\\"fa fa-book smd-margin-right-8\\">
@@ -125,6 +132,9 @@ exports[`Launchpad: index render component with initial (enterprise mode) 1`] = 
       </div>
     </div>
   </div>
+  <Blueprint.Dialog isOpen={false} onClose={[undefined]} title=\\"Additional Instructions\\" className=\\"pt-dark cli-dialog\\" canOutsideClickClose={true}>
+    <withRouter(Connect(CLI)) />
+  </Blueprint.Dialog>
 </div>"
 `;
 
@@ -157,6 +167,12 @@ exports[`Launchpad: index render component with initial (public mode) 1`] = `
             </h4>
           </div>
           <div className=\\"col-sm-6 text-right\\">
+            <Blueprint.Button onClick={[undefined]} className=\\"pt-button pt-minimal\\">
+              <i className=\\"fa fa-info-circle smd-margin-right-8\\">
+                 
+              </i>
+              Instructions
+            </Blueprint.Button>
             <a href=\\"https://developers.blockapps.net/advanced/launch-dapp/\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
               <button className=\\"pt-button pt-minimal pt-intent-primary\\">
                 <i className=\\"fa fa-book smd-margin-right-8\\">
@@ -233,5 +249,8 @@ exports[`Launchpad: index render component with initial (public mode) 1`] = `
       </div>
     </div>
   </div>
+  <Blueprint.Dialog isOpen={false} onClose={[undefined]} title=\\"Additional Instructions\\" className=\\"pt-dark cli-dialog\\" canOutsideClickClose={true}>
+    <withRouter(Connect(CLI)) />
+  </Blueprint.Dialog>
 </div>"
 `;

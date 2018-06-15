@@ -30,6 +30,7 @@ export function query(query, resourceType) {
     constructedURL,
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },

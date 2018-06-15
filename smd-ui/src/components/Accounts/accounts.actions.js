@@ -15,6 +15,9 @@ export const RESET_ACCOUNT_ADDRESS = 'RESET_ACCOUNT_ADDRESS';
 export const GET_BALANCE = 'GET_BALANCE';
 export const BALANCE_SUCCESS = 'BALANCE_SUCCESS';
 export const BALANCE_FAILURE = 'BALANCE_FAILURE';
+export const FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST = 'FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST';
+export const FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS = 'FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS';
+export const FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE = 'FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE';
 
 export const fetchAccounts = function (loadAddresses, loadBalances) {
   return {
@@ -38,7 +41,7 @@ export const fetchAccountsFailure = function (error) {
   }
 };
 
-export const changeAccountFilter = function(filter) {
+export const changeAccountFilter = function (filter) {
   return {
     type: CHANGE_ACCOUNT_FILTER,
     filter: filter
@@ -76,7 +79,7 @@ export const fetchUserAddressesFailure = function (name, error) {
   }
 };
 
-export const fetchAccountDetail = function(name, address) {
+export const fetchAccountDetail = function (name, address) {
   return {
     type: FETCH_ACCOUNT_DETAIL_REQUEST,
     name: name,
@@ -84,7 +87,7 @@ export const fetchAccountDetail = function(name, address) {
   }
 };
 
-export const fetchAccountDetailSuccess = function(name, address, detail) {
+export const fetchAccountDetailSuccess = function (name, address, detail) {
   return {
     type: FETCH_ACCOUNT_DETAIL_SUCCESS,
     name: name,
@@ -93,7 +96,7 @@ export const fetchAccountDetailSuccess = function(name, address, detail) {
   }
 };
 
-export const fetchAccountDetailFailure = function(name, address, error) {
+export const fetchAccountDetailFailure = function (name, address, error) {
   return {
     type: FETCH_ACCOUNT_DETAIL_FAILURE,
     name: name,
@@ -102,7 +105,7 @@ export const fetchAccountDetailFailure = function(name, address, error) {
   }
 };
 
-export const faucetRequest = function(address, name) {
+export const faucetRequest = function (address, name) {
   return {
     type: FAUCET_REQUEST,
     address,
@@ -110,36 +113,59 @@ export const faucetRequest = function(address, name) {
   }
 };
 
-export const faucetSuccess = function() {
+export const faucetSuccess = function () {
   return {
     type: FAUCET_SUCCESS
   }
 };
 
-export const faucetFailure = function(err) {
+export const faucetFailure = function (err) {
   return {
     type: FAUCET_FAILURE,
     error: err
   }
 };
 
-export const fetchBalanceRequest = function(address) {
+export const fetchBalanceRequest = function (address) {
   return {
     type: GET_BALANCE,
     address
   }
 }
 
-export const fetchBalanceSuccess = function(detail) {
+export const fetchBalanceSuccess = function (detail) {
   return {
     type: BALANCE_SUCCESS,
     detail
   }
 };
 
-export const fetchBalanceFailure = function(error) {
+export const fetchBalanceFailure = function (error) {
   return {
     type: BALANCE_FAILURE,
     error
+  }
+};
+
+export const fetchCurrentAccountDetail = function (address) {
+  return {
+    type: FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST,
+    address: address
+  }
+};
+
+export const fetchCurrentAccountDetailSuccess = function (address, detail) {
+  return {
+    type: FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
+    address: address,
+    detail: detail
+  }
+};
+
+export const fetchCurrentAccountDetailFailure = function (address, error) {
+  return {
+    type: FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
+    address: address,
+    error: error
   }
 };

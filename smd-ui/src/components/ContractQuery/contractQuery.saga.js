@@ -21,6 +21,7 @@ export function queryCirrusRequest(name, queryString) {
     cirrusUrl.replace(":contractName", name).replace(':queryString', queryString),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },
@@ -38,6 +39,7 @@ export function queryCirrusVarsRequest(contractName) {
     contractUrl.replace(":contractName", contractName),
     {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Accept': 'application/json'
       },

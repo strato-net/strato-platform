@@ -14,8 +14,9 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
+import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Xabi.Type
+import           BlockApps.Solidity.Xabi.Type
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
 
 
@@ -23,11 +24,12 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
-unparse :: [(Text, (Xabi, [Text]))] -> String
-unparse contracts = List.concat $ List.map unparseContract contracts
+unparse :: File -> String
+unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
-unparseContract :: (Text, (Xabi, [Text])) -> String
-unparseContract (name, (contract,inherited)) =
+unparseSourceUnit :: SourceUnit -> String
+unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
+unparseSourceUnit (NamedXabi name (contract,inherited)) =
      "contract "
   <> Text.unpack name
   <> (case inherited of
@@ -63,19 +65,24 @@ unparseVar (name, theType) =
   <> ";"
 
 unparseVarType :: Type -> String
-unparseVarType (Int (Just True) _) = "int"
-unparseVarType (Int (Just False) _) = "uint"
-unparseVarType (Int Nothing _) = "uint"
+unparseVarType (Int (Just True) (Just n)) = "int" <> show (8*n)
+unparseVarType (Int (Just True) Nothing) = "int"
+unparseVarType (Int (Just False) (Just n)) = "uint" <> show (8*n)
+unparseVarType (Int (Just False) Nothing) = "uint"
+unparseVarType (Int Nothing (Just n)) = "uint" <> show (8*n)
+unparseVarType (Int Nothing Nothing) = "uint"
+unparseVarType (Bool) = "bool"
 unparseVarType (String _) = "string"
-unparseVarType Bool    = "bool"
-unparseVarType Address = "address"
+unparseVarType (Address) = "address"
+unparseVarType (Bytes (Just True) _ ) = "bytes"
+unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (Label str) = str
-unparseVarType (Bytes _ (Just n)) = "bytes" <> (show n)
-unparseVarType (Bytes _ Nothing)  = "bytes"
-unparseVarType (Array _ (Just len) entry) = (unparseVarType entry) <> "[" <> (show len) <> "]"
-unparseVarType (Array _ Nothing    entry) = (unparseVarType entry) <> "[]"
+unparseVarType (Enum _ name _) = Text.unpack name
+unparseVarType (Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
+unparseVarType (Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
-unparseVarType _ = "int"
+unparseVarType (Contract contractName) = Text.unpack contractName
+unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
 unparseFunc (name, Func{..}) =
@@ -85,12 +92,9 @@ unparseFunc (name, Func{..}) =
     <> "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
-    <> case funcMutable of
-        Just False -> "constant "
-        _ -> ""
-    <> case funcPayable of
-        Just True -> "payable "
-        _ -> ""
+    <> case funcStateMutability of
+        Just sm -> tShow sm <> " "
+        Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
@@ -159,29 +163,7 @@ unparseVals (name, theType) =
      else " " <> name
 
 unparseIndexedType :: IndexedType -> Text
--- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) (Just n)} = Text.pack $ "int" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) Nothing} = "int"
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) (Just n)} = Text.pack $ "uint" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) Nothing} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = Int Nothing (Just n)} = Text.pack $ "uint" <> show (8*n)
-unparseIndexedType IndexedType{indexedTypeType = Int Nothing Nothing} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = Bool} = "bool"
-unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
-unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
-unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
-unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
-  "bytes" <> (Text.pack . show $ bytes)
-unparseIndexedType IndexedType{indexedTypeType = Label str} = Text.pack str
-unparseIndexedType IndexedType{indexedTypeType = Enum _ name _} = name
-unparseIndexedType IndexedType{indexedTypeType = Array (Just True) _ t} = (unparseIndexedType (IndexedType undefined t))
-                                                                       <> "[]"
-unparseIndexedType IndexedType{indexedTypeType = Array (Just False) (Just n) t} = (unparseIndexedType (IndexedType undefined t))
-                                                                               <> Text.pack ("[" <> show n <> "]")
-unparseIndexedType IndexedType{indexedTypeType = Array Nothing _ t} = (unparseIndexedType (IndexedType undefined t))
-                                                                   <> "[]"
-unparseIndexedType IndexedType{indexedTypeType = Contract contractName} = contractName
-unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
+unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
 
 addFunction :: (Text, String) -> Xabi -> Xabi
 addFunction (name, contents) c =
@@ -190,8 +172,7 @@ addFunction (name, contents) c =
                                                              , indexedTypeIndex=0
                                                              }
                   , funcContents = Just $ Text.pack contents
-                  , funcMutable = Just False
-                  , funcPayable = Just False
+                  , funcStateMutability = Just View
                   , funcVisibility = Nothing
                   , funcModifiers = Nothing
                   }

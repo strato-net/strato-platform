@@ -3,15 +3,22 @@ pipeline {
     label "cd10"
   }
   options { disableConcurrentBuilds() }
+  parameters {string(name: 'PLATFORM_BRANCH_NAME', defaultValue: 'develop', description: 'blockapps/strato-platform git branch name to build upon. Skip the "origin/" part.\n' +
+    'This job will build using the pipeline from Jenkinsfile.test and all the code in this branch.')}
   stages {
     stage('Prepare') {
       steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+          }
+        }
         sh '''#!/bin/bash -le
           set -x
           docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
         '''
-       }
+      }
     }
 
     stage('Build') {
@@ -27,37 +34,26 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
-          # TODO: unify for all pipelines by creating the run script file
-          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
-            BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
-            BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
-            STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
-            STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
-            CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
-            APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
-            STRATO_GS_MODE=1 \
-            docker-compose -p strato up -d
+          rm -rf strato-getting-started
+          git clone https://github.com/blockapps/strato-getting-started
+          cp docker-compose.yml strato-getting-started/
+          cd strato-getting-started
+          NODE_HOST=cd10.eastus.cloudapp.azure.com
+          NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0
           # Few quick tests
           until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
           do
-            if [[ "$counter" -gt 300 ]]; then
-              echo "bloc took longer than 5 minutes to initialize! aborting."
+            if [[ "$counter" -gt 120 ]]; then
+              echo "bloc took longer than 2 minutes to initialize! aborting."
               exit 73
             fi
             echo "waiting for bloc to be available through nginx"
             counter=$((counter+1))
             sleep 1
           done
-          echo "bloc is available"
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
-          do
-            echo "waiting for cirrus to be available through nginx"
-            sleep 1
-          done
-          echo "cirrus is available"
+          echo "bloc is available through nginx - node is running"
         '''
       }
     }
@@ -88,11 +84,11 @@ pipeline {
             '''
           },
 
-          'Monstrato tests': {
+          'Core Strato tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running monstrato unit tests"
-              cd monstrato
+              echo "Running core-strato unit tests"
+              cd core-strato
               ./run_unit_tests.sh
             '''
           },
@@ -139,7 +135,7 @@ pipeline {
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+      )
       sh '''
         echo "Build Successful for Git branch: $BRANCH_NAME"
       '''

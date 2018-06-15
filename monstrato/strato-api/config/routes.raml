@@ -17,31 +17,6 @@ protocols: [ HTTP ]
         example:
       responses:
 
-/extabi:
-  description: |
-    handler: ExtABIR
-  post:
-    description: Get the symbol table associated with a solidity source file.
-    queryParameters:
-      src:
-        description: a solidity source main file
-        required: false
-        type: string
-        example: "src=contract C{}"
-      main:
-        description: a solidity source main file
-        required: false
-        type: file
-        repeat: true
-        example:
-      import:
-        description: a solidity source file imported by a main file
-        required: false
-        type: file
-        repeat: true
-        example:
-      responses:
-
 /stats:
   /difficulty:
     description: |

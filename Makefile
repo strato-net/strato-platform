@@ -54,7 +54,7 @@ dappstore:
 
 strato:
 	@echo Now building strato...
-	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=monstrato/
+	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
 nginx:
 	@echo Now building nginx...

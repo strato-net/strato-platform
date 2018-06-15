@@ -18,9 +18,8 @@ spec = do
     it "should unparse a function that returns a pair 'returns (int, uint)'" $ do
       let func = Func Map.empty
                       (Map.fromList [("#0", intIndexedType), ("#1", uintIndexedType)])
+                      Nothing
                       (Just "")
-                      Nothing
-                      Nothing
                       Nothing
                       Nothing
       let ret = unparseFunc ("test", func)
@@ -29,9 +28,8 @@ spec = do
     it "should unparse a function that returns a pair 'returns (ErrorCodes, uint)'" $ do
       let func = Func Map.empty
                       (Map.fromList [("#0", errorIndexedType), ("#1", uintIndexedType)])
+                      Nothing
                       (Just "")
-                      Nothing
-                      Nothing
                       Nothing
                       Nothing
       let ret = unparseFunc ("test2", func)
@@ -40,15 +38,13 @@ spec = do
     it "should unparse a function that returns a pair 'returns (ErrorCodes, ProjectState)'" $ do
       let func = Func Map.empty
                       (Map.fromList [("#0", errorIndexedType), ("#1", stateIndexedType)])
+                      Nothing
                       (Just "")
-                      Nothing
-                      Nothing
                       Nothing
                       Nothing
       let ret = unparseFunc ("fsm", func)
           expected = "function fsm() returns (ErrorCodes, ProjectState) {\n        \n    }"
       ret `shouldBe` expected
-
 
 
 expectedFunc :: String

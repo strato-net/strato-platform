@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Can be ran from any path.
 # 1. Makes the dumps of both: `bloc22` and `cirrus` dbs
 # 2. creates `~/db_backups/` folder if doesn't exist
 # 3. copies the dumps into it with the timestamped dir name

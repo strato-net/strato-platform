@@ -1,12 +1,14 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module BlockApps.Bloc22.Server where
 
-import           Control.Lens             ((&), (.~), (?~))
+import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
+import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
 import           Data.Swagger
 import           Servant
@@ -16,12 +18,11 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Addresses
 import           BlockApps.Bloc22.Server.Contracts
-import           BlockApps.Bloc22.Server.Git
 import           BlockApps.Bloc22.Server.Search
 import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
-bloc = getHomepage
+bloc = (return gitInfo)
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
@@ -44,14 +45,12 @@ bloc = getHomepage
   :<|> getContractsStates
   :<|> getContractsEnum
   :<|> postContractsCompile
+  :<|> postContractsXabi
   :<|> getSearchContract
   :<|> getSearchContractState
   :<|> getSearchContractStateReduced
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
-
-getHomepage :: Bloc Homepage
-getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
@@ -65,9 +64,6 @@ blocSwagger = toSwagger (Proxy @BlocAPI)
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
-serveBlocAndDocs
-  :: BlocEnv
-  -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
-serveBlocAndDocs blocEnv = serveBloc blocEnv
-  :<|> getGitInfo
-  :<|> return blocSwagger
+makeLenses ''Swagger
+filterEnterprisePaths :: Swagger -> Swagger
+filterEnterprisePaths = over swaggerPaths $ filterWithKey (\k _ -> k /= "/users")

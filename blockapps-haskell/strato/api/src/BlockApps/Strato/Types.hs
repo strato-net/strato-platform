@@ -32,9 +32,6 @@ module BlockApps.Strato.Types
   , Difficulty (..)
   , TxCount (..)
   , Storage (..)
-  , Src (..)
-  , ExtabiResponse (..)
-  , SolcResponse (..)
   , AbiBin (..)
   , exampleTxResult
   ) where
@@ -53,6 +50,7 @@ import           Data.Map.Strict              (Map)
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Swagger
+import qualified Data.Swagger                 as Sw
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -69,14 +67,10 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
 import           Text.Read.Lex
-import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
-
 import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
                                                Nonce (..), addressString,
                                                keccak256, keccak256lazy,
                                                stringAddress)
-
-import           BlockApps.Solidity.Xabi
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
@@ -194,26 +188,11 @@ instance ToSchema Storage
 instance ToSchema Word160 where
   declareNamedSchema = const . pure $ named "Word160" binarySchema
 -- add min max
-instance ToSchema Src where
-  declareNamedSchema _ = do
-             _ <- declareSchemaRef (Proxy :: Proxy Text)
-             return $ NamedSchema (Just "Post Users Contract Request")
-                 ( mempty
-                 & type_ .~ SwaggerString
-                 )
 
-instance ToSchema SolcResponse
 instance ToSchema AbiBin
-instance ToSchema ExtabiResponse
 
 instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
-
-instance ToSchema Natural where
-  declareNamedSchema = const . pure $ named "Natural" $ sketchSchema (8 :: Natural)
-
-instance ToParamSchema Natural where
-  toParamSchema _ = mempty & type_ .~ SwaggerInteger
 
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
@@ -447,30 +426,10 @@ instance FromJSON Storage where
 instance ToJSON Storage where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
-newtype Src = Src { unSrc :: Text } deriving (Eq, Show)
-
-instance ToForm Src where
-  toForm (Src src) = Form $ HashMap.singleton "src" [src]
-
-newtype ExtabiResponse = ExtabiResponse { extabiresponseSrc :: Map Text Xabi }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON ExtabiResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToJSON ExtabiResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance MimeUnrender PlainText ExtabiResponse where
-  mimeUnrender _ = eitherDecode
-
 instance FromJSON FaucetResponse where
   parseJSON = fmap FaucetResponse . parseJSON
 instance ToJSON FaucetResponse where
   toJSON (FaucetResponse x) = toJSON x
-
-instance MimeRender PlainText ExtabiResponse where
-  mimeRender _ = encode
 
 instance MimeUnrender PlainText FaucetResponse where
   mimeUnrender _ =
@@ -479,15 +438,6 @@ instance MimeUnrender PlainText FaucetResponse where
 instance MimeRender PlainText FaucetResponse where
   mimeRender _ (FaucetResponse x) =
     Lazy.fromStrict $ Text.encodeUtf8 x
-
-newtype SolcResponse = SolcResponse { solcresponseSrc :: Map Text AbiBin }
-                     deriving (Eq,Show,Generic)
-
-instance FromJSON SolcResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToJSON SolcResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
 
 data AbiBin = AbiBin
   { abi        :: Text
@@ -507,12 +457,6 @@ instance ToJSON AbiBin where
     , "bin" .= bin
     , "bin-runtime" .= binRuntime
     ]
-
-instance MimeUnrender PlainText SolcResponse where
-  mimeUnrender _ = eitherDecode
-
-instance MimeRender PlainText SolcResponse where
-  mimeRender _ = encode
 
 data TransactionResult = TransactionResult
   { transactionresultBlockHash        :: Keccak256
@@ -564,7 +508,7 @@ exampleTxResult :: TransactionResult
 exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage"
 
 stratoSchemaOptions :: SchemaOptions
-stratoSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
+stratoSchemaOptions = defaultSchemaOptions {Sw.fieldLabelModifier = camelCase . dropFPrefix}
 
 newtype BatchTransactionResult = BatchTransactionResult
     { unBatchTransactionResult :: Map Keccak256 [TransactionResult]

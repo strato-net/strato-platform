@@ -39,7 +39,6 @@ library
                      Handler.BatchTransactionResult
                      Handler.TransactionResult
                      Handler.Faucet
-                     Handler.ExtABI
                      Handler.Login
                      Handler.Wallet
                      Handler.RegisterApp
@@ -52,7 +51,6 @@ library
                      Handler.Version
                      Handler.Coinbase
                      Handler.LogInfo
-                     Handler.SolidityCommon
                      Handler.UUIDInfo
                      Handler.Peers
                      Versioning
@@ -111,7 +109,6 @@ library
                  , postgresql-simple
                  , process
                  , shakespeare                   >= 2.0
-                 , solidity-abi
                  , strato-conf
                  , strato-model
                  , strato-sequencer
@@ -198,7 +195,6 @@ test-suite test
                  , aeson
                  , blaze-html
                  , blaze-markup
-                 , solidity-abi
                  , aeson-pretty
                  , bcrypt
                  , entropy

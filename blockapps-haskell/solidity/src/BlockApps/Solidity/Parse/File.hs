@@ -11,7 +11,6 @@ module BlockApps.Solidity.Parse.File (solidityFile) where
 
 --import Data.Either
 
-import           Data.Text                             (Text)
 import           Text.Parsec
 
 import           Prelude                               hiding (lookup)
@@ -20,7 +19,6 @@ import           BlockApps.Solidity.Parse.Declarations
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Parse.Pragmas
-import           BlockApps.Solidity.Xabi
 
 -- TODO- oops, it looks like xabis can contain multiple contracts and imports.  For now I'll just hardcode a single contract to match the XABI type.
 {-
@@ -36,26 +34,12 @@ solidityFile = do
   return $ uncurry Xabi $ partitionEithers toplevel
 -}
 
-solidityFile :: SolidityParser [(Text, (Xabi, [Text]))]
+solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  versionOk <- option Nothing solidityPragma
-  case versionOk of
-    Just msg -> fail msg
-    Nothing -> do
-      contracts <- many solidityContract
-      eof
-      return contracts
-
-{-
-data Xabi = Xabi
-  { xabiFuncs :: Map Text Func
-  , xabiConstr :: Map Text Xabi.IndexedType
-  , xabiVars :: Map Text Xabi.VarType
-  , xabiTypes :: Map Text Xabi.Def
-  } deriving (Eq,Show,Generic)
--}
-
+  units <- many (solidityPragma <|> solidityContract)
+  eof
+  return . File $ units
 
 --TODO readd imports
 
