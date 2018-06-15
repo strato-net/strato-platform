@@ -21,7 +21,7 @@ prebuild:
 build_haskell: prebuild
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
-	stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin && stack test --no-run-tests test-suite \
+	stack setup $(STACKFLAGS) && stack install --local-bin-path=$(FAKEROOT)/usr/bin && stack test --no-run-tests test-suite \
         # --profile --ghc-options="-fprof-auto -rtsopts"
 
 build_deploybase: prebuild

@@ -3,9 +3,8 @@ RUN apt-get -y update                                          && \
     apt-get install -y curl                                    && \
     curl -sL -f https://deb.nodesource.com/setup_6.x | bash -  && \
     apt-get install -y libleveldb-dev libpq-dev libpcre3-dev      \
-                       libboost-all-dev libjsoncpp-dev netbase    \
-                       netcat-openbsd libstdc++6 nodejs           \
-                       postgresql-client                       && \
+                       netbase netcat-openbsd libstdc++6          \
+                       nodejs postgresql-client                && \
     apt-get autoremove                                         && \
     rm -rf /var/lib/apt/lists/*                                && \
     mkdir -p /var/lib/strato
