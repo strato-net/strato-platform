@@ -126,6 +126,11 @@ data TransactionRequest =
   , trDirection       :: Direction
   } deriving (Eq, Show)
 
+instance RLPSerializable TransactionRequest where
+  rlpEncode (Explicit [x]) = RLPArray $ rlpEncode <$> [x]
+  rlpEncode (Implicit a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d]
+	-- Add in rlpDecode implementations
+
 data Message =
   --p2p wire protocol
   Hello { version::Int, clientId::String, capability::[Capability], port::Int, nodeId::Point } |
@@ -288,14 +293,14 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
   (0x20, RLPArray [rlpEncode $ toInteger ver])
 
 -- private chains
-{- wireMessage2Obj (GetChainDetails c) = 
-  (0x1c, RLPArray [rlpEncode c])
+wireMessage2Obj (GetChainDetails c) = 
+  (0x1c, rlpEncode c)
 
 wireMessage2Obj (ChainDetails c cl fth ad cd) = 
   (0x1d, RLPArray [rlpEncode c, rlpEncode cl, rlpEncode fth, rlpEncode ad, rlpEncode cd])
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
+
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
--}
 
