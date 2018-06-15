@@ -1,13 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.SequencerSpec where
 
+import          Debug.Trace (trace)
 import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
 import           Control.Exception                   (finally)
 import           Control.Monad.Logger
-import           Control.Monad.Stats
 
-import           Blockchain.EthConf                  (lookupConsumerGroup, runStatsTConfigured)
 import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -42,17 +42,20 @@ withTemporaryDepBlockDB genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
+    trace "Gotten here" $ return ()
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
+                               , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
                                , kafkaClientId         = kcid
-                               , kafkaConsumerGroup    = lookupConsumerGroup kcid
+                               , kafkaConsumerGroup    = KP.ConsumerGroup (KP.KString "fake")
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
-                               , bootstrapDoEmit       = True
+                               , bootstrapDoEmit       = False
+                               , statsConfig           = Nothing
                                }
 
-    runLoggingT (runStatsTConfigured (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m))) printLogMsg
+    runLoggingT (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
