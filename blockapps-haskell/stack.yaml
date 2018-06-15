@@ -1,4 +1,4 @@
-resolver: nightly-2017-04-21
+resolver: nightly-2017-04-21 #also duplicated in docker section below
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
@@ -44,3 +44,7 @@ extra-include-dirs:
 
 extra-lib-dirs:
 - /usr/local/lib
+
+docker:
+  enable: true
+  image: "stack-buildbase:nightly-2017-04-21"
