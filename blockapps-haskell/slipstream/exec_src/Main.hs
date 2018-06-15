@@ -275,112 +275,110 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
-getAndProcessMessages :: Kafka a => K.Offset -> a [B.ByteString]
-getAndProcessMessages offset = do
+processTheMessages :: [B.ByteString] -> IO ()
+processTheMessages messages = do
+
+  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages
+  --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
+
+  liftIO $ putStrLn $ "changes: " ++ (show changes)
+
+  let conHost = flags_pghost
+  --let conHost = "172.18.0.6"
+  let conPort = read flags_pgport
+  let conUser = flags_pguser
+  let conPass = flags_password
+  let conDB = flags_database
+
+  let dbConnectInfo = ConnectInfo { connectHost = conHost
+                                 , connectPort = conPort
+                                 , connectUser = conUser
+                                 , connectPassword = conPass
+                                 , connectDatabase = conDB
+                                 }
+
+  pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
+
+  let strato = flags_stratourl
+  --let strato = "172.18.0.8:3000/eth/v1.2/"
+
+  stratoUrl <- parseBaseUrl strato
+  mgr <- newManager defaultManagerSettings
+
+  let env = BlocEnv
+            {
+              urlStrato=stratoUrl   -- :: BaseUrl
+            , httpManager=mgr -- :: Manager
+            , dbPool=pool     --  :: Pool Connection
+            , logLevel=Error    -- :: Severity
+            }
+
+
+  cachedContractsIORef <- newIORef Map.empty
+
+
+  _ <-
+    enterBloc2 env $ do
+      forM (filter hasContract changes) $ \change -> do
+        filledInChange <- addStorageIfNeeded change
+
+        let (address, codehash, storage) =
+              case filledInChange of
+               Action _ a c (Just s) -> (a, c, storageToFunction s)
+               Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+
+        liftIO $ putStrLn $ "a = " ++ show address ++ " c = " ++ show codehash
+        cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
+
+        contractMetaData <-
+          case Map.lookup codehash cachedContracts of
+           Just c -> return c
+           Nothing -> do
+             contractOrError <- getContract address codehash
+             case contractOrError of
+              Left e -> error e
+              Right c -> do
+                liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
+                return c
+
+        --let hexadd = readHex address
+        --let addr = Address hexadd
+        --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
+
+        let ret =
+              Map.fromList $ map (fmap valueToSolidityValue) $
+              decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
+        liftIO $ convertRet address $ encode ret
+  return()
+
+getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
+getTheMessages offset = do
+  liftIO $ putStrLn "getAndProcessMessages"
   fetched <- fetch offset 0 lookupTopic
+  -- unlines $ (BC.unpack . B16.encode) <$> result
+  liftIO $ putStrLn $ "FETCHED_________: " ++ show (fetched)
   let ret = (map tamPayload . fetchMessages) fetched
+  liftIO $ putStrLn $ "RET_________: " ++ show (ret)
   return ret
+
+getAndProcessMessages :: Kafka a => K.Offset -> a ()
+getAndProcessMessages offset = do
+  messages <- getTheMessages offset
+  liftIO $ processTheMessages messages
+  getAndProcessMessages $ (offset + fromIntegral (length messages))
 
 main::IO ()
 main = do
-  --Debug
-  liftIO $ putStrLn "SLIPSTREAM MAIN"
+  liftIO $ putStrLn "Main"
   _ <- $initHFlags "Setup Slipstream Variables"
-  liftIO $ putStrLn "SLIPSTREAM VARIABLES"
 
   let offset = 0 :: K.Offset
+  let kafkaID = "queryStrato" :: KafkaClientId
+  let state = mkConfiguredKafkaState kafkaID
 
-  runMain offset
-  main
-    where
-    runMain :: K.Offset -> IO ()
-    runMain offset = do
-
-      let kafkaID = "queryStrato" :: KafkaClientId
-      let state = mkConfiguredKafkaState kafkaID
-
-      msg <- runKafka state $ (getAndProcessMessages offset)
-
-      messages <- case msg of
+  msg <- runKafka state $ (getAndProcessMessages offset)
+  messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
-
-      --lastOffset <- getLastOffset LatestTime 0 lookupTopic
-
-      let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages
-      --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
-      liftIO $ putStrLn $ "SLIPSTREAM POST CHANGES: " ++ (show changes)
-
-
-      let conHost = flags_pghost
-      --let conHost = "172.18.0.6"
-      let conPort = read flags_pgport
-      let conUser = flags_pguser
-      let conPass = flags_password
-      let conDB = flags_database
-
-      let dbConnectInfo = ConnectInfo { connectHost = conHost
-                                     , connectPort = conPort
-                                     , connectUser = conUser
-                                     , connectPassword = conPass
-                                     , connectDatabase = conDB
-                                     }
-
-      pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
-
-      let strato = flags_stratourl
-      --let strato = "172.18.0.8:3000/eth/v1.2/"
-
-      stratoUrl <- parseBaseUrl strato
-      mgr <- newManager defaultManagerSettings
-
-      let env = BlocEnv
-                {
-                  urlStrato=stratoUrl   -- :: BaseUrl
-                , httpManager=mgr -- :: Manager
-                , dbPool=pool     --  :: Pool Connection
-                , logLevel=Error    -- :: Severity
-                }
-
-
-      cachedContractsIORef <- newIORef Map.empty
-
-
-      _ <-
-        enterBloc2 env $ do
-          forM (filter hasContract changes) $ \change -> do
-            filledInChange <- addStorageIfNeeded change
-
-            let (address, codehash, storage) =
-                  case filledInChange of
-                   Action _ a c (Just s) -> (a, c, storageToFunction s)
-                   Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-
-            liftIO $ putStrLn $ "a = " ++ show address ++ " c = " ++ show codehash
-            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
-
-            contractMetaData <-
-              case Map.lookup codehash cachedContracts of
-               Just c -> return c
-               Nothing -> do
-                 contractOrError <- getContract address codehash
-                 case contractOrError of
-                  Left e -> error e
-                  Right c -> do
-                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
-                    return c
-
-            --let hexadd = readHex address
-            --let addr = Address hexadd
-            --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
-
-            let ret =
-                  Map.fromList $ map (fmap valueToSolidityValue) $
-                  decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
-            liftIO $ convertRet address $ encode ret
-
-      --if (offset > lastOffset)
-        --then return ()
-        --else
-      runMain (offset + 1)
-  --return ()
+  liftIO $ putStrLn "END OF MAIN"
+  return ()
