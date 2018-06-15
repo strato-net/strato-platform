@@ -6,7 +6,6 @@ module BlockApps.Solidity.Xabi.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
-import           Data.Aeson.TH
 import           Data.Swagger
 import           Data.Text                    (Text)
 import           Generic.Random.Generic
