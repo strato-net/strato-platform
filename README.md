@@ -4,7 +4,8 @@
 
 ## Prerequisites to build
 
-```TODO: build core-strato and bloch with `docker: true` in stack.yaml to remove dependency on environment setup (both ubuntu/mac)```
+### Docker
+Install the latest docker from https://www.docker.com/community-edition
 
 ### Stack
 Most unix systems (incl. ubuntu and mac):
