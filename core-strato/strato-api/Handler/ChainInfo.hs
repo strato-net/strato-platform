@@ -12,7 +12,29 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), Ingest
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [GenesisInfo] -> m ()
+
+data ChainInfo =
+  ChainInfo {
+    chainLabel      :: String,
+    addRule         :: String,
+    removeRule      :: String,
+    members         :: [String],
+    accountBalance  :: [(Address, Word256)]
+}
+
+
+instance FromJSON ChainInfo where
+  parseJSON (Object o) =
+    ChainInfo <$>
+    o .: "chainLabel" <*>
+    o .: "addRule" <*>
+    o .: "removeRule" <*>
+    o .: "members" <*>
+    o .: "accountBalance"
+  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
+
+
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [ChainInfo] -> m ()
 emitKafkaTransactions gs = do
     let ingestGeneses = (\g -> IEGenesis (IngestGenesis API g)) <$> gs
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestGeneses) ++ " genesis info(s) to unseqevents"
@@ -26,7 +48,7 @@ postChainR :: Handler Text
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  gi <- parseJsonBody :: Handler (Result GenesisInfo)
+  gi <- parseJsonBody :: Handler (Result ChainInfo)
   case gi of
     Success gen -> do
       liftIO $ putStrLn $ T.pack $ show gen
