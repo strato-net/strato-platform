@@ -6,9 +6,6 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
--- TODO(tim): Replace runInsert with runInsertMany
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
 module BlockApps.Bloc22.Server.Users where
 
 import           Control.Concurrent
@@ -39,7 +36,7 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           Opaleye                           hiding (not, null, index)
+import           Opaleye                           hiding (not, null)
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
