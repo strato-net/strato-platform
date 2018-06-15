@@ -10,6 +10,8 @@ const nodes = config.nodes;
 const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
+const adminName = util.uid('Admin');
+const adminPassword = '1234';
 
 describe('State pagination', function () {
 
@@ -20,8 +22,21 @@ describe('State pagination', function () {
   let contract;
 
   before(function * () {
-    admin = yield createUser();
+    console.log(`Creating admin user and contract`);
+    admin = yield rest.createUser(adminName, adminPassword);
+    yield rest.fill(admin, true); // add Ether
+    yield rest.fill(admin, true); // add Ether
+    console.log('created user');
+    console.log(admin);
+    let balance;
+    console.log('waiting for the block');
+    do {
+      balance = yield rest.getBalance(admin.address);
+      yield new Promise(resolve => setTimeout(resolve, 1000));
+    } while (balance < 1);
+    console.log('Uploading the contract');
     contract = yield rest.uploadContract(admin, contractArrayName, contractArrayFilename, {}, false);
+    console.log(contract);
   });
 
   it('should get the state of the uint by name', function * () {
@@ -68,4 +83,3 @@ describe('State pagination', function () {
   }
 
 });
-

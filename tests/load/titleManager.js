@@ -7,51 +7,58 @@ const titleJs = require('./title')
 
 const ErrorCodes = rest.getEnums(path.join(config.contractsPath, "ErrorCodes.sol")).ErrorCodes;
 const contractName = 'TitleManager';
-const contractFilename = path.join(config.contractsPath, 'TitleManager.sol');
+const contractFilename = path.join(config.contractsPath, "TitleManager.sol");
 
 function* uploadContract(admin) {
   // NOTE: in production, the contract is created and owned by the AdminInterface
   // for testing purposes the creator is the admin user
-  const args = {_creator: admin.address};
-  const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  yield compileSearch();
+  const args = { creator: admin.address };
+  const contract = yield rest.uploadContract(admin, contractName, contractFilename, util.usc(args));
+  yield compileSearch(contract);
   contract.src = 'removed';
   return bind(admin, contract);
 }
 
 function bind(admin, contract) {
-  contract.getState = function*() {
+  contract.getState = function* () {
     return yield rest.getState(contract);
   }
-  contract.createTitleAsync = function*(args) {
+  contract.createTitleAsync = function* (args) {
     return yield createTitleAsync(admin, contract, args);
   }
-  contract.createTitle = function*(args) {
+  contract.createTitle = function* (args) {
     return yield createTitle(admin, contract, args);
   }
-  contract.exists = function*(vin) {
+  contract.exists = function* (vin) {
     return yield exists(admin, contract, vin);
   }
+  contract.getTitle = function* (vin) {
+    return yield getTitle(admin, contract, vin);
+  }
+  contract.bindTitle = function* (address) {
+    return yield bindTitle(admin, contract, address);
+  }
+  contract.setLienRelease = function* (args) {
+    return yield setLienRelease(admin, contract, args);
+  }
+  contract.addLienHolder = function* (args) {
+    return yield addLienHolder(admin, contract, args);
+  }
+  contract.setTitleDetails = function* (args) {
+    return yield setTitleDetails(admin, contract, args);
+  }
+
   return contract;
 }
 
-function* compileSearch() {
+function* compileSearch(contract) {
   rest.verbose('compileSearch', contractName);
 
-  if (yield rest.isCompiled(contractName)) {
+  if (yield rest.isSearchable(contract.codeHash)) {
     return;
   }
-
-  // compile dependencies
-  yield titleJs.compileSearch();
-  {
-    const contractName = 'TitleMo';
-    const contractFilename = `${config.libPath}/contracts/TitleMo.sol`;
-    const searchable = [contractName];
-    yield rest.compileSearch(searchable, contractName, contractFilename);
-  }
-
-  const searchable = [contractName];
+  // compile + dependencies
+  const searchable = [titleJs.contractName, contractName];
   yield rest.compileSearch(searchable, contractName, contractFilename);
 }
 
@@ -62,7 +69,7 @@ function* createTitleAsync(admin, contract, args) {
   // function createTitle(string _vin) returns (ErrorCodes, address) {
   const method = 'createTitle';
 
-  const result = yield rest.callMethod(admin, contract, method, args);
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
   const errorCode = parseInt(result[0]);
   if (errorCode != ErrorCodes.SUCCESS) {
     throw new Error(errorCode);
@@ -94,14 +101,93 @@ function* exists(admin, contract, vin) {
   return exists;
 }
 
+function* setLienRelease(admin, contract, args) {
+  rest.verbose('setLienRelease', args);
+  // function setLienRelease(string _vin, string _date, string trackingNumber, string lienholderName ) return (ErrorCodes)
+  const method = 'setLienRelease';
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
+  const errorCode = parseInt(result[0]);
+  if (errorCode != ErrorCodes.SUCCESS) {
+    throw new Error(errorCode);
+  }
+  return errorCode;
+}
+
+function* setTitleDetails(admin, contract, args) {
+  rest.verbose("setTitleDetails", args);
+  // function setTitleDetails(string _vin, uint _titleNumber, string _make,
+  //                          string _state, string _modelYear, string _bodyStyle,
+  //                          string _color) returns (ErrorCodes, address)
+  const method = "setTitleDetails";
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
+  const errorCode = parseInt(result[0]);
+  if (errorCode != ErrorCodes.SUCCESS) {
+    throw new Error(errorCode);
+  }
+  return result;
+}
+
+// bind a title created from json, into the titles array
+// throws: ErrorCodes
+function* bindTitle(admin, contract, address) {
+  rest.verbose('bindTitle', address);
+  // function bindTitle(address _address) returns (ErrorCodes, address) {
+  const method = 'bindTitle';
+  const args = { address: address };
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
+  const errorCode = parseInt(result[0]);
+  if (errorCode != ErrorCodes.SUCCESS) {
+    throw new Error(errorCode);
+  }
+  return errorCode;
+}
+
+function* addLienHolder(admin, contract, args) {
+  rest.verbose('addLienHolder', args);
+  const method = 'addLienHolder';
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
+  const errorCode = parseInt(result[0]);
+  if (errorCode != ErrorCodes.SUCCESS) {
+    throw new Error(errorCode);
+  }
+  return errorCode;
+}
+
+// get a title by vin
+// throws: ErrorCodes
+function* getTitle(admin, contract, vin) {
+  rest.verbose('getTitle', vin);
+  // function getTitle(string _vin) returns (ErrorCodes, address) {
+  const method = 'getTitle';
+  const args = { vin: vin };
+  const result = yield rest.callMethod(admin, contract, method, util.usc(args));
+  const errorCode = parseInt(result[0]);
+  if (errorCode != ErrorCodes.SUCCESS) {
+    throw new Error(errorCode);
+  }
+  // FIXME search the title by address when cirrus is fixed
+  return result[1];
+}
+
 function* getByVin(vin) {
   console.log('titleManagerJs', 'getByVin', vin);
   return yield titleJs.getByVin(vin);
+}
+
+function* getAllTitles() {
+  console.log('titleManagerJs', 'getAllTitles');
+  return yield titleJs.getAll();
 }
 
 module.exports = {
   bind: bind,
   compileSearch: compileSearch,
   getByVin: getByVin,
+  getAllTitles: getAllTitles,
   uploadContract: uploadContract,
+  setLienRelease: setLienRelease,
+  setTitleDetails: setTitleDetails,
+  addLienHolder: addLienHolder,
+  contractName: contractName,
+  bindTitle: bindTitle
 };
