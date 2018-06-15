@@ -174,20 +174,20 @@ enterBloc env x
     reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
-          StratoError (FailureResponse Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+          StratoError (FailureResponse url' Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
-                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "Response from server:",
                      boxIt $ Lazy.Char8.unpack responseBody'
                    ]}
-          StratoError (FailureResponse Status{statusCode=404} _ _) ->
+          StratoError (FailureResponse url' Status{statusCode=404} _ _) ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
-                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
