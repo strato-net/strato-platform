@@ -2,6 +2,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- TODO(tim): Replace Control.Monad.Trans.Either with Control.Monad.Trans.Except
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+
 module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
