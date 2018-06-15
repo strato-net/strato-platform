@@ -47,6 +47,7 @@ data SequencerConfig =
      SequencerConfig { depBlockDBCacheSize   :: Int
                      , depBlockDBPath        :: String
                      , seenTransactionDBSize :: Int
+                     , kafkaAddress          :: Maybe K.KafkaAddress
                      , kafkaClientId         :: K.KafkaClientId
                      , kafkaConsumerGroup    :: KP.ConsumerGroup
                      , syncWrites            :: Bool
@@ -75,15 +76,20 @@ runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
 runSequencerM c m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     a <- runResourceT . runStatsTConfigured . flip runReaderT c $ do
-        dbCS     <- depBlockDBCacheSize <$> ask
-        dbPath   <- depBlockDBPath      <$> ask
-        stxSize  <- seenTransactionDBSize <$> ask
-        kClId    <- kafkaClientId <$> ask
+        dbCS     <- asks depBlockDBCacheSize
+        dbPath   <- asks depBlockDBPath
+        stxSize  <- asks seenTransactionDBSize
+        kClId    <- asks kafkaClientId
+        mAddr    <- asks kafkaAddress
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
+        let kState = case mAddr of
+                         Nothing -> mkConfiguredKafkaState kClId
+                         Just addr -> K.mkKafkaState kClId addr
+
         runStateT m SequencerContext
             { dependentBlockDB    = depBlock
             , seenTransactionDB   = mkSeenTxDB stxSize
-            , sequencerKafkaState = mkConfiguredKafkaState kClId
+            , sequencerKafkaState = kState
             }
     return $ fst a
 

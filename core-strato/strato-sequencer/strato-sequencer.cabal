@@ -53,15 +53,16 @@ executable strato-sequencer
   main-is:             Main.hs
   ghc-options:         -Wall -O2 -threaded
   build-depends:       base >=4.8 && <4.10
-                     , strato-sequencer
                      , blockapps-data
+                     , blockapps-milena
                      , blockapps-util
+                     , bytestring
                      , clock
                      , hflags
                      , monad-logger
-                     , blockapps-milena
-                     , bytestring
+                     , safe
                      , strato-conf
+                     , strato-sequencer
   default-language:    Haskell2010
   other-modules: Flags
 
