@@ -15,6 +15,7 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import           Data.Aeson.Types                   hiding (Success)
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
