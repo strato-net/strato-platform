@@ -18,9 +18,10 @@ import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Constants
-import           Blockchain.EthConf                        (mkConfiguredKafkaState, runStatsTConfigured)
+import qualified Blockchain.EthConf                        as EC
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.StatsConf
 
 import           System.Directory                          (createDirectoryIfMissing)
 
@@ -52,6 +53,7 @@ data SequencerConfig =
                      , kafkaConsumerGroup    :: KP.ConsumerGroup
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
+                     , statsConfig           :: Maybe StatsConf
                      }
 
 
@@ -75,7 +77,7 @@ instance K.HasKafkaState SequencerM where
 runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
 runSequencerM c m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    a <- runResourceT . runStatsTConfigured . flip runReaderT c $ do
+    a <- runResourceT . EC.runStatsT (statsConfig c) . flip runReaderT c $ do
         dbCS     <- asks depBlockDBCacheSize
         dbPath   <- asks depBlockDBPath
         stxSize  <- asks seenTransactionDBSize
@@ -83,7 +85,7 @@ runSequencerM c m = do
         mAddr    <- asks kafkaAddress
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         let kState = case mAddr of
-                         Nothing -> mkConfiguredKafkaState kClId
+                         Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
 
         runStateT m SequencerContext

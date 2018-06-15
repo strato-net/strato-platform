@@ -7,7 +7,7 @@ import qualified Data.ByteString.Char8      as C8
 import           HFlags
 import           Safe
 
-import           Blockchain.EthConf
+import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Monad
@@ -28,10 +28,11 @@ main = do
       depBlockDBCacheSize   = flags_depblockcachesize
     , depBlockDBPath        = flags_depblockdbpath
     , kafkaClientId         = kafkaClientId'
-    , kafkaConsumerGroup    = lookupConsumerGroup kafkaClientId'
+    , kafkaConsumerGroup    = EC.lookupConsumerGroup kafkaClientId'
     , kafkaAddress          = mKafkaAddress
     , seenTransactionDBSize = flags_txdedupwindow
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
+    , statsConfig           = EC.statsConfig EC.ethConf
   }
   runLoggingT (runSequencerM cfg sequencer) printLogMsg
