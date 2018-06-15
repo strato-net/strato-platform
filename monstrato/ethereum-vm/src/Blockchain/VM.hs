@@ -28,7 +28,6 @@ import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
-import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
