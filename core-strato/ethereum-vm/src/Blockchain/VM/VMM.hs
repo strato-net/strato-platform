@@ -20,6 +20,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -61,6 +62,16 @@ instance HasStateDB VMM where
     setStateDBStateRoot x = do
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
+
+instance HasChainDB VMM where
+  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
+  putBlockHashRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
+  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
+  putGenesisRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
 
 instance HasStorageDB VMM where
     getStorageDB = do

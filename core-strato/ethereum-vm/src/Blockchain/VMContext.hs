@@ -46,6 +46,7 @@ import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -69,6 +70,8 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextSQLDB               :: SQLDB
                        , contextAddressStateDBMap   :: M.Map (Maybe Word256, Address) AddressStateModification
                        , contextStorageMap          :: M.Map (Maybe Word256, Address, Word256) Word256
+                       , contextBlockHashRoot       :: MP.StateRoot
+                       , contextGenesisRoot         :: MP.StateRoot
                        , contextBaggerState         :: !BaggerState
                        , contextKafkaState          :: K.KafkaState
                        , contextBestBlockInfo       :: M.Map (Maybe Word256) ContextBestBlockInfo
@@ -137,6 +140,16 @@ instance HasStateDB ContextM where
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
 
+instance HasChainDB ContextM where
+  getBlockHashRoot = contextBlockHashRoot <$> get
+  putBlockHashRoot sr = do
+    cxt <- get
+    put cxt{contextBlockHashRoot = sr}
+  getGenesisRoot = contextGenesisRoot <$> get
+  putGenesisRoot sr = do
+    cxt <- get
+    put cxt{contextGenesisRoot = sr}
+
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
     putKafkaState ks = do
@@ -198,6 +211,8 @@ runContextM f = do
                         conn
                         M.empty
                         M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
                         defaultBaggerState
                         initialKafkaState
                         (M.insert Nothing Unspecified M.empty)
