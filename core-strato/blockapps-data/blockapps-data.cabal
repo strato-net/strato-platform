@@ -93,6 +93,7 @@ library
                    Blockchain.DB.AddressStateDB
                    Blockchain.DB.BlockDB
                    Blockchain.DB.BlockSummaryDB
+                   Blockchain.DB.ChainDB
                    Blockchain.DB.CodeDB
                    Blockchain.DB.DetailsDB
                    Blockchain.DB.HashDB
