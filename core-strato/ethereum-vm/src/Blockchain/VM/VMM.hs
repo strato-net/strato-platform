@@ -72,6 +72,14 @@ instance HasChainDB VMM where
   putGenesisRoot sr = do
     vmState <- lift get
     lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
+  getCurrentBlockHash = lift $ fmap (contextCurrentBlockHash . dbs) get
+  putCurrentBlockHash bh = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentBlockHash = bh}}
+  getCurrentChainId = lift $ fmap (contextCurrentChainId . dbs) get
+  putCurrentChainId cid = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentChainId = cid}}
 
 instance HasStorageDB VMM where
     getStorageDB = do
@@ -230,33 +238,28 @@ addGas gas = do
 
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
-  chainId <- getEnvVar envChainId
-  success <- pay reason chainId from to val
+  success <- pay reason from to val
   unless success $ left InsufficientFunds
 
 addToBalance'::Address->Integer->VMM ()
 addToBalance' address' val = do
-  chainId <- getEnvVar envChainId
-  success <- addToBalance chainId address' val
+  success <- addToBalance address' val
   unless success $ left InsufficientFunds
 
 getStorageKeyVal::Word256->VMM Word256
 getStorageKeyVal key = do
   owner <- getEnvVar envOwner
-  chainId <- getEnvVar envChainId
-  getStorageKeyVal' chainId owner key
+  getStorageKeyVal' owner key
 
 getAllStorageKeyVals::VMM [(MP.Key, Word256)]
 getAllStorageKeyVals = do
   owner <- getEnvVar envOwner
-  chainId <- getEnvVar envChainId
-  getAllStorageKeyVals' chainId owner
+  getAllStorageKeyVals' owner
 
 putStorageKeyVal::Word256->Word256->VMM ()
 putStorageKeyVal key val = do
   owner <- getEnvVar envOwner
-  chainId <- getEnvVar envChainId
-  putStorageKeyVal' chainId owner key val
+  putStorageKeyVal' owner key val
 
 vmTrace::String->VMM ()
 vmTrace msg = do

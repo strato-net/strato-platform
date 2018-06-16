@@ -179,7 +179,7 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
 accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
               [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
-  (_, address) <- lookupAddress k
+  address <- lookupAddress k
   let addrState = retrieveMPDBValue v
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
@@ -187,7 +187,7 @@ accountEnd k v = do
 accountUpdate :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                  [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
 accountUpdate k vOld vNew = do
-  (_, address) <- lookupAddress k
+  address <- lookupAddress k
   let oldAddrState = retrieveMPDBValue vOld
       newAddrState = retrieveMPDBValue vNew
   accountDiff <- incrementalAccountState oldAddrState newAddrState
@@ -272,7 +272,7 @@ decodeStorageKV k v = do
 retrieveMPDBValue :: (RLPSerializable a) => Val -> a
 retrieveMPDBValue = rlpDecode . rlpDeserialize . rlpDecode
 
-lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m (Maybe Word256, Address)
+lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m ByteString

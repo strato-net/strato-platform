@@ -18,7 +18,7 @@ import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataChainId, blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
@@ -41,7 +41,6 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-import           Blockchain.Strato.Model.Class
 
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
@@ -53,7 +52,7 @@ ethereumVM = void . execContextM $ do
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
-    putContextBestBlockInfo (blockDataChainId cpHead) cpBBI
+    putContextBestBlockInfo cpBBI
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -66,17 +65,9 @@ ethereumVM = void . execContextM $ do
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
-        let newGenesisBlocks = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
-        forM_ newGenesisBlocks $ \ gi -> do
-          gb <- initializeGenesisBlockFromInfo gi
-          let header = blockHeader gb
-              hash = blockHeaderHash header
-              chainId = blockHeaderChainId header
-              diff = blockHeaderDifficulty header
-          Bagger.processNewBestBlock hash header []
-          putContextBestBlockInfo chainId (ContextBestBlockInfo (hash, header, diff, 0, 0))
-          putBSum hash (blockHeaderToBSum header diff 0)
-          return gb
+        let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
+        forM_ newGenesisInfos $ \ gi -> do
+          void $ initializeGenesisBlockFromInfo gi
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand

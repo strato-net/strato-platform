@@ -68,13 +68,15 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextCodeDB              :: CodeDB
                        , contextBlockSummaryDB      :: BlockSummaryDB
                        , contextSQLDB               :: SQLDB
-                       , contextAddressStateDBMap   :: M.Map (Maybe Word256, Address) AddressStateModification
-                       , contextStorageMap          :: M.Map (Maybe Word256, Address, Word256) Word256
+                       , contextAddressStateDBMap   :: M.Map Address AddressStateModification
+                       , contextStorageMap          :: M.Map (Address, Word256) Word256
                        , contextBlockHashRoot       :: MP.StateRoot
                        , contextGenesisRoot         :: MP.StateRoot
+                       , contextCurrentBlockHash    :: SHA
+                       , contextCurrentChainId      :: Maybe Word256
                        , contextBaggerState         :: !BaggerState
                        , contextKafkaState          :: K.KafkaState
-                       , contextBestBlockInfo       :: M.Map (Maybe Word256) ContextBestBlockInfo
+                       , contextBestBlockInfo       :: ContextBestBlockInfo
                        , contextRedisPool           :: Redis.Connection
                        , contextInsertTxResultQueue :: [TransactionResult]
                        , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
@@ -149,6 +151,14 @@ instance HasChainDB ContextM where
   putGenesisRoot sr = do
     cxt <- get
     put cxt{contextGenesisRoot = sr}
+  getCurrentBlockHash = contextCurrentBlockHash <$> get
+  putCurrentBlockHash bh = do
+    cxt <- get
+    put cxt{contextCurrentBlockHash = bh}
+  getCurrentChainId = contextCurrentChainId <$> get
+  putCurrentChainId cid = do
+    cxt <- get
+    put cxt{contextCurrentChainId = cid}
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
@@ -213,9 +223,11 @@ runContextM f = do
                         M.empty
                         MP.emptyTriePtr
                         MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
                         defaultBaggerState
                         initialKafkaState
-                        (M.insert Nothing Unspecified M.empty)
+                        Unspecified
                         redisPool
                         [] [] [])
 
@@ -226,28 +238,28 @@ evalContextM f = fst <$> runContextM f
 execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
-incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Maybe Word256 -> Address -> m ()
-incrementNonce chainId address = do
-  addressState <- getAddressState chainId address
-  putAddressState chainId address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
+incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
+incrementNonce address = do
+  addressState <- getAddressState address
+  putAddressState address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Maybe Word256 -> Address -> m Address
-getNewAddress chainId address = do
-  addressState <- getAddressState chainId address
+getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m Address
+getNewAddress address = do
+  addressState <- getAddressState address
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
   let newAddress = getNewAddress_unsafe address (addressStateNonce addressState)
-  incrementNonce chainId address
+  incrementNonce address
   return newAddress
 
-purgeStorageMap :: HasStorageDB m => Maybe Word256 -> Address -> m ()
-purgeStorageMap chainId address = do
+purgeStorageMap :: HasStorageDB m => Address -> m ()
+purgeStorageMap address = do
   (_, storageMap) <- getStorageDB
-  putStorageMap $ M.filterWithKey (\(c,a,_) _ -> (c /= chainId) && (a /= address)) storageMap
+  putStorageMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
-getContextBestBlockInfo :: Maybe Word256 -> ContextM ContextBestBlockInfo
-getContextBestBlockInfo chainId = maybe Unspecified id . M.lookup chainId . contextBestBlockInfo <$> get
+getContextBestBlockInfo :: ContextM ContextBestBlockInfo
+getContextBestBlockInfo = contextBestBlockInfo <$> get
 
-putContextBestBlockInfo :: Maybe Word256 -> ContextBestBlockInfo -> ContextM ()
-putContextBestBlockInfo chainId new = do
+putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
+putContextBestBlockInfo new = do
     ctx <- get
-    put ctx { contextBestBlockInfo = M.alter (const $ Just new) chainId (contextBestBlockInfo ctx) }
+    put ctx { contextBestBlockInfo = new }

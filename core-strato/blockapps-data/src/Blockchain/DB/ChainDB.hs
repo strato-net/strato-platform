@@ -91,10 +91,14 @@ import           Numeric                              (showHex)
 -}
 
 class Monad m => HasChainDB m where
-  getBlockHashRoot :: m MP.StateRoot
-  putBlockHashRoot :: MP.StateRoot -> m ()
-  getGenesisRoot   :: m MP.StateRoot
-  putGenesisRoot   :: MP.StateRoot -> m ()
+  getBlockHashRoot    :: m MP.StateRoot
+  putBlockHashRoot    :: MP.StateRoot -> m ()
+  getGenesisRoot      :: m MP.StateRoot
+  putGenesisRoot      :: MP.StateRoot -> m ()
+  getCurrentBlockHash :: m SHA
+  putCurrentBlockHash :: SHA -> m ()
+  getCurrentChainId   :: m (Maybe Word256)
+  putCurrentChainId   :: Maybe Word256 -> m ()
 
 forJust :: Applicative f => Maybe a -> b -> (a -> f b) -> f b
 forJust m b f =
@@ -180,23 +184,25 @@ putChainStateRoot chainId (SHA bHash) stateRoot = do
       newBlockHashRoot <- putkv bhdb (word256ToMPKey bHash) newChainRoot
       putBlockHashRoot newBlockHashRoot
 
-getChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Word256 -> SHA -> Address -> m AddressState
-getChainAddressState chainId bHash address = do
+getChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Maybe Word256 -> SHA -> Address -> m AddressState
+getChainAddressState Nothing        _     address = getAddressState address
+getChainAddressState (Just chainId) bHash address = do
   previousStateRoot <- getStateRoot
   mStateRoot <- getChainStateRoot chainId bHash
   addressState <- forJust mStateRoot blankAddressState $ \stateRoot -> do
     setStateDBStateRoot stateRoot
-    getAddressState (Just chainId) address
+    getAddressState address
   setStateDBStateRoot previousStateRoot
   return addressState
 
-putChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Word256 -> SHA -> Address -> AddressState -> m ()
-putChainAddressState chainId bHash address state = do
+putChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Maybe Word256 -> SHA -> Address -> AddressState -> m ()
+putChainAddressState Nothing        _     address state = putAddressState address state
+putChainAddressState (Just chainId) bHash address state = do
   previousStateRoot <- getStateRoot
   mStateRoot <- getChainStateRoot chainId bHash
   forM_ mStateRoot $ \stateRoot -> do
     setStateDBStateRoot stateRoot
-    putAddressState (Just chainId) address state
+    putAddressState address state
     newStateRoot <- getStateRoot
     putChainStateRoot chainId bHash newStateRoot
     setStateDBStateRoot previousStateRoot
