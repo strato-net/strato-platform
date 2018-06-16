@@ -15,6 +15,7 @@ module Blockchain.DB.ChainDB (
 
 import           Control.Monad.Trans.Resource
 
+import           Data.Foldable                        (forM_)
 import qualified Data.NibbleString                    as N
 import           Data.Word                            (Word8)
 
@@ -29,6 +30,8 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.SHA          (SHA(..))
+
+import qualified Database.LevelDB                     as DB
 
 import           Numeric                              (showHex)
 
@@ -93,17 +96,20 @@ class Monad m => HasChainDB m where
   getGenesisRoot   :: m MP.StateRoot
   putGenesisRoot   :: MP.StateRoot -> m ()
 
-whenJust :: Applicative f => Maybe a -> b -> (a -> f b) -> f b
-whenJust m b f =
+forJust :: Applicative f => Maybe a -> b -> (a -> f b) -> f b
+forJust m b f =
   case m of
     Nothing -> pure b
     Just a -> f a
 
-whenNothing :: Applicative f => Maybe a -> (a -> b) -> f b -> f b
-whenNothing m f b =
+forNothing :: Applicative f => Maybe a -> (a -> b) -> f b -> f b
+forNothing m f b =
   case m of
     Nothing -> b
     Just a -> f <$> pure a
+
+getLDB :: HasStateDB m => m DB.DB
+getLDB = MP.ldb <$> getStateDB
 
 bytesToMPKey :: [Word8] -> N.NibbleString
 bytesToMPKey = N.pack . (N.byte2Nibbles =<<)
@@ -122,48 +128,48 @@ putBlockHashInChainDB b = do
   let p = blockHeaderParentHash b
       h = blockHeaderHash b
   mChainRoot <- getChainRoot p
-  whenJust mChainRoot () $ putChainRoot h
+  forM_ mChainRoot (putChainRoot h)
 
 getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
 getChainRoot (SHA h) = do
-  bhdb <- MP.MPDB <$> (MP.ldb <$> getStateDB) <*> getBlockHashRoot
+  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
   getkv bhdb (word256ToMPKey h)
 
 putChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> MP.StateRoot -> m ()
 putChainRoot (SHA h) sr = do
-  bhdb <- MP.MPDB <$> (MP.ldb <$> getStateDB) <*> getBlockHashRoot
+  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
   newBlockHashRoot <- putkv bhdb (word256ToMPKey h) sr
   putBlockHashRoot newBlockHashRoot
 
 getGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe MP.StateRoot)
 getGenesisStateRoot cid = do
-  gdb <- MP.MPDB <$> (MP.ldb <$> getStateDB) <*> getGenesisRoot
+  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
   getkv gdb (word256ToMPKey cid)
 
 putGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> MP.StateRoot -> m ()
 putGenesisStateRoot cid sr = do
-  gdb <- MP.MPDB <$> (MP.ldb <$> getStateDB) <*> getGenesisRoot
+  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
   newGenesisRoot <- putkv gdb (word256ToMPKey cid) sr
   putGenesisRoot newGenesisRoot
 
 getChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> m (Maybe MP.StateRoot)
 getChainStateRoot chainId (SHA bHash) = do
-  db <- MP.ldb <$> getStateDB
+  db <- getLDB
   bhdb <- MP.MPDB db <$> getBlockHashRoot
   mChainRoot <- getkv bhdb (word256ToMPKey bHash)
-  mStateRoot <- whenJust mChainRoot Nothing $ \chainRoot -> do
+  mStateRoot <- forJust mChainRoot Nothing $ \chainRoot -> do
     let cdb = MP.MPDB db chainRoot
     getkv cdb (word256ToMPKey chainId)
-  whenNothing mStateRoot Just $ do
+  forNothing mStateRoot Just $ do
     gdb <- MP.MPDB db <$> getGenesisRoot
     mGenStateRoot <- getkv gdb (word256ToMPKey chainId)
-    whenJust mGenStateRoot Nothing $ \genStateRoot -> do
+    forJust mGenStateRoot Nothing $ \genStateRoot -> do
       putChainStateRoot chainId (SHA bHash) genStateRoot
       return $ Just genStateRoot
 
 putChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
 putChainStateRoot chainId (SHA bHash) stateRoot = do
-  db <- MP.ldb <$> getStateDB
+  db <- getLDB
   bhdb <- MP.MPDB db <$> getBlockHashRoot
   mChainRoot <- getkv bhdb (word256ToMPKey bHash)
   case mChainRoot of
@@ -178,7 +184,7 @@ getChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Word256 -> 
 getChainAddressState chainId bHash address = do
   previousStateRoot <- getStateRoot
   mStateRoot <- getChainStateRoot chainId bHash
-  addressState <- whenJust mStateRoot blankAddressState $ \stateRoot -> do
+  addressState <- forJust mStateRoot blankAddressState $ \stateRoot -> do
     setStateDBStateRoot stateRoot
     getAddressState (Just chainId) address
   setStateDBStateRoot previousStateRoot
@@ -188,7 +194,7 @@ putChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Word256 -> 
 putChainAddressState chainId bHash address state = do
   previousStateRoot <- getStateRoot
   mStateRoot <- getChainStateRoot chainId bHash
-  whenJust mStateRoot () $ \stateRoot -> do
+  forM_ mStateRoot $ \stateRoot -> do
     setStateDBStateRoot stateRoot
     putAddressState (Just chainId) address state
     newStateRoot <- getStateRoot
