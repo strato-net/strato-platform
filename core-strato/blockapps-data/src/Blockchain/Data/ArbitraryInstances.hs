@@ -76,7 +76,6 @@ instance Arbitrary BlockData where
         extraData        <- unboxPI <$> arbitrary
         nonce            <- arbitrary
         mixHash          <- arbitrary
-        chainId          <- arbitrary
         return BlockData { blockDataParentHash       = parentHash
                          , blockDataUnclesHash       = uncleHash
                          , blockDataCoinbase         = coinbase
@@ -92,7 +91,6 @@ instance Arbitrary BlockData where
                          , blockDataExtraData        = extraData
                          , blockDataNonce            = nonce
                          , blockDataMixHash          = mixHash
-                         , blockDataChainId          = chainId
                          }
 
 instance Arbitrary Block where

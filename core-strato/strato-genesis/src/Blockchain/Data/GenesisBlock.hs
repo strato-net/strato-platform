@@ -100,8 +100,7 @@ genesisInfoToGenesisBlock gi = do
             blockDataTimestamp = genesisInfoTimestamp gi,
             blockDataExtraData = genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi,
-            blockDataChainId = genesisInfoChainId gi
+            blockDataNonce = genesisInfoNonce gi
         },
         blockReceiptTransactions = [],
         blockBlockUncles         = []

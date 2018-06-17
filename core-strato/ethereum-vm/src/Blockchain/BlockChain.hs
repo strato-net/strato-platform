@@ -195,63 +195,60 @@ timeit message timer f = do
 
 addBlocks :: [OutputBlock] -> ContextM ()
 addBlocks [] = return ()
-addBlocks blocks = do
-  let partitioned = Bagger.partitionWith (blockDataChainId . obBlockData) blocks
-
-  forM_ partitioned $ \(chainId, blocks') -> do
-    bbi <- getContextBestBlockInfo
-    case bbi of
-      Unspecified -> return () -- TODO: bootstrap private chains
-      ContextBestBlockInfo (_, oldHeader, _, _, _) -> do
-        let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
-        lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) to chain " ++ show chainId ++ " starting with " ++
-                                               (show . blockDataNumber . obBlockData $ head filtered))
-        let oldStateRoot = blockDataStateRoot oldHeader
-        didReplaceBest <- liftIO (newIORef False)
-        replacedBest   <- liftIO (newIORef undefined)
-        potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
-          case (obOrigin block) of
-            TO.Quarry -> do
-              cache <- Bagger.miningCache <$> Bagger.getBaggerState
-              let currentBaggerSR = Bagger.lastRewardedStateRoot cache
-                  blockSR = blockDataStateRoot $ obBlockData block
-              lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
-              lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
-              if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
-                then do
-                  _ <- setParentStateRoot block
-                  let lastRun = Bagger.lastExecutedTxs cache
-                      updates = if (flags_miner == Mining.Instant)
-                                  then lastRun
-                                  else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
-                  lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
-                  Bagger.updateTxCallback
-                    updates
-                    (blockHeaderPartialHash $ obBlockData block)
-                    (blockHeaderHash $ obBlockData block)
-                    Mined
-                  return [block]
-                else return []
-            _ -> addBlock block >> return [block]
-        forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
-                                                              --       build the canonical chain. However, running each new
-                                                              --       block could be inefficient, and inadvertently spam
-                                                              --       the network with NewBestBlock messages.
-          (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
-          when didReplaceThisTime . liftIO $ do
-              let Just nbb = newBestBlock
-              writeIORef didReplaceBest True
-              writeIORef replacedBest (nbb, replacedBits)
-          didReplaceBest' <- liftIO (readIORef didReplaceBest)
-          void . withKafkaViolently $ writeIndexEvents (RanBlock <$> filtered)
-          when didReplaceBest' $ do
-              $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-              (theBlock, nbb) <- liftIO (readIORef replacedBest)
-              void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-              let b = obBlockData theBlock
-                  codeSource = getSource False b
-                  codeContractName = getContractName False b
-              calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+addBlocks blocks' = do
+  bbi <- getContextBestBlockInfo
+  case bbi of
+    Unspecified -> return () -- TODO: bootstrap private chains
+    ContextBestBlockInfo (_, oldHeader, _, _, _) -> do
+      let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
+      lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
+                                             (show . blockDataNumber . obBlockData $ head filtered))
+      let oldStateRoot = blockDataStateRoot oldHeader
+      didReplaceBest <- liftIO (newIORef False)
+      replacedBest   <- liftIO (newIORef undefined)
+      potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
+        case (obOrigin block) of
+          TO.Quarry -> do
+            cache <- Bagger.miningCache <$> Bagger.getBaggerState
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+                blockSR = blockDataStateRoot $ obBlockData block
+            lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+              then do
+                _ <- setParentStateRoot block
+                let lastRun = Bagger.lastExecutedTxs cache
+                    updates = if (flags_miner == Mining.Instant)
+                                then lastRun
+                                else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
+                lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
+                Bagger.updateTxCallback
+                  updates
+                  (blockHeaderPartialHash $ obBlockData block)
+                  (blockHeaderHash $ obBlockData block)
+                  Mined
+                return [block]
+              else return []
+          _ -> addBlock block >> return [block]
+      forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
+                                                            --       build the canonical chain. However, running each new
+                                                            --       block could be inefficient, and inadvertently spam
+                                                            --       the network with NewBestBlock messages.
+        (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
+        when didReplaceThisTime . liftIO $ do
+            let Just nbb = newBestBlock
+            writeIORef didReplaceBest True
+            writeIORef replacedBest (nbb, replacedBits)
+        didReplaceBest' <- liftIO (readIORef didReplaceBest)
+        void . withKafkaViolently $ writeIndexEvents (RanBlock <$> filtered)
+        when didReplaceBest' $ do
+            $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+            (theBlock, nbb) <- liftIO (readIORef replacedBest)
+            void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+            let b = obBlockData theBlock
+                codeSource = getSource False b
+                codeContractName = getContractName False b
+            calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -639,11 +636,11 @@ calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = w
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff (blockHeaderChainId newHeader) newNumber newHash oldStateRoot newStateRoot
+    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot -- TODO: THIS IS NOT RIGHT
 
     let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
 
-    
+
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \codeHash -> do
         codeSrc <- codeSource codeHash

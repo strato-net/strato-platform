@@ -45,14 +45,13 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderExtraData        :: h -> Integer -- todo: extradata newtype
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
-    blockHeaderChainId          :: h -> Maybe Word256
 
     morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
     {-# MINIMAL blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
-                blockHeaderMixHash, blockHeaderChainId, morphBlockHeader #-}
+                blockHeaderMixHash, morphBlockHeader #-}
 
     blockHeaderHash :: h -> SHA
     blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode

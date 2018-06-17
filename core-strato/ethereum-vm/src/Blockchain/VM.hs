@@ -969,7 +969,7 @@ getFromSelector sel _ b codeHash = do
 
   stateRoot <- getStateRoot
   setStateDBStateRoot (blockDataStateRoot b)
-  let env = 
+  let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
           envBlockHeader=BlockData{
@@ -987,8 +987,7 @@ getFromSelector sel _ b codeHash = do
             blockDataTimestamp = posixSecondsToUTCTime 0,
             blockDataExtraData = 0,
             blockDataNonce = 0,
-            blockDataMixHash = SHA 0,
-            blockDataChainId = blockDataChainId b
+            blockDataMixHash = SHA 0
             },
           envOwner = Address 0,
           envOrigin = Address 0,
@@ -996,8 +995,7 @@ getFromSelector sel _ b codeHash = do
           envSender = Address 0,
           envValue = 0,
           envCode = theCode,
-          envJumpDests = getValidJUMPDESTs theCode,
-          envChainId = blockDataChainId b
+          envJumpDests = getValidJUMPDESTs theCode
           }
   (eRes, _) <-
     runVMM False True S.empty 0 env 1000000000000000000 $ call' True
@@ -1021,8 +1019,7 @@ create :: Bool
        -> Code
        -> ContextM (Either VMException Code, VMState)
 create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender origin value' gasPrice' availableGas newAddress init' = do
-  let chainId = blockDataChainId b
-      env =
+  let env =
         Environment{
           envGasPrice=gasPrice',
           envBlockHeader=b,
@@ -1032,8 +1029,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
           envSender = sender,
           envValue = value',
           envCode = init',
-          envJumpDests = getValidJUMPDESTs init',
-          envChainId = chainId
+          envJumpDests = getValidJUMPDESTs init'
           }
 
   dbs' <- get
@@ -1132,7 +1128,6 @@ call :: Bool
      -> ContextM (Either VMException B.ByteString, VMState)
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth' receiveAddress (Address codeAddress) sender value' gasPrice' theData availableGas origin = do
 
-  let chainId = blockDataChainId b
   addressState <- getAddressState $ Address codeAddress
 
   code <-
@@ -1150,8 +1145,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
           envSender = sender,
           envValue = fromIntegral value',
           envCode = code,
-          envJumpDests = getValidJUMPDESTs code,
-          envChainId = chainId
+          envJumpDests = getValidJUMPDESTs code
           }
 
   runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas $ call' noValueTransfer

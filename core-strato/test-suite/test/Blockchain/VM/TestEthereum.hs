@@ -180,8 +180,7 @@ runTest test = do
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
              blockDataExtraData = 0, --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=SHA 0, --error "mixHash not set"
-             blockDataChainId = cid
+             blockDataMixHash=SHA 0 --error "mixHash not set"
              },
           blockReceiptTransactions = [], --error "receiptTransactions not set",
           blockBlockUncles = [] --error "blockUncles not set"
@@ -201,8 +200,7 @@ runTest test = do
                 envSender = caller exec,
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
-                envJumpDests = getValidJUMPDESTs $ code exec,
-                envChainId = cid
+                envJumpDests = getValidJUMPDESTs $ code exec
                 }
 
         cxt <- get
