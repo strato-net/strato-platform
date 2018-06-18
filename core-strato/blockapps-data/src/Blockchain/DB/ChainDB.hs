@@ -2,7 +2,7 @@
 
 module Blockchain.DB.ChainDB (
     HasChainDB(..)
-  , putBlockHashInChainDB
+  , putBlockHeaderInChainDB
   , getChainRoot
   , putChainRoot
   , getGenesisStateRoot
@@ -11,6 +11,7 @@ module Blockchain.DB.ChainDB (
   , putChainStateRoot
   , getChainAddressState
   , putChainAddressState
+  , withBlockchain
   ) where
 
 import           Control.Monad.Trans.Resource
@@ -23,6 +24,7 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.Data.Address              (Address)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
+import           Blockchain.Format
 
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.HashDB
@@ -127,12 +129,14 @@ getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
 putkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 
-putBlockHashInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
-putBlockHashInChainDB b = do
+putBlockHeaderInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
+putBlockHeaderInChainDB b = do
   let p = blockHeaderParentHash b
       h = blockHeaderHash b
   mChainRoot <- getChainRoot p
-  forM_ mChainRoot (putChainRoot h)
+  case mChainRoot of
+    Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
+    Just chainRoot -> putChainRoot h chainRoot
 
 getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
 getChainRoot (SHA h) = do
@@ -206,3 +210,18 @@ putChainAddressState (Just chainId) bHash address state = do
     newStateRoot <- getStateRoot
     putChainStateRoot chainId bHash newStateRoot
     setStateDBStateRoot previousStateRoot
+
+withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
+withBlockchain bh cid f = do
+  case cid of
+    Nothing -> f
+    Just chainId -> do
+      mStateRoot <- getChainStateRoot chainId bh
+      case mStateRoot of
+        Nothing -> error $ "withBlockchain: Couldn't find state root for chain " ++ format chainId
+        Just stateRoot -> do
+          previousStateRoot <- getStateRoot
+          setStateDBStateRoot stateRoot
+          a <- f
+          setStateDBStateRoot previousStateRoot
+          return a

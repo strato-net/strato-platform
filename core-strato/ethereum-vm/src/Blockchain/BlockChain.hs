@@ -61,6 +61,7 @@ import qualified Blockchain.Data.TXOrigin                as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StateDB
@@ -222,6 +223,7 @@ addBlocks blocks' = do
                                 then lastRun
                                 else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
                 lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
+                addBlockTransactions False block
                 Bagger.updateTxCallback
                   updates
                   (blockHeaderPartialHash $ obBlockData block)
@@ -264,10 +266,11 @@ setParentStateRoot b@OutputBlock{..} = do
     setStateDBStateRoot (bSumStateRoot bSum)
     return bSum
 
-addBlock :: OutputBlock -> ContextM () -- change Block to OutputBlock
-addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
+addBlock :: OutputBlock -> ContextM ()
+addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
+    putBlockHeaderInChainDB bd
     bSum <- setParentStateRoot b
-    when (blockDataNumber bd == 1920000) runTheDAOFork
+    when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
     s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
     unless s1 $ error "addToBalance failed even after a check in addBlock"
 
@@ -279,12 +282,8 @@ addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obB
               (blockDataCoinbase uncle)
             ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
         unless s3 $ error "addToBalance failed even after a check in addBlock"
-    _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) transactions
-      --when flags_debug $ liftIO $ putStrLn $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList fullSuicideList)
-      --forM_ (S.toList fullSuicideList) deleteAddressState
 
-    flushMemStorageDB
-    flushMemAddressStateDB
+    addBlockTransactions True b
 
     db <- getStateDB
 
@@ -303,6 +302,17 @@ addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obB
     tick ctr_vm_blocks_processed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
     return ()
+
+addBlockTransactions :: Bool -> OutputBlock -> ContextM ()
+addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
+  let chains' = Bagger.partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ transactions
+      chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
+  forM_ chains $ \(chainId, txs) -> do
+    withBlockchain (blockHeaderHash bd) chainId $ do
+      $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
+      _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) transactions -- TODO: Run the checks Bagger does reject invalid transactions for private chains
+      flushMemStorageDB
+      flushMemAddressStateDB
 
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
 addTransactions _ remGas [] = return remGas

@@ -4,6 +4,8 @@ module Blockchain.Bagger.BaggerState where
 
 import           Control.Applicative                (Alternative, empty)
 
+import           Data.Map.Ordered                   (OMap)
+import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 
@@ -29,6 +31,7 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
+                               , privateHashes         :: OMap SHA OutputTx
                                , startTimestamp        :: UTCTime
                                } deriving (Show)
 
@@ -66,6 +69,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
+                                  , privateHashes         = OMap.empty
                                   , startTimestamp        = error "reached defaultMiningCache"
                                   }
 

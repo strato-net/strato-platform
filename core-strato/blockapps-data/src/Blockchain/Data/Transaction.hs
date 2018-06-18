@@ -82,7 +82,7 @@ instance TransactionLike Transaction where
                        PrivateHashTX{..} -> SHA transactionTxHash -- TODO: Should this be an error instead?
                        t -> hash . rlpSerialize $ partialRLPEncode t
     txSigner      = \case
-                       PrivateHashTX{} -> Just (Address (-1)) -- TODO: Should this be an error instead?
+                       PrivateHashTX{} -> Just (Address 0) -- TODO: Should this be an error instead?
                        t -> whoSignedThisTransaction t
     txNonce       = \case
                        PrivateHashTX{} -> 0
@@ -273,7 +273,7 @@ createChainContractCreationTX n gp gl val init' cid prvKey = do
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
-  PrivateHashTX{} -> Just (Address (-1))
+  PrivateHashTX{} -> Just (Address 0)
   t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)

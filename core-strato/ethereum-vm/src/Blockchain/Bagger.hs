@@ -1,7 +1,8 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
@@ -11,6 +12,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State.Lazy           (State, execState, get, put)
 import qualified Data.Map                           as M
+import           Data.Map.Ordered                   (OMap)
+import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Text                          as T
 import           Data.Time.Clock
 import           Numeric                            (readHex)
@@ -33,6 +36,7 @@ import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Verification            as V
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
@@ -59,22 +63,34 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     addTransactionsToMempool :: [OutputTx] -> m ()
     addTransactionsToMempool ts = do
+        let publicTxs  = filter ((/= PrivateHash) . txType) ts
+            privateTxs = filter ((== PrivateHash) . txType) ts
         $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
         existingStateDbStateRoot <- getStateRoot
         stateRoot <- (B.lastExecutedStateRoot . B.miningCache) <$> getBaggerState
         setStateDBStateRoot stateRoot
-        sequence_ (addToQueued Insertion <$> ts)
+        sequence_ (addToQueued Insertion <$> publicTxs)
+        state <- getBaggerState
+        let cache = B.miningCache state
+            hashes' = B.privateHashes cache
+            hashes = buildState hashes' privateTxs $ \tx -> do
+              (st :: OMap SHA OutputTx) <- get
+              let st' = st OMap.|> (txHash (otBaseTx tx), tx)
+              put st'
+        putBaggerState state{ B.miningCache = cache{ B.privateHashes = hashes } }
         promoteExecutables
         setStateDBStateRoot existingStateDbStateRoot
 
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
-    processNewBestBlock blockHash bd txShas = do
+    processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         existingStateDbStateRoot <- getStateRoot
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
         time  <- liftIO getCurrentTime
-        let newMiningCache = B.MiningCache { B.bestBlockSHA          = blockHash
+        let pHashes = B.privateHashes $ B.miningCache state
+            hashMap = OMap.fromList $ map (\a -> (a,a)) txShas -- why is this not a standard function?
+        let newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
                                            , B.bestBlockHeader       = bd
                                            , B.bestBlockTxHashes     = txShas
                                            , B.lastExecutedStateRoot = thisStateRoot
@@ -82,6 +98,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
+                                           , B.privateHashes         = pHashes OMap.\\ hashMap
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.miningCache = newMiningCache }
@@ -341,15 +358,15 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
     -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
     state <- getBaggerState
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-    let txGasLimit   = TD.transactionGasLimit bt
-    let txNonce      = TD.transactionNonce bt
+    let txgl         = TD.transactionGasLimit bt
+    let txn          = TD.transactionNonce bt
     let txFee        = B.calculateIntrinsicTxFee state t
-    if intrinsicGas > txGasLimit
+    if intrinsicGas > txgl
         then return . Left $ GasLimitTooLow Validation Incoming intrinsicGas t
         else do
             (addressNonce, addressBalance) <- getAddressNonceAndBalance address
-            --liftIO $ putStrLn $ "V4P: " ++ (show tup) ++ " vs (" ++ show txNonce ++ ", " ++ show txFee ++ ")"
-            if addressNonce > txNonce then
+            --liftIO $ putStrLn $ "V4P: " ++ (show tup) ++ " vs (" ++ show txn ++ ", " ++ show txFee ++ ")"
+            if addressNonce > txn then
                 return . Left $ NonceTooLow Validation Incoming addressNonce t
               else if addressBalance < txFee then
                 return . Left $ BalanceTooLow Validation Incoming txFee addressBalance t
@@ -387,7 +404,7 @@ buildFromMiningCache = do
     let parentHash   = B.bestBlockSHA cache
     let parentHeader = B.bestBlockHeader cache
     let stateRoot    = B.lastExecutedStateRoot cache
-    let txs          = trrTransaction <$> B.lastExecutedTxs cache
+    let txs          = (trrTransaction <$> B.lastExecutedTxs cache) ++ (snd <$> OMap.assocs (B.privateHashes cache))
     let parentNum    = DD.blockDataNumber parentHeader
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader

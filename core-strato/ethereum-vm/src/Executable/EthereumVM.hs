@@ -12,7 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isJust)
+import           Data.Maybe                            (fromJust, isJust, isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -21,10 +21,12 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.GenesisBlock
+import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.TransactionDef        (transactionChainId)
 import           Blockchain.Data.TransactionResult
+import           Blockchain.Database.MerklePatricia.StateRoot (StateRoot(..))
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.Format                     (format)
 import           Blockchain.JsonRpcCommand
@@ -39,6 +41,7 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
@@ -67,31 +70,21 @@ ethereumVM = void . execContextM $ do
 
         let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
         forM_ newGenesisInfos $ \ gi -> do
-          void $ initializeGenesisBlockFromInfo gi
+          gb <- initializeGenesisBlockFromInfo gi
+          let cid = genesisInfoChainId gi
+          when (isJust $ cid) $ putGenesisStateRoot (fromJust cid) (StateRoot . blockHeaderStateRoot $ blockHeader gb)
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
+        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
         $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
         unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
 
-        -- TODO: wrap private transactions in their own blocks
-        -- TODO: Run some sort of consensus on private chains once their sent via P2P
-        let privateChainIds = filter isJust . map fst . Bagger.partitionWith (transactionChainId . otBaseTx) $ poolableNewTxs
-        privateBlocks <- forM privateChainIds $ \chainId -> do
-          $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
-          newChainBlock <- Bagger.makeNewBlock
-          Bagger.processNewBestBlock
-            (outputBlockHash newChainBlock)
-            (obBlockData newChainBlock)
-            (map otHash $ obReceiptTransactions newChainBlock)
-          return newChainBlock
-
-        let blocks = [b | OEBlock b <- seqEvents] ++ privateBlocks
+        let blocks = [b | OEBlock b <- seqEvents]
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
         forM_ blocks $ \b -> do
             let number = blockDataNumber . obBlockData $ b
