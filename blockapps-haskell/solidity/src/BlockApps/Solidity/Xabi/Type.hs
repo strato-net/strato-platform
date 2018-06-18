@@ -6,6 +6,7 @@ module BlockApps.Solidity.Xabi.Type where
 
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
+import           Data.Aeson.TH
 import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -38,7 +39,7 @@ instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions{omitNothingFields = True}
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
 instance ToSchema Type where
-  declareNamedSchema proxy = genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.name ?~ "Solidity type"
     & mapped.schema.description ?~ "Represents a soldity type"
     & mapped.schema.example ?~ toJSON Address

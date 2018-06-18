@@ -13,6 +13,7 @@ module BlockApps.Bloc22.API.Utils where
 import           Control.Lens                     (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
+import           Data.Aeson.Types
 import           Data.Proxy
 import           Data.String
 import           Data.Text                        (Text)
