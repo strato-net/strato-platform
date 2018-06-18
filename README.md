@@ -14,7 +14,7 @@ curl -sSL https://get.haskellstack.org/ | sh
 ```
 
 ### NodeJS
-core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still used in genesis generation)
+core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still used in coinbase generation)
 
 ## Build
 
