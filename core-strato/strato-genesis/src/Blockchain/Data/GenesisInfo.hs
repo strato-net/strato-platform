@@ -26,6 +26,7 @@ import           Data.Time
 import           Data.Word
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.ExtWord
@@ -36,12 +37,21 @@ data CodeInfo = CodeInfo B.ByteString String String
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
+instance RLPSerializable CodeInfo where
+  rlpEncode (CodeInfo a b c) = 
+    RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad CodeInfo object") 
+    
+
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Read, Eq)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
+
+
 
 data GenesisInfo =
   GenesisInfo {

@@ -81,6 +81,7 @@ library
                  , transformers
                  , yaml
                  , strato-statediff
+                 , ethereum-rlp
 
 executable generate-genesis
     main-is: GenerateGenesis.hs
