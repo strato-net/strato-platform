@@ -77,7 +77,7 @@ extra-deps:
 - csv-0.1.2
 - json-stream-0.4.2.3
 
-resolver: lts-7.18
+resolver: lts-7.18 #also duplicated in docker section below
 compiler: ghc-8.0.2
 compiler-check: newer-minor
 extra-include-dirs:
@@ -101,3 +101,7 @@ ghc-options:
   strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
   strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
+
+docker:
+  enable: true
+  image: "stack-buildbase:lts-7.18"
