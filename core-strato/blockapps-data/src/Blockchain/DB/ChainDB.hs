@@ -3,14 +3,8 @@
 module Blockchain.DB.ChainDB (
     HasChainDB(..)
   , putBlockHeaderInChainDB
-  , getChainRoot
-  , putChainRoot
   , getGenesisStateRoot
   , putGenesisStateRoot
-  , getChainStateRoot
-  , putChainStateRoot
-  , getChainAddressState
-  , putChainAddressState
   , withBlockchain
   ) where
 
@@ -169,8 +163,7 @@ getChainStateRoot chainId (SHA bHash) = do
     let cdb = MP.MPDB db chainRoot
     getkv cdb (word256ToMPKey chainId)
   forNothing mStateRoot Just $ do
-    gdb <- MP.MPDB db <$> getGenesisRoot
-    mGenStateRoot <- getkv gdb (word256ToMPKey chainId)
+    mGenStateRoot <- getGenesisStateRoot chainId
     forJust mGenStateRoot Nothing $ \genStateRoot -> do
       putChainStateRoot chainId (SHA bHash) genStateRoot
       return $ Just genStateRoot
@@ -188,29 +181,6 @@ putChainStateRoot chainId (SHA bHash) stateRoot = do
       newBlockHashRoot <- putkv bhdb (word256ToMPKey bHash) newChainRoot
       putBlockHashRoot newBlockHashRoot
 
-getChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Maybe Word256 -> SHA -> Address -> m AddressState
-getChainAddressState Nothing        _     address = getAddressState address
-getChainAddressState (Just chainId) bHash address = do
-  previousStateRoot <- getStateRoot
-  mStateRoot <- getChainStateRoot chainId bHash
-  addressState <- forJust mStateRoot blankAddressState $ \stateRoot -> do
-    setStateDBStateRoot stateRoot
-    getAddressState address
-  setStateDBStateRoot previousStateRoot
-  return addressState
-
-putChainAddressState :: (HasHashDB m, HasStateDB m, HasChainDB m) => Maybe Word256 -> SHA -> Address -> AddressState -> m ()
-putChainAddressState Nothing        _     address state = putAddressState address state
-putChainAddressState (Just chainId) bHash address state = do
-  previousStateRoot <- getStateRoot
-  mStateRoot <- getChainStateRoot chainId bHash
-  forM_ mStateRoot $ \stateRoot -> do
-    setStateDBStateRoot stateRoot
-    putAddressState address state
-    newStateRoot <- getStateRoot
-    putChainStateRoot chainId bHash newStateRoot
-    setStateDBStateRoot previousStateRoot
-
 withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
 withBlockchain bh cid f = do
   case cid of
@@ -220,8 +190,8 @@ withBlockchain bh cid f = do
       case mStateRoot of
         Nothing -> error $ "withBlockchain: Couldn't find state root for chain " ++ format chainId
         Just stateRoot -> do
-          previousStateRoot <- getStateRoot
+          existingStateRoot <- getStateRoot
           setStateDBStateRoot stateRoot
           a <- f
-          setStateDBStateRoot previousStateRoot
+          setStateDBStateRoot existingStateRoot
           return a

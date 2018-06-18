@@ -310,7 +310,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
   forM_ chains $ \(chainId, txs) -> do
     withBlockchain (blockHeaderHash bd) chainId $ do
       $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
-      _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) transactions -- TODO: Run the checks Bagger does reject invalid transactions for private chains
+      _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
       flushMemStorageDB
       flushMemAddressStateDB
 

@@ -12,7 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (fromJust, isJust, isNothing)
+import           Data.Maybe                            (isJust, isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -68,11 +68,7 @@ ethereumVM = void . execContextM $ do
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
-        let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
-        forM_ newGenesisInfos $ \ gi -> do
-          gb <- initializeGenesisBlockFromInfo gi
-          let cid = genesisInfoChainId gi
-          when (isJust $ cid) $ putGenesisStateRoot (fromJust cid) (StateRoot . blockHeaderStateRoot $ blockHeader gb)
+        insertNewChains seqEvents
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
@@ -113,6 +109,22 @@ ethereumVM = void . execContextM $ do
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         setCheckpointNoMetadata newOffset
+
+insertNewChains :: [OutputEvent] -> ContextM ()
+insertNewChains events = do
+  let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- events]
+  forM_ newGenesisInfos $ \ gi -> do
+    gb <- initializeGenesisBlockFromInfo gi -- TODO: This should be :: ChainInfo -> ChainDetails
+    let cid = genesisInfoChainId gi
+    when (isJust $ cid) $ do
+      let (Just cid') = cid
+      mGSR <- getGenesisStateRoot cid'
+      case mGSR of
+        Just gsr -> error $ "ethereumVM.getGenesisStateRoot: chain "
+                      ++ format cid'
+                      ++ " is already initialized with state root "
+                      ++ format gsr
+        Nothing -> putGenesisStateRoot cid' (StateRoot . blockHeaderStateRoot $ blockHeader gb)
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
