@@ -136,9 +136,10 @@ instance RLPSerializable TransactionRequest where
       trTransactionHash = rlpDecode a
     , trMaxTransactions = fromInteger $ rlpDecode b
     , trSkip            = fromInteger $ rlpDecode c
-	, trDirection       = rlpDecode d
-	}
+    , trDirection       = rlpDecode d
+    }
   rlpDecode (RLPArray x) = Explicit $ rlpDecode <$> x
+  rlpDecode _ = error "Error in rlpDecode for TransactionRequest: bad RLPObject"
 
 data Message =
   --p2p wire protocol
@@ -208,14 +209,14 @@ instance Format Message where
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
 
   -- private chains
-  format (GetChainDetails cid) = "GetChainDetails\n" ++ "chainID: " ++ (show cid)
+{-  format (GetChainDetails cid) = "GetChainDetails\n" ++ "chainID: " ++ (show cid)
   format (ChainDetails cid2 cl fth ad cd) = 
       CL.blue "Chain Details\n" ++
       "  chainID: " ++ show cid2 ++ "\n" ++
       "  chainLabel: " ++ show cl ++ "\n" ++
       "  firstTransactionHash " ++ show fth ++ "\n"
   format (GetTransactions cid3 tr) = "GetTransactions\n" 
-
+-}
   format (WhisperProtocolVersion ver) = CL.blue "WhisperProtocolVersion " ++ show ver
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
@@ -306,8 +307,8 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
 wireMessage2Obj (GetChainDetails c) = 
   (0x1c, rlpEncode c)
 
-wireMessage2Obj (ChainDetails c cl fth ad cd) = 
-  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, rlpEncode ad, rlpEncode cd])
+wireMessage2Obj (ChainDetails c cl fth ad cd) = --decodeUTF8 
+  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
