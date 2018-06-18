@@ -40,6 +40,7 @@ function* attest(user, contractAddress, args) {
   // function attest(bytes32 _signature) public view returns(bytes32[]) {
   const method = 'attest';
   const result = yield rest.callMethod(user, contract, method, args);
+  return result;
 }
 
 // ================== wrapper methods ====================

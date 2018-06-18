@@ -113,7 +113,7 @@ module.exports = {
 
       try {
         let data = yield externalStorage.attest(userCredentials, contractAddress, args);
-        res.status(200).json({ signers: data, message: 'returns a list of signers of the uploaded resource' });
+        res.status(200).json({ attested: true, signers: data[0] });
       } catch (error) {
         let err = new Error(error);
         err.status = 500;
