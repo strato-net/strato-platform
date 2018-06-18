@@ -8,10 +8,6 @@ DEPLOYBASE_NAME=bloch-deploybase
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
-# Using custom BASE_IMAGE because fpco/stack-build has only lts resolvers but bloc uses the nightly build currently
-# Dockerfile used: Dockerfile.stack-build-nightly-tmp
-STACK_BASE_IMAGE=wombasta/stack-build:nightly-2017-04-21
-
 SOLC_VERSION=0.4.24
 
 all: build_docker
@@ -29,7 +25,7 @@ build_solidity: prebuild
 
 build_haskell: prebuild
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
-	docker build --build-arg BASE_IMAGE=${STACK_BASE_IMAGE} --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
 	stack setup && stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_deploybase: prebuild
