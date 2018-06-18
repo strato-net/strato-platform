@@ -11,7 +11,7 @@ import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 -- import           Blockchain.Data.GenesisInfo               (GenesisInfo(..))
-import           Handler.ChainInfo
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO

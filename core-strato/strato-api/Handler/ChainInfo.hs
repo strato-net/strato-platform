@@ -1,37 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric     #-}
+
 
 module Handler.ChainInfo where
 
 import           Data.Aeson
 import qualified Data.Text                      as T
 
-import           Blockchain.Data.GenesisInfo
+--import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
 
-
-data ChainInfo =
-  ChainInfo {
-    chainLabel      :: String,
-    addRule         :: String,
-    removeRule      :: String,
-    members         :: [String],
-    accountBalance  :: [(Address, Word256)]
-}
-
-
-instance FromJSON ChainInfo where
-  parseJSON (Object o) =
-    ChainInfo <$>
-    o .: "chainLabel" <*>
-    o .: "addRule" <*>
-    o .: "removeRule" <*>
-    o .: "members" <*>
-    o .: "accountBalance"
-  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
+import           Blockchain.Data.ChainInfo
 
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [ChainInfo] -> m ()
