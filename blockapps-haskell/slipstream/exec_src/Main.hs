@@ -210,6 +210,7 @@ convertRet address x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
+      liftIO $ putStrLn $ "convertRet____: " ++ show(x)
       --Debug
       --putStrLn $ show x
       let list = H.toList $ H.filter isString x
@@ -218,6 +219,7 @@ convertRet address x = do
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals
+      liftIO $ putStrLn $ "Insert Statement_______: " ++ show(ins)
       p <- dbInsert createSt
       print p
       dbInsert ins
@@ -278,11 +280,9 @@ lookupTopic = fromString "statediff"
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
 
-  --liftIO $ putStrLn $ "map(B16.decode) messages____: " ++ (show $ map(B16.decode) messages)
-  --liftIO $ putStrLn $ "map(fst . B16.decode) messages______: " ++ (show $ map(fst . B16.decode) messages)
   liftIO $ putStrLn $ "map(BL.fromStrict) messages______: " ++ (show $ map(BL.fromStrict) messages)
   liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages______: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
-  liftIO $ putStrLn $ "map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages______: " ++ (show $ map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages)
+  --liftIO $ putStrLn $ "map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages______: " ++ (show $ map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages)
 
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
@@ -291,6 +291,7 @@ processTheMessages messages = do
 
   let conHost = flags_pghost
   --let conHost = "172.18.0.6"
+  liftIO $ putStrLn $ "conHost_______: " ++ show (conHost)
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -305,10 +306,13 @@ processTheMessages messages = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
-  let strato = flags_stratourl
-  --let strato = "172.18.0.8:3000/eth/v1.2/"
+  --let strato = flags_stratourl
+  let strato = "172.18.0.8:3000/eth/v1.2/"
+  liftIO $ putStrLn $ "Strato Flag_____: " ++ show(strato)
 
   stratoUrl <- parseBaseUrl strato
+  liftIO $ putStrLn $ "StratoURL_______: " ++ show(stratoUrl)
+
   mgr <- newManager defaultManagerSettings
 
   let env = BlocEnv
@@ -322,10 +326,12 @@ processTheMessages messages = do
 
   cachedContractsIORef <- newIORef Map.empty
 
-
   _ <-
     enterBloc2 env $ do
+      liftIO $ putStrLn "enterBloc2 env $ do"
+      liftIO $ putStrLn $ "filter hasContract changes: " ++ show(filter hasContract changes)
       forM (filter hasContract changes) $ \change -> do
+        liftIO $ putStrLn "forM (filter hasContract changes) $ change -> do"
         filledInChange <- addStorageIfNeeded change
 
         let (address, codehash, storage) =
@@ -346,7 +352,7 @@ processTheMessages messages = do
               Right c -> do
                 liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
                 return c
-
+        liftIO $ putStrLn $ "contractMetaData_______: " ++ show(contractMetaData)
         --let hexadd = readHex address
         --let addr = Address hexadd
         --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
@@ -354,6 +360,7 @@ processTheMessages messages = do
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $
               decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
+        liftIO $ putStrLn $ "Returned Contracts_______: " ++ show (ret)
         liftIO $ convertRet address $ encode ret
   return()
 
@@ -371,6 +378,8 @@ getAndProcessMessages offset = do
   messages <- getTheMessages offset
   liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
+  liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
+  liftIO $ putStrLn $ "new offset >>>>>>>>> " ++ show(offset + fromIntegral (length messages))
   getAndProcessMessages $ (offset + fromIntegral (length messages))
 
 
@@ -379,7 +388,7 @@ main = do
   liftIO $ putStrLn "Main"
   _ <- $initHFlags "Setup Slipstream Variables"
 
-  let offset = 0 :: K.Offset
+  let offset = 10 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
