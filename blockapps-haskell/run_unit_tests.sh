@@ -14,7 +14,7 @@ TESTS=(
 )
 
 for tst in ${TESTS[@]}; do
-  if [[ TESTS[@] == "blockapps-bloc22-server" ]]; then
+  if [[ $tst == "blockapps-bloc22-server" ]]; then
     stack --docker-env=PATH test $tst
   else
     stack test $tst
