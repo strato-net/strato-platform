@@ -127,9 +127,18 @@ data TransactionRequest =
   } deriving (Eq, Show)
 
 instance RLPSerializable TransactionRequest where
-  rlpEncode (Explicit [x]) = RLPArray $ rlpEncode <$> [x]
-  rlpEncode (Implicit a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d]
-	-- Add in rlpDecode implementations
+  rlpEncode (Explicit x) = RLPArray $ rlpEncode <$> x
+  rlpEncode (Implicit a b c d) = 
+    RLPArray [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
+
+  rlpDecode (RLPArray [a, b, c, d]) = 
+    Implicit {
+      trTransactionHash = rlpDecode a
+    , trMaxTransactions = fromInteger $ rlpDecode b
+    , trSkip            = fromInteger $ rlpDecode c
+	, trDirection       = rlpDecode d
+	}
+  rlpDecode (RLPArray x) = Explicit $ rlpDecode <$> x
 
 data Message =
   --p2p wire protocol
@@ -210,6 +219,7 @@ instance Format Message where
   format (WhisperProtocolVersion ver) = CL.blue "WhisperProtocolVersion " ++ show ver
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
+-- Convert RLPObject and message code into corresponding Message
 obj2WireMessage::Word8->RLPObject->Message
 obj2WireMessage 0x0 (RLPArray [ver, cId, RLPArray cap, p, nId]) =
   Hello (fromInteger $ rlpDecode ver) (rlpDecode cId) (rlpDecode <$> cap) (fromInteger $ rlpDecode p) (rlpDecode nId)
@@ -251,7 +261,7 @@ obj2WireMessage 0x20 (RLPArray [ver]) =
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
-
+-- Convert Message into RLPObject and corresponding message code
 wireMessage2Obj::Message->(Word8, RLPObject)
 wireMessage2Obj Hello { version = ver,
                         clientId = cId,
@@ -297,7 +307,7 @@ wireMessage2Obj (GetChainDetails c) =
   (0x1c, rlpEncode c)
 
 wireMessage2Obj (ChainDetails c cl fth ad cd) = 
-  (0x1d, RLPArray [rlpEncode c, rlpEncode cl, rlpEncode fth, rlpEncode ad, rlpEncode cd])
+  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, rlpEncode ad, rlpEncode cd])
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
