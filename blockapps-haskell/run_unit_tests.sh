@@ -14,7 +14,11 @@ TESTS=(
 )
 
 for tst in ${TESTS[@]}; do
-  stack test $tst
+  if [[ $tst == "blockapps-bloc22-server" ]]; then
+    stack --docker-env=PATH test $tst
+  else
+    stack test $tst
+  fi
   RESULT=RESULT+$?
 done
 

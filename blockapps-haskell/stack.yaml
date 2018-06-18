@@ -1,4 +1,4 @@
-resolver: lts-10.10
+resolver: lts-10.10 #also duplicated in docker section below
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
@@ -44,3 +44,7 @@ extra-include-dirs:
 
 extra-lib-dirs:
 - /usr/local/lib
+
+docker:
+  enable: true
+  image: "stack-buildbase:lts-10.10"
