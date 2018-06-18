@@ -11,23 +11,23 @@ const healthHandler = require('../controllers/health');
 const checkMode = require('../lib/checkMode').checkMode;
 const fileController = require('../controllers/file');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
-const appConfig = require('../config/app.config');
-const s3 = require('../lib/s3');
 
 var upload = multer({ storage: multer.memoryStorage() });
 
-
-
 const multerMiddleware = (req, res, next) => {
-    upload.single('metadata')(req, res, (error) => {
-        if (error) {
-            if (error.status)
-                return res.status(error.status).send({ reason: error.message });
-            return res.status(400).send({ reason: error.message });
-        }
-        next();
-    })
+  upload.single('content')(req, res, (error) => {
+    if (!req.file) {
+      let err = new Error('wrong params, expected: {content(file), username, password, address, provider, metadata}');
+      err.status = 400;
+      return next(err);
+    }
+    if (error) {
+      if (error.status)
+        return res.status(error.status).send({ reason: error.message });
+      return res.status(400).send({ reason: error.message });
+    }
+    next();
+  })
 }
 
 router.post('/dapps', dappController.upload);
@@ -41,7 +41,7 @@ router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
 router.post('/bloc/file/upload', multerMiddleware, fileController.upload);
-router.get('/bloc/file/attest', fileController.attest);
+router.post('/bloc/file/attest', fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);
 

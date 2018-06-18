@@ -31,17 +31,26 @@ function* compileSearch() {
 }
 
 // ================== contract methods ====================
-function* attest(admin, contract, args, user) {
+function* attest(user, contractAddress, args) {
   rest.verbose('attest', args);
-  const signer = (user) ? user : admin;
-
+  let contract = {
+    name: contractName,
+    address: contractAddress
+  }
   // function attest(bytes32 _signature) public view returns(bytes32[]) {
   const method = 'attest';
-  const result = yield rest.callMethod(signer, contract, method, args);
+  const result = yield rest.callMethod(user, contract, method, args);
+}
+
+// ================== wrapper methods ====================
+function* getExternalStorage(address) {
+  const results = (yield rest.waitQuery(`${contractName}?address=eq.${address}`, 1, 3 * 60 * 1000))[0];
+  return results;
 }
 
 module.exports = {
   compileSearch: compileSearch,
   uploadContract: uploadContract,
-  attest: attest
+  attest: attest,
+  getExternalStorage: getExternalStorage
 };

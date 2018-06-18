@@ -20,8 +20,10 @@ module.exports = {
       const password = req.body.password;
       const address = req.body.address;
 
-      if (!content || !provider || !username || !password || !address) {
-        let err = new Error('something went wrong');
+      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
+
+      if (!metadata || !provider || !username || !password || !address) {
+        let err = new Error('wrong params, expected: {username, password, address, provider, metadata}');
         err.status = 400;
         return next(err);
       }
@@ -32,88 +34,122 @@ module.exports = {
         Body: req.file.buffer,
       };
 
-      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
+      function uploadData() {
+        return new Promise((resolve, reject) => {
+          s3.upload(params, function (err, data) {
+            if (err) {
+              return reject(err);
+            }
+            return resolve(data);
+          })
+        })
+      }
 
-      // s3.upload(params, function (err, data) {
-      //   if (err) {
-      //     console.log('error in callback');
-      //     console.log(err);
-      //   }
-      //   console.log('success');
-      //   console.log(data);
-      // });
+      let uploadedFile = yield uploadData();
 
-      // const args = {
-      //   _uri: req.file.originalname,
-      //   _host: provider,
-      //   _hash: '0x12345678'
-      // };
+      const args = {
+        _uri: uploadedFile.Location,
+        _host: provider,
+        _hash: hash
+      };
 
-      // const userCredentials = {
-      //   name: username,
-      //   address: address,
-      //   password: password
-      // };
+      const userCredentials = {
+        name: username,
+        address: address,
+        password: password
+      };
 
-      // try {
-      //   let temp = yield externalStorage.uploadContract(userCredentials, args);
-      //   console.log("---------------------------", temp)
-      // } catch (error) {
-      //   console.log('-------------------------------');
-      //   console.warn('externalstorage contract upload error:', error);
-      // }
-
-      res.status(200).json({ contractAddress: req.body });
-      // res.status(200).json({ contractAddress: "0xsdfsdf", uri: 'uri of the video', metadata: 'a sample video on s3' });
+      try {
+        let contractUpload = yield externalStorage.uploadContract(userCredentials, args);
+        res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+      } catch (error) {
+        let err = new Error(error);
+        err.status = 500;
+        return next(err);
+      };
     });
   },
 
   verify: function (req, res, next) {
-    const dataBlob = req.body.dataBlob;
-    const contractAddress = req.body.contractAddress;
+    co(function* () {
+      const contractAddress = req.query.contractAddress;
 
-    if (!contractAddress && !dataBlob) {
-      let err = new Error('something went wrong');
-      err.status = 400;
-      return next(err);
-    }
+      if (!contractAddress) {
+        let err = new Error('wrong params, expected: {contractAddress}');
+        err.status = 400;
+        return next(err);
+      }
 
-    // will returns isValid, Uri of the video, timestamp and signers
-    res.status(200).json({ isValid: true, uri: 'uri of the video', timestamp: '', signers: [{}] });
+      try {
+        let data = yield externalStorage.getExternalStorage(contractAddress);
+        res.status(200).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
+      } catch (error) {
+        let err = new Error(error);
+        err.status = 500;
+        return next(err);
+      }
+    });
   },
 
   attest: function (req, res, next) {
-    const contractAddress = req.query.contractAddress;
+    co(function* () {
+      const contractAddress = req.body.contractAddress;
+      const username = req.body.username;
+      const password = req.body.password;
+      const address = req.body.address;
 
-    if (!contractAddress) {
-      let err = new Error('something went wrong');
-      err.status = 400;
-      return next(err);
-    }
+      if (!contractAddress && !username && !password && !address) {
+        let err = new Error('wrong params, expected: {username, password, address, contractAddress}');
+        err.status = 400;
+        return next(err);
+      }
 
-    // will returns a list of signers of the uploaded resource
-    res.status(200).json({ signers: [], message: 'returns a list of signers of the uploaded resource' });
+      const args = {};
+      const userCredentials = {
+        name: username,
+        address: address,
+        password: password
+      };
+
+      try {
+        let data = yield externalStorage.attest(userCredentials, contractAddress, args);
+        res.status(200).json({ signers: data, message: 'returns a list of signers of the uploaded resource' });
+      } catch (error) {
+        let err = new Error(error);
+        err.status = 500;
+        return next(err);
+      }
+    });
   },
 
   download: function (req, res, next) {
     co(function* () {
       const contractAddress = req.query.contractAddress;
 
-      // if (!contractAddress) {
-      //   let err = new Error('something went wrong');
-      //   err.status = 400;
-      //   return next(err);
-      // }
+      if (!contractAddress) {
+        let err = new Error('wrong params, expected: {contractAddress}');
+        err.status = 400;
+        return next(err);
+      }
 
-      // TODO: Will get fileName form contract
-      var options = {
-        Bucket: appConfig.s3.bucket.Bucket,
-        Key: '1528970375737-SampleVideo_1280x720_1mb.flv',
-      };
+      try {
+        let data = yield externalStorage.getExternalStorage(contractAddress);
 
-      res.attachment(options.Key);
-      var fileStream = s3.getObject(options).createReadStream();
-      fileStream.pipe(res);
+        var options = {
+          Bucket: appConfig.s3.bucket.Bucket,
+          Key: /[^/]*$/.exec(data.uri)[0]
+        };
+
+        res.attachment(options.Key);
+        var fileStream = s3.getObject(options).createReadStream();
+        fileStream.pipe(res);
+
+      } catch (error) {
+        let err = new Error(error);
+        err.status = 500;
+        return next(err);
+      }
+
     })
   }
 };
