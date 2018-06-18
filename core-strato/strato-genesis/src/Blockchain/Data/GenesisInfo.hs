@@ -41,9 +41,8 @@ instance RLPSerializable CodeInfo where
   rlpEncode (CodeInfo a b c) = 
     RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
-  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad CodeInfo object") 
+  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
     
-
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
@@ -51,6 +50,20 @@ data AccountInfo = NonContract Address Integer
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
 
+instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
+  rlpEncode (a,b) = RLPArray [rlpEncode a, rlpEncode b]
+  rlpDecode (RLPArray [a, b]) = (rlpDecode a, rlpDecode b)
+  rlpDecode _ = error "Error in rlpDecode for RLPSerializable tuples: bad RLPObject"
+
+instance RLPSerializable AccountInfo where
+  rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
+  rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
+  rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray (rlpEncode <$> d)]
+
+  rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
+  rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)
+  rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
 
 
 data GenesisInfo =
