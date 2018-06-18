@@ -4,43 +4,14 @@
 
 ## Prerequisites to build
 
-```TODO: build core-strato and bloch with `docker: true` in stack.yaml to remove dependency on environment setup (both ubuntu/mac)```
-
 ### Stack
 Most unix systems (incl. ubuntu and mac):
 ```
 curl -sSL https://get.haskellstack.org/ | sh
 ```
 
-### Libraries
-
-#### Ubuntu/debian:
-
-```
-sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf libleveldb-dev
-```
-
-#### Centos/RHEL/Amazon linux 2
-
-```
-sudo yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
-sudo yum install libsodium libsodium-devel postgresql-devel cmake3 gcc-c++ libleveldb-devel libtool automake libz-devel libleveldb-devel
-```
-There are some additional awkward steps to have `cmake3` under a name that solidity can build with
-and to install a compatible version of boost:
-```
-sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake
-wget http://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz
-tar -xvzf boost_1_67_0.tar.gz
-cd boost_1_67_0/
-./bootstrap.sh
-./b2
-sudo ./b2 install
-```
-
-#### Mac people:
-
-TBD
+### NodeJS
+core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still used in genesis generation)
 
 ## Build
 
