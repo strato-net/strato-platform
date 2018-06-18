@@ -282,7 +282,6 @@ processTheMessages messages = do
 
   liftIO $ putStrLn $ "map(BL.fromStrict) messages______: " ++ (show $ map(BL.fromStrict) messages)
   liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages______: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
-  --liftIO $ putStrLn $ "map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages______: " ++ (show $ map(stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) messages)
 
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
@@ -388,7 +387,7 @@ main = do
   liftIO $ putStrLn "Main"
   _ <- $initHFlags "Setup Slipstream Variables"
 
-  let offset = 10 :: K.Offset
+  let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
