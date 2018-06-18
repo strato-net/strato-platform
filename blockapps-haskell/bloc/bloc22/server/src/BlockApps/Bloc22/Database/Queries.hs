@@ -9,6 +9,9 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
+-- TODO(tim): Replace runInsertReturning with runInsertManyReturning
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+
 module BlockApps.Bloc22.Database.Queries where
 
 
@@ -39,7 +42,7 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
-import           Opaleye                         hiding (not, null)
+import           Opaleye                         hiding (not, null, index)
 import qualified Opaleye                         (not, null)
 
 
