@@ -80,7 +80,7 @@ services:
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
-#    - zookeeper_conn=zookeeper
+    - zookeeper_conn=zookeeper
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
