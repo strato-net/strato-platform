@@ -78,3 +78,12 @@ sudo ./b2 install
 #### Mac people:
 
 TBD
+
+#### Knows issue with 'happy' lib
+
+Also we need to explicitly install `happy` library on the host:
+```
+stack install happy-1.19.5
+```
+possible reason for that is because some of the used libs uses it but doesn't have as a "build-tools" dependency in .cabal
+(also see https://github.com/haskell/cabal/issues/4574)
