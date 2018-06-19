@@ -7,6 +7,7 @@ import           Blockchain.Data.Address     ()
 import qualified Blockchain.Data.DataDefs    as DD
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.Transaction as TX
+import qualified Blockchain.Data.ChainInfo   as CI
 import           Blockchain.Data.TXOrigin    ()
 import           GHC.Generics                ()
 
@@ -107,6 +108,22 @@ instance Binary GI.GenesisInfo where
             accountInfo codeInfo transactionsRoot receiptsRoot logBloom
             difficulty number gasLimit gasUsed timestamp extraData
             mixHash nonce chainId
+
+instance Binary CI.ChainInfo where
+    put gi = sequence_ $ map ($ gi) $
+        [ put. CI.chainLabel
+        , put. CI.addRule
+        , put. CI.removeRule
+        , put. CI.members
+        , put. CI.accountBalance
+        ]
+    get = do
+        chainLabel      <- get
+        addRule         <- get
+        removeRule      <- get
+        members         <- get
+        accountBalance  <- get
+        return $ CI.ChainInfo chainLabel addRule removeRule members accountBalance
 
 instance Binary GI.CodeInfo where
   put (GI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2

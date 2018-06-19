@@ -10,7 +10,8 @@ import           Data.Maybe                                (fromJust)
 import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
-import           Blockchain.Data.GenesisInfo               (GenesisInfo(..))
+-- import           Blockchain.Data.GenesisInfo               (GenesisInfo(..))
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -50,7 +51,7 @@ data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
                                } deriving (Eq, Read, Show, GHCG.Generic)
 
 data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
-                                   , igGenesisInfo     :: GenesisInfo
+                                   , igGenesisInfo     :: ChainInfo
                                    } deriving (Eq, Read, Show, GHCG.Generic)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
@@ -94,7 +95,7 @@ data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                } deriving (Eq, Read, Show, GHCG.Generic)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
-                                   , ogGenesisInfo     :: GenesisInfo
+                                   , ogGenesisInfo     :: ChainInfo
                                    } deriving (Eq, Read, Show, GHCG.Generic)
 
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
