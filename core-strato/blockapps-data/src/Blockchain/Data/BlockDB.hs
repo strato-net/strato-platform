@@ -32,7 +32,6 @@ import           Data.List
 import qualified Data.Map                           as M
 import           Data.Maybe
 import qualified Data.Set                           as S
-import qualified Data.Text                          as T
 
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
@@ -66,7 +65,7 @@ blk2BlkDataRef :: (HasSQLDB m) =>
 blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
-  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH cI blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
+  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
       bd = blockBlockData b
@@ -85,7 +84,6 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
       eD = blockDataExtraData bd
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
-      cI = blockDataChainId bd
 
 getBlocks :: HasSQLDB m => m [Block]
 getBlocks = do
@@ -232,25 +230,6 @@ instance RLPSerializable Block where
     RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
 
 instance RLPSerializable BlockData where
-  rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16]) =
-    BlockData {
-      blockDataParentHash = rlpDecode v1,
-      blockDataUnclesHash = rlpDecode v2,
-      blockDataCoinbase = rlpDecode v3,
-      blockDataStateRoot = rlpDecode v4,
-      blockDataTransactionsRoot = rlpDecode v5,
-      blockDataReceiptsRoot = rlpDecode v6,
-      blockDataLogBloom = rlpDecode v7,
-      blockDataDifficulty = rlpDecode v8,
-      blockDataNumber = rlpDecode v9,
-      blockDataGasLimit = rlpDecode v10,
-      blockDataGasUsed = rlpDecode v11,
-      blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v12,
-      blockDataExtraData = rlpDecode v13,
-      blockDataMixHash = rlpDecode v14,
-      blockDataNonce = bytesToWord64 $ B.unpack $ rlpDecode v15,
-      blockDataChainId = Just $ rlpDecode v16
-      }
   rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15]) =
     BlockData {
       blockDataParentHash = rlpDecode v1,
@@ -267,15 +246,14 @@ instance RLPSerializable BlockData where
       blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v12,
       blockDataExtraData = rlpDecode v13,
       blockDataMixHash = rlpDecode v14,
-      blockDataNonce = bytesToWord64 $ B.unpack $ rlpDecode v15,
-      blockDataChainId = Nothing
+      blockDataNonce = bytesToWord64 $ B.unpack $ rlpDecode v15
       }
   rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ show (pretty arr))
   rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
 
 
   rlpEncode bd =
-    RLPArray $ [
+    RLPArray [
       rlpEncode $ blockDataParentHash bd,
       rlpEncode $ blockDataUnclesHash bd,
       rlpEncode $ blockDataCoinbase bd,
@@ -291,7 +269,7 @@ instance RLPSerializable BlockData where
       rlpEncode $ blockDataExtraData bd,
       rlpEncode $ blockDataMixHash bd,
       rlpEncode $ B.pack $ word64ToBytes $ blockDataNonce bd
-      ] ++ (maybeToList . fmap rlpEncode $ blockDataChainId bd)
+      ]
 
 
 instance Format BlockData where
@@ -308,8 +286,7 @@ instance Format BlockData where
     "gasUsed: " ++ show (blockDataGasUsed b) ++ "\n" ++
     "timestamp: " ++ show (blockDataTimestamp b) ++ "\n" ++
     "extraData: " ++ show (pretty $ blockDataExtraData b) ++ "\n" ++
-    "nonce: " ++ showHex (blockDataNonce b) "" ++ "\n" ++
-    "chainId: " ++ (show . fmap (flip showHex "") $ blockDataChainId b) ++ "\n"
+    "nonce: " ++ showHex (blockDataNonce b) "" ++ "\n"
 
 instance BlockLike BlockData Transaction Block where
     blockHeader       = blockBlockData
@@ -334,7 +311,6 @@ instance BlockHeaderLike BlockData where
     blockHeaderExtraData        = blockDataExtraData
     blockHeaderTimestamp        = blockDataTimestamp
     blockHeaderMixHash          = blockDataMixHash
-    blockHeaderChainId          = blockDataChainId
 
     morphBlockHeader h2 =
         BlockData { blockDataNumber           = blockHeaderBlockNumber h2
@@ -352,13 +328,12 @@ instance BlockHeaderLike BlockData where
                   , blockDataExtraData        = blockHeaderExtraData h2
                   , blockDataTimestamp        = blockHeaderTimestamp h2
                   , blockDataMixHash          = blockHeaderMixHash h2
-                  , blockDataChainId          = blockHeaderChainId h2
                   }
 
 createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block
 createBlockFromHeaderAndBody header (transactions, uncles) =
   Block (headerToBlockData header) transactions (map headerToBlockData uncles)
   where
-    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cid) =
-      BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh cid
+    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+      BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
 

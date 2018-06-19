@@ -10,7 +10,6 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
-import           Blockchain.ExtWord                 (Word256)
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
@@ -18,8 +17,8 @@ import           Blockchain.SHA                     hiding (hash)
 data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrResult      :: Either TransactionFailureCause ExecResults
                                , trrTime        :: NominalDiffTime
-                               , trrBeforeMap   :: M.Map (Maybe Word256, Address) AddressStateModification
-                               , trrAfterMap    :: M.Map (Maybe Word256, Address) AddressStateModification
+                               , trrBeforeMap   :: M.Map Address AddressStateModification
+                               , trrAfterMap    :: M.Map Address AddressStateModification
                                } deriving (Show)
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- txCost, accountBalance

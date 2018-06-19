@@ -45,28 +45,27 @@ initializeBlankStateDB = do
     setStateDBStateRoot emptyTriePtr
 
 putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
-                  Maybe Ext.Word256 -> Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
-putStorageTrie chainId address slots = do
-    mapM_ (\(k, v) -> putStorageKeyVal' chainId address k v) slots
+                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
+putStorageTrie address slots = do
+    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
-                  => Maybe Ext.Word256
-                  -> [AccountInfo]
+                  => [AccountInfo]
                   -> m ()
-initializeStateDB chainId addressInfo = do
+initializeStateDB addressInfo = do
     initializeBlankStateDB
     let putAccount acc = case acc of
                               NonContract address balance' ->
-                                putAddressState chainId address blankAddressState{addressStateBalance=balance'}
+                                putAddressState address blankAddressState{addressStateBalance=balance'}
                               ContractNoStorage address balance' codeHash' -> do
-                                putAddressState chainId address blankAddressState{addressStateBalance=balance',
+                                putAddressState address blankAddressState{addressStateBalance=balance',
                                                                           addressStateCodeHash=codeHash'}
                               ContractWithStorage address balance' codeHash' slots -> do
-                                putAddressState chainId address blankAddressState{addressStateBalance=balance',
+                                putAddressState address blankAddressState{addressStateBalance=balance',
                                                                           addressStateCodeHash=codeHash'}
-                                putStorageTrie chainId address slots
+                                putStorageTrie address slots
     mapM_ putAccount addressInfo
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
@@ -83,7 +82,7 @@ genesisInfoToGenesisBlock gi = do
                     [c] -> zip accounts (repeat c)
                     _ -> error "not equipped to seed for multiple contract types"
     initializeCodeDB codes
-    initializeStateDB (genesisInfoChainId gi) accounts
+    initializeStateDB accounts
     db <- getStateDB
     return (sourceInfo, Block {
         blockBlockData = BlockData {
@@ -101,8 +100,7 @@ genesisInfoToGenesisBlock gi = do
             blockDataTimestamp = genesisInfoTimestamp gi,
             blockDataExtraData = genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi,
-            blockDataChainId = genesisInfoChainId gi
+            blockDataNonce = genesisInfoNonce gi
         },
         blockReceiptTransactions = [],
         blockBlockUncles         = []
@@ -123,8 +121,8 @@ initializeGenesisBlockFromInfo genesisInfo = do
     (srcInfo, genesisBlock) <- genesisInfoToGenesisBlock genesisInfo
     _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     let genesisChainId = genesisInfoChainId genesisInfo
-    genAddrStates <- filter (\(c,_,_) -> c == genesisChainId) <$> getAllAddressStates
-    accountDiffs <- mapM eventualAccountState . Map.fromList $ map (\(_,a,s) -> (a,s)) genAddrStates
+    genAddrStates <- getAllAddressStates
+    accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     let diff = StateDiff {
         StateDiff.chainId   = genesisChainId,
         blockNumber         = 0,

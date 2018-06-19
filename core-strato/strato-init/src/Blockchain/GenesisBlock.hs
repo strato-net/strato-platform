@@ -100,7 +100,7 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    return (gb, undefined)
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState . Map.fromList $ map (\(_,a,s) -> (a,s)) genAddrStates
+    accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {
         StateDiff.chainId   = genesisChainId,

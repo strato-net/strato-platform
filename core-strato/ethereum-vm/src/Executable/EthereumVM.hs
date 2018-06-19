@@ -12,19 +12,21 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isJust)
+import           Data.Maybe                            (isJust, isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataChainId, blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.GenesisBlock
+import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.TransactionDef        (transactionChainId)
 import           Blockchain.Data.TransactionResult
+import           Blockchain.Database.MerklePatricia.StateRoot (StateRoot(..))
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.Format                     (format)
 import           Blockchain.JsonRpcCommand
@@ -39,9 +41,9 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-import           Blockchain.Strato.Model.Class
 
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
@@ -53,7 +55,7 @@ ethereumVM = void . execContextM $ do
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
-    putContextBestBlockInfo (blockDataChainId cpHead) cpBBI
+    putContextBestBlockInfo cpBBI
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -66,41 +68,19 @@ ethereumVM = void . execContextM $ do
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
-        let newGenesisBlocks = [g | OEGenesis (OutputGenesis _ g) <- seqEvents]
-        forM_ newGenesisBlocks $ \ gi -> do
-          gb <- initializeGenesisBlockFromInfo gi
-          let header = blockHeader gb
-              hash = blockHeaderHash header
-              chainId = blockHeaderChainId header
-              diff = blockHeaderDifficulty header
-          Bagger.processNewBestBlock hash header []
-          putContextBestBlockInfo chainId (ContextBestBlockInfo (hash, header, diff, 0, 0))
-          putBSum hash (blockHeaderToBSum header diff 0)
-          return gb
+        insertNewChains seqEvents
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
+        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
         $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
         unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
 
-        -- TODO: wrap private transactions in their own blocks
-        -- TODO: Run some sort of consensus on private chains once their sent via P2P
-        let privateChainIds = filter isJust . map fst . Bagger.partitionWith (transactionChainId . otBaseTx) $ poolableNewTxs
-        privateBlocks <- forM privateChainIds $ \chainId -> do
-          $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
-          newChainBlock <- Bagger.makeNewBlock chainId
-          Bagger.processNewBestBlock
-            (outputBlockHash newChainBlock)
-            (obBlockData newChainBlock)
-            (map otHash $ obReceiptTransactions newChainBlock)
-          return newChainBlock
-
-        let blocks = [b | OEBlock b <- seqEvents] ++ privateBlocks
+        let blocks = [b | OEBlock b <- seqEvents]
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
         forM_ blocks $ \b -> do
             let number = blockDataNumber . obBlockData $ b
@@ -113,13 +93,13 @@ ethereumVM = void . execContextM $ do
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
-        let pending = B.unsafeGetPublic B.pending state -- TODO: Grab pending txs for private chains
+        let pending = B.pending state
         let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- Bagger.makeNewBlock Nothing -- TODO: Make blocks for private chains as well
+            newBlock <- Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
@@ -129,6 +109,22 @@ ethereumVM = void . execContextM $ do
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         setCheckpointNoMetadata newOffset
+
+insertNewChains :: [OutputEvent] -> ContextM ()
+insertNewChains events = do
+  let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- events]
+  forM_ newGenesisInfos $ \ gi -> do
+    gb <- initializeGenesisBlockFromInfo gi -- TODO: This should be :: ChainInfo -> ChainDetails
+    let cid = genesisInfoChainId gi
+    when (isJust $ cid) $ do
+      let (Just cid') = cid
+      mGSR <- getGenesisStateRoot cid'
+      case mGSR of
+        Just gsr -> error $ "ethereumVM.getGenesisStateRoot: chain "
+                      ++ format cid'
+                      ++ " is already initialized with state root "
+                      ++ format gsr
+        Nothing -> putGenesisStateRoot cid' (StateRoot . blockHeaderStateRoot $ blockHeader gb)
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
