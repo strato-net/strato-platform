@@ -50,11 +50,6 @@ data AccountInfo = NonContract Address Integer
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
 
-instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
-  rlpEncode (a,b) = RLPArray [rlpEncode a, rlpEncode b]
-  rlpDecode (RLPArray [a, b]) = (rlpDecode a, rlpDecode b)
-  rlpDecode _ = error "Error in rlpDecode for RLPSerializable tuples: bad RLPObject"
-
 instance RLPSerializable AccountInfo where
   rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
   rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
