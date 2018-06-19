@@ -53,3 +53,5 @@ postChainR = do
       return . T.pack . show $ byteStringToWord256 bytes
     _ -> invalidArgs ["could not parse the args"]
 
+-- todo: implement getChainR
+  
