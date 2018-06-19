@@ -3,7 +3,10 @@
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 module Control.Monad.Stats.Monad
     ( MonadStats
     , StatsT(..)
@@ -24,7 +27,7 @@ module Control.Monad.Stats.Monad
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Exception         (AsyncException (..), fromException)
-import           Control.Monad.Ether
+import           Ether
 import           Control.Monad.IO.Class
 import           Control.Monad.Stats.Types
 import           Control.Monad.Stats.Util
@@ -51,50 +54,50 @@ borrowTMVar tmvar m = do
     liftIO . atomically $ putTMVar tmvar var
     return v
 
-withSocket :: (MonadStats tag m) => proxy tag -> (Socket.Socket -> m ()) -> m ()
-withSocket tag m = withEnvironment tag $ \e -> borrowTMVar (envSocket e) m
+withSocket :: forall tag m.(MonadStats tag m) => (Socket.Socket -> m ()) -> m ()
+withSocket m = withEnvironment @tag $ \e -> borrowTMVar (envSocket e) m
 
-withEnvironment :: (MonadStats tag m) => proxy tag -> (StatsTEnvironment -> m ()) -> m ()
-withEnvironment tag f = ask tag >>= \case
+withEnvironment :: forall tag m.(MonadStats tag m) => (StatsTEnvironment -> m ()) -> m ()
+withEnvironment f = ask @tag >>= \case
     NoStatsTEnvironment -> return ()
     env -> f env
 
-withSTS :: (MonadStats tag m) => proxy tag -> (StatsTState -> StatsTState) -> m ()
-withSTS tag f = withEnvironment tag $ \(StatsTEnvironment (_, _, state)) ->
+withSTS :: forall tag m.(MonadStats tag m) => (StatsTState -> StatsTState) -> m ()
+withSTS f = withEnvironment @tag $ \(StatsTEnvironment (_, _, state)) ->
     liftIO $ atomicModifyIORef' state (\x -> (f x, ()))
 
-tick :: (MonadStats tag m) => proxy tag -> Counter -> m ()
-tick tag = tickBy tag 1
+tick :: forall tag m.(MonadStats tag m) => Counter -> m ()
+tick = tickBy @tag 1
 
-tickBy :: (MonadStats tag m) => proxy tag -> Int -> Counter -> m ()
-tickBy tag n c = withSTS tag f
+tickBy :: forall tag m.(MonadStats tag m) => Int -> Counter -> m ()
+tickBy n c = withSTS @tag f
     where f (StatsTState m q) = flip StatsTState q $ case metricMapLookup c m of
                     Nothing -> metricMapInsert c MetricStore{metricValue = n} m
                     Just (MetricStore n')  -> metricMapInsert c (MetricStore (n' + n)) m
 
-setRegularValue :: (MonadStats tag m, Metric m') => proxy tag -> Int -> m' -> m ()
-setRegularValue tag v c = withSTS tag f
+setRegularValue :: forall tag m m'.(MonadStats tag m, Metric m') => Int -> m' -> m ()
+setRegularValue v c = withSTS @tag f
     where f (StatsTState m q) = StatsTState (metricMapInsert c (fromIntegral v) m) q
 
-enqueueNonMetric :: (MonadStats tag m) => proxy tag -> ByteString -> m ()
-enqueueNonMetric tag e = withSTS tag f
+enqueueNonMetric :: forall tag m.(MonadStats tag m) => ByteString -> m ()
+enqueueNonMetric e = withSTS @tag f
     where f (StatsTState m q) = StatsTState m (pushBack q e)
 
-setCounter :: (MonadStats tag m) => proxy tag -> Int -> Counter -> m ()
-setCounter = setRegularValue
+setCounter :: forall tag m.(MonadStats tag m) => Int -> Counter -> m ()
+setCounter = setRegularValue @tag
 
-setGauge :: (MonadStats tag m) => proxy tag -> Int -> Gauge -> m ()
-setGauge = setRegularValue
+setGauge :: forall tag m.(MonadStats tag m) => Int -> Gauge -> m ()
+setGauge = setRegularValue @tag
 
-time :: (Real n, Fractional n, MonadStats tag m) => proxy tag -> n -> Timer -> m ()
-time tag = setRegularValue tag . v
+time :: forall n tag m.(Real n, Fractional n, MonadStats tag m) => n -> Timer -> m ()
+time = setRegularValue @tag . v
     where v = round . (* 1000.0) . toDouble
 
-histoSample :: (MonadStats tag m) => proxy tag -> Int -> Histogram -> m ()
-histoSample tag v Histogram{..} = withEnvironment tag $ \env -> do
+histoSample :: forall m tag.(MonadStats tag m) => Int -> Histogram -> m ()
+histoSample v Histogram{..} = withEnvironment @tag $ \env -> do
     rando <- liftIO $ getStdRandom random -- per System.Random docs: for fractional types,
                                           -- the range is normally the semi-closed interval [0,1).
-    when (rando < _histogramSampleRate) $ enqueueNonMetric tag (rendered env)
+    when (rando < _histogramSampleRate) $ enqueueNonMetric @tag (rendered env)
     where rendered = renderSimpleMetric histogramName v "|h" histogramTags (Just _histogramSampleRate)
 
 renderTimestamp :: POSIXTime -> ByteString
@@ -116,16 +119,16 @@ renderSimpleMetric name value kind tags sampleRate env =
           cfg      = envConfig env
           allTags  = renderAllTags [defaultTags cfg, tags]
 
-addSetMember :: (MonadStats tag m) => proxy tag -> Int -> Set -> m ()
-addSetMember tag member Set{..} = withEnvironment tag $ enqueueNonMetric tag . rendered
+addSetMember :: forall m tag.(MonadStats tag m) => Int -> Set -> m ()
+addSetMember member Set{..} = withEnvironment @tag $ enqueueNonMetric @tag . rendered
     where rendered = renderSimpleMetric setName member "|s" setTags Nothing
 
-reportEvent :: (MonadStats tag m) => proxy tag -> Event -> m ()
-reportEvent tag Event{..} = withEnvironment tag $ \env -> do
+reportEvent :: forall tag m.(MonadStats tag m) => Event -> m ()
+reportEvent Event{..} = withEnvironment @tag $ \env -> do
     timestamp <- case eventTimestamp of
         Just x  -> return $ renderTimestamp x
         Nothing -> renderTimestamp <$> liftIO getPOSIXTime
-    enqueueNonMetric tag $ renderEvent timestamp (defaultTags $ envConfig env)
+    enqueueNonMetric @tag $ renderEvent timestamp (defaultTags $ envConfig env)
     where renderEvent ts dt = ByteString.concat [ "_e{"
                                                 , Char8.pack . show $ ByteString.length eventName
                                                 , ","
@@ -143,14 +146,14 @@ reportEvent tag Event{..} = withEnvironment tag $ \env -> do
                                                 , renderAllTags [dt, eventTags]
                                                 ]
 
-reportServiceCheck :: (MonadStats tag m) => proxy tag -> ServiceCheck -> ServiceCheckValue -> m ()
-reportServiceCheck t ServiceCheck{..} ServiceCheckValue{..} = ask t >>= \case
+reportServiceCheck :: forall m tag.(MonadStats tag m) => ServiceCheck -> ServiceCheckValue -> m ()
+reportServiceCheck ServiceCheck{..} ServiceCheckValue{..} = (ask @tag) >>= \case
     NoStatsTEnvironment -> return ()
     env -> do
         timestamp <- case scvTimestamp of
             Just x  -> return $ renderTimestamp x
             Nothing -> renderTimestamp <$> liftIO getPOSIXTime
-        enqueueNonMetric t $ renderSC timestamp
+        (enqueueNonMetric @tag) $ renderSC timestamp
         where renderSC ts = ByteString.concat [ "_sc|"
                                               , serviceCheckName
                                               , "|"
@@ -219,17 +222,17 @@ reportSamples env@(StatsTEnvironment (cfg, socket, state)) = do
 
 type StatsT t = ReaderT t StatsTEnvironment
 
-runStatsT :: (MonadIO m) => proxy t -> StatsT t m a -> StatsTConfig -> m a
-runStatsT t m c = do
+runStatsT :: (MonadIO m) => StatsT t m a -> StatsTConfig -> m a
+runStatsT m c = do
     (socket, addr) <- mkStatsDSocket c
     liftIO $ borrowTMVar socket (`Socket.connect` addr)
     theEnv <- mkStatsTEnv c socket
-    flip (runReaderT t) theEnv $ do
+    flip runReaderT theEnv $ do
         tid <- forkStatsThread theEnv
         ret <- m
         reportSamples theEnv -- just in case our actions ran faster than 2x flush interval
         liftIO $ killThread tid
         return ret
 
-runNoStatsT :: (MonadIO m) => proxy t -> StatsT t m a -> m a
-runNoStatsT t = flip (runReaderT t) NoStatsTEnvironment
+runNoStatsT :: (MonadIO m) => StatsT t m a -> m a
+runNoStatsT = flip runReaderT NoStatsTEnvironment

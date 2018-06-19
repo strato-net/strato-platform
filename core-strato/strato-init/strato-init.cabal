@@ -25,10 +25,12 @@ executable strato-setup
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
+                 , ethereum-rlp
                  , strato-sequencer
                  , strato-index
                  , bytestring
                  , containers
+                 , cryptohash
                  , directory
                  , entropy
                  , ethereum-discovery
@@ -148,7 +150,7 @@ library
 
     default-language: Haskell2010
     buildable: True
-    ghc-options: -Wall -O2 -threaded
+    ghc-options: -Wall -O2
     build-depends: base
                  , aeson
                  , base16-bytestring
@@ -176,6 +178,8 @@ executable generate-genesis
     default-language: Haskell2010
     buildable: True
     ghc-options: -Wall -O2 -threaded
+    other-modules: Blockchain.Data.GenesisInfo
+                 , Blockchain.Generation
     build-depends: base
                  , aeson
                  , aeson-extra

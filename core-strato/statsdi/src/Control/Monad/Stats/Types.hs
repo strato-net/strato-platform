@@ -6,7 +6,7 @@
 module Control.Monad.Stats.Types where
 
 import           Control.Concurrent.STM (TMVar)
-import           Control.Monad.Ether
+import           Ether
 import           Control.Monad.IO.Class
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
