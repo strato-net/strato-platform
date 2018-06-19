@@ -130,7 +130,6 @@ instance RLPSerializable TransactionRequest where
   rlpEncode (Explicit x) = RLPArray $ rlpEncode <$> x
   rlpEncode (Implicit a b c d) = 
     RLPArray [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
-
   rlpDecode (RLPArray [a, b, c, d]) = 
     Implicit {
       trTransactionHash = rlpDecode a
@@ -158,12 +157,13 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
   
+  WhisperProtocolVersion Int |
+  
   -- private chains
   GetChainDetails Word256 |
   ChainDetails { chid::Word256, chainLabel::Maybe Text, firstTransactionHash::SHA, accountData::[AccountInfo], codeData::[CodeInfo] } |
-  GetTransactions Word256 TransactionRequest |  
+  GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
-  WhisperProtocolVersion Int deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -208,16 +208,21 @@ instance Format Message where
       formatUncles uncles = "\nUncles:" ++ tab ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
 
-  -- private chains
-{-  format (GetChainDetails cid) = "GetChainDetails\n" ++ "chainID: " ++ (show cid)
-  format (ChainDetails cid2 cl fth ad cd) = 
-      CL.blue "Chain Details\n" ++
-      "  chainID: " ++ show cid2 ++ "\n" ++
-      "  chainLabel: " ++ show cl ++ "\n" ++
-      "  firstTransactionHash " ++ show fth ++ "\n"
-  format (GetTransactions cid3 tr) = "GetTransactions\n" 
--}
   format (WhisperProtocolVersion ver) = CL.blue "WhisperProtocolVersion " ++ show ver
+  
+  -- private chains
+  format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
+  format (ChainDetails cid2 cl fth ad cd) = 
+    CL.blue "Chain Details\n" ++
+    "  chainID: " ++ show cid2 ++ "\n" ++
+    "  chainLabel: " ++ show cl ++ "\n" ++
+    "  firstTransactionHash: " ++ show fth ++ "\n" ++
+    "  accountData: " ++ show ad ++ "\n" ++
+    "  codeData: " ++ show cd ++ "\n"
+  format (GetTransactions cid3 tr) = "GetTransactions\n" ++
+    "  chainID: " ++ show cid3 ++ "\n" ++
+    "  transactionData: " ++ show tr ++ "\n"
+
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
 -- Convert RLPObject and message code into corresponding Message
@@ -259,6 +264,16 @@ obj2WireMessage 0x17 (RLPArray [b, td]) =
 
 obj2WireMessage 0x20 (RLPArray [ver]) =
   WhisperProtocolVersion $ fromInteger $ rlpDecode ver
+
+-- private chains
+obj2WireMessage 0x1c (RLPArray [cid]) = 
+  GetChainDetails (rlpDecode cid)
+
+obj2WireMessage 0x1d (RLPArray [c, cl, fth, RLPArray ad, RLPArray cd]) =
+  ChainDetails (rlpDecode c) (read $ rlpDecode cl) (rlpDecode fth) (rlpDecode <$> ad) (rlpDecode <$> cd)
+
+obj2WireMessage 0x1e (RLPArray [c, tr]) =
+  GetTransactions (rlpDecode c) (rlpDecode tr)
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
@@ -307,7 +322,7 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
 wireMessage2Obj (GetChainDetails c) = 
   (0x1c, rlpEncode c)
 
-wireMessage2Obj (ChainDetails c cl fth ad cd) = --decodeUTF8 
+wireMessage2Obj (ChainDetails c cl fth ad cd) =  
   (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
 
 wireMessage2Obj (GetTransactions c tr) = 
