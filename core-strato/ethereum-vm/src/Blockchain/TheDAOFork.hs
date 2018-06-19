@@ -138,13 +138,13 @@ runTheDAOFork::(HasStateDB m, HasHashDB m)=>m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
-      addressState <- getAddressState Nothing a -- I don't think we care about this anymore, but it would only run on the public chain anyway
-      putAddressState Nothing a addressState{addressStateBalance=0}
+      addressState <- getAddressState a
+      putAddressState a addressState{addressStateBalance=0}
       return $ addressStateBalance addressState
 
   let recipAddr = Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754
 
-  recipAddressState <- getAddressState Nothing recipAddr
-  putAddressState Nothing recipAddr recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
+  recipAddressState <- getAddressState recipAddr
+  putAddressState recipAddr recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
 
   return ()

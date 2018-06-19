@@ -141,6 +141,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
           prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
                 where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
                       prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+                      prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
 
                       shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
                       shortOrigin x                    = format x

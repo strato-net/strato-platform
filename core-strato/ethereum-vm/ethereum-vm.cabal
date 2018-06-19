@@ -39,6 +39,7 @@ library
                  , blockapps-milena
                  , mtl
                  , monad-logger
+                 , ordered-containers
                  , persistent-postgresql
                  , postgresql-simple
                  , resourcet

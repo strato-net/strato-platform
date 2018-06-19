@@ -92,7 +92,6 @@ getBlkFilter (_, accStateRef, _, _) ("address", v)   = accStateRef E.^. AddressS
 getBlkFilter (bdRef, _, _, blk) ("blockid", v)   = bdRef E.^. BlockDataRefBlockId E.==. E.val (toBlockId v)
                                                               E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
 getBlkFilter (bdRef, _, _, blk) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-getBlkFilter (bdRef, _, _, _) ("chainid", v)    = ((bdRef E.^. BlockDataRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
 
 
 getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
@@ -298,7 +297,7 @@ extraFilter ("index", _) v' = ("index", v')
 extraFilter (a,b) _'        = (a,b)
 
 getBlockNum :: Block -> Integer
-getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _ _) _ _) = num
+getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num
 
 getTxNum :: RawTransaction -> Int
 getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ _ bn _ _) = bn

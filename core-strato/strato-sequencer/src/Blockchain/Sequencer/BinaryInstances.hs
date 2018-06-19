@@ -42,7 +42,6 @@ instance Binary DD.BlockData where
         , put . DD.blockDataExtraData
         , put . DD.blockDataNonce
         , put . DD.blockDataMixHash
-        , put . DD.blockDataChainId
         ]
     get = do
         parentHash       <- get
@@ -60,11 +59,10 @@ instance Binary DD.BlockData where
         extraData        <- get
         nonce            <- get
         mixHash          <- get
-        chainId          <- get
         return $ DD.BlockData parentHash unclesHash coinbase
             stateRoot transactionsRoot receiptsRoot logBloom
             difficulty number gasLimit gasUsed timestamp extraData
-            nonce mixHash chainId
+            nonce mixHash
 
 instance Binary GI.GenesisInfo where
     put gi = sequence_ $ map ($ gi) $

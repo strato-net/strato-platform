@@ -7,7 +7,6 @@ module Blockchain.Data.BlockHeader (
   ) where
 
 import qualified Data.ByteString                    as B
-import           Data.Maybe                         (maybeToList)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
@@ -42,12 +41,11 @@ data BlockHeader =
     timestamp        :: UTCTime,
     extraData        :: Integer,
     mixHash          :: SHA,
-    nonce            :: Word64,
-    chainId          :: Maybe Word256
+    nonce            :: Word64
     } deriving (Eq, Read, Show)
 
 instance Format BlockHeader where
-  format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce' cId) =
+  format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
     CL.blue ("BlockHeader #" ++ show number') ++ " " ++ format (headerHash header) ++
     tab ("\nparentHash: " ++ format ph ++ "\n" ++
          "ommersHash: " ++ format oh ++
@@ -61,11 +59,10 @@ instance Format BlockHeader where
          "gasUsed: " ++ show gu ++ "\n" ++
          "timestamp: " ++ show ts ++ "\n" ++
          "extraData: " ++ show ed ++ "\n" ++
-         "nonce: " ++ showHex nonce' "" ++ "\n" ++
-         "chainId: " ++ (show . fmap (flip showHex "") $ cId) ++ "\n")
+         "nonce: " ++ showHex nonce' "" ++ "\n")
 
 instance RLPSerializable BlockHeader where
-  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cId) =
+  rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
     RLPArray $ [
       rlpEncode ph,
       rlpEncode oh,
@@ -82,26 +79,7 @@ instance RLPSerializable BlockHeader where
       rlpEncode ed,
       rlpEncode mh,
       rlpEncode $ B.pack $ word64ToBytes nonce'
-      ] ++ (maybeToList $ fmap rlpEncode cId)
-  rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce', cid]) =
-    BlockHeader {
-      parentHash=rlpDecode ph,
-      ommersHash=rlpDecode oh,
-      beneficiary=rlpDecode b,
-      stateRoot=rlpDecode sr,
-      transactionsRoot=rlpDecode tr,
-      receiptsRoot=rlpDecode rr,
-      logsBloom=rlpDecode lb,
-      difficulty=rlpDecode d,
-      number=rlpDecode number',
-      gasLimit=rlpDecode gl,
-      gasUsed=rlpDecode gu,
-      timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
-      extraData=rlpDecode ed,
-      mixHash=rlpDecode mh,
-      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
-      chainId = Just $ rlpDecode cid
-      }
+      ]
   rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
     BlockHeader {
       parentHash=rlpDecode ph,
@@ -118,8 +96,7 @@ instance RLPSerializable BlockHeader where
       timestamp=posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
       extraData=rlpDecode ed,
       mixHash=rlpDecode mh,
-      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce',
-      chainId = Nothing
+      nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce'
       }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
@@ -139,7 +116,6 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderExtraData        = extraData
     blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
-    blockHeaderChainId          = chainId
 
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
                                               , parentHash       = blockHeaderParentHash b
@@ -156,7 +132,6 @@ instance BlockHeaderLike BlockHeader where
                                               , extraData        = blockHeaderExtraData b
                                               , timestamp        = blockHeaderTimestamp b
                                               , mixHash          = blockHeaderMixHash b
-                                              , chainId          = blockHeaderChainId b
                                               }
 
 headerHash :: BlockHeader->SHA
@@ -170,5 +145,5 @@ blockToBody Block{blockReceiptTransactions=transactions, blockBlockUncles=uncles
   (transactions, map blockDataToBlockHeader uncles)
 
 blockDataToBlockHeader::BlockData->BlockHeader
-blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce' cid) =
-  BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh cid
+blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+  BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh

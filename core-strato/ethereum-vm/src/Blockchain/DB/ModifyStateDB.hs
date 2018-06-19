@@ -9,7 +9,6 @@ module Blockchain.DB.ModifyStateDB (
 import           Control.Monad.Logger
 import           Control.Monad.Trans
 
-import           Blockchain.ExtWord              (Word256)
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
@@ -17,21 +16,21 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 addToBalance :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m) =>
-              Maybe Word256 -> Address -> Integer -> m Bool
-addToBalance chainId address val = do
-  addressState <- getAddressState chainId address
+              Address -> Integer -> m Bool
+addToBalance address val = do
+  addressState <- getAddressState address
 
   let newVal = addressStateBalance addressState + val
 
   if newVal < 0
     then return False
     else do
-    putAddressState chainId address addressState{addressStateBalance = newVal}
+    putAddressState address addressState{addressStateBalance = newVal}
     return True
 
 pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m) =>
-     String -> Maybe Word256 -> Address -> Address -> Integer -> m Bool
-pay _description chainId fromAddr toAddr val = do
+     String -> Address -> Address -> Integer -> m Bool
+pay _description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.
   {-
@@ -45,10 +44,10 @@ pay _description chainId fromAddr toAddr val = do
         $logDebugS "pay" "insufficient funds"
   -}
 
-  fromAddressState <- getAddressState chainId fromAddr
+  fromAddressState <- getAddressState fromAddr
   if addressStateBalance fromAddressState < val
     then return False
     else do
-    _ <- addToBalance chainId fromAddr (-val)
-    _ <- addToBalance chainId toAddr val
+    _ <- addToBalance fromAddr (-val)
+    _ <- addToBalance toAddr val
     return True
