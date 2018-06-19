@@ -26,6 +26,7 @@ class SideBar extends Component {
         { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
         { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
         { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" },
+        { path: '/external_storage', label: 'External Storage', id: 'external_storage', icon: "fa-cloud-upload" }
       ]
     );
     

@@ -16,6 +16,7 @@ import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import AccountDetail from './components/AccountDetail';
+import ExternalStorage from './components/ExternalStorage';
 import { isModePublic } from './lib/checkMode';
 
 const CommonRoute = (props) => {
@@ -31,6 +32,7 @@ const CommonRoute = (props) => {
     <CommonRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <CommonRoute exact path="/code_editor" component={CodeEditor} />
     <CommonRoute exact path="/launchpad" component={LaunchPad} />
+    <CommonRoute exact path="/external_storage" component={ExternalStorage} />
   </div>)
 };
 
