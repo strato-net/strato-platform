@@ -103,6 +103,7 @@ library
                  , file-embed
                  , filepath
                  , hjsmin                        >= 0.1
+                 , largeword
                  , mime-mail
                  , monad-logger                  >= 0.3
                  , persistent                    >= 2.0
