@@ -127,17 +127,21 @@ data TransactionRequest =
   } deriving (Eq, Show)
 
 instance RLPSerializable TransactionRequest where
-  rlpEncode (Explicit x) = RLPArray $ rlpEncode <$> x
+  rlpEncode (Explicit x) = 
+    RLPArray $ [(rlpEncode (0::Integer))] ++ (rlpEncode <$> x)
   rlpEncode (Implicit a b c d) = 
-    RLPArray [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
-  rlpDecode (RLPArray [a, b, c, d]) = 
-    Implicit {
-      trTransactionHash = rlpDecode a
-    , trMaxTransactions = fromInteger $ rlpDecode b
-    , trSkip            = fromInteger $ rlpDecode c
-    , trDirection       = rlpDecode d
-    }
-  rlpDecode (RLPArray x) = Explicit $ rlpDecode <$> x
+    RLPArray $ [(rlpEncode (1::Integer))] ++ 
+      [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
+
+  rlpDecode (RLPArray (x:xs@[a,b,c,d])) 
+    | (rlpDecode x) == (0::Integer) = Explicit $ rlpDecode <$> xs
+    | (rlpDecode x) == (1::Integer) = 
+      Implicit {
+        trTransactionHash = rlpDecode a
+      , trMaxTransactions = fromInteger $ rlpDecode b
+      , trSkip            = fromInteger $ rlpDecode c
+      , trDirection       = rlpDecode d
+      }
   rlpDecode _ = error "Error in rlpDecode for TransactionRequest: bad RLPObject"
 
 data Message =
