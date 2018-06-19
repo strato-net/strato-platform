@@ -14,6 +14,7 @@ import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString              as B
 import           Data.List
 import           Data.Word
+import           Data.Text.Internal
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
@@ -25,6 +26,8 @@ import           Blockchain.Data.Transaction
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.ExtWord
+import           Blockchain.Data.GenesisInfo 
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | SHH Integer               -- | Whisper support
@@ -114,6 +117,36 @@ instance RLPSerializable Direction where
   rlpDecode x | rlpDecode x == (0::Integer) = Forward
   rlpDecode _ = Reverse
 
+data TransactionRequest =
+  Explicit [SHA] |
+  Implicit {
+    trTransactionHash :: SHA
+  , trMaxTransactions :: Int
+  , trSkip            :: Int
+  , trDirection       :: Direction
+  } deriving (Eq, Show)
+
+instance RLPSerializable TransactionRequest where
+  rlpEncode (Explicit x) = 
+    RLPArray $ [(rlpEncode (0::Integer))] ++ (rlpEncode <$> x)
+  rlpEncode (Implicit a b c d) = 
+    RLPArray $ [(rlpEncode (1::Integer))] ++ 
+      [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
+
+  rlpDecode (RLPArray (x:xs)) 
+    | (rlpDecode x) == (0::Integer) = Explicit $ rlpDecode <$> xs
+    | (rlpDecode x) == (1::Integer) = 
+      Implicit {
+        trTransactionHash = rlpDecode a
+      , trMaxTransactions = fromInteger $ rlpDecode b
+      , trSkip            = fromInteger $ rlpDecode c
+      , trDirection       = rlpDecode d
+      } where a = xs !! 0
+              b = xs !! 1
+              c = xs !! 2
+              d = xs !! 3
+  rlpDecode _ = error "Error in rlpDecode for TransactionRequest: bad RLPObject"
+
 data Message =
   --p2p wire protocol
   Hello { version::Int, clientId::String, capability::[Capability], port::Int, nodeId::Point } |
@@ -130,8 +163,14 @@ data Message =
   GetBlockBodies [SHA] |
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
+  
+  WhisperProtocolVersion Int |
+  
+  -- private chains
+  GetChainDetails Word256 |
+  ChainDetails { chid::Word256, chainLabel::Maybe Text, firstTransactionHash::SHA, accountData::[AccountInfo], codeData::[CodeInfo] } |
+  GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
-  WhisperProtocolVersion Int deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -177,12 +216,28 @@ instance Format Message where
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
 
   format (WhisperProtocolVersion ver) = CL.blue "WhisperProtocolVersion " ++ show ver
+  
+  -- private chains
+  format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
+  format (ChainDetails cid2 cl fth ad cd) = 
+    CL.blue "Chain Details\n" ++
+    "  chainID: " ++ show cid2 ++ "\n" ++
+    "  chainLabel: " ++ show cl ++ "\n" ++
+    "  firstTransactionHash: " ++ show fth ++ "\n" ++
+    "  accountData: " ++ show ad ++ "\n" ++
+    "  codeData: " ++ show cd ++ "\n"
+  format (GetTransactions cid3 tr) = "GetTransactions\n" ++
+    "  chainID: " ++ show cid3 ++ "\n" ++
+    "  transactionData: " ++ show tr ++ "\n"
+
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
+-- Convert RLPObject and message code into corresponding Message
 obj2WireMessage::Word8->RLPObject->Message
 obj2WireMessage 0x0 (RLPArray [ver, cId, RLPArray cap, p, nId]) =
   Hello (fromInteger $ rlpDecode ver) (rlpDecode cId) (rlpDecode <$> cap) (fromInteger $ rlpDecode p) (rlpDecode nId)
 obj2WireMessage 0x1 (RLPArray [reason]) =
+
   Disconnect (numberToTerminationReason $ rlpDecode reason)
 obj2WireMessage 0x2 (RLPArray []) = Ping
 obj2WireMessage 0x2 (RLPArray [RLPArray []]) = Ping
@@ -217,9 +272,19 @@ obj2WireMessage 0x17 (RLPArray [b, td]) =
 obj2WireMessage 0x20 (RLPArray [ver]) =
   WhisperProtocolVersion $ fromInteger $ rlpDecode ver
 
+-- private chains
+obj2WireMessage 0x1c (RLPArray [cid]) = 
+  GetChainDetails (rlpDecode cid)
+
+obj2WireMessage 0x1d (RLPArray [c, cl, fth, RLPArray ad, RLPArray cd]) =
+  ChainDetails (rlpDecode c) (read $ rlpDecode cl) (rlpDecode fth) (rlpDecode <$> ad) (rlpDecode <$> cd)
+
+obj2WireMessage 0x1e (RLPArray [c, tr]) =
+  GetTransactions (rlpDecode c) (rlpDecode tr)
+
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
-
+-- Convert Message into RLPObject and corresponding message code
 wireMessage2Obj::Message->(Word8, RLPObject)
 wireMessage2Obj Hello { version = ver,
                         clientId = cId,
@@ -260,6 +325,15 @@ wireMessage2Obj (NewBlock b d) =
 wireMessage2Obj (WhisperProtocolVersion ver) =
   (0x20, RLPArray [rlpEncode $ toInteger ver])
 
---wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
+-- private chains
+wireMessage2Obj (GetChainDetails c) = 
+  (0x1c, rlpEncode c)
 
+wireMessage2Obj (ChainDetails c cl fth ad cd) =  
+  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
+
+wireMessage2Obj (GetTransactions c tr) = 
+  (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
+
+--wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
 

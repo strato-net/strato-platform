@@ -34,6 +34,7 @@ executable genesis-setup
                  , json-stream
                  , merkle-patricia-db
                  , time
+                 , ethereum-rlp
     other-modules: Blockchain.GenesisBlockSetup
                    Blockchain.Data.GenesisInfo
     buildable: True
@@ -81,6 +82,7 @@ library
                  , transformers
                  , yaml
                  , strato-statediff
+                 , ethereum-rlp
 
 executable generate-genesis
     main-is: GenerateGenesis.hs
@@ -108,6 +110,7 @@ executable generate-genesis
                  , unordered-containers
                  , vector
                  , utf8-string
+                 , ethereum-rlp
 
 test-suite strato-genesis-test
     type: exitcode-stdio-1.0
