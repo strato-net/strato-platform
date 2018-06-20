@@ -79,4 +79,4 @@ ghc-options:
 
 docker:
   enable: true
-  image: "stack-buildbase:lts-10.10"
+  image: "stack-core-buildbase:lts-10.10"

@@ -47,4 +47,4 @@ extra-lib-dirs:
 
 docker:
   enable: true
-  image: "stack-buildbase:lts-10.10"
+  image: "stack-bloc-buildbase:lts-10.10"
