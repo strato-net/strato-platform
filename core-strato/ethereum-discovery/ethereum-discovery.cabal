@@ -42,7 +42,6 @@ library
                   , Executable.EthereumDiscovery
                   , Executable.EthDiscoverySetup
   other-modules:  Blockchain.Strato.Discovery.ContextLite
-                , Blockchain.Strato.Discovery.ExtendedECDSA
                 , Blockchain.Strato.Discovery.P2PUtil
                 , Blockchain.Strato.Discovery.PeerDB
                 , Blockchain.Strato.Discovery.UDPServer

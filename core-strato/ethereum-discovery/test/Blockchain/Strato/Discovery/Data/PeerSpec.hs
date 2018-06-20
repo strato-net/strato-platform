@@ -1,4 +1,6 @@
-module Blockchain.Strato.Discovery.Data.PeerSpec where
+module Blockchain.Strato.Discovery.Data.PeerSpec (
+  spec
+  ) where
 
 import           Data.Monoid                           ((<>))
 import           Test.Hspec

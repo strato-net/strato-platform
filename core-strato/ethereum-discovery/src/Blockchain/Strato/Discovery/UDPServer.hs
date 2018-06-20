@@ -7,7 +7,6 @@
 module Blockchain.Strato.Discovery.UDPServer
      ( runEthUDPServer
      , connectMe
-     , udpHandshakeServer
      ) where
 
 import           Control.Monad.Catch
