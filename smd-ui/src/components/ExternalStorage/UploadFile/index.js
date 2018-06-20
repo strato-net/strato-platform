@@ -3,11 +3,13 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
-import { closeUploadModal, uploadFileRequest, resetError } from './uploadFile.actions';
-import { Field, reduxForm, reset } from 'redux-form';
+import { closeUploadModal, uploadFileRequest, resetError, changeUsername } from './uploadFile.actions';
+import { Field, reduxForm } from 'redux-form';
 import Dropzone from 'react-dropzone';
 import { toasts } from '../../Toasts';
 import { validate } from './validate';
+import { isModePublic } from '../../../lib/checkMode';
+import { fetchAccounts, fetchUserAddresses } from '../../Accounts/accounts.actions';
 
 import './uploadFile.css';
 
@@ -23,6 +25,12 @@ class UplaodFile extends Component {
       toasts.show({ message: nextProps.uploadError });
       this.props.resetError();
     }
+  }
+
+  componentDidMount() {
+    mixpanelWrapper.track("external_storage_loaded");
+    this.props.reset();
+    !isModePublic() && this.props.fetchAccounts(true, false);
   }
 
   renderDropzoneInput = (field) => {
@@ -68,9 +76,67 @@ class UplaodFile extends Component {
     return null;
   }
 
+  handleUsernameChange = (e) => {
+    this.props.changeUsername(e.target.value); 
+    this.props.fetchUserAddresses(e.target.value, true)
+  };
+
+  renderUsername = (isPublicMode) => {
+    const users = Object.getOwnPropertyNames(this.props.accounts);
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="username"
+        onChange={this.handleUsernameChange}
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.initialValues.username : null}>
+          {isPublicMode && this.props.initialValues.username}
+        </option>
+        {
+          users.map((user, i) => {
+            return (
+              <option key={'user' + i} value={user}>{user}</option>
+            )
+          })
+        }
+      </Field>
+    </div>)
+  };
+
+  renderAddress = (isPublicMode) => {
+    const userAddresses = this.props.accounts && this.props.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.username])
+      : [];
+    return (<div className={isPublicMode ? "" : "pt-select"}>
+      <Field
+        className="pt-input"
+        component="select"
+        name="address"
+        required
+        disabled={isPublicMode}
+      >
+        <option value={isPublicMode ? this.props.initialValues.address : null}>
+          {isPublicMode && this.props.initialValues.address}
+        </option>
+        {
+          userAddresses.map((address, i) => {
+            return (
+              <option key={address} value={address}>{address}</option>
+            )
+          })
+        }
+      </Field>
+    </div>);
+  };
+
   uploadForm() {
+    let isPublicMode = isModePublic();
+
     return (
-      <div className="pt-dialog-body">
+      <div className="pt-dialog-body upload-form">
 
         <div className="row">
           <div className="col-sm-3 text-right">
@@ -79,16 +145,8 @@ class UplaodFile extends Component {
             </label>
           </div>
           <div className="col-sm-9 smd-pad-4">
-            <Field
-              name="username"
-              component="input"
-              type="text"
-              placeholder="Username"
-              className="pt-input form-width"
-              tabIndex="1"
-              required
-            /> <br />
-            <span className="error-text">{this.errorMessageFor('username')}</span>
+            {this.renderUsername(isPublicMode)}
+            <br /><span className="error-text">{this.errorMessageFor('username')}</span>
           </div>
         </div>
 
@@ -99,16 +157,8 @@ class UplaodFile extends Component {
             </label>
           </div>
           <div className="col-sm-9 smd-pad-4">
-            <Field
-              name="address"
-              component="input"
-              type="text"
-              placeholder="Address"
-              className="pt-input form-width"
-              tabIndex="2"
-              required
-            /> <br />
-            <span className="error-text">{this.errorMessageFor('address')}</span>
+            {this.renderAddress(isPublicMode)}
+            <br /> <span className="error-text">{this.errorMessageFor('address')}</span>
           </div>
         </div>
 
@@ -195,8 +245,8 @@ class UplaodFile extends Component {
           </div>
         </div>
 
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions button-center">
+        <div className="pt-dialog-footer upload-button">
+          <div className="pt-dialog-footer-actions button-center upload">
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
@@ -288,7 +338,13 @@ export function mapStateToProps(state) {
   return {
     isOpen: state.uploadFile.isOpen,
     uploadError: state.uploadFile.error,
-    result: state.uploadFile.result
+    result: state.uploadFile.result,
+    accounts: state.accounts.accounts,
+    username: state.uploadFile.username,
+    initialValues: {
+      username: state.user.currentUser.username,
+      address: state.user.currentUser.accountAddress
+    }
   };
 }
 
@@ -298,7 +354,10 @@ const connected = connect(
   {
     closeUploadModal,
     uploadFileRequest,
-    resetError
+    resetError,
+    fetchAccounts,
+    fetchUserAddresses,
+    changeUsername
   }
 )(formed);
 
