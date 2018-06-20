@@ -17,6 +17,7 @@ import qualified Data.Text                                 as T
 
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 
@@ -34,6 +35,8 @@ import qualified Database.LevelDB                          as LDB
 
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
+
+import           Blockchain.Strato.Model.SHA
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
@@ -86,7 +89,9 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
     where unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> emitBlocks bk (ingestBlockToSequencedBlock bk)
-                                  IEGenesis g -> return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)] -- TODO: yeah buddy
+                                  IEGenesis (g@(IngestGenesis _ (cId, cInfo))) -> do
+                                    insertChainInfo cId cInfo
+                                    return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)]
 
           emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
             case wrappedTx of
@@ -172,6 +177,15 @@ getNextIngestedOffset = do
     Right (ofs, _) -> return ofs
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
+
+filterPrivateTransactions :: IngestTx -> SequencerM IngestTx
+filterPrivateTransactions itx =
+  let baseTx = itTransaction itx
+   in case TD.transactionChainId baseTx of
+        Nothing -> return itx
+        Just _ -> do
+          (SHA th, SHA ch) <- insertPrivateHash baseTx
+          return itx{itTransaction = TD.PrivateHashTX th ch}
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
