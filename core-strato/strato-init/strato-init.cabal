@@ -25,12 +25,10 @@ executable strato-setup
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
-                 , ethereum-rlp
                  , strato-sequencer
                  , strato-index
                  , bytestring
                  , containers
-                 , cryptohash
                  , directory
                  , entropy
                  , ethereum-discovery
@@ -55,7 +53,6 @@ executable strato-setup
                  , strato-statediff
                  , split
     other-modules: Blockchain.BackupBlocks
-                   Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock
                    Blockchain.Data.GenesisInfo
                    Blockchain.Setup
@@ -114,7 +111,6 @@ executable genesis-setup
                  , entropy
                  , blockapps-haskoin
                  , hflags
-                 , strato-init
                  , merkle-patricia-db
                  , time
                  , json-stream
@@ -157,20 +153,14 @@ library
                  , blockapps-data
                  , blockapps-util
                  , bytestring
-                 , containers
-                 , cryptonite
-                 , csv
                  , json-stream
-                 , memory
                  , merkle-patricia-db
                  , scientific
-                 , split
                  , strato-model
                  , text
                  , time
                  , unordered-containers
                  , vector
-                 , utf8-string
 
 executable generate-genesis
     main-is: GenerateGenesis.hs
@@ -183,24 +173,19 @@ executable generate-genesis
     build-depends: base
                  , aeson
                  , aeson-extra
-                 , aeson-pretty
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
                  , bytestring
-                 , containers
-                 , csv
                  , hflags
                  , json-stream
                  , merkle-patricia-db
                  , scientific
-                 , strato-init
                  , strato-model
                  , text
                  , time
                  , unordered-containers
                  , vector
-                 , utf8-string
 
 test-suite strato-init-test
     type: exitcode-stdio-1.0

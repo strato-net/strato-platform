@@ -4,7 +4,6 @@
 
 module Blockchain.Data.GenesisBlock (
   initializeGenesisBlock,
-  initializeStateDB,
   BackupType(..)
 ) where
 
