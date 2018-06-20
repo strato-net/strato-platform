@@ -2,8 +2,9 @@
 
 declare -i RESULT=0
 TESTS=(
-  strato-init
   blockapps-data
+  ethereum-rlp
+  strato-init
   strato-sequencer
 )
 
