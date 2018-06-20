@@ -16,10 +16,11 @@ import           Import
 import           Blockchain.Data.ChainInfo
 import           System.Entropy
 import           Blockchain.Util
+import           Blockchain.ExtWord              (Word256)
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [ChainInfo] -> m ()
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
-    let ingestGeneses = (\g -> IEGenesis (IngestGenesis API g)) <$> gs
+    let ingestGeneses = (\(cid,g) -> IEGenesis (IngestGenesis API (cid,g))) <$> gs
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestGeneses) ++ " genesis info(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestGeneses
     case rets of
@@ -35,10 +36,11 @@ postChainR = do
   gi <- parseJsonBody :: Handler (Result ChainInfo)
   case gi of
     Success gen -> do
-      liftIO $ putStrLn $ T.pack $ show gen
-      emitKafkaTransactions [gen]
+      liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
-      return . T.pack . show $ fromInteger $ byteString2Integer bytes
+      let cid = fromInteger $ byteString2Integer bytes
+      emitKafkaTransactions [(cid, gen)]
+      return . T.pack . show $ fromInteger $ byteString2Integer bytes 
     _ -> invalidArgs ["could not parse the args"]
 
 -- todo: implement getChainR
