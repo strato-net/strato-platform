@@ -275,7 +275,7 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
           kp = fromIntegral $ kafkaPort k
 
 lookupTopic :: K.TopicName
-lookupTopic = fromString "statediff"
+lookupTopic = fromString "statediff_topic"
 
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
