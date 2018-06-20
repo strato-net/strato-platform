@@ -3,6 +3,7 @@
 declare -i RESULT=0
 TESTS=(
   blockapps-data
+  ethereum-vm
   merkle-patricia-db
   strato-init
   strato-p2p
