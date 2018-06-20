@@ -21,10 +21,8 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.GenesisBlock
-import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
-import           Blockchain.Database.MerklePatricia.StateRoot (StateRoot(..))
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
@@ -112,10 +110,11 @@ ethereumVM = void . execContextM $ do
 
 insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
-  let newGenesisInfos = [g | OEGenesis (OutputGenesis _ g) <- events]
-  forM_ newGenesisInfos $ \ gi -> do
-    gb <- initializeGenesisBlockFromInfo gi -- TODO: This should be :: ChainInfo -> ChainDetails
-    let cid = genesisInfoChainId gi
+  let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
+
+  forM_ newChainInfos $ \ ci -> do
+    sr <- chainInfoToGenesisState ci
+    let cid = Just 5 -- TODO: Get the chainId from the ChainInfo
     when (isJust $ cid) $ do
       let (Just cid') = cid
       mGSR <- getGenesisStateRoot cid'
@@ -124,7 +123,7 @@ insertNewChains events = do
                       ++ format cid'
                       ++ " is already initialized with state root "
                       ++ format gsr
-        Nothing -> putGenesisStateRoot cid' (StateRoot . blockHeaderStateRoot $ blockHeader gb)
+        Nothing -> putGenesisStateRoot cid' sr
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

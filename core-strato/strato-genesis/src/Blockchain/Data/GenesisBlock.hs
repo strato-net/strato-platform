@@ -3,6 +3,7 @@
 {-# LANGUAGE TupleSections     #-}
 
 module Blockchain.Data.GenesisBlock (
+  chainInfoToGenesisState,
   genesisInfoToGenesisBlock,
   initializeGenesisBlockFromInfo,
   initializeStateDB,
@@ -16,6 +17,7 @@ import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
@@ -70,6 +72,14 @@ initializeStateDB addressInfo = do
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
+
+chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+                          => ChainInfo
+                          -> m StateRoot
+chainInfoToGenesisState ci = do
+    let accounts = (\(a,w) -> NonContract a (fromIntegral w)) <$> accountBalance ci
+    initializeStateDB accounts
+    stateRoot <$> getStateDB
 
 genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
