@@ -202,8 +202,8 @@ addBlocks blocks = do
   let oldStateRoot = blockDataStateRoot oldHeader
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
-  potentialBestBlocks <- forM blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-    case (obOrigin block) of
+  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+    replace <- case (obOrigin block) of
       TO.Quarry -> do
         currentBaggerSR <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
         let blockSR = blockDataStateRoot $ obBlockData block
@@ -222,28 +222,24 @@ addBlocks blocks = do
               (blockHeaderPartialHash $ obBlockData block)
               (blockHeaderHash $ obBlockData block)
               Mined
-            return [block]
-          else return []
-      _ -> addBlock block >> return [block]
-  forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
-                                                        --       build the canonical chain. However, running each new
-                                                        --       block could be inefficient, and inadvertently spam
-                                                        --       the network with NewBestBlock messages.
-      (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
+            return True
+          else return False -- don't let old local blocks become the best block
+      _ -> addBlock block >> return True
+    when replace $ do
+      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
       when didReplaceThisTime . liftIO $ do
-          let Just nbb = newBestBlock
           writeIORef didReplaceBest True
-          writeIORef replacedBest (nbb, replacedBits)
-      didReplaceBest' <- liftIO (readIORef didReplaceBest)
-      void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-      when didReplaceBest' $ do
-          $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-          (theBlock, nbb) <- liftIO (readIORef replacedBest)
-          void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-          let b = obBlockData theBlock
-              codeSource = getSource False b
-              codeContractName = getContractName False b
-          calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+          writeIORef replacedBest (block, replacedBits)
+  didReplaceBest' <- liftIO (readIORef didReplaceBest)
+  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
+  when didReplaceBest' $ do
+      $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+      (theBlock, nbb) <- liftIO (readIORef replacedBest)
+      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb] -- only emit one NewBestBlock message
+      let b = obBlockData theBlock
+          codeSource = getSource False b
+          codeContractName = getContractName False b
+      calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName -- only calculate stateDiff once per batch
 
   where
     timerToUse = Just time_vm_block_insertion_mined
