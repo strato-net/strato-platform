@@ -168,7 +168,7 @@ data Message =
   
   -- private chains
   GetChainDetails Word256 |
-  ChainDetails { chid::Word256, chainLabel::Maybe Text, firstTransactionHash::SHA, accountData::[AccountInfo], codeData::[CodeInfo] } |
+  ChainDetails { chid::Word256, chainLabel::Maybe Text, accountData::[AccountInfo], codeData::[CodeInfo] } |
   GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
 
@@ -219,11 +219,10 @@ instance Format Message where
   
   -- private chains
   format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
-  format (ChainDetails cid2 cl fth ad cd) = 
+  format (ChainDetails cid2 cl ad cd) = 
     CL.blue "Chain Details\n" ++
     "  chainID: " ++ show cid2 ++ "\n" ++
     "  chainLabel: " ++ show cl ++ "\n" ++
-    "  firstTransactionHash: " ++ show fth ++ "\n" ++
     "  accountData: " ++ show ad ++ "\n" ++
     "  codeData: " ++ show cd ++ "\n"
   format (GetTransactions cid3 tr) = "GetTransactions\n" ++
@@ -276,8 +275,8 @@ obj2WireMessage 0x20 (RLPArray [ver]) =
 obj2WireMessage 0x1c (RLPArray [cid]) = 
   GetChainDetails (rlpDecode cid)
 
-obj2WireMessage 0x1d (RLPArray [c, cl, fth, RLPArray ad, RLPArray cd]) =
-  ChainDetails (rlpDecode c) (read $ rlpDecode cl) (rlpDecode fth) (rlpDecode <$> ad) (rlpDecode <$> cd)
+obj2WireMessage 0x1d (RLPArray [c, cl, RLPArray ad, RLPArray cd]) =
+  ChainDetails (rlpDecode c) (read $ rlpDecode cl) (rlpDecode <$> ad) (rlpDecode <$> cd)
 
 obj2WireMessage 0x1e (RLPArray [c, tr]) =
   GetTransactions (rlpDecode c) (rlpDecode tr)
@@ -329,8 +328,8 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
 wireMessage2Obj (GetChainDetails c) = 
   (0x1c, rlpEncode c)
 
-wireMessage2Obj (ChainDetails c cl fth ad cd) =  
-  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, rlpEncode fth, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
+wireMessage2Obj (ChainDetails c cl ad cd) =  
+  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
