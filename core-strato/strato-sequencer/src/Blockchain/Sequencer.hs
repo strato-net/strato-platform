@@ -36,7 +36,10 @@ import qualified Database.LevelDB                          as LDB
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
 
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
+
+import           MonadUtils                                (concatMapM)
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
@@ -93,10 +96,13 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                                     insertChainInfo cId cInfo
                                     return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)]
 
-          emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
-            case wrappedTx of
+          emitTxs inTs inTx = deflatePrivateTransaction inTx >>= concatMapM (wrap inTs)
+
+          wrap its itx = do
+            let wrappedTx = wrapTransaction itx
+             in case wrappedTx of
                 Nothing -> do
-                    $logWarnS "transformEvents/emitTxs" . T.pack $ "Cannot ECRecover " ++ prettyTx inTx ++"; not emitting"
+                    $logWarnS "transformEvents/emitTxs" . T.pack $ "Cannot ECRecover " ++ prettyTx itx ++"; not emitting"
                     tick ctr_sequencer_txs_ecrfail
                     return [] -- ignore transactions we cant ECrecover
                 Just tx -> do
@@ -104,14 +110,14 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                     txWasWitnessed <- wasTransactionHashWitnessed witnessHash
                     if txWasWitnessed
                       then do
-                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx
+                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx itx
                         tick ctr_sequencer_txs_witnessed
                         return []
                       else do
-                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx inTx
+                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx itx
                         witnessTransactionHash witnessHash
                         tick ctr_sequencer_txs_unwitnessed
-                        return [(Nothing, OETx inTs tx)]
+                        return [(Nothing, OETx its tx)]
 
           emitBlocks bk b' = case b' of
             Nothing -> do
@@ -126,22 +132,25 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                 case readyToEmit of
                     (ReadyToEmit totalPastDifficulty) -> do
                         t2 <- liftIO $ getTime Realtime
-                        chain <- buildEmissionChain b totalPastDifficulty
+                        deflatedChain <- buildEmissionChain b totalPastDifficulty
+                        inflatedChain <- forM deflatedChain $ \(ldbOp, OEBlock (ob@OutputBlock{obReceiptTransactions = txs})) -> do
+                          inflatedTxs <- mapM inflatePrivateTransaction txs
+                          return (ldbOp, OEBlock ob{obReceiptTransactions = inflatedTxs})
                         t3 <- liftIO $ getTime Realtime
                         $logDebug . T.pack $ "buildEmissionChain took: " ++ show (toNanoSecs $ t3 - t2)
-                        tickBy (length chain) ctr_sequencer_blocks_released
-                        if (chain /= [])
+                        tickBy (length inflatedChain) ctr_sequencer_blocks_released
+                        if (inflatedChain /= [])
                           then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."
                           else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
-                        return chain
+                        return inflatedChain
                     NotReadyToEmit                    -> do
                         $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is not yet ready to emit."
                         tick ctr_sequencer_blocks_enqueued
                         return []
 
-          prettyBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ blockHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
+          prettyBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
             where blockNonce = show . BDB.blockDataNumber $ bd
-                  blockHash  = format . BDB.blockHeaderHash $ bd
+                  bHash  = format . BDB.blockHeaderHash $ bd
 
           prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
                 where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
@@ -178,14 +187,26 @@ getNextIngestedOffset = do
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
 
-filterPrivateTransactions :: IngestTx -> SequencerM IngestTx
-filterPrivateTransactions itx =
+deflatePrivateTransaction :: IngestTx -> SequencerM [IngestTx]
+deflatePrivateTransaction itx =
   let baseTx = itTransaction itx
    in case TD.transactionChainId baseTx of
-        Nothing -> return itx
+        Nothing -> return [itx]
         Just _ -> do
           (SHA th, SHA ch) <- insertPrivateHash baseTx
-          return itx{itTransaction = TD.PrivateHashTX th ch}
+          return [itx, itx{itTransaction = TD.PrivateHashTX th ch}]
+
+inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx
+inflatePrivateTransaction otx =
+   case txType otx of
+        Message -> return otx
+        ContractCreation -> return otx
+        PrivateHash -> do
+          let TD.PrivateHashTX tHash _ = otBaseTx otx
+          mTx <- lookupTransaction (SHA tHash)
+          case mTx of
+            Just tx -> return otx{otBaseTx = tx, otSigner = maybe (A.Address (-1)) id $ TX.whoSignedThisTransaction tx}
+            Nothing -> return otx -- TODO: Use chainHash to lookup chainId and retrieve from P2P
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
