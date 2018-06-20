@@ -3,7 +3,7 @@ import {
   put,
   call
 } from 'redux-saga/effects';
-import { UPLOAD_FILE_REQUEST } from './uploadFile.actions';
+import { UPLOAD_FILE_REQUEST, uploadFileSuccess, uploadFileFailure } from './uploadFile.actions';
 import { env } from '../../../env';
 
 const url = env.APEX_URL + "/bloc/file/upload";
@@ -37,9 +37,14 @@ export function uploadFileApiCall(data) {
 export function* uploadFile(action) {
   try {
     let response = yield call(uploadFileApiCall, action.data);
+    if (response.error) {
+      yield put(uploadFileFailure(response.error.message));
+    } else {
+      yield put(uploadFileSuccess(response));
+    }
   }
   catch (err) {
-    
+    yield put(uploadFileFailure(err));
   }
 }
 

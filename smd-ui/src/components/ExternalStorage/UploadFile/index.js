@@ -3,13 +3,27 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
-import { closeUploadModal, uploadFileRequest } from './uploadFile.actions';
-import { Field, reduxForm } from 'redux-form';
+import { closeUploadModal, uploadFileRequest, resetError } from './uploadFile.actions';
+import { Field, reduxForm, reset } from 'redux-form';
 import Dropzone from 'react-dropzone';
+import { toasts } from '../../Toasts';
+import { validate } from './validate';
 
 import './uploadFile.css';
 
 class UplaodFile extends Component {
+
+  constructor(props) {
+    super(props);
+    this.state = { errors: null }
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.uploadError) {
+      toasts.show({ message: nextProps.uploadError });
+      this.props.resetError();
+    }
+  }
 
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
@@ -37,8 +51,14 @@ class UplaodFile extends Component {
   };
 
   submit = (values) => {
-    values.file = values.content[0];
-    this.props.uploadFileRequest(values);
+    let errors = validate(values);
+    this.setState({ errors });
+
+    if (JSON.stringify(errors) === JSON.stringify({})) {
+      values.file = values.content[0];
+      this.props.uploadFileRequest(values);
+      this.props.reset();
+    }
   }
 
   errorMessageFor(fieldName) {
@@ -48,7 +68,7 @@ class UplaodFile extends Component {
     return null;
   }
 
-  dialogContent() {
+  uploadForm() {
     return (
       <div className="pt-dialog-body">
 
@@ -56,7 +76,7 @@ class UplaodFile extends Component {
           <div className="col-sm-3 text-right">
             <label className="pt-label smd-pad-4">
               Username
-                  </label>
+            </label>
           </div>
           <div className="col-sm-9 smd-pad-4">
             <Field
@@ -67,7 +87,8 @@ class UplaodFile extends Component {
               className="pt-input form-width"
               tabIndex="1"
               required
-            />
+            /> <br />
+            <span className="error-text">{this.errorMessageFor('username')}</span>
           </div>
         </div>
 
@@ -86,7 +107,8 @@ class UplaodFile extends Component {
               className="pt-input form-width"
               tabIndex="2"
               required
-            />
+            /> <br />
+            <span className="error-text">{this.errorMessageFor('address')}</span>
           </div>
         </div>
 
@@ -105,7 +127,8 @@ class UplaodFile extends Component {
               className="pt-input form-width"
               tabIndex="3"
               required
-            />
+            /> <br />
+            <span className="error-text">{this.errorMessageFor('password')}</span>
           </div>
         </div>
 
@@ -125,7 +148,8 @@ class UplaodFile extends Component {
               title="Content"
               tabIndex="4"
               required
-            />
+            /> <br />
+            <span className="error-text">{this.errorMessageFor('content')}</span>
           </div>
         </div>
 
@@ -145,7 +169,8 @@ class UplaodFile extends Component {
                 required
               >
                 <option value={'s3'}> s3 </option>
-              </Field>
+              </Field> <br />
+              <span className="error-text">{this.errorMessageFor('provider')}</span>
             </div>
           </div>
         </div>
@@ -165,6 +190,17 @@ class UplaodFile extends Component {
               className="pt-input form-width"
               tabIndex="6"
               required
+            /> <br />
+            <span className="error-text">{this.errorMessageFor('description')}</span>
+          </div>
+        </div>
+
+        <div className="pt-dialog-footer">
+          <div className="pt-dialog-footer-actions button-center">
+            <Button
+              intent={Intent.PRIMARY}
+              onClick={this.props.handleSubmit(this.submit)}
+              text="Upload"
             />
           </div>
         </div>
@@ -172,7 +208,61 @@ class UplaodFile extends Component {
     );
   }
 
+  renderSuccess(data) {
+    return (
+      <div>
+        <div className="pt-dialog-body">
+
+          <div className="row content-margin">
+            <div className="col-sm-4">
+              <label> Contract Address </label>
+            </div>
+            <div className="col-sm-8">
+              <label> {data.contractAddress} </label>
+            </div>
+          </div>
+
+          <div className="row content-margin">
+            <div className="col-sm-4">
+              <label> URI </label>
+            </div>
+            <div className="col-sm-8">
+              <label> {data.uri} </label>
+            </div>
+          </div>
+
+          <div className="row content-margin">
+            <div className="col-sm-4">
+              <label> Description </label>
+            </div>
+            <div className="col-sm-8">
+              <label> {data.metadata} </label>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="pt-dialog-footer">
+          <div className="pt-dialog-footer-actions button-center">
+            <Button
+              intent={Intent.PRIMARY}
+              onClick={() => this.closeModal()}
+              text="Close"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  closeModal() {
+    this.props.closeUploadModal();
+    this.props.reset();
+  }
+
   render() {
+    let result = this.props.result;
+
     return (
       <div>
         <form>
@@ -180,21 +270,13 @@ class UplaodFile extends Component {
             isOpen={this.props.isOpen}
             onClose={() => {
               mixpanelWrapper.track('close_upload_modal');
-              this.props.closeUploadModal();
+              this.closeModal();
             }}
-            title='Upload'
-            className="pt-dark"
+            iconName={result ? 'saved' : 'inbox'}
+            title={result ? 'URI Upload Success' : 'Upload'}
+            className="pt-dark upload-dialog"
           >
-            {this.dialogContent()}
-            <div className="pt-dialog-footer">
-              <div className="pt-dialog-footer-actions">
-                <Button
-                  intent={Intent.PRIMARY}
-                  onClick={this.props.handleSubmit(this.submit)}
-                  text="Upload"
-                />
-              </div>
-            </div>
+            {result ? this.renderSuccess(result) : this.uploadForm()}
           </Dialog>
         </form>
       </div>
@@ -204,7 +286,9 @@ class UplaodFile extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.uploadFile.isOpen
+    isOpen: state.uploadFile.isOpen,
+    uploadError: state.uploadFile.error,
+    result: state.uploadFile.result
   };
 }
 
@@ -213,7 +297,8 @@ const connected = connect(
   mapStateToProps,
   {
     closeUploadModal,
-    uploadFileRequest
+    uploadFileRequest,
+    resetError
   }
 )(formed);
 

@@ -3,6 +3,7 @@ export const CLOSE_UPLOAD_MODAL = 'CLOSE_UPLOAD_MODAL';
 export const UPLOAD_FILE_REQUEST = 'UPLOAD_FILE_REQUEST';
 export const UPLOAD_FILE_SUCCESS = 'UPLOAD_FILE_SUCCESS';
 export const UPLOAD_FILE_FAILURE = 'UPLOAD_FILE_FAILURE';
+export const RESET_UPLOAD_ERROR = 'RESET_UPLOAD_ERROR';
 
 export const openUploadModal = function () {
   return {
@@ -23,10 +24,10 @@ export const uploadFileRequest = function (data) {
   }
 }
 
-export const uploadFileSuccess = function (data) {
+export const uploadFileSuccess = function (result) {
   return {
     type: UPLOAD_FILE_SUCCESS,
-    data
+    result
   }
 }
 
@@ -34,5 +35,11 @@ export const uploadFileFailure = function (error) {
   return {
     type: UPLOAD_FILE_FAILURE,
     error
+  }
+}
+
+export const resetError = function () {
+  return {
+    type: RESET_UPLOAD_ERROR
   }
 }
