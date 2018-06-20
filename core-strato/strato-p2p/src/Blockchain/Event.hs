@@ -263,6 +263,12 @@ handleEvents mode peer = awaitForever $ \case
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
                 stampActionTimestamp
+ 
+    MsgEvt (GetChainDetails cid) -> do
+      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ show cid
+      -- communicate with Redis, get serialized chainDetails if chain exists
+      -- check permissions of peer??
+      -- package chainDetails into a GetChainDetails message, yield it 
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
