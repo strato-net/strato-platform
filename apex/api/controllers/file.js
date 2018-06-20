@@ -50,7 +50,8 @@ module.exports = {
       const args = {
         _uri: uploadedFile.Location,
         _host: provider,
-        _hash: hash
+        _hash: hash,
+        _metadata: metadata
       };
 
       const userCredentials = {

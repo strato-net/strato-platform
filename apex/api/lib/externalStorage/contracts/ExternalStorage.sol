@@ -6,12 +6,14 @@ contract ExternalStorage {
     string public tempHash;
     address[] public signers;
     uint public timeStamp;
+    string public metadata;
 
-    function ExternalStorage(string _uri, string _host, string _hash) public {
+    function ExternalStorage(string _uri, string _host, string _hash, string _metadata) public {
         uri = _uri;
         host = _host;
         tempHash = _hash;
         signers = [msg.sender];
+        metadata = _metadata;
         timeStamp = now;
     }
 
