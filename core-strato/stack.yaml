@@ -24,11 +24,8 @@ packages:
 - strato-statediff/
 - test-suite/
 - blockapps-haskoin/
-- statsdi
-- location:
-    git: https://github.com/blockapps/ethereum-rlp
-    commit: 6627727a26ee74381d057eccbe458b419ea24c92 # tag '1'
-  extra-dep: true
+- statsdi/
+- ethereum-rlp/
 extra-deps:
 - Crypto-4.2.5.1
 - bytestring-arbitrary-0.1.1
