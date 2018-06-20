@@ -14,6 +14,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
+import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
@@ -29,7 +30,6 @@ import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
-import           Blockchain.ExtWord                        (Word256)
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
 

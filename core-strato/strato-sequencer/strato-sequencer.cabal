@@ -19,6 +19,7 @@ library
   exposed-modules:     Blockchain.Sequencer
                      , Blockchain.Sequencer.DB.DependentBlockDB
                      , Blockchain.Sequencer.DB.SeenTransactionDB
+                     , Blockchain.Sequencer.DB.PrivateHashDB
                      , Blockchain.Sequencer.Monad
                      , Blockchain.Sequencer.Event
                      , Blockchain.Sequencer.Kafka
@@ -34,6 +35,7 @@ library
                      , clock
                      , containers
                      , directory
+                     , ghc
                      , mtl
                      , resourcet
                      , monad-logger
