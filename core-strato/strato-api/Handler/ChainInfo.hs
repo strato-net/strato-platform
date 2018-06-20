@@ -12,6 +12,7 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
+import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
 import           System.Entropy
@@ -40,7 +41,7 @@ postChainR = do
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
       emitKafkaTransactions [(cid, gen)]
-      return . T.pack . show $ fromInteger $ byteString2Integer bytes 
+      return . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 -- todo: implement getChainR
