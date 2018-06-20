@@ -7,7 +7,6 @@
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
-    , awaitMsg
     , mkEthP2PEventSource
     , mkEthP2PEventConduit
     ) where

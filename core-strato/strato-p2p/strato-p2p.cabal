@@ -115,7 +115,6 @@ library
     other-modules:
                    Blockchain.TimerSource
                    Blockchain.CommunicationConduit
-                   Blockchain.BlockSynchronizerSql
                    Blockchain.P2PUtil
     ghc-options: -Wall -O2
     buildable: True
