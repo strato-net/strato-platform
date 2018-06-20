@@ -45,7 +45,7 @@ runJsonRpcCommand::(MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCod
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
-  setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
+  setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   let response = show $ addressStateBalance addressState
   liftIO $ produceResponse id $ BC.pack response
@@ -54,7 +54,7 @@ runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
 runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
-  setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
+  setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   maybeCode <- getCode $ addressStateCodeHash addressState
   case maybeCode of
@@ -64,7 +64,7 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
 runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
-  setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
+  setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   let response = show $ addressStateNonce addressState
   liftIO $ produceResponse id $ BC.pack response
@@ -73,7 +73,7 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
 runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
-  setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
+  setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   value <- getStorageKeyVal' address $ bytesToWord256 $ B.unpack key
   liftIO $ produceResponse id $ B.pack $ word256ToBytes value
   liftIO $ putStrLn $ show value

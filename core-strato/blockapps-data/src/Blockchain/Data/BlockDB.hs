@@ -92,7 +92,7 @@ getBlocks = do
   liftM (map entityVal) . liftIO . SQL.runSqlPool (selectList [] []) $ db
 
 getBlock::(HasSQLDB m)=>
-          SHA->m (Maybe Block)
+          SHA->m (Maybe BlockDataRef)
 getBlock h = do
   db <- getSQLDB
   entBlkL <- runResourceT $
@@ -101,9 +101,9 @@ getBlock h = do
   case entBlkL of
     []  -> return Nothing
     lst -> return $ Just . entityVal . head $ lst
-  where actions = E.select $ E.from $ \(bdRef, block) -> do
-                                   E.where_ ( (bdRef E.^. BlockDataRefHash E.==. E.val h ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. block E.^. BlockId ))
-                                   return block
+  where actions = E.select $ E.from $ \bdRef -> do
+                                   E.where_ (bdRef E.^. BlockDataRefHash E.==. E.val h )
+                                   return bdRef
 
 -- if useDiffBomb is False then the expAdjustment is not added.
 nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
