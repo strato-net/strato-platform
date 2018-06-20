@@ -12,16 +12,16 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
+import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
-import qualified Data.ByteString.Lazy             as BL
 import           System.Entropy
-import           Data.Binary.Get                  (runGet, getWord64be)
-import           Data.LargeWord
+import           Blockchain.Util
+import           Blockchain.ExtWord              (Word256)
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [ChainInfo] -> m ()
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
-    let ingestGeneses = (\g -> IEGenesis (IngestGenesis API g)) <$> gs
+    let ingestGeneses = (\(cid,g) -> IEGenesis (IngestGenesis API (cid,g))) <$> gs
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestGeneses) ++ " genesis info(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestGeneses
     case rets of
@@ -29,16 +29,6 @@ emitKafkaTransactions gs = do
         Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
-byteStringToWord256 :: ByteString -> Word256
-byteStringToWord256 bs =
-  let
-    [w4,w3,w2,w1] = flip runGet (BL.fromStrict bs) $ do
-      w_4 <- getWord64be
-      w_3 <- getWord64be
-      w_2 <- getWord64be
-      w_1 <- getWord64be
-      return [w_4,w_3,w_2,w_1]
-  in LargeKey w1 (LargeKey w2 (LargeKey w3 w4))
 
 postChainR :: Handler Text
 postChainR = do
@@ -47,11 +37,13 @@ postChainR = do
   gi <- parseJsonBody :: Handler (Result ChainInfo)
   case gi of
     Success gen -> do
-      liftIO $ putStrLn $ T.pack $ show gen
-      emitKafkaTransactions [gen]
+      liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
-      return . T.pack . show $ byteStringToWord256 bytes
+      let cid = fromInteger $ byteString2Integer bytes
+      emitKafkaTransactions [(cid, gen)]
+      return . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 -- todo: implement getChainR
   
+

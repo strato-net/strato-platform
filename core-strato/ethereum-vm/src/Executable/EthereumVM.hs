@@ -12,7 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isJust, isNothing)
+import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -112,18 +112,15 @@ insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
-  forM_ newChainInfos $ \ ci -> do
-    sr <- chainInfoToGenesisState ci
-    let cid = Just 5 -- TODO: Get the chainId from the ChainInfo
-    when (isJust $ cid) $ do
-      let (Just cid') = cid
-      mGSR <- getGenesisStateRoot cid'
-      case mGSR of
-        Just gsr -> error $ "ethereumVM.getGenesisStateRoot: chain "
-                      ++ format cid'
-                      ++ " is already initialized with state root "
-                      ++ format gsr
-        Nothing -> putGenesisStateRoot cid' sr
+  forM_ newChainInfos $ \(cId, cInfo) -> do
+    sr <- chainInfoToGenesisState cInfo
+    mGSR <- getGenesisStateRoot cId
+    case mGSR of
+      Just gsr -> error $ "ethereumVM.getGenesisStateRoot: chain "
+                    ++ format cId
+                    ++ " is already initialized with state root "
+                    ++ format gsr
+      Nothing -> putGenesisStateRoot cId sr
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
