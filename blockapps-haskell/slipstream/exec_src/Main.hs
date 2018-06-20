@@ -275,13 +275,13 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
           kp = fromIntegral $ kafkaPort k
 
 lookupTopic :: K.TopicName
-lookupTopic = fromString "statediff_topic"
+lookupTopic = fromString "statediff"
 
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
 
   liftIO $ putStrLn $ "map(BL.fromStrict) messages______: " ++ (show $ map(BL.fromStrict) messages)
-  liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages______: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
+  liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages_____: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
 
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
