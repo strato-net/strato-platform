@@ -23,6 +23,7 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
@@ -248,7 +249,7 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
-    [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    [(_, genBId)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
     let diff = StateDiff {
@@ -279,7 +280,7 @@ initializeGenesisBlock backupType genesisBlockName = do
        Right errs -> error . show $ errs
        Left err -> error . show $ err
 
-bootstrapIndexer :: SQL.Key Block -> OutputBlock -> IO ()
+bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds

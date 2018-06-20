@@ -20,6 +20,7 @@ import           Network.Kafka.Protocol
 import           System.Clock
 
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
@@ -54,13 +55,13 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
             results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
-            let bids = fst <$> results
+            let bids = snd <$> results
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime
             maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock
             num <- case maybeOldBestBlock of
                 Just x -> return x
-                Nothing -> blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
+                Nothing -> blockDataRefNumber <$> sqlQuery (getJust bestBid)
             --num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
             numTime <- liftIO $ getTime Realtime
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids
