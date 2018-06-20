@@ -65,10 +65,11 @@ blk2BlkDataRef :: (HasSQLDB m) =>
 blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
-  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
+  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' uncles True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
       bd = blockBlockData b
+      uncles = blockBlockUncles b
       pH = blockDataParentHash bd
       uH = blockDataUnclesHash bd
       cB = blockDataCoinbase bd
@@ -190,10 +191,10 @@ putBlocks difficultyBase blocks makeHashOne = do
            [] -> do
              blkId <- SQL.insert b
              toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') blkId makeHashOne
+             blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do
                txID <- updateBlockNumber b $ transactionHash tx
-               SQL.insert $ BlockTransaction blkId txID
-             blkDataRefId <- SQL.insert toInsert
+               SQL.insert $ BlockTransaction blkDataRefId txID
              return (blkId, blkDataRefId)
            [bd] -> return (blockDataRefBlockId $ SQL.entityVal bd, SQL.entityKey bd)
            _ -> error "DB has multiple blocks with the same hash"

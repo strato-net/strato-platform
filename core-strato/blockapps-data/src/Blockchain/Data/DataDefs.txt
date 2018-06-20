@@ -34,6 +34,7 @@ BlockDataRef
     mixHash SHA
     blockId BlockId
     hash SHA
+    blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
@@ -55,7 +56,7 @@ NewBlk
     deriving Eq Read Show
 
 BlockTransaction
-    blockId BlockId
+    blockDataRefId BlockDataRefId
     transaction RawTransactionId
     deriving Eq Read Show
 

@@ -46,7 +46,7 @@ getBlockInfoR = do
 
                     E.on ( accStateRef E.^. AddressStateRefAddress E.==. rawTX E.^. RawTransactionFromAddress )
                     E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
-                    E.on ( btx E.^. BlockTransactionBlockId E.==. blk E.^. BlockId )
+                    E.on ( btx E.^. BlockTransactionBlockDataRefId E.==. bdRef E.^. BlockDataRefId )
                     E.on ( blk E.^. BlockId E.==. bdRef E.^. BlockDataRefBlockId )
 
                     let criteria = P.map (getBlkFilter (bdRef, accStateRef, rawTX, blk)) $ getParameters
