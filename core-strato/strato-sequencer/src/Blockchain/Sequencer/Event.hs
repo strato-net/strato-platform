@@ -10,7 +10,6 @@ import           Data.Maybe                                (fromJust)
 import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
--- import           Blockchain.Data.GenesisInfo               (GenesisInfo(..))
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
@@ -31,6 +30,7 @@ import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+import           Blockchain.ExtWord                        (Word256)
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
 
@@ -96,7 +96,7 @@ data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                } deriving (Eq, Read, Show, GHCG.Generic)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
-                                   , ogGenesisInfo     :: (Word256,ChainInfo)
+                                   , ogGenesisInfo     :: (Word256, ChainInfo)
                                    } deriving (Eq, Read, Show, GHCG.Generic)
 
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis

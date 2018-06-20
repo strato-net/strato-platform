@@ -112,7 +112,7 @@ insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
-  forM_ newChainInfos $ \ (cId, cInfo) -> do
+  forM_ newChainInfos $ \(cId, cInfo) -> do
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
