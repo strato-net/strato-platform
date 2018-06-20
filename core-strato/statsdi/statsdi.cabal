@@ -30,8 +30,6 @@ library
                      , time
                      , bytestring
                      , ether
-                     , transformers
-                     , transformers-lift
                      , template-haskell
                      , unordered-containers >= 0.2.7.0 && < 0.3
                      , hashable >= 1.2.4.0 && < 1.3

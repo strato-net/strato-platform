@@ -56,7 +56,6 @@ executable strato-sequencer
                      , strato-sequencer
                      , blockapps-data
                      , blockapps-util
-                     , clock
                      , hflags
                      , monad-logger
                      , blockapps-milena
