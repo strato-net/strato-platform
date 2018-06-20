@@ -106,6 +106,7 @@ library
                    Blockchain.Stream.VMEvent
                    Blockchain.Stream.UnminedBlock
                    Blockchain.Data.Blockchain
+                   Blockchain.Data.ChainInfo
     other-modules: Paths_blockapps_data
     ghc-options: -Wall -O2
     extensions: TemplateHaskell

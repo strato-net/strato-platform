@@ -30,7 +30,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/blockapps/ethereum-rlp
-    commit: 6627727a26ee74381d057eccbe458b419ea24c92 # tag '1'
+    commit: da647b414ebe45b04811b935cdca221d295449b5
   extra-dep: true
 - location:
     git: https://github.com/iostat/statsdi
