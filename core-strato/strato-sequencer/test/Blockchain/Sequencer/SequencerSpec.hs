@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.SequencerSpec where
 
-import          Debug.Trace (trace)
 import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
@@ -42,7 +41,6 @@ withTemporaryDepBlockDB genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
-    trace "Gotten here" $ return ()
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
