@@ -172,10 +172,3 @@ LogDB
     bloom Word512
     deriving Eq Read Show Generic
 
-BlockOffset
-    offset Integer
-    number Integer
-    hash SHA
-    Primary hash
-    UniqueH hash
-    deriving Eq Read Show
