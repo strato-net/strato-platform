@@ -5,14 +5,12 @@ module Blockchain.Sequencer.DB.PrivateHashDB where
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.TransactionDef
 import           Blockchain.SHA
 import           Control.Monad.Trans.Resource
 
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
-import qualified Data.Sequence                as Q
-import qualified Data.Set                     as S
+-- import qualified Data.Sequence                as Q
 
 import           Blockchain.Strato.Model.Class
 
