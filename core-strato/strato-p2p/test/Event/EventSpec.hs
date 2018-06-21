@@ -13,10 +13,8 @@ import           Data.Conduit
 import qualified Data.Map                    as Map
 import           Test.Hspec
 
-upstreamShouldImmediatelyEmit :: (Eq i, Show i, Monad m) => Maybe i -> ConduitM i o m Expectation
-upstreamShouldImmediatelyEmit theValue = do
-  someVal <- await
-  return $ someVal `shouldBe` theValue
+shouldEmit :: (Eq i, Show i, Monad m) => Maybe i -> ConduitM i o m Expectation
+shouldEmit theValue = (`shouldBe` theValue) <$> await
 
 helloMsg :: Message
 helloMsg =
@@ -45,21 +43,6 @@ dummyServerStatusMsg =
          , genesisHash = SHA 0
          }
 
-disconnectProtocolBreach :: Message
-disconnectProtocolBreach = Disconnect BreachOfProtocol
-
-helloConduit :: (Monad m) => ConduitM () Message m ()
-helloConduit = yield helloMsg
-
-helloEventConduit :: (Monad m) => ConduitM () Event m ()
-helloEventConduit = yield (MsgEvt helloMsg)
-
-pingEventConduit :: (Monad m) => ConduitM () Event m ()
-pingEventConduit = yield (MsgEvt Ping)
-
-statusConduit :: (Monad m) => ConduitM () Message m ()
-statusConduit = yield statusMsg
-
 getPutAction :: (MonadState (Map.Map Int Int) m) => m Bool
 getPutAction =  do
   theMapBefore <- get
@@ -68,15 +51,6 @@ getPutAction =  do
   let theVal = Map.lookup 10 theMapAfter
   return (theVal == Just 12)
 
-upstreamStatusChecker :: ConduitM Message o (InMemoryServer SHA Block) Expectation
-upstreamStatusChecker = upstreamShouldImmediatelyEmit (Just dummyServerStatusMsg)
-
-upstreamDisconnectChecker :: ConduitM Message o (InMemoryClient SHA Block) Expectation
-upstreamDisconnectChecker = upstreamShouldImmediatelyEmit (Just disconnectProtocolBreach)
-
-upstreamPingPong :: ConduitM Message o (InMemoryClient SHA Block) Expectation
-upstreamPingPong = upstreamShouldImmediatelyEmit (Just Pong)
-
 spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
@@ -84,36 +58,28 @@ spec = do
       getPutBool <- evalStateT getPutAction Map.empty
       getPutBool `shouldBe` True
 
---    it "InMemory model gets and puts blocks" $ do
-
   describe "handshake tests" $ do
+    let mapempty = Map.empty :: Map.Map SHA Block
     it "conduit sanity test - status gets through immediately" $ do
-      let statusDetector = upstreamShouldImmediatelyEmit (Just statusMsg) :: Sink Message IO Expectation
-      val  <- statusConduit $$ statusDetector
-      val
+      join . runConduit $ yield statusMsg  .| shouldEmit (Just statusMsg)
 
     it "conduit sanity test - hello  gets through immediately" $ do
-      let helloDetector = upstreamShouldImmediatelyEmit (Just helloMsg) :: Sink Message IO Expectation
-      val'  <- helloConduit $$ helloDetector
-      val'
+      join  . runConduit $ yield helloMsg .| shouldEmit (Just helloMsg)
 
     it "hello gets a status when we are the server" $ do
-      let handleEventsEmitsStatusSink = handleEvents' Nothing =$= upstreamStatusChecker
-          conduitStartAction = helloEventConduit $$ handleEventsEmitsStatusSink
-
-      helloGetsStatus <- evalInMemoryServer conduitStartAction (Map.empty :: Map.Map SHA Block)
-      helloGetsStatus
+      let pipeline = yield (MsgEvt helloMsg)
+                  .| handleEvents' Nothing
+                  .| shouldEmit (Just dummyServerStatusMsg)
+      join $ evalInMemoryServer (runConduit pipeline) mapempty
 
     it "hello gets a disconnect when we are the client" $ do
-       let handleEventsEmitsDisconnectSink = handleEvents' Nothing =$= upstreamDisconnectChecker
-           conduitStartAction' = helloEventConduit $$ handleEventsEmitsDisconnectSink
-
-       helloGetsDisconnect <- evalInMemoryClient conduitStartAction' (Map.empty :: Map.Map SHA Block)
-       helloGetsDisconnect
+      let pipeline = yield (MsgEvt helloMsg)
+                  .| handleEvents' Nothing
+                  .| shouldEmit (Just (Disconnect BreachOfProtocol))
+      join $ evalInMemoryClient (runConduit pipeline) mapempty
 
     it "ping gets pong" $ do
-       let handleEventsEmitsPongSink = handleEvents' Nothing =$= upstreamPingPong
-           conduitStartAction'' = pingEventConduit $$ handleEventsEmitsPongSink
-
-       pingGetsPong <- evalInMemoryClient conduitStartAction'' (Map.empty :: Map.Map SHA Block)
-       pingGetsPong
+      let pipeline = yield (MsgEvt Ping)
+                  .| handleEvents' Nothing
+                  .| shouldEmit (Just Pong)
+      join $ evalInMemoryClient (runConduit pipeline) mapempty
