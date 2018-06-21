@@ -4,6 +4,7 @@ declare -i RESULT=0
 TESTS=(
   strato-init
   blockapps-data
+  strato-sequencer
 )
 
 for tst in ${TESTS[@]}; do
