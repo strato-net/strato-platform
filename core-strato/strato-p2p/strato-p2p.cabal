@@ -54,6 +54,7 @@ library
                  , blockapps-data
                  , blockapps-util
                  , bytestring
+                 , classy-prelude
                  , conduit
                  , conduit-combinators
                  , conduit-extra
