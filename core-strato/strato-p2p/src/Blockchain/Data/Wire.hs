@@ -6,6 +6,7 @@ module Blockchain.Data.Wire (
   BlockHashOrNumber(..),
   Direction(..),
   Capability(..),
+  TransactionRequest(..),
   obj2WireMessage,
   wireMessage2Obj
   ) where
@@ -167,7 +168,7 @@ data Message =
   
   -- private chains
   GetChainDetails Word256 |
-  ChainDetails ChainInfo |
+  ChainDetails Word256 ChainInfo |
   GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
 
@@ -218,8 +219,10 @@ instance Format Message where
   
   -- private chains
   format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
-  format (ChainDetails ci) = 
-    CL.blue "Chain Details\n" ++ (show ci)
+  format (ChainDetails chid ci) = 
+    CL.blue "Chain Details\n" ++ 
+    "  chainID: " ++ show chid ++ "\n" ++
+    "  chainInfo: " ++ show ci ++ "\n"
   format (GetTransactions cid3 tr) = "GetTransactions\n" ++
     "  chainID: " ++ show cid3 ++ "\n" ++
     "  transactionData: " ++ show tr ++ "\n"
@@ -267,11 +270,11 @@ obj2WireMessage 0x20 (RLPArray [ver]) =
   WhisperProtocolVersion $ fromInteger $ rlpDecode ver
 
 -- private chains
-obj2WireMessage 0x1c (RLPArray [cid]) = 
+obj2WireMessage 0x1c cid = 
   GetChainDetails (rlpDecode cid)
 
-obj2WireMessage 0x1d c =
-  ChainDetails (rlpDecode c) 
+obj2WireMessage 0x1d (RLPArray [chid, ci]) =
+  ChainDetails (rlpDecode chid) (rlpDecode ci) 
 
 obj2WireMessage 0x1e (RLPArray [c, tr]) =
   GetTransactions (rlpDecode c) (rlpDecode tr)
@@ -323,8 +326,8 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
 wireMessage2Obj (GetChainDetails c) = 
   (0x1c, rlpEncode c)
 
-wireMessage2Obj (ChainDetails ci) =  
-  (0x1d, rlpEncode ci)
+wireMessage2Obj (ChainDetails chid ci) =  
+  (0x1d, RLPArray [rlpEncode chid, rlpEncode ci])
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
