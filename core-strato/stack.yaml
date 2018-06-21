@@ -50,7 +50,7 @@ extra-deps:
 - monad-logger-0.3.28.1
 - ether-0.4.2.0
 
-resolver: lts-10.10
+resolver: lts-10.10 #also duplicated in docker section below
 compiler: ghc-8.0.2
 compiler-check: newer-minor
 extra-include-dirs:
@@ -76,3 +76,7 @@ ghc-options:
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
   blockapps-data:          -Wall -Werror
   ethereum-vm:             -Wall -Werror -fno-warn-warnings-deprecations
+
+docker:
+  enable: true
+  image: "stack-core-buildbase:lts-10.10"
