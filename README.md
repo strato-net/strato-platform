@@ -46,6 +46,12 @@ core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still 
     <CONFIG_VARS> make docker-compose
     ```
 
+### Plain `stack` usage for core-strato and bloc
+Stack commands (like `stack build`, `stack test` etc.) can only be used once the buildbase image is built.
+
+This is a part of main build process described in this readme but you can also build it manually by running
+```make build_buildbase``` in `core-strato/` and `blockapps-haskell/` directories (for core-strato and bloc accordingly)
+
 ## Appendix: Libraries used in build process
 For the list of currenty used libraries see Dockerfile.deploybase for run-time libs and Dockerfile.buildbase for compilation lib requirements
 These libraries are no longer required to be installed on the host since we use docker-enabled Stack. So we keep them here just in case:
