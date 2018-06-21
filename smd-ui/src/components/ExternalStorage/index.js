@@ -5,10 +5,17 @@ import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { openUploadModal } from './UploadFile/uploadFile.actions';
 import UploadFile from './UploadFile';
+import List from './List';
+import { fetchUploadList } from './externalStorage.actions';
 
 import './externalStorage.css';
 
 class ExternalStorage extends Component {
+
+  componentDidMount() {
+    this.props.fetchUploadList();
+  }
+
   render() {
     return (
       <div className="container-fluid pt-dark external-storage">
@@ -38,8 +45,15 @@ class ExternalStorage extends Component {
               }}
               className="pt-intent-primary button-spacing pt-icon-info-sign"
               text="Verify" />
+            <Button
+              onClick={() => {
+
+              }}
+              className="pt-intent-primary button-spacing pt-icon-download"
+              text="Downlaod" />
           </div>
           <UploadFile />
+          <List uploadList={this.props.uploadList} />
         </div>
       </div>
     );
@@ -48,12 +62,13 @@ class ExternalStorage extends Component {
 
 export function mapStateToProps(state) {
   return {
-
+    uploadList: state.externalStorage.uploadList
   };
 }
 
 const connected = connect(mapStateToProps, {
-  openUploadModal
+  openUploadModal,
+  fetchUploadList
 })(ExternalStorage)
 
 export default withRouter(connected);

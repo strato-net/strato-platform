@@ -1,10 +1,11 @@
-import { OPEN_UPLOAD_MODAL, CLOSE_UPLOAD_MODAL, UPLOAD_FILE_SUCCESS, UPLOAD_FILE_FAILURE, RESET_UPLOAD_ERROR, USERNAME_FORM_CHANGE } from "./uploadFile.actions";
+import { OPEN_UPLOAD_MODAL, CLOSE_UPLOAD_MODAL, UPLOAD_FILE_SUCCESS, UPLOAD_FILE_FAILURE, RESET_UPLOAD_ERROR, USERNAME_FORM_CHANGE, UPLOAD_FILE_REQUEST } from "./uploadFile.actions";
 
 const initialState = {
   isOpen: false,
   result: null,
   error: null,
-  username: null
+  username: null,
+  isLoading: false
 }
 
 const reducer = function (state = initialState, action) {
@@ -21,17 +22,24 @@ const reducer = function (state = initialState, action) {
         result: null,
         error: null
       }
+    case UPLOAD_FILE_REQUEST:
+      return {
+        ...state,
+        isLoading: true
+      }
     case UPLOAD_FILE_SUCCESS:
       return {
         ...state,
         result: action.result,
-        error: null
+        error: null,
+        isLoading: false
       }
     case UPLOAD_FILE_FAILURE:
       return {
         ...state,
         result: null,
-        error: action.error
+        error: action.error,
+        isLoading: false
       }
     case RESET_UPLOAD_ERROR:
       return {

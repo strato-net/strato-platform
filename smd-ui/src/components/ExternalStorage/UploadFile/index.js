@@ -77,7 +77,7 @@ class UplaodFile extends Component {
   }
 
   handleUsernameChange = (e) => {
-    this.props.changeUsername(e.target.value); 
+    this.props.changeUsername(e.target.value);
     this.props.fetchUserAddresses(e.target.value, true)
   };
 
@@ -250,6 +250,7 @@ class UplaodFile extends Component {
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
+              disabled={this.props.isLoading}
               text="Upload"
             />
           </div>
@@ -341,9 +342,11 @@ export function mapStateToProps(state) {
     result: state.uploadFile.result,
     accounts: state.accounts.accounts,
     username: state.uploadFile.username,
+    isLoading: state.uploadFile.isLoading,
     initialValues: {
       username: state.user.currentUser.username,
-      address: state.user.currentUser.accountAddress
+      address: state.user.currentUser.accountAddress,
+      provider: 's3'
     }
   };
 }

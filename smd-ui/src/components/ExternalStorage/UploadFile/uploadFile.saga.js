@@ -5,6 +5,7 @@ import {
 } from 'redux-saga/effects';
 import { UPLOAD_FILE_REQUEST, uploadFileSuccess, uploadFileFailure } from './uploadFile.actions';
 import { env } from '../../../env';
+import { fetchUploadList } from '../externalStorage.actions';
 
 const url = env.APEX_URL + "/bloc/file/upload";
 
@@ -41,6 +42,7 @@ export function* uploadFile(action) {
       yield put(uploadFileFailure(response.error.message));
     } else {
       yield put(uploadFileSuccess(response));
+      yield put(fetchUploadList());
     }
   }
   catch (err) {
