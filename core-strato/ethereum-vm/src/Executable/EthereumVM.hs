@@ -121,7 +121,7 @@ insertNewChains events = do
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> putGenesisStateRoot cId sr >> return [(cId, cInfo)]
 
-  void . K.withKafkaViolently $ writeIndexEvents (map (uncurry NewChainInfo) $ concat newChains)
+  void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
