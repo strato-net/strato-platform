@@ -7,7 +7,7 @@ import qualified Database.Esqueleto                 as E
 import           Database.Persist                   hiding (get)
 import qualified Database.Persist.Postgresql        as SQL
 
-import qualified Blockchain.Data.ChainInfo          as C
+import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                 (Word256)
 
 import           Blockchain.DB.SQLDB
@@ -15,7 +15,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Control.Monad.Trans.Resource
 
-getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe C.ChainInfo)
+getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe ChainInfo)
 getChainInfo chainId = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
@@ -37,7 +37,7 @@ getChainInfo chainId = do
           --   E.where_ (abRef E.^. AccountInfoRefChainId E.==. E.val chainInfoRefId)
           -- cInfos <- E.select . E.from $ \ciRef -> do
           --   E.where_ (abRef E.^. CodeInfoRefChainId E.==. E.val chainInfoRefId)
-          return . Just $ C.ChainInfo
+          return . Just $ ChainInfo
                             chainInfoRefChainLabel
                             chainInfoRefAddRule
                             chainInfoRefRemoveRule
@@ -47,3 +47,13 @@ getChainInfo chainId = do
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
+
+putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
+putChainInfo chainId ChainInfo{..} = do
+  db <- getSQLDB
+  runResourceT . flip SQL.runSqlPool db $ do
+    let chainInfoRef = ChainInfoRef chainId chainLabel addRule removeRule
+    chainInfoRefId <- E.insert chainInfoRef
+    insertMany_ $ map (ChainMemberRef chainInfoRefId) members
+    insertMany_ $ map (uncurry (ChainAccountBalanceRef chainInfoRefId)) accountBalance
+    return chainInfoRefId
