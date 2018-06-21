@@ -191,8 +191,8 @@ ChainInfo
     removeRule String
     members [String]
     accountBalance [AddressBalancePair]
-    accountData [Word256]
-    codeData [Word256]
+    accountData [AccountInfoId]
+    codeData [CodeInfoId]
     deriving Eq Generic Read Show
 
 AccountInfo
