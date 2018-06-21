@@ -114,6 +114,9 @@ handleEvents' _ = awaitForever $ \case
       error $ "GetBlockBodies handler unimplemented" ++ (show bestBlk)
     MsgEvt (BlockBodies []) -> error "BlockBodies [] handler unimplemented"
     MsgEvt (BlockBodies _) -> error "BlockBodies bodies handler unimplemented"
+    MsgEvt (GetChainDetails _) -> error "GetChainDetails handler unimplemented"
+    MsgEvt (ChainDetails _) -> error "ChainDetails handler unimplemented"
+    MsgEvt (GetTransactions _) -> error "GetTransactions handler unimplemented"
     MsgEvt (Disconnect _) -> error "Disconnect handler unimplemented"
     NewTX _ -> error "NewTX handler unimplemented"
     NewBL _ _ -> error "NewBL handler unimplemented"
