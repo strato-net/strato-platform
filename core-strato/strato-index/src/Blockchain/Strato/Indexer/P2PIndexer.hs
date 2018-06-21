@@ -36,6 +36,10 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
                 $logInfoS "p2pIndexer" . T.pack $
                     "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
                 void $ RBDB.withRedisBlockDB (RBDB.putBestBlockInfo sha num tdiff)
+            NewChainInfo cId cInfo -> do
+                $logInfoS "p2pIndexer" . T.pack $
+                    "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo
+                void $ RBDB.withRedisBlockDB (RBDB.putChainInfo cId cInfo)
             _ -> return ()
         setKafkaCheckpoint nextIdx
 
