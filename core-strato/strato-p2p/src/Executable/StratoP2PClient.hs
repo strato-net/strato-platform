@@ -77,7 +77,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
                 eventSource
              .| handleMsgClientConduit myPublic peer
              .| eventSink
-             .|appSink app
+             .| appSink app
 
         void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 0
         case attempt of
