@@ -44,6 +44,7 @@ router.post('/bloc/file/upload', multerMiddleware, fileController.upload);
 router.post('/bloc/file/attest', fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);
+router.get('/bloc/file/list', fileController.list)
 
 
 // Node governance (for future)

@@ -62,6 +62,12 @@ module.exports = {
 
       try {
         let contractUpload = yield externalStorage.uploadContract(userCredentials, args);
+
+        let upload = yield models.Upload.create({
+          contractAddress: contractUpload.address,
+          uri: 'uploadedFile.Location'
+        });
+
         res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
       } catch (error) {
         let err = new Error(error);
@@ -69,6 +75,19 @@ module.exports = {
         return next(err);
       };
     });
+  },
+
+  list: function (req, res, next) {
+    co(function* () {
+      try {
+        let uploads = yield models.Upload.all();
+        res.status(200).json({ list: uploads });
+      } catch (error) {
+        let err = new Error(error);
+        err.status = 500;
+        return next(err);
+      }
+    })
   },
 
   verify: function (req, res, next) {
