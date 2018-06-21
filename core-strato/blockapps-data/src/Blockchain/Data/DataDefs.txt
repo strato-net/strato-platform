@@ -183,3 +183,29 @@ BlockOffset
     Primary hash
     UniqueH hash
     deriving Eq Read Show
+
+ChainInfo
+    chainId Word256
+    chainLabel String
+    addRule String
+    removeRule String
+    members [String]
+    accountBalance [AddressBalancePair]
+    accountData [Word256]
+    codeData [Word256]
+    deriving Eq Generic Read Show
+
+AccountInfo
+    accountId Word256
+    address Address
+    balance Int
+    codeHash SHA Maybe
+    map [MapPair] Maybe
+    deriving Eq Generic Read Show
+
+CodeInfo
+    codeId Word256
+    evmByteCode BS.ByteString
+    contractCode String
+    contractName String
+    deriving Eq Generic Read Show
