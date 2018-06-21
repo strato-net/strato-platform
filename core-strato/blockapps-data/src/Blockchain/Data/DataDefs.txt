@@ -184,27 +184,34 @@ BlockOffset
     UniqueH hash
     deriving Eq Read Show
 
-ChainInfo
+ChainInfoRef
     chainId Word256
     chainLabel String
     addRule String
     removeRule String
-    members [String]
-    accountBalance [AddressBalancePair]
-    accountData [AccountInfoId]
-    codeData [CodeInfoId]
     deriving Eq Generic Read Show
 
-AccountInfo
-    accountId Word256
+ChainMemberRef
+    chainInfoId ChainInfoRefId
+    name String
+    deriving Eq Generic Read Show
+
+ChainAccountBalanceRef
+    chainInfoId ChainInfoRefId
+    address Address
+    balance Word256
+    deriving Eq Generic Read Show
+
+AccountInfoRef
+    chainInfoId ChainInfoRefId
     address Address
     balance Int
     codeHash SHA Maybe
     map [MapPair] Maybe
     deriving Eq Generic Read Show
 
-CodeInfo
-    codeId Word256
+CodeInfoRef
+    chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
     contractName String
