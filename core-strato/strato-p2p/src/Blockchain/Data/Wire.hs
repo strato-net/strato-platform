@@ -14,12 +14,12 @@ import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString              as B
 import           Data.List
 import           Data.Word
-import           Data.Text.Internal
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey       ()
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -27,7 +27,6 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.ExtWord
-import           Blockchain.Data.GenesisInfo 
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | SHH Integer               -- | Whisper support
@@ -168,7 +167,7 @@ data Message =
   
   -- private chains
   GetChainDetails Word256 |
-  ChainDetails { chainId::Word256, chainLabel::Maybe Text, accountData::[AccountInfo], codeData::[CodeInfo] } |
+  ChainDetails ChainInfo |
   GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
 
@@ -219,12 +218,8 @@ instance Format Message where
   
   -- private chains
   format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
-  format (ChainDetails cid2 cl ad cd) = 
-    CL.blue "Chain Details\n" ++
-    "  chainID: " ++ show cid2 ++ "\n" ++
-    "  chainLabel: " ++ show cl ++ "\n" ++
-    "  accountData: " ++ show ad ++ "\n" ++
-    "  codeData: " ++ show cd ++ "\n"
+  format (ChainDetails ci) = 
+    CL.blue "Chain Details\n" ++ (show ci)
   format (GetTransactions cid3 tr) = "GetTransactions\n" ++
     "  chainID: " ++ show cid3 ++ "\n" ++
     "  transactionData: " ++ show tr ++ "\n"
@@ -275,8 +270,8 @@ obj2WireMessage 0x20 (RLPArray [ver]) =
 obj2WireMessage 0x1c (RLPArray [cid]) = 
   GetChainDetails (rlpDecode cid)
 
-obj2WireMessage 0x1d (RLPArray [c, cl, RLPArray ad, RLPArray cd]) =
-  ChainDetails (rlpDecode c) (read $ rlpDecode cl) (rlpDecode <$> ad) (rlpDecode <$> cd)
+obj2WireMessage 0x1d c =
+  ChainDetails (rlpDecode c) 
 
 obj2WireMessage 0x1e (RLPArray [c, tr]) =
   GetTransactions (rlpDecode c) (rlpDecode tr)
@@ -328,8 +323,8 @@ wireMessage2Obj (WhisperProtocolVersion ver) =
 wireMessage2Obj (GetChainDetails c) = 
   (0x1c, rlpEncode c)
 
-wireMessage2Obj (ChainDetails c cl ad cd) =  
-  (0x1d, RLPArray [rlpEncode c, rlpEncode $ show cl, RLPArray (rlpEncode <$> ad), RLPArray (rlpEncode <$> cd)])
+wireMessage2Obj (ChainDetails ci) =  
+  (0x1d, rlpEncode ci)
 
 wireMessage2Obj (GetTransactions c tr) = 
   (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
