@@ -168,7 +168,7 @@ data Message =
   
   -- private chains
   GetChainDetails Word256 |
-  ChainDetails { chid::Word256, chainLabel::Maybe Text, accountData::[AccountInfo], codeData::[CodeInfo] } |
+  ChainDetails { chainId::Word256, chainLabel::Maybe Text, accountData::[AccountInfo], codeData::[CodeInfo] } |
   GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
 
 

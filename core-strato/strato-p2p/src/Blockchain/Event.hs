@@ -265,10 +265,11 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
  
     MsgEvt (GetChainDetails cid) -> do
+      stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ show cid
-      -- communicate with Redis, get serialized chainDetails if chain exists
-      -- check permissions of peer??
-      -- package chainDetails into a GetChainDetails message, yield it 
+      -- communicate with Redis, get serialized chainDetails if chain exists, throw error if not (its a Maybe)
+      -- check permissions of peer, throw error if not a member of the chain (so you gotta parse that shit)
+      -- pack chainDetails into a GetChainDetails message, yield it 
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
