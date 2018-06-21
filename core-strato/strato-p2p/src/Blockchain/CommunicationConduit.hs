@@ -71,7 +71,7 @@ mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
         .| bytesToMessages
         .| tap (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
-    , seqEventNotifictationSource
+    , seqEventNotificationSource
         .| CL.map NewSeqEvent
     ] ++ extra) (2 + length extra)
 
