@@ -1,4 +1,6 @@
 resolver: lts-10.10 #also duplicated in docker section below
+compiler: ghc-8.0.2
+compiler-check: newer-minor
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
