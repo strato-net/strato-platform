@@ -103,7 +103,6 @@ library
                    Blockchain.EventException
                    Blockchain.Event
                    Blockchain.NewEvent
-                   Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.SeqEventNotify
                    Blockchain.DeLoopNotify

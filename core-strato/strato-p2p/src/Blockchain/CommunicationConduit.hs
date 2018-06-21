@@ -40,7 +40,6 @@ import           Blockchain.DBM
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
-import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Options
 import           Blockchain.SeqEventNotify
@@ -65,7 +64,7 @@ mkEthP2PEventSource :: ( Monad m
                     -> EthCryptState
                     -> [Source m Event]
                     -> m (Source m Event)
-mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
+mkEthP2PEventSource app inCtx extra = sequenceSources (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
