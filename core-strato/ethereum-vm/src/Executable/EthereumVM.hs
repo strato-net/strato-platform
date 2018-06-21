@@ -39,6 +39,8 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
+import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -112,15 +114,14 @@ insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
-  forM_ newChainInfos $ \(cId, cInfo) -> do
+  newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
-      Just gsr -> error $ "ethereumVM.getGenesisStateRoot: chain "
-                    ++ format cId
-                    ++ " is already initialized with state root "
-                    ++ format gsr
-      Nothing -> putGenesisStateRoot cId sr
+      Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
+      Nothing -> putGenesisStateRoot cId sr >> return [(cId, cInfo)]
+
+  void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

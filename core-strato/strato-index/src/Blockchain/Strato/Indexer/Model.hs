@@ -4,9 +4,11 @@ module Blockchain.Strato.Indexer.Model
     ( IndexEvent(..)
     ) where
 
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs                (LogDB, TransactionResult)
 import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResultStatus
+import           Blockchain.ExtWord                      (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA
 import           Data.Binary
@@ -16,6 +18,7 @@ data IndexEvent = RanBlock OutputBlock
                 | LogDBEntry LogDB
                 | InsertTxResult TransactionResult
                 | UpdateTxResult (SHA, SHA, SHA, MiningStatus) -- TODO: Three SHA's with different meanings... newtype?
+                | NewChainInfo Word256 ChainInfo
                 deriving (Eq, Read, Show)
 
 instance Binary LogDB
@@ -33,6 +36,7 @@ instance Binary IndexEvent where
             2 -> LogDBEntry <$> get
             3 -> InsertTxResult <$> get
             4 -> UpdateTxResult <$> get
+            5 -> NewChainInfo <$> get <*> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
     put (RanBlock b)       = putWord8 0 >> put b
@@ -40,3 +44,4 @@ instance Binary IndexEvent where
     put (LogDBEntry e)     = putWord8 2 >> put e
     put (InsertTxResult r) = putWord8 3 >> put r
     put (UpdateTxResult s) = putWord8 4 >> put s
+    put (NewChainInfo w c) = putWord8 5 >> put w >> put c
