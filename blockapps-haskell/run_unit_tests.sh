@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 # These env variables are needed to prioritize the solc being bundled when available
-export PATH=$PWD/.basil-work/fakeroot/usr/bin:$PATH
-export LD_LIBRARY_PATH=$PWD/.basil-work/fakeroot/usr/lib:$LD_LIBRARY_PATH
+# NOT REQUIRED FOR DOCKER-ENABLED STACK
+#export PATH=$PWD/.basil-work/fakeroot/usr/bin:$PATH
+#export LD_LIBRARY_PATH=$PWD/.basil-work/fakeroot/usr/lib:$LD_LIBRARY_PATH
 
 declare -i RESULT=0
 TESTS=(
@@ -14,11 +15,7 @@ TESTS=(
 )
 
 for tst in ${TESTS[@]}; do
-  if [[ $tst == "blockapps-bloc22-server" ]]; then
-    stack --docker-env=PATH test $tst
-  else
-    stack test $tst
-  fi
+  stack test $tst
   RESULT=RESULT+$?
 done
 

@@ -79,7 +79,7 @@ sudo ./b2 install
 
 TBD
 
-#### Knows issue with 'happy' lib
+#### Known issue with 'happy' lib when building on host (non-docker-enabled stack)
 
 Also we need to explicitly install `happy` library on the host:
 ```

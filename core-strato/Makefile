@@ -22,7 +22,7 @@ build_haskell: prebuild
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-core-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
 	stack setup
-	# installing happy-1.19.8 explicitly to avoid the error while building
+	# installing happy-1.19.8 explicitly to avoid the error while building 3rd party lib "language-javascript-0.6.0.11" - remove when migrated to compiler ghc-8.2.2 in stack.yaml
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 	stack test --no-run-tests test-suite \
