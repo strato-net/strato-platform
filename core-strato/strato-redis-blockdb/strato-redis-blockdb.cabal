@@ -25,6 +25,7 @@ library
                      , blockapps-util
                      -- solely for REPL
                      , strato-conf
+                     , strato-model
                      , blockapps-data
   hs-source-dirs:      src
   default-language:    Haskell2010
