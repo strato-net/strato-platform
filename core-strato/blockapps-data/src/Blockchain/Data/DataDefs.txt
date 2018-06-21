@@ -32,7 +32,6 @@ BlockDataRef
     extraData Integer
     nonce Word64
     mixHash SHA
-    blockId BlockId
     hash SHA
     blockUncles [BlockData]
     powVerified Bool

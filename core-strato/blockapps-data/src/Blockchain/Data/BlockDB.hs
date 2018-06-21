@@ -61,11 +61,11 @@ import           Control.Monad.Trans.Resource
 import           Blockchain.Strato.Model.Class
 
 blk2BlkDataRef :: (HasSQLDB m) =>
-                  M.Map SHA Integer->(Block, SHA)->BlockId->Bool->m BlockDataRef
-blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
+                  M.Map SHA Integer->(Block, SHA)->Bool->m BlockDataRef
+blk2BlkDataRef dm (b, hash') makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
-  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' uncles True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
+  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
       bd = blockBlockData b
@@ -175,7 +175,7 @@ getDifficultyMap difficultyBase blocksAndHashes = do
          ) blocksAndHashes)
 
 
-putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [(Key Block, Key BlockDataRef)]
+putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [Key BlockDataRef]
 putBlocks difficultyBase blocks makeHashOne = do
   let blocksAndHashes = map (\b -> (b, blockHash b)) blocks
   dm <- getDifficultyMap difficultyBase blocksAndHashes
@@ -189,14 +189,14 @@ putBlocks difficultyBase blocks makeHashOne = do
 
       case existingBlockData of
            [] -> do
-             blkId <- SQL.insert b
-             toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') blkId makeHashOne
+             _ <- SQL.insert b
+             toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') makeHashOne
              blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do
                txID <- updateBlockNumber b $ transactionHash tx
                SQL.insert $ BlockTransaction blkDataRefId txID
-             return (blkId, blkDataRefId)
-           [bd] -> return (blockDataRefBlockId $ SQL.entityVal bd, SQL.entityKey bd)
+             return blkDataRefId
+           [bd] -> return $ SQL.entityKey bd
            _ -> error "DB has multiple blocks with the same hash"
 
   where

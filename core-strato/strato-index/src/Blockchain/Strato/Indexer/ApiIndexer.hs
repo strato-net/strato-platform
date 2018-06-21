@@ -53,9 +53,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         then do
             insertStartTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-            results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
+            bids <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
-            let bids = snd <$> results
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime
             maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock

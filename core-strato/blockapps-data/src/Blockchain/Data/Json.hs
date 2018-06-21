@@ -180,11 +180,36 @@ instance ToJSON Block' where
          "receiptTransactions" .= map tToTPrime rt,
          "blockUncles" .= map bdToBdPrime bu]
 
-bToBPrime :: (String , Block) -> Block'
-bToBPrime (s, x) = Block' x s
+blockDataRefToBlock::BlockDataRef->[Transaction]->Block
+blockDataRefToBlock bdr txs = Block{
+  blockBlockData =
+     BlockData{
+       blockDataParentHash = blockDataRefParentHash bdr,
+       blockDataUnclesHash = blockDataRefUnclesHash bdr,
+       blockDataCoinbase = blockDataRefCoinbase bdr,
+       blockDataStateRoot = blockDataRefStateRoot bdr,
+       blockDataTransactionsRoot = blockDataRefTransactionsRoot bdr,
+       blockDataReceiptsRoot = blockDataRefReceiptsRoot bdr,
+       blockDataLogBloom = blockDataRefLogBloom bdr,
+       blockDataDifficulty = blockDataRefDifficulty bdr,
+       blockDataNumber = blockDataRefNumber bdr,
+       blockDataGasLimit = blockDataRefGasLimit bdr,
+       blockDataGasUsed = blockDataRefGasUsed bdr,
+       blockDataTimestamp = blockDataRefTimestamp bdr,
+       blockDataExtraData = blockDataRefExtraData bdr,
+       blockDataNonce = blockDataRefNonce bdr,
+       blockDataMixHash = blockDataRefMixHash bdr
+       },
+  blockReceiptTransactions = txs,
+  blockBlockUncles = blockDataRefBlockUncles bdr
+  }
 
-bToBPrime' :: Block -> Block'
-bToBPrime' x = Block' x ""
+
+bToBPrime :: String -> BlockDataRef -> [Transaction] -> Block'
+bToBPrime s x txs = Block' (blockDataRefToBlock x txs) s
+
+bToBPrime' :: BlockDataRef -> [Transaction] -> Block'
+bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
 
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
@@ -235,11 +260,11 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh bi h uncles pow isConf td)) =
+      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
         object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
-        "mixHash" .= mh, "blockId" .= bi, "hash" .= h, "uncles" .= map bdToBdPrime uncles, "powVerified" .= pow, "isConfirmed" .= isConf, "totalDifficulty" .= td]
+        "mixHash" .= mh, "hash" .= h, "uncles" .= map bdToBdPrime uncles, "powVerified" .= pow, "isConfirmed" .= isConf, "totalDifficulty" .= td]
 
 
 

@@ -249,7 +249,7 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
-    [(_, genBId)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
     let diff = StateDiff {
