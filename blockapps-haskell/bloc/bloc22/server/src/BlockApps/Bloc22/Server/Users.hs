@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Users where
 
 import           Control.Concurrent
 import           Control.Arrow
+import           Control.Exception.Lifted          (catch)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -37,6 +38,7 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Opaleye                           hiding (not, null, index)
+import           Database.PostgreSQL.Simple        (SqlError(..))
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -127,7 +129,9 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
       returnA -< (salt, nonce, seckey)
   case catMaybes . map (\(s, n, sk) -> decryptSecKey password s n sk) $ cryptos of
     [] -> err
-    _ -> blocModify $ insertKeyStore uid keystore
+    _ -> blocModify (insertKeyStore uid keystore) `catch`
+          \s@SqlError{..} -> throwError . AlreadyExists $
+            "keystore could not be inserted: " <> Text.pack (show s)
 
 
 postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
