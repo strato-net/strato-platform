@@ -1,4 +1,6 @@
-resolver: lts-10.10
+resolver: lts-10.10 #also duplicated in docker section below
+compiler: ghc-8.0.2
+compiler-check: newer-minor
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
@@ -44,3 +46,7 @@ extra-include-dirs:
 
 extra-lib-dirs:
 - /usr/local/lib
+
+docker:
+  enable: true
+  image: "stack-bloc-buildbase:lts-10.10"
