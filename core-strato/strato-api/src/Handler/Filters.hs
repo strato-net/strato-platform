@@ -15,6 +15,7 @@ import           Database.Persist.Postgresql
 import           Numeric
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA

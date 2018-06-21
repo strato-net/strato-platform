@@ -14,7 +14,6 @@ module Blockchain.Data.BlockDB (
   blockHeaderHash,
   blockHeaderPartialHash,
   getBlock,
-  getBlocks,
   putBlocks,
   nextDifficulty,
   homesteadNextDifficulty,
@@ -46,6 +45,7 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Database.MerklePatricia (StateRoot (..), unboxStateRoot)
 import           Blockchain.DB.SQLDB
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -59,6 +59,9 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Strato.Model.Class
+
+
+
 
 blk2BlkDataRef :: (HasSQLDB m) =>
                   M.Map SHA Integer->(Block, SHA)->Bool->m BlockDataRef
@@ -85,11 +88,6 @@ blk2BlkDataRef dm (b, hash') makeHashOne = do
       eD = blockDataExtraData bd
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
-
-getBlocks :: HasSQLDB m => m [Block]
-getBlocks = do
-  db <- getSQLDB
-  liftM (map entityVal) . liftIO . SQL.runSqlPool (selectList [] []) $ db
 
 getBlock::(HasSQLDB m)=>
           SHA->m (Maybe BlockDataRef)
@@ -189,7 +187,6 @@ putBlocks difficultyBase blocks makeHashOne = do
 
       case existingBlockData of
            [] -> do
-             _ <- SQL.insert b
              toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') makeHashOne
              blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do

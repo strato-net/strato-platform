@@ -17,6 +17,7 @@ module Blockchain.NewEvent (
 ) where
 
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Wire
 import           Data.Conduit

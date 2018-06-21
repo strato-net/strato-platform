@@ -39,12 +39,6 @@ BlockDataRef
     totalDifficulty Integer sqltype=numeric(1000,0)
     deriving Eq Read Show
 
-Block
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    deriving Eq Read Show
-
 NewBlk
     hash SHA
     blockData BlockData

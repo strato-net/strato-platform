@@ -9,6 +9,7 @@
 module Blockchain.Data.Json where
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
