@@ -50,5 +50,3 @@ extra-lib-dirs:
 docker:
   enable: true
   image: "stack-bloc-buildbase:lts-10.10"
-  # mount the solc from the host if available at /usr/local/bin/solc (has lower priority in container than the one packaged with build_solidity in Makefile)
-  mount: ["/usr/local/bin/solc:/usr/local/bin/solc:ro"]

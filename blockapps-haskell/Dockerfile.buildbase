@@ -7,3 +7,6 @@ RUN apt-get update && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
+
+# package the pre-built solc (e.g. required for 'stack test blockapps-bloc22-server')
+COPY ./solc /usr/local/bin/

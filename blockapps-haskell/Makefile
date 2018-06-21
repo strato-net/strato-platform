@@ -22,13 +22,13 @@ prebuild:
 
 build_solidity: prebuild
 	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin
-	# make the pulled solc available in stack-bloc-buildbase container (e.g. solc is used for "stack test blockapps-bloc22-server")
-	# this solc will have higher priority in container than the one mounted in stack.yaml docker section (`/root/.local/bin` is used prior to `/usr/local/bin` according to $PATH)
-	mkdir -p .stack-work/docker/_home/.local/bin/ && cp .basil-work/fakeroot/usr/bin/solc .stack-work/docker/_home/.local/bin/
 
-build_haskell: prebuild
+build_buildbase: prebuild build_solidity
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
+	cp -f $(FAKEROOT)/usr/bin/solc /tmp/docker-dummy
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-bloc-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+
+build_haskell: prebuild build_buildbase
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
