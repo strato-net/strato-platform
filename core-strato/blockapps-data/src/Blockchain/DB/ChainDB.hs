@@ -10,18 +10,13 @@ module Blockchain.DB.ChainDB (
 
 import           Control.Monad.Trans.Resource
 
-import           Data.Foldable                        (forM_)
 import qualified Data.NibbleString                    as N
 import           Data.Word                            (Word8)
 
 import qualified Blockchain.Database.MerklePatricia   as MP
-import           Blockchain.Data.Address              (Address)
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import           Blockchain.Format
 
-import           Blockchain.DB.AddressStateDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)

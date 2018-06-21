@@ -192,18 +192,18 @@ ChainInfoRef
     deriving Eq Generic Read Show
 
 ChainMemberRef
-    chainInfoId ChainInfoId
+    chainInfoId ChainInfoRefId
     name String
     deriving Eq Generic Read Show
 
 ChainAccountBalanceRef
-    chainInfoId ChainInfoId
+    chainInfoId ChainInfoRefId
     address Address
-    balance Integer sqltype=numeric(1000,0)
+    balance Word256
     deriving Eq Generic Read Show
 
 AccountInfoRef
-    chainInfoId ChainInfoId
+    chainInfoId ChainInfoRefId
     address Address
     balance Int
     codeHash SHA Maybe
@@ -211,7 +211,7 @@ AccountInfoRef
     deriving Eq Generic Read Show
 
 CodeInfoRef
-    chainInfoId ChainInfoId
+    chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
     contractName String
