@@ -31,6 +31,7 @@ import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
+--import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
@@ -263,6 +264,42 @@ handleEvents mode peer = awaitForever $ \case
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
                 stampActionTimestamp
+
+    -- private chains
+    MsgEvt (GetChainDetails cid) -> do
+      stampActionTimestamp
+      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
+      chDet <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cid
+      case chDet of
+        Nothing -> do  
+          yield $ GetChainDetails cid
+        Just (ci) -> do 
+          yield $ ChainDetails cid ci
+      
+    MsgEvt (ChainDetails chid ci) -> do
+      stampActionTimestamp
+      $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
+      st <- (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
+      case st of
+        Left r -> do
+          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, Redis replied with: \n" ++ (show r)
+          return ()
+        Right s -> do
+          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, Redis status is: \n" ++ (show s)
+          return()
+-- check permissions of peer, throw error if not a member of the chain (so you gotta parse that shit)
+
+    MsgEvt (GetTransactions chid req) -> do
+      stampActionTimestamp
+      $logInfoS "handleEvents/GetTransactions" $ T.pack $ "transaction info for chainID " ++ (show chid)
+        ++ "\n  " ++ (show req)
+      tr <- case req of 
+        (Explicit ids) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions ids
+        (Implicit ha _ _ _) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions [ha]
+      case tr of
+        ((Just ts):_) -> 
+          yield $ Transactions ts
+        _ -> return ()
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
