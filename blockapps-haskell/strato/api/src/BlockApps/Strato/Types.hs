@@ -18,6 +18,7 @@ module BlockApps.Strato.Types
   , Address (..)
   , addressString
   , stringAddress
+  , ChainId (..)
   , Keccak256 (..)
   , WithNext (..)
   , FaucetResponse(..)
@@ -73,10 +74,10 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
 import           Text.Read.Lex
-import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
-                                               Nonce (..), addressString,
-                                               keccak256, keccak256lazy,
-                                               stringAddress)
+import           BlockApps.Ethereum           (Address (..), ChainId (..),
+                                               Keccak256 (..), Nonce (..),
+                                               addressString, keccak256,
+                                               keccak256lazy, stringAddress)
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
@@ -203,13 +204,13 @@ instance ToSchema Word160 where
 instance ToSchema AbiBin
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerInteger
+  toParamSchema _ = mempty & type_ .~ SwaggerString
 
 instance ToHttpApiData Word256 where
-  toUrlPiece = Text.pack . flip showHex ""
+  toUrlPiece = Text.pack . ("0x" ++ ) . flip showHex ""
 
 instance FromHttpApiData Word256 where
-  parseUrlPiece text = case readMaybe ("0x" ++ Text.unpack text) of
+  parseUrlPiece text = case readMaybe (Text.unpack text) of
     Nothing      -> Left $ "Could not decode Word256: " <> text
     Just (Hex w256) -> Right w256
 
@@ -268,7 +269,7 @@ data Transaction = Transaction
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
   , transactionOrigin          :: Text
-  , transactionChainId         :: Maybe (Hex Word256)
+  , transactionChainId         :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Transaction where
@@ -289,7 +290,7 @@ data PostTransaction = PostTransaction
   , posttransactionS          :: Hex Natural
   , posttransactionV          :: Hex Word8
   , posttransactionNonce      :: Natural
-  , posttransactionChainId    :: Maybe (Hex Word256)
+  , posttransactionChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -388,7 +389,7 @@ data BlockData = BlockData
   , blockdataNonce            :: Word64
   , blockdataStateRoot        :: Keccak256
   , blockdataTransactionsRoot :: Keccak256
-  , blockdataChainId          :: Maybe (Hex Word256)
+  , blockdataChainId          :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON BlockData where
@@ -418,7 +419,7 @@ data Account = Account
   , accountContractRoot   :: Keccak256
   , accountCode           :: Text
   , accountCodeHash       :: Keccak256
-  , accountChainId        :: Maybe (Hex Word256)
+  , accountChainId        :: Maybe ChainId
   , accountLatestBlockNum :: Natural
   , accountSource         :: Text
   , accountContractName   :: Maybe Text
@@ -454,7 +455,7 @@ data Storage = Storage
   { storageAddress :: Address
   , storageKey     :: Hex Word256
   , storageValue   :: Hex Word256
-  , storageChainId :: Maybe (Hex Word256)
+  , storageChainId :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Storage where
@@ -509,7 +510,7 @@ data TransactionResult = TransactionResult
   , transactionresultTime             :: Double
   , transactionresultNewStorage       :: Text
   , transactionresultDeletedStorage   :: Text
-  , transactionresultChainId          :: Maybe (Hex Word256)
+  , transactionresultChainId          :: Maybe ChainId
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
@@ -612,7 +613,7 @@ data GenesisInfo =
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: Keccak256,
     genesisInfoNonce            :: Word64,
-    genesisInfoChainId          :: Maybe (Hex Word256)
+    genesisInfoChainId          :: Maybe ChainId
 } deriving (Show, Eq, Generic)
 
 instance FromJSON GenesisInfo where

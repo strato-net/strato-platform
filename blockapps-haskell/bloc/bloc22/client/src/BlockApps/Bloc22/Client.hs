@@ -64,7 +64,7 @@ getContractsContract
 getContractsContract = client (Proxy @ GetContractsContract)
 
 getContractsState
-  :: ContractName -> MaybeNamed Address -> Maybe Int -> Maybe Text -> Maybe Int -> Maybe Int -> Bool -> ClientM (Map Text SolidityValue)
+  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Maybe Text -> Maybe Int -> Maybe Int -> Bool -> ClientM (Map Text SolidityValue)
 getContractsState = client (Proxy @ GetContractsState)
 
 getContractsDetails
@@ -123,17 +123,17 @@ postUsersFill :: UserName -> Address -> Bool -> ClientM BlocTransactionResult
 postUsersFill = client (Proxy @ PostUsersFill)
 
 postUsersSend
-  :: UserName -> Address -> Maybe Int -> Bool -> PostSendParameters -> ClientM BlocTransactionResult
+  :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> ClientM BlocTransactionResult
 postUsersSend = client (Proxy @ PostUsersSend)
 
 postUsersContract
-  :: UserName -> Address -> Maybe Int -> Bool -> PostUsersContractRequest -> ClientM BlocTransactionResult
+  :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> ClientM BlocTransactionResult
 postUsersContract = client (Proxy @ PostUsersContract)
 
 postUsersUploadList
   :: UserName
   -> Address
-  -> Maybe Int
+  -> Maybe ChainId
   -> Bool
   -> UploadListRequest
   -> ClientM [BlocTransactionResult]
@@ -144,27 +144,27 @@ postUsersContractMethod
   -> Address
   -> ContractName
   -> Address
-  -> Maybe Int
+  -> Maybe ChainId
   -> Bool
   -> PostUsersContractMethodRequest
   -> ClientM BlocTransactionResult
 postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
 
 postUsersSendList
-  :: UserName -> Address -> Maybe Int -> Bool -> PostSendListRequest -> ClientM [BlocTransactionResult]
+  :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendListRequest -> ClientM [BlocTransactionResult]
 postUsersSendList = client (Proxy @ PostUsersSendList)
 
 postUsersContractMethodList
   :: UserName
   -> Address
-  -> Maybe Int
+  -> Maybe ChainId
   -> Bool
   -> PostMethodListRequest
   -> ClientM [BlocTransactionResult]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
-getBlocTransactionResult :: Keccak256 -> Maybe Int -> Bool -> ClientM BlocTransactionResult
+getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
 
-postBlocTransactionResults :: Maybe Int -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
