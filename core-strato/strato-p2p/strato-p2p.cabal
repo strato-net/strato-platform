@@ -103,7 +103,6 @@ library
                    Blockchain.Display
                    Blockchain.EventException
                    Blockchain.Event
-                   Blockchain.NewEvent
                    Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.SeqEventNotify
@@ -129,7 +128,6 @@ test-suite strato-p2p-client-test
     hs-source-dirs: test
     ghc-options: -Wall -Werror
     main-is: Spec.hs
-    other-modules: Event.EventSpec
     build-depends: base >=4 && < 5
       , hspec
       , strato-p2p
