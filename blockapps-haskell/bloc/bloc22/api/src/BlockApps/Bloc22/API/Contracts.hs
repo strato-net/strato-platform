@@ -13,6 +13,7 @@ import           Control.Lens                     (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Int                         (Int64)
+import           Data.LargeWord                   (Word256)
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import           Data.Proxy
@@ -112,7 +113,7 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
-  :> QueryParam "chainid" Int
+  :> QueryParam "chainid" Word256
   :> QueryParam "name" Text
   :> QueryParam "count" Int
   :> QueryParam "offset" Int

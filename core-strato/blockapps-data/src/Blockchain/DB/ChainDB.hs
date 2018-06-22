@@ -25,6 +25,7 @@ import           Blockchain.Strato.Model.SHA          (SHA(..))
 import qualified Database.LevelDB                     as DB
 
 import           Numeric                              (showHex)
+import           Debug.Trace
 
 {-
 |-------------------------------------------------------------------------------|

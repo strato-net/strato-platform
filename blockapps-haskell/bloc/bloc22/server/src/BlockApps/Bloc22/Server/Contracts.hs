@@ -77,7 +77,7 @@ translateStorageMap storage' =
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
-                  -> Maybe Int
+                  -> Maybe Word256
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
