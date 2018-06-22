@@ -33,6 +33,7 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionTo = Just (Address 0x13978aee95f38490e9769c39b2773ed763d9cd5f)
           , unsignedTransactionValue = Wei 10000000000000000
           , unsignedTransactionInitOrData = ""
+          , unsignedTransactionChainId = Nothing
           }
       let unsignedN = take 10000 $ map (\i -> unsigned1'{unsignedTransactionNonce = Nonce i}) [0..]
       t0 <- getTime Realtime
@@ -50,6 +51,7 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionTo = Nothing
           , unsignedTransactionValue = Wei 0
           , unsignedTransactionInitOrData = fst $ Base16.decode "6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2"
+          , unsignedTransactionChainId = Nothing
           }
       let unsignedN = take 10000 $ map (\i -> unsigned2'{unsignedTransactionNonce = Nonce i}) [0..]
       t0 <- getTime Realtime

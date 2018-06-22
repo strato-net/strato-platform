@@ -28,7 +28,6 @@ module BlockApps.Strato.Client
   ) where
 
 import           Data.Proxy
-import           Data.LargeWord  (Word256)
 import           Data.Text       (Text)
 import           GHC.Generics
 import           Numeric.Natural
@@ -53,7 +52,7 @@ data TxsFilterParams = TxsFilterParams
   , qtMinGasLimit :: Maybe Natural
   , qtBlockNumber :: Maybe Natural
   , qtHash        :: Maybe Keccak256
-  , qtChainId     :: Maybe Word256
+  , qtChainId     :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 txsFilterParams :: TxsFilterParams
@@ -78,7 +77,7 @@ data BlocksFilterParams = BlocksFilterParams
   , qbAddress    :: Maybe Address
   , qbCoinbase   :: Maybe Address
   , qbHash       :: Maybe Keccak256
-  , qbChainId    :: Maybe Word256
+  , qbChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 blocksFilterParams :: BlocksFilterParams
@@ -95,7 +94,7 @@ data AccountsFilterParams = AccountsFilterParams
   , qaNonce      :: Maybe Natural
   , qaMinNonce   :: Maybe Natural
   , qaMaxNonce   :: Maybe Natural
-  , qaChainId    :: Maybe Word256
+  , qaChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 accountsFilterParams :: AccountsFilterParams
@@ -110,7 +109,7 @@ data StorageFilterParams = StorageFilterParams
   , qsValue    :: Maybe Natural
   , qsMinValue :: Maybe Natural
   , qsMaxValue :: Maybe Natural
-  , qsChainId  :: Maybe Word256
+  , qsChainId  :: Maybe ChainId
   }
 
 storageFilterParams :: StorageFilterParams
@@ -118,13 +117,13 @@ storageFilterParams = StorageFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
-getTxsLast :: Natural -> Maybe Word256 -> ClientM [WithNext Transaction]
+getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256
 postTxList :: [PostTransaction] -> ClientM [Keccak256]
-getTxResult :: Keccak256 -> Maybe Word256 -> ClientM [TransactionResult]
-postTxResultBatch :: Maybe Word256 -> [Keccak256] -> ClientM BatchTransactionResult
+getTxResult :: Keccak256 -> Maybe ChainId -> ClientM [TransactionResult]
+postTxResultBatch :: Maybe ChainId -> [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
-getBlocksLast :: Natural -> Maybe Word256 -> ClientM [WithNext Block]
+getBlocksLast :: Natural -> Maybe ChainId -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
