@@ -271,11 +271,13 @@ handleEvents mode peer = awaitForever $ \case
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
       chDet <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cid
       case chDet of
-        Nothing -> do  
-          yield $ GetChainDetails cid
+        Nothing ->  
+          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "Redis has no information about the chain with chainID " ++ (show cid)
         Just (ci) -> do 
           yield $ ChainDetails cid ci
       
+-- check permissions of peer, throw error if not a member of the chain - via a new `Enode` type?
+
     MsgEvt (ChainDetails chid ci) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
@@ -286,8 +288,7 @@ handleEvents mode peer = awaitForever $ \case
           return ()
         Right s -> do
           $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, Redis status is: \n" ++ (show s)
-          return()
--- check permissions of peer, throw error if not a member of the chain (so you gotta parse that shit)
+          return ()
 
     MsgEvt (GetTransactions chid req) -> do
       stampActionTimestamp
