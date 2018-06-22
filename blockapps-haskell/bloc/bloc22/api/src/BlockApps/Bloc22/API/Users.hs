@@ -17,7 +17,6 @@ import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import           Data.Aeson.Types                   hiding (Success)
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
-import           Data.LargeWord                     (Word256)
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Proxy
@@ -170,13 +169,13 @@ instance ToSchema BlocTransactionResult where
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
   :> "result"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
 type PostBlocTransactionResults = "transactions"
   :> "results"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]
@@ -209,13 +208,10 @@ type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendParameters
   :> Post '[JSON] BlocTransactionResult
-
-instance ToParam (QueryParam "chainid" Word256) where
-  toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal
 
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
@@ -259,7 +255,7 @@ type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractRequest
   :> Post '[JSON] BlocTransactionResult
@@ -335,7 +331,7 @@ type PostUsersUploadList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "uploadList"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] [BlocTransactionResult]
@@ -434,7 +430,7 @@ type PostUsersContractMethod = "users"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
   :> Post '[JSON] BlocTransactionResult
@@ -515,7 +511,7 @@ type PostUsersSendList = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "sendList"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [BlocTransactionResult]
@@ -620,7 +616,7 @@ type PostUsersContractMethodList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "callList"
-  :> QueryParam "chainid" Word256
+  :> QueryParam "chainId" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [BlocTransactionResult]

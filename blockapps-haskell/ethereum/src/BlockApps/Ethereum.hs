@@ -16,6 +16,9 @@ module BlockApps.Ethereum
   , addressString
   , stringAddress
   , newSecKey
+  , ChainId (..)
+  , chainIdString
+  , stringChainId
     -- * Keccak 256 Hashes
   , Keccak256 (..)
   , keccak256
@@ -80,9 +83,6 @@ import           Test.QuickCheck
 import           Text.Read              hiding (String)
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
--- instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
---   arbitrary = (liftM2 LargeKey) arbitrary arbitrary
-
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
 
@@ -101,11 +101,23 @@ instance ToJSONKey Address where
 padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
+show256 :: Word256 -> String
+show256 (LargeKey w64 w192) = (show192 w192) ++ (show64 w64)
+
+show192 :: Word192 -> String
+show192 (LargeKey w64 w128) = (show128 w128) ++ (show64 w64)
+
 show160 :: Word160 -> String
-show160 (LargeKey w32 w128) = (show128 w128) ++ (padZeros 8 (showHex w32 ""))
+show160 (LargeKey w32 w128) = (show128 w128) ++ (show32 w32)
 
 show128 :: Word128 -> String
-show128 (LargeKey w1 w2) = (padZeros 16 (showHex w2 "")) ++ (padZeros 16 (showHex w1 ""))
+show128 (LargeKey w1 w2) = (show64 w2) ++ (show64 w1)
+
+show64 :: Word64 -> String
+show64 w64 = padZeros 16 (showHex w64 "")
+
+show32 :: Word32 -> String
+show32 w32 = padZeros 8 (showHex w32 "")
 
 addressString :: Address -> String
 addressString (Address address) = show160 address
@@ -177,6 +189,79 @@ deriveAddress :: PubKey -> Address
 deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 
 --------------------------------------------------------------------------------
+
+newtype ChainId = ChainId { unChainId :: Word256 }
+  deriving (Eq, Ord, Generic, Bounded)
+
+instance NFData ChainId
+
+instance Show ChainId where show = chainIdString
+
+instance ToJSONKey ChainId where
+  toJSONKey = ToJSONKeyText f g
+    where f x = Text.pack $ chainIdString x
+          g x = AesonEnc.text . Text.pack $ chainIdString x
+
+chainIdString :: ChainId -> String
+chainIdString = show256 . unChainId
+
+stringChainId :: String -> Maybe ChainId
+stringChainId string = ChainId . fromInteger <$> readMaybe ("0x" ++ string)
+
+instance ToJSON ChainId where toJSON = toJSON . chainIdString
+
+instance FromJSON ChainId where
+  parseJSON value = do
+    string <- parseJSON value
+    case stringChainId string of
+      Nothing      -> fail $ "Could not decode ChainId: " <> string
+      Just chainId -> return chainId
+
+instance ToHttpApiData ChainId where
+  toUrlPiece = Text.pack . chainIdString
+
+instance FromHttpApiData ChainId where
+  parseUrlPiece text = case stringChainId (Text.unpack text) of
+    Nothing      -> Left $ "Could not decode ChainId: " <> text
+    Just chainId -> Right chainId
+
+instance ToForm ChainId where
+  toForm chainId = [("chainid", toQueryParam chainId)]
+
+instance FromForm ChainId where fromForm = parseUnique "chainId"
+
+instance Arbitrary ChainId where
+  arbitrary = ChainId . fromInteger <$> arbitrary
+
+instance ToSample ChainId where
+  toSamples _ = samples [ChainId 0xdeadbeef, ChainId 0x12345678]
+
+instance ToCapture (Capture "chainid" ChainId) where
+  toCapture _ = DocCapture "chainid" "a private chain Id"
+
+instance RLPEncodable ChainId where
+  rlpEncode chainId = rlpEncode . fst . Base16.decode . Char8.pack $ chainIdString chainId
+  rlpDecode obj = ChainId . fromInteger <$> rlpDecode obj
+
+instance ToParam (QueryParam "chainid" ChainId) where
+  toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal
+
+instance ToParam (QueryParam "chainId" ChainId) where
+  toParam _ = DocQueryParam "chainId" [] "Blockchain Identifier" Normal
+
+instance ToParamSchema ChainId where
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerString
+    & minimum_ ?~ fromInteger (toInteger . unChainId $ (minBound :: ChainId))
+    & maximum_ ?~ fromInteger (toInteger . unChainId $ (maxBound :: ChainId))
+    & format ?~ "hex string"
+
+instance ToSchema ChainId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "ChainId")
+      ( mempty
+        & type_ .~ SwaggerString
+        & description ?~ "Private chain id, 32 byte hex encoded string" )
 
 newSecKey :: IO SecKey
 newSecKey = fromMaybe err . secKey <$> getEntropy 32
@@ -278,7 +363,7 @@ data AccountState = AccountState
   , accountStateBalance     :: Wei
   , accountStateStorageRoot :: Keccak256
   , accountStateCodeHash    :: Keccak256
-  , accountStateChainId     :: Maybe Word256
+  , accountStateChainId     :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
@@ -288,7 +373,7 @@ data Transaction = Transaction
   , transactionTo         :: Maybe Address
   , transactionValue      :: Wei
   , transactionInitOrData :: ByteString
-  , transactionChainId    :: Maybe Word256
+  , transactionChainId    :: Maybe ChainId
   , transactionV          :: Word8
   , transactionR          :: Word256
   , transactionS          :: Word256
@@ -341,7 +426,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionTo         :: Maybe Address
   , unsignedTransactionValue      :: Wei
   , unsignedTransactionInitOrData :: ByteString
-  , unsignedTransactionChainId    :: Maybe Word256
+  , unsignedTransactionChainId    :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
 instance RLPEncodable UnsignedTransaction where
@@ -526,20 +611,24 @@ instance RLPEncodable Wei where
   rlpEncode (Wei n) = rlpEncode $ toInteger n
   rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
-newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
+newtype Gas = Gas Integer deriving (Eq,Show,Generic)
 
 instance NFData Gas
 
-instance Arbitrary Gas where arbitrary = Gas . fromInteger <$> arbitrary
+instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 
 instance ToJSON Gas where
-  toJSON (Gas g) = toJSON $ toInteger g
+  toJSON (Gas g) = toJSON g
 
 instance FromJSON Gas where
-  parseJSON = fmap (Gas . fromInteger) . parseJSON
+  parseJSON = fmap Gas . parseJSON
 
 instance ToParamSchema Gas where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerInteger
+    & minimum_ ?~ 0
+    & maximum_ ?~ (2^(256 :: Integer) - 1)
+    & format ?~ "hex string"
 
 instance ToSchema Gas where
   declareNamedSchema _ = return $
@@ -550,8 +639,8 @@ instance ToSchema Gas where
         & description ?~ "Number of Gas units" )
 
 instance RLPEncodable Gas where
-  rlpEncode (Gas n) = rlpEncode $ toInteger n
-  rlpDecode obj = Gas . fromInteger <$> rlpDecode obj
+  rlpEncode (Gas n) = rlpEncode n
+  rlpDecode obj = Gas <$> rlpDecode obj
 
 newtype BloomFilter = BloomFilter
   ( LargeKey
