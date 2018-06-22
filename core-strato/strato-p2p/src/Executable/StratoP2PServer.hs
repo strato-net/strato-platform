@@ -53,11 +53,11 @@ runEthServer myPriv listenPort = do
             (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
             !eventSource <- mkEthP2PEventSource app inCtx []
             let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-            (attempt :: Either SomeException ()) <- try $
-                        eventSource
-                          =$= handleMsgServerConduit myPubkey p
-                          =$= eventSink
-                           $$ appSink app
+            (attempt :: Either SomeException ()) <- try . runConduit $
+                   eventSource
+                .| handleMsgServerConduit myPubkey p
+                .| eventSink
+                .| appSink app
 
             void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) 0
             case attempt of
