@@ -50,3 +50,5 @@ extra-lib-dirs:
 docker:
   enable: true
   image: "stack-bloc-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]
