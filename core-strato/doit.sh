@@ -5,13 +5,15 @@ set -x
 
 function newnode {
   initialize=false
+  
+  mkdir -p logs/rotation
+
   if [[ ! -d .ethereumH ]]
   then initialize=true
        cleanupDB
        doInit
   fi
 
-  mkdir -p logs/rotation
   echo "Starting Strato processes. All output is logged to $PWD/logs."
 
   if $mineBlocks
@@ -89,8 +91,9 @@ function doInit {
      echo "# of lines in block-backup-file: " `cat $backupLocation | wc -l`
   fi
 
-  echo $cmd
-  $cmd
+  echo "strato-setup command: $cmd"
+  # logging to stdout and log file:
+  $cmd 2>&1 | tee logs/strato-setup
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
