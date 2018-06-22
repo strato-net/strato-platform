@@ -1,4 +1,11 @@
 FROM strato-deploybase:latest
+
 COPY ./ /
+
 EXPOSE 30303 30303/udp 3000
+
+# Check ethereum-vm process is running (it is killed in container if one of the background processes crashed)
+HEALTHCHECK --interval=10s --timeout=1s --start-period=20s \
+  CMD pgrep ethereum-vm  || exit 1
+
 ENTRYPOINT ["/var/lib/doit.sh"]

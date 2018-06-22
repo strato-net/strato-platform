@@ -3,6 +3,9 @@
 set -e
 set -x
 
+MONITORED_PIDS=()
+MONITORING_TIMER=5;
+
 function newnode {
   initialize=false
   
@@ -57,11 +60,35 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel +RTS -N1 >> logs/ethereum-vm 2>&1
 
+  echo "Starting strato-api"
+  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runForever strato-api +RTS -N1 >> logs/strato-api 2>&1
+
   echo "Configuring log maintenance"
   runForever cleanupLogs
 
-  echo "Becoming strato-api"
-   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api +RTS -N1 2>&1 | tee -a logs/strato-api
+  set +x
+  echo "Monitoring the background processes..."
+  while sleep ${MONITORING_TIMER}; do
+    # check status for every monitored process
+    for monitored_pid in "${MONITORED_PIDS[@]}"; do
+      # if process with pid does not exist
+      if ! (ps -p ${monitored_pid} > /dev/null); then
+        echo "Process with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+        # Kill all the rest of monitored processes
+        for pid_to_kill in "${MONITORED_PIDS[@]}"; do
+          if [ ${pid_to_kill} -ne ${monitored_pid} ]; then
+            echo "killing process ${pid_to_kill}..."
+            kill -9 ${pid_to_kill}
+            echo "done"
+          fi
+        done
+        echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/"
+        # Keep container running idle
+        tail -f /dev/null
+      fi
+    done
+    echo "All background processes are up, waiting ${MONITORING_TIMER} sec for the next check..."
+  done
 }
 
 function cleanupDB {
@@ -113,10 +140,10 @@ function cleanupLogs {
 }
 
 function runForever {
-  while :
-  do  $@
-      sleep 1
-  done &
+  $@ &
+  proc_pid=$!
+  MONITORED_PIDS+=(${proc_pid})
+  echo "process pid:: $proc_pid (command: $@)"
   disown %
 }
 
