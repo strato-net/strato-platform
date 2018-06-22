@@ -80,3 +80,5 @@ ghc-options:
 docker:
   enable: true
   image: "stack-core-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]
