@@ -7,6 +7,8 @@ import { openUploadModal } from './UploadFile/uploadFile.actions';
 import UploadFile from './UploadFile';
 import List from './List';
 import { fetchUploadList } from './externalStorage.actions';
+import Attest from './Attest';
+import { openAttestModal } from './Attest/attest.action';
 
 import './externalStorage.css';
 
@@ -35,7 +37,7 @@ class ExternalStorage extends Component {
               text="Upload" />
             <Button
               onClick={() => {
-
+                this.props.openAttestModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-tick"
               text="Attest" />
@@ -52,9 +54,10 @@ class ExternalStorage extends Component {
               className="pt-intent-primary button-spacing pt-icon-download"
               text="Downlaod" />
           </div>
-          <UploadFile />
-          <List uploadList={this.props.uploadList} />
         </div>
+        <List uploadList={this.props.uploadList} />
+        <UploadFile />
+        <Attest />
       </div>
     );
   }
@@ -68,7 +71,8 @@ export function mapStateToProps(state) {
 
 const connected = connect(mapStateToProps, {
   openUploadModal,
-  fetchUploadList
+  fetchUploadList,
+  openAttestModal
 })(ExternalStorage)
 
 export default withRouter(connected);
