@@ -203,7 +203,7 @@ instance ToSchema Word160 where
 instance ToSchema AbiBin
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerInteger
+  toParamSchema _ = mempty & type_ .~ SwaggerString
 
 instance ToHttpApiData Word256 where
   toUrlPiece = Text.pack . flip showHex ""

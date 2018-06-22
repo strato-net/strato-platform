@@ -115,7 +115,9 @@ postUsersSend :: UserName -> Address -> Maybe Word256 -> Bool -> PostSendParamet
 postUsersSend userName addr chainId resolve
   (PostSendParameters toAddr value password mTxParams) = do
     sk <- getAccountSecKey userName password addr
+    logWith logNotice ("Getting account tx params for " <> Text.pack (show addr) <> " on chain " <> Text.pack (show chainId))
     txParams <- getAccountTxParams addr chainId mTxParams
+    logWith logNotice ("Account tx params: " <> Text.pack (show txParams))
     tx <- prepareTx sk $
       TransactionHeader
         (Just toAddr)
@@ -125,7 +127,9 @@ postUsersSend userName addr chainId resolve
         ByteString.empty
         0
         (fromIntegral <$> chainId)
+    logWith logNotice ("Signed transaction: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
+    logWith logNotice ("Transaction hash: " <> Text.pack (show hash))
     void . blocModify $ \conn -> runInsert conn hashNameTable
       ( Nothing
       , constant hash
