@@ -6,9 +6,11 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { openUploadModal } from './UploadFile/uploadFile.actions';
 import UploadFile from './UploadFile';
 import List from './List';
-import { fetchUploadList } from './externalStorage.actions';
 import Attest from './Attest';
+import Verify from './Verify';
+import { fetchUploadList } from './externalStorage.actions';
 import { openAttestModal } from './Attest/attest.action';
+import { openVerifyModal } from './Verify/verify.action';
 
 import './externalStorage.css';
 
@@ -43,7 +45,7 @@ class ExternalStorage extends Component {
               text="Attest" />
             <Button
               onClick={() => {
-
+                this.props.openVerifyModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-info-sign"
               text="Verify" />
@@ -58,6 +60,7 @@ class ExternalStorage extends Component {
         <List uploadList={this.props.uploadList} />
         <UploadFile />
         <Attest />
+        <Verify />
       </div>
     );
   }
@@ -72,7 +75,8 @@ export function mapStateToProps(state) {
 const connected = connect(mapStateToProps, {
   openUploadModal,
   fetchUploadList,
-  openAttestModal
+  openAttestModal,
+  openVerifyModal
 })(ExternalStorage)
 
 export default withRouter(connected);

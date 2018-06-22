@@ -6,9 +6,11 @@ import {
 import { fetchUploadFailure, FETCH_UPLOAD_LIST, fetchUploadSuccess } from './externalStorage.actions';
 import { env } from '../../env';
 import { ATTEST_DOCUMENT_REQUEST, attestDocumentSuccess, attestDocumentFailure } from './Attest/attest.action';
+import { verifyDocumentSuccess, verifyDocumentFailure, VERIFY_DOCUMENT_REQUEST } from './Verify/verify.action';
 
 const fetchUploadUrl = env.APEX_URL + "/bloc/file/list";
 const attestDocumentUrl = env.APEX_URL + "/bloc/file/attest";
+const verifyDocumentUrl = env.APEX_URL + "/bloc/file/verify?contractAddress=:contractAddress";
 
 export function fetchUploadList() {
   return fetch(
@@ -47,6 +49,24 @@ export function attestDocumentApiCall(values) {
     });
 }
 
+export function verifyDocumentApiCall(contractAddress) {
+  return fetch(
+    verifyDocumentUrl.replace(':contractAddress', contractAddress),
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  )
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
 export function* fetchUpload(action) {
   try {
     let response = yield call(fetchUploadList);
@@ -72,7 +92,18 @@ export function* attestDocument(action) {
   }
 }
 
+export function* verifyUpload(action) {
+  try {
+    let response = yield call(verifyDocumentApiCall, action.contractAddress);
+    yield put(verifyDocumentSuccess(response));
+  }
+  catch (err) {
+    yield put(verifyDocumentFailure(err));
+  }
+}
+
 export default function* watchFetchUpload() {
   yield takeLatest(FETCH_UPLOAD_LIST, fetchUpload);
   yield takeLatest(ATTEST_DOCUMENT_REQUEST, attestDocument);
+  yield takeLatest(VERIFY_DOCUMENT_REQUEST, verifyUpload);
 }
