@@ -41,7 +41,6 @@ library
                , blockapps-strato-api
                , blockapps-strato-client
                , clock
-               , conduit
                , containers
                , contravariant
                , cryptonite
