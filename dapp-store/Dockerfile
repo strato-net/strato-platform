@@ -1,7 +1,7 @@
-FROM node:boron-slim
+FROM node:9
 
 RUN mkdir -p /usr/src/app && \
-    npm install -g serve@6.5.3
+    npm install -g serve@7.1.1
 
 WORKDIR /usr/src/app
 
