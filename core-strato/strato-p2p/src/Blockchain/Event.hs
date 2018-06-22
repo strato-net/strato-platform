@@ -48,7 +48,6 @@ import           Blockchain.Verification
 import           Blockchain.Sequencer.Event            (IngestEvent (..), IngestTx (..), OutputEvent (..),
                                                         OutputTx (..), blockToIngestBlock, obOrigin, obTotalDifficulty, otBaseTx,
                                                         outputBlockToBlock)
-import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 
 import           Blockchain.Util                       (getCurrentMicrotime)
 
@@ -93,16 +92,18 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-emitKafkaTransactions :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
+emitKafkaTransactions :: (MonadIO m, K.HasKafkaState m, MonadLogger m, MonadState Context m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
-    void . withKafkaViolently $ writeUnseqEvents ingestTxs
+    sink <- gets unseqSink
+    runConduit (yield ingestTxs .| sink)
 
-emitKafkaBlock :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> Block -> m ()
+emitKafkaBlock :: (MonadIO m, K.HasKafkaState m, MonadLogger m, MonadState Context m) => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    void . withKafkaViolently $ writeUnseqEvents [ingestBlock]
+    sink <- gets unseqSink
+    runConduit (yield [ingestBlock] .| sink)
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, K.HasKafkaState m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message

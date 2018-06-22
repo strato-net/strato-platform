@@ -5,11 +5,13 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE Rank2Types           #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
     , ContextM
     , initContext
+    , quietContext
     , runContextM
     , getDebugMsg
     , addDebugMsg
@@ -24,16 +26,19 @@ module Blockchain.Context
     ) where
 
 
+import           Conduit
 import           Control.Monad.Logger
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           Data.Void
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Sequencer.Event            (IngestEvent (..))
+import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 import           Blockchain.Strato.Discovery.Data.Peer
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
@@ -49,6 +54,7 @@ data Context =
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
+        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime
     }
@@ -121,8 +127,18 @@ initContext = do
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
+                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents)
                  , vmTrace=[]
                  }
+
+-- quietContext is useful for testing because it doesn't require
+-- Kafka, TODO(tim) postgres, TODO(tim) and redis.
+quietContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+             => m Context
+quietContext = do
+  ctx <- initContext
+  return ctx{unseqSink=sinkNull}
+
 
 addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
         => PPeer
