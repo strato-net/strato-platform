@@ -27,7 +27,7 @@ import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
-import           Data.Either                     (rights)
+import           Data.Conduit
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
@@ -40,6 +40,7 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
+import           Data.Void                       (Void)
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
@@ -1481,21 +1482,28 @@ getContractContractByMetadataId metadataId = do
   -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
   -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
-  let powUp :: Int -> Int
-      powUp n = 5 * (2^n)
-      sleeps = 0:map powUp [0..9]
-      mYield t = case t of
+  let mSleep t = case t of
                     0 -> return ()
                     _ -> liftIO . threadDelay . (1000*) $ t
-      getWait mid sleep = mYield sleep >> getContractXabiByMetadataId mid
-  xabis <- zipWithM getWait (repeat metadataId) sleeps
-  let ctracts = map xAbiToContract xabis
-  case rights ctracts of
-    (ctract:_) -> return ctract
-    _ -> throwError . UserError .
-            ("getContractContractByMetadataId: invalid types in contract: " <>) .
-            Text.pack . show . head $ ctracts
-
+      xabiSource :: Int -> Conduit () Bloc Xabi
+      xabiSource t = do
+        mSleep t
+        yieldM $ getContractXabiByMetadataId metadataId
+        if t > 5000 then return () else xabiSource (1 + 2 * t)
+      convert :: Conduit Xabi Bloc Contract
+      convert = forever $ do
+        mc <- await
+        case xAbiToContract <$> mc of
+          Just (Right c) -> yield c
+          _ -> return ()
+      contractSink :: ConduitM Contract Void Bloc Contract
+      contractSink = do
+        mc <- await
+        case mc of
+            Nothing -> throwError . UserError $
+              ("getContractContractByMetadataId: invalid types in contract ")
+            Just c -> return c
+  runConduit $ xabiSource 0 .| convert .| contractSink
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
