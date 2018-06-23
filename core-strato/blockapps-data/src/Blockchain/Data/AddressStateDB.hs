@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -10,15 +11,24 @@ module Blockchain.Data.AddressStateDB (
 
 import qualified Blockchain.Colors                  as CL
 
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
+
+data AddressState =
+  AddressState{
+    addressStateNonce::Integer,
+    addressStateBalance::Integer,
+    addressStateContractRoot::MP.StateRoot,
+    addressStateCodeHash::SHA
+    } deriving (Eq, Generic, Read, Show)
+
 
 blankAddressState:: AddressState
 blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" }

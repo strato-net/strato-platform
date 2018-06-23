@@ -44,13 +44,6 @@ BlockTransaction
     transaction RawTransactionId
     deriving Eq Read Show
 
-AddressState
-    nonce Integer sqltype=numeric(1000,0)
-    balance Integer sqltype=numeric(1000,0)
-    contractRoot StateRoot
-    codeHash SHA
-    deriving Eq Generic Read Show
-
 AddressStateRef
     address Address
     nonce Integer sqltype=numeric(1000,0)
