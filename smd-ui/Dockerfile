@@ -1,7 +1,7 @@
 FROM node:9
 
 RUN mkdir -p /usr/src/app && \
-    npm install --verbose -g serve@7.1.1
+    npm install -g serve@7.1.1
 
 WORKDIR /usr/src/app
 

@@ -311,10 +311,12 @@ bootstrapSequencer gb = do
     let clientId = KP.KString $ C8.pack SeqConstants.defaultKafkaClientId'
     let dummySequencerCfg = SequencerConfig { depBlockDBCacheSize   = 0
                                             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
+                                            , kafkaAddress          = Nothing
                                             , kafkaClientId         = clientId
                                             , kafkaConsumerGroup    = lookupConsumerGroup clientId
                                             , seenTransactionDBSize = 10
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
+                                            , statsConfig           = Nothing
                                             }
     runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) printLogMsg

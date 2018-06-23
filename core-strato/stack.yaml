@@ -45,7 +45,7 @@ extra-deps:
 - yesod-raml-0.2.0
 - static-canvas-0.2.0.3
 
-resolver: lts-10.10
+resolver: lts-10.10 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -71,3 +71,9 @@ ghc-options:
   blockapps-data:          -Wall -Werror
   ethereum-vm:             -Wall -Werror -fno-warn-warnings-deprecations
   "$locals":			   -XMonoLocalBinds
+
+docker:
+  enable: true
+  image: "stack-core-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]
