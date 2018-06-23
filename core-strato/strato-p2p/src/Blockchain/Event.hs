@@ -31,7 +31,6 @@ import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
@@ -121,7 +120,6 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
-        lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
         let sha         = blockHash block'
         let header      = blockHeader block'
         let num         = blockHeaderBlockNumber header
