@@ -22,32 +22,32 @@ function newnode {
   if $mineBlocks
   then echo "Starting strato-adit"
       export miningThreads=${miningThreads:-1}
-      runForever strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
+      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
   fi
 
   if $serveBlocks
   then echo "Starting strato-p2p-server"
-       runForever strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
+       runBackgroundProcess strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
        echo "Starting ethereum-discover"
-       runForever ethereum-discover >> logs/ethereum-discover 2>&1
+       runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
   fi
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runForever strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
+       runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
   echo "Starting strato-sequencer"
-  runForever strato-sequencer >> logs/strato-sequencer 2>&1
+  runBackgroundProcess strato-sequencer >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
-  runForever strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+  runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
 
   echo "Starting strato-p2p-indexer"
-  runForever strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+  runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting strato-txr-indexer"
-  runForever strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
   minLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -55,16 +55,16 @@ function newnode {
   fi
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
+  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runForever strato-api +RTS -N1 >> logs/strato-api 2>&1
+  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
   echo "Configuring log maintenance"
-  runForever cleanupLogs
+  runBackgroundProcess cleanupLogs
 
   set +x
   echo "Monitoring the background processes..."
@@ -139,7 +139,7 @@ function cleanupLogs {
   done
 }
 
-function runForever {
+function runBackgroundProcess {
   $@ &
   proc_pid=$!
   MONITORED_PIDS+=(${proc_pid})
