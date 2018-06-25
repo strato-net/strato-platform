@@ -60,4 +60,4 @@ getChainR = do
         cInfos <- getAllChainInfos
         case cInfos of
             [] -> invalidArgs ["no chain found"]
-            cis -> return $ toJSON cis 
+            cis -> returnJson cis 
