@@ -15,9 +15,11 @@ import           Import
 import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.ChainInfoDB
 import           System.Entropy
 import           Blockchain.Util
 import           Blockchain.ExtWord              (Word256)
+import           Handler.Filters
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
@@ -44,6 +46,18 @@ postChainR = do
       return . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
--- todo: implement getChainR
-  
-
+getChainR :: Handler Value
+getChainR = do
+  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid" 
+  addHeader "Access-Control-Allow-Origin" "*"
+  case chainId of
+    Just cid -> do 
+      chainInfo <- getChainInfo cid
+      case chainInfo of
+        Just ci -> returnJson ci
+        Nothing -> invalidArgs ["could not find any chain with the given chain id"]
+    Nothing -> do
+        cInfos <- getAllChainInfos
+        case cInfos of
+            [] -> invalidArgs ["no chain found"]
+            cis -> return $ toJSON cis 
