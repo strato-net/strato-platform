@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module EventSpec where
@@ -7,6 +8,10 @@ import Control.Monad.State.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Database.Persist.Sql
+import qualified Data.Text                             as T
+import qualified Database.Persist.Sqlite               as Lite
+import qualified Database.Redis                        as Redis
+import System.IO.Temp                        (emptySystemTempFile)
 
 import Blockchain.Context
 import Blockchain.Data.ArbitraryInstances()
@@ -24,6 +29,30 @@ import Blockchain.Strato.RedisBlockDB.Models
 import Test.Hspec
 import Test.QuickCheck
 
+-- testContext is useful for testing because it doesn't require
+-- Kafka, postgres, or ethconf. It does need redis, but targets
+-- a test instance.
+testContext :: (MonadIO m, MonadBaseControl IO m)
+            => m Context
+testContext = do
+  redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+        Redis.connectHost           = "localhost",
+        Redis.connectPort           = Redis.PortNumber 2023,
+        Redis.connectDatabase       = 0
+    }
+  -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
+  file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
+  conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
+  return Context { actionTimestamp = Nothing
+                 , contextRedisBlockDB = redisBDBPool
+                 , contextKafkaState = error "no kafka state available"
+                 , contextSQLDB = conn
+                 , blockHeaders=[]
+                 , unseqSink=sinkNull
+                 , vmEventsSink=sinkNull
+                 , vmTrace=[]
+                 }
+
 testPeer :: DataPeer.PPeer
 testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
 
@@ -37,7 +66,7 @@ migrateAll = do
 
 runTestPeer :: ContextM a -> IO ()
 runTestPeer mv = do
-  ctx <- quietContext
+  ctx <- testContext
   let pool = contextSQLDB ctx
   liftSqlPersistMPool migrateAll pool
   runLoggingT (runContextM ctx mv) printLogMsg

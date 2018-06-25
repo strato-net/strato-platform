@@ -11,7 +11,6 @@ module Blockchain.Context
     ( Context(..)
     , ContextM
     , initContext
-    , quietContext
     , runContextM
     , getDebugMsg
     , addDebugMsg
@@ -32,7 +31,6 @@ import           Control.Monad.State
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Data.Void
-import           System.IO.Temp                        (emptySystemTempFile)
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
@@ -45,7 +43,6 @@ import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VME
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import qualified Database.Persist.Sql                  as SQL
-import qualified Database.Persist.Sqlite               as Lite
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
@@ -138,28 +135,6 @@ initContext = do
                  , vmTrace=[]
                  }
 
--- quietContext is useful for testing because it doesn't require
--- Kafka, TODO(tim) postgres, TODO(tim) and redis.
-quietContext :: (MonadIO m, MonadBaseControl IO m)
-             => m Context
-quietContext = do
-  redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
-        Redis.connectHost           = "localhost",
-        Redis.connectPort           = Redis.PortNumber 2023,
-        Redis.connectDatabase       = 0
-    }
-  -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
-  file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
-  conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
-  return Context { actionTimestamp = Nothing
-                 , contextRedisBlockDB = redisBDBPool
-                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextSQLDB = conn
-                 , blockHeaders=[]
-                 , unseqSink=sinkNull
-                 , vmEventsSink=sinkNull
-                 , vmTrace=[]
-                 }
 
 
 addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)

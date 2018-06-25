@@ -79,14 +79,12 @@ library
                  , mtl
                  , network
                  , persistent
-                 , persistent-sqlite
                  , resourcet
                  , SafeSemaphore
                  , stm
                  , stm-conduit
                  , streaming-commons
                  , strato-conf
-                 , temporary
                  , text
                  , time
                  , transformers
@@ -151,3 +149,6 @@ test-suite strato-p2p-client-test
       , QuickCheck
       , strato-sequencer
       , strato-redis-blockdb
+      , persistent-sqlite
+      , temporary
+      , hedis
