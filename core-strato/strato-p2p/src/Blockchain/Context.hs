@@ -130,8 +130,8 @@ initContext = do
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
-                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents)
-                 , vmEventsSink=mapM_C (void . produceVMEventsM)
+                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
+                 , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
                  }
 
