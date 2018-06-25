@@ -66,6 +66,8 @@ import System.IO.Unsafe
 import qualified Data.Vector as V
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
+import Data.List
+import Data.Time
 
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -104,7 +106,7 @@ emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
 getContract::String->String->Bloc (Either String Contract)
-getContract _ emptyHash = return $ Left "Blank contract"
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ Left "Blank contract"
 getContract address _ = do
   qqqq <-
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
@@ -210,7 +212,7 @@ convertRet address x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
-      liftIO $ putStrLn $ "convertRet____: " ++ show(x)
+      --liftIO $ putStrLn $ "convertRet____: " ++ show(x)
       --Debug
       --putStrLn $ show x
       let list = H.toList $ H.filter isString x
@@ -219,10 +221,12 @@ convertRet address x = do
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals
-      liftIO $ putStrLn $ "Insert Statement_______: " ++ show(ins)
       p <- dbInsert createSt
       print p
       dbInsert ins
+      currentTime <- getCurrentTime
+      liftIO $ putStrLn $ "End -> " ++ show(currentTime)
+
   -- case x of
   --  Left ex  -> return "Caught exception: " ++ show ex
     --Right val -> return "Result: " ++ show val
@@ -238,6 +242,10 @@ getContractName x =
         Nothing -> "No name found"
         Just z -> valueToString "" z
 -}
+
+defaultMaxB :: K.MaxBytes
+defaultMaxB = 32 * 1024 * 1024
+--defaultMaxB = 1024 * 1024
 
 data KafkaConf =
     KafkaConf {
@@ -260,7 +268,7 @@ makeKafkaState cid addy =
                defaultRequiredAcks
                defaultRequestTimeout
                defaultMinBytes
-               defaultMaxBytes
+               defaultMaxB
                defaultMaxWaitTime
                defaultCorrelationId
                M.empty
@@ -280,17 +288,11 @@ lookupTopic = fromString "statediff"
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
 
-  liftIO $ putStrLn $ "map(BL.fromStrict) messages______: " ++ (show $ map(BL.fromStrict) messages)
-  liftIO $ putStrLn $ "map(toStateDiff . BL.fromStrict) messages_____: " ++ (show $ map(toStateDiff . BL.fromStrict) messages)
-
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
 
-  liftIO $ putStrLn $ "changes: " ++ (show changes)
-
   let conHost = flags_pghost
   --let conHost = "172.18.0.6"
-  liftIO $ putStrLn $ "conHost_______: " ++ show (conHost)
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -305,12 +307,10 @@ processTheMessages messages = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
-  --let strato = flags_stratourl
-  let strato = "172.18.0.8:3000/eth/v1.2/"
-  liftIO $ putStrLn $ "Strato Flag_____: " ++ show(strato)
+  let strato = flags_stratourl
+  --let strato = "172.18.0.8:3000/eth/v1.2/"
 
   stratoUrl <- parseBaseUrl strato
-  liftIO $ putStrLn $ "StratoURL_______: " ++ show(stratoUrl)
 
   mgr <- newManager defaultManagerSettings
 
@@ -327,10 +327,7 @@ processTheMessages messages = do
 
   _ <-
     enterBloc2 env $ do
-      liftIO $ putStrLn "enterBloc2 env $ do"
-      liftIO $ putStrLn $ "filter hasContract changes: " ++ show(filter hasContract changes)
       forM (filter hasContract changes) $ \change -> do
-        liftIO $ putStrLn "forM (filter hasContract changes) $ change -> do"
         filledInChange <- addStorageIfNeeded change
 
         let (address, codehash, storage) =
@@ -338,7 +335,6 @@ processTheMessages messages = do
                Action _ a c (Just s) -> (a, c, storageToFunction s)
                Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
 
-        liftIO $ putStrLn $ "a = " ++ show address ++ " c = " ++ show codehash
         cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
 
         contractMetaData <-
@@ -351,7 +347,6 @@ processTheMessages messages = do
               Right c -> do
                 liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
                 return c
-        liftIO $ putStrLn $ "contractMetaData_______: " ++ show(contractMetaData)
         --let hexadd = readHex address
         --let addr = Address hexadd
         --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
@@ -359,32 +354,32 @@ processTheMessages messages = do
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $
               decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
-        liftIO $ putStrLn $ "Returned Contracts_______: " ++ show (ret)
         liftIO $ convertRet address $ encode ret
   return()
 
 getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
 getTheMessages offset = do
-  liftIO $ putStrLn "getTheMessages"
   fetched <- fetch offset 0 lookupTopic
-  -- unlines $ (BC.unpack . B16.encode) <$> result
-  liftIO $ putStrLn $ "FETCHED_________: " ++ show (fetched)
+  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
+  case find (/= K.NoError) errorStatuses of
+   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (lookupTopic ^. K.tName ^. K.kString) ++ ", offset = " ++ show offset
+   _ -> return ()
   let ret = (map tamPayload . fetchMessages) fetched
   return ret
 
 getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
-  liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
+  --liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
-  liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
-  liftIO $ putStrLn $ "new offset >>>>>>>>> " ++ show(offset + fromIntegral (length messages))
+  --liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
   getAndProcessMessages $ (offset + fromIntegral (length messages))
 
 
 main::IO ()
 main = do
-  liftIO $ putStrLn "Main"
+  currentTime <- getCurrentTime
+  liftIO $ putStrLn $ "Main --> " ++ show(currentTime)
   _ <- $initHFlags "Setup Slipstream Variables"
 
   let offset = 0 :: K.Offset
@@ -395,6 +390,5 @@ main = do
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
-  liftIO $ putStrLn "END OF MAIN"
 
   return ()
