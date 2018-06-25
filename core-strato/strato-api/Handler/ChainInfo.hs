@@ -49,12 +49,15 @@ postChainR = do
 getChainR :: Handler Value
 getChainR = do
   chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid" 
-
+  addHeader "Access-Control-Allow-Origin" "*"
   case chainId of
-    Just cid -> do
-      addHeader "Access-Control-Allow-Origin" "*"
+    Just cid -> do 
       chainInfo <- getChainInfo cid
       case chainInfo of
         Just ci -> returnJson ci
-        Nothing -> invalidArgs ["could find any chain"]
-    Nothing -> invalidArgs ["could not find chainId in query parameter"]
+        Nothing -> invalidArgs ["could not find any chain with the given chain id"]
+    Nothing -> do
+        cInfos <- getAllChainInfos
+        case cInfos of
+            [] -> invalidArgs ["no chain found"]
+            cis -> return $ toJSON cis 
