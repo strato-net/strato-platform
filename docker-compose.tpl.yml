@@ -111,6 +111,7 @@ services:
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}

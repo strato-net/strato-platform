@@ -41,6 +41,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
+import           Executable.EVMFlags                (flags_maxTxsPerBlock)
+
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
     putBaggerState     :: B.BaggerState -> m ()
@@ -130,7 +132,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
                     let lastHead        = B.bestBlockHeader cache
-                    let promoted        = B.promotedTransactions cache
+                    let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
                     let time            = B.startTimestamp cache
                     let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
                     let remGas          = B.remainingGas cache
