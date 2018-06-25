@@ -269,7 +269,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (GetChainDetails cid) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
-      chDet <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cid
+      chDet <- lift (RBDB.withRedisBlockDB $ RBDB.getChainInfo cid)
       case chDet of
         Nothing ->  
           $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information found about the chain with chainID " ++ (show cid)
@@ -281,7 +281,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (ChainDetails chid ci) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
-      st <- (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
+      st <- lift (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
       case st of
         Left r -> do
           $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, reply: \n" ++ (show r)
