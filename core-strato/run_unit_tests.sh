@@ -4,6 +4,7 @@ declare -i RESULT=0
 TESTS=(
   strato-init
   blockapps-data
+  strato-p2p
   strato-redis-blockdb
   strato-sequencer
 )
