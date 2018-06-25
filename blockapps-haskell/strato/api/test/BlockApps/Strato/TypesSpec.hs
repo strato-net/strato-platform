@@ -55,7 +55,6 @@ spec = modifyMaxSuccess (const 10) $ do
   describe "Storage" $
     prop "has inverse JSON decode/encode" $ jsonProp @ Storage
 
-
 -- helpers
 
 jsonProp :: (Eq x, Show x, FromJSON x, ToJSON x) => x -> Property
