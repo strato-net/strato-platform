@@ -78,14 +78,15 @@ library
                  , blockapps-milena
                  , mtl
                  , network
-                 , persistent-postgresql
-                 , postgresql-simple
+                 , persistent
+                 , persistent-sqlite
                  , resourcet
                  , SafeSemaphore
                  , stm
                  , stm-conduit
                  , streaming-commons
                  , strato-conf
+                 , temporary
                  , text
                  , time
                  , transformers

@@ -32,6 +32,7 @@ import           Control.Monad.State
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Data.Void
+import           System.IO.Temp                        (emptySystemTempFile)
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
@@ -42,8 +43,8 @@ import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 import           Blockchain.Strato.Discovery.Data.Peer
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import qualified Database.Persist.Postgresql           as SQL
-import qualified Database.PostgreSQL.Simple            as PS
+import qualified Database.Persist.Sql                  as SQL
+import qualified Database.Persist.Sqlite               as Lite
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
@@ -108,16 +109,13 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-instance Show PS.Connection where
-  show _ = "Postgres Simple Connection"
-
 runContextM :: (MonadBaseControl IO m )
             => s
             -> StateT s (ResourceT m) a
             -> m ()
 runContextM s f = void . runResourceT $ runStateT f s
 
-initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
             => m Context
 initContext = do
   dbs <- openDBs
@@ -136,8 +134,18 @@ initContext = do
 quietContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
              => m Context
 quietContext = do
-  ctx <- initContext
-  return ctx{unseqSink=sinkNull}
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
+  file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
+  conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
+  return Context { actionTimestamp = Nothing
+                 , contextRedisBlockDB = redisBDBPool
+                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+                 , contextSQLDB = conn
+                 , blockHeaders=[]
+                 , unseqSink=sinkNull
+                 , vmTrace=[]
+                 }
 
 
 addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
