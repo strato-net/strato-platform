@@ -140,7 +140,7 @@ initContext = do
 
 -- quietContext is useful for testing because it doesn't require
 -- Kafka, TODO(tim) postgres, TODO(tim) and redis.
-quietContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+quietContext :: (MonadIO m, MonadBaseControl IO m)
              => m Context
 quietContext = do
   redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {

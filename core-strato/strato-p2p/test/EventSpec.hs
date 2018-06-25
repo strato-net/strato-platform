@@ -1,0 +1,72 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+module EventSpec where
+
+import Conduit
+import Control.Monad.State.Class
+import Control.Monad.Logger
+import Control.Monad.Trans.Reader
+import Database.Persist.Sql
+
+import Blockchain.Context
+import Blockchain.Data.ArbitraryInstances()
+import qualified Blockchain.Data.Blockchain as DataBlock
+import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.Wire
+import Blockchain.DBM
+import Blockchain.Event
+import Blockchain.Output
+import Blockchain.Sequencer.Kafka
+import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import Blockchain.Strato.RedisBlockDB.Models
+
+import Test.Hspec
+import Test.QuickCheck
+
+testPeer :: DataPeer.PPeer
+testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
+
+migrateAll :: ReaderT SqlBackend (NoLoggingT (ResourceT IO)) ()
+migrateAll = do
+  -- TODO(tim): bracket and TRUNCATE the tables in a DBMS agnostic way
+  _ <- runMigrationSilent DataBlock.migrateAll
+  _ <- runMigrationSilent DataDefs.migrateAll
+  _ <- runMigrationSilent DataPeer.migrateAll
+  return ()
+
+runTestPeer :: ContextM a -> IO ()
+runTestPeer mv = do
+  ctx <- quietContext
+  let pool = contextSQLDB ctx
+  liftSqlPersistMPool migrateAll pool
+  runLoggingT (runContextM ctx mv) printLogMsg
+
+expectAs :: (MonadIO m, Eq a, Show a) => a -> a -> m ()
+expectAs a b = liftIO $ a `shouldBe` b
+
+spec :: Spec
+spec = do
+  describe "environment sanity checks" $ do
+    it "has a PPeer table" $ do
+      runTestPeer $ do
+        pool <- gets contextSQLDB
+        peerCount <- liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool
+        peerCount `expectAs` 0
+    it "can pretend to write to kafka" $ do
+      quickCheck . once $ \ori txs -> runTestPeer (emitKafkaTransactions ori txs)
+      quickCheck . once $ \ori blk -> runTestPeer (emitKafkaBlock ori blk)
+    it "has a redis instance" $ do
+      runTestPeer $ do
+        bb :: Maybe RedisBestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+        bb `expectAs` Nothing
+
+  describe "handleEvents" $ do
+    it "should pong a ping" $ do
+      runTestPeer $ do
+        msgs <- runConduit $ yield (MsgEvt Ping) .| handleEvents Log testPeer .| sinkList
+        msgs `expectAs` [Pong]
+    it "should return empty BlockBodies to empty BlockHeaders" $ do
+      runTestPeer $ do
+        msgs <- runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents Log testPeer .| sinkList
+        msgs `expectAs` [GetBlockBodies []]
