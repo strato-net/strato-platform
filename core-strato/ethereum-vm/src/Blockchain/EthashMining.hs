@@ -14,7 +14,6 @@ import qualified Data.ByteString.Lazy      as BL
 import           Data.Time.Clock.POSIX
 import           Data.Word
 
-import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
