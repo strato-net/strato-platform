@@ -3,6 +3,7 @@
 module Blockchain.DB.ChainDB (
     HasChainDB(..)
   , putBlockHeaderInChainDB
+  , getChainRoot
   , getGenesisStateRoot
   , putGenesisStateRoot
   , withBlockchain

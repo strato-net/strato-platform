@@ -5,6 +5,7 @@ module Blockchain.Strato.StateDiff
     , Diff(..)
     , Detail(..)
     , Detailed(..)
+    , chainDiff
     , stateDiff
     , eventualAccountState
     , incrementalAccountState
@@ -16,12 +17,14 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
+import           Blockchain.Util
 
 import           Control.Monad.Trans.Resource
 
@@ -31,6 +34,7 @@ import           Data.Maybe
 import           Data.String
 
 import           Data.ByteString                             (ByteString)
+import qualified Data.ByteString                             as BS
 
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
@@ -144,6 +148,37 @@ instance Detailed (Diff ByteString) where
 instance Detailed (Diff SHA) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
+
+chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+             Integer -> SHA -> SHA -> m [StateDiff]
+chainDiff blockNumber oldBlockHash newBlockHash = do
+  mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
+  case mChainRoots of
+    (Just old, Just new) -> do
+      db <- getStateDB
+      diffs <- Diff.dbDiff db old new
+      collectModes diffs
+
+  where
+    collectModes diffs = coll [] diffs
+    coll sds [] = return sds
+    coll sds (Diff.Create k v : rest) = do
+      chainId <- toChainId k
+      let sr = retrieveMPDBValue v
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash emptyTriePtr sr
+      coll (sd:sds) rest
+    coll sds (Diff.Delete k v : rest) = do
+      chainId <- toChainId k
+      let sr = retrieveMPDBValue v
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
+      coll (sd:sds) rest
+    coll sds (Diff.Update k v1 v2 : rest) = do
+      chainId <- toChainId k
+      let sr1 = retrieveMPDBValue v1
+          sr2 = retrieveMPDBValue v2
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
+      coll (sd:sds) rest
+    toChainId = bytesToWord256 . BS.unpack . nibbleString2ByteString . N.pack
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff

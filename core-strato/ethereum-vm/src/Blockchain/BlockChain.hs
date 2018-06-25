@@ -204,7 +204,6 @@ addBlocks blocks' = do
       let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
       lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
-      let oldStateRoot = blockDataStateRoot oldHeader
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
       potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
@@ -250,7 +249,7 @@ addBlocks blocks' = do
             let b = obBlockData theBlock
                 codeSource = getSource False b
                 codeContractName = getContractName False b
-            calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+            calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -636,17 +635,20 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
-                           -> MP.StateRoot
+                           -> BlockData
                            -> (SHA -> ContextM String)
                            -> (SHA -> ContextM String)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
-    let newHeader    = blockHeader newBlock
+calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
+    let oldHash      = blockHeaderHash oldHeader
+        oldStateRoot = blockHeaderStateRoot oldHeader
+        newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot -- TODO: THIS IS NOT RIGHT
+    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+    chainDiffs <- chainDiff newNumber oldHash newHash
 
     let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
 
