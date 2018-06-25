@@ -39,8 +39,9 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
-import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
+import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import qualified Database.Persist.Sql                  as SQL
@@ -56,6 +57,7 @@ data Context =
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
+        vmEventsSink           :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime
     }
@@ -73,6 +75,12 @@ instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
 
 instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
   getSQLDB = contextSQLDB <$> get
+
+instance (MonadState Context m, MonadIO m) => HasUnseqSink m where
+  getUnseqSink = gets unseqSink
+
+instance (MonadState Context m, MonadIO m, HasSQLDB m) => HasVMEventsSink m where
+  getVMEventsSink = gets vmEventsSink
 
 getDebugMsg :: MonadState Context m => m String
 getDebugMsg = concat . reverse . vmTrace <$> get
@@ -126,6 +134,7 @@ initContext = do
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
                  , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents)
+                 , vmEventsSink=mapM_C (void . produceVMEventsM)
                  , vmTrace=[]
                  }
 
@@ -144,6 +153,7 @@ quietContext = do
                  , contextSQLDB = conn
                  , blockHeaders=[]
                  , unseqSink=sinkNull
+                 , vmEventsSink=sinkNull
                  , vmTrace=[]
                  }
 

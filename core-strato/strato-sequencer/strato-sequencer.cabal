@@ -45,6 +45,7 @@ library
                      , ethereum-rlp
                      , time
                      , statsdi
+                     , conduit-combinators
 
   default-language:    Haskell2010
 
