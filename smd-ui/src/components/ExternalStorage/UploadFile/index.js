@@ -62,7 +62,7 @@ class UplaodFile extends Component {
     let errors = validate(values);
     this.setState({ errors });
 
-    if (JSON.stringify(errors) === JSON.stringify({})) {
+    if (!Object.values(errors).length) {
       values.file = values.content[0];
       this.props.uploadFileRequest(values);
       this.props.reset();
@@ -323,7 +323,7 @@ class UplaodFile extends Component {
               mixpanelWrapper.track('close_upload_modal');
               this.closeModal();
             }}
-            iconName={result ? 'saved' : 'inbox'}
+            iconName={result ? 'saved' : 'pt-icon-upload'}
             title={result ? 'URI Upload Success' : 'Upload'}
             className="pt-dark upload-dialog"
           >

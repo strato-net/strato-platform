@@ -6,6 +6,7 @@ const co = require('co');
 const appConfig = require('../config/app.config');
 const models = require('../models');
 const s3 = require('../lib/s3');
+const uploader = require('../lib/uploader');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const crypto = require('crypto');
 
@@ -34,18 +35,7 @@ module.exports = {
         Body: req.file.buffer,
       };
 
-      function uploadData() {
-        return new Promise((resolve, reject) => {
-          s3.upload(params, function (err, data) {
-            if (err) {
-              return reject(err);
-            }
-            return resolve(data);
-          })
-        })
-      }
-
-      let uploadedFile = yield uploadData();
+      let uploadedFile = yield uploader.upload(params);
 
       const args = {
         _uri: uploadedFile.Location,
@@ -65,7 +55,7 @@ module.exports = {
 
         let upload = yield models.Upload.create({
           contractAddress: contractUpload.address,
-          uri: 'uploadedFile.Location'
+          uri: uploadedFile.Location
         });
 
         res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
@@ -80,7 +70,9 @@ module.exports = {
   list: function (req, res, next) {
     co(function* () {
       try {
-        let uploads = yield models.Upload.all();
+        let uploads = yield models.Upload.all({
+          attributes: ['contractAddress', 'uri', 'createdAt']
+        });
         res.status(200).json({ list: uploads });
       } catch (error) {
         let err = new Error(error);
@@ -96,6 +88,16 @@ module.exports = {
 
       if (!contractAddress) {
         let err = new Error('wrong params, expected: {contractAddress}');
+        err.status = 400;
+        return next(err);
+      }
+
+      let record = yield models.Upload.findOne({
+        where: { contractAddress: contractAddress },
+      });
+
+      if (!record) {
+        let err = new Error('Address not found');
         err.status = 400;
         return next(err);
       }
@@ -124,6 +126,16 @@ module.exports = {
         return next(err);
       }
 
+      let record = yield models.Upload.findOne({
+        where: { contractAddress: contractAddress },
+      });
+
+      if (!record) {
+        let err = new Error('Contract address not found');
+        err.status = 400;
+        return next(err);
+      }
+
       const args = {};
       const userCredentials = {
         name: username,
@@ -132,8 +144,17 @@ module.exports = {
       };
 
       try {
-        let data = yield externalStorage.attest(userCredentials, contractAddress, args);
-        res.status(200).json({ attested: true, signers: data[0] });
+        let result = yield externalStorage.getExternalStorage(contractAddress);
+
+        if (result.signers.indexOf(address) > -1) {
+          let err = new Error('You already signed this transaction');
+          err.status = 400;
+          return next(err);
+        } else {
+          let data = yield externalStorage.attest(userCredentials, contractAddress, args);
+          res.status(200).json({ attested: true, signers: data[0] });
+        }
+
       } catch (error) {
         let err = new Error(error);
         err.status = 500;
@@ -152,17 +173,27 @@ module.exports = {
         return next(err);
       }
 
+      let record = yield models.Upload.findOne({
+        where: { contractAddress: contractAddress },
+      });
+
+      if (!record) {
+        let err = new Error('Address not found');
+        err.status = 400;
+        return next(err);
+      }
+
       try {
         let data = yield externalStorage.getExternalStorage(contractAddress);
 
         var options = {
           Bucket: appConfig.s3.bucket.Bucket,
-          Key: /[^/]*$/.exec(data.uri)[0]
+          Key: /[^/]*$/.exec(data.uri)[0],
+          Expires: 3600
         };
 
-        res.attachment(options.Key);
-        var fileStream = s3.getObject(options).createReadStream();
-        fileStream.pipe(res);
+        const url = s3.getSignedUrl('getObject', options);
+        res.status(200).json({ url: url });
 
       } catch (error) {
         let err = new Error(error);

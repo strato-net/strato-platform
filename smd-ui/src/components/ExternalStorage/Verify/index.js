@@ -5,9 +5,10 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { closeVerifyModal, verifyDocumentRequest } from './verify.action';
+import { closeVerifyModal, verifyDocumentRequest, resetError } from './verify.action';
 import moment from 'moment';
 import { parseDateFromString } from '../../../lib/dateUtils';
+import { toasts } from '../../Toasts';
 
 import './verify.css';
 
@@ -18,11 +19,18 @@ class Verify extends Component {
     this.state = { errors: null }
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.verifyError) {
+      toasts.show({ message: nextProps.verifyError });
+      this.props.resetError();
+    }
+  }
+
   submit = (values) => {
     let errors = validate(values);
     this.setState({ errors });
 
-    if (JSON.stringify(errors) === JSON.stringify({})) {
+    if (!Object.values(errors).length) {
       this.props.verifyDocumentRequest(values.contractAddress);
     }
   }
@@ -142,7 +150,7 @@ class Verify extends Component {
               mixpanelWrapper.track('close_verify_modal');
               this.closeModal();
             }}
-            iconName={result ? 'saved' : 'inbox'}
+            iconName={result ? 'saved' : 'pt-icon-info-sign'}
             title={result ? 'Valid Resource' : 'Verify'}
             className="pt-dark verify-dialog"
           >
@@ -158,7 +166,8 @@ export function mapStateToProps(state) {
   return {
     isOpen: state.verify.isOpen,
     isLoading: state.verify.isLoading,
-    verifyDocument: state.verify.verifyDocument
+    verifyDocument: state.verify.verifyDocument,
+    verifyError: state.verify.error
   };
 }
 
@@ -167,7 +176,8 @@ const connected = connect(
   mapStateToProps,
   {
     verifyDocumentRequest,
-    closeVerifyModal
+    closeVerifyModal,
+    resetError
   }
 )(formed);
 

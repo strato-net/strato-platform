@@ -36,8 +36,9 @@ import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reduc
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
 import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
-import attestReducer from "./components/ExternalStorage/Attest/attest.reducer";
-import verifyReducer from "./components/ExternalStorage/Verify/verify.reducer";
+import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
+import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
+import downloadReducer from './components/ExternalStorage/Download/download.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -109,7 +110,8 @@ const rootReducer = combineReducers({
   uploadFile: uploadFileReducer,
   externalStorage: externalStorageReducer,
   attest: attestReducer,
-  verify: verifyReducer
+  verify: verifyReducer,
+  download: downloadReducer
 });
 
 const rootSaga = function* startForeman() {

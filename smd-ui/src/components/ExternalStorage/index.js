@@ -8,11 +8,13 @@ import UploadFile from './UploadFile';
 import List from './List';
 import Attest from './Attest';
 import Verify from './Verify';
+import Download from './Download';
 import { fetchUploadList } from './externalStorage.actions';
 import { openAttestModal } from './Attest/attest.action';
 import { openVerifyModal } from './Verify/verify.action';
 
 import './externalStorage.css';
+import { openDownloadModal } from './Download/download.action';
 
 class ExternalStorage extends Component {
 
@@ -24,12 +26,10 @@ class ExternalStorage extends Component {
     return (
       <div className="container-fluid pt-dark external-storage">
         <div className="row">
-          <div className="col-sm-9 text-left">
+          <div className="col-sm-4 text-left">
             <h3>External Storage</h3>
           </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12 content">
+          <div className="col-sm-8 text-right">
             <Button
               onClick={() => {
                 mixpanelWrapper.track('open_upload_modal');
@@ -39,19 +39,22 @@ class ExternalStorage extends Component {
               text="Upload" />
             <Button
               onClick={() => {
+                mixpanelWrapper.track('open_attest_modal');
                 this.props.openAttestModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-tick"
               text="Attest" />
             <Button
               onClick={() => {
+                mixpanelWrapper.track('open_verify_modal');
                 this.props.openVerifyModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-info-sign"
               text="Verify" />
             <Button
               onClick={() => {
-
+                mixpanelWrapper.track('open_download_modal');
+                this.props.openDownloadModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-download"
               text="Downlaod" />
@@ -61,6 +64,7 @@ class ExternalStorage extends Component {
         <UploadFile />
         <Attest />
         <Verify />
+        <Download />
       </div>
     );
   }
@@ -76,7 +80,8 @@ const connected = connect(mapStateToProps, {
   openUploadModal,
   fetchUploadList,
   openAttestModal,
-  openVerifyModal
+  openVerifyModal,
+  openDownloadModal
 })(ExternalStorage)
 
 export default withRouter(connected);

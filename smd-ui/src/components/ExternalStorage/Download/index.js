@@ -5,21 +5,36 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { closeVerifyModal } from './verify.action';
+import { closeDownloadModal, downloadRequest, resetError, clearUrl } from './download.action';
+import { toasts } from '../../Toasts';
 
-class Verify extends Component {
+class Download extends Component {
 
   constructor(props) {
     super(props);
     this.state = { errors: null }
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.downloadError) {
+      toasts.show({ message: nextProps.downloadError });
+      this.props.resetError();
+    }
+    if (nextProps.downloadUrl) {
+      var a = document.createElement('a');
+      a.href = nextProps.downloadUrl;
+      a.download = "filename";
+      a.click();
+      this.props.clearUrl();
+    }
+  }
+
   submit = (values) => {
     let errors = validate(values);
     this.setState({ errors });
 
-    if (JSON.stringify(errors) === JSON.stringify({})) {
-      this.props.attestDocument(values.contractAddress);
+    if (!Object.values(errors).length) {
+      this.props.downloadRequest(values.contractAddress);
     }
   }
 
@@ -59,7 +74,7 @@ class Verify extends Component {
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
-              text="Attest"
+              text="Download"
             />
           </div>
         </div>
@@ -74,11 +89,12 @@ class Verify extends Component {
           <Dialog
             isOpen={this.props.isOpen}
             onClose={() => {
-              mixpanelWrapper.track('close_verify_modal');
-              this.props.closeVerifyModal();
+              mixpanelWrapper.track('close_download_modal');
+              this.props.closeDownloadModal();
+              this.props.reset();
             }}
-            iconName={'inbox'}
-            title={'Verify'}
+            iconName='pt-icon-download'
+            title='Download'
             className="pt-dark"
           >
             {this.renderAttestForm()}
@@ -91,15 +107,20 @@ class Verify extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.verify.isOpen
+    isOpen: state.download.isOpen,
+    downloadError: state.download.error,
+    downloadUrl: state.download.url
   };
 }
 
-const formed = reduxForm({ form: 'verify-form' })(Verify);
+const formed = reduxForm({ form: 'verify-form' })(Download);
 const connected = connect(
   mapStateToProps,
   {
-    closeVerifyModal
+    closeDownloadModal,
+    downloadRequest,
+    resetError,
+    clearUrl
   }
 )(formed);
 

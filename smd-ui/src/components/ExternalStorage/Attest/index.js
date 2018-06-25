@@ -31,7 +31,7 @@ class Attest extends Component {
     let errors = validate(values);
     this.setState({ errors });
 
-    if (JSON.stringify(errors) === JSON.stringify({})) {
+    if (!Object.values(errors).length) {
       this.props.attestDocument(values);
       this.props.reset();
     }
@@ -236,7 +236,7 @@ class Attest extends Component {
               this.props.reset();
               this.props.closeAttestModal();
             }}
-            iconName={result ? 'saved' : 'inbox'}
+            iconName={result ? 'saved' : 'pt-icon-tick'}
             title={result ? 'Successfully Signed' : 'Attest'}
             className="pt-dark"
           >

@@ -7,10 +7,12 @@ import { fetchUploadFailure, FETCH_UPLOAD_LIST, fetchUploadSuccess } from './ext
 import { env } from '../../env';
 import { ATTEST_DOCUMENT_REQUEST, attestDocumentSuccess, attestDocumentFailure } from './Attest/attest.action';
 import { verifyDocumentSuccess, verifyDocumentFailure, VERIFY_DOCUMENT_REQUEST } from './Verify/verify.action';
+import { DOWNLOAD_REQUEST, downloadSuccess, downloadFailure } from './Download/download.action';
 
 const fetchUploadUrl = env.APEX_URL + "/bloc/file/list";
 const attestDocumentUrl = env.APEX_URL + "/bloc/file/attest";
 const verifyDocumentUrl = env.APEX_URL + "/bloc/file/verify?contractAddress=:contractAddress";
+const downloadUrl = env.APEX_URL + "/bloc/file/download?contractAddress=:contractAddress";
 
 export function fetchUploadList() {
   return fetch(
@@ -77,6 +79,21 @@ export function* fetchUpload(action) {
   }
 }
 
+export function downloadApiCall(contractAddress) {
+  return fetch(
+    downloadUrl.replace(':contractAddress', contractAddress),
+    {
+      method: 'GET'
+    }
+  )
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
 export function* attestDocument(action) {
   try {
     let response = yield call(attestDocumentApiCall, action.values);
@@ -95,10 +112,29 @@ export function* attestDocument(action) {
 export function* verifyUpload(action) {
   try {
     let response = yield call(verifyDocumentApiCall, action.contractAddress);
-    yield put(verifyDocumentSuccess(response));
+    if (response.error) {
+      yield put(verifyDocumentFailure(response.error.message));
+    } else {
+      yield put(verifyDocumentSuccess(response));
+    }
   }
   catch (err) {
     yield put(verifyDocumentFailure(err));
+  }
+}
+
+export function* download(action) {
+  try {
+    let response = yield call(downloadApiCall, action.contractAddress);
+
+    if (response.url) {
+      yield put(downloadSuccess(response.url));
+    } else {
+      yield put(downloadFailure(response.error.message));
+    }
+  }
+  catch (err) {
+    yield put(downloadFailure(err));
   }
 }
 
@@ -106,4 +142,5 @@ export default function* watchFetchUpload() {
   yield takeLatest(FETCH_UPLOAD_LIST, fetchUpload);
   yield takeLatest(ATTEST_DOCUMENT_REQUEST, attestDocument);
   yield takeLatest(VERIFY_DOCUMENT_REQUEST, verifyUpload);
+  yield takeLatest(DOWNLOAD_REQUEST, download);
 }

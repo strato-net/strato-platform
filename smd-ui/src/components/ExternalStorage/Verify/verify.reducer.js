@@ -1,4 +1,4 @@
-import { OPEN_VERIFY_MODAL, CLOSE_VERIFY_MODAL, VERIFY_DOCUMENT_REQUEST, VERIFY_DOCUMENT_SUCCESS, VERIFY_DOCUMENT_FAILURE } from "./verify.action";
+import { OPEN_VERIFY_MODAL, CLOSE_VERIFY_MODAL, VERIFY_DOCUMENT_REQUEST, VERIFY_DOCUMENT_SUCCESS, VERIFY_DOCUMENT_FAILURE, RESET_ERROR } from "./verify.action";
 
 const initialState = {
   isOpen: false,
@@ -37,6 +37,11 @@ const reducer = function (state = initialState, action) {
         isLoading: false,
         verifyDocument: null,
         error: action.error
+      }
+    case RESET_ERROR:
+      return {
+        ...state,
+        error: null
       }
     default:
       return state;
