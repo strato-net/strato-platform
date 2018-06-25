@@ -143,7 +143,11 @@ initContext = do
 quietContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
              => m Context
 quietContext = do
-  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+        Redis.connectHost           = "localhost",
+        Redis.connectPort           = Redis.PortNumber 2023,
+        Redis.connectDatabase       = 0
+    }
   -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
   file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
   conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
