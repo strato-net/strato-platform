@@ -18,7 +18,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
 import           System.Entropy
 import           Blockchain.Util
-import           Blockchain.ExtWord              (Word256)
+import           Blockchain.ExtWord             (Word256)
 import           Handler.Filters
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
@@ -38,8 +38,12 @@ postChainR = do
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo cl ar rr mb ab) -> do
-      when (length mb == 0) $ invalidArgs ["member list is empty"] 
+    Success gen@(ChainInfo _ ar rr mb ab) -> do 
+      when (ar == "") $ invalidArgs ["add rule is empty"]
+      when (rr == "") $ invalidArgs ["remove rule is empty"]
+      when (length mb == 0) $ invalidArgs ["member list is empty"]
+      let balanceSum = Import.foldr (\cur acc -> acc + (snd cur)) 0 ab
+      when (balanceSum == 0) $ invalidArgs ["All balances are zero"]
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
