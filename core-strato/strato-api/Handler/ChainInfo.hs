@@ -36,9 +36,10 @@ postChainR :: Handler Text
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  gi <- parseJsonBody :: Handler (Result ChainInfo)
-  case gi of
-    Success gen -> do
+  ci <- parseJsonBody :: Handler (Result ChainInfo)
+  case ci of
+    Success gen@(ChainInfo cl ar rr mb ab) -> do
+      when (length mb == 0) $ invalidArgs ["member list is empty"] 
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
