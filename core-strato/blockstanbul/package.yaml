@@ -6,7 +6,10 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - conduit-combinators
+  - mtl
   - strato-model
+  - text
+  - transformers
 
 library:
   source-dirs: src/
