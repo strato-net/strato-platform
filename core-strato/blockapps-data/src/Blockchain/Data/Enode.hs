@@ -7,7 +7,9 @@
 module Blockchain.Data.Enode (
   Enode(..),
   showEnode,
-  readEnode
+  readEnode,
+  showIP,
+  readIP
   ) where
 
 
