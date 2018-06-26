@@ -9,13 +9,13 @@ protocols: [ HTTP ]
     handler: ChainR
   post:
     description: Submit the genesis info of a new private chain
+  get:
+    description: Request the details of an existing private chain
     queryParameters:
-      address:
-        description: the hex encoded address
+      chainid:
+        description: the hex encoded chain Id
         required: true
         type: string
-        example:
-      responses:
 
 /faucet:
   description: |
