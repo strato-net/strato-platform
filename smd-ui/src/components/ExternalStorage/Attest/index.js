@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { closeAttestModal, attestDocument, resetError, changeUsername } from './attest.action';
+import { closeAttestModal, attestDocument, resetError, changeUsername } from './attest.actions';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';

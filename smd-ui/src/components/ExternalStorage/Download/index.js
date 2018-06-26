@@ -5,7 +5,7 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { closeDownloadModal, downloadRequest, resetError, clearUrl } from './download.action';
+import { closeDownloadModal, downloadRequest, resetError, clearUrl } from './download.actions';
 import { toasts } from '../../Toasts';
 
 class Download extends Component {

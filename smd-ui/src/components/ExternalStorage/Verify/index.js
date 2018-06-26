@@ -5,7 +5,7 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { closeVerifyModal, verifyDocumentRequest, resetError } from './verify.action';
+import { closeVerifyModal, verifyDocumentRequest, resetError } from './verify.actions';
 import moment from 'moment';
 import { parseDateFromString } from '../../../lib/dateUtils';
 import { toasts } from '../../Toasts';

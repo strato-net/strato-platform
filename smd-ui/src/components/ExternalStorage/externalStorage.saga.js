@@ -5,9 +5,9 @@ import {
 } from 'redux-saga/effects';
 import { fetchUploadFailure, FETCH_UPLOAD_LIST, fetchUploadSuccess } from './externalStorage.actions';
 import { env } from '../../env';
-import { ATTEST_DOCUMENT_REQUEST, attestDocumentSuccess, attestDocumentFailure } from './Attest/attest.action';
-import { verifyDocumentSuccess, verifyDocumentFailure, VERIFY_DOCUMENT_REQUEST } from './Verify/verify.action';
-import { DOWNLOAD_REQUEST, downloadSuccess, downloadFailure } from './Download/download.action';
+import { ATTEST_DOCUMENT_REQUEST, attestDocumentSuccess, attestDocumentFailure } from './Attest/attest.actions';
+import { verifyDocumentSuccess, verifyDocumentFailure, VERIFY_DOCUMENT_REQUEST } from './Verify/verify.actions';
+import { DOWNLOAD_REQUEST, downloadSuccess, downloadFailure } from './Download/download.actions';
 
 const fetchUploadUrl = env.APEX_URL + "/bloc/file/list";
 const attestDocumentUrl = env.APEX_URL + "/bloc/file/attest";

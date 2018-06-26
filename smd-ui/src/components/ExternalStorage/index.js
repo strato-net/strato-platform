@@ -10,11 +10,11 @@ import Attest from './Attest';
 import Verify from './Verify';
 import Download from './Download';
 import { fetchUploadList } from './externalStorage.actions';
-import { openAttestModal } from './Attest/attest.action';
-import { openVerifyModal } from './Verify/verify.action';
+import { openAttestModal } from './Attest/attest.actions';
+import { openVerifyModal } from './Verify/verify.actions';
+import { openDownloadModal } from './Download/download.actions';
 
 import './externalStorage.css';
-import { openDownloadModal } from './Download/download.action';
 
 class ExternalStorage extends Component {
 
