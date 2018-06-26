@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
-
 module Blockchain.Data.Enode (
   Enode(..),
   showEnode,
@@ -13,12 +12,13 @@ module Blockchain.Data.Enode (
 
 
 import                  Data.Bits
+import                  Data.Binary
 import qualified        Data.ByteString             as B
 import qualified        Data.ByteString.Base16      as B16
 import                  Data.List
 import qualified        Data.Text                   as T
 import                  Data.Aeson
-import                  GHC.Generics                as GHCG
+import qualified        GHC.Generics                as GHCG
 import                  Network.Socket.Internal
 
 import                  Blockchain.Data.RLP
@@ -37,6 +37,41 @@ instance (RLPSerializable a) => RLPSerializable (Maybe a) where
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, GHCG.Generic)
 
+instance RLPSerializable HostAddress where
+
+instance Binary IPAddress where
+
+instance RLPSerializable IPAddress where
+  rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
+  rlpDecode x = IPv4 (fromInteger $ rlpDecode x)
+
+data Enode = Enode 
+  { pubKey     :: B.ByteString
+  , ipAddress  :: IPAddress
+  , tcpPort    :: Int
+  , udpPort    :: Maybe Int
+  } deriving (Show, Read, Eq, GHCG.Generic)
+        
+instance Binary Enode where
+
+instance RLPSerializable Enode where
+  rlpEncode (Enode pk ip tp up) = 
+    RLPArray [rlpEncode pk, rlpEncode ip, rlpEncode $ toInteger tp, rlpEncode (toInteger <$> up)]
+
+  rlpDecode (RLPArray [a,b,c,d]) = 
+    Enode (rlpDecode a) (rlpDecode b) (fromInteger $ rlpDecode c) (fromInteger <$> (rlpDecode d))
+
+  rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
+
+instance FromJSON Enode where
+  parseJSON (String str) = return (readEnode $ T.unpack str)
+  parseJSON x = error $ "could not parse JSON for Enode: " ++ show x
+
+instance ToJSON Enode where
+  toJSON enode = String (T.pack $ showEnode enode)
+
+
+-- replacements for show/read for IPAddress and Enode, because implementing read is a nightmare
 showIP :: IPAddress -> String
 showIP (IPv4 addy) =
   let b3 = (addy `shiftR` 24) .&. 0xff
@@ -57,30 +92,6 @@ readIP input =
       addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) + 
         (((read b3) .&. 0xff) `shiftL` 24))
   in (IPv4 addy)
-
-instance RLPSerializable HostAddress where
-
-instance RLPSerializable IPAddress where
-  rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
-  rlpDecode x = IPv4 (fromInteger $ rlpDecode x)
-
-data Enode = Enode 
-  { pubKey     :: B.ByteString
-  , ipAddress  :: IPAddress
-  , tcpPort    :: Int
-  , udpPort    :: Maybe Int
-  } deriving (Show, Read, Eq, GHCG.Generic)
-
-        
-instance RLPSerializable Enode where
-  rlpEncode (Enode pk ip tp up) = 
-    RLPArray [rlpEncode pk, rlpEncode ip, rlpEncode $ toInteger tp, rlpEncode (toInteger <$> up)]
-
-  rlpDecode (RLPArray [a,b,c,d]) = 
-    Enode (rlpDecode a) (rlpDecode b) (fromInteger $ rlpDecode c) (fromInteger <$> (rlpDecode d))
-
-  rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
-
 
 showEnode :: Enode -> String
 showEnode (Enode pk ip tp up) = 
@@ -111,11 +122,3 @@ readEnode input =
             [] -> Nothing
             _ -> Just (read udp)
      in (Enode (read pk) (readIP ip) (read tcp) up)
-
-instance FromJSON Enode where
-  parseJSON (String str) = return (readEnode $ T.unpack str)
-  parseJSON x = error $ "could not parse JSON for Enode: " ++ show x
-
-instance ToJSON Enode where
-  toJSON enode = String (T.pack $ showEnode enode)
-
