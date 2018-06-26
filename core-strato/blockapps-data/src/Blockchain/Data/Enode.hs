@@ -6,6 +6,7 @@
 
 module Blockchain.Data.Enode (
   Enode(..),
+  IPAddress(..),
   showEnode,
   readEnode,
   showIP,
