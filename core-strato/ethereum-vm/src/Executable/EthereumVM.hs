@@ -56,6 +56,7 @@ ethereumVM = void . execContextM $ do
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
+    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -119,7 +120,9 @@ insertNewChains events = do
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
-      Nothing -> putGenesisStateRoot cId sr >> return [(cId, cInfo)]
+      Nothing -> do
+        initializeChainDBs cId sr -- only needed to update Postgres with chain info for API calls
+        putGenesisStateRoot cId sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 

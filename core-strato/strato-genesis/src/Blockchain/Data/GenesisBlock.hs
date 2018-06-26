@@ -3,10 +3,11 @@
 {-# LANGUAGE TupleSections     #-}
 
 module Blockchain.Data.GenesisBlock (
+  initializeStateDB,
   chainInfoToGenesisState,
   genesisInfoToGenesisBlock,
   initializeGenesisBlockFromInfo,
-  initializeStateDB,
+  initializeChainDBs
 ) where
 
 import           Control.Monad
@@ -28,8 +29,8 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.SHA
 
-import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash))
-import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs)
 
@@ -37,6 +38,7 @@ import qualified Data.Map                             as Map
 
 import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Model.Address      as Ad
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
@@ -128,29 +130,64 @@ initializeGenesisBlockFromInfo :: ( MonadResource m
                                => GenesisInfo
                                -> m Block
 initializeGenesisBlockFromInfo genesisInfo = do
-    (srcInfo, genesisBlock) <- genesisInfoToGenesisBlock genesisInfo
-    _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
-    let genesisChainId = genesisInfoChainId genesisInfo
-    genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
-    let diff = StateDiff {
-        StateDiff.chainId   = genesisChainId,
-        blockNumber         = 0,
-        StateDiff.blockHash = blockHash genesisBlock,
-        createdAccounts     = accountDiffs,
-        deletedAccounts     = Map.empty,
-        updatedAccounts     = Map.empty
-    }
-    commitSqlDiffs diff (const "") (const "")
-    let writeSource (account, CodeInfo _ name src) = case account of
-            NonContract _ _ -> return ()
-            ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
-            ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
+  (srcInfo, genesisBlock) <- genesisInfoToGenesisBlock genesisInfo
+  _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+  let genesisBlockHash = blockHeaderHash $ blockHeader genesisBlock
+      genesisChainId = genesisInfoChainId genesisInfo
+      genesisStateRoot = StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock
+  emitInitialStateDiff srcInfo genesisBlockHash genesisChainId genesisStateRoot
+  return genesisBlock
 
-    forM_ srcInfo writeSource
-    mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-      splitWriteStateDiffs [diff]
-    case filterResponse <$> mErr of
-       Right [] -> return genesisBlock
-       Right errs -> error . show $ errs
-       Left err -> error . show $ err
+initializeChainDBs :: ( MonadResource m
+                      , HasCodeDB m
+                      , HasHashDB m
+                      , Mem.HasMemAddressStateDB m
+                      , RBDB.HasRedisBlockDB m
+                      , HasSQLDB m
+                      , HasStateDB m
+                      , HasStorageDB m
+                      )
+                   => Ext.Word256
+                   -> StateRoot
+                   -> m ()
+initializeChainDBs chainId sRoot = emitInitialStateDiff [] (SHA 0) (Just chainId) sRoot
+
+emitInitialStateDiff :: ( MonadResource m
+                        , HasCodeDB m
+                        , HasHashDB m
+                        , Mem.HasMemAddressStateDB m
+                        , RBDB.HasRedisBlockDB m
+                        , HasSQLDB m
+                        , HasStateDB m
+                        , HasStorageDB m
+                        )
+                     => [(AccountInfo, CodeInfo)]
+                     -> SHA
+                     -> Maybe Ext.Word256
+                     -> StateRoot
+                     -> m ()
+emitInitialStateDiff srcInfo bHash chainId sRoot = do
+  genAddrStates <- getAllAddressStates
+  accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
+  let diff = StateDiff {
+      StateDiff.chainId   = chainId,
+      blockNumber         = 0,
+      StateDiff.blockHash = bHash,
+      StateDiff.stateRoot = sRoot,
+      createdAccounts     = accountDiffs,
+      deletedAccounts     = Map.empty,
+      updatedAccounts     = Map.empty
+  }
+  commitSqlDiffs diff (const "") (const "")
+  let writeSource (account, CodeInfo _ name src) = case account of
+          NonContract _ _ -> return ()
+          ContractNoStorage addr _ _ -> updateSource chainId addr name src
+          ContractWithStorage addr _ _ _ -> updateSource chainId addr name src
+
+  forM_ srcInfo writeSource
+  mErr <- liftIO . runKafkaConfigured "strato-init" $ do
+    splitWriteStateDiffs [diff]
+  case filterResponse <$> mErr of
+     Right [] -> return ()
+     Right errs -> error . show $ errs
+     Left err -> error . show $ err
