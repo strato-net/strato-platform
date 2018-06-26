@@ -14,7 +14,7 @@ const attestDocumentUrl = env.APEX_URL + "/bloc/file/attest";
 const verifyDocumentUrl = env.APEX_URL + "/bloc/file/verify?contractAddress=:contractAddress";
 const downloadUrl = env.APEX_URL + "/bloc/file/download?contractAddress=:contractAddress";
 
-export function fetchUploadList() {
+export function fetchUploadListApiCall() {
   return fetch(
     fetchUploadUrl,
     {
@@ -71,7 +71,7 @@ export function verifyDocumentApiCall(contractAddress) {
 
 export function* fetchUpload(action) {
   try {
-    let response = yield call(fetchUploadList);
+    let response = yield call(fetchUploadListApiCall);
     yield put(fetchUploadSuccess(response.list))
   }
   catch (err) {
