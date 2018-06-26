@@ -19,18 +19,19 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
+import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
-import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash))
-import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
@@ -52,6 +53,7 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 
@@ -103,13 +105,14 @@ initializeGenesisBlock backupType genesisBlockName = do
     accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {
-        StateDiff.chainId   = genesisChainId,
-        blockNumber         = 0,
-        StateDiff.blockHash = blockHash genesisBlock,
-        createdAccounts     = accountDiffs,
-        deletedAccounts     = Map.empty,
-        updatedAccounts     = Map.empty
-    }
+          StateDiff.chainId   = genesisChainId,
+          blockNumber         = 0,
+          StateDiff.blockHash = blockHash genesisBlock,
+          StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
+          createdAccounts     = accountDiffs,
+          deletedAccounts     = Map.empty,
+          updatedAccounts     = Map.empty
+        }
     commitSqlDiffs diff (const "") (const "")
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()

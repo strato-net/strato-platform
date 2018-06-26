@@ -15,16 +15,17 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
-import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.Internal hiding (stateRoot)
+import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Monad.Trans.Resource
 
@@ -50,6 +51,7 @@ data StateDiff =
     chainId         :: Maybe Word256,
     blockNumber     :: Integer,
     blockHash       :: SHA,
+    stateRoot       :: StateRoot,
     -- | The 'Eventual value is the initial state of the contract
     createdAccounts :: Map Address (AccountDiff 'Eventual),
     -- | The 'Eventual value is the pre-deletion state of the contract
@@ -157,27 +159,27 @@ chainDiff blockNumber oldBlockHash newBlockHash = do
     (Just old, Just new) -> do
       db <- getStateDB
       diffs <- Diff.dbDiff db old new
-      collectModes diffs
-
+      go [] diffs
+    (Nothing, _) -> error $ "chainDiff: Missing chain root for block hash " ++ format oldBlockHash
+    (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
   where
-    collectModes diffs = coll [] diffs
-    coll sds [] = return sds
-    coll sds (Diff.Create k v : rest) = do
-      chainId <- toChainId k
-      let sr = retrieveMPDBValue v
+    go sds [] = return sds
+    go sds (Diff.Create k v : rest) = do
+      let chainId = toChainId k
+          sr = retrieveMPDBValue v
       sd <- stateDiff (Just chainId) blockNumber newBlockHash emptyTriePtr sr
-      coll (sd:sds) rest
-    coll sds (Diff.Delete k v : rest) = do
-      chainId <- toChainId k
-      let sr = retrieveMPDBValue v
+      go (sd:sds) rest
+    go sds (Diff.Delete k v : rest) = do
+      let chainId = toChainId k
+          sr = retrieveMPDBValue v
       sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
-      coll (sd:sds) rest
-    coll sds (Diff.Update k v1 v2 : rest) = do
-      chainId <- toChainId k
-      let sr1 = retrieveMPDBValue v1
+      go (sd:sds) rest
+    go sds (Diff.Update k v1 v2 : rest) = do
+      let chainId = toChainId k
+          sr1 = retrieveMPDBValue v1
           sr2 = retrieveMPDBValue v2
       sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
-      coll (sd:sds) rest
+      go (sd:sds) rest
     toChainId = bytesToWord256 . BS.unpack . nibbleString2ByteString . N.pack
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
@@ -187,14 +189,14 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   diffs <- Diff.dbDiff db oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
-      StateDiff{
-        chainId,
-        blockNumber,
-        blockHash,
-        createdAccounts,
-        deletedAccounts,
+      StateDiff
+        chainId
+        blockNumber
+        blockHash
+        newRoot
+        createdAccounts
+        deletedAccounts
         updatedAccounts
-        }
 
   where
     collectModes diffs f = do
@@ -271,7 +273,7 @@ eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                    StateRoot -> m (Map Word256 (Diff Word256 'Eventual))
 eventualStorage storageRoot = do
   db <- getStateDB
-  let storageDB = db{stateRoot = storageRoot}
+  let storageDB = db{MP.stateRoot = storageRoot}
   allStorageKV <- unsafeGetAllKeyVals storageDB
   storageAssoc <- mapM (uncurry decodeStorageKV) allStorageKV
   return $ Map.map Value $ Map.fromList storageAssoc

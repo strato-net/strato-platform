@@ -2,6 +2,7 @@
 
 module Blockchain.DB.ChainDB (
     HasChainDB(..)
+  , bootstrapChainDB
   , putBlockHeaderInChainDB
   , getChainRoot
   , getGenesisStateRoot
@@ -102,7 +103,7 @@ forNothing :: Applicative f => Maybe a -> (a -> b) -> f b -> f b
 forNothing m f b =
   case m of
     Nothing -> b
-    Just a -> f <$> pure a
+    Just a -> pure (f a)
 
 getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
@@ -118,6 +119,9 @@ getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
 
 putkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
+
+bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()
+bootstrapChainDB genesisHash = putChainRoot genesisHash MP.emptyTriePtr
 
 putBlockHeaderInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
 putBlockHeaderInChainDB b = do
