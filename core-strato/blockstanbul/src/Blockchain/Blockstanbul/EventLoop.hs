@@ -8,11 +8,12 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.State.Class
 
-import qualified Data.Set as S
+import qualified Data.Map as M
 
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Messages
+import Blockchain.SHA
 
 type StateMachineM m = (MonadIO m, MonadState BlockstanbulContext m)
 
@@ -27,7 +28,8 @@ data BlockstanbulContext = BlockstanbulContext {
   , _proposer :: Maybe Address
   -- The total group of participants
   , _validators :: [Address]
-  , _prepared :: S.Set address
+  -- Validators who have sent us a prepare for this round
+  , _prepared :: M.Map Address SHA
 }
 makeLenses ''BlockstanbulContext
 
@@ -49,14 +51,11 @@ roundChange = do
   yield . RoundChange (error "TODO(tim): supply a private key to StateMachineM") . (+1) $ r
 
 eventLoop :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
-eventLoop = do
-  wm' <- await
-  authz <- lift $ traverse isAuthorized wm'
+eventLoop = awaitForever $ \wm' -> do
+  authz <- lift $ isAuthorized wm'
   curRound <- use roundId
-  case (authz, wm') of
-    (_, Nothing) -> return ()
-    (Just False, _) -> eventLoop
-    (_, Just (Preprepare auth ri pp)) -> do
+  when authz $ case wm' of
+    Preprepare auth ri pp -> do
       pr <- use proposer
       when (Just (sender (auth)) == pr) $ do
         proposal .= Just pp
@@ -64,17 +63,18 @@ eventLoop = do
           -- TODO(tim): use own auth
           then yield (Prepare auth ri (blockHash pp))
           else roundChange
-      eventLoop
-    (_, Just (Prepare auth ri di)) -> when (curRound <= ri) $ do
-      prepared %= insert (sender auth)
-      when (3 * (S.size prepared) >= 2 * length validators) $ do
+    Prepare auth ri di -> when (curRound <= ri) $ do
+      ps <- prepared <%= M.insert (sender auth) di
+      total <- uses validators length
+      let sameVoteCount = M.size . M.filter (==di) $ ps
+      sameHash <- uses proposal $ maybe False ((== di) . blockHash)
+      when (3 * sameVoteCount >= 2 * total && sameHash) $ do
         -- TODO(tim): use own auth
         yield (Commit auth ri di)
-      eventLoop
-    (_, Just (Commit auth ri _)) -> when (curRound <= ri) $ do
+    Commit auth ri _ -> when (curRound <= ri) $ do
+      -- TODO(tim): use own auth
       yield (RoundChange auth (roundidRound ri + 1))
-      eventLoop
-    (_, Just (RoundChange _ ri)) -> when ((roundidRound curRound) <= ri) $ do
+    RoundChange _ ri -> when ((roundidRound curRound) <= ri) $ do
       return ()
-    (_, Just Timeout) -> roundChange >> eventLoop
-    (_, Just (CommitFailure _)) -> roundChange >> eventLoop
+    Timeout -> roundChange
+    CommitFailure _ -> roundChange

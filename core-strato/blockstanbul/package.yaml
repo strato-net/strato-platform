@@ -5,6 +5,7 @@ dependencies:
   - base
   - blockapps-data
   - blockapps-util
+  - containers
   - conduit-combinators
   - ethereum-encryption
   - lens

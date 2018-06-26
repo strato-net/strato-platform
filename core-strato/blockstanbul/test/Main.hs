@@ -9,6 +9,8 @@ import Conduit
 import Control.Lens
 import Control.Monad.Trans.State
 
+import qualified Data.Map as M
+
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.EventLoop
@@ -27,15 +29,17 @@ testContext = BlockstanbulContext
   Nothing
   Nothing
   []
+  M.empty
 
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext
 
+sendMessages :: (StateMachineM m) => [BlockstanbulEvent] -> m [BlockstanbulEvent]
+sendMessages wms = runConduit (yieldMany wms .| eventLoop .| sinkList)
+
 spec :: Spec
 spec = parallel $ do
   describe "The blockstanbul event loop" $ do
-    let sendMessages :: (StateMachineM m) => [BlockstanbulEvent] -> m [BlockstanbulEvent]
-        sendMessages wms = runConduit (yieldMany wms .| eventLoop .| sinkList)
     it "does nothing to the messages" $ property $ \auth blk ->
       runTest $ do
         proposer .= Just (sender auth)
@@ -57,7 +61,7 @@ spec = parallel $ do
         let input = [Timeout, CommitFailure "invalid hash"]
         got <- sendMessages input
         map roundchangeRound got `expectAs` [21, 21]
-
+  describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
       runTest $ do
         proposer .= Just (sender auth)
@@ -113,3 +117,25 @@ spec = parallel $ do
         let input = [Preprepare auth curRound{roundidRound = 3} blk]
         got <- sendMessages input
         map roundchangeRound got `expectAs` [21]
+
+  describe "A prepare message" $ do
+    it "sets the prepared state of a validator" $ property $ \auth blk ->
+      runTest $ do
+        validators .= [sender auth]
+        curRound <- use roundId
+        proposal .= Just blk
+        let di = blockHash blk
+        let input = [Prepare auth curRound di]
+        got <- sendMessages input
+        -- Only one validator, so that should be a majority
+        got `expectAs` [Commit auth curRound di]
+        gotVotes <- use prepared
+        gotVotes `expectAs` M.singleton (sender auth) di
+    it "does not send a commit without a proposal" $ property $ \auth di ->
+      runTest $ do
+        validators .= [sender auth]
+        curRound <- use roundId
+        got <- sendMessages [Prepare auth curRound di]
+        got `expectAs` []
+        gotVotes <- use prepared
+        gotVotes `expectAs` M.singleton (sender auth) di
