@@ -57,7 +57,7 @@ class ExternalStorage extends Component {
                 this.props.openDownloadModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-download"
-              text="Downlaod" />
+              text="Download" />
           </div>
         </div>
         <List uploadList={this.props.uploadList} />

@@ -3,6 +3,22 @@
   padding: 0px !important;
 }
 
+.verify-result li {
+  color: lightgreen; 
+}
+
+.verify-result li:after {
+	font-family: 'FontAwesome';
+	content: '\F00C';
+	margin: 0 0px 0 5px;
+	color: lightgreen;
+	font-size: 20px;
+}
+
 .verify-dialog .content-margin {
-  margin: 10px 20px;
+  margin: 10px 10px;
+}
+
+.verify-dialog {
+  width: 550px;
 }

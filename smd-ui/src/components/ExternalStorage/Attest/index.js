@@ -196,7 +196,7 @@ class Attest extends Component {
       <div>
         <div className="pt-dialog-body attest-result">
 
-          <div className="row content-margin">
+          <div className="row content-margin signatures">
             <div className="col-sm-12">
               <center>
                 <h4><label> Signatures </label></h4>
