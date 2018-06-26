@@ -32,21 +32,23 @@ runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext
 
 spec :: Spec
-spec = do
+spec = parallel $ do
   describe "The blockstanbul event loop" $ do
     let sendMessages :: (StateMachineM m) => [BlockstanbulEvent] -> m [BlockstanbulEvent]
         sendMessages wms = runConduit (yieldMany wms .| eventLoop .| sinkList)
     it "does nothing to the messages" $ property $ \auth blk ->
       runTest $ do
         proposer .= Just (sender auth)
-        let m1 = Preprepare auth (RoundId 0 0) blk
+        validators .= [sender auth]
+        curRound <- use roundId
+        let m1 = Preprepare auth curRound blk
         let hash = blockHash blk
         m2 <- sendMessages [m1]
-        m2 `expectAs` [Prepare auth (RoundId 0 0) hash]
+        m2 `expectAs` [Prepare auth curRound hash]
         m3 <- sendMessages m2
-        m3 `expectAs` [Commit auth (RoundId 0 0) hash]
+        m3 `expectAs` [Commit auth curRound hash]
         m4 <- sendMessages m3
-        m4 `expectAs` [RoundChange auth 1]
+        m4 `expectAs` [RoundChange auth 21]
         m5 <- sendMessages m4
         m5 `expectAs` [] :: StateT BlockstanbulContext IO ()
 
@@ -91,3 +93,23 @@ spec = do
         got `expectAs` []
         gotProp <- use proposal
         gotProp `expectAs` Nothing
+
+    it "rejects a preprepare from a non-validator" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= Just (sender auth)
+        validators .= []
+        curRound <- use roundId
+        let input = [Preprepare auth curRound blk]
+        got <- sendMessages input
+        got `expectAs` []
+        gotProp <- use proposal
+        gotProp `expectAs` Nothing
+
+    it "round-changes an old preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= Just (sender auth)
+        validators .= [sender auth]
+        curRound <- use roundId
+        let input = [Preprepare auth curRound{roundidRound = 3} blk]
+        got <- sendMessages input
+        map roundchangeRound got `expectAs` [21]

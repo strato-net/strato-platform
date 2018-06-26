@@ -25,9 +25,20 @@ data BlockstanbulContext = BlockstanbulContext {
   , _proposer :: Maybe Address
   -- The total group of participants
   , _validators :: [Address]
-
 }
 makeLenses ''BlockstanbulContext
+
+isAuthorized :: (StateMachineM m) => BlockstanbulEvent -> m Bool
+isAuthorized event = case getAuth event of
+    -- Timeouts and failures are trusted as they are from this node.
+    Nothing -> return True
+    Just (MsgAuth addr _) -> do
+      authn <- use authenticator
+      if not (authn event)
+        then return False
+        else do
+          authorized <- use validators
+          return $ addr `elem` authorized
 
 roundChange :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
 roundChange = do
@@ -37,22 +48,26 @@ roundChange = do
 eventLoop :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
 eventLoop = do
   wm' <- await
-  isAuthentic <- use authenticator
-  case wm' of
-    Nothing -> return ()
-    Just msg@(Preprepare auth ri pp) -> when (isAuthentic msg) $ do
+  authz <- lift $ traverse isAuthorized wm'
+  curRound <- use roundId
+  case (authz, wm') of
+    (_, Nothing) -> return ()
+    (Just False, _) -> eventLoop
+    (_, Just (Preprepare auth ri pp)) -> do
       pr <- use proposer
       when (Just (sender (auth)) == pr) $ do
         proposal .= Just pp
-        yield (Prepare auth ri (blockHash pp))
+        if curRound == ri
+          then yield (Prepare auth ri (blockHash pp))
+          else roundChange
       eventLoop
-    Just msg@(Prepare auth ri di) -> when (isAuthentic msg) $ do
+    (_, Just (Prepare auth ri di)) -> when (curRound <= ri) $ do
       yield (Commit auth ri di)
       eventLoop
-    Just msg@(Commit auth ri _) -> when (isAuthentic msg) $ do
+    (_, Just (Commit auth ri _)) -> when (curRound <= ri) $ do
       yield (RoundChange auth (roundidRound ri + 1))
       eventLoop
-    Just msg@(RoundChange _ _) -> when (isAuthentic msg) $ do
+    (_, Just (RoundChange _ ri)) -> when ((roundidRound curRound) <= ri) $ do
       return ()
-    Just Timeout -> roundChange >> eventLoop
-    Just (CommitFailure _) -> roundChange >> eventLoop
+    (_, Just Timeout) -> roundChange >> eventLoop
+    (_, Just (CommitFailure _)) -> roundChange >> eventLoop
