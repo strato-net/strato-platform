@@ -8,6 +8,8 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.State.Class
 
+import qualified Data.Set as S
+
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Messages
@@ -25,6 +27,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _proposer :: Maybe Address
   -- The total group of participants
   , _validators :: [Address]
+  , _prepared :: S.Set address
 }
 makeLenses ''BlockstanbulContext
 
@@ -58,11 +61,15 @@ eventLoop = do
       when (Just (sender (auth)) == pr) $ do
         proposal .= Just pp
         if curRound == ri
+          -- TODO(tim): use own auth
           then yield (Prepare auth ri (blockHash pp))
           else roundChange
       eventLoop
     (_, Just (Prepare auth ri di)) -> when (curRound <= ri) $ do
-      yield (Commit auth ri di)
+      prepared %= insert (sender auth)
+      when (3 * (S.size prepared) >= 2 * length validators) $ do
+        -- TODO(tim): use own auth
+        yield (Commit auth ri di)
       eventLoop
     (_, Just (Commit auth ri _)) -> when (curRound <= ri) $ do
       yield (RoundChange auth (roundidRound ri + 1))
