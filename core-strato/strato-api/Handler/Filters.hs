@@ -133,7 +133,7 @@ getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefA
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
-getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
+getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
 
 getAccFilter _             _                 = P.undefined ("no match in getAccFilter"::String)
 
@@ -186,7 +186,7 @@ getTransFilter (rawTx)     ("minvalue", v)     = rawTx E.^. RawTransactionValue 
 getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue E.<=. E.val (toInteger' v)
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
-getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
+getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val (fromHexText v)))
 getTransFilter _           _                   = P.undefined ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
@@ -215,7 +215,7 @@ getStorageFilter (storage,_) ("addressid", v)
 getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
   = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
 getStorageFilter (_,addrStRef) ("chainid", v)
-  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (P.fromIntegral (toInteger' v) :: Word256)))
+  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
 
 getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
 
