@@ -5,6 +5,7 @@ module Blockchain.Strato.StateDiff
     , Diff(..)
     , Detail(..)
     , Detailed(..)
+    , chainDiff
     , stateDiff
     , eventualAccountState
     , incrementalAccountState
@@ -14,14 +15,17 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
-import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.Internal hiding (stateRoot)
+import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
+import           Blockchain.Util
+import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Monad.Trans.Resource
 
@@ -31,6 +35,7 @@ import           Data.Maybe
 import           Data.String
 
 import           Data.ByteString                             (ByteString)
+import qualified Data.ByteString                             as BS
 
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
@@ -46,6 +51,7 @@ data StateDiff =
     chainId         :: Maybe Word256,
     blockNumber     :: Integer,
     blockHash       :: SHA,
+    stateRoot       :: StateRoot,
     -- | The 'Eventual value is the initial state of the contract
     createdAccounts :: Map Address (AccountDiff 'Eventual),
     -- | The 'Eventual value is the pre-deletion state of the contract
@@ -145,6 +151,37 @@ instance Detailed (Diff SHA) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
 
+chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+             Integer -> SHA -> SHA -> m [StateDiff]
+chainDiff blockNumber oldBlockHash newBlockHash = do
+  mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
+  case mChainRoots of
+    (Just old, Just new) -> do
+      db <- getStateDB
+      diffs <- Diff.dbDiff db old new
+      go [] diffs
+    (Nothing, _) -> error $ "chainDiff: Missing chain root for block hash " ++ format oldBlockHash
+    (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
+  where
+    go sds [] = return sds
+    go sds (Diff.Create k v : rest) = do
+      let chainId = toChainId k
+          sr = retrieveMPDBValue v
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash emptyTriePtr sr
+      go (sd:sds) rest
+    go sds (Diff.Delete k v : rest) = do
+      let chainId = toChainId k
+          sr = retrieveMPDBValue v
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
+      go (sd:sds) rest
+    go sds (Diff.Update k v1 v2 : rest) = do
+      let chainId = toChainId k
+          sr1 = retrieveMPDBValue v1
+          sr2 = retrieveMPDBValue v2
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
+      go (sd:sds) rest
+    toChainId = bytesToWord256 . BS.unpack . nibbleString2ByteString . N.pack
+
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
@@ -152,14 +189,14 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   diffs <- Diff.dbDiff db oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
-      StateDiff{
-        chainId,
-        blockNumber,
-        blockHash,
-        createdAccounts,
-        deletedAccounts,
+      StateDiff
+        chainId
+        blockNumber
+        blockHash
+        newRoot
+        createdAccounts
+        deletedAccounts
         updatedAccounts
-        }
 
   where
     collectModes diffs f = do
@@ -236,7 +273,7 @@ eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                    StateRoot -> m (Map Word256 (Diff Word256 'Eventual))
 eventualStorage storageRoot = do
   db <- getStateDB
-  let storageDB = db{stateRoot = storageRoot}
+  let storageDB = db{MP.stateRoot = storageRoot}
   allStorageKV <- unsafeGetAllKeyVals storageDB
   storageAssoc <- mapM (uncurry decodeStorageKV) allStorageKV
   return $ Map.map Value $ Map.fromList storageAssoc
