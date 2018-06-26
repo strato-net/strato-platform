@@ -27,7 +27,6 @@ import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
-import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
@@ -1474,22 +1473,25 @@ getContractXabiByMetadataId metadataId = do
   return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
-getContractContractByMetadataId metadataId = do
+getContractContractByMetadataId metadataId = getContractRetry 0
+  where
   -- Impatient clients may have submitted a contract and immediately issued
   -- a function call against it. Here we give a basic defense against it.
   -- A much nicer way to handle that is to return cookies to the client
   -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
-  let sleeps = [0, 40, 80, 160, 320, 640, 1280]
-      getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
-  xabis <- zipWithM getWait (repeat metadataId) sleeps
-  let ctracts = map xAbiToContract xabis
-  case rights ctracts of
-    (ctract:_) -> return ctract
-    _ -> throwError . UserError .
-            ("getContractContractByMetadataId: invalid types in contract: " <>) .
-            Text.pack . show . head $ ctracts
-
+  -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
+      sleep t = liftIO . threadDelay . (1000*) $ t
+      getContractRetry :: Int -> Bloc Contract
+      getContractRetry t = do
+        x <- getContractXabiByMetadataId metadataId
+        case xAbiToContract x of
+          Right c -> return c
+          Left err ->
+            if t < 5000
+              then sleep t >> getContractRetry (1 + 2 * t)
+              else throwError . UserError $
+                    "getContractContractByMetadataId: invalid types in contract: " <> (Text.pack . show $ err)
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
