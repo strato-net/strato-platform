@@ -5,6 +5,8 @@ dependencies:
   - base
   - blockapps-data
   - blockapps-util
+  - conduit-combinators
+  - strato-model
 
 library:
   source-dirs: src/
@@ -16,4 +18,5 @@ tests:
     dependencies:
       - blockstanbul
       - hspec
+      - QuickCheck
 
