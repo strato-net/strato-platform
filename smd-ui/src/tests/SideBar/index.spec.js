@@ -53,6 +53,11 @@ describe('SideBar: index', () => {
       expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
     });
 
+    test('eight position /external-storage', () => {
+      wrapper.find('NavLink').at(7).simulate('click');
+      expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
+    });
+
   });
 
   test('render component for enterprise mode', () => {
@@ -97,11 +102,17 @@ describe('SideBar: index', () => {
       wrapper.find('NavLink').at(5).simulate('click');
       expect(wrapper.find('NavLink').get(5)).toMatchSnapshot();
     });
-
-    test('seventh position /apps', () => {
+    
+    test('seventh position /external-storage', () => {
       wrapper.find('NavLink').at(6).simulate('click');
       expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
     });
+
+    test('eight position /apps', () => {
+      wrapper.find('NavLink').at(7).simulate('click');
+      expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
+    });
+
 
   });
 
