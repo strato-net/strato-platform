@@ -6,10 +6,10 @@
   color: lightgreen; 
 }
 
-.attest-result li:after {
+.attest-result li:before {
 	font-family: 'FontAwesome';
 	content: '\F00C';
-	margin: 0 0px 0 5px;
+	margin: 0 5px 0 0px;
 	color: lightgreen;
 	font-size: 20px;
 }
