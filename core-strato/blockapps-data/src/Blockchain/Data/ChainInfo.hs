@@ -8,6 +8,7 @@ import           Data.Aeson
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord              (Word256)
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Data.Enode
 import qualified GHC.Generics                              as GHCG
 import           Data.Monoid ((<>))
 
@@ -15,7 +16,7 @@ data ChainInfo = ChainInfo {
     chainLabel      :: String,
     addRule         :: String,
     removeRule      :: String,
-    members         :: [String],
+    members         :: [Enode],
     accountBalance  :: [(Address, Word256)]
 } deriving (Eq, Read, Show, GHCG.Generic)
 

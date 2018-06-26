@@ -13,6 +13,7 @@ import           Blockchain.ExtWord                 (Word256)
 import           Blockchain.DB.SQLDB
 
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Enode
 import           Control.Monad.Trans.Resource
 import           Data.Maybe
 
@@ -44,7 +45,7 @@ getChainInfo chainId = do
                             chainInfoRefRemoveRule
                             (map name members)
                             (map anb accts)
-          where name = chainMemberRefName . entityVal
+          where name = readEnode . chainMemberRefName . entityVal
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
@@ -70,6 +71,6 @@ putChainInfo chainId ChainInfo{..} = do
   runResourceT . flip SQL.runSqlPool db $ do
     let chainInfoRef = ChainInfoRef chainId chainLabel addRule removeRule
     chainInfoRefId <- E.insert chainInfoRef
-    insertMany_ $ map (ChainMemberRef chainInfoRefId) members
+    insertMany_ $ map (ChainMemberRef chainInfoRefId . showEnode) members
     insertMany_ $ map (uncurry (ChainAccountBalanceRef chainInfoRefId)) accountBalance
     return chainInfoRefId

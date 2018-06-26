@@ -31,7 +31,8 @@ import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
---import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
@@ -269,25 +270,37 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (GetChainDetails cid) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
-      chDet <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cid
+      chDet <- lift (RBDB.withRedisBlockDB $ RBDB.getChainInfo cid)
       case chDet of
-        Nothing -> do  
-          yield $ GetChainDetails cid
-        Just (ci) -> do 
-          yield $ ChainDetails cid ci
+        Nothing ->  
+          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information found about the chain with chainID " ++ (show cid)
+        Just (ci) -> do
+          -- check that the peer is authorized to receive these chain details, by verifying that their 
+          -- IPaddress is associated with one of the Enodes in the chain's member list
+          let pIp = readIP $ T.unpack (pPeerIp peer)
+          let enodeList = members ci
+          let ipList = ipAddress <$> enodeList 
+          let match = find (==pIp) ipList
+
+          case match of
+            Nothing -> do 
+              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cid)
+            Just _ -> do 
+              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "sending ChainDetails for chainID " ++ (show cid)
+              yield $ ChainDetails cid ci
       
+
     MsgEvt (ChainDetails chid ci) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
-      st <- (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
+      st <- lift (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
       case st of
         Left r -> do
-          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, Redis replied with: \n" ++ (show r)
+          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, reply: \n" ++ (show r)
           return ()
         Right s -> do
-          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, Redis status is: \n" ++ (show s)
-          return()
--- check permissions of peer, throw error if not a member of the chain (so you gotta parse that shit)
+          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, status: \n" ++ (show s)
+          return ()
 
     MsgEvt (GetTransactions chid req) -> do
       stampActionTimestamp
