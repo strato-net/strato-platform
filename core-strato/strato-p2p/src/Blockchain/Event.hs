@@ -31,7 +31,8 @@ import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
---import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
@@ -273,10 +274,21 @@ handleEvents mode peer = awaitForever $ \case
       case chDet of
         Nothing ->  
           $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information found about the chain with chainID " ++ (show cid)
-        Just (ci) -> do 
-          yield $ ChainDetails cid ci
+        Just (ci) -> do
+          -- check that the peer is authorized to receive these chain details, by verifying that their 
+          -- IPaddress is associated with one of the Enodes in the chain's member list
+          let pIp = readIP $ T.unpack (pPeerIp peer)
+          let enodeList = members ci
+          let ipList = ipAddress <$> enodeList 
+          let match = find (==pIp) ipList
+
+          case match of
+            Nothing -> do 
+              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cid)
+            Just _ -> do 
+              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "sending ChainDetails for chainID " ++ (show cid)
+              yield $ ChainDetails cid ci
       
--- check permissions of peer, throw error if not a member of the chain - via a new `Enode` type?
 
     MsgEvt (ChainDetails chid ci) -> do
       stampActionTimestamp
