@@ -30,6 +30,7 @@ testContext = BlockstanbulContext
   Nothing
   []
   M.empty
+  M.empty
 
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext
@@ -50,7 +51,7 @@ spec = parallel $ do
         m2 <- sendMessages [m1]
         m2 `expectAs` [Prepare auth curRound hash]
         m3 <- sendMessages m2
-        m3 `expectAs` [Commit auth curRound hash]
+        m3 `expectAs` [Commit auth curRound hash ()]
         m4 <- sendMessages m3
         m4 `expectAs` [RoundChange auth 21]
         m5 <- sendMessages m4
@@ -128,7 +129,7 @@ spec = parallel $ do
         let input = [Prepare auth curRound di]
         got <- sendMessages input
         -- Only one validator, so that should be a majority
-        got `expectAs` [Commit auth curRound di]
+        got `expectAs` [Commit auth curRound di ()]
         gotVotes <- use prepared
         gotVotes `expectAs` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->

@@ -11,6 +11,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.SHA
 import Blockchain.ExtendedECDSA
 
+type Seal = ()
 
 data RoundId = RoundId {
   roundidRound :: Word256,
@@ -28,7 +29,7 @@ instance Arbitrary MsgAuth where
 
 data BlockstanbulEvent = Preprepare MsgAuth RoundId Block
                        | Prepare MsgAuth RoundId SHA
-                       | Commit MsgAuth RoundId SHA
+                       | Commit MsgAuth RoundId SHA Seal
                        | RoundChange {roundchangeAuth :: MsgAuth,
                                       roundchangeRound :: Word256}
                        | Timeout
@@ -38,7 +39,7 @@ data BlockstanbulEvent = Preprepare MsgAuth RoundId Block
 getAuth :: BlockstanbulEvent -> Maybe MsgAuth
 getAuth (Preprepare a _ _) = Just a
 getAuth (Prepare a _ _) = Just a
-getAuth (Commit a _ _) = Just a
+getAuth (Commit a _ _ _) = Just a
 getAuth (RoundChange a _) = Just a
 getAuth _ = Nothing
 

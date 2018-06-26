@@ -30,6 +30,8 @@ data BlockstanbulContext = BlockstanbulContext {
   , _validators :: [Address]
   -- Validators who have sent us a prepare for this round
   , _prepared :: M.Map Address SHA
+  -- Validators who have sent us a commitment seal for this round
+  , _committed :: M.Map Address (SHA, Seal)
 }
 makeLenses ''BlockstanbulContext
 
@@ -50,6 +52,14 @@ roundChange = do
   r <- uses roundId roundidRound
   yield . RoundChange (error "TODO(tim): supply a private key to StateMachineM") . (+1) $ r
 
+hasSameHash :: (StateMachineM m) => SHA -> m Bool
+hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
+
+-- TODO(tim): Define an exit type from the conduit for sending blocks to the EVM
+-- TODO(tim): what to do if the block hasn't arrived yet?
+commit :: (StateMachineM m) => Maybe Block -> Conduit BlockstanbulEvent m BlockstanbulEvent
+commit _ = return ()
+
 eventLoop :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
 eventLoop = awaitForever $ \wm' -> do
   authz <- lift $ isAuthorized wm'
@@ -67,11 +77,18 @@ eventLoop = awaitForever $ \wm' -> do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
       let sameVoteCount = M.size . M.filter (==di) $ ps
-      sameHash <- uses proposal $ maybe False ((== di) . blockHash)
+      sameHash <- hasSameHash di
       when (3 * sameVoteCount >= 2 * total && sameHash) $ do
         -- TODO(tim): use own auth
-        yield (Commit auth ri di)
-    Commit auth ri _ -> when (curRound <= ri) $ do
+        yield (Commit auth ri di ())
+    Commit auth ri di seal -> when (curRound <= ri) $ do
+      cs <- committed <%= M.insert (sender auth) (di, seal)
+      total <- uses validators length
+      let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
+      sameHash <- hasSameHash di
+      -- TODO(tim): Is it necessary to check that we have prepared?
+      when (3 * sameVoteCount >= 2 * total && sameHash) $ do
+        join $ uses proposal commit
       -- TODO(tim): use own auth
       yield (RoundChange auth (roundidRound ri + 1))
     RoundChange _ ri -> when ((roundidRound curRound) <= ri) $ do
