@@ -20,6 +20,7 @@ module Blockchain.BlockChain
     , calculateIntrinsicGas'
   ) where
 
+import           Control.Arrow                           ((&&&))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -89,6 +90,7 @@ import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
+import qualified Blockchain.Strato.StateDiff             as SD (StateDiff)
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka
@@ -204,7 +206,6 @@ addBlocks blocks' = do
       let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
       lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
-      let oldStateRoot = blockDataStateRoot oldHeader
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
       potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
@@ -217,6 +218,7 @@ addBlocks blocks' = do
             lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
             if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
               then do
+                putBlockHeaderInChainDB (blockHeader block)
                 _ <- setParentStateRoot block
                 let lastRun = Bagger.lastExecutedTxs cache
                     updates = if (flags_miner == Mining.Instant)
@@ -247,10 +249,9 @@ addBlocks blocks' = do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             (theBlock, nbb) <- liftIO (readIORef replacedBest)
             void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-            let b = obBlockData theBlock
-                codeSource = getSource False b
-                codeContractName = getContractName False b
-            calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+            let codeSource = getSource False
+                codeContractName = getContractName False
+            calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -634,34 +635,43 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 
         return (shouldReplace, Just b, bestBlockInfo)
 
+splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, SHA)]
+splitCreateDiffs =
+    let sr = stateRoot &&& (M.toList . createdAccounts)
+        ch = fmap (codeHash . snd)
+        srch = map ch . join . map sequence . map sr
+     in S.toList . S.fromList . srch
+
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
-                           -> MP.StateRoot
-                           -> (SHA -> ContextM String)
-                           -> (SHA -> ContextM String)
+                           -> BlockData
+                           -> (MP.StateRoot -> SHA -> ContextM String)
+                           -> (MP.StateRoot -> SHA -> ContextM String)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
-    let newHeader    = blockHeader newBlock
+calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
+    let oldHash      = blockHeaderHash oldHeader
+        oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
+        newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot -- TODO: THIS IS NOT RIGHT
+    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+    chainDiffs <- chainDiff newNumber oldHash newHash
 
-    let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
-
+    let allNewCodeHashes = splitCreateDiffs (diffs : chainDiffs)
 
     codeSourceMap <- fmap M.fromList $
-      forM allNewCodeHashes $ \codeHash -> do
-        codeSrc <- codeSource codeHash
+      forM allNewCodeHashes $ \(sr,codeHash) -> do
+        codeSrc <- codeSource sr codeHash
         return (codeHash, codeSrc)
 
     let codeSource' x =
           M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap
 
     codeNameMap <- fmap M.fromList $
-      forM allNewCodeHashes $ \codeHash -> do
-        codeName <- codeContractName codeHash
+      forM allNewCodeHashes $ \(sr,codeHash) -> do
+        codeName <- codeContractName sr codeHash
         return (codeHash, codeName)
 
     let codeContractName' x =

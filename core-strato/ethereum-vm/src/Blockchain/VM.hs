@@ -957,18 +957,18 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> BlockData -> SHA -> ContextM String
+getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> BlockData -> SHA -> ContextM String
+getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
-getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
-getFromSelector sel _ b codeHash = do
+getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
+getFromSelector sel _ sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
   stateRoot <- getStateRoot
-  setStateDBStateRoot (blockDataStateRoot b)
+  setStateDBStateRoot sr
   let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,

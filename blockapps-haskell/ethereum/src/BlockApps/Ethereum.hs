@@ -218,7 +218,7 @@ instance FromJSON ChainId where
       Just chainId -> return chainId
 
 instance ToHttpApiData ChainId where
-  toUrlPiece = Text.pack . ("0x" ++ ) . chainIdString
+  toUrlPiece = Text.pack . chainIdString
 
 instance FromHttpApiData ChainId where
   parseUrlPiece text = case stringChainId (Text.unpack text) of

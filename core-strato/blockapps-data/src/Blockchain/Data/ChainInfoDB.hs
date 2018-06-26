@@ -15,6 +15,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Control.Monad.Trans.Resource
+import           Data.Maybe
 
 getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe ChainInfo)
 getChainInfo chainId = do
@@ -48,6 +49,21 @@ getChainInfo chainId = do
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
+
+getAllChainInfos :: (HasSQLDB m) => m [ChainInfo]
+getAllChainInfos = do
+  db <- getSQLDB
+  cids <- runResourceT . flip SQL.runSqlPool db $ do  
+    chains <- E.select . E.from $ \cRef -> do
+              return cRef
+    case chains of
+      [] -> return []
+      cIds -> return $ map (chainInfoRefChainId . E.entityVal) cIds
+  chainInfos <- mapM getChainInfo cids      
+  let cInfos = sequence $ filter isJust chainInfos
+  case cInfos of 
+    Nothing -> return [] 
+    Just cis -> return cis
 
 putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId ChainInfo{..} = do

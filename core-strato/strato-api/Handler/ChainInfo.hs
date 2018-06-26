@@ -15,9 +15,11 @@ import           Import
 import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.ChainInfoDB
 import           System.Entropy
 import           Blockchain.Util
-import           Blockchain.ExtWord              (Word256)
+import           Blockchain.ExtWord             (Word256)
+import           Handler.Filters
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
@@ -34,9 +36,14 @@ postChainR :: Handler Text
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  gi <- parseJsonBody :: Handler (Result ChainInfo)
-  case gi of
-    Success gen -> do
+  ci <- parseJsonBody :: Handler (Result ChainInfo)
+  case ci of
+    Success gen@(ChainInfo _ ar rr mb ab) -> do 
+      when (ar == "") $ invalidArgs ["add rule is empty"]
+      when (rr == "") $ invalidArgs ["remove rule is empty"]
+      when (length mb == 0) $ invalidArgs ["member list is empty"]
+      let balanceSum = Import.foldr (\cur acc -> acc + (snd cur)) 0 ab
+      when (balanceSum == 0) $ invalidArgs ["All balances are zero"]
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
@@ -44,6 +51,18 @@ postChainR = do
       return . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
--- todo: implement getChainR
-  
-
+getChainR :: Handler Value
+getChainR = do
+  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid" 
+  addHeader "Access-Control-Allow-Origin" "*"
+  case chainId of
+    Just cid -> do 
+      chainInfo <- getChainInfo cid
+      case chainInfo of
+        Just ci -> returnJson ci
+        Nothing -> invalidArgs ["could not find any chain with the given chain id"]
+    Nothing -> do
+        cInfos <- getAllChainInfos
+        case cInfos of
+            [] -> invalidArgs ["no chain found"]
+            cis -> returnJson cis 
