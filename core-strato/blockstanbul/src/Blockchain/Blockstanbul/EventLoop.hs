@@ -99,7 +99,6 @@ eventLoop = awaitForever $ \ev -> do
         hasCommitted .= True
         join $ uses proposal commit
       -- TODO(tim): use own auth
-      yield (RoundChange auth (roundidRound ri + 1))
     RoundChange _ ri -> when ((roundidRound curRound) <= ri) $ do
       return ()
     Timeout -> roundChange
