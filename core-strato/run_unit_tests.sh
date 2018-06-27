@@ -2,8 +2,9 @@
 
 declare -i RESULT=0
 TESTS=(
-  strato-init
   blockapps-data
+  merkle-patricia-db
+  strato-init
   strato-p2p
   strato-redis-blockdb
   strato-sequencer
