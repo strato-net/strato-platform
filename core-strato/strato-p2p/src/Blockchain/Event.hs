@@ -267,13 +267,19 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     -- private chains
+    
+    -- TODO:  should take [ChainId] so that Transactions handler can request multiple
+    --          chain details in one messag
+    --        should these be calls to ChainInfoDB functions????e
+    --        should these be calls to ChainInfoDB functions????
     MsgEvt (GetChainDetails cid) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
       chDet <- lift (RBDB.withRedisBlockDB $ RBDB.getChainInfo cid)
       case chDet of
         Nothing ->  
-          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information found about the chain with chainID " ++ (show cid)
+          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information " ++ 
+            "found about the chain with chainID " ++ (show cid)
         Just (ci) -> do
           -- check that the peer is authorized to receive these chain details, by verifying that their 
           -- IPaddress is associated with one of the Enodes in the chain's member list
@@ -288,8 +294,9 @@ handleEvents mode peer = awaitForever $ \case
             Just _ -> do 
               $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "sending ChainDetails for chainID " ++ (show cid)
               yield $ ChainDetails cid ci
+              stampActionTimestamp
       
-
+    -- TODO: should take [ChainID] [ChainInfo] 
     MsgEvt (ChainDetails chid ci) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
@@ -310,8 +317,9 @@ handleEvents mode peer = awaitForever $ \case
         (Explicit ids) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions ids
         (Implicit ha _ _ _) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions [ha]
       case tr of
-        ((Just ts):_) -> 
+        ((Just ts):_) -> do
           yield $ Transactions ts
+          stampActionTimestamp
         _ -> return ()
 
     MsgEvt (Disconnect _) -> do

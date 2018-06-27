@@ -17,6 +17,7 @@ module Blockchain.Data.Enode (
 import                  Data.Bits
 import                  Data.Binary
 import qualified        Data.ByteString             as B
+import qualified        Data.ByteString.Char8       as C8
 import qualified        Data.ByteString.Base16      as B16
 import                  Data.List
 import qualified        Data.Text                   as T
@@ -99,7 +100,7 @@ readIP input =
 showEnode :: Enode -> String
 showEnode (Enode pk ip tp up) = 
     "enode://" ++ 
-    (show $ B16.encode pk) ++
+    (C8.unpack $ B16.encode pk) ++
     "@" ++
     (showIP ip) ++ ":" ++
     (show tp) ++ uPort 
@@ -124,4 +125,4 @@ readEnode input =
           case udp of
             [] -> Nothing
             _ -> Just (read udp)
-     in (Enode (read pk) (readIP ip) (read tcp) up)
+     in (Enode (fst $ B16.decode (C8.pack pk)) (readIP ip) (read tcp) up)
