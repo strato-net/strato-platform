@@ -5,10 +5,10 @@ module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
 import Control.Lens hiding (view)
-import Control.Monad
+import Control.Monad hiding (sequence)
 import Control.Monad.State.Class
-
 import qualified Data.Map as M
+import Prelude hiding (round, sequence)
 
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
@@ -16,6 +16,8 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.SHA
 
 type StateMachineM m = (MonadIO m, MonadState BlockstanbulContext m)
+
+data NextType = Round RoundNumber | Sequence SequenceNumber
 
 data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
@@ -35,13 +37,9 @@ data BlockstanbulContext = BlockstanbulContext {
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPrepared :: Bool
-  -- We've already committed this block, no need to do it again.
-  , _hasCommitted :: Bool
-  , _pendingView :: Maybe View
+  , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
-  , _roundChanged :: M.Map Address View
-  -- Have we broadcast our own round-change?
-  , _hasRoundChanged :: Bool
+  , _roundChanged :: M.Map Address RoundNumber
 }
 makeLenses ''BlockstanbulContext
 
@@ -57,31 +55,36 @@ isAuthorized event = case getAuth event of
           authorized <- use validators
           return $ addr `elem` authorized
 
-roundChange :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
-roundChange = do
-  View r s <- use view
-  yield . RoundChange (error "TODO(tim): supply a private key to StateMachineM") $ View (r+1) s
-
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
+
+roundChange :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
+roundChange = do
+  r <- use (view . round)
+  yield . RoundChange (error "TODO(tim): supply a private key to StateMachineM") $ r+1
 
 -- TODO(tim): Define an exit type from the conduit for sending blocks to the EVM
 -- TODO(tim): what to do if the block hasn't arrived yet?
 commit :: (StateMachineM m) => Maybe Block -> Conduit BlockstanbulEvent m BlockstanbulEvent
-commit _ = return ()
+commit _ = do
+  s <- use $ view . sequence
+  nextRound . Sequence $ s+1
 
-nextRound :: (StateMachineM m) => Maybe View -> Conduit BlockstanbulEvent m BlockstanbulEvent
-nextRound Nothing = error "next round without a pending view"
-nextRound (Just v) = do
-  view .= v
-  prepared .= M.empty
-  hasPrepared .= False
-  committed .= M.empty
-  hasCommitted .= False
-  hasRoundChanged .= False
-  pendingView .= Nothing
+nextRound :: (StateMachineM m) => NextType -> Conduit BlockstanbulEvent m BlockstanbulEvent
+nextRound nt = do
+  case nt of
+    Sequence s -> view . sequence .= s
+    Round r -> view . round .= r
   vals <- use validators
-  proposer .= vals !! (fromIntegral (viewRound v) `mod` length vals)
+  thisR <- use $ view . round
+  proposer .= vals !! (fromIntegral thisR  `mod` length vals)
+
+  prepared .= M.empty
+  committed .= M.empty
+  roundChanged .= M.empty
+
+  hasPrepared .= False
+  pendingRound .= Nothing
 
 eventLoop :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
 eventLoop = awaitForever $ \ev -> do
@@ -112,20 +115,22 @@ eventLoop = awaitForever $ \ev -> do
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
-      hasSent <- use hasCommitted
-      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
-        hasCommitted .= True
+      when (3 * sameVoteCount > 2 * total && sameHash) $ do
         join $ uses proposal commit
-    RoundChange auth v' -> when (v <= v') $ do
-      rs <- roundChanged <%= M.insert (sender auth) v'
+    RoundChange auth rn -> when (_round v <= rn) $ do
+      rs <- roundChanged <%= M.insert (sender auth) rn
       total <- uses validators length
-      hasSent <- use hasRoundChanged
-      when (3 * M.size rs > total && not hasSent) $ do
-        hasRoundChanged .= True
+      sentRN <- use pendingRound
+      let sameRNCount = M.size . M.filter (== rn) $ rs
+      when (3 * sameRNCount > total && Just rn > sentRN) $ do
+        pendingRound .= Just rn
         -- TODO(tim): use own auth
-        yield (RoundChange auth v')
-      when (3 * M.size rs > 2 * total) $ do
-        join $ uses pendingView nextRound
+        yield (RoundChange auth rn)
+      when (3 * sameRNCount > 2 * total) $ do
+        next <- use pendingRound
+        case next of
+          Nothing -> error "a round was voted on without existing"
+          Just r -> nextRound (Round r)
       return ()
     Timeout -> roundChange
     CommitFailure _ -> roundChange

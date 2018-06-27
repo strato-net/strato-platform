@@ -1,5 +1,7 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Blockstanbul.Messages where
 
+import Control.Lens
 import Control.Monad
 import Data.Text
 
@@ -13,10 +15,13 @@ import Blockchain.ExtendedECDSA
 
 type Seal = ()
 
+type RoundNumber = Word256
+type SequenceNumber = Word256
 data View = View {
-  viewRound :: Word256,
-  viewSequence :: Word256
+  _round :: RoundNumber,
+  _sequence :: SequenceNumber
 } deriving (Eq, Show, Ord)
+makeLenses ''View
 
 data MsgAuth = MsgAuth {
   sender :: Address,
@@ -31,7 +36,7 @@ data BlockstanbulEvent = Preprepare MsgAuth View Block
                        | Prepare MsgAuth View SHA
                        | Commit MsgAuth View SHA Seal
                        | RoundChange {roundchangeAuth :: MsgAuth,
-                                      roundchangeView :: View}
+                                      roundchangeRound :: RoundNumber }
                        | Timeout
                        | CommitFailure Text
                        deriving (Eq, Show)

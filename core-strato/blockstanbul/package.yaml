@@ -26,4 +26,3 @@ tests:
       - blockstanbul
       - hspec
       - hspec-expectations-lifted
-
