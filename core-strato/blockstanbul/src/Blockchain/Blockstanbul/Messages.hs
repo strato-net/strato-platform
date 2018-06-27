@@ -13,9 +13,9 @@ import Blockchain.ExtendedECDSA
 
 type Seal = ()
 
-data RoundId = RoundId {
-  roundidRound :: Word256,
-  roundidSequence :: Word256
+data View = View {
+  viewRound :: Word256,
+  viewSequence :: Word256
 } deriving (Eq, Show, Ord)
 
 data MsgAuth = MsgAuth {
@@ -27,11 +27,11 @@ instance Arbitrary MsgAuth where
   arbitrary = liftM2 MsgAuth arbitrary arbitrary
 
 
-data BlockstanbulEvent = Preprepare MsgAuth RoundId Block
-                       | Prepare MsgAuth RoundId SHA
-                       | Commit MsgAuth RoundId SHA Seal
+data BlockstanbulEvent = Preprepare MsgAuth View Block
+                       | Prepare MsgAuth View SHA
+                       | Commit MsgAuth View SHA Seal
                        | RoundChange {roundchangeAuth :: MsgAuth,
-                                      roundchangeRound :: Word256}
+                                      roundchangeView :: View}
                        | Timeout
                        | CommitFailure Text
                        deriving (Eq, Show)
