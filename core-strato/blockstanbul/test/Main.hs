@@ -30,6 +30,7 @@ testContext = BlockstanbulContext
   M.empty
   M.empty
   False
+  False
 
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext

@@ -35,6 +35,8 @@ data BlockstanbulContext = BlockstanbulContext {
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPrepared :: Bool
+  -- We've already committed this block, no need to do it again.
+  , _hasCommitted :: Bool
 }
 makeLenses ''BlockstanbulContext
 
@@ -64,10 +66,10 @@ commit :: (StateMachineM m) => Maybe Block -> Conduit BlockstanbulEvent m Blocks
 commit _ = return ()
 
 eventLoop :: (StateMachineM m) => Conduit BlockstanbulEvent m BlockstanbulEvent
-eventLoop = awaitForever $ \wm' -> do
-  authz <- lift $ isAuthorized wm'
+eventLoop = awaitForever $ \ev -> do
+  authz <- lift $ isAuthorized ev
   curRound <- use roundId
-  when authz $ case wm' of
+  when authz $ case ev of
     Preprepare auth ri pp -> do
       pr <- use proposer
       when (Just (sender (auth)) == pr) $ do
@@ -92,7 +94,9 @@ eventLoop = awaitForever $ \wm' -> do
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
-      when (3 * sameVoteCount > 2 * total && sameHash) $ do
+      hasSent <- use hasCommitted
+      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
+        hasCommitted .= True
         join $ uses proposal commit
       -- TODO(tim): use own auth
       yield (RoundChange auth (roundidRound ri + 1))
