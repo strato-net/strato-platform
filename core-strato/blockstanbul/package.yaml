@@ -25,4 +25,5 @@ tests:
     dependencies:
       - blockstanbul
       - hspec
+      - hspec-expectations-lifted
 

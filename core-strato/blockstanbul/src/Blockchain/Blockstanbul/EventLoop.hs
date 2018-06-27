@@ -32,6 +32,9 @@ data BlockstanbulContext = BlockstanbulContext {
   , _prepared :: M.Map Address SHA
   -- Validators who have sent us a commitment seal for this round
   , _committed :: M.Map Address (SHA, Seal)
+  -- We've already sent out a commit message to indicate a transition
+  -- to prepared
+  , _hasPrepared :: Bool
 }
 makeLenses ''BlockstanbulContext
 
@@ -78,7 +81,9 @@ eventLoop = awaitForever $ \wm' -> do
       total <- uses validators length
       let sameVoteCount = M.size . M.filter (==di) $ ps
       sameHash <- hasSameHash di
-      when (3 * sameVoteCount >= 2 * total && sameHash) $ do
+      hasSent <- use hasPrepared
+      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
+        hasPrepared .= True
         -- TODO(tim): use own auth
         yield (Commit auth ri di ())
     Commit auth ri di seal -> when (curRound <= ri) $ do
@@ -87,7 +92,7 @@ eventLoop = awaitForever $ \wm' -> do
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
-      when (3 * sameVoteCount >= 2 * total && sameHash) $ do
+      when (3 * sameVoteCount > 2 * total && sameHash) $ do
         join $ uses proposal commit
       -- TODO(tim): use own auth
       yield (RoundChange auth (roundidRound ri + 1))
