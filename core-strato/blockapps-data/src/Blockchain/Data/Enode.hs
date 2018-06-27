@@ -100,7 +100,7 @@ readIP input =
 showEnode :: Enode -> String
 showEnode (Enode pk ip tp up) = 
     "enode://" ++ 
-    (show $ B16.encode pk) ++
+    (C8.unpack $ B16.encode pk) ++
     "@" ++
     (showIP ip) ++ ":" ++
     (show tp) ++ uPort 
