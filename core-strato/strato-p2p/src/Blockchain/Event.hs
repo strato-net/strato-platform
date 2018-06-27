@@ -25,7 +25,6 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
-import           Blockchain.MilenaTools                as K
 
 import           Blockchain.Colors
 import           Blockchain.Context
@@ -45,12 +44,8 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Verification
 
-import           Blockchain.Sequencer.Event            (IngestEvent (..), IngestTx (..), OutputEvent (..),
-                                                        OutputTx (..), blockToIngestBlock, obOrigin, obTotalDifficulty, otBaseTx,
-                                                        outputBlockToBlock)
-import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
-
-import           Blockchain.Util                       (getCurrentMicrotime)
+import           Blockchain.Sequencer.Event            (OutputEvent(..), OutputTx(..), obOrigin, obTotalDifficulty, otBaseTx, outputBlockToBlock)
+import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
@@ -61,21 +56,22 @@ import           Debug.Trace                           (trace)
 data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt | AbortEvt String deriving (Show)
 
 -- MonadBaseControl IO m, MonadIO m
-setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
+setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
     let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
     let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
+    sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        void . produceVMEvents $ map ChainBlock newBlocks
+        runConduit $ yield (map ChainBlock newBlocks) .| sink
     return $ length newBlocks
 
 -- drop every n-th element from the list
 -- e.g. skipEntries 0 [1..20] => [1..20]
---      skipEntries 1 [1..20] => [1,3,5,7,9,11,13,15,17,19]
---      skipEntries 2 [1..20] => [1,4,7,10,13,16,19]
---      skipEntries 3 [1..20] => [1,5,9,13,17]
+--      skipEntries 1 [1..20] => [13,5,7,9,11,13,15,17,19]
+--      skipEntries 2 [1..20] => [14,7,10,13,16,19]
+--      skipEntries 3 [1..20] => [15,9,13,17]
 skipEntries :: Int -> [a] -> [a]
 skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
     where helper xs' = case drop n xs' of
@@ -93,18 +89,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-emitKafkaTransactions :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
-emitKafkaTransactions origin txs = do
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = IETx ts . IngestTx origin <$> txs
-    void . withKafkaViolently $ writeUnseqEvents ingestTxs
-
-emitKafkaBlock :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> Block -> m ()
-emitKafkaBlock origin baseBlock = do
-    let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    void . withKafkaViolently $ writeUnseqEvents [ingestBlock]
-
-handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, K.HasKafkaState m, MonadState Context m, MonadLogger m)
+handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
 handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
@@ -115,7 +100,7 @@ handleEvents mode peer = awaitForever $ \case
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
         _ <- lift $ insertTX mode txo Nothing txs
-        emitKafkaTransactions txo txs
+        SK.emitKafkaTransactions txo txs
         return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
@@ -142,7 +127,7 @@ handleEvents mode peer = awaitForever $ \case
                     syncFetch Forward fetchNumber
                 Just _  -> do
                     lift . void $ setTitleAndProduceBlocks [block']
-                    void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+                    void $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         stampActionTimestamp
@@ -253,7 +238,7 @@ handleEvents mode peer = awaitForever $ \case
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
-        forM_ blocks' $ lift . emitKafkaBlock (Origin.PeerString $ peerString peer)
+        forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
         let remainingHeaders = drop (length bodies) headers
         lift $ putBlockHeaders remainingHeaders
         if null remainingHeaders

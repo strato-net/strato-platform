@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies      #-}
 
 module Blockchain.SeqEventNotify (
-  seqEventNotifictationSource
+  seqEventNotificationSource
   ) where
 
 import           Conduit
@@ -18,14 +18,14 @@ import qualified Network.Kafka.Protocol     as KP
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqEvents, seqEventsTopicName)
 
-seqEventNotifictationSource :: ( MonadIO m
-                               , MonadBaseControl IO m
-                               , MonadResource m
-                               , MonadLogger m
-                               , K.HasKafkaState m
-                               )
-                            => Source m OutputEvent
-seqEventNotifictationSource = do
+seqEventNotificationSource :: ( MonadIO m
+                              , MonadBaseControl IO m
+                              , MonadResource m
+                              , MonadLogger m
+                              , K.HasKafkaState m
+                              )
+                           => Source m OutputEvent
+seqEventNotificationSource = do
     ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqEventsTopicName
     loop ofs'
     where loop nextOffset = do

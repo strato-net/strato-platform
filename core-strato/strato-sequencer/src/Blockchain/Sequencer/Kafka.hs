@@ -8,14 +8,24 @@ module Blockchain.Sequencer.Kafka (
     readSeqEvents,
     readSeqEventsFromTopic,
     writeUnseqEvents,
-    writeSeqEvents
+    writeSeqEvents,
+    HasUnseqSink(..),
+    HasSeqSink(..),
+    emitKafkaTransactions,
+    emitKafkaBlock
 ) where
 
+import           Conduit
+import           Data.Void
 import           Data.Binary                (Binary, decode, encode)
 
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.KafkaTopics     (lookupTopic)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Stream.Raw
+import           Blockchain.Util
 
 import qualified Data.ByteString.Lazy       as BL
 import qualified Network.Kafka              as K
@@ -62,3 +72,22 @@ readFromTopic' topic offset = do
   return $ map (decode . BL.fromStrict) bytes
   --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}
+
+class HasUnseqSink k where
+  getUnseqSink :: k (Conduit [IngestEvent] k Void)
+
+class HasSeqSink k where
+  getSeqSink :: k (Conduit [OutputEvent] k Void)
+
+emitKafkaTransactions :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> [Transaction] -> m ()
+emitKafkaTransactions origin txs = do
+    ts <- liftIO getCurrentMicrotime
+    let ingestTxs = IETx ts . IngestTx origin <$> txs
+    sink <- getUnseqSink
+    runConduit (yield ingestTxs .| sink)
+
+emitKafkaBlock :: (Monad m, HasUnseqSink m) => Origin.TXOrigin -> Block -> m ()
+emitKafkaBlock origin baseBlock = do
+    let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
+    sink <- getUnseqSink
+    runConduit (yield [ingestBlock] .| sink)

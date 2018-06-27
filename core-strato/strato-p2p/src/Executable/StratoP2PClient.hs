@@ -73,11 +73,11 @@ runPeer peer myPriv _ _ = runResourceT $ do
 
         !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
         let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-        (attempt :: Either SomeException ()) <- try $
-                    eventSource
-                       =$= handleMsgClientConduit myPublic peer
-                       =$= eventSink
-                        $$ appSink app
+        (attempt :: Either SomeException ()) <- try . runConduit $
+                eventSource
+             .| handleMsgClientConduit myPublic peer
+             .| eventSink
+             .| appSink app
 
         void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 0
         case attempt of

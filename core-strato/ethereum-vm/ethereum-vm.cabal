@@ -110,7 +110,6 @@ test-suite ethereum-vm-test
     type: exitcode-stdio-1.0
     hs-source-dirs: test
     main-is: Spec.hs
-    other-modules: VM.VMSpec
     build-depends:       aeson,
                          base,
                          base16-bytestring,

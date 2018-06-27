@@ -118,10 +118,11 @@ pipeline {
           usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
         ]) {
           sh '''#!/bin/bash -le
-            set -x
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            cd strato-platform
-            docker-compose -f docker-compose.push.yml push
+            # Removing temporarily -- need to verify but this is probably not a needed step.
+            #set -x
+            #docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+            #cd strato-platform
+            #docker-compose -f docker-compose.push.yml push
           '''
         }
       }

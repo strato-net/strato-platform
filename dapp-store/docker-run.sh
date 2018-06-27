@@ -32,4 +32,4 @@ sed -i "s|__CIRRUS_URL__|$CIRRUS_URL|g" build/index.html
 #   curl http://api.mixpanel.com/track/?data=ewogICAgImV2ZW50IjogInNtZF9jb250YWluZXJfc3RhcnRlZF9hd3MiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRva2VuIjogImRhZjE3MWU5MDMwYWJiM2UzMDJkZjlkNzhiNmIxYWEwIgogICAgfQp9&ip=1
 # fi
 
-serve --port 3000 build
+serve -l 3000 build
