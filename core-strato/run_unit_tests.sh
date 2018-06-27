@@ -2,8 +2,12 @@
 
 declare -i RESULT=0
 TESTS=(
-  strato-init
   blockapps-data
+  blockapps-ecrecover
+  ethereum-vm
+  merkle-patricia-db
+  statsdi
+  strato-init
   strato-p2p
   strato-redis-blockdb
   strato-sequencer
