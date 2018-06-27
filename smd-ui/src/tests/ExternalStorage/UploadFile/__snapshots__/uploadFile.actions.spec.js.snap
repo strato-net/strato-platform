@@ -1,0 +1,62 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`UploadFile: actions Modal: close 1`] = `
+Object {
+  "type": "CLOSE_UPLOAD_MODAL",
+}
+`;
+
+exports[`UploadFile: actions Modal: open 1`] = `
+Object {
+  "type": "OPEN_UPLOAD_MODAL",
+}
+`;
+
+exports[`UploadFile: actions Reset errors 1`] = `
+Object {
+  "type": "RESET_UPLOAD_ERROR",
+}
+`;
+
+exports[`UploadFile: actions Upload: failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "UPLOAD_FILE_FAILURE",
+}
+`;
+
+exports[`UploadFile: actions Upload: request 1`] = `
+Object {
+  "data": Object {
+    "address": "23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c",
+    "content": Array [
+      Object {
+        "preview": "blob:http://localhost:3000/5952fbb0-1598-483f-a050-2e9d8f2f95f6",
+      },
+    ],
+    "description": "widescreen is one of the most important factor",
+    "password": "password",
+    "provider": "s3",
+    "username": "tanuj55@mailinator.com",
+  },
+  "type": "UPLOAD_FILE_REQUEST",
+}
+`;
+
+exports[`UploadFile: actions Upload: success 1`] = `
+Object {
+  "result": Object {
+    "contractAddress": "23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c",
+    "metadata": "widescreen is one of the most important factor",
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1529905060401-widescreen.jpeg",
+  },
+  "type": "UPLOAD_FILE_SUCCESS",
+}
+`;
+
+exports[`UploadFile: actions change username 1`] = `
+Object {
+  "name": "tanuj55",
+  "type": "USERNAME_FORM_CHANGE",
+}
+`;

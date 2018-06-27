@@ -78,7 +78,7 @@ exports[`ExternalStorage: index render component with values 1`] = `
     </div>
   </div>
   <List uploadList={{...}} />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(UplaodFile)) />
   <withRouter(Connect(ReduxForm)) />
   <withRouter(Connect(ReduxForm)) />
   <withRouter(Connect(ReduxForm)) />
@@ -101,7 +101,7 @@ exports[`ExternalStorage: index render component without values 1`] = `
     </div>
   </div>
   <List uploadList={{...}} />
-  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(UplaodFile)) />
   <withRouter(Connect(ReduxForm)) />
   <withRouter(Connect(ReduxForm)) />
   <withRouter(Connect(ReduxForm)) />
