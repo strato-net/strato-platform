@@ -70,11 +70,9 @@ spec = parallel $ do
         curRound <- use roundId
         let input = [Preprepare auth curRound blk]
         let hash = blockHash blk
-        got <- sendMessages input
         -- TODO(tim): change the auth to be that of the eventloop
-        got `shouldBe` [Prepare auth curRound hash]
-        gotProp <- use proposal
-        gotProp `shouldBe` Just blk
+        sendMessages input `shouldReturn` [Prepare auth curRound hash]
+        use proposal `shouldReturn` Just blk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do
@@ -83,10 +81,8 @@ spec = parallel $ do
         authenticator .= const False
         curRound <- use roundId
         let input = [Preprepare auth curRound blk]
-        got <- sendMessages input
-        got `shouldBe` []
-        gotProp <- use proposal
-        gotProp `shouldBe` Nothing
+        sendMessages input `shouldReturn` []
+        use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
       runTest $ do
@@ -94,10 +90,8 @@ spec = parallel $ do
         validators .= [sender auth, addr]
         curRound <- use roundId
         let input = [Preprepare auth curRound blk]
-        got <- sendMessages input
-        got `shouldBe` []
-        gotProp <- use proposal
-        gotProp `shouldBe` Nothing
+        sendMessages input `shouldReturn` []
+        use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-validator" $ property $ \auth blk ->
       runTest $ do
@@ -105,10 +99,8 @@ spec = parallel $ do
         validators .= []
         curRound <- use roundId
         let input = [Preprepare auth curRound blk]
-        got <- sendMessages input
-        got `shouldBe` []
-        gotProp <- use proposal
-        gotProp `shouldBe` Nothing
+        sendMessages input `shouldReturn` []
+        use proposal `shouldReturn` Nothing
 
     it "round-changes an old preprepare" $ property $ \auth blk ->
       runTest $ do
@@ -127,19 +119,15 @@ spec = parallel $ do
         proposal .= Just blk
         let di = blockHash blk
         let input = [Prepare auth curRound di]
-        got <- sendMessages input
         -- Only one validator, so that should be a majority
-        got `shouldBe` [Commit auth curRound di ()]
-        gotVotes <- use prepared
-        gotVotes `shouldBe` M.singleton (sender auth) di
+        sendMessages input `shouldReturn` [Commit auth curRound di ()]
+        use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
         validators .= [sender auth]
         curRound <- use roundId
-        got <- sendMessages [Prepare auth curRound di]
-        got `shouldBe` []
-        gotVotes <- use prepared
-        gotVotes `shouldBe` M.singleton (sender auth) di
+        sendMessages [Prepare auth curRound di] `shouldReturn` []
+        use prepared `shouldReturn` M.singleton (sender auth) di
     it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
       runTest $ do
         proposal .= Just blk
@@ -147,10 +135,8 @@ spec = parallel $ do
         validators .= [a1, a2, a3]
         curRound <- use roundId
         let input = map (\a -> Prepare (MsgAuth a sig) curRound di) [a1, a2, a3]
-        got <- sendMessages input
-        got `shouldBe` [Commit (MsgAuth a3 sig) curRound di ()]
-        votes <- use prepared
-        votes `shouldBe` M.fromList [(a1, di), (a2, di), (a3, di)]
+        sendMessages input `shouldReturn` [Commit (MsgAuth a3 sig) curRound di ()]
+        use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
     it "only sends one commit message" $ property $ \sig as blk ->
       runTest $ do
