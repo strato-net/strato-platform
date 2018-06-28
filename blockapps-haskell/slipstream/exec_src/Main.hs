@@ -79,7 +79,6 @@ stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
   (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
   ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  --Early stage of slipstream ommits updates
   ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
@@ -89,6 +88,7 @@ toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
   case eitherDecode x of
    Left e -> error $ show e
+   --Right y -> traceShow(y) y
    Right y -> y
 
 enterBloc2 :: BlocEnv -> Bloc x -> IO x
@@ -104,6 +104,16 @@ enterBloc2 env x = do
 
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+
+{-
+getContract::String->String->Bloc (Either String Contract)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ Left "Blank contract"
+getContract address _ = do
+  qqqq <-
+    getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
+
+  return $ xAbiToContract $ contractdetailsXabi qqqq
+-}
 
 getContract::String->String->Bloc (Either String Contract, String)
 getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ (Left "Blank contract", "Blank ABI")
@@ -187,7 +197,6 @@ useTPGDatabase (defaultPGDatabase { pgDBName = "postgres", pgDBUser = "postgres"
 dbInsert :: String -> IO()
 dbInsert insrt = do
   let conHost = flags_pghost :: HostName
-  --let conHost = "172.18.0.6" :: HostName
   let conPort = PortNumber $ read flags_pgport
   let conUser = BC.pack flags_pguser :: B.ByteString
   let conPass = BC.pack flags_password :: B.ByteString
@@ -219,11 +228,15 @@ convertRet address codehash abi x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
-      -- Change contract name here
+
       let contractName = take 30 codehash
+
       let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
       let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
+
+      --Write contract info
       let list = H.toList $ H.filter isString x
+
       let beg = "BEGIN;"
       let comm = "COMMIT;"
       let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
@@ -232,7 +245,7 @@ convertRet address codehash abi x = do
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
       let oneIns = beg ++ conIns ++ createSt ++ ins ++ comm
       p <- dbInsert oneIns
-      --print p
+      print p
 
   -- case x of
   --  Left ex  -> return "Caught exception: " ++ show ex
@@ -286,6 +299,7 @@ processTheMessages messages = do
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
 
   let conHost = flags_pghost
+  --let conHost = "172.18.0.6"
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -327,8 +341,8 @@ processTheMessages messages = do
                Action _ a c (Just s) -> (a, c, storageToFunction s)
                Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
 
+        --cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
         cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String))
-
         contractMetaData <-
           case Map.lookup codehash cachedContracts of
            Just c -> do
@@ -342,6 +356,7 @@ processTheMessages messages = do
                 return (c, abi)
 
         let strAbi = snd contractMetaData
+        liftIO $ putStrLn $ "address: " ++ show(address)
 
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $
@@ -362,8 +377,12 @@ getTheMessages offset = do
 getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
+  --liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
+
+  --liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
   getAndProcessMessages $ (offset + fromIntegral (length messages))
+
 
 main::IO ()
 main = do
