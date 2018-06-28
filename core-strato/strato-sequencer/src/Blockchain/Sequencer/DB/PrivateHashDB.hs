@@ -12,6 +12,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import qualified Data.Sequence                as Q
+import qualified Data.Set                     as S
 
 import           Blockchain.Strato.Model.Class
 
@@ -19,6 +20,8 @@ data PrivateHashDB =
      PrivateHashDB { txHashMap    :: Map SHA Transaction -- TODO: Make these LDB entries
                    , chainHashMap :: Map SHA (Bool, Word256)
                    , chainBuffers :: Map Word256 (CircularBuffer SHA) -- TODO: Use buffers to remove old entries
+                   , seenChains   :: S.Set Word256
+                   , missingChainDB :: Map Word256 [Transaction]
                    }
 
 data CircularBuffer a =
@@ -34,7 +37,7 @@ emptyCircularBuffer :: CircularBuffer a
 emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
 emptyPrivateHashDB :: PrivateHashDB
-emptyPrivateHashDB  = PrivateHashDB Map.empty Map.empty Map.empty
+emptyPrivateHashDB  = PrivateHashDB Map.empty Map.empty Map.empty S.empty Map.empty
 
 class (MonadResource m) => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
@@ -127,3 +130,33 @@ class (MonadResource m) => HasPrivateHashDB m where
       let h = hash . rlpSerialize $ rlpEncode cInfo
       insertChainHash h cId
       insertChainBufferEntry cId h
+
+    lookupChainId :: Word256 -> m Bool
+    lookupChainId chainId = do
+      db <- getPrivateHashDB
+      return $ S.member chainId (seenChains db)
+
+    insertChainId :: Word256 -> m ()
+    insertChainId chainId = do
+      db <- getPrivateHashDB
+      putPrivateHashDB db{seenChains = S.insert chainId (seenChains db)}
+
+    lookupMissingTxs :: Word256 -> m [Transaction]
+    lookupMissingTxs chainId = do
+      db <- missingChainDB <$> getPrivateHashDB
+      case Map.lookup chainId db of
+        Nothing -> return []
+        Just txs -> return txs
+
+    insertMissingTx :: Word256 -> Transaction -> m ()
+    insertMissingTx chainId tx = do
+      db <- getPrivateHashDB
+      let m = missingChainDB db
+      case Map.lookup chainId m of
+        Nothing -> putPrivateHashDB db{missingChainDB = Map.insert chainId [tx] m}
+        Just stuff -> putPrivateHashDB db{missingChainDB = Map.insert chainId (tx:stuff) m}
+
+    clearMissingTxs :: Word256 -> m ()
+    clearMissingTxs chainId = do
+      db <- getPrivateHashDB
+      putPrivateHashDB db{missingChainDB = Map.delete chainId (missingChainDB db)}
