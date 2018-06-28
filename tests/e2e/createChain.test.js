@@ -35,24 +35,42 @@ describe("Create Chain", function() {
     const removeRule = 'My remove rule';
     const members = ["enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301","enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301"];
     const balances = [
-               { address:"00000000000000000000000000000000deadbeef"
+               { address: alice.address
                , balance:"0000000000000000000000000000000000000001000000000000000000000000"
                },
-               { address:"0000000000000000000000000000000012345678"
+               { address: bob.address
                , balance:"0000000000000000000000000000000000000001234500000000000000000000"
                }];
     console.log(balances);
     const chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
+    console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
 
+    yield promiseTimeout(1000);
+
     const chainInfo = yield rest.getChainInfo(chainId);
+    console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
-    assert.isEqual(label, chainInfo.label, "chain labels should be identical");
-    assert.isEqual(addRule, chainInfo.addRule, "chain labels should be identical");
-    assert.isEqual(removeRule, chainInfo.removeRule, "chain labels should be identical");
-    assert.isEqual(members, chainInfo.members, "chain labels should be identical");
-    assert.isEqual(balances, chainInfo.balances, "chain labels should be identical");
+    assert.equal(label, chainInfo.label, "chain labels should be identical");
+    assert.equal(addRule, chainInfo.addRule, "chain addRules should be identical");
+    assert.equal(removeRule, chainInfo.removeRule, "chain removeRules should be identical");
+    assert.deepEqual(members, chainInfo.members, "chain members should be identical");
+    assert.deepEqual(balances, chainInfo.balances, "chain balances should be identical");
+
+    for(var i=0; i < 10; i++) {
+      const txResult = yield rest.send(alice, bob, 123456, chainId);
+      console.log('### TRANSACTION RESULT ###', txResult);
+    }
+
   });
 
 });
+
+function promiseTimeout(timeout) {
+  return new Promise(function(resolve, reject) {
+    setTimeout(function() {
+      resolve();
+    }, timeout);
+  });
+}

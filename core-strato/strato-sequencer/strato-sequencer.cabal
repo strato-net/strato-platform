@@ -35,7 +35,6 @@ library
                      , clock
                      , containers
                      , directory
-                     , ghc
                      , mtl
                      , resourcet
                      , monad-logger

@@ -26,8 +26,6 @@ import           Blockchain.Strato.Model.SHA          (SHA(..))
 
 import qualified Database.LevelDB                     as DB
 
-import           Numeric                              (showHex)
-
 {-
 |-------------------------------------------------------------------------------|
 |                          The Chain State Root DB                              |
@@ -155,31 +153,27 @@ putGenesisStateRoot cid sr = do
   putGenesisRoot newGenesisRoot
 
 getChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> m (Maybe MP.StateRoot)
-getChainStateRoot chainId (SHA bHash) = do
-  db <- getLDB
-  bhdb <- MP.MPDB db <$> getBlockHashRoot
-  mChainRoot <- getkv bhdb (word256ToMPKey bHash)
-  mStateRoot <- forJust mChainRoot Nothing $ \chainRoot -> do
-    let cdb = MP.MPDB db chainRoot
-    getkv cdb (word256ToMPKey chainId)
-  forNothing mStateRoot Just $ do
+getChainStateRoot chainId bHash = do
+  mChainRoot <- getChainRoot bHash
+  (mStateRoot :: Maybe (Word256, MP.StateRoot))
+    <- forJust mChainRoot Nothing $ \chainRoot -> do
+      cdb <- flip MP.MPDB chainRoot <$> getLDB
+      getkv cdb (word256ToMPKey chainId)
+  forNothing mStateRoot (Just . snd) $ do
     mGenStateRoot <- getGenesisStateRoot chainId
     forJust mGenStateRoot Nothing $ \genStateRoot -> do
-      putChainStateRoot chainId (SHA bHash) genStateRoot
+      putChainStateRoot chainId bHash genStateRoot
       return $ Just genStateRoot
 
 putChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
-putChainStateRoot chainId (SHA bHash) stateRoot = do
-  db <- getLDB
-  bhdb <- MP.MPDB db <$> getBlockHashRoot
-  mChainRoot <- getkv bhdb (word256ToMPKey bHash)
+putChainStateRoot chainId bHash stateRoot = do
+  mChainRoot <- getChainRoot bHash
   case mChainRoot of
-    Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ (showHex bHash "") ++ ", but it doesn't exist"
+    Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ format bHash ++ ", but it doesn't exist"
     Just chainRoot -> do
-      let cdb = MP.MPDB db chainRoot
-      newChainRoot <- putkv cdb (word256ToMPKey chainId) stateRoot
-      newBlockHashRoot <- putkv bhdb (word256ToMPKey bHash) newChainRoot
-      putBlockHashRoot newBlockHashRoot
+      cdb <- flip MP.MPDB chainRoot <$> getLDB
+      newChainRoot <- putkv cdb (word256ToMPKey chainId) (chainId, stateRoot)
+      putChainRoot bHash newChainRoot
 
 withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
 withBlockchain bh cid f = do
@@ -193,5 +187,7 @@ withBlockchain bh cid f = do
           existingStateRoot <- getStateRoot
           setStateDBStateRoot stateRoot
           a <- f
+          newStateRoot <- getStateRoot
+          putChainStateRoot chainId bh newStateRoot
           setStateDBStateRoot existingStateRoot
           return a

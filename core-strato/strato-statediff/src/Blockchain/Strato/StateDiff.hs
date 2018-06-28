@@ -27,6 +27,7 @@ import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord
 
+import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource
 
 import           Data.Aeson
@@ -164,23 +165,22 @@ chainDiff blockNumber oldBlockHash newBlockHash = do
     (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
   where
     go sds [] = return sds
-    go sds (Diff.Create k v : rest) = do
-      let chainId = toChainId k
-          sr = retrieveMPDBValue v
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash emptyTriePtr sr
+    go sds (Diff.Create _ v : rest) = do
+      let (chainId, sr) = rlpDecode v
+      genSR <- maybe emptyTriePtr id <$> getGenesisStateRoot chainId
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash genSR sr
       go (sd:sds) rest
-    go sds (Diff.Delete k v : rest) = do
-      let chainId = toChainId k
-          sr = retrieveMPDBValue v
+    go sds (Diff.Delete _ v : rest) = do
+      let (chainId, sr) = rlpDecode v
       sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
       go (sd:sds) rest
-    go sds (Diff.Update k v1 v2 : rest) = do
-      let chainId = toChainId k
-          sr1 = retrieveMPDBValue v1
-          sr2 = retrieveMPDBValue v2
+    go sds (Diff.Update _ v1 v2 : rest) = do
+      let (chainId, sr1) = rlpDecode v1
+          (chainId2, sr2) = rlpDecode v2
+      when (chainId /= chainId2) $
+        error $ "chainDiff.Update: decoded two different chainIds for Update: " ++ show chainId ++ " and " ++ show chainId2
       sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
       go (sd:sds) rest
-    toChainId = bytesToWord256 . BS.unpack . nibbleString2ByteString . N.pack
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
