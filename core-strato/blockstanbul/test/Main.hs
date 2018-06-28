@@ -20,6 +20,7 @@ import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.SHA
+import qualified Network.Haskoin.Crypto as HK
 
 main :: IO ()
 main = hspec spec
@@ -36,6 +37,7 @@ testContext = BlockstanbulContext
   False
   Nothing
   M.empty
+  (fromMaybe (error "working key now fails") HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext

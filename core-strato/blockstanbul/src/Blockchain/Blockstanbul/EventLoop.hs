@@ -14,6 +14,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Messages
 import Blockchain.SHA
+import qualified Network.Haskoin.Crypto as HK
 
 type StateMachineM m = (MonadIO m, MonadState BlockstanbulContext m)
 
@@ -40,7 +41,11 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
+
+  -- The nodekey for this validator
+  , _prvkey :: HK.PrvKey
 }
+
 makeLenses ''BlockstanbulContext
 
 isAuthorized :: (StateMachineM m) => BlockstanbulEvent -> m Bool

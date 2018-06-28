@@ -4,6 +4,7 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-data
+  - blockapps-haskoin
   - blockapps-util
   - containers
   - conduit-combinators
