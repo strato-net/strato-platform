@@ -23,7 +23,6 @@ module Blockchain.Data.Address (
 import           Data.Binary
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.NibbleString               as N
-import           Numeric
 
 import           Blockchain.Data.RLP
 import           Blockchain.SHA

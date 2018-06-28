@@ -9,6 +9,9 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
+-- TODO(tim): Replace runInsertReturning with runInsertManyReturning
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+
 module BlockApps.Bloc22.Database.Queries where
 
 
@@ -24,7 +27,6 @@ import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
-import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
@@ -39,7 +41,7 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
-import           Opaleye                         hiding (not, null)
+import           Opaleye                         hiding (not, null, index)
 import qualified Opaleye                         (not, null)
 
 
@@ -681,11 +683,11 @@ getXabiFunctionsQuery :: HasCallStack =>
                          Int32 -> Bloc (Map Text Func)
 getXabiFunctionsQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (xfId,contractmetadataId,isConstr,name) <-
+    (xfId,contractmetadataId,isConstr,name,mut) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& Opaleye.not isConstr
-    returnA -< (name,xfId)
-  for funcsWithIds $ \ xfId -> do --TODO remove the selector from the DB
+    returnA -< (name,(xfId, mut))
+  for funcsWithIds $ \ (xfId, mut) -> do --TODO remove the selector from the DB
     args <- getXabiFunctionsArgsQuery xfId
     let
       valMap valList = Map.fromList
@@ -696,8 +698,7 @@ getXabiFunctionsQuery cmId = do
     return  Func { funcArgs = args
                  , funcVals = vals
                  , funcContents = Nothing
-                 , funcMutable = Nothing
-                 , funcPayable = Nothing
+                 , funcStateMutability = mut
                  , funcVisibility = Nothing
                  , funcModifiers = Nothing
                  }
@@ -714,7 +715,7 @@ getXabiConstrQuery :: HasCallStack =>
                          Int32 -> Bloc (Map Text Func)
 getXabiConstrQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (xfId,contractmetadataId,isConstr,name) <-
+    (xfId,contractmetadataId,isConstr,name, _) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& isConstr
     returnA -< (name,xfId)
@@ -731,9 +732,8 @@ getXabiConstrQuery cmId = do
       vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
       let func = Func { funcArgs = args
                       , funcVals = vals
+                      , funcStateMutability = Nothing
                       , funcContents = Nothing
-                      , funcMutable = Nothing
-                      , funcPayable = Nothing
                       , funcVisibility = Nothing
                       , funcModifiers = Nothing
                       }
@@ -741,7 +741,7 @@ getXabiConstrQuery cmId = do
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do
-  (_,cmid,isc,name) <-
+  (_,cmid,isc,name,_) <-
     queryTable xabiFunctionsTable -< ()
   restrict -< cmid .== constant metadataId .&& Opaleye.not isc
   returnA -< name
@@ -953,6 +953,14 @@ instance Default Constant PubKey (Column PGBytea) where
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
+instance Default Constant StateMutability (Column PGText) where
+  def = lmap tShow def
+
+instance QueryRunnerColumnDefault PGText StateMutability where
+  queryRunnerColumnDefault = queryRunnerColumn id
+    (fromMaybe (error "could not decode mutability") . tRead)
+    queryRunnerColumnDefault
+
 instance QueryRunnerColumnDefault PGBytea Keccak256 where
   queryRunnerColumnDefault =
     queryRunnerColumn id toKecc queryRunnerColumnDefault
@@ -1011,7 +1019,7 @@ insertXabiFunction
   -> Bloc ()
 insertXabiFunction metadataId (name,Func{..}) = do
   funcIds :: [Int32] <- blocQuery $ proc () -> do
-    (fId,cmId,_,fname) <- queryTable xabiFunctionsTable -< ()
+    (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
     restrict -< cmId .== constant metadataId
       .&& fname .== constant name
     returnA -< fId
@@ -1021,8 +1029,9 @@ insertXabiFunction metadataId (name,Func{..}) = do
       , constant metadataId
       , constant False
       , constant name
+      , constant funcStateMutability
       )
-      (\ (xfId,_,_,_) -> xfId)
+      (\ (xfId,_,_,_,_) -> xfId)
     void $ insertXabiFunctionArg funcId funcArgs
     void $ insertXabiFunctionRet funcId (toList funcVals)
 
@@ -1037,8 +1046,9 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
     , constant metadataId
     , constant True
     , constant contractName
+    , constant (Nothing :: Maybe StateMutability)
     )
-    (\ (xfId,_,_,_) -> xfId)
+    (\ (xfId,_,_,_, _) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
@@ -1256,14 +1266,14 @@ insertXabiType = \case
     --       )
     --     | (name,value) <- zip names [(0::Int32)..]]
     -- return tyid
-  Xabi.Array dynamic len entry -> do
+  Xabi.Array entry len -> do
     entryId <- insertXabiType entry
     blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Array"::Text)
         , Opaleye.null
-        , constant $ fromMaybe False dynamic
+        , constant $ isNothing len
         , constant False
         , Opaleye.null
         , constant (fmap fromIntegral len :: Maybe Int32)
@@ -1349,7 +1359,7 @@ getXabiType typeId = do
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
-      return $ Xabi.Array (Just xtdy) (fmap fromIntegral (xtlen :: Maybe Int32))  xtet
+      return $ Xabi.Array xtet (fmap fromIntegral (xtlen :: Maybe Int32))
     "Contract" -> do
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
       return $ Xabi.Contract xttd'
@@ -1463,22 +1473,25 @@ getContractXabiByMetadataId metadataId = do
   return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
-getContractContractByMetadataId metadataId = do
+getContractContractByMetadataId metadataId = getContractRetry 0
+  where
   -- Impatient clients may have submitted a contract and immediately issued
   -- a function call against it. Here we give a basic defense against it.
   -- A much nicer way to handle that is to return cookies to the client
   -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
-  let sleeps = [0, 40, 80, 160, 320, 640, 1280]
-      getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
-  xabis <- zipWithM getWait (repeat metadataId) sleeps
-  let ctracts = map xAbiToContract xabis
-  case rights ctracts of
-    (ctract:_) -> return ctract
-    _ -> throwError . UserError .
-            ("getContractContractByMetadataId: invalid types in contract: " <>) .
-            Text.pack . show . head $ ctracts
-
+  -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
+      sleep t = liftIO . threadDelay . (1000*) $ t
+      getContractRetry :: Int -> Bloc Contract
+      getContractRetry t = do
+        x <- getContractXabiByMetadataId metadataId
+        case xAbiToContract x of
+          Right c -> return c
+          Left err ->
+            if t < 5000
+              then sleep t >> getContractRetry (1 + 2 * t)
+              else throwError . UserError $
+                    "getContractContractByMetadataId: invalid types in contract: " <> (Text.pack . show $ err)
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
@@ -1516,7 +1529,7 @@ getContractMetadataAndBin contract = blocTransaction $ do
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
 getConstructorId cmId = do
   functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_)
+    (xfId,contractMetaDataId,isConstr,_,_)
       <- queryTable xabiFunctionsTable -< ()
     restrict -< contractMetaDataId .== constant cmId .&& isConstr
     returnA -< xfId
@@ -1524,7 +1537,7 @@ getConstructorId cmId = do
 
 getFunctionId :: Int32 -> Text -> Bloc Int32
 getFunctionId cmId funcName = blocQuery1 $ proc () -> do
-  (xfId,contractMetaDataId,isConstr,name)
+  (xfId,contractMetaDataId,isConstr,name,_)
     <- queryTable xabiFunctionsTable -< ()
   restrict -< contractMetaDataId .== constant cmId
     .&& name .== constant funcName

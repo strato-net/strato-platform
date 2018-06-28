@@ -58,6 +58,7 @@ import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import           Data.Proxy
 import           Data.Swagger
+import qualified Data.Swagger                 as Sw
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -216,12 +217,6 @@ instance FromHttpApiData Word256 where
 
 instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
-
-instance ToSchema Natural where
-  declareNamedSchema = const . pure $ named "Natural" $ sketchSchema (8 :: Natural)
-
-instance ToParamSchema Natural where
-  toParamSchema _ = mempty & type_ .~ SwaggerInteger
 
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
@@ -547,7 +542,7 @@ exampleTxResult :: TransactionResult
 exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage" Nothing
 
 stratoSchemaOptions :: SchemaOptions
-stratoSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
+stratoSchemaOptions = defaultSchemaOptions {Sw.fieldLabelModifier = camelCase . dropFPrefix}
 
 newtype BatchTransactionResult = BatchTransactionResult
     { unBatchTransactionResult :: Map Keccak256 [TransactionResult]

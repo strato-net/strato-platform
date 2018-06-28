@@ -3,11 +3,15 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module BlockApps.Bloc22.API.Git where
 
 import           Data.Aeson
 import           Data.Swagger
+import           Data.Proxy
+import           Data.ByteString.Char8 (pack, unpack)
+import           Data.ByteString.Lazy  (fromStrict, toStrict)
 import           Development.GitRev
 import           GHC.Generics
 import           Servant.API
@@ -17,7 +21,7 @@ import           Test.QuickCheck
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type GetGitInfo = "git" :> Get '[JSON] GitInfo
+type GetGitInfo = Get '[JSON, PlainText] GitInfo
 
 gitInfo :: GitInfo
 gitInfo = GitInfo
@@ -38,9 +42,16 @@ data GitInfo = GitInfo
   , gitInfoDescribe :: String
   , gitInfoDirty :: Bool
   , gitInfoDirtyTracked :: Bool
-  } deriving (Show,Generic)
+  } deriving (Show, Generic, Ord, Read, Eq)
+
 instance ToJSON GitInfo
 instance FromJSON GitInfo
 instance ToSample GitInfo where toSamples _ = singleSample gitInfo
 instance Arbitrary GitInfo where arbitrary = return gitInfo
 instance ToSchema GitInfo
+
+instance MimeRender PlainText GitInfo where
+  mimeRender Proxy = fromStrict . pack . show
+
+instance MimeUnrender PlainText GitInfo where
+  mimeUnrender Proxy = read . unpack . toStrict

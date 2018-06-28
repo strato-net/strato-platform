@@ -17,7 +17,8 @@ import           Control.Monad.Logger         (MonadLogger, runNoLoggingT)
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
-import qualified Database.Persist.Postgresql  as SQL
+import           qualified Database.Persist.Sql as SQL
+import           qualified Database.Persist.Postgresql as PSQL
 
 import           Data.IORef
 import           System.IO.Unsafe             (unsafePerformIO)
@@ -36,14 +37,14 @@ sqlQuery q = do
                SQL.runSqlPool q db
 
 runPostgresConn :: (MonadBaseControl IO m, MonadIO m, MonadLogger m, backend ~ SQL.SqlBackend)
-                => SQL.ConnectionString
+                => PSQL.ConnectionString
                 -> ReaderT backend m a
                 -> m a
-runPostgresConn pgConn = SQL.withPostgresqlConn pgConn . runReaderT
+runPostgresConn pgConn = PSQL.withPostgresqlConn pgConn . runReaderT
 
 createPostgresqlPool' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, backend ~ SQL.SqlBackend)
-                      => SQL.ConnectionString -> Int -> m SQLDB
-createPostgresqlPool' = SQL.createPostgresqlPool
+                      => PSQL.ConnectionString -> Int -> m SQLDB
+createPostgresqlPool' = PSQL.createPostgresqlPool
 
 globalSQLPool :: IORef SQLDB
 globalSQLPool = unsafePerformIO $ do

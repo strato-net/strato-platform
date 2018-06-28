@@ -998,7 +998,7 @@ getFromSelector sel _ sr codeHash = do
           envJumpDests = getValidJUMPDESTs theCode
           }
   (eRes, _) <-
-    runVMM False True S.empty 0 env 1000000000000000000 $ call' True
+    runVMM isRunningTests' True S.empty 0 env 1000000000000000000 $ call' True
 
   setStateDBStateRoot stateRoot
   case eRes of

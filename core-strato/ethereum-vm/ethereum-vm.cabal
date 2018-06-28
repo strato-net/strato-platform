@@ -21,9 +21,12 @@ library
     default-language: Haskell98
     build-depends:
                    base >= 4 && < 5
+                 , ansi-wl-pprint
                  , base16-bytestring
                  , binary
                  , blockapps-data
+                 , blockapps-haskoin
+                 , blockapps-milena
                  , blockapps-util
                  , bytestring
                  , containers
@@ -32,33 +35,30 @@ library
                  , either
                  , ethereum-encryption
                  , ethereum-rlp
-                 , blockapps-haskoin
+                 , extra
+                 , hedis
                  , hflags
                  , leveldb-haskell
                  , merkle-patricia-db
-                 , blockapps-milena
-                 , mtl
                  , monad-logger
                  , ordered-containers
+                 , mtl
                  , persistent-postgresql
                  , postgresql-simple
                  , resourcet
+                 , statsdi
                  , strato-adit
                  , strato-conf
+                 , strato-genesis
+                 , strato-index
+                 , strato-model
+                 , strato-redis-blockdb
                  , strato-sequencer
+                 , strato-statediff
                  , text
                  , time
                  , transformers
                  , vector
-                 , ansi-wl-pprint
-                 , strato-genesis
-                 , strato-model
-                 , strato-index
-                 , strato-statediff
-                 , strato-redis-blockdb
-                 , hedis
-                 , statsdi
-                 , extra
     exposed-modules:
                      Blockchain.BlockChain
                      Blockchain.Bagger
@@ -82,7 +82,9 @@ library
                      Executable.EVMCheckpoint
     other-modules:
                   Blockchain.Bagger.TransactionList
+                  Blockchain.Data.BlockSummary
                   Blockchain.DB.ModifyStateDB
+                  Blockchain.DB.BlockSummaryDB
                   Blockchain.JsonRpcCommand
                   Blockchain.VM.Memory
                   Blockchain.VM.OpcodePrices
@@ -110,7 +112,6 @@ test-suite ethereum-vm-test
     type: exitcode-stdio-1.0
     hs-source-dirs: test
     main-is: Spec.hs
-    other-modules: VM.VMSpec
     build-depends:       aeson,
                          base,
                          base16-bytestring,

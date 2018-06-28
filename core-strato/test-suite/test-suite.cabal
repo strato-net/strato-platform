@@ -105,14 +105,8 @@ Test-suite test-suite
     ghc-options: -Wall -Werror -threaded
     main-is: Spec.hs
     other-modules:
-        Blockchain.Database.MerklePatriciaSpec
         --Blockchain.Strato.RedisBlockDB.RedisBlockDBSpec
         Blockchain.Strato.RedisBlockDB.Chain
-        Blockchain.Sequencer.ArbitraryInstances
-        Blockchain.Sequencer.ChainHelpers
-        Blockchain.Sequencer.EventSpec
-        Blockchain.Sequencer.SequencerSpec
-        Blockchain.Sequencer.OrderValidator
         Blockchain.Strato.Model.BlockHeaderModel
         Blockchain.Strato.Model.BlockModel
         Blockchain.Strato.Model.BlockchainClassSpec

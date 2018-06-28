@@ -210,8 +210,8 @@ addBlocks blocks' = do
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
-      potentialBestBlocks <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
-        case (obOrigin block) of
+      forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
+        replace <- case (obOrigin block) of
           TO.Quarry -> do
             cache <- Bagger.miningCache <$> Bagger.getBaggerState
             let currentBaggerSR = Bagger.lastRewardedStateRoot cache
@@ -236,24 +236,20 @@ addBlocks blocks' = do
                 return [block]
               else return []
           _ -> addBlock block >> return [block]
-      forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
-                                                            --       build the canonical chain. However, running each new
-                                                            --       block could be inefficient, and inadvertently spam
-                                                            --       the network with NewBestBlock messages.
-        (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
-        when didReplaceThisTime . liftIO $ do
-            let Just nbb = newBestBlock
-            writeIORef didReplaceBest True
-            writeIORef replacedBest (nbb, replacedBits)
-        didReplaceBest' <- liftIO (readIORef didReplaceBest)
-        void . withKafkaViolently $ writeIndexEvents (RanBlock <$> filtered)
-        when didReplaceBest' $ do
-            $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-            (theBlock, nbb) <- liftIO (readIORef replacedBest)
-            void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-            let codeSource = getSource False
-                codeContractName = getContractName False
-            calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
+	when replace $ do
+          (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
+          when didReplaceThisTime . liftIO $ do
+          writeIORef didReplaceBest True
+          writeIORef replacedBest (block, replacedBits)
+      didReplaceBest' <- liftIO (readIORef didReplaceBest)
+      void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
+      when didReplaceBest' $ do
+        $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+        (theBlock, nbb) <- liftIO (readIORef replacedBest)
+        void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+        let codeSource = getSource False
+            codeContractName = getContractName False
+        calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -598,7 +594,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -635,7 +631,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
             bestNum       = if shouldReplace then newNumber else oldNumber
             bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-        return (shouldReplace, Just b, bestBlockInfo)
+        return (shouldReplace, bestBlockInfo)
 
 splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, SHA)]
 splitCreateDiffs =

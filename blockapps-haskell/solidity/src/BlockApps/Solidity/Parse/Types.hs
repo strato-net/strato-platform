@@ -59,9 +59,10 @@ arrayType :: SolidityParser Xabitype.Type
 arrayType = do
   baseElemType <- simpleType <|> mappingType
   sizeList <- many1 $ brackets $ optionMaybe intExpr
-  return $ makeArrayType baseElemType (sizeList::[Maybe Integer])
-  where
-    makeArrayType = foldl (\t -> maybe (Xabitype.Array (Just True) Nothing t) (flip (Xabitype.Array Nothing) t . Just . fromIntegral))
+  return $ combine baseElemType sizeList
+    where combine :: Xabitype.Type -> [Maybe Word] -> Xabitype.Type
+          combine t [] = t
+          combine t (l:ls) = combine (Xabitype.Array t l) ls
 
 -- | Parses mapping types, ignoring possible restrictions on what the
 -- domain and codomain can be.

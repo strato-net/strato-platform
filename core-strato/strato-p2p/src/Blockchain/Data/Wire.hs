@@ -30,21 +30,15 @@ import           Blockchain.Util
 import           Blockchain.ExtWord
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
-                | SHH Integer               -- | Whisper support
-                | PAR Integer               -- | Parity client
                 | UNKNOWNCAP String Integer -- | ¯\_(ツ)_/¯
                 deriving (Eq, Read, Show)
 
 name2Cap::Integer->String->Capability
 name2Cap ver "eth" = ETH ver
-name2Cap ver "shh" = SHH ver
-name2Cap ver "par" = PAR ver
 name2Cap ver name  = UNKNOWNCAP name ver
 
 instance RLPSerializable Capability where
     rlpEncode (ETH ver)             = RLPArray [rlpEncode ("eth"::B.ByteString), rlpEncode ver]
-    rlpEncode (SHH ver)             = RLPArray [rlpEncode ("shh"::B.ByteString), rlpEncode ver]
-    rlpEncode (PAR ver)             = RLPArray [rlpEncode ("par"::B.ByteString), rlpEncode ver]
     rlpEncode (UNKNOWNCAP name ver) = RLPArray [rlpEncode name, rlpEncode ver]
 
     rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
@@ -164,13 +158,10 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
   
-  WhisperProtocolVersion Int |
-  
   -- private chains
   GetChainDetails Word256 |
   ChainDetails Word256 ChainInfo |
   GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
-
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -214,8 +205,6 @@ instance Format Message where
       formatUncles []     = "No uncles"
       formatUncles uncles = "\nUncles:" ++ tab ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
-
-  format (WhisperProtocolVersion ver) = CL.blue "WhisperProtocolVersion " ++ show ver
   
   -- private chains
   format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
@@ -266,16 +255,11 @@ obj2WireMessage 0x16 (RLPArray bodies) =
 obj2WireMessage 0x17 (RLPArray [b, td]) =
   NewBlock (rlpDecode b) (rlpDecode td)
 
-obj2WireMessage 0x20 (RLPArray [ver]) =
-  WhisperProtocolVersion $ fromInteger $ rlpDecode ver
-
 -- private chains
 obj2WireMessage 0x1c cid = 
   GetChainDetails (rlpDecode cid)
-
 obj2WireMessage 0x1d (RLPArray [chid, ci]) =
   ChainDetails (rlpDecode chid) (rlpDecode ci) 
-
 obj2WireMessage 0x1e (RLPArray [c, tr]) =
   GetTransactions (rlpDecode c) (rlpDecode tr)
 
@@ -318,9 +302,6 @@ wireMessage2Obj (BlockBodies bodies) =
   )
 wireMessage2Obj (NewBlock b d) =
   (0x17, RLPArray [rlpEncode b, rlpEncode d])
-
-wireMessage2Obj (WhisperProtocolVersion ver) =
-  (0x20, RLPArray [rlpEncode $ toInteger ver])
 
 -- private chains
 wireMessage2Obj (GetChainDetails c) = 

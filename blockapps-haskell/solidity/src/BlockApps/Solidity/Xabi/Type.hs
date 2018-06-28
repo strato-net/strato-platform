@@ -6,7 +6,6 @@ module BlockApps.Solidity.Xabi.Type where
 
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
-import           Data.Aeson.TH
 import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -29,7 +28,7 @@ data Type
   | Label String
   | Struct { bytes::Maybe Int32, typedef::Text}
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
-  | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
+  | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::Text}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)
 
@@ -39,7 +38,7 @@ instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions{omitNothingFields = True}
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
 instance ToSchema Type where
-  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+  declareNamedSchema proxy = genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
     & mapped.name ?~ "Solidity type"
     & mapped.schema.description ?~ "Represents a soldity type"
     & mapped.schema.example ?~ toJSON Address

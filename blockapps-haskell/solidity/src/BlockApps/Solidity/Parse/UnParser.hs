@@ -78,9 +78,8 @@ unparseVarType (Bytes (Just True) _ ) = "bytes"
 unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (Label str) = str
 unparseVarType (Enum _ name _) = Text.unpack name
-unparseVarType (Array (Just True) _ t) = (unparseVarType t) <> "[]"
-unparseVarType (Array (Just False) (Just n) t) = (unparseVarType t) <> ("[" <> show n <> "]")
-unparseVarType (Array Nothing _ t) = (unparseVarType t) <> "[]"
+unparseVarType (Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
+unparseVarType (Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (Contract contractName) = Text.unpack contractName
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
@@ -93,12 +92,9 @@ unparseFunc (name, Func{..}) =
     <> "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
-    <> case funcMutable of
-        Just False -> "constant "
-        _ -> ""
-    <> case funcPayable of
-        Just True -> "payable "
-        _ -> ""
+    <> case funcStateMutability of
+        Just sm -> tShow sm <> " "
+        Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
@@ -176,8 +172,7 @@ addFunction (name, contents) c =
                                                              , indexedTypeIndex=0
                                                              }
                   , funcContents = Just $ Text.pack contents
-                  , funcMutable = Just False
-                  , funcPayable = Just False
+                  , funcStateMutability = Just View
                   , funcVisibility = Nothing
                   , funcModifiers = Nothing
                   }
