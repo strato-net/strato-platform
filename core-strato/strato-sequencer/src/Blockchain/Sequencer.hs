@@ -94,9 +94,9 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                                     insertChainInfo cId cInfo
                                     return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)]
 
-          emitTxs inTs inTx = wrap inTx >>= mapM deflatePrivateTransaction >>= return . map (toOutput inTs) . concat
+          emitTxs inTs inTx = wrap inTx >>= mapM (deflatePrivateTransaction inTs) >>= return . map toOutput . concat
 
-          toOutput inTs inTx = (Nothing, OETx inTs inTx)
+          toOutput oEv = (Nothing, oEv)
 
           wrap itx = do
             let wrappedTx = wrapTransaction itx
@@ -187,15 +187,22 @@ getNextIngestedOffset = do
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
 
-deflatePrivateTransaction :: OutputTx -> SequencerM [OutputTx]
-deflatePrivateTransaction otx =
+deflatePrivateTransaction :: Timestamp -> OutputTx -> SequencerM [OutputEvent]
+deflatePrivateTransaction ts otx =
   let baseTx = otBaseTx otx
    in case TD.transactionChainId baseTx of
-        Nothing -> return [otx]
-        Just _ -> do
-          (SHA th, SHA ch) <- insertPrivateHash baseTx
-          $logInfoS "transformEvents/deflatePrivateTransaction" . T.pack $ "Got chainHash " ++ format (SHA ch) ++ " for txHash " ++ format (SHA th)
-          return [otx, otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
+        Nothing -> return [OETx ts otx]
+        Just cid -> do
+          chainSeen <- lookupChainId cid
+          if chainSeen
+            then do
+              (SHA th, SHA ch) <- insertPrivateHash baseTx
+              $logInfoS "transformEvents/deflatePrivateTransaction" . T.pack $ "Got chainHash " ++ format (SHA ch) ++ " for txHash " ++ format (SHA th)
+              return [OETx ts otx, OETx ts otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
+            else do
+              insertChainId cid
+              insertMissingTx cid baseTx
+              return [OEGetChain cid]
 
 inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx
 inflatePrivateTransaction otx =

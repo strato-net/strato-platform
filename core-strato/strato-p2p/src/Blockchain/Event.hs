@@ -45,16 +45,15 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
-import           Blockchain.Verification
+-- import           Blockchain.Verification
 
-import           Blockchain.Sequencer.Event            (IngestEvent (..), IngestTx (..), OutputEvent (..),
-                                                        OutputTx (..), blockToIngestBlock, obOrigin, obTotalDifficulty, otBaseTx,
-                                                        outputBlockToBlock)
+import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 
 import           Blockchain.Util                       (getCurrentMicrotime)
 
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
@@ -105,6 +104,11 @@ emitKafkaBlock :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrig
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
     void . withKafkaViolently $ writeUnseqEvents [ingestBlock]
+
+emitKafkaChainDetails :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
+emitKafkaChainDetails origin chainId details = do
+    let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
+    void . withKafkaViolently $ writeUnseqEvents [ingestGenesis]
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, K.HasKafkaState m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
@@ -250,8 +254,8 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (BlockBodies bodies) -> do
         stampActionTimestamp
         headers <- lift getBlockHeaders
-        let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
-        unless verified $ error "headers don't match bodies"
+        -- let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
+        -- unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
@@ -297,17 +301,9 @@ handleEvents mode peer = awaitForever $ \case
               stampActionTimestamp
       
     -- TODO: should take [ChainID] [ChainInfo] 
-    MsgEvt (ChainDetails chid ci) -> do
+    MsgEvt (ChainDetails cId cInfo) -> do
       stampActionTimestamp
-      $logInfoS "handleEvents/ChainDetails" $ T.pack $ "details returned: " ++ (show ci)
-      st <- lift (RBDB.withRedisBlockDB $ RBDB.putChainInfo chid ci)
-      case st of
-        Left r -> do
-          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, reply: \n" ++ (show r)
-          return ()
-        Right s -> do
-          $logInfoS "handleEvents/ChainDetails" $ T.pack $ "called putChainInfo, status: \n" ++ (show s)
-          return ()
+      emitKafkaChainDetails (Origin.PeerString $ peerString peer) cId cInfo
 
     MsgEvt (GetTransactions chid req) -> do
       stampActionTimestamp
@@ -342,7 +338,20 @@ handleEvents mode peer = awaitForever $ \case
           $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
           when (shouldSend peer $ otOrigin tx) . yield $ Transactions [tx'] where
               tx' = otBaseTx $ tx
-      _          -> return () -- shouldn't happen but our types don't prohibit us
+      OEGenesis (OutputGenesis og (cId, cInfo)) -> do
+        when (shouldSend peer og) $ do
+          $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show cInfo
+          let pIp = readIP $ T.unpack (pPeerIp peer)
+          let ipList = ipAddress <$> members cInfo
+          let match = find (==pIp) ipList
+
+          case match of
+            Nothing -> do 
+              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
+            Just _ -> do 
+              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
+              yield $ ChainDetails cId cInfo
+      _ -> return () -- shouldn't happen but our types don't prohibit us
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
