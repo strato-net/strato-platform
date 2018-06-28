@@ -79,7 +79,8 @@ stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
   (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
   ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  --Early stage of slipstream ommits updates
+  -- ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -88,7 +89,6 @@ toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
   case eitherDecode x of
    Left e -> error $ show e
-   --Right y -> traceShow(y) y
    Right y -> y
 
 enterBloc2 :: BlocEnv -> Bloc x -> IO x
@@ -105,14 +105,21 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::String->String->Bloc (Either String Contract)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ Left "Blank contract"
+getContract::String->String->Bloc (Either String Contract, String)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ (Left "Blank contract", "Blank ABI")
 getContract address _ = do
   qqqq <-
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
 
-  return $ xAbiToContract $ contractdetailsXabi qqqq
+  let ret2 = show $ toJSON $ contractdetailsXabi qqqq
+  let ret1 = xAbiToContract $ contractdetailsXabi qqqq
+  return (ret1, ret2)
 
+fetchABI :: String -> Bloc String
+fetchABI address = do
+  conDet <- getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
+  let ret = show $ toJSON $ contractdetailsXabi conDet
+  return ret
 
 storageToFunction::[(String, String)]->Storage
 storageToFunction s k =
@@ -207,45 +214,32 @@ dbInsert insrt = do
 
   pgDisconnect conn
 
-convertRet :: String -> BLC.ByteString -> IO()
-convertRet address x = do
+convertRet :: String -> String -> String -> BLC.ByteString -> IO()
+convertRet address codehash abi x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
-      --liftIO $ putStrLn $ "convertRet____: " ++ show(x)
-      --Debug
-      --putStrLn $ show x
+      -- Change contract name here
+      let contractName = take 30 codehash
+      let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
+      let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
       let list = H.toList $ H.filter isString x
-      let contractName = "test"
-      let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ")"
+      let beg = "BEGIN;"
+      let comm = "COMMIT;"
+      let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
-      let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals
-      p <- dbInsert createSt
-      print p
-      dbInsert ins
-      currentTime <- getCurrentTime
-      liftIO $ putStrLn $ "End -> " ++ show(currentTime)
+      let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
+      let oneIns = beg ++ conIns ++ createSt ++ ins ++ comm
+      p <- dbInsert oneIns
+      --print p
 
   -- case x of
   --  Left ex  -> return "Caught exception: " ++ show ex
     --Right val -> return "Result: " ++ show val
-{-}
-getContractName :: BLC.ByteString -> String
-getContractName x =
-  case decode x of
-    Nothing -> "No contract information found"
-    Just (Object y) -> do
-      let list = H.toList y
-      let mapVal = Map.lookup "name" y
-      case mapVal of
-        Nothing -> "No name found"
-        Just z -> valueToString "" z
--}
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
---defaultMaxB = 1024 * 1024
 
 data KafkaConf =
     KafkaConf {
@@ -292,7 +286,6 @@ processTheMessages messages = do
   --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
 
   let conHost = flags_pghost
-  --let conHost = "172.18.0.6"
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -308,7 +301,6 @@ processTheMessages messages = do
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
 
   let strato = flags_stratourl
-  --let strato = "172.18.0.8:3000/eth/v1.2/"
 
   stratoUrl <- parseBaseUrl strato
 
@@ -335,26 +327,26 @@ processTheMessages messages = do
                Action _ a c (Just s) -> (a, c, storageToFunction s)
                Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
 
-        cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
+        cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String))
 
         contractMetaData <-
           case Map.lookup codehash cachedContracts of
-           Just c -> return c
+           Just c -> do
+             return c
            Nothing -> do
-             contractOrError <- getContract address codehash
+             (contractOrError, abi) <- getContract address codehash
              case contractOrError of
               Left e -> error e
               Right c -> do
-                liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
-                return c
-        --let hexadd = readHex address
-        --let addr = Address hexadd
-        --let name = contractdetailsName <$>  getContractDetailsByAddressOnly addr
+                liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi) cachedContracts)
+                return (c, abi)
+
+        let strAbi = snd contractMetaData
 
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $
-              decodeValues (typeDefs contractMetaData) (mainStruct contractMetaData) storage 0
-        liftIO $ convertRet address $ encode ret
+              decodeValues (typeDefs $ fst contractMetaData) (mainStruct $ fst contractMetaData) storage 0
+        liftIO $ convertRet address codehash strAbi $ encode ret
   return()
 
 getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
@@ -370,17 +362,17 @@ getTheMessages offset = do
 getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
-  --liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
-  --liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
   getAndProcessMessages $ (offset + fromIntegral (length messages))
-
 
 main::IO ()
 main = do
   currentTime <- getCurrentTime
-  liftIO $ putStrLn $ "Main --> " ++ show(currentTime)
+  liftIO $ putStrLn $ "Main -> " ++ show(currentTime)
   _ <- $initHFlags "Setup Slipstream Variables"
+
+  let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text)"
+  dbInsert conCreate
 
   let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
