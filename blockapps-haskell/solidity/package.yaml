@@ -1,0 +1,59 @@
+name: blockapps-solidity
+version: 0.1.0.0
+synopsis: Solidity datatypes
+description: Solidity datatypes
+license: BSD3
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - blockapps-ethereum
+  - aeson
+  - aeson-casing
+  - base16-bytestring
+  - bimap
+  - binary
+  - bytestring
+  - containers
+  - cryptonite
+  - generic-random
+  - http-api-data
+  - largeint
+  - largeword
+  - lens
+  - logging-effect
+  - memory
+  - mtl
+  - ordered-containers
+  - parsec
+  - parsec3-numbers
+  - QuickCheck
+  - quickcheck-instances
+  - raw-strings-qq
+  - servant
+  - servant-docs
+  - swagger2
+  - text
+  - unordered-containers
+  - vector
+
+library:
+  source-dirs: src/
+
+tests:
+  blockapps-solidity-test:
+    main: Spec.hs
+    source-dirs: test/
+    dependencies:
+     - blockapps-solidity
+     - blockapps-strato-api
+     - hspec
+
+github: blockapps/strato-platform/blockapps-haskall/blockapps-solidity
