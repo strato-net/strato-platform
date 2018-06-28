@@ -45,61 +45,61 @@ class Download extends Component {
     return null;
   }
 
-  renderAttestForm() {
+  renderDownloadForm() {
     return (
-      <div className="pt-dialog-body upload-form">
+      <form>
+        <div className="pt-dialog-body upload-form">
 
-        <div className="row">
-          <div className="col-sm-4 text-right">
-            <label className="pt-label smd-pad-4">
-              Contract Address
+          <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                Contract Address
             </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <Field
+                name="contractAddress"
+                component="input"
+                type="text"
+                placeholder="Contract Address"
+                className="pt-input form-width"
+                tabIndex="1"
+                required
+              />
+              <br /><span className="error-text">{this.errorMessageFor('contractAddress')}</span>
+            </div>
           </div>
-          <div className="col-sm-8 smd-pad-4">
-            <Field
-              name="contractAddress"
-              component="input"
-              type="text"
-              placeholder="Contract Address"
-              className="pt-input form-width"
-              tabIndex="1"
-              required
-            />
-            <br /><span className="error-text">{this.errorMessageFor('contractAddress')}</span>
-          </div>
-        </div>
 
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions button-center smd-margin-8">
-            <Button
-              intent={Intent.PRIMARY}
-              onClick={this.props.handleSubmit(this.submit)}
-              text="Download"
-            />
+          <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer-actions button-center smd-margin-8">
+              <Button
+                intent={Intent.PRIMARY}
+                onClick={this.props.handleSubmit(this.submit)}
+                text="Download"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </form>
     );
   }
 
   render() {
     return (
       <div>
-        <form>
-          <Dialog
-            isOpen={this.props.isOpen}
-            onClose={() => {
-              mixpanelWrapper.track('close_download_modal');
-              this.props.closeDownloadModal();
-              this.props.reset();
-            }}
-            iconName='pt-icon-download'
-            title='Download'
-            className="pt-dark"
-          >
-            {this.renderAttestForm()}
-          </Dialog>
-        </form>
+        <Dialog
+          isOpen={this.props.isOpen}
+          onClose={() => {
+            mixpanelWrapper.track('close_download_modal');
+            this.props.closeDownloadModal();
+            this.props.reset();
+          }}
+          iconName='pt-icon-download'
+          title='Download'
+          className="pt-dark"
+        >
+          {this.renderDownloadForm()}
+        </Dialog>
       </div>
     )
   }
