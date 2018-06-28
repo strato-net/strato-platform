@@ -115,11 +115,6 @@ class UploadForm extends Component {
     </div>);
   };
 
-  closeModal() {
-    this.props.closeUploadModal();
-    this.props.reset();
-  }
-
   render() {
     let isPublicMode = isModePublic();
 
