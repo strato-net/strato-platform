@@ -41,8 +41,6 @@ instance (RLPSerializable a) => RLPSerializable (Maybe a) where
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, GHCG.Generic)
 
-instance RLPSerializable HostAddress where
-
 instance Binary IPAddress where
 
 instance RLPSerializable IPAddress where

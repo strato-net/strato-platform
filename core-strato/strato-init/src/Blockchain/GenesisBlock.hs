@@ -48,7 +48,7 @@ import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured, ethConf)
+import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka

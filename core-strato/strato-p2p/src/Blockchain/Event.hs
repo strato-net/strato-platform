@@ -46,11 +46,10 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
 -- import           Blockchain.Verification
 
-import           Blockchain.Util                       (getCurrentMicrotime)
+import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
@@ -285,7 +284,7 @@ handleEvents mode peer = awaitForever $ \case
     -- TODO: should take [ChainID] [ChainInfo] 
     MsgEvt (ChainDetails cId cInfo) -> do
       stampActionTimestamp
-      emitKafkaChainDetails (Origin.PeerString $ peerString peer) cId cInfo
+      SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer) cId cInfo
 
     MsgEvt (GetTransactions chid req) -> do
       stampActionTimestamp

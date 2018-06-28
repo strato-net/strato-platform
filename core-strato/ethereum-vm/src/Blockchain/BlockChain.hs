@@ -210,7 +210,7 @@ addBlocks blocks' = do
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
-      forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
+      forM_ filtered $ \block -> timeit "Block insertion" timerToUse $ do
         replace <- case (obOrigin block) of
           TO.Quarry -> do
             cache <- Bagger.miningCache <$> Bagger.getBaggerState
@@ -233,14 +233,14 @@ addBlocks blocks' = do
                   (blockHeaderPartialHash $ obBlockData block)
                   (blockHeaderHash $ obBlockData block)
                   Mined
-                return [block]
-              else return []
-          _ -> addBlock block >> return [block]
-	when replace $ do
+                return True
+              else return False
+          _ -> addBlock block >> return True
+        when replace $ do
           (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
           when didReplaceThisTime . liftIO $ do
-          writeIORef didReplaceBest True
-          writeIORef replacedBest (block, replacedBits)
+            writeIORef didReplaceBest True
+            writeIORef replacedBest (block, replacedBits)
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
       when didReplaceBest' $ do
@@ -594,7 +594,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 

@@ -964,7 +964,7 @@ getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
 getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
-getFromSelector sel _ sr codeHash = do
+getFromSelector sel isRunningTests' sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
   stateRoot <- getStateRoot
