@@ -1,8 +1,8 @@
-name: blockapps-ethereum
+name: blockapps-ethereum-abi
 version: 0.1.0.0
 synopsis: Ethereum datatypes
 description: Ethereum datatypes
-github: blockapps/strato-platform/blockapps-haskell/blockapps-ethereum
+github: blockapps/strato-platform/blockapps-haskell/blockapps-ethereum-abi
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav
@@ -15,34 +15,21 @@ ghc-options: -Wall -Werror
 
 dependencies:
   - base
-  - aeson
-  - base16-bytestring
+  - blockapps-ethereum
   - binary
   - bytestring
-  - cryptonite
-  - deepseq
-  - hashable
-  - http-api-data
+  - largeint
   - largeword
-  - lens
-  - memory
-  - QuickCheck
-  - relapse
-  - secp256k1
-  - servant
-  - servant-docs
-  - swagger2
   - text
-  - time
 
 library:
   source-dirs: src/
 
 tests:
-  blockapps-ethereum-test:
+  blockapps-ethereum-abi-test:
     main: Spec.hs
     source-dirs: test/
     dependencies:
-      - blockapps-ethereum
-      - clock
+      - base16-bytestring
+      - blockapps-ethereum-abi
       - hspec
