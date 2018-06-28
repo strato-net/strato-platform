@@ -39,8 +39,6 @@ import qualified Network.Kafka.Protocol                    as KP
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
-import           MonadUtils                                (concatMapM)
-
 sequencer :: SequencerM ()
 sequencer = forever $ do
     inEvents <- readUnseqEvents'
@@ -96,9 +94,11 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                                     insertChainInfo cId cInfo
                                     return [(Nothing, OEGenesis $ ingestGenesisToOutputGenesis g)]
 
-          emitTxs inTs inTx = deflatePrivateTransaction inTx >>= concatMapM (wrap inTs)
+          emitTxs inTs inTx = wrap inTx >>= mapM deflatePrivateTransaction >>= return . map (toOutput inTs) . concat
 
-          wrap its itx = do
+          toOutput inTs inTx = (Nothing, OETx inTs inTx)
+
+          wrap itx = do
             let wrappedTx = wrapTransaction itx
              in case wrappedTx of
                 Nothing -> do
@@ -117,7 +117,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                         $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx itx
                         witnessTransactionHash witnessHash
                         tick ctr_sequencer_txs_unwitnessed
-                        return [(Nothing, OETx its tx)]
+                        return [tx]
 
           emitBlocks bk b' = case b' of
             Nothing -> do
@@ -187,14 +187,15 @@ getNextIngestedOffset = do
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
 
-deflatePrivateTransaction :: IngestTx -> SequencerM [IngestTx]
-deflatePrivateTransaction itx =
-  let baseTx = itTransaction itx
+deflatePrivateTransaction :: OutputTx -> SequencerM [OutputTx]
+deflatePrivateTransaction otx =
+  let baseTx = otBaseTx otx
    in case TD.transactionChainId baseTx of
-        Nothing -> return [itx]
+        Nothing -> return [otx]
         Just _ -> do
           (SHA th, SHA ch) <- insertPrivateHash baseTx
-          return [itx, itx{itTransaction = TD.PrivateHashTX th ch}]
+          $logInfoS "transformEvents/deflatePrivateTransaction" . T.pack $ "Got chainHash " ++ format (SHA ch) ++ " for txHash " ++ format (SHA th)
+          return [otx, otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
 
 inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx
 inflatePrivateTransaction otx =

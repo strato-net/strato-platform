@@ -657,9 +657,12 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
     diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
     chainDiffs <- chainDiff newNumber oldHash newHash
+    $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allNewCodeHashes = splitCreateDiffs (diffs : chainDiffs)
+    let allDiffs = (diffs : chainDiffs)
+        allNewCodeHashes = splitCreateDiffs allDiffs
 
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
@@ -676,10 +679,11 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
 
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
-    when flags_sqlDiff $ commitSqlDiffs diffs codeSource' codeContractName'
-    when flags_diffPublish $
-        let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
-         in withKafkaViolently $ do
-             void $ writeStateDiffEvents deletionEvents
-             void $ writeStateDiffEvents creationEvents
-             void $ writeStateDiffEvents updateEvents
+    forM_ allDiffs $ \diff -> do
+      when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
+      when flags_diffPublish $
+          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diff
+          in withKafkaViolently $ do
+              void $ writeStateDiffEvents deletionEvents
+              void $ writeStateDiffEvents creationEvents
+              void $ writeStateDiffEvents updateEvents

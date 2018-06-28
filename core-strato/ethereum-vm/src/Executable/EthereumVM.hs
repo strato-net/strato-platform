@@ -74,7 +74,9 @@ ethereumVM = void . execContextM $ do
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
+        let allTxs = [OETx ts t | OETx ts t <- seqEvents]
+        $logInfoS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+        let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]

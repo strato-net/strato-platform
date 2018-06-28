@@ -112,7 +112,7 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
-  :> QueryParam "chainId" ChainId
+  :> QueryParam "chainid" ChainId
   :> QueryParam "name" Text
   :> QueryParam "count" Int
   :> QueryParam "offset" Int

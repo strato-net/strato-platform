@@ -25,7 +25,7 @@ data CircularBuffer a =
      CircularBuffer { capacity :: Int
                     , size     :: Int
                     , queue    :: Q.Seq a
-                    }
+                    } deriving (Show)
 
 maxBufferCapacity :: Int
 maxBufferCapacity = 4096
@@ -89,7 +89,7 @@ class (MonadResource m) => HasPrivateHashDB m where
       let cb = if sz < cap
                  then CircularBuffer cap (sz + 1) (q Q.|> h)
                  else case Q.viewl q of
-                        Q.EmptyL -> CircularBuffer cap 1 (Q.empty Q.|> h)
+                        Q.EmptyL -> CircularBuffer cap 1 (q Q.|> h)
                         (_ Q.:< q') -> CircularBuffer cap sz (q' Q.|> h)
       insertChainBuffer cid cb
 
@@ -118,9 +118,12 @@ class (MonadResource m) => HasPrivateHashDB m where
         insertChainHash rs chainId
         insertChainHash sr chainId
         chainHash <- getChainHash chainId
+        insertChainBufferEntry chainId rs
+        insertChainBufferEntry chainId sr
         return (h, chainHash)
 
     insertChainInfo :: Word256 -> ChainInfo -> m ()
-    insertChainInfo cId cInfo =
+    insertChainInfo cId cInfo = do
       let h = hash . rlpSerialize $ rlpEncode cInfo
-       in insertChainHash h cId
+      insertChainHash h cId
+      insertChainBufferEntry cId h

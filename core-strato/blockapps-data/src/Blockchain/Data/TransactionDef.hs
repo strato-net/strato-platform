@@ -149,7 +149,13 @@ instance RLPSerializable Transaction where
               ]
       RLPArray [n, gp, gl, toAddr, val, i] ->
         case t of
-          PrivateHashTX{..} -> RLPArray [(rlpEncode transactionTxHash), (rlpEncode transactionChainHash)]
+          PrivateHashTX{..} ->
+            RLPArray [
+             n, gp, gl, toAddr, val, i,
+             RLPString "",
+             (rlpEncode transactionTxHash),
+             (rlpEncode transactionChainHash)
+             ]
           MessageTX{..} ->
             RLPArray [
               n, gp, gl, toAddr, val, i,

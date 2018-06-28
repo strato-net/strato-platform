@@ -228,7 +228,7 @@ instance FromHttpApiData ChainId where
 instance ToForm ChainId where
   toForm chainId = [("chainid", toQueryParam chainId)]
 
-instance FromForm ChainId where fromForm = parseUnique "chainId"
+instance FromForm ChainId where fromForm = parseUnique "chainid"
 
 instance Arbitrary ChainId where
   arbitrary = ChainId . fromInteger <$> arbitrary
@@ -245,9 +245,6 @@ instance RLPEncodable ChainId where
 
 instance ToParam (QueryParam "chainid" ChainId) where
   toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal
-
-instance ToParam (QueryParam "chainId" ChainId) where
-  toParam _ = DocQueryParam "chainId" [] "Blockchain Identifier" Normal
 
 instance ToParamSchema ChainId where
   toParamSchema _ = mempty
