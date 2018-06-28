@@ -93,8 +93,9 @@ describe("Create Chain", function() {
                , balance:"0000000000000000000000000000000000000001234500000000000000000000"
                }];
     console.log(balances);
+    let chainId;
     try {
-      const chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
+      chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -129,8 +130,9 @@ describe("Create Chain", function() {
                , balance:"0000000000000000000000000000000000000001234500000000000000000000"
                }];
     console.log(balances);
+    let chainId;
     try {
-      const chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
+      chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -165,8 +167,9 @@ describe("Create Chain", function() {
                , balance:"0000000000000000000000000000000000000001234500000000000000000000"
                }];
     console.log(balances);
+    let chainId;
     try {
-      const chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
+      chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -201,8 +204,9 @@ describe("Create Chain", function() {
                , balance:"0000000000000000000000000000000000000000000000000000000000000000"
                }];
     console.log(balances);
+    let chainId;
     try {
-      const chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
+      chainId = yield rest.createChain(label, addRule, removeRule, members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
