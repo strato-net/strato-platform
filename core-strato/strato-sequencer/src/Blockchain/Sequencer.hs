@@ -39,8 +39,6 @@ import qualified Network.Kafka.Protocol                    as KP
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
-import           Debug.Trace
-
 sequencer :: SequencerM ()
 sequencer = forever $ do
     inEvents <- readUnseqEvents'
@@ -98,7 +96,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
 
           emitTxs inTs inTx = wrap inTx >>= mapM (deflatePrivateTransaction inTs) >>= return . map toOutput . concat
 
-          toOutput oEv = (Nothing, (trace ("This is an output event: " ++ show oEv) oEv))
+          toOutput oEv = (Nothing, oEv)
 
           wrap itx = do
             let wrappedTx = wrapTransaction itx

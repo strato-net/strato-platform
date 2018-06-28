@@ -128,6 +128,7 @@ class (MonadResource m) => HasPrivateHashDB m where
     insertChainInfo :: Word256 -> ChainInfo -> m ()
     insertChainInfo cId cInfo = do
       let h = hash . rlpSerialize $ rlpEncode cInfo
+      insertChainId cId
       insertChainHash h cId
       insertChainBufferEntry cId h
 
