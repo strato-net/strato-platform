@@ -10,7 +10,6 @@ module Blockchain.Database.MerklePatricia.StateRoot (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3       as C
 import           Data.Aeson
 import           Data.Binary
 import qualified Data.ByteString        as B
@@ -53,7 +52,7 @@ instance RLPSerializable StateRoot where
 
 -- | The stateRoot of the empty database.
 emptyTriePtr::StateRoot
-emptyTriePtr = StateRoot $ C.hash 256 $ rlpSerialize $ rlpEncode (0::Integer)
+emptyTriePtr = StateRoot $ keccak256 $ rlpSerialize $ rlpEncode (0::Integer)
 
 sha2StateRoot::SHA->StateRoot
 sha2StateRoot (SHA x) = StateRoot $ B.pack $ word256ToBytes x
