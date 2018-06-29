@@ -139,7 +139,7 @@ initBlockSummary block =
 
 getCheckpoint :: ContextM (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
-    let topic  = seqEventsTopicName
+    let topic  = seqVmEventsTopicName
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
@@ -153,7 +153,7 @@ getCheckpoint = do
 
 getCheckpointNoMetadata :: ContextM KP.Offset
 getCheckpointNoMetadata = do
-    let topic  = seqEventsTopicName
+    let topic  = seqVmEventsTopicName
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
@@ -168,20 +168,20 @@ setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
     either (error . show) return ret
 
 setCheckpointNoMetadata :: KP.Offset -> ContextM ()
 setCheckpointNoMetadata ofs = do
     $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
     let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs emptyMetadata
+    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-    ret <- K.withKafkaViolently (readSeqEvents offset)
+    ret <- K.withKafkaViolently (readSeqVmEvents offset)
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
     return ret
 
