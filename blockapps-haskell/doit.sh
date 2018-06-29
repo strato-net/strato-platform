@@ -18,8 +18,10 @@ slipstream:
 --stratourl=\$stratoRoot="${stratoRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
+
 strato-server:
 no vars/flags set
+
 bloc:
 stratoHost="${stratoHost}"
 --cirrusurl=\$cirrusHost="${cirrusHost}"
