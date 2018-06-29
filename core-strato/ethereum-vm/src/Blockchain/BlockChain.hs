@@ -215,7 +215,7 @@ addBlocks blocks = do
             lastRun <- Bagger.lastExecutedTxs . Bagger.miningCache <$> Bagger.getBaggerState
             let updates = if (flags_miner == Mining.Instant)
                             then lastRun
-                            else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
+                            else [trr | trr <- lastRun, otx <- obReceiptTransactions block, (otHash otx) == (otHash $ trrTransaction trr)]
             lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
             Bagger.updateTxCallback
               updates
