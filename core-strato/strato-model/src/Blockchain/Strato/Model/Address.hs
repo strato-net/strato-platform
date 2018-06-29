@@ -39,7 +39,6 @@ import           Web.PathPieces
 
 import           GHC.Generics
 
-
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
