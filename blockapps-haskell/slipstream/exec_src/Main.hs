@@ -234,7 +234,6 @@ convertRet address codehash abi x = do
       let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
       let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
 
-      --Write contract info
       let list = H.toList $ H.filter isString x
 
       let beg = "BEGIN;"
@@ -296,10 +295,7 @@ processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
 
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-  --changes <- fmap (concat . map (stateDiffToChanges . toStateDiff . BL.fromStrict . fst . B16.decode) . BC.lines) BC.getContents
-
   let conHost = flags_pghost
-  --let conHost = "172.18.0.6"
   let conPort = read flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
@@ -341,7 +337,6 @@ processTheMessages messages = do
                Action _ a c (Just s) -> (a, c, storageToFunction s)
                Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
 
-        --cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String Contract)
         cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String))
         contractMetaData <-
           case Map.lookup codehash cachedContracts of
@@ -377,10 +372,7 @@ getTheMessages offset = do
 getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
-  --liftIO $ putStrLn $ "getAndProcessMessages__________:" ++ show(messages)
   liftIO $ processTheMessages messages
-
-  --liftIO $ putStrLn $ "length messages >>>>>>> " ++ show (length messages)
   getAndProcessMessages $ (offset + fromIntegral (length messages))
 
 
