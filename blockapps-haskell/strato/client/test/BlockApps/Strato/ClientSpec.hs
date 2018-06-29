@@ -4,7 +4,6 @@
 module BlockApps.Strato.ClientSpec where
 
 import           Data.Either
-import           Data.LargeWord
 import           Generic.Random.Generic
 import           Network.HTTP.Client
 import           Servant.Client
@@ -15,7 +14,8 @@ import           Test.QuickCheck
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
-stratoDev = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+stratoDev :: BaseUrl
+stratoDev = BaseUrl Http "localhost" 80 "/strato-api/eth/v1.2"
 
 spec :: Spec
 spec
@@ -80,7 +80,8 @@ spec
   describe "getStorage" $
     it "works" $ \ mgr ->
       forAll (Just <$> arbitrary) $ \ addr -> do
-        str <- runClientM (getStorage addr) (ClientEnv mgr stratoDev)
+        let p = storageFilterParams{qsAddress = addr}
+        str <- runClientM (getStorage p) (ClientEnv mgr stratoDev)
         str `shouldSatisfy` isRight
   describe "postTx" $
     it "works" $ \ mgr ->
@@ -101,8 +102,6 @@ spec
 -- orphans
 
 instance Arbitrary TransactionType where arbitrary = genericArbitrary uniform
-instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
-  arbitrary = LargeKey <$> arbitrary <*> arbitrary
 instance Arbitrary Transaction where arbitrary = genericArbitrary uniform
 instance Arbitrary x => Arbitrary (WithNext x) where
   arbitrary = genericArbitrary uniform
