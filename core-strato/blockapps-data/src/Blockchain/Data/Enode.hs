@@ -27,19 +27,23 @@ import                  Network.Socket.Internal
 
 import                  Blockchain.Data.RLP
 
+import                  Test.QuickCheck.Arbitrary
+import                  Test.QuickCheck.Gen
+
 -- Move to ethereum-rlp (generic serialization of Maybe)
 instance (RLPSerializable a) => RLPSerializable (Maybe a) where
-  rlpEncode Nothing = RLPArray [rlpEncode (0::Integer)]
-  rlpEncode (Just a) = RLPArray [rlpEncode (1::Integer), rlpEncode a]
+  rlpEncode Nothing = RLPString ""
+  rlpEncode (Just a) = RLPArray [rlpEncode a]
 
-  rlpDecode (RLPArray (x:xs)) 
-    | (rlpDecode x) == (0::Integer) = Nothing
-    | (rlpDecode x) == (1::Integer) = Just (rlpDecode (RLPArray xs))
-
+  rlpDecode (RLPString "") = Nothing
+  rlpDecode (RLPArray [x]) = Just (rlpDecode x)
   rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
 
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, GHCG.Generic)
+
+instance Arbitrary IPAddress where
+  arbitrary = IPv4 <$> arbitrary
 
 instance Binary IPAddress where
 
@@ -54,6 +58,13 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, GHCG.Generic)
         
+instance Arbitrary Enode where
+  arbitrary = Enode
+          <$> (B.pack <$> vectorOf 64 arbitrary)
+          <*> arbitrary
+          <*> arbitrary `suchThat` (>=0)
+          <*> (arbitrary `suchThat` maybe True (>=0))
+
 instance Binary Enode where
 
 instance RLPSerializable Enode where

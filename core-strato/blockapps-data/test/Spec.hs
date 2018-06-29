@@ -1,4 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+import           Control.Arrow                   ((&&&))
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson                      as Ae
@@ -13,16 +16,22 @@ import qualified Data.Vector                     as V
 import           Test.Hspec
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
+import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Data.Json
 import  Blockchain.Data.Transaction
 
+import           Test.QuickCheck
 
 main :: IO()
 main = hspec $ do
   describe "Data round trips" $ do
+    enodeRLP
+    chainInfoRLP
     addressTesting
     rawtxRoundTrip
     blockDataRoundTrip
@@ -34,11 +43,24 @@ main = hspec $ do
     eventualFromIdempotency
     directComparison
 
+rlpRT :: (RLPSerializable a) => a -> a
+rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
+
+enodeRLP :: Spec
+enodeRLP = do
+  it "should convert an Enode address to and from its RLP encoding" $ do
+    quickCheck $ uncurry (==) . (id &&& (rlpRT :: Enode -> Enode))
+
+chainInfoRLP :: Spec
+chainInfoRLP = do
+  it "should convert a Bytestring to and from Word256" $ do
+    quickCheck $ uncurry (==) . (id &&& (rlpRT :: ChainInfo -> ChainInfo))
+
 addressTesting :: Spec
 addressTesting = forM_ testAddresses $ \input -> do
       it ("fromJSON . toJSON = id on address " ++ input) $ do
-        let output = T.unpack . addressToString . stringToAddress $ input
-        output `shouldBe` input
+        let o = T.unpack . addressToString . stringToAddress $ input
+        o `shouldBe` input
 
 stringToAddress :: [Char] -> Address
 stringToAddress x = Address
@@ -94,9 +116,9 @@ compareJSON :: (Show a, FromJSON a, ToJSON a) => C8.ByteString -> Either String 
 compareJSON expected actual =
   case actual of
       Left r -> expectationFailure r
-      Right c -> let output = Ae.encode c
+      Right c -> let o = Ae.encode c
                      inValue = Ae.eitherDecode expected :: Either String Ae.Value
-                     outValue = Ae.eitherDecode output :: Either String Ae.Value
+                     outValue = Ae.eitherDecode o :: Either String Ae.Value
                  in liftM2 diff inValue outValue`shouldBe` (Right $ Patch [])
 
 unsafeExtractTX :: String -> IO Transaction'
