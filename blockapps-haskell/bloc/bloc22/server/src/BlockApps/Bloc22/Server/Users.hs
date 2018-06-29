@@ -104,13 +104,13 @@ postUsersFill :: UserName -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
-  void . blocModify $ \conn -> runInsert conn hashNameTable
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
     , constant hash
     , constant (0 :: Int32)
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
-    )
+    )]
   getBlocTransactionResult' Nothing hash resolve
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
@@ -128,13 +128,13 @@ postUsersSend userName addr chainId resolve
         0
         chainId
     hash <- blocStrato $ postTx tx
-    void . blocModify $ \conn -> runInsert conn hashNameTable
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
       , constant hash
       , constant (0 :: Int32)
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
-      )
+      )]
     getBlocTransactionResult' chainId hash resolve
 
 postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
@@ -171,13 +171,13 @@ postUsersContract userName addr chainId resolve
         chainId
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
-    void . blocModify $ \conn -> runInsert conn hashNameTable
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
       , constant hash
       , constant cmId
       , constant (1 :: Int32)
       , constant contractdetailsName
-      )
+      )]
     getBlocTransactionResult' chainId hash resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
@@ -393,13 +393,13 @@ postUsersContractMethod
         chainId
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
-    void . blocModify $ \conn -> runInsert conn hashNameTable
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
       , constant hash
       , constant cmId
       , constant (2 :: Int32)
       , constant funcName
-      )
+      )]
     getBlocTransactionResult' chainId hash resolve
 
 data TRD = TRD -- transaction resolution data

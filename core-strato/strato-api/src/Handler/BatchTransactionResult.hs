@@ -13,6 +13,8 @@ import           Import
 import           Numeric         (readHex)
 import qualified Prelude         as P
 
+import           Blockchain.Data.MiningStatus
+
 data StrungSHA = StrungSHA { unStrungSHA :: SHA }
     deriving (Eq, Ord, Read, Show)
 
@@ -36,7 +38,10 @@ postBatchTransactionResultR = do
   hashesR <- parseJsonBody :: Handler (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
-        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes) , TransactionResultChainId ==. chainId ] [] :: Handler [Entity TransactionResult]
+        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes)
+                                   , TransactionResultChainId ==. chainId
+                                   , TransactionResultMiningStatus ==. Mined
+                                   ] [] :: Handler [Entity TransactionResult]
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m
                 Just vs -> M.insert k (v:vs) m
