@@ -1,0 +1,31 @@
+name:                blockapps-bloc
+version:             0.1.0.0
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+
+ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror -fsimpl-tick-factor=20000
+
+dependencies:
+  - base
+  - blockapps-bloc22-api
+  - blockapps-bloc22-server
+  - blockapps-strato-api
+  - blockapps-strato-client
+  - logging-effect
+  - hflags
+  - http-client
+  - postgresql-simple
+  - resource-pool
+  - servant-client
+  - servant-options
+  - servant-server
+  - servant-swagger
+  - servant-swagger-ui
+  - wai-cors
+  - wai-extra
+  - warp
+
+executable:
+  source-dirs: app/
+  main: Main.hs
