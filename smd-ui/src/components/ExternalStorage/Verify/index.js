@@ -81,7 +81,6 @@ class Verify extends Component {
   }
 
   renderSuccess(data) {
-
     const signers = data.signers.map((value, key) => {
       return (
         <li key={key}> {value} </li>
@@ -106,7 +105,7 @@ class Verify extends Component {
               <label> Date Uploaded </label>
             </div>
             <div className="col-sm-9">
-              <label> {parseDateFromString(moment(data.timestamp).toISOString())} </label>
+              <label> {data.timestamp && parseDateFromString(moment(data.timestamp).toISOString())} </label>
             </div>
           </div>
 

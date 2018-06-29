@@ -119,7 +119,7 @@ describe('Download: index', () => {
       ).dive().dive().dive();
 
       wrapper.instance().submit({});
-      expect(wrapper.state().errors).toBeTruthy();
+      expect(wrapper.state()).toMatchSnapshot();
     });
 
     test('Submit with values', () => {

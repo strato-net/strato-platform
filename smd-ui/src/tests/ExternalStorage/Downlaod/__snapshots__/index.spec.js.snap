@@ -1,5 +1,13 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Download: index Modal Submit with empty value 1`] = `
+Object {
+  "errors": Object {
+    "contractAddress": "Can't be blank",
+  },
+}
+`;
+
 exports[`Download: index mapStateToProps with values 1`] = `
 Object {
   "downloadError": "error",
