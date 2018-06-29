@@ -52,7 +52,8 @@ sequencer = forever $ do
         setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
         $logInfoS "sequencer" "Applied pending LDB writes"
         unless (lenOutEv == 0) $ do
-            writeSeqEvents' outEv
+            writeSeqVmEvents' outEv
+            writeSeqP2pEvents' outEv
             $logInfoS "sequencer" . T.pack $ "Wrote " ++ show lenOutEv ++ " SeqEvents"
         setNextIngestedOffset ofs
 
@@ -78,7 +79,8 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
               shouldEmit <- bootstrapDoEmit <$> ask
               when shouldEmit $ do
                   assertTopicCreation'
-                  writeSeqEvents' [OEBlock shortCircuit]  -- todo handle the error :)
+                  writeSeqVmEvents' [OEBlock shortCircuit]  -- todo handle the error :)
+                  writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
@@ -155,9 +157,14 @@ readUnseqEvents' = do
     tickBy (length ret) ctr_sequencer_kafka_unseq_reads
     return ret
 
-writeSeqEvents' :: [OutputEvent] -> SequencerM ()
-writeSeqEvents' events = void $ do
-    void $ K.withKafkaViolently (writeSeqEvents events)
+writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
+writeSeqVmEvents' events = void $ do
+    void $ K.withKafkaViolently (writeSeqVmEvents events)
+    tickBy (length events) ctr_sequencer_kafka_seq_writes
+
+writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
+writeSeqP2pEvents' events = void $ do
+    void $ K.withKafkaViolently (writeSeqP2pEvents events)
     tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 getNextIngestedOffset :: SequencerM KP.Offset
