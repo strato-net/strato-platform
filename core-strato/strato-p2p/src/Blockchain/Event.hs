@@ -252,11 +252,6 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     -- private chains
-    
-    -- TODO:  should take [ChainId] so that Transactions handler can request multiple
-    --          chain details in one messag
-    --        should these be calls to ChainInfoDB functions????e
-    --        should these be calls to ChainInfoDB functions????
     MsgEvt (GetChainDetails cid) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
@@ -280,8 +275,7 @@ handleEvents mode peer = awaitForever $ \case
               $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "sending ChainDetails for chainID " ++ (show cid)
               yield $ ChainDetails cid ci
               stampActionTimestamp
-      
-    -- TODO: should take [ChainID] [ChainInfo] 
+    
     MsgEvt (ChainDetails cId cInfo) -> do
       stampActionTimestamp
       SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer) cId cInfo
