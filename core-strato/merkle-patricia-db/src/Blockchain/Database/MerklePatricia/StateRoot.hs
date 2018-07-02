@@ -26,7 +26,7 @@ import           Blockchain.SHA
 
 import           GHC.Generics
 
--- | Internal nodes are indexed in the underlying database by their 256-bit SHA3 hash.
+-- | Internal nodes are indexed in the underlying database by their keccak256-bit hash.
 -- This types represents said hash.
 --
 -- The stateRoot is of this type,

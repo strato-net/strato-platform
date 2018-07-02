@@ -16,7 +16,6 @@ import           Control.Monad.Logger
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Either
 import           Control.Monad.Trans.State
-import qualified Crypto.Hash.SHA3                            as SHA3
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
@@ -50,6 +49,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.SHA                 (keccak256)
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.VM
@@ -260,7 +260,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . (SHA3.hash 256) . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
+  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . keccak256 . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

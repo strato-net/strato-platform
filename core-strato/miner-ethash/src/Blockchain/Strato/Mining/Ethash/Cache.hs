@@ -7,7 +7,6 @@ module Blockchain.Strato.Mining.Ethash.Cache (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3                          as SHA3
 import qualified Data.Array.IO                             as MA
 import qualified Data.Array.IO.Internals                   as MA
 import qualified Data.Array.Unboxed                        as A
@@ -16,6 +15,7 @@ import           Data.Word
 
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Model.SHA               (keccak512)
 
 type Cache = A.UArray (Word32, Word32) Word32
 
