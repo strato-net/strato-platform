@@ -60,7 +60,7 @@ extra-lib-dirs:
 
 ghc-options:
   ethereum-discovery:      -Wall -Werror
-  ethereum-encryption:     -Wall -Werror -fno-warn-warnings-deprecations
+  ethereum-encryption:     -Wall -Werror
   merkle-patricia-db:      -Wall -Werror
   strato-init:             -Wall -Werror
   strato-p2p:              -Wall -Werror
