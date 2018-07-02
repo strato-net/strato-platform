@@ -200,15 +200,15 @@ deflatePrivateTransaction ts otx =
    in case TD.transactionChainId baseTx of
         Nothing -> return [OETx ts otx]
         Just cid -> do
-          chainSeen <- lookupChainId cid
+          chainSeen <- lookupSeenChain cid
           if chainSeen
             then do
               (SHA th, SHA ch) <- insertPrivateHash baseTx
               $logInfoS "transformEvents/deflatePrivateTransaction" . T.pack $ "Got chainHash " ++ format (SHA ch) ++ " for txHash " ++ format (SHA th)
               return [OETx ts otx, OETx ts otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
             else do
-              insertChainId cid
-              insertMissingTx cid baseTx
+              insertSeenChain cid
+              insertMissingChainTx cid baseTx
               return [OEGetChain cid]
 
 inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx

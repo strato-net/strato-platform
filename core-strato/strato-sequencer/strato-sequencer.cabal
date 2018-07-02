@@ -29,12 +29,14 @@ library
   build-depends:       base >=4.8 && <4.10
                      , strato-model
                      , strato-genesis
+                     , bimap
                      , blockapps-data
                      , blockapps-util
                      , strato-conf
                      , clock
                      , containers
                      , directory
+                     , exceptions
                      , mtl
                      , resourcet
                      , monad-logger

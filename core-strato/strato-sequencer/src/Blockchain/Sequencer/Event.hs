@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
@@ -32,6 +33,14 @@ import qualified Data.ByteString.Lazy                      as B
 import           Blockchain.Sequencer.BinaryInstances      ()
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
+
+data IngestEventType = IETTransaction | IETBlock | IETGenesis
+
+iEventType :: IngestEvent -> IngestEventType
+iEventType = \case
+  IETx _ _    -> IETTransaction
+  IEBlock _   -> IETBlock
+  IEGenesis _ -> IETGenesis
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o

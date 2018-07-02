@@ -10,7 +10,7 @@ import           Control.Arrow                      ((&&&))
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.State.Lazy           (State, execState, get, put)
+import           Control.Monad.State.Lazy           (get, put)
 import qualified Data.Map                           as M
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
@@ -37,6 +37,7 @@ import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
@@ -176,20 +177,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
-
-buildState :: s -> [a] -> (a -> State s ()) -> s
-buildState s [] _ = s
-buildState s (a:as) run =
-  let s' = execState (run a) s
-   in buildState s' as run
-
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = M.toList . buildState M.empty as $ \a -> do
-  s <- get
-  let k = f a
-  case M.lookup k s of
-    Nothing -> put (M.insert k [a] s)
-    Just _  -> put (M.update (Just . (++ [a])) k s)
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do
