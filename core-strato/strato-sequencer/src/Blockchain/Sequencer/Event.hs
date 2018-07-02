@@ -34,7 +34,7 @@ import           Blockchain.Sequencer.BinaryInstances      ()
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
 
-data IngestEventType = IETTransaction | IETBlock | IETGenesis
+data IngestEventType = IETTransaction | IETBlock | IETGenesis deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
 iEventType = \case

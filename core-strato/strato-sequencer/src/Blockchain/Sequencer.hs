@@ -2,7 +2,10 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# OPTIONS -fno-warn-unused-local-binds #-}
+{-# OPTIONS -fno-warn-unused-matches #-}
 module Blockchain.Sequencer where
 
 import           Control.Monad.Logger
@@ -12,7 +15,8 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe)
+import           Data.Maybe                                (catMaybes, fromMaybe, fromJust)
+import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 
 import           Blockchain.Format
@@ -38,6 +42,8 @@ import qualified Network.Kafka.Protocol                    as KP
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
+
+import           Blockchain.Util
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
@@ -89,7 +95,127 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
 
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
 transformEvents input = unzip . join <$> forM input unboxAndTransform
-    where unboxAndTransform e = case e of
+    where goSplitYourself :: [IngestEvent] -> SequencerM ()
+          goSplitYourself es = forM_ (partitionWith iEventType es) $ \(eventType, events) -> do
+            case eventType of
+              IETTransaction -> forM_ (partitionWith isPrivateHashTX events) $ \(isPrivateHash, txs) -> do
+                case isPrivateHash of
+                  True -> forM_ txs $ \(IETx _ (IngestTx _ TD.PrivateHashTX{TD.transactionTxHash = th', TD.transactionChainHash = ch'})) -> do
+                    let th = SHA th'
+                        ch = SHA ch'
+                    lookupSeenTxHash th >>= \case
+                      Just _ -> return ()
+                      Nothing -> do
+                        insertSeenTxHash th ch
+                        lookupTransaction th >>= \case
+                          Just tx -> useChainHash ch (fromJust $ TD.transactionChainId tx)
+                          Nothing -> do
+                            lookupChainHash ch >>= \case
+                              Nothing -> return ()
+                              Just (_, cid) -> do
+                                useChainHash ch cid
+                                insertMissingTx th
+                                -- TODO: add to GetTransactions list
+                  False -> do
+                    forM_ txs $ \(IETx ts tx) -> do
+                      let witnessHash = witnessableHash tx
+                      wasTransactionHashWitnessed witnessHash >>= \case
+                        True -> do
+                          $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx tx
+                          tick ctr_sequencer_txs_witnessed
+                          return ()
+                        False -> do
+                          $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx tx
+                          witnessTransactionHash witnessHash
+                          tick ctr_sequencer_txs_unwitnessed
+                    forM_ (partitionWith isPrivateChainTX txs) $ \(isPrivateChain, txs') -> do
+                      case isPrivateChain of
+                        False -> return () -- TODO: Mark for send to VM and P2P
+                        True -> forM_ (partitionWith getChainIdFromIETx txs') $ \((Just chainId), ptxs) -> do
+                          lookupSeenChain chainId >>= \case
+                            False -> insertMissingChainTxs chainId $ map (\(IETx _ (IngestTx _ tx)) -> (txHash tx)) ptxs -- TODO: Add chainId to GetChains list
+                            True -> forM_ ptxs $ \(IETx _ (IngestTx _ ptx)) -> do
+                              (tHash, cHash) <- insertPrivateHash ptx
+                              insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+                              removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+                              -- TODO: Mark for send to P2P
+                              lookupTxBlocks tHash >>= \case
+                                Nothing -> return ()
+                                Just bHash -> lookupDependentTxs bHash >>= \case
+                                  depTxs | not (S.member tHash depTxs) ->
+                                    error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
+                                  depTxs | depTxs == S.singleton tHash -> do
+                                    removeTxBlock tHash
+                                    clearDependentTxs bHash
+                                    when (readyToEmit bHash) $ do
+                                      hydratedBlock <- hydrateBlock bHash
+                                      markForVM hydratedBlock
+                                  depTxs -> do
+                                    removeTxBlock tHash
+                                    let depTxs' = S.delete tHash depTxs
+                                    mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                                    insertDependentTxs bHash depTxs'
+              IETBlock -> forM_ events $ \(IEBlock ib@IngestBlock{..}) -> do
+                let bHash = blockHeaderHash ibBlockData
+                when (readyToEmit ib) $ markForP2P ib
+                forM_ ibReceiptTransactions $ \tx -> do
+                  when (isPrivateHashTX tx) $ do
+                    let TD.PrivateHashTX{TD.transactionTxHash = th'} = tx
+                        th = SHA th'
+                    lookupMissingTx th >>= \case
+                      False -> return ()
+                      True -> do
+                        insertTxBlock th bHash
+                        insertDependentTx bHash th
+                lookupDependentTxs bHash >>= \case
+                  s | s == S.empty -> do
+                    when (readyToEmit bHash) $ do
+                      hydratedBlock <- hydrateBlock bHash
+                      markForVM hydratedBlock
+                  _ -> return () -- TODO: add to GetTransactions list
+              IETGenesis -> forM_ events $ \(IEGenesis (ig@(IngestGenesis io (cId, cInfo)))) -> do
+                markForP2P (cId, cInfo)
+                lookupSeenChain cId >>= \case
+                  True -> return ()
+                  False -> do
+                    insertSeenChain cId
+                    markForVM (cId, cInfo)
+                    lookupMissingChainTxs cId >>= \case
+                      [] -> return ()
+                      ths -> forM_ ths $ \th -> lookupTransaction th >>= \case
+                        Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show cId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
+                        Just tx -> do
+                          (tHash, cHash) <- insertPrivateHash tx
+                          insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+                          removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+                          markForP2P (tHash, cHash)
+                          lookupTxBlocks tHash >>= \case
+                            Nothing -> return ()
+                            Just bHash -> lookupDependentTxs bHash >>= \case
+                              depTxs | not (S.member tHash depTxs) ->
+                                error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
+                              depTxs | depTxs == S.singleton tHash -> do
+                                removeTxBlock tHash
+                                clearDependentTxs bHash
+                                when (readyToEmit bHash) $ do
+                                  hydratedBlock <- hydrateBlock bHash
+                                  markForVM hydratedBlock
+                              depTxs -> do
+                                removeTxBlock tHash
+                                let depTxs' = S.delete tHash depTxs
+                                mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                                insertDependentTxs bHash depTxs'
+
+          markForVM = const (return ())
+          markForP2P = const (return ())
+          isPrivateHashTX = const False
+          isPrivateChainTX = const False
+          readyToEmit = const False
+          hydrateBlock = return
+          getChainIdFromIETx (IETx _ tx) = TD.transactionChainId $ itTransaction tx
+          getChainIdFromIETx _ = error "getChainIdFromIETx: Called on not a transaction"
+
+          unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> emitBlocks bk (ingestBlockToSequencedBlock bk)
                                   IEGenesis (g@(IngestGenesis _ (cId, cInfo))) -> do
@@ -128,10 +254,10 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                 return [] -- couldnt ecrecover some transactions in this block. block is likely garbage
             Just b  -> do
                 t0 <- liftIO $ getTime Realtime
-                readyToEmit <- enqueueIfParentNotEmitted b
+                readiness <- enqueueIfParentNotEmitted b
                 t1 <- liftIO $ getTime Realtime
                 $logDebug . T.pack $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
-                case readyToEmit of
+                case readiness of
                     (ReadyToEmit totalPastDifficulty) -> do
                         t2 <- liftIO $ getTime Realtime
                         deflatedChain <- buildEmissionChain b totalPastDifficulty
@@ -208,7 +334,7 @@ deflatePrivateTransaction ts otx =
               return [OETx ts otx, OETx ts otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
             else do
               insertSeenChain cid
-              insertMissingChainTx cid baseTx
+              insertMissingChainTx cid (otHash otx)
               return [OEGetChain cid]
 
 inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx

@@ -14,6 +14,7 @@ import           Data.Bimap                   (Bimap)
 import qualified Data.Bimap                   as B
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
+import           Data.Maybe                   (fromMaybe)
 import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 
@@ -24,10 +25,10 @@ data PrivateHashDB =
                    , chainHashMap   :: Map SHA (Bool, Word256)
                    , chainBuffers   :: Map Word256 (CircularBuffer SHA) -- TODO: Use buffers to remove old entries
                    , seenChains     :: S.Set Word256
-                   , missingChainDB :: Map Word256 [Transaction]
+                   , missingChainDB :: Map Word256 [SHA]
                    , seenHashes     :: Bimap SHA SHA                    -- transaction hashes and chain hashes
                    , missingTxs     :: S.Set SHA                        -- set of transaction hashes for chains we recognize but don't have data for
-                   , dependentTxDB  :: Map SHA [SHA]                    -- map from block hash to dependent transaction hashes
+                   , dependentTxDB  :: Map SHA (S.Set SHA)              -- map from block hash to dependent transaction hashes
                    , txBlockDB      :: Map SHA SHA                      -- map from transaction hash to block hash
                    }
 
@@ -152,21 +153,24 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
     insertSeenChain :: Word256 -> m ()
     insertSeenChain chainId = getSeenChainsDB >>= putSeenChainsDB . S.insert chainId
 
-    getMissingChainsDB :: m (Map Word256 [Transaction])
+    getMissingChainsDB :: m (Map Word256 [SHA])
     getMissingChainsDB = missingChainDB <$> getPrivateHashDB
 
-    putMissingChainsDB :: Map Word256 [Transaction] -> m ()
+    putMissingChainsDB :: Map Word256 [SHA] -> m ()
     putMissingChainsDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingChainDB = m }
 
-    lookupMissingChainTxs :: Word256 -> m [Transaction]
-    lookupMissingChainTxs chainId = maybe [] id . M.lookup chainId <$> getMissingChainsDB
+    lookupMissingChainTxs :: Word256 -> m [SHA]
+    lookupMissingChainTxs chainId = fromMaybe [] . M.lookup chainId <$> getMissingChainsDB
 
-    insertMissingChainTx :: Word256 -> Transaction -> m ()
-    insertMissingChainTx chainId tx = do
+    insertMissingChainTx :: Word256 -> SHA -> m ()
+    insertMissingChainTx chainId th = do
       m <- getMissingChainsDB
       case M.lookup chainId m of
-        Nothing -> putMissingChainsDB (M.insert chainId [tx] m)
-        Just txs -> putMissingChainsDB (M.insert chainId (tx:txs) m)
+        Nothing -> putMissingChainsDB (M.insert chainId [th] m)
+        Just ths -> putMissingChainsDB (M.insert chainId (th:ths) m)
+
+    insertMissingChainTxs :: Word256 -> [SHA] -> m ()
+    insertMissingChainTxs chainId ths = getMissingChainsDB >>= putMissingChainsDB . M.insert chainId ths
 
     clearMissingChainTxs :: Word256 -> m ()
     clearMissingChainTxs chainId = getMissingChainsDB >>= putMissingChainsDB . M.delete chainId
@@ -191,8 +195,8 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
         then Just <$> B.lookupR ch db -- Data.Bimap calls `fail` if element is not in map
         else return Nothing
 
-    insertSeenChainHash :: SHA -> SHA -> m ()
-    insertSeenChainHash th ch = getSeenHashDB >>= putSeenHashDB . B.insert th ch
+    insertSeenTxHash :: SHA -> SHA -> m ()
+    insertSeenTxHash th ch = getSeenHashDB >>= putSeenHashDB . B.insert th ch
 
     getMissingTxsDB :: m (S.Set SHA)
     getMissingTxsDB = missingTxs <$> getPrivateHashDB
@@ -206,21 +210,27 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
     insertMissingTx :: SHA -> m ()
     insertMissingTx tx = getMissingTxsDB >>= putMissingTxsDB . S.insert tx
 
-    getDependentTxDB :: m (Map SHA [SHA])
+    removeMissingTx :: SHA -> m ()
+    removeMissingTx tx = getMissingTxsDB >>= putMissingTxsDB . S.delete tx
+
+    getDependentTxDB :: m (Map SHA (S.Set SHA))
     getDependentTxDB = dependentTxDB <$> getPrivateHashDB
 
-    putDependentTxDB :: Map SHA [SHA] -> m ()
+    putDependentTxDB :: Map SHA (S.Set SHA) -> m ()
     putDependentTxDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ dependentTxDB = m }
 
-    lookupDependentTxs :: SHA -> m [SHA]
-    lookupDependentTxs bHash = maybe [] id . M.lookup bHash <$> getDependentTxDB
+    lookupDependentTxs :: SHA -> m (S.Set SHA)
+    lookupDependentTxs bHash = fromMaybe S.empty . M.lookup bHash <$> getDependentTxDB
 
     insertDependentTx :: SHA -> SHA -> m ()
     insertDependentTx bHash tHash = do
       m <- getDependentTxDB
       case M.lookup bHash m of
-        Nothing -> putDependentTxDB (M.insert bHash [tHash] m)
-        Just ths -> putDependentTxDB (M.insert bHash (tHash:ths) m)
+        Nothing -> putDependentTxDB (M.insert bHash (S.singleton tHash) m)
+        Just ths -> putDependentTxDB (M.insert bHash (S.insert tHash ths) m)
+
+    insertDependentTxs :: SHA -> S.Set SHA -> m ()
+    insertDependentTxs bHash ths = getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
 
     clearDependentTxs :: SHA -> m ()
     clearDependentTxs bHash = getDependentTxDB >>= putDependentTxDB . M.delete bHash
