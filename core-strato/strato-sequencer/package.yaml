@@ -1,0 +1,58 @@
+name:                strato-sequencer
+version:             0.1.0.0
+license:             MIT
+author:              Ilya Ostrovskiy
+maintainer:          ilya@blockapps.net
+copyright:           2016 BlockApps Inc
+category:            Blockchain
+build-type:          Simple
+
+
+dependencies:
+  - base >=4.8 && <4.10
+  - strato-model
+  - blockapps-data
+  - blockapps-util
+  - strato-conf
+  - clock
+  - containers
+  - directory
+  - mtl
+  - resourcet
+  - monad-logger
+  - text
+  - strato-conf
+  - leveldb-haskell
+  - blockapps-milena
+  - binary
+  - bytestring
+  - ethereum-rlp
+  - time
+  - statsdi
+  - conduit-combinators
+
+ghc-options: -Wall -O2 -threaded
+
+library:
+  source-dirs:      src
+
+executable:
+  source-dirs:      exec-src
+  main:             Main.hs
+  dependencies:
+    - hflags
+    - safe
+    - strato-sequencer
+
+tests:
+  strato-sequencer-spec:
+    source-dirs:   test
+    main:          Main.hs
+    dependencies:
+      - HUnit
+      - QuickCheck
+      - derive
+      - hflags
+      - hspec
+      - hspec-contrib
+      - strato-sequencer
