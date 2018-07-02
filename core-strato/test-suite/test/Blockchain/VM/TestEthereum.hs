@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests

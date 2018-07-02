@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.SHA (
   module Blockchain.Strato.Model.SHA,
@@ -7,25 +8,16 @@ module Blockchain.SHA (
   hash
   ) where
 
-import           Control.Monad
-import qualified Data.Aeson                  as JSON
-import           Data.Binary
-import qualified Data.ByteString             as B
-import qualified Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
-import qualified Data.ByteString.Lazy        as BL
 import qualified Data.Text                   as T
 import           Numeric
 import           Web.HttpApiData
 import           Web.PathPieces
 
 import qualified Blockchain.Colors           as CL
-import           Blockchain.Data.RLP
-import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Util
 
-import           GHC.Generics
 
 import           Blockchain.Strato.Model.SHA
 

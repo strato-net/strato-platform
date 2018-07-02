@@ -5,7 +5,6 @@ module Commands (
   ) where
 
 import           Control.Monad.Except
-import           Control.Monad.IO.Class
 import qualified Data.Aeson                  as JSON
 import           Data.Binary
 import qualified Data.ByteString             as B
@@ -17,30 +16,23 @@ import qualified Data.Map                    as M
 import qualified Data.Text                   as T
 import qualified Data.Vector                 as V
 import qualified Network.Haskoin.Internals   as H
-import           Network.HTTP.Client
 import           Network.JsonRpc.Server
 import           Network.Kafka
 import           Network.Kafka.Protocol
-import           Numeric
 import           System.Random
 
 import           Blockchain.Constants
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Json
-import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.TXOrigin
-import           Blockchain.DB.DetailsDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.SHA (keccak256)
 import           Blockchain.Stream.Raw
 
 import qualified APIProxy                    as API
 import           Binary
+import           Prelude                     hiding (id)
 
 type Server = IO
 
@@ -206,9 +198,10 @@ getBlockNumber (JSON.Array val) =
       Just (JSON.Object v) ->
         case H.lookup "number" v of
          Just (JSON.Number n) -> Just $ round n
-         Nothing              -> Nothing
+         _                    -> Nothing
       _ -> Nothing
    _ -> Nothing
+getBlockNumber _ = Nothing
 
 
 eth_blockNumber::Method Server
@@ -233,7 +226,7 @@ emitKafkaJsonRlpCommand c = do
       writeSeqEvents [OEJsonRpcCommand c]
     case rets of
         Left e      -> error $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> return ()
+        Right _ -> return ()
 
 waitForResponse::String->Offset->IO B.ByteString
 waitForResponse id offset = do
@@ -320,7 +313,7 @@ eth_getTransactionCount = toMethod "eth_getTransactionCount" f (Required "addres
 eth_getStorageAt::Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
   where f::String->String->String->RpcResult Server String
-        f addressString key blockString = do
+        f addressString _ blockString = do
           id <- liftIO $ fmap (take 10 . randomRs ('a','z')) newStdGen
           case strToAddress addressString of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
@@ -340,7 +333,7 @@ eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockStrin
   where f::String->String->RpcResult Server String
         f codeString blockString = do
           let id = "qqqq"
-          tx <- liftIO $ H.withSource H.devURandom $
+          _ <- liftIO $ H.withSource H.devURandom $
             createMessageTX undefined undefined undefined undefined undefined undefined undefined
           case strToByteString codeString of
            Left err -> throwError $ rpcError (-32602) $ T.pack err

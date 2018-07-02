@@ -25,7 +25,7 @@ import           Yesod.Raml.Routes
 import           Blockchain.DB.SQLDB
 
 debug :: c -> String -> c
-debug = flip trace
+debug = const
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
