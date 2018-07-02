@@ -3,7 +3,7 @@ pragma solidity ^0.4.8;
 contract ExternalStorage {
     string public uri;
     string public host;
-    string public tempHash;
+    string public fileHash;
     address[] public signers;
     uint public timeStamp;
     string public metadata;
@@ -11,7 +11,7 @@ contract ExternalStorage {
     function ExternalStorage(string _uri, string _host, string _hash, string _metadata) public {
         uri = _uri;
         host = _host;
-        tempHash = _hash;
+        fileHash = _hash;
         signers = [msg.sender];
         metadata = _metadata;
         timeStamp = now;

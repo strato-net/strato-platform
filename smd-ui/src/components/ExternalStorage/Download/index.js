@@ -21,10 +21,7 @@ class Download extends Component {
       this.props.resetError();
     }
     if (nextProps.downloadUrl) {
-      var a = document.createElement('a');
-      a.href = nextProps.downloadUrl;
-      a.download = "filename";
-      a.click();
+      window.open(nextProps.downloadUrl, "_parent")
       this.props.clearUrl();
     }
   }

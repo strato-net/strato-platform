@@ -52,10 +52,10 @@ module.exports = {
 
       try {
         let contractUpload = yield externalStorage.uploadContract(userCredentials, args);
-
         let upload = yield models.Upload.create({
           contractAddress: contractUpload.address,
-          uri: uploadedFile.Location
+          uri: uploadedFile.Location,
+          hash: hash
         });
 
         res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
@@ -71,7 +71,7 @@ module.exports = {
     co(function* () {
       try {
         let uploads = yield models.Upload.all({
-          attributes: ['contractAddress', 'uri', 'createdAt']
+          attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
         });
         res.status(200).json({ list: uploads });
       } catch (error) {

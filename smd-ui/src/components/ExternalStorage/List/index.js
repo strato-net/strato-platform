@@ -12,9 +12,14 @@ class List extends Component {
             <td>
               <small>{list.uri}</small>
             </td>
-            <td className="text-right">
+            <td>
               <small>
                 <HexText value={list.contractAddress} classes="smd-pad-2" />
+              </small>
+            </td>
+            <td>
+              <small>
+                <HexText value={list.hash} classes="smd-pad-2" />
               </small>
             </td>
             <td>
@@ -27,17 +32,18 @@ class List extends Component {
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
-        <table className="pt-table pt-interactive pt-condensed pt-striped upload-list">
+        <table className="pt-table pt-interactive pt-condensed pt-striped upload-list" style={{ tableLayout: 'fixed', width: '100%' }}>
           <thead>
             <tr>
-              <th><h5>Document</h5></th>
-              <th><h5>Owner</h5></th>
-              <th><h5>Uploaded</h5></th>
+              <th width="40%"><h5>Document</h5></th>
+              <th width="20%"><h5>Address</h5></th>
+              <th width="20%"><h5>Hash</h5></th>
+              <th width="20%"><h5>Uploaded</h5></th>
             </tr>
           </thead>
 
           <tbody>
-            {list || <tr><td colSpan={3}>No Data</td></tr>}
+            {list || <tr><td colSpan={4}>No Data</td></tr>}
           </tbody>
         </table>
       </div>
