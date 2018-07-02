@@ -17,6 +17,22 @@ import           Data.Text.Encoding              (encodeUtf8, decodeUtf8)
 
 import           Test.QuickCheck.Arbitrary
 
+newtype AccountBalance = AccountBalance {
+    unAccountBalance :: (Address, Word256)
+} deriving (Eq, Read, Show, GHCG.Generic)
+
+instance FromJSON AccountBalance where
+  parseJSON (Object a) =
+    AccountBalance <$>
+    a .: "unAccountBalance"
+  parseJSON x = error $ "couldn't parse JSON for account balance: " ++ show x
+
+instance ToJSON AccountBalance where
+  toEncoding (AccountBalance uab) =
+    pairs (
+      "unAccountBalance" .= uab
+    )
+
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
     addRule         :: String,
@@ -40,7 +56,7 @@ instance FromJSON ChainInfo where
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    o .: "accountBalance"
+    (map unAccountBalance <$> (o .: "accountBalance"))
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
@@ -50,7 +66,7 @@ instance ToJSON ChainInfo where
       "addRule" .= ar <>
       "removeRule" .= rr <>
       "members" .= ms <>
-      "accountBalance" .= ab
+      "accountBalance" .= (map AccountBalance ab)
     )
 
 instance RLPSerializable ChainInfo where
