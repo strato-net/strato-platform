@@ -109,7 +109,7 @@ logN n = do
 guardStorage :: VMM ()
 guardStorage = do
   w <- lift $ writable <$> get
-  when (not w) (left WriteProtection)
+  when (not w) (throwE WriteProtection)
 
 
 dupN::Int->VMM ()
@@ -117,7 +117,7 @@ dupN n = do
   stack' <- lift $ fmap stack get
   if length stack' < n
     then do
-    left StackTooSmallException
+    throwE StackTooSmallException
     else push $ stack' !! (n-1)
 
 
@@ -133,7 +133,7 @@ swapn n = do
   vmState <- lift get
   if length (stack vmState) < n
     then do
-      left StackTooSmallException
+      throwE StackTooSmallException
     else do
       let (middle, v2:rest2) = splitAt (n-1) $ stack vmState
       lift $ put vmState{stack = v2:(middle++(v1:rest2))}
@@ -420,7 +420,7 @@ runOperation JUMP = do
 
   if p `elem` jumpDests
     then setPC $ fromIntegral p - 1 -- Subtracting 1 to compensate for the pc-increment that occurs every step.
-    else left InvalidJump
+    else throwE InvalidJump
 
 runOperation JUMPI = do
   p <- pop
@@ -430,7 +430,7 @@ runOperation JUMPI = do
   case (p `elem` jumpDests, (0::Word256) /= condition) of
     (_, False) -> return ()
     (True, _)  -> setPC $ fromIntegral p - 1
-    _          -> left InvalidJump
+    _          -> throwE InvalidJump
 
 runOperation PC = pushVMStateVar pc
 
@@ -694,7 +694,7 @@ runOperation DELEGATECALL = do
     else do
       let MalformedOpcode opcode = DELEGATECALL
       when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
-      left MalformedOpcodeException
+      throwE MalformedOpcodeException
 
 runOperation STATICCALL = do
   gas <- pop :: VMM Word256
@@ -711,9 +711,9 @@ runOperation REVERT = do
   retVal <- unsafeSliceByteString address' size
 
   setReturnVal $ Just retVal
-  left RevertException
+  throwE RevertException
 
-runOperation INVALID = left InvalidInstruction
+runOperation INVALID = throwE InvalidInstruction
 
 runOperation SUICIDE = do
   guardStorage
@@ -733,7 +733,7 @@ runOperation SUICIDE = do
 
 runOperation (MalformedOpcode opcode) = do
   when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
-  left MalformedOpcodeException
+  throwE MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
 
