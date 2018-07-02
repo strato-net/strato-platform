@@ -17,7 +17,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Stats
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
@@ -942,7 +942,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
                          callDepth=callDepth',
                          vmGasRemaining=availableGas,
                          suicideList=preExistingSuicideList} $
-      runEitherT f
+      runExceptT f
 
   case result of
       (Left e, vmState') -> do
@@ -969,7 +969,7 @@ getFromSelector sel isRunningTests' b codeHash = do
 
   stateRoot <- getStateRoot
   setStateDBStateRoot (blockDataStateRoot b)
-  let env = 
+  let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
           envBlockHeader=BlockData{

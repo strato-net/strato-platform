@@ -26,7 +26,7 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Stats                     hiding (Success)
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
@@ -299,7 +299,7 @@ addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
 addTransactions _ remGas [] = return remGas
 addTransactions b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
-  !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
+  !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
   afterMap <- getAddressStateDBMap
 
   printTransactionMessage t result deltaT
@@ -324,7 +324,7 @@ mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> Cont
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
     beforeMap <- getAddressStateDBMap
-    (time', !result) <- timeIt . runEitherT $ addTransaction False header remGas tx
+    (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateDBMap
     time time' time_vm_tx_mining
     printTransactionMessage tx result time'
@@ -336,7 +336,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
 
-addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> EitherT TransactionFailureCause ContextM ExecResults
+addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
     nonceValid <- lift $ isNonceValid t
 
@@ -352,10 +352,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
-    when (txCost > acctBalance) $ left $ TFInsufficientFunds txCost acctBalance t
-    when (intrinsicGas' > transactionGasLimit bt) $ left $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
-    when (transactionGasLimit bt > remainingBlockGas) $ left $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-    unless nonceValid $ left $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
+    when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
+    when (intrinsicGas' > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
+    when (transactionGasLimit bt > remainingBlockGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
+    unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
     let availableGas = transactionGasLimit bt - intrinsicGas'
 
@@ -623,7 +623,7 @@ calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = w
 
     let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
 
-    
+
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \codeHash -> do
         codeSource' <- codeSource codeHash

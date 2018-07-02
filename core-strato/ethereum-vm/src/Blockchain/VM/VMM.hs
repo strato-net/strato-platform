@@ -9,7 +9,7 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Stats
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
@@ -34,8 +34,8 @@ import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
-type VMM = EitherT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
---type VMM2 = EitherT VMException (StateT VMState (ResourceT IO))
+type VMM = ExceptT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
+--type VMM2 = ExceptT VMException (StateT VMState (ResourceT IO))
 
 --TODO- Do I really need this?  Is it bad that it is undefined?
 instance MonadResource VMM where
