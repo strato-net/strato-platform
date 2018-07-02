@@ -29,7 +29,6 @@ executable slipstream
                  , logging-effect
                  , milena
                  , monad-control
-                 , monad-logger
                  , mtl
                  , network
                  , postgresql-simple

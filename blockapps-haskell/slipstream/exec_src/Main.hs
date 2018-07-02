@@ -238,7 +238,7 @@ convertRet address codehash abi x = do
 
       let beg = "BEGIN;"
       let comm = "COMMIT;"
-      let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
+      let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ", created_at timestamp default now());"
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
