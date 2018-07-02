@@ -6,14 +6,11 @@ module Blockchain.BackupMP (
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Crypto.Hash.SHA3                   as SHA3
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Lazy               as BL
 import qualified Data.ByteString.Lazy.Char8         as BLC
 import qualified Database.LevelDB                   as LDB
---import Network.Kafka
---import Network.Kafka.Producer
 import           Numeric
 
 import           Blockchain.Data.BlockDB
@@ -22,11 +19,10 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
---import Blockchain.EthConf
---import Blockchain.KafkaTopics
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MPDB
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA        (keccak256)
 import           Blockchain.Stream.VMEvent
 
 addBlock::(HasSQLDB m)=>BL.ByteString->m ()
@@ -38,19 +34,19 @@ addBlock blockData = do
 addStateDB::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
 addStateDB db stateDBData = do
   let val = decodeWithCheck $ BL.toStrict stateDBData
-  LDB.put db LDB.defaultWriteOptions (SHA3.hash 256 val) val
+  LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
 addCode'::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
 addCode' db codeData = do
   let val = decodeWithCheck $ BL.toStrict codeData
-  LDB.put db LDB.defaultWriteOptions (SHA3.hash 256 val) val
+  LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
 addHash'::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
 addHash' db hashData = do
   let val = decodeWithCheck $ BL.toStrict hashData
-  LDB.put db LDB.defaultWriteOptions (SHA3.hash 256 val) val
+  LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
 

@@ -6,7 +6,6 @@ module Commands (
 
 import           Control.Monad.Except
 import           Control.Monad.IO.Class
-import qualified Crypto.Hash.SHA3            as SHA3
 import qualified Data.Aeson                  as JSON
 import           Data.Binary
 import qualified Data.ByteString             as B
@@ -37,6 +36,7 @@ import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA (keccak256)
 import           Blockchain.Stream.Raw
 
 import qualified APIProxy                    as API
@@ -140,7 +140,7 @@ web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
           case strToByteString val of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
            Right bytes ->
-             return $ "0x" ++ BC.unpack (B16.encode $ SHA3.hash 256 bytes)
+             return $ "0x" ++ BC.unpack (B16.encode $ keccak256 bytes)
 
 net_peerCount::Method Server
 net_peerCount = toMethod "net_peerCount" f ()

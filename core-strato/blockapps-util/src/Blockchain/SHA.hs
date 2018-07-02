@@ -8,7 +8,6 @@ module Blockchain.SHA (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3            as C
 import qualified Data.Aeson                  as JSON
 import           Data.Binary
 import qualified Data.ByteString             as B

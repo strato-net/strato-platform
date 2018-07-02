@@ -20,6 +20,7 @@ library
                        binary,
                        bytestring,
                        cryptohash,
+                       strato-model,
                        time
   ghc-options:         -Wall -O2
   hs-source-dirs:      src
