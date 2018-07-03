@@ -16,22 +16,22 @@ import qualified Data.Text                       as T
 import           Data.Text.Encoding              (encodeUtf8, decodeUtf8)
 
 import           Test.QuickCheck.Arbitrary
+import           Control.Applicative
 
 newtype AccountBalance = AccountBalance {
     unAccountBalance :: (Address, Word256)
 } deriving (Eq, Read, Show, GHCG.Generic)
 
 instance FromJSON AccountBalance where
-  parseJSON (Object a) =
-    AccountBalance <$>
-    a .: "unAccountBalance"
+  parseJSON (Object a) = AccountBalance <$> liftA2 (,) (a .: "address") (a .: "balance")    
   parseJSON x = error $ "couldn't parse JSON for account balance: " ++ show x
 
 instance ToJSON AccountBalance where
-  toEncoding (AccountBalance uab) =
-    pairs (
-      "unAccountBalance" .= uab
-    )
+  toEncoding (AccountBalance (addr, bal)) =
+      pairs (
+        "address" .= addr <>
+        "balance" .= bal
+      )  
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
