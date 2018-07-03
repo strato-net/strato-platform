@@ -5,6 +5,7 @@ set -e
 declare -i RESULT=0
 TESTS=(
   blockapps-data
+  blockapps-haskoin
   blockapps-ecrecover
   blockstanbul
   ethereum-rlp
