@@ -68,7 +68,7 @@ kafkaBitsForService = \case
     Sequencer -> let clientId = KP.KString (S8.pack SeqConst.defaultKafkaClientId') in
         (clientId, lookupConsumerGroup clientId, SeqKafka.unseqEventsTopicName)
     EVM -> let clientId = "ethereum-vm" in
-        (clientId, lookupConsumerGroup clientId, SeqKafka.seqEventsTopicName)
+        (clientId, lookupConsumerGroup clientId, SeqKafka.seqVmEventsTopicName)
     ApiIndexer -> let clientId = "strato-api-indexer" in
         (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
     P2PIndexer -> let clientId = "strato-p2p-indexer" in
