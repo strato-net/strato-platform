@@ -11,7 +11,6 @@ module Control.Monad.Stats.TH
 import           Control.Monad
 import qualified Data.ByteString.Char8        as Char8
 import           Data.Char
-import           Data.List
 import           Text.ParserCombinators.ReadP
 
 import qualified Language.Haskell.TH          as TH
@@ -82,9 +81,6 @@ satisfiesParser p = predicate . readP_to_S p
 
 isValidMetricName :: String -> Bool
 isValidMetricName = not . null . readP_to_S validateMetricName
-
-isValidTag :: (String, String) -> Bool
-isValidTag (name, val) = isValidTagName name
 
 isValidTagName :: String -> Bool
 isValidTagName name = isValidTagNameForm name && name /= "device"
