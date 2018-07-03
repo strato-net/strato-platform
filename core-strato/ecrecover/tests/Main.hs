@@ -7,10 +7,9 @@ import qualified Control.Parallel.Strategies       as C
 import qualified Main.Samples                      as B
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.Tasty.QuickCheck
-import           Test.Tasty.Runners
 
 
+main :: IO ()
 main =
   defaultMain (testGroup "" [bytes, integer])
   where
