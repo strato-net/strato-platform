@@ -39,6 +39,10 @@ extra-deps:
   - insert-ordered-containers-0.2.1.0
 
 flags: {}
+
+ghc-options:
+  "$locals": -Wall -Werror
+
 extra-package-dbs: []
 
 extra-include-dirs:
