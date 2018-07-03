@@ -24,9 +24,6 @@ import           Yesod.Raml.Routes
 
 import           Blockchain.DB.SQLDB
 
-debug :: c -> String -> c
-debug = const
-
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
 
@@ -36,9 +33,8 @@ stringToDate s = time where
     picos = (P.init (T.unpack s)) ++ replicate 9 '0'
 
 instance PathPiece UTCTime where
-    toPathPiece t = T.pack $ show t `debug` "PathPieceTo"
-    fromPathPiece s = Just time `debug` ("PathPiece: " ++ show time) where
-       time = stringToDate s `debug` ("PathPieceFrom: " ++ show s)
+    toPathPiece t = T.pack $ show t
+    fromPathPiece s = Just . stringToDate $ s
 
 
 -- | The foundation datatype for your application. This can be a good place to
