@@ -17,7 +17,7 @@ import           Blockchain.Data.Enode
 import           Control.Monad.Trans.Resource
 import           Data.Maybe
 
-getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe ChainInfo)
+getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (Word256, ChainInfo))
 getChainInfo chainId = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
@@ -39,18 +39,19 @@ getChainInfo chainId = do
           --   E.where_ (abRef E.^. AccountInfoRefChainId E.==. E.val chainInfoRefId)
           -- cInfos <- E.select . E.from $ \ciRef -> do
           --   E.where_ (abRef E.^. CodeInfoRefChainId E.==. E.val chainInfoRefId)
-          return . Just $ ChainInfo
-                            chainInfoRefChainLabel
-                            chainInfoRefAddRule
-                            chainInfoRefRemoveRule
-                            (map name members)
-                            (map anb accts)
+          return . Just $ (chainId,  
+                           ChainInfo
+                             chainInfoRefChainLabel
+                             chainInfoRefAddRule
+                             chainInfoRefRemoveRule
+                             (map name members)
+                             (map anb accts))
           where name = readEnode . chainMemberRefName . entityVal
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
 
-getAllChainInfos :: (HasSQLDB m) => m [ChainInfo]
+getAllChainInfos :: (HasSQLDB m) => m [(Word256, ChainInfo)]
 getAllChainInfos = do
   db <- getSQLDB
   cids <- runResourceT . flip SQL.runSqlPool db $ do  
