@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -14,7 +13,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Aeson
 import qualified Data.ByteString                             as B
@@ -206,7 +205,7 @@ runTest test = do
 
         (result, vmState1) <- lift $
           flip runStateT vmState0{vmGasRemaining=getNumber $ gas' exec, debugCallCreates=Just []} $
-          runEitherT $ do
+          runExceptT $ do
             runCodeFromStart
 
             vmState2 <- lift get
@@ -247,7 +246,7 @@ runTest test = do
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
-          runEitherT $ addTransaction True (blockBlockData $ block) (currentGasLimit $ env test) signedTransaction
+          runExceptT $ addTransaction True (blockBlockData $ block) (currentGasLimit $ env test) signedTransaction
 
         flushMemStorageDB
         flushMemAddressStateDB
