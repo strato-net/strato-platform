@@ -90,6 +90,12 @@ decodeB64 = withText "Base64 bytestring" $ \txt ->
     Left err -> fail $ "invalid base64 string: " ++ err
     Right bs -> return bs
 
+instance Arbitrary SecretBox.Nonce where
+  arbitrary = (fromMaybe Saltine.zero . Saltine.decode) <$> arbitrary
+
+instance Show SecretBox.Nonce where
+  show = show . Saltine.encode
+
 data KeyStore = KeyStore
   { keystoreSalt          :: ByteString
   , keystorePasswordHash  :: ByteString
@@ -97,7 +103,7 @@ data KeyStore = KeyStore
   , keystoreAcctEncSecKey :: ByteString
   , keystorePubKey        :: PubKey
   , keystoreAcctAddress   :: Address
-  } deriving (Generic)
+  } deriving (Generic, Eq, Show)
 
 instance ToJSON KeyStore where
   toJSON KeyStore{..} = object [
@@ -130,12 +136,8 @@ instance FromJSON KeyStore where
 instance ToSample KeyStore where
   toSamples _ = noSamples
 
-instance Arbitrary SecretBox.Nonce where
-  arbitrary = (fromMaybe Saltine.zero . Saltine.decode) <$> arbitrary
-
 instance Arbitrary KeyStore where
   arbitrary = genericArbitrary uniform
-
 
 instance GToSchema (K1 i ByteString) where
   gdeclareNamedSchema _ _ _ = pure $ NamedSchema Nothing byteSchema
