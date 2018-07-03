@@ -69,17 +69,11 @@ module.exports = {
 
   list: function (req, res, next) {
     co(function* () {
-      try {
-        let uploads = yield models.Upload.all({
-          attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
-        });
-        res.status(200).json({ list: uploads });
-      } catch (error) {
-        let err = new Error(error);
-        err.status = 500;
-        return next(err);
-      }
-    })
+      let uploads = yield models.Upload.all({
+        attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
+      });
+      res.status(200).json({ list: uploads });
+    });
   },
 
   verify: function (req, res, next) {
