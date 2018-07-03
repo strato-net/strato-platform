@@ -51,20 +51,23 @@ getChainInfo chainId = do
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
 
-getAllChainInfos :: (HasSQLDB m) => m [(Word256, ChainInfo)]
-getAllChainInfos = do
-  db <- getSQLDB
-  cids <- runResourceT . flip SQL.runSqlPool db $ do  
-    chains <- E.select . E.from $ \cRef -> do
-              return cRef
-    case chains of
-      [] -> return []
-      cIds -> return $ map (chainInfoRefChainId . E.entityVal) cIds
+getChainInfos :: (HasSQLDB m) => [Word256] -> m [(Word256, ChainInfo)]
+getChainInfos chainIds = do
+  cids <- case chainIds of
+              [] -> do
+                  db <- getSQLDB
+                  runResourceT . flip SQL.runSqlPool db $ do  
+                      chains <- E.select . E.from $ \cRef -> do
+                          return cRef
+                      case chains of
+                          [] -> return []
+                          cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
+              cIds -> return cIds
   chainInfos <- mapM getChainInfo cids      
   let cInfos = sequence $ filter isJust chainInfos
   case cInfos of 
-    Nothing -> return [] 
-    Just cis -> return cis
+      Nothing -> return [] 
+      Just cis -> return cis
 
 putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId ChainInfo{..} = do
