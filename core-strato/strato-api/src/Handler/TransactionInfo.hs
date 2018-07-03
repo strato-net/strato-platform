@@ -123,7 +123,7 @@ getTransactionR = do
 
                  sortParam <- lookupGetParam "sortby"
                  showRejectedMaybe <- lookupGetParam "rejected"
-                 chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+                 chainIds <- lookupGetParams "chainid"
 
                  let showReject = case showRejectedMaybe of
                                     Just "true"  -> -1
@@ -145,13 +145,21 @@ getTransactionR = do
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getTransFilter (rawTx)) $ getParameters ))
 
                                         let criteria = P.map (getTransFilter rawTx) $ getParameters
-                                        let chainCriteria = case chainId of
-                                              Nothing -> (E.isNothing $ rawTx E.^. RawTransactionChainId)
-                                              Just c -> ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val c))
-                                        let allCriteria = chainCriteria : ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
-
+                                        let matchChainId cid = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val $ fromHexText cid))
+                                        let chainCriteria = case chainIds of
+                                              [] -> [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                              [cid] -> if (T.unpack cid == "main")
+                                                           then [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                                           else if (T.unpack cid == "all")
+                                                                    then []
+                                                                    else [matchChainId cid]             
+                                              cids -> P.map matchChainId cids 
+                                        let otherCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
+                                        let allCriteria = case chainCriteria of
+                                                [] -> [otherCriteria]
+                                                _ -> P.map (\cc -> cc : otherCriteria) chainCriteria
                                         -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
-                                        E.where_ (P.foldl1 (E.&&.) allCriteria)
+                                        E.where_ (P.foldl1 (E.||.) (P.map (P.foldl1 (E.&&.)) allCriteria))
 
                                         -- E.offset $ (limit * offset)
                                         E.limit $ (limit)
