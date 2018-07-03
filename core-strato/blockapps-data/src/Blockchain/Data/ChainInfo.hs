@@ -85,3 +85,19 @@ instance RLPSerializable ChainInfo where
       (rlpDecode <$> ms)
       (rlpDecode <$> ab)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
+
+newtype ChainIdChainInfo = ChainIdChainInfo {
+    unChainIdChainInfo :: (Word256, ChainInfo)
+} deriving (Eq, Read, Show, GHCG.Generic)
+
+instance FromJSON ChainIdChainInfo where
+  parseJSON (Object a) =
+    ChainIdChainInfo <$> liftA2 (,) (a .: "chainId") (a .: "chainInfo")
+  parseJSON x = error $ "couldn't parse JSON for (chainId, chainInfo): " ++ show x
+
+instance ToJSON ChainIdChainInfo where
+  toEncoding (ChainIdChainInfo (cid, cinfo)) =
+    pairs (
+      "chainId" .= cid <>
+      "chainInfo" .= cinfo
+    )
