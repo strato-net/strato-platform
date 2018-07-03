@@ -3,32 +3,59 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
 const expect = chai.expect;
-const should = chai.should();
-const fs = require('fs');
-const process = require('process');
-const bcrypt = require('bcrypt');
 const sinon = require('sinon');
-const rp = require('request-promise');
-const rewire = require('rewire');
 
 const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
-const appConfig = require('../config/app.config');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const uploader = require('../lib/uploader');
 const app = require('../app');
 
+
+const waitFaucet = async function (address) {
+  const res = await chai.request(process.env.stratoRoot)
+    .post('/faucet')
+    .field('address', address);
+  assert.equal(res.status, '200');
+  const sleep = function (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  };
+  let text = "[]";
+  do {
+    await sleep(400);
+    let res = await chai.request(process.env.stratoRoot)
+      .get('/account')
+      .query({
+        'address': address
+      })
+      .catch((err) => {
+        throw err;
+      });
+    text = res.text;
+  } while (text === "[]");
+}
+
 chai.use(chaiHttp);
 
 describe('File', function () {
-  this.timeout(10000);
-  let _contractAddress;
+  this.timeout(20000);
+  let _contractAddress, accountAddress;
 
   before(async function () {
     await initDb();
     await models.sequelize.sync();
     await createInitialData();
+
+    const res1 = await chai.request(app)
+      .post('/users')
+      .send({
+        username: "test1@test.com",
+        password: "password"
+      });
+
+    accountAddress = JSON.parse(res1.text).user.accountAddress;
+    await waitFaucet(accountAddress);
   });
 
 
@@ -72,19 +99,18 @@ describe('File', function () {
     });
 
     it('replies 200 with file uplaod and data entry', async function () {
-      let res = await chai.request(app)
+      let result = await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'tanuj500')
-        .field('address', '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad')
+        .field('username', 'test1@test.com')
+        .field('address', accountAddress)
         .field('password', 'password')
         .field('metadata', 'Nature Pics')
         .field('provider', 's3')
         .attach('content', './test/testdata/testImage.png')
         .type('form')
-        .then((result) => {
-          expect(result).to.have.status(200);
-          _contractAddress = result.body.contractAddress;
-        })
+
+      expect(result).to.have.status(200);
+      _contractAddress = result.body.contractAddress;
     });
 
     it('replies 500', async function () {
