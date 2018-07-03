@@ -93,129 +93,159 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                   writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
+transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
+  let th = SHA th'
+      ch = SHA ch'
+  lookupSeenTxHash th >>= \case
+    Just _ -> return ()
+    Nothing -> do
+      insertSeenTxHash th ch
+      lookupTransaction th >>= \case
+        Just tx -> useChainHash ch (fromJust $ TD.transactionChainId tx)
+        Nothing -> do
+          lookupChainHash ch >>= \case
+            Nothing -> return ()
+            Just (_, cid) -> do
+              useChainHash ch cid
+              insertMissingTx th
+              -- TODO: add to GetTransactions list
+
+transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformFullTransactions pairs = do
+  forM_ pairs $ \(ts,tx) -> do
+    let witnessHash = witnessableHash tx
+    wasTransactionHashWitnessed witnessHash >>= \case
+      True -> do
+        $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx tx
+        tick ctr_sequencer_txs_witnessed
+        return ()
+      False -> do
+        $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx tx
+        witnessTransactionHash witnessHash
+        tick ctr_sequencer_txs_unwitnessed
+  forM_ (partitionWith isPrivateChainTX pairs) $ \(isPrivateChain, txs) -> do
+    if not isPrivateChain
+      then do
+        markForVM txs
+        markForP2P txs
+      else forM_ (partitionWith (TD.transactionChainId . itTransaction . snd) txs) $ \((Just chainId), ptxs) -> do
+        lookupSeenChain chainId >>= \case
+          False -> insertMissingChainTxs chainId $ map (\(_, IngestTx _ tx) -> (txHash tx)) ptxs -- TODO: Add chainId to GetChains list
+          True -> forM_ ptxs $ \(_, IngestTx _ ptx) -> do
+            (tHash, cHash) <- insertPrivateHash ptx
+            insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+            removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+            lookupTxBlocks tHash >>= \case
+              Nothing -> do -- if it's not already in a block, send it to the world
+                let SHA th' = tHash
+                    SHA ch' = cHash
+                    phtx = TD.PrivateHashTX th' ch'
+                markForVM phtx
+                markForP2P phtx
+              Just bHash -> lookupDependentTxs bHash >>= \case
+                depTxs | not (S.member tHash depTxs) ->
+                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
+                depTxs | depTxs == S.singleton tHash -> do
+                  removeTxBlock tHash
+                  clearDependentTxs bHash
+                  when (readyToEmit bHash) $ do
+                    hydratedBlock <- hydrateBlock bHash
+                    markForVM hydratedBlock
+                depTxs -> do
+                  removeTxBlock tHash
+                  let depTxs' = S.delete tHash depTxs
+                  mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                  insertDependentTxs bHash depTxs'
+
+transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformTransactions events = forM_ (partitionWith (isPrivateHashTX . snd) events) $ \(isPrivateHash, pairs) ->
+  if isPrivateHash
+    then transformPrivateHashTXs pairs
+    else transformFullTransactions pairs
+
+transformBlocks :: [IngestBlock] -> SequencerM ()
+transformBlocks blocks = forM_ blocks $ \ib -> do
+  let bHash = blockHeaderHash $ ibBlockData ib
+  when (readyToEmit ib) $ markForP2P ib
+  forM_ (ibReceiptTransactions ib) $ \tx -> do
+    when (isPrivateHashTX tx) $ do
+      let TD.PrivateHashTX{TD.transactionTxHash = th'} = tx
+          th = SHA th'
+      lookupMissingTx th >>= \case
+        False -> return ()
+        True -> do
+          insertTxBlock th bHash
+          insertDependentTx bHash th
+  lookupDependentTxs bHash >>= \case
+    s | s == S.empty -> do
+      when (readyToEmit ib) $ do
+        hydratedBlock <- hydrateBlock ib
+        markForVM hydratedBlock
+    _ -> return () -- TODO: add to GetTransactions list
+
+transformGenesis :: [IngestGenesis] -> SequencerM ()
+transformGenesis chains = forM_ chains $ \(IngestGenesis _ (cId, cInfo)) -> do
+  markForP2P (cId, cInfo)
+  lookupSeenChain cId >>= \case
+    True -> return ()
+    False -> do
+      insertSeenChain cId
+      markForVM (cId, cInfo)
+      lookupMissingChainTxs cId >>= \case
+        [] -> return ()
+        ths -> forM_ ths $ \th -> lookupTransaction th >>= \case
+          Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show cId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
+          Just tx -> do
+            (tHash, cHash) <- insertPrivateHash tx
+            insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+            removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+            markForP2P (tHash, cHash)
+            lookupTxBlocks tHash >>= \case
+              Nothing -> return ()
+              Just bHash -> lookupDependentTxs bHash >>= \case
+                depTxs | not (S.member tHash depTxs) ->
+                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
+                depTxs | depTxs == S.singleton tHash -> do
+                  removeTxBlock tHash
+                  clearDependentTxs bHash
+                  when (readyToEmit bHash) $ do
+                    hydratedBlock <- hydrateBlock bHash
+                    markForVM hydratedBlock
+                depTxs -> do
+                  removeTxBlock tHash
+                  let depTxs' = S.delete tHash depTxs
+                  mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                  insertDependentTxs bHash depTxs'
+
+markForVM :: a -> SequencerM ()
+markForVM = const (return ())
+
+markForP2P :: a -> SequencerM ()
+markForP2P = const (return ())
+
+isPrivateHashTX :: a -> Bool
+isPrivateHashTX = const False
+
+isPrivateChainTX :: a -> Bool
+isPrivateChainTX = const False
+
+readyToEmit :: a -> Bool
+readyToEmit = const False
+
+hydrateBlock :: a -> SequencerM a
+hydrateBlock = return
+
+splitEvents :: [IngestEvent] -> SequencerM ()
+splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
+  case eventType of
+    IETTransaction -> transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
+    IETBlock -> transformBlocks $ map (\(IEBlock ob) -> ob) events
+    IETGenesis -> transformGenesis $ map (\(IEGenesis og) -> og) events
+
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
 transformEvents input = unzip . join <$> forM input unboxAndTransform
-    where goSplitYourself :: [IngestEvent] -> SequencerM ()
-          goSplitYourself es = forM_ (partitionWith iEventType es) $ \(eventType, events) -> do
-            case eventType of
-              IETTransaction -> forM_ (partitionWith isPrivateHashTX events) $ \(isPrivateHash, txs) -> do
-                case isPrivateHash of
-                  True -> forM_ txs $ \(IETx _ (IngestTx _ TD.PrivateHashTX{TD.transactionTxHash = th', TD.transactionChainHash = ch'})) -> do
-                    let th = SHA th'
-                        ch = SHA ch'
-                    lookupSeenTxHash th >>= \case
-                      Just _ -> return ()
-                      Nothing -> do
-                        insertSeenTxHash th ch
-                        lookupTransaction th >>= \case
-                          Just tx -> useChainHash ch (fromJust $ TD.transactionChainId tx)
-                          Nothing -> do
-                            lookupChainHash ch >>= \case
-                              Nothing -> return ()
-                              Just (_, cid) -> do
-                                useChainHash ch cid
-                                insertMissingTx th
-                                -- TODO: add to GetTransactions list
-                  False -> do
-                    forM_ txs $ \(IETx ts tx) -> do
-                      let witnessHash = witnessableHash tx
-                      wasTransactionHashWitnessed witnessHash >>= \case
-                        True -> do
-                          $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx tx
-                          tick ctr_sequencer_txs_witnessed
-                          return ()
-                        False -> do
-                          $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx tx
-                          witnessTransactionHash witnessHash
-                          tick ctr_sequencer_txs_unwitnessed
-                    forM_ (partitionWith isPrivateChainTX txs) $ \(isPrivateChain, txs') -> do
-                      case isPrivateChain of
-                        False -> return () -- TODO: Mark for send to VM and P2P
-                        True -> forM_ (partitionWith getChainIdFromIETx txs') $ \((Just chainId), ptxs) -> do
-                          lookupSeenChain chainId >>= \case
-                            False -> insertMissingChainTxs chainId $ map (\(IETx _ (IngestTx _ tx)) -> (txHash tx)) ptxs -- TODO: Add chainId to GetChains list
-                            True -> forM_ ptxs $ \(IETx _ (IngestTx _ ptx)) -> do
-                              (tHash, cHash) <- insertPrivateHash ptx
-                              insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
-                              removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
-                              -- TODO: Mark for send to P2P
-                              lookupTxBlocks tHash >>= \case
-                                Nothing -> return ()
-                                Just bHash -> lookupDependentTxs bHash >>= \case
-                                  depTxs | not (S.member tHash depTxs) ->
-                                    error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
-                                  depTxs | depTxs == S.singleton tHash -> do
-                                    removeTxBlock tHash
-                                    clearDependentTxs bHash
-                                    when (readyToEmit bHash) $ do
-                                      hydratedBlock <- hydrateBlock bHash
-                                      markForVM hydratedBlock
-                                  depTxs -> do
-                                    removeTxBlock tHash
-                                    let depTxs' = S.delete tHash depTxs
-                                    mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
-                                    insertDependentTxs bHash depTxs'
-              IETBlock -> forM_ events $ \(IEBlock ib@IngestBlock{..}) -> do
-                let bHash = blockHeaderHash ibBlockData
-                when (readyToEmit ib) $ markForP2P ib
-                forM_ ibReceiptTransactions $ \tx -> do
-                  when (isPrivateHashTX tx) $ do
-                    let TD.PrivateHashTX{TD.transactionTxHash = th'} = tx
-                        th = SHA th'
-                    lookupMissingTx th >>= \case
-                      False -> return ()
-                      True -> do
-                        insertTxBlock th bHash
-                        insertDependentTx bHash th
-                lookupDependentTxs bHash >>= \case
-                  s | s == S.empty -> do
-                    when (readyToEmit bHash) $ do
-                      hydratedBlock <- hydrateBlock bHash
-                      markForVM hydratedBlock
-                  _ -> return () -- TODO: add to GetTransactions list
-              IETGenesis -> forM_ events $ \(IEGenesis (ig@(IngestGenesis io (cId, cInfo)))) -> do
-                markForP2P (cId, cInfo)
-                lookupSeenChain cId >>= \case
-                  True -> return ()
-                  False -> do
-                    insertSeenChain cId
-                    markForVM (cId, cInfo)
-                    lookupMissingChainTxs cId >>= \case
-                      [] -> return ()
-                      ths -> forM_ ths $ \th -> lookupTransaction th >>= \case
-                        Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show cId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
-                        Just tx -> do
-                          (tHash, cHash) <- insertPrivateHash tx
-                          insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
-                          removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
-                          markForP2P (tHash, cHash)
-                          lookupTxBlocks tHash >>= \case
-                            Nothing -> return ()
-                            Just bHash -> lookupDependentTxs bHash >>= \case
-                              depTxs | not (S.member tHash depTxs) ->
-                                error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
-                              depTxs | depTxs == S.singleton tHash -> do
-                                removeTxBlock tHash
-                                clearDependentTxs bHash
-                                when (readyToEmit bHash) $ do
-                                  hydratedBlock <- hydrateBlock bHash
-                                  markForVM hydratedBlock
-                              depTxs -> do
-                                removeTxBlock tHash
-                                let depTxs' = S.delete tHash depTxs
-                                mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
-                                insertDependentTxs bHash depTxs'
-
-          markForVM = const (return ())
-          markForP2P = const (return ())
-          isPrivateHashTX = const False
-          isPrivateChainTX = const False
-          readyToEmit = const False
-          hydrateBlock = return
-          getChainIdFromIETx (IETx _ tx) = TD.transactionChainId $ itTransaction tx
-          getChainIdFromIETx _ = error "getChainIdFromIETx: Called on not a transaction"
-
-          unboxAndTransform e = case e of
+    where unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> emitBlocks bk (ingestBlockToSequencedBlock bk)
                                   IEGenesis (g@(IngestGenesis _ (cId, cInfo))) -> do
@@ -276,17 +306,19 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                         tick ctr_sequencer_blocks_enqueued
                         return []
 
-          prettyBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
-            where blockNonce = show . BDB.blockDataNumber $ bd
-                  bHash  = format . BDB.blockHeaderHash $ bd
+prettyBlock :: IngestBlock -> String
+prettyBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
+  where blockNonce = show . BDB.blockDataNumber $ bd
+        bHash  = format . BDB.blockHeaderHash $ bd
 
-          prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
-                where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-                      prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-                      prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+prettyTx :: IngestTx -> String
+prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
 
-                      shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
-                      shortOrigin x                    = format x
+            shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
+            shortOrigin x                    = format x
 
 assertTopicCreation' :: SequencerM ()
 assertTopicCreation' = void $ K.withKafkaViolently assertTopicCreation
