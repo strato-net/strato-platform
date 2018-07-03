@@ -1,4 +1,4 @@
-name:                blockapps-bloc
+name:                blocExec
 version:             0.1.0.0
 category:            Web
 build-type:          Simple
@@ -26,6 +26,7 @@ dependencies:
   - wai-extra
   - warp
 
-executable:
-  source-dirs: app/
-  main: Main.hs
+executables:
+  blockapps-bloc:
+    source-dirs: app/
+    main: Main.hs
