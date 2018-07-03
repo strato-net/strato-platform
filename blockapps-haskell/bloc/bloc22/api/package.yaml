@@ -17,6 +17,8 @@ dependencies:
   - base
   - aeson
   - aeson-casing
+  - base16-bytestring
+  - base64-bytestring
   - blockapps-ethereum
   - blockapps-solidity
   - blockapps-strato-api

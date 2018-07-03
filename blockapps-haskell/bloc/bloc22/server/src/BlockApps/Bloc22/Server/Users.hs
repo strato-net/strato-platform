@@ -96,6 +96,12 @@ postUsersUser (UserName name) pass = blocTransaction $ do
   unless createdUser (throwError (DBError "failed to create user"))
   return $ keystoreAcctAddress keyStore
 
+getUsersKeyStore :: UserName -> Address -> Password -> Bloc KeyStore
+getUsersKeyStore = undefined
+
+postUsersKeyStore :: UserName -> PostUsersKeyStoreRequest -> Bloc Bool
+postUsersKeyStore = undefined
+
 postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
