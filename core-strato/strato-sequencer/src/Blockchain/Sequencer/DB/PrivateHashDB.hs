@@ -18,8 +18,6 @@ import           Data.Maybe                   (fromMaybe)
 import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 
-import           Blockchain.Strato.Model.Class
-
 data PrivateHashDB =
      PrivateHashDB { txHashMap      :: Map SHA Transaction              -- TODO: Make these LDB entries
                    , chainHashMap   :: Map SHA (Bool, Word256)
@@ -52,18 +50,6 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
-
-    getTxHashMap :: m (Map SHA Transaction)
-    getTxHashMap = txHashMap <$> getPrivateHashDB
-
-    putTxHashMap :: Map SHA Transaction -> m ()
-    putTxHashMap m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ txHashMap = m }
-
-    lookupTransaction :: SHA -> m (Maybe Transaction)
-    lookupTransaction h = M.lookup h <$> getTxHashMap
-
-    insertTransaction :: Transaction -> m ()
-    insertTransaction tx = getTxHashMap >>= putTxHashMap . M.insert (txHash tx) tx
 
     getChainHashMap :: m (Map SHA (Bool, Word256))
     getChainHashMap = chainHashMap <$> getPrivateHashDB
@@ -116,23 +102,6 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
           if not used
             then useChainHash h cid >> return h
             else getChainHash cid
-
-    insertPrivateHash :: Transaction -> m (SHA, SHA)
-    insertPrivateHash tx = case txChainId tx of
-      Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
-      Just chainId -> do
-        let r = txSigR tx
-            s = txSigS tx
-            h = txHash tx
-            rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-            sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-        insertTransaction tx
-        insertChainHash rs chainId
-        insertChainHash sr chainId
-        chainHash <- getChainHash chainId
-        insertChainBufferEntry chainId rs
-        insertChainBufferEntry chainId sr
-        return (h, chainHash)
 
     insertChainInfo :: Word256 -> ChainInfo -> m ()
     insertChainInfo cId cInfo = do

@@ -22,6 +22,7 @@ import qualified Data.Text                                 as T
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.PrivateTxDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 
