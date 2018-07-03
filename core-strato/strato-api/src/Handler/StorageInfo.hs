@@ -36,7 +36,7 @@ getStorageInfoR :: Handler Value
 getStorageInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 
-                 chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+                 chainIds <- fmap (fmap fromHexText) $ lookupGetParams "chainid"
 
                  limit <- liftIO $ myFetchLimit
 
@@ -46,11 +46,15 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        let chainCriteria = case chainId of
-                                              Nothing -> (E.isNothing $ addrStRef E.^. AddressStateRefChainId)
-                                              Just c -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val c))
+                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val cid)) 
 
-                                        E.on ( ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId ) E.&&. chainCriteria )
+                                        let chainCriteria = case chainIds of
+                                              [] -> [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
+                                              cids -> P.map matchChainId cids
+
+                                        let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
+                                        
+                                        E.on (P.foldl1 (E.||.) $ P.map (criteria E.&&.) chainCriteria)
 
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
 
