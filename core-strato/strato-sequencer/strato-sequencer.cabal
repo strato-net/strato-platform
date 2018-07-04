@@ -21,6 +21,7 @@ library
                      , Blockchain.Sequencer.DB.DependentBlockDB
                      , Blockchain.Sequencer.DB.PrivateHashDB
                      , Blockchain.Sequencer.DB.PrivateTxDB
+                     , Blockchain.Sequencer.DB.SeenChainDB
                      , Blockchain.Sequencer.DB.SeenTransactionDB
                      , Blockchain.Sequencer.Monad
                      , Blockchain.Sequencer.Event

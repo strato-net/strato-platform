@@ -49,18 +49,6 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
 
-    getSeenChainsDB :: m (S.Set Word256)
-    getSeenChainsDB = seenChains <$> getPrivateHashDB
-
-    putSeenChainsDB :: S.Set Word256 -> m ()
-    putSeenChainsDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ seenChains = m }
-
-    lookupSeenChain :: Word256 -> m Bool
-    lookupSeenChain chainId = S.member chainId <$> getSeenChainsDB
-
-    insertSeenChain :: Word256 -> m ()
-    insertSeenChain chainId = getSeenChainsDB >>= putSeenChainsDB . S.insert chainId
-
     getMissingChainsDB :: m (Map Word256 [SHA])
     getMissingChainsDB = missingChainDB <$> getPrivateHashDB
 

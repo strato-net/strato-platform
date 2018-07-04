@@ -11,6 +11,7 @@ import qualified Data.Map.Strict              as M
 import qualified Data.Sequence                as Q
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.SeenChainDB
 
 getChainHashMap :: HasPrivateHashDB m => m (Map SHA (Bool, Word256))
 getChainHashMap = chainHashMap <$> getPrivateHashDB

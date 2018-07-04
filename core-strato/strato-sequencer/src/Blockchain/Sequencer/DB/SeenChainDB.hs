@@ -5,6 +5,8 @@ import           Blockchain.ExtWord           (Word256)
 
 import qualified Data.Set                     as S
 
+import           Blockchain.Sequencer.DB.PrivateHashDB
+
 getSeenChainsDB :: HasPrivateHashDB m => m (S.Set Word256)
 getSeenChainsDB = seenChains <$> getPrivateHashDB
 
