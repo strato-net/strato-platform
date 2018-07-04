@@ -49,28 +49,6 @@ class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
 
-    getMissingChainsDB :: m (Map Word256 [SHA])
-    getMissingChainsDB = missingChainDB <$> getPrivateHashDB
-
-    putMissingChainsDB :: Map Word256 [SHA] -> m ()
-    putMissingChainsDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingChainDB = m }
-
-    lookupMissingChainTxs :: Word256 -> m [SHA]
-    lookupMissingChainTxs chainId = fromMaybe [] . M.lookup chainId <$> getMissingChainsDB
-
-    insertMissingChainTx :: Word256 -> SHA -> m ()
-    insertMissingChainTx chainId th = do
-      m <- getMissingChainsDB
-      case M.lookup chainId m of
-        Nothing -> putMissingChainsDB (M.insert chainId [th] m)
-        Just ths -> putMissingChainsDB (M.insert chainId (th:ths) m)
-
-    insertMissingChainTxs :: Word256 -> [SHA] -> m ()
-    insertMissingChainTxs chainId ths = getMissingChainsDB >>= putMissingChainsDB . M.insert chainId ths
-
-    clearMissingChainTxs :: Word256 -> m ()
-    clearMissingChainTxs chainId = getMissingChainsDB >>= putMissingChainsDB . M.delete chainId
-
     getSeenHashDB :: m (Bimap SHA SHA)
     getSeenHashDB = seenHashes <$> getPrivateHashDB
 

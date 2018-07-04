@@ -19,6 +19,7 @@ library
   exposed-modules:     Blockchain.Sequencer
                      , Blockchain.Sequencer.DB.ChainHashDB
                      , Blockchain.Sequencer.DB.DependentBlockDB
+                     , Blockchain.Sequencer.DB.MissingChainDB
                      , Blockchain.Sequencer.DB.PrivateHashDB
                      , Blockchain.Sequencer.DB.PrivateTxDB
                      , Blockchain.Sequencer.DB.SeenChainDB

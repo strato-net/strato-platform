@@ -1,19 +1,12 @@
 
-module Blockchain.Sequencer.DB.PrivateHashDB where
+module Blockchain.Sequencer.DB.MissingChainDB where
 
 import           Blockchain.ExtWord           (Word256)
-import           Blockchain.Data.Transaction
 import           Blockchain.SHA
-import           Control.Monad.Catch
-import           Control.Monad.Trans.Resource
 
-import           Data.Bimap                   (Bimap)
-import qualified Data.Bimap                   as B
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromMaybe)
-import qualified Data.Sequence                as Q
-import qualified Data.Set                     as S
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 
