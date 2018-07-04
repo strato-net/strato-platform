@@ -15,7 +15,7 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe, fromJust)
+import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust)
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 
@@ -135,7 +135,7 @@ transformFullTransactions pairs = do
         $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx tx
         witnessTransactionHash witnessHash
         tick ctr_sequencer_txs_unwitnessed
-  forM_ (partitionWith isPrivateChainTX pairs) $ \(isPrivateChain, txs) -> do
+  forM_ (partitionWith (isPrivateChainTX . itTransaction. snd) pairs) $ \(isPrivateChain, txs) -> do
     if not isPrivateChain
       then do
         markForVM txs
@@ -173,7 +173,7 @@ transformFullTransactions pairs = do
                   insertDependentTxs bHash depTxs'
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
-transformTransactions events = forM_ (partitionWith (isPrivateHashTX . snd) events) $ \(isPrivateHash, pairs) ->
+transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
   if isPrivateHash
     then transformPrivateHashTXs pairs
     else transformFullTransactions pairs
@@ -239,11 +239,11 @@ markForVM = const (return ())
 markForP2P :: a -> SequencerM ()
 markForP2P = const (return ())
 
-isPrivateHashTX :: a -> Bool
-isPrivateHashTX = const False
+isPrivateHashTX :: TransactionLike t => t -> Bool
+isPrivateHashTX = (== PrivateHash) . txType
 
-isPrivateChainTX :: a -> Bool
-isPrivateChainTX = const False
+isPrivateChainTX :: TransactionLike t => t -> Bool
+isPrivateChainTX = isJust . txChainId
 
 readyToEmit :: a -> Bool
 readyToEmit = const False
