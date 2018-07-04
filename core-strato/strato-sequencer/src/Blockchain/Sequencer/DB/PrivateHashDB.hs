@@ -45,19 +45,3 @@ emptyPrivateHashDB  = PrivateHashDB M.empty M.empty M.empty S.empty M.empty
 class MonadResource m => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
     putPrivateHashDB :: PrivateHashDB -> m ()
-    {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
-
-    getTxBlockDB :: m (Map SHA SHA)
-    getTxBlockDB = txBlockDB <$> getPrivateHashDB
-
-    putTxBlockDB :: Map SHA SHA -> m ()
-    putTxBlockDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ txBlockDB = m }
-
-    lookupTxBlocks :: SHA -> m (Maybe SHA)
-    lookupTxBlocks tHash = M.lookup tHash <$> getTxBlockDB
-
-    insertTxBlock :: SHA -> SHA -> m ()
-    insertTxBlock tHash bHash = getTxBlockDB >>= putTxBlockDB . M.insert tHash bHash
-
-    removeTxBlock :: SHA -> m ()
-    removeTxBlock tHash = getTxBlockDB >>= putTxBlockDB . M.delete tHash
