@@ -7,6 +7,7 @@ import           Blockchain.SHA
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 
+import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Strato.Model.Class
 

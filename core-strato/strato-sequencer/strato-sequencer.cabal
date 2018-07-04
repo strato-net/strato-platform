@@ -17,10 +17,11 @@ library
   ghc-options: -Wall -O2 -threaded
   hs-source-dirs:      src
   exposed-modules:     Blockchain.Sequencer
+                     , Blockchain.Sequencer.DB.ChainHashDB
                      , Blockchain.Sequencer.DB.DependentBlockDB
-                     , Blockchain.Sequencer.DB.SeenTransactionDB
                      , Blockchain.Sequencer.DB.PrivateHashDB
                      , Blockchain.Sequencer.DB.PrivateTxDB
+                     , Blockchain.Sequencer.DB.SeenTransactionDB
                      , Blockchain.Sequencer.Monad
                      , Blockchain.Sequencer.Event
                      , Blockchain.Sequencer.Kafka
