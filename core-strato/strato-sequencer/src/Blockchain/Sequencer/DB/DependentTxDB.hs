@@ -3,6 +3,8 @@ module Blockchain.Sequencer.DB.DependentTxDB where
 
 import           Blockchain.SHA
 
+import           Data.Map.Strict              (Map)
+import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Set                     as S
 

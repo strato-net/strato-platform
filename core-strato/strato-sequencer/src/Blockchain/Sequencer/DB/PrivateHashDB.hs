@@ -11,7 +11,6 @@ import           Data.Bimap                   (Bimap)
 import qualified Data.Bimap                   as B
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
-import           Data.Maybe                   (fromMaybe)
 import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 
@@ -47,28 +46,6 @@ class MonadResource m => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
-
-    getDependentTxDB :: m (Map SHA (S.Set SHA))
-    getDependentTxDB = dependentTxDB <$> getPrivateHashDB
-
-    putDependentTxDB :: Map SHA (S.Set SHA) -> m ()
-    putDependentTxDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ dependentTxDB = m }
-
-    lookupDependentTxs :: SHA -> m (S.Set SHA)
-    lookupDependentTxs bHash = fromMaybe S.empty . M.lookup bHash <$> getDependentTxDB
-
-    insertDependentTx :: SHA -> SHA -> m ()
-    insertDependentTx bHash tHash = do
-      m <- getDependentTxDB
-      case M.lookup bHash m of
-        Nothing -> putDependentTxDB (M.insert bHash (S.singleton tHash) m)
-        Just ths -> putDependentTxDB (M.insert bHash (S.insert tHash ths) m)
-
-    insertDependentTxs :: SHA -> S.Set SHA -> m ()
-    insertDependentTxs bHash ths = getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
-
-    clearDependentTxs :: SHA -> m ()
-    clearDependentTxs bHash = getDependentTxDB >>= putDependentTxDB . M.delete bHash
 
     getTxBlockDB :: m (Map SHA SHA)
     getTxBlockDB = txBlockDB <$> getPrivateHashDB
