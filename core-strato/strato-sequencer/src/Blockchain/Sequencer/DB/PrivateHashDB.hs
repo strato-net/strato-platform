@@ -5,7 +5,6 @@ module Blockchain.Sequencer.DB.PrivateHashDB where
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.Data.Transaction
 import           Blockchain.SHA
-import           Control.Monad.Catch
 import           Control.Monad.Trans.Resource
 
 import           Data.Bimap                   (Bimap)
@@ -44,33 +43,10 @@ emptyPrivateHashDB :: PrivateHashDB
 emptyPrivateHashDB  = PrivateHashDB M.empty M.empty M.empty S.empty M.empty
                                     B.empty S.empty M.empty M.empty
 
-class (MonadResource m, MonadThrow m) => HasPrivateHashDB m where
+class MonadResource m => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
-
-    getSeenHashDB :: m (Bimap SHA SHA)
-    getSeenHashDB = seenHashes <$> getPrivateHashDB
-
-    putSeenHashDB :: Bimap SHA SHA -> m ()
-    putSeenHashDB bm = getPrivateHashDB >>= \db -> putPrivateHashDB db{ seenHashes = bm }
-
-    lookupSeenTxHash :: SHA -> m (Maybe SHA)
-    lookupSeenTxHash th = do
-      db <- getSeenHashDB
-      if B.member th db
-        then Just <$> B.lookup th db -- Data.Bimap calls `fail` if element is not in map
-        else return Nothing
-
-    lookupSeenChainHash :: SHA -> m (Maybe SHA)
-    lookupSeenChainHash ch = do
-      db <- getSeenHashDB
-      if B.memberR ch db
-        then Just <$> B.lookupR ch db -- Data.Bimap calls `fail` if element is not in map
-        else return Nothing
-
-    insertSeenTxHash :: SHA -> SHA -> m ()
-    insertSeenTxHash th ch = getSeenHashDB >>= putSeenHashDB . B.insert th ch
 
     getMissingTxsDB :: m (S.Set SHA)
     getMissingTxsDB = missingTxs <$> getPrivateHashDB

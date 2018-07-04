@@ -26,6 +26,7 @@ import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
 import           Blockchain.Sequencer.DB.SeenChainDB
+import           Blockchain.Sequencer.DB.SeenHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 
