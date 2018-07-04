@@ -23,6 +23,7 @@ import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.DependentTxDB
+import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.MissingTxDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
@@ -57,6 +58,7 @@ sequencer = forever $ do
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
+        clearGetTransactionsDB
         t0 <- liftIO $ getTime Realtime
         (emittedLDBWrites, outEv) <- transformEvents [inEv]
         t1 <- liftIO $ getTime Realtime
@@ -116,7 +118,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX
             Just (_, cid) -> do
               useChainHash ch cid
               insertMissingTx th
-              -- TODO: add to GetTransactions list
+              insertGetTransactionsDB th
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
@@ -162,7 +164,8 @@ transformFullTransactions pairs = do
                 depTxs -> do
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
-                  mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                  mapM_ insertMissingTx depTxs'
+                  mapM_ insertGetTransactionsDB depTxs'
                   insertDependentTxs bHash depTxs'
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
@@ -189,7 +192,7 @@ transformBlocks blocks = forM_ blocks $ \ib -> do
       when (readyToEmit ib) $ do
         hydratedBlock <- hydrateBlock ib
         markForVM hydratedBlock
-    _ -> return () -- TODO: add to GetTransactions list
+    s -> mapM_ insertGetTransactionsDB s
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \(IngestGenesis _ (cId, cInfo)) -> do
@@ -222,7 +225,8 @@ transformGenesis chains = forM_ chains $ \(IngestGenesis _ (cId, cInfo)) -> do
                 depTxs -> do
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
-                  mapM_ insertMissingTx depTxs' -- TODO: add to GetTransactions list
+                  mapM_ insertMissingTx depTxs'
+                  mapM_ insertGetTransactionsDB depTxs'
                   insertDependentTxs bHash depTxs'
 
 markForVM :: a -> SequencerM ()

@@ -2,17 +2,14 @@
 module Blockchain.Sequencer.DB.GetTransactionsDB where
 
 import           Blockchain.SHA
-
 import qualified Data.Set                     as S
 
-import           Blockchain.Sequencer.DB.PrivateHashDB
-
-class MonadResource m => HasGetTransactionsDB m where
+class Monad m => HasGetTransactionsDB m where
     getGetTransactionsDB :: m (S.Set SHA)
     putGetTransactionsDB :: (S.Set SHA) -> m ()
 
-insertGetTransactionsDB :: SHA -> m ()
-insertGetTransactionsDB tx = getMissingTxsDB >>= putMissingTxsDB . S.insert tx
+insertGetTransactionsDB :: HasGetTransactionsDB m => SHA -> m ()
+insertGetTransactionsDB tx = getGetTransactionsDB >>= putGetTransactionsDB . S.insert tx
 
-clearGetTransactionsDB :: m ()
-clearGetTransactionsDB = putMissingTxsDB S.empty
+clearGetTransactionsDB :: HasGetTransactionsDB m => m ()
+clearGetTransactionsDB = putGetTransactionsDB S.empty

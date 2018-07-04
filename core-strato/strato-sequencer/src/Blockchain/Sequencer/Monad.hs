@@ -17,11 +17,15 @@ import           Control.Monad.State
 import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
+import qualified Data.Set                                  as S
+
 import           Blockchain.Constants
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.SHA
 import           Blockchain.StatsConf
 
 import           System.Directory                          (createDirectoryIfMissing)
@@ -43,6 +47,7 @@ data SequencerContext = SequencerContext
                       { dependentBlockDB    :: DependentBlockDB
                       , seenTransactionDB   :: SeenTransactionDB
                       , privateHashDB       :: PrivateHashDB
+                      , getTransactionsDB   :: S.Set SHA
                       , sequencerKafkaState :: K.KafkaState
                       }
 
@@ -63,6 +68,12 @@ instance HasDependentBlockDB SequencerM where
     getDependentBlockDB = dependentBlockDB <$> get
     getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
     getReadOptions      = return LDB.defaultReadOptions
+
+instance HasGetTransactionsDB SequencerM where
+    getGetTransactionsDB = getTransactionsDB <$> get
+    putGetTransactionsDB new = do
+        ctx <- get
+        put $ ctx { getTransactionsDB = new }
 
 instance HasPrivateHashDB SequencerM where
     getPrivateHashDB = privateHashDB <$> get
@@ -100,6 +111,7 @@ runSequencerM c m = do
             { dependentBlockDB    = depBlock
             , seenTransactionDB   = mkSeenTxDB stxSize
             , privateHashDB       = emptyPrivateHashDB
+            , getTransactionsDB   = S.empty
             , sequencerKafkaState = kState
             }
     return $ fst a

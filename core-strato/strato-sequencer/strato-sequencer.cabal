@@ -20,6 +20,7 @@ library
                      , Blockchain.Sequencer.DB.ChainHashDB
                      , Blockchain.Sequencer.DB.DependentBlockDB
                      , Blockchain.Sequencer.DB.DependentTxDB
+                     , Blockchain.Sequencer.DB.GetTransactionsDB
                      , Blockchain.Sequencer.DB.MissingChainDB
                      , Blockchain.Sequencer.DB.MissingTxDB
                      , Blockchain.Sequencer.DB.PrivateHashDB
