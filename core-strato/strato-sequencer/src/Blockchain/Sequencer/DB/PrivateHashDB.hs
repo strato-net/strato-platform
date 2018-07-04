@@ -48,21 +48,6 @@ class MonadResource m => HasPrivateHashDB m where
     putPrivateHashDB :: PrivateHashDB -> m ()
     {-# MINIMAL getPrivateHashDB, putPrivateHashDB #-}
 
-    getMissingTxsDB :: m (S.Set SHA)
-    getMissingTxsDB = missingTxs <$> getPrivateHashDB
-
-    putMissingTxsDB :: S.Set SHA -> m ()
-    putMissingTxsDB txs = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingTxs = txs }
-
-    lookupMissingTx :: SHA -> m Bool
-    lookupMissingTx tx = S.member tx <$> getMissingTxsDB
-
-    insertMissingTx :: SHA -> m ()
-    insertMissingTx tx = getMissingTxsDB >>= putMissingTxsDB . S.insert tx
-
-    removeMissingTx :: SHA -> m ()
-    removeMissingTx tx = getMissingTxsDB >>= putMissingTxsDB . S.delete tx
-
     getDependentTxDB :: m (Map SHA (S.Set SHA))
     getDependentTxDB = dependentTxDB <$> getPrivateHashDB
 
