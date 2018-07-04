@@ -21,7 +21,9 @@ import qualified Data.Set                                  as S
 
 import           Blockchain.Constants
 import qualified Blockchain.EthConf                        as EC
+import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
@@ -47,6 +49,7 @@ data SequencerContext = SequencerContext
                       { dependentBlockDB    :: DependentBlockDB
                       , seenTransactionDB   :: SeenTransactionDB
                       , privateHashDB       :: PrivateHashDB
+                      , getChainsDB         :: S.Set Word256
                       , getTransactionsDB   :: S.Set SHA
                       , sequencerKafkaState :: K.KafkaState
                       }
@@ -68,6 +71,12 @@ instance HasDependentBlockDB SequencerM where
     getDependentBlockDB = dependentBlockDB <$> get
     getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
     getReadOptions      = return LDB.defaultReadOptions
+
+instance HasGetChainsDB SequencerM where
+    getGetChainsDB = getChainsDB <$> get
+    putGetChainsDB new = do
+        ctx <- get
+        put $ ctx { getChainsDB = new }
 
 instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = getTransactionsDB <$> get
@@ -111,6 +120,7 @@ runSequencerM c m = do
             { dependentBlockDB    = depBlock
             , seenTransactionDB   = mkSeenTxDB stxSize
             , privateHashDB       = emptyPrivateHashDB
+            , getChainsDB         = S.empty
             , getTransactionsDB   = S.empty
             , sequencerKafkaState = kState
             }

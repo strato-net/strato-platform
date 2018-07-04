@@ -8,7 +8,7 @@ class Monad m => HasGetChainsDB m where
     getGetChainsDB :: m (S.Set Word256)
     putGetChainsDB :: (S.Set Word256) -> m ()
 
-insertGetChainsDB :: HasGetChainsDB m => SHA -> m ()
+insertGetChainsDB :: HasGetChainsDB m => Word256 -> m ()
 insertGetChainsDB tx = getGetChainsDB >>= putGetChainsDB . S.insert tx
 
 clearGetChainsDB :: HasGetChainsDB m => m ()

@@ -23,6 +23,7 @@ import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.DependentTxDB
+import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.MissingTxDB
@@ -58,6 +59,7 @@ sequencer = forever $ do
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
+        clearGetChainsDB
         clearGetTransactionsDB
         t0 <- liftIO $ getTime Realtime
         (emittedLDBWrites, outEv) <- transformEvents [inEv]
@@ -140,7 +142,9 @@ transformFullTransactions pairs = do
         markForP2P txs
       else forM_ (partitionWith (TD.transactionChainId . itTransaction . snd) txs) $ \((Just chainId), ptxs) -> do
         lookupSeenChain chainId >>= \case
-          False -> insertMissingChainTxs chainId $ map (\(_, IngestTx _ tx) -> (txHash tx)) ptxs -- TODO: Add chainId to GetChains list
+          False -> do
+            insertMissingChainTxs chainId $ map (\(_, IngestTx _ tx) -> (txHash tx)) ptxs
+            insertGetChainsDB chainId
           True -> forM_ ptxs $ \(_, IngestTx _ ptx) -> do
             (tHash, cHash) <- insertPrivateHash ptx
             insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
