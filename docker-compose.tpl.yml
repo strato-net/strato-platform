@@ -40,6 +40,8 @@ services:
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
+    - awsAccessKeyId=${awsAccessKeyId}
+    - awsSecretAccessKey=${awsSecretAccessKey}
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
