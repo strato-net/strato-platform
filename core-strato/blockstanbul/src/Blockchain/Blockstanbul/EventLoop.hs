@@ -66,8 +66,8 @@ hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
 roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
 roundChange = do
-  r <- use (view . round)
-  yield . OMsg . RoundChange (error "TODO(tim): supply a private key to StateMachineM") $ r+1
+  nextView <- uses view (over round (+1))
+  yield . OMsg . RoundChange (error "TODO(tim): supply a private key to StateMachineM") $ nextView
 
 -- TODO(tim): Define an exit type from the conduit for sending blocks to the EVM
 -- TODO(tim): what to do if the block hasn't arrived yet?
@@ -123,7 +123,8 @@ eventLoop = awaitForever $ \ev -> do
       -- TODO(tim): Is it necessary to check that we have prepared?
       when (3 * sameVoteCount > 2 * total && sameHash) $ do
         join $ uses proposal commit
-    IMsg (RoundChange auth rn) -> when (_round v <= rn) $ do
+    IMsg (RoundChange auth vn) -> when (_round v <= _round vn) $ do
+      let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
       total <- uses validators length
       sentRN <- use pendingRound
@@ -131,7 +132,7 @@ eventLoop = awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         -- TODO(tim): use own auth
-        yield . OMsg $ RoundChange auth rn
+        yield . OMsg $ RoundChange auth vn
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of

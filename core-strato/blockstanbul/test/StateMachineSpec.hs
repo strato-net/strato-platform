@@ -58,7 +58,7 @@ spec = parallel $ do
     it "requests a round changes round in response to a timeout or insertion failure" $
       runTest $ do
         got <- sendMessages [Timeout, CommitFailure "invalid hash"]
-        map (roundchangeRound . unOMsg) got `shouldBe` [21, 21]
+        map (_round . roundchangeView . unOMsg) got `shouldBe` [21, 21]
 
     it "can handle several rounds in succession" $ property $ \blk blk2 as seal ->
       not (null as) ==> runTest $ do
@@ -93,9 +93,9 @@ spec = parallel $ do
         sendMessages coms `shouldReturn` []
         use view `shouldReturn` v2
         -- Lets abort this round
-        next <- use (view . round)
-        let aborts = map (\a -> IMsg $ RoundChange a (next + 1)) as
-        sendMessages aborts `shouldReturn` [OMsg $ RoundChange wantBroadcaster (next + 1)]
+        next <- uses view (over round (+1))
+        let aborts = map (\a -> IMsg $ RoundChange a next) as
+        sendMessages aborts `shouldReturn` [OMsg $ RoundChange wantBroadcaster next]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -141,7 +141,7 @@ spec = parallel $ do
         validators .= [sender auth]
         curView <- use view
         got <- sendMessages [IMsg $ Preprepare auth curView{_round = 3} blk]
-        map (roundchangeRound . unOMsg) got `shouldBe` [21]
+        map (_round . roundchangeView . unOMsg) got `shouldBe` [21]
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk seal ->
@@ -231,20 +231,20 @@ spec = parallel $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3-> do
       runTest $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
-        next <- uses (view . round) (+4)
-        let nextView = curView {_round = next}
+        next <- uses view (over round (+4))
+        let roundNext = _round next
         sendMessages [IMsg $ RoundChange a1 next] `shouldReturn` []
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
-        use roundChanged `shouldReturn` M.singleton (sender a1) next
+        use roundChanged `shouldReturn` M.singleton (sender a1) roundNext
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
         sendMessages [IMsg $ RoundChange a2 next] `shouldReturn` [OMsg $ RoundChange a2 next]
-        use pendingRound `shouldReturn` Just next
-        use roundChanged `shouldReturn` M.fromList [(sender a1, next), (sender a2, next)]
+        use pendingRound `shouldReturn` Just roundNext
+        use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
         sendMessages [IMsg $ RoundChange a3 next] `shouldReturn` []
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
-        use view `shouldReturn` nextView
+        use view `shouldReturn` next

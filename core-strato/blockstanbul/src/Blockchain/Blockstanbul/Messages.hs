@@ -33,7 +33,7 @@ data WireMessage = Preprepare MsgAuth View Block
                  | Prepare MsgAuth View SHA
                  | Commit MsgAuth View SHA ExtendedSignature
                  | RoundChange {roundchangeAuth :: MsgAuth,
-                                roundchangeRound :: RoundNumber }
+                                roundchangeView :: View }
                  deriving (Eq, Show)
 
 data InEvent = IMsg {unIMsg :: WireMessage}
