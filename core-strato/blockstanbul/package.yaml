@@ -1,0 +1,19 @@
+name: blockstanbul
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - blockapps-data
+  - blockapps-util
+
+library:
+  source-dirs: src/
+
+tests:
+  blockstanbul-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+      - blockstanbul
+      - hspec
+
