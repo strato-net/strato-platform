@@ -3,7 +3,7 @@
 {-# LANGUAGE TupleSections #-}
 module StateMachineSpec where
 
-import Test.Hspec (Spec, describe, it, parallel, pendingWith, it)
+import Test.Hspec (Spec, describe, it, parallel, pendingWith)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck
 
@@ -60,11 +60,11 @@ spec = parallel $ do
         got <- sendMessages [Timeout, CommitFailure "invalid hash"]
         map (roundchangeRound . unOMsg) got `shouldBe` [21, 21]
 
-    it "can handle several rounds in succession" $ property $ \blk blk2 as ->
+    it "can handle several rounds in succession" $ property $ \blk blk2 as seal ->
       not (null as) ==> runTest $ do
+        lift $ pendingWith "TODO(tim): calculate seal"
         (v, hsh) <- setupRound blk . map sender $ as
-        let seal = ()
-            ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
+        let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
             wantBroadcaster = as !! (length as `div` 3)
             wantDecider = as !! (2 * length as `div` 3)
         proposer .= sender ppr
@@ -144,12 +144,13 @@ spec = parallel $ do
         map (roundchangeRound . unOMsg) got `shouldBe` [21]
 
   describe "A prepare message" $ do
-    it "sets the prepared state of a validator" $ property $ \auth blk ->
+    it "sets the prepared state of a validator" $ property $ \auth blk seal ->
       runTest $ do
+        lift $ pendingWith "TODO(tim): calculate the seal"
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
         sendMessages [IMsg $ Prepare auth curView di] `shouldReturn`
-          [OMsg $ Commit auth curView di ()]
+          [OMsg $ Commit auth curView di seal]
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
@@ -157,11 +158,13 @@ spec = parallel $ do
         curView <- use view
         sendMessages [IMsg $ Prepare auth curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
-    it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
+    it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk seal ->
       runTest $ do
+        lift $ pendingWith "TODO(tim): seal the commit"
         (curView, di) <- setupRound blk [a1, a2, a3]
         let input = map (\a -> IMsg $ Prepare (MsgAuth a sig) curView di) [a1, a2, a3]
-        sendMessages input `shouldReturn` [OMsg $ Commit (MsgAuth a3 sig) curView di ()]
+        -- TODO(tim): rewrite the seal on `got` to be the generated one
+        sendMessages input `shouldReturn` [OMsg $ Commit (MsgAuth a3 sig) curView di seal]
         use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
     it "only sends one commit message" $ property $ \sig as blk ->
@@ -172,46 +175,41 @@ spec = parallel $ do
         got `shouldSatisfy` (== min (length as) 1) . length
 
   describe "A commit message" $ do
-    it "sets the committed state" $ property $ \auth blk ->
+    it "sets the committed state" $ property $ \auth blk seal ->
       runTest $ do
         (curView@(View r s), di) <- setupRound blk [sender auth]
-        sendMessages [IMsg $ Commit auth curView di ()] `shouldReturn` []
+        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` View r (s+1)
-    it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk ->
+    it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
       runTest $ do
-        let seal = ()
         (curView, _) <- setupRound blk [sender auth]
         sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
-    it "won't trigger a commit without a block" $ property $ \auth di ->
+    it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
-        let seal = ()
         validators .= [sender auth]
         curView <- use view
         sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
-    it "rejects a message from a non-validator" $ property $ \auth blk ->
+    it "rejects a message from a non-validator" $ property $ \auth blk seal ->
       runTest $ do
-        let seal = ()
         (curView, di) <- setupRound blk []
         sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView
-    it "rejects a message from an unauthenticated peer" $ property $ \auth blk ->
+    it "rejects a message from an unauthenticated peer" $ property $ \auth blk seal ->
       runTest $ do
-        let seal = ()
         (curView, di) <- setupRound blk [sender auth]
         authenticator .= const False
         sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView
 
-    it "waits for 2/3s of commits" $ property $ \sig blk as ->
+    it "waits for 2/3s of commits" $ property $ \sig blk as seal ->
       runTest $ do
-        let seal = ()
         (curView@(View r s), di) <- setupRound blk as
         let count =  2 * length as `div` 3
             (front, back) = splitAt count as

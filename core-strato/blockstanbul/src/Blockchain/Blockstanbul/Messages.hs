@@ -13,8 +13,6 @@ import Blockchain.Data.BlockDB
 import Blockchain.SHA
 import Blockchain.ExtendedECDSA
 
-type Seal = ()
-
 type RoundNumber = Word256
 type SequenceNumber = Word256
 data View = View {
@@ -33,7 +31,7 @@ instance Arbitrary MsgAuth where
 
 data WireMessage = Preprepare MsgAuth View Block
                  | Prepare MsgAuth View SHA
-                 | Commit MsgAuth View SHA Seal
+                 | Commit MsgAuth View SHA ExtendedSignature
                  | RoundChange {roundchangeAuth :: MsgAuth,
                                 roundchangeRound :: RoundNumber }
                  deriving (Eq, Show)

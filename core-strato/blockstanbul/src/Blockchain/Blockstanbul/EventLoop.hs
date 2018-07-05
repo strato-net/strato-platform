@@ -13,6 +13,7 @@ import Prelude hiding (round, sequence)
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Messages
+import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
@@ -34,7 +35,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- Validators who have sent us a prepare for this round
   , _prepared :: M.Map Address SHA
   -- Validators who have sent us a commitment seal for this round
-  , _committed :: M.Map Address (SHA, Seal)
+  , _committed :: M.Map Address (SHA, ExtendedSignature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPrepared :: Bool
@@ -113,7 +114,7 @@ eventLoop = awaitForever $ \ev -> do
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
         -- TODO(tim): use own auth
-        yield . OMsg $ Commit auth v di ()
+        yield . OMsg $ Commit auth v di (error "TODO(tim): sign the hash")
     IMsg (Commit auth v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- uses validators length
