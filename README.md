@@ -68,7 +68,11 @@ npm-license-crawler  --omitVersion --onlyDirectDependencies --dependencies --csv
 
 #### Haskell apps
 
-TBD
+E.g. for core-strato:
+```
+cd strato-platform/core-strato
+stack ls dependencies --license --no-include-base --depth 1
+```
 
 #### Other (binary installations etc)
 
