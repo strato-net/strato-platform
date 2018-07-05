@@ -33,13 +33,11 @@ instance ToJSONKey StrungSHA where
 
 postBatchTransactionResultR :: Handler Value
 postBatchTransactionResultR = do
-  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
   hashesR <- parseJsonBody :: Handler (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
         txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes)
-                                   , TransactionResultChainId ==. chainId
                                    , TransactionResultMiningStatus ==. Mined
                                    ] [] :: Handler [Entity TransactionResult]
         let mmUpsert k v m = case M.lookup k m of
