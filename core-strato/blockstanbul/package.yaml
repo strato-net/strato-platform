@@ -9,6 +9,7 @@ dependencies:
   - containers
   - conduit-combinators
   - ethereum-encryption
+  - ethereum-rlp
   - lens
   - mtl
   - QuickCheck
@@ -24,6 +25,10 @@ tests:
     main: Main.hs
     source-dirs: test/
     dependencies:
+      - base16-bytestring
       - blockstanbul
+      - bytestring
       - hspec
       - hspec-expectations-lifted
+      - merkle-patricia-db
+      - time
