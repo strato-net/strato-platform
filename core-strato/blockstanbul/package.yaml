@@ -6,7 +6,9 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - conduit-combinators
+  - ethereum-encryption
   - mtl
+  - QuickCheck
   - strato-model
   - text
   - transformers
@@ -21,5 +23,4 @@ tests:
     dependencies:
       - blockstanbul
       - hspec
-      - QuickCheck
 

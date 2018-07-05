@@ -9,6 +9,7 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
+import           Test.QuickCheck
 
 import           Network.Haskoin.Constants
 import           Network.Haskoin.Crypto
@@ -96,3 +97,5 @@ getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash = do
   w <- if r == 0 then Nothing else Just $ recip r
   return $ makePubKey $ shamirsTrick (s * w) p (-h * w) curveG
 
+instance Arbitrary ExtendedSignature where
+  arbitrary = liftM2 ExtendedSignature arbitrary arbitrary
