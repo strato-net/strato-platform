@@ -87,6 +87,7 @@ stateDiffToChanges StateDiff{..} =
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
   case eitherDecode x of
+    --Slipstream shouldn't crash here?
    Left e -> error $ show e
    --Right y -> traceShow(y) y
    Right y -> y
@@ -99,6 +100,7 @@ enterBloc2 env x = do
     $ flip runReaderT env $ runBloc x
 
   case ret of
+    --Slipstream shouldn't crash here?
    Left e -> error $ show e
    Right v -> return v
 
@@ -218,9 +220,9 @@ dbInsert insrt = do
   p <- ins
   print p
   case p of
-    (-1, _) -> putStrLn "Error writing to the database"
-    (x, _) -> putStrLn "Successfully wrote to the database"
-
+    --Too many logs? Create table statement every time
+    (-1, _) -> putStrLn $ "Error writing to the database"
+    --(x, _) -> putStrLn "Successfully wrote to the database"
   pgDisconnect conn
 
 convertRet :: String -> String -> String -> BLC.ByteString -> IO()
@@ -239,10 +241,17 @@ convertRet address codehash abi x = do
       let beg = "BEGIN;"
       let comm = "COMMIT;"
       let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ", created_at timestamp default now());"
+
+      let indFlag = True
+      let ind = if (indFlag)
+                  --Index in contract already
+                  then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
+                  else ""
+
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
-      let oneIns = beg ++ conIns ++ createSt ++ ins ++ comm
+      let oneIns = beg ++ conIns ++ createSt ++ ind ++ ins ++ comm
       p <- dbInsert oneIns
       print p
 
@@ -351,7 +360,6 @@ processTheMessages messages = do
                 return (c, abi)
 
         let strAbi = snd contractMetaData
-        liftIO $ putStrLn $ "address: " ++ show(address)
 
         let ret =
               Map.fromList $ map (fmap valueToSolidityValue) $
@@ -382,7 +390,8 @@ main = do
   liftIO $ putStrLn $ "Main -> " ++ show(currentTime)
   _ <- $initHFlags "Setup Slipstream Variables"
 
-  let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text)"
+  --Indexing on
+  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); CREATE INDEX IF NOT EXISTS idx ON contract (\"codeHash\"); COMMIT;"
   dbInsert conCreate
 
   let offset = 0 :: K.Offset
