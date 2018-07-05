@@ -283,11 +283,14 @@ handleEvents mode peer = awaitForever $ \case
       unfilteredTrs::[Maybe [t]] <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
       let trs::[t] = head <$> (fmap fromJust $ filter isJust unfilteredTrs) -- all non-Nothing TXs
       
-      -- send all of the first list, do auth check for second list and send the ones that peer is allowed to see
+      -- yield all of the first list, do auth check for second list and send the ones that peer is allowed to see
       let splitTrs::([t],[t]) = partition ((== Nothing) . txChainId) trs
-     
+    
+      -- get all of the TX's corresponding ChainInfos from Redis, extract value from Maybe
       unfilteredChInfos::[Maybe ChainInfo] <- (lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
       let justChInfos::[ChainInfo] = fromJust <$> unfilteredChInfos
+      
+      -- Make pairs of TransactionLike's and their corresponding ChainInfos, do auth check, yield resultant TXs
       let txChInfoPairs::[(t, ChainInfo)] = makePairs (snd splitTrs) justChInfos
       let validPairs::[(t, ChainInfo)] = filter ((checkPeerIsMember peer) . snd) txChInfoPairs
       let finalTrs::[t] = (fst splitTrs) ++ (fst <$> validPairs)
