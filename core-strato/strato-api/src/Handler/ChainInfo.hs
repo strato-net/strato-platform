@@ -53,9 +53,14 @@ postChainR = do
 
 getChainR :: Handler Value
 getChainR = do
-  chainIds <- fmap (fmap fromHexText) $ lookupGetParams "chainid" 
+  chainIds <- lookupGetParams "chainid" 
   addHeader "Access-Control-Allow-Origin" "*"
-  cInfos <- getChainInfos chainIds
+  cInfos <- case chainIds of 
+      [] -> getChainInfos []
+      [cid] -> if (T.unpack cid == "all")
+                   then getChainInfos []
+                   else getChainInfos [fromHexText cid]
+      cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
       [] -> invalidArgs ["no chain found"]
       cis -> returnJson cis
