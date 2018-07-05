@@ -29,7 +29,7 @@ module.exports = {
     bucket: {
       Bucket: "strato-external-storage"
     },
-    accessKeyId: "AKIAJWOO7U4OR4YY6ZOA",
-    secretAccessKey: "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"
+    accessKeyId: process.env.aws.accessKeyId || "AKIAJWOO7U4OR4YY6ZOA",
+    secretAccessKey: process.env.aws.secretAccessKey || "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"
   }
 };
