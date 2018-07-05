@@ -268,11 +268,6 @@ handleEvents mode peer = awaitForever $ \case
           stampActionTimestamp
           $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++ 
             (intercalate "\n" $ show <$> finalPairs)
-      where 
-        makePairs :: [a] -> [b] -> [(a,b)]
-        makePairs [] _ = []
-        makePairs _ [] = []
-        makePairs (x:xs) (y:ys) = (x,y) : makePairs xs ys
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
@@ -280,33 +275,23 @@ handleEvents mode peer = awaitForever $ \case
       mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
-    -- TODO: txChainId will return Nothing if the transaction is main chain or just a private hash for which
-      --         we are not authorized to see the full details. Either way, you'll want to forward those
-      --         It's the one's that actually have chainIDs that need authorization checking. Those
-      --         are private chains you are on, but that they may not be on.
-      --
-      --         How can you remove transactions where you find that peer does not have permission for the chain?
-
     MsgEvt (GetTransactions trHashes) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: " 
         ++ (intercalate "\n" (show <$> trHashes))
 
       unfilteredTrs::[Maybe [t]] <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
-      let trs::[t] = head <$> (fmap fromJust $ filter isJust unfilteredTrs)
+      let trs::[t] = head <$> (fmap fromJust $ filter isJust unfilteredTrs) -- all non-Nothing TXs
       
       -- send all of the first list, do auth check for second list and send the ones that peer is allowed to see
       let splitTrs::([t],[t]) = partition ((== Nothing) . txChainId) trs
-      let finalTrs:[t] = (fst splitTrs)  -- ++ authorizedTrs
-
-      -- YOU ARE HERE: Figure out why unfilteredChInfos is [[Maybe ChainInfo]], it should be [ChainInfo]
-      --    also need to figure out how to map the list of chainInfos to the list of Transactions so you can
-      --       remove the transactions that the peer is not authorized to see... 
-      --         maybe make a list of tuples [(Transaction, ChainInfo)]??
-      
-      let unfilteredChInfos = (RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
-      let chInfos = filter (checkPeerIsMember peer) unfilteredChInfos
-      return ()
+     
+      unfilteredChInfos::[Maybe ChainInfo] <- (lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
+      let justChInfos::[ChainInfo] = fromJust <$> unfilteredChInfos
+      let txChInfoPairs::[(t, ChainInfo)] = makePairs (snd splitTrs) justChInfos
+      let validPairs::[(t, ChainInfo)] = filter ((checkPeerIsMember peer) . snd) txChInfoPairs
+      let finalTrs::[t] = (fst splitTrs) ++ (fst <$> validPairs)
+      yield $ Transactions finalTrs
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -404,5 +389,7 @@ checkPeerIsMember peer ci =
     ipList = ipAddress <$> (members ci)
     match = find (==pIp) ipList
 
-       
-
+makePairs :: [a] -> [b] -> [(a,b)]
+makePairs [] _ = []
+makePairs _ [] = []
+makePairs (x:xs) (y:ys) = (x,y) : makePairs xs ys 
