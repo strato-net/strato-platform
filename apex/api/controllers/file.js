@@ -1,6 +1,4 @@
 /* jshint esnext: true */
-const bcrypt = require('bcrypt');
-const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 
 const appConfig = require('../config/app.config');
@@ -35,7 +33,7 @@ module.exports = {
         Body: req.file.buffer,
       };
 
-      let uploadedFile = yield uploader.upload(params);
+      const uploadedFile = yield uploader.upload(params);
 
       const args = {
         _uri: uploadedFile.Location,
@@ -52,7 +50,7 @@ module.exports = {
 
       try {
         let contractUpload = yield externalStorage.uploadContract(userCredentials, args);
-        let upload = yield models.Upload.create({
+        yield models.Upload.create({
           contractAddress: contractUpload.address,
           uri: uploadedFile.Location,
           hash: hash
