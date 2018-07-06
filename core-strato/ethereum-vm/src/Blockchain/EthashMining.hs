@@ -6,7 +6,6 @@ module Blockchain.Mining (
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
-import qualified Crypto.Hash.SHA3          as SHA3
 import qualified Data.Array.IO             as A
 import qualified Data.Binary               as Bin
 import qualified Data.ByteString           as B
@@ -14,19 +13,14 @@ import qualified Data.ByteString.Lazy      as BL
 import           Data.Time.Clock.POSIX
 import           Data.Word
 
-import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
---import Blockchain.SHA
+import           Blockchain.Strato.Model.SHA (keccak256)
 import           Blockchain.Util
 
---import Cache
 import           Constants
---import Dataset
 import           Hashimoto
-
---import Debug.Trace
 
 
 word32Unpack::B.ByteString->[Word32]
@@ -87,5 +81,5 @@ noncelessBlockData2RLP bd =
       ]
 
 headerHashWithoutNonce::Block->B.ByteString
-headerHashWithoutNonce b = SHA3.hash 256 $ rlpSerialize $ noncelessBlockData2RLP $ blockBlockData b
+headerHashWithoutNonce b = keccak256 $ rlpSerialize $ noncelessBlockData2RLP $ blockBlockData b
 

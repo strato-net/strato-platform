@@ -26,13 +26,13 @@ module Blockchain.Database.MerklePatricia (
   ) where
 
 import           Control.Monad.Trans.Resource
-import qualified Crypto.Hash.SHA3                            as SHA3
 import           Data.Default
 import           Data.Maybe                                  (isJust)
 import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Strato.Model.SHA                 (keccak256)
 
 
 -- | Adds a new key/value pair.
@@ -72,7 +72,7 @@ keyExists db key = isJust <$> getKeyVal db key
 
 -- | Returns the StateRoot of the blank database
 blankStateRoot :: StateRoot
-blankStateRoot = StateRoot $ SHA3.hash 256 (rlpSerialize $ rlpEncode (0 :: Integer))
+blankStateRoot = StateRoot $ keccak256 (rlpSerialize $ rlpEncode (0 :: Integer))
 
 -- | Initialize the DB by adding a blank stateroot.
 initializeBlank::MonadResource m=>MPDB -- ^ The object containing the current stateRoot.
@@ -80,5 +80,5 @@ initializeBlank::MonadResource m=>MPDB -- ^ The object containing the current st
 initializeBlank db =
     let bytes = rlpSerialize $ rlpEncode (0::Integer)
     in
-      DB.put (ldb db) def (SHA3.hash 256 bytes) bytes
+      DB.put (ldb db) def (keccak256 bytes) bytes
 

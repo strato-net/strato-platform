@@ -24,7 +24,6 @@ import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
-import           Data.Either                     (rights)
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
@@ -39,7 +38,7 @@ import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
-import           Opaleye                         hiding (not, null)
+import           Opaleye                         hiding (not, null, index)
 import qualified Opaleye                         (not, null)
 
 
@@ -113,13 +112,13 @@ postUsersUserQuery userName KeyStore{..} conn = do
     restrict -< name .== constant userName
     returnA -< userId
   userIds2 <- case listToMaybe userIds1 of
-    Nothing -> runInsertReturning conn usersTable
-      (Nothing,constant userName) fst
+    Nothing -> runInsertManyReturning conn usersTable
+      [(Nothing,constant userName)] fst
     Just userId -> return [userId::Int32]
   case listToMaybe userIds2 of
     Nothing -> return False
     Just userId -> do
-      _ <- runInsert conn keyStoreTable
+      _ <- runInsertMany conn keyStoreTable [
         ( Nothing
         , constant keystoreSalt
         , constant keystorePasswordHash
@@ -128,7 +127,7 @@ postUsersUserQuery userName KeyStore{..} conn = do
         , constant keystorePubKey
         , constant keystoreAcctAddress
         , constant userId
-        )
+        )]
       return True
 
 contractsJoinTable :: Query
@@ -382,12 +381,12 @@ getContractDetailsByAddressOnly contractAddr = do
             (cmId',_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr -< ()
             returnA -< cmId'
           when (isNothing $ listToMaybe xs) $ do
-            void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+            void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable [
               ( Nothing
               , constant cmId
               , constant contractAddr
               , Nothing
-              )
+              )]
           return details{contractdetailsAddress = Just $ Unnamed contractAddr}
     name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr)
   where
@@ -884,8 +883,8 @@ createContractQuery contractName = do
     returnA -< cId
   case listToMaybe cIds of
     Just cId -> return cId
-    Nothing -> blocModify1 $ \ conn -> runInsertReturning conn contractsTable
-      (Nothing, constant contractName)
+    Nothing -> blocModify1 $ \ conn -> runInsertManyReturning conn contractsTable
+      [(Nothing, constant contractName)]
       fst
 
 {- |
@@ -901,14 +900,14 @@ insertContractMetaDataQuery
   -> Bloc Int32
 insertContractMetaDataQuery
   contractId bin binRuntime codeHash xcodeHash = blocModify1 $ \ conn ->
-    runInsertReturning conn contractsMetaDataTable
+    runInsertManyReturning conn contractsMetaDataTable [
       ( Nothing
       , constant contractId
       , constant (Text.encodeUtf8 bin)
       , constant (Text.encodeUtf8 binRuntime)
       , constant codeHash
       , constant xcodeHash
-      )
+      )]
       (\ (contractmetadataId,_,_,_,_,_) -> contractmetadataId)
 
 {- |
@@ -926,8 +925,8 @@ insertContractLookup metadataId linkedId conn = do
       .&& linkedmetadataId .== constant linkedId
     returnA -< row
   when (null (rows::[(Int32,Int32)])) . void $
-    runInsert conn contractsLookupTable
-      (constant metadataId,constant linkedId)
+    runInsertMany conn contractsLookupTable
+      [(constant metadataId,constant linkedId)]
 
 
 
@@ -1022,13 +1021,13 @@ insertXabiFunction metadataId (name,Func{..}) = do
       .&& fname .== constant name
     returnA -< fId
   when (null funcIds) $ do
-    funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
+    funcId <- blocModify1 $ \ conn -> runInsertManyReturning conn xabiFunctionsTable [
       ( Nothing
       , constant metadataId
       , constant False
       , constant name
       , constant funcStateMutability
-      )
+      )]
       (\ (xfId,_,_,_,_) -> xfId)
     void $ insertXabiFunctionArg funcId funcArgs
     void $ insertXabiFunctionRet funcId (toList funcVals)
@@ -1039,13 +1038,13 @@ insertXabiConstr
   -> Map Text Xabi.IndexedType
   -> Bloc ()
 insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArgs) $ do
-  funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
+  funcId <- blocModify1 $ \ conn -> runInsertManyReturning conn xabiFunctionsTable [
     ( Nothing
     , constant metadataId
     , constant True
     , constant contractName
     , constant (Nothing :: Maybe StateMutability)
-    )
+    )]
     (\ (xfId,_,_,_, _) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
@@ -1128,7 +1127,7 @@ insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
   Xabi.Int signed bytes ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Int"::Text)
         , Opaleye.null
@@ -1139,11 +1138,11 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.String dynamic ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("String"::Text)
         , Opaleye.null
@@ -1154,11 +1153,11 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Bytes dynamic bytes ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Bytes"::Text)
         , Opaleye.null
@@ -1169,11 +1168,11 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Bool ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Bool"::Text)
         , Opaleye.null
@@ -1184,11 +1183,11 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Address ->
     blocModify1 $ \ conn->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Address"::Text)
         , Opaleye.null
@@ -1199,11 +1198,11 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Struct bytes typedef ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Struct"::Text)
         , constant $ Just typedef
@@ -1214,10 +1213,10 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
     -- parentTypeId <- blocModify1 $ \ conn -> do
-    --   runInsertReturning conn xabiTypesTable
+    --   runInsertManyReturning conn xabiTypesTable [
     --     ( Nothing
     --     , constant ("Struct"::Text)
     --     , constant $ Just typedef
@@ -1228,7 +1227,7 @@ insertXabiType = \case
     --     , Opaleye.null
     --     , Opaleye.null
     --     , Opaleye.null
-    --     )
+    --     )]
     --     (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
     -- void $ blocModify $ \ conn -> do
     --   runInsertMany conn xabiStructFieldsTable
@@ -1242,7 +1241,7 @@ insertXabiType = \case
     -- return parentTypeId
   Xabi.Enum bytes typedef _ ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Enum"::Text)
         , constant $ Just typedef
@@ -1253,7 +1252,7 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
     -- void $ blocModify $ \ conn -> do
     --   runInsertMany conn xabiEnumNamesTable
@@ -1267,7 +1266,7 @@ insertXabiType = \case
   Xabi.Array entry len -> do
     entryId <- insertXabiType entry
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Array"::Text)
         , Opaleye.null
@@ -1278,11 +1277,11 @@ insertXabiType = \case
         , constant $ Just entryId
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Contract typedef ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Contract"::Text)
         , constant $ Just typedef
@@ -1293,13 +1292,13 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Mapping dynamic key value -> do
     keyId <- insertXabiType key
     valueId <- insertXabiType value
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Mapping"::Text)
         , Opaleye.null
@@ -1310,11 +1309,11 @@ insertXabiType = \case
         , Opaleye.null
         , constant $ Just valueId
         , constant $ Just keyId
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Label name ->
     blocModify1 $ \conn ->
-      runInsertReturning conn xabiTypesTable
+      runInsertManyReturning conn xabiTypesTable [
         ( Nothing
         , constant ("Label"::Text)
         , constant $ Just name
@@ -1325,7 +1324,7 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        )
+        )]
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: HasCallStack =>
@@ -1471,22 +1470,25 @@ getContractXabiByMetadataId metadataId = do
   return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
-getContractContractByMetadataId metadataId = do
+getContractContractByMetadataId metadataId = getContractRetry 0
+  where
   -- Impatient clients may have submitted a contract and immediately issued
   -- a function call against it. Here we give a basic defense against it.
   -- A much nicer way to handle that is to return cookies to the client
   -- after writes, and use that cookie on subsequent calls to block until
   -- their write will be visible.
-  let sleeps = [0, 40, 80, 160, 320, 640, 1280]
-      getWait mid sleep = liftIO (threadDelay sleep) >> getContractXabiByMetadataId mid
-  xabis <- zipWithM getWait (repeat metadataId) sleeps
-  let ctracts = map xAbiToContract xabis
-  case rights ctracts of
-    (ctract:_) -> return ctract
-    _ -> throwError . UserError .
-            ("getContractContractByMetadataId: invalid types in contract: " <>) .
-            Text.pack . show . head $ ctracts
-
+  -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
+      sleep t = liftIO . threadDelay . (1000*) $ t
+      getContractRetry :: Int -> Bloc Contract
+      getContractRetry t = do
+        x <- getContractXabiByMetadataId metadataId
+        case xAbiToContract x of
+          Right c -> return c
+          Left err ->
+            if t < 5000
+              then sleep t >> getContractRetry (1 + 2 * t)
+              else throwError . UserError $
+                    "getContractContractByMetadataId: invalid types in contract: " <> (Text.pack . show $ err)
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi

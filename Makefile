@@ -28,9 +28,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: apex bloc docs cirrus dappstore strato nginx postgrest smd
+build_all: bloc strato apex docs cirrus dappstore nginx postgrest smd
 
-.PHONY: apex cirrus docs cirrus dappstore strato nginx postgrest smd
+.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd
 
 apex:
 	@echo Now building apex...
@@ -52,10 +52,6 @@ dappstore:
 	@echo Now building dappstore...
 	BASIL_DOCKER_TAG=${REPO_URL}dappstore:${VERSION} make --directory=dapp-store/
 
-strato:
-	@echo Now building strato...
-	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
-
 nginx:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/
@@ -67,6 +63,10 @@ postgrest:
 smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
+
+strato:
+	@echo Now building core-strato...
+	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...

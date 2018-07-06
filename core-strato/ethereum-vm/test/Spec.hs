@@ -81,7 +81,7 @@ runContextM' f = do
                         (error "Kafka not initialized") --initialKafkaState
                         Unspecified
                         (error "Redis not initialized") --redisPool
-                        [] [])
+                        [] [] [])
 
 
 spec :: Spec

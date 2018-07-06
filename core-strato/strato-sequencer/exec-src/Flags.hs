@@ -15,3 +15,5 @@ defineFlag "s:syncwrites" False "Whether or not to sync() all dependent block DB
 
 -- kafka-related flags
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
+
+defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to."

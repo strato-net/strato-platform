@@ -5,6 +5,8 @@
 module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
+import           Control.Monad.IO.Class     (MonadIO(..))
+import           Control.Monad.Trans.Except
 import           Data.Aeson hiding (String)
 import Data.Monoid ((<>))
 import qualified Data.List                  as List
@@ -13,9 +15,6 @@ import qualified Data.Map                   as Map
 import           Data.Text
 import qualified Data.Text                  as Text
 import qualified Data.Traversable           as Trv
-import           Control.Monad.IO.Class     (MonadIO(..))
-
-import           Control.Monad.Trans.Either
 import           System.IO.Temp
 import           System.Directory
 import           System.Exit
@@ -51,7 +50,7 @@ import BlockApps.Solidity.Parse.UnParser
 compileSolc :: Text -> Bloc Aeson.Value
 compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
     Left (err,_) -> blocError . AnError . Text.pack $ err
@@ -64,7 +63,7 @@ compileSolc mainSrc = do
 compileSolcIO :: Text -> IO (Either String Aeson.Value)
 compileSolcIO mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   return $ case eRes of
     Left (err, ExitFailure 1) -> Left err
     Left (err,_) -> Left err
@@ -74,7 +73,7 @@ compileSolcIO mainSrc = do
 runSolc :: Map String String
         -> Map String String
         -> Map String String
-        -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
+        -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
 runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
@@ -93,10 +92,10 @@ runSolc optsObj mainSrc importsSrc =
 
 
 execSolc :: [String] -> [String] -> Map String String -> Map String String
-            -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
+            -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
 execSolc compileOpts linkOpts mainSrc importsSrc =
-  doWithEitherT withTempDir $ \dir -> do
-    bimapEitherT (\x -> (x,ExitFailure 0)) id $ makeSrcFiles dir $ Map.union mainSrc importsSrc
+  doWithExceptT withTempDir $ \dir -> do
+    withExceptT (\e -> (e,ExitFailure 0)) $ makeSrcFiles dir $ Map.union mainSrc importsSrc
     compiledFiles <- Trv.sequence $ Map.mapWithKey (const . solcFile compileOpts linkOpts dir) mainSrc
     return $ Map.filter
       (\file -> case file of
@@ -104,34 +103,34 @@ execSolc compileOpts linkOpts mainSrc importsSrc =
           _          -> True)
       compiledFiles
 
-solcFile :: [String] -> [String] -> String -> String -> EitherT (String, ExitCode) IO Aeson.Value
+solcFile :: [String] -> [String] -> String -> String -> ExceptT (String, ExitCode) IO Aeson.Value
 solcFile compileOpts linkOpts dir fileName = do
   solcOutput <- callSolc compileOpts dir fileName
-  solcJSON0 <- hoistEither $ aesonDecodeUtf8 $ Text.pack solcOutput
+  solcJSON0 <- ExceptT . return  . aesonDecodeUtf8 . Text.pack $ solcOutput
   let solcJSON1 = Map.lookup ("contracts" :: String) solcJSON0
 
   let nullOutput n = liftM $ either (maybe (Right n) Left) Right
-  mapEitherT (nullOutput $ Aeson.Null) $ do
+  mapExceptT (nullOutput $ Aeson.Null) $ do
     solcJSON :: Map String (Map String Aeson.Value) <-
       case Aeson.fromJSON <$> solcJSON1 of
-        Just (Aeson.Error err) -> left $ Just (err, ExitFailure 0)
-        Just (Aeson.Success m) -> right m
-        Nothing                -> left Nothing
+        Just (Aeson.Error err) -> throwE $ Just (err, ExitFailure 0)
+        Just (Aeson.Success m) -> return m
+        Nothing                -> throwE Nothing
 
     let linkBin binabi bin tag =
           if (not . List.null $ linkOpts)
           then do
-            linkedBin <- bimapEitherT Just id $ callSolc linkOpts dir bin
+            linkedBin <- withExceptT Just $ callSolc linkOpts dir bin
             return $ Map.insert tag (Aeson.toJSON linkedBin) binabi
           else return binabi
 
     linkJSON <- Trv.forM solcJSON $ \binabi ->
-      bimapEitherT Just id $ mapEitherT (nullOutput Map.empty) $ do
+      withExceptT Just $ mapExceptT (nullOutput Map.empty) $ do
         let lookupTag tag = case Aeson.fromJSON <$> Map.lookup tag binabi of
-              Just (Aeson.Error err)  -> left $ Just (err, ExitFailure 0)
-              Just (Aeson.Success "") -> left Nothing
-              Just (Aeson.Success s)  -> right s
-              Nothing                 -> left Nothing
+              Just (Aeson.Error err)  -> throwE $ Just (err, ExitFailure 0)
+              Just (Aeson.Success "") -> throwE Nothing
+              Just (Aeson.Success s)  -> return s
+              Nothing                 -> throwE Nothing
         bin <- lookupTag "bin"
         binabiL <- linkBin binabi bin "bin"
         binr <- lookupTag "bin-runtime"
@@ -139,34 +138,34 @@ solcFile compileOpts linkOpts dir fileName = do
 
     return $ Aeson.toJSON $ Map.filter (not . Map.null) linkJSON
 
-callSolc :: [String] -> String -> String -> EitherT (String, ExitCode) IO String
+callSolc :: [String] -> String -> String -> ExceptT (String, ExitCode) IO String
 callSolc opts dir fileName =
   let solcCmd = (proc "solc" $ opts ++ [fileName]){ cwd = Just dir }
-  in execWithEitherT $ readCreateProcessWithExitCode solcCmd ""
+  in execWithExceptT $ readCreateProcessWithExitCode solcCmd ""
 
-makeSrcFiles :: String -> Map String String -> EitherT String IO ()
+makeSrcFiles :: String -> Map String String -> ExceptT String IO ()
 makeSrcFiles dir filesSrc = do
   let ensureRelative path =
         if isRelative path
-        then right path
-        else left $ "Refusing to handle absolute file path: " List.++ path
+        then return path
+        else throwE $ "Refusing to handle absolute file path: " List.++ path
   dirs <- mapM ensureRelative $ List.nub $ List.map takeDirectory $ Map.keys filesSrc
   liftIO $ do
     mapM_ (createDirectoryIfMissing True) $ List.map (dir </>) dirs
     Map.foldrWithKey (\k s x -> IO.writeFile (dir </> k) s >> x) (return ()) filesSrc
 
-doWithEitherT :: ((String -> IO (Either c d)) -> IO (Either c e)) -> ((String -> EitherT c IO d) -> EitherT c IO e)
-doWithEitherT runner cmd = do
-  let cmdIO = runEitherT . cmd
+doWithExceptT :: ((String -> IO (Either c d)) -> IO (Either c e)) -> ((String -> ExceptT c IO d) -> ExceptT c IO e)
+doWithExceptT runner cmd = do
+  let cmdIO = runExceptT . cmd
   resultE <- liftIO $ runner cmdIO
-  hoistEither resultE
+  ExceptT . return $ resultE
 
-execWithEitherT :: IO (ExitCode, String, String) -> EitherT (String,ExitCode) IO String
-execWithEitherT op = do
+execWithExceptT :: IO (ExitCode, String, String) -> ExceptT (String,ExitCode) IO String
+execWithExceptT op = do
   (exitCode, stdOut, stdErr) <- liftIO op
   case exitCode of
-    ExitSuccess -> right stdOut
-    _           -> left (stdErr,exitCode)
+    ExitSuccess -> return stdOut
+    _           -> throwE (stdErr,exitCode)
 
 withTempDir :: (String -> IO a) -> IO a
 withTempDir act = withSystemTempDirectory "solc" act

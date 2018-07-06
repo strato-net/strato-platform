@@ -26,7 +26,7 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Stats                     hiding (Success)
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
@@ -202,8 +202,8 @@ addBlocks blocks = do
   let oldStateRoot = blockDataStateRoot oldHeader
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
-  potentialBestBlocks <- forM blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-    case (obOrigin block) of
+  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+    replace <- case (obOrigin block) of
       TO.Quarry -> do
         currentBaggerSR <- Bagger.lastRewardedStateRoot . Bagger.miningCache <$> Bagger.getBaggerState
         let blockSR = blockDataStateRoot $ obBlockData block
@@ -222,28 +222,24 @@ addBlocks blocks = do
               (blockHeaderPartialHash $ obBlockData block)
               (blockHeaderHash $ obBlockData block)
               Mined
-            return [block]
-          else return []
-      _ -> addBlock block >> return [block]
-  forM_ (concat potentialBestBlocks) $ \bestBlock -> do -- TODO: Redis needs to see each incremental best block to properly
-                                                        --       build the canonical chain. However, running each new
-                                                        --       block could be inefficient, and inadvertently spam
-                                                        --       the network with NewBestBlock messages.
-      (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter bestBlock
+            return True
+          else return False -- don't let old local blocks become the best block
+      _ -> addBlock block >> return True
+    when replace $ do
+      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
       when didReplaceThisTime . liftIO $ do
-          let Just nbb = newBestBlock
           writeIORef didReplaceBest True
-          writeIORef replacedBest (nbb, replacedBits)
-      didReplaceBest' <- liftIO (readIORef didReplaceBest)
-      void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-      when didReplaceBest' $ do
-          $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-          (theBlock, nbb) <- liftIO (readIORef replacedBest)
-          void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-          let b = obBlockData theBlock
-              codeSource = getSource False b
-              codeContractName = getContractName False b
-          calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName
+          writeIORef replacedBest (block, replacedBits)
+  didReplaceBest' <- liftIO (readIORef didReplaceBest)
+  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
+  when didReplaceBest' $ do
+      $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+      (theBlock, nbb) <- liftIO (readIORef replacedBest)
+      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb] -- only emit one NewBestBlock message
+      let b = obBlockData theBlock
+          codeSource = getSource False b
+          codeContractName = getContractName False b
+      calculateAndEmitStateDiffs theBlock oldStateRoot codeSource codeContractName -- only calculate stateDiff once per batch
 
   where
     timerToUse = Just time_vm_block_insertion_mined
@@ -303,7 +299,7 @@ addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
 addTransactions _ remGas [] = return remGas
 addTransactions b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
-  !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
+  !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
   afterMap <- getAddressStateDBMap
 
   printTransactionMessage t result deltaT
@@ -328,7 +324,7 @@ mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> Cont
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
     beforeMap <- getAddressStateDBMap
-    (time', !result) <- timeIt . runEitherT $ addTransaction False header remGas tx
+    (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateDBMap
     time time' time_vm_tx_mining
     printTransactionMessage tx result time'
@@ -340,7 +336,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
 
-addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> EitherT TransactionFailureCause ContextM ExecResults
+addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
     nonceValid <- lift $ isNonceValid t
 
@@ -356,10 +352,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
-    when (txCost > acctBalance) $ left $ TFInsufficientFunds txCost acctBalance t
-    when (intrinsicGas' > transactionGasLimit bt) $ left $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
-    when (transactionGasLimit bt > remainingBlockGas) $ left $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-    unless nonceValid $ left $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
+    when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
+    when (intrinsicGas' > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
+    when (transactionGasLimit bt > remainingBlockGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
+    unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
     let availableGas = transactionGasLimit bt - intrinsicGas'
 
@@ -576,7 +572,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
@@ -609,7 +605,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
         bestNum       = if shouldReplace then newNumber else oldNumber
         bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-    return (shouldReplace, Just b, bestBlockInfo)
+    return (shouldReplace, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
@@ -627,11 +623,11 @@ calculateAndEmitStateDiffs newBlock oldStateRoot codeSource codeContractName = w
 
     let allNewCodeHashes = S.toList $ S.fromList $ map (codeHash . snd) $ M.toList $ createdAccounts diffs
 
-    
+
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \codeHash -> do
-        codeSource <- codeSource codeHash
-        return (codeHash, codeSource)
+        codeSource' <- codeSource codeHash
+        return (codeHash, codeSource')
 
     let codeSource' x =
           M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap

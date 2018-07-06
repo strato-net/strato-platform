@@ -75,6 +75,7 @@ services:
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
+    - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - stratoHost=strato:3000
     build: .

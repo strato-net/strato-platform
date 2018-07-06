@@ -8,7 +8,6 @@ import qualified BlockApps.ECRecover.IntegerFormat as F
 import qualified Blockchain.ExtendedECDSA          as D
 import qualified Blockchain.ExtWord                as E
 import qualified Data.Binary                       as A
-import qualified Data.ByteString                   as B
 import qualified Data.ByteString.Lazy              as G
 import qualified Network.Haskoin.Internals         as C
 

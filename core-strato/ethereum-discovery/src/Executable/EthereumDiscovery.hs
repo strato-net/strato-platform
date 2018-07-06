@@ -38,7 +38,7 @@ ethereumDiscovery = do
 
     bracket
       (connectMe $ discoveryPort $ discoveryConfig ethConf)
-      (liftIO . S.sClose)
+      (liftIO . S.close)
       (runEthUDPServer cxt privateKey (discoveryPort $ discoveryConfig ethConf))
 
   return ()

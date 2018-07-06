@@ -67,18 +67,19 @@ mkEthP2PEventSource :: ( Monad m
                     -> m (Source m Event)
 mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
     [ appSource app
-        =$= ethDecrypt inCtx
-        =$= bytesToMessages
-        =$= tap (displayMessage False (show $ appSockAddr app))
-        =$= CL.map MsgEvt
-    , seqEventNotifictationSource =$= CL.map NewSeqEvent
+        .| ethDecrypt inCtx
+        .| bytesToMessages
+        .| tap (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.map MsgEvt
+    , seqEventNotificationSource
+        .| CL.map NewSeqEvent
     ] ++ extra) (2 + length extra)
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx = tap (displayMessage Outbound str) .| messageToBytes .| ethEncrypt outCtx
 
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point

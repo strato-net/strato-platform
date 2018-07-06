@@ -10,6 +10,7 @@ import           Diagrams.Prelude                          hiding (option)
 import           Diagrams.TwoD.Layout.Tree
 --import           Diagrams.Backend.Canvas.CmdLine
 import           Data.Data
+import           Data.Semigroup                            ((<>))
 import           Diagrams.Backend.Html5.CmdLine
 import           Options.Applicative                       as OA
 
@@ -25,13 +26,13 @@ data TreeOpts = TreeOpts
 treeOpts :: Parser TreeOpts
 treeOpts = TreeOpts
   <$> (optional . option auto)
-      (long "depth" OA.<> short 'd'
-    OA.<> metavar "DEPTH"
-    OA.<> help "Desired DEPTH of the tree")
+      (long "depth" <> short 'd'
+    <> metavar "DEPTH"
+    <> help "Desired DEPTH of the tree")
   <*> (optional . option auto)
-      (long "sibling" OA.<> short 's'
-    OA.<> metavar "SIBLING"
-    OA.<> help "Desired maxSibling count of the tree")
+      (long "sibling" <> short 's'
+    <> metavar "SIBLING"
+    <> help "Desired maxSibling count of the tree")
 
 symmTree :: Tree BlockData -> Diagram B
 symmTree t =
