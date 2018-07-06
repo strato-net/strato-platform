@@ -13,9 +13,9 @@ class SideBar extends Component {
   // noOverlay
   // TODO: customCrossIcon={<div><div className="pt-icon-standard pt-icon-chevron-left"/></div>}
   render() {
-    let route = isModePublic() ? 
+    let route = isModePublic() ?
       [{ path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }, { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" }]
-    : [{ path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }];
+      : [{ path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }];
 
     const navLinksData = (
       [
@@ -25,11 +25,10 @@ class SideBar extends Component {
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
         { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
         { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
-        { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" },
-        { path: '/external_storage', label: 'External Storage', id: 'external_storage', icon: "fa-cloud-upload" }
+        { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" }
       ]
     );
-    
+
     return (
       <aside>
         <div className="menu">
@@ -48,9 +47,20 @@ class SideBar extends Component {
               </NavLink>
             )
           }
+          {!isModePublic() &&
+            <NavLink
+              id={'external_storage'}
+              to={'/external_storage'}
+              className="menu-item"
+              activeClassName="active-menu-item"
+              onClick={() => { mixpanelWrapper.track('nav_link_external_storage_click') }}
+            >
+              <i className='fa fa-cloud-upload'> </i>
+              <span className="menu-text">External Storage</span>
+            </NavLink>}
         </div>
         <hr />
-        { !isModePublic() && <div className="menu">
+        {!isModePublic() && <div className="menu">
           <NavLink
             id={'apps'}
             to={'/apps'}

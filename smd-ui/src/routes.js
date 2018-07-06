@@ -32,7 +32,6 @@ const CommonRoute = (props) => {
     <CommonRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <CommonRoute exact path="/code_editor" component={CodeEditor} />
     <CommonRoute exact path="/launchpad" component={LaunchPad} />
-    <CommonRoute exact path="/external_storage" component={ExternalStorage} />
   </div>)
 };
 
@@ -54,6 +53,7 @@ export const routes = isModePublic() ? (
       <Route exact path="/home" component={Dashboard} />
       <Route exact path="/apps" component={Applications} />
       <Route exact path="/accounts" component={Accounts} />
+      <Route exact path="/external_storage" component={ExternalStorage} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>

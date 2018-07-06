@@ -62,7 +62,6 @@ exports[`SideBar: index render component for enterprise mode 1`] = `
          
       </i>
       <span className=\\"menu-text\\">
-         
         External Storage
       </span>
     </NavLink>
@@ -151,15 +150,6 @@ exports[`SideBar: index render component for public mode 1`] = `
       <span className=\\"menu-text\\">
          
         Contract Editor
-      </span>
-    </NavLink>
-    <NavLink id=\\"external_storage\\" to=\\"/external_storage\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-cloud-upload\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        External Storage
       </span>
     </NavLink>
   </div>
@@ -298,7 +288,6 @@ exports[`SideBar: index sequence of links for enterprise mode seventh position /
   <span
     className="menu-text"
   >
-     
     External Storage
   </span>
 </NavLink>
@@ -344,28 +333,6 @@ exports[`SideBar: index sequence of links for enterprise mode third position /tr
   >
      
     Transactions
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for public mode eight position /external-storage 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="external_storage"
-  onClick={[Function]}
-  to="/external_storage"
->
-  <i
-    className="fa fa-cloud-upload"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    External Storage
   </span>
 </NavLink>
 `;
