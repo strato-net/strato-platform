@@ -5,6 +5,8 @@ FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 DEPLOYBASE_NAME=bloch-deploybase
+LICENSE_DIR=$(FAKEROOT)/licenses
+LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
@@ -18,10 +20,11 @@ prebuild:
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(BLOCHOME)
 	mkdir -p $(BUILDER_HOME)
+	mkdir -p $(LICENSE_SOURCE_DIR)
 	mkdir -p /tmp/docker-dummy
 
 build_solidity: prebuild
-	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin
+	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin $(LICENSE_SOURCE_DIR)/solidity
 
 build_buildbase: prebuild build_solidity
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
