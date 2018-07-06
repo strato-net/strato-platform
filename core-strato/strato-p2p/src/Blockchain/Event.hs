@@ -284,8 +284,6 @@ handleEvents mode peer = awaitForever $ \case
       
       -- yield all of the first list, do auth check for second list and send the ones that peer is allowed to see
       let splitTrs::([Transaction],[Transaction]) = partition ((== Nothing) . txChainId) trs
-    
-      -- get all of the TX's corresponding ChainInfos from Redis, extract value from Maybe
       unfilteredChInfos::[Maybe ChainInfo] <- (lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
       let justChInfos::[ChainInfo] = fromJust <$> unfilteredChInfos
       
