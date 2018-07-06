@@ -10,8 +10,9 @@ const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const uploader = require('../lib/uploader');
-const app = require('../app');
-
+const bcrypt = require('bcrypt');
+const checkMode = require('../lib/checkMode');
+const appConfig = require('../config/app.config');
 
 const waitFaucet = async function (address) {
   const res = await chai.request(process.env.stratoRoot)
@@ -40,23 +41,34 @@ chai.use(chaiHttp);
 
 describe('File', function () {
   this.timeout(20000);
-  let _contractAddress, accountAddress;
+  let _contractAddress, accountAddress, app;
 
   before(async function () {
-    await initDb();
-    await models.sequelize.sync();
-    await createInitialData();
+    checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
+      return next();
+    });
 
+    app = require('../app');
+
+    await models.TempUser.create({
+      email: 'test18@test.com',
+      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
+      verified: true
+    });
     const res1 = await chai.request(app)
       .post('/users')
       .send({
-        username: "test1@test.com",
+        username: "test18@test.com",
         password: "password"
       });
 
     accountAddress = JSON.parse(res1.text).user.accountAddress;
     await waitFaucet(accountAddress);
   });
+
+  after(function () {
+    checkMode.checkMode.restore();
+  })
 
 
   describe('post /bloc/file/upload', async function () {
@@ -101,7 +113,7 @@ describe('File', function () {
     it('replies 200 with file uplaod and data entry', async function () {
       let result = await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'test1@test.com')
+        .field('username', 'test18@test.com')
         .field('address', accountAddress)
         .field('password', 'password')
         .field('metadata', 'Nature Pics')
@@ -116,7 +128,7 @@ describe('File', function () {
     it('replies 500', async function () {
       let res = await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'tanuj8000')
+        .field('username', 'test18@test.com')
         .field('address', '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad')
         .field('password', 'password')
         .field('metadata', 'Nature Pics')
