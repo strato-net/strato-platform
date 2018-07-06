@@ -10,66 +10,71 @@
 #-}
 
 import           Control.Monad.Except
-import           Control.Monad.Log                  hiding (Handler)
-import           Control.Monad.Reader
-import Data.Aeson hiding (Error)
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.ByteString.Base16 as B16
-import Data.IORef
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Pool
-import           Database.PostgreSQL.Simple
-import Network.HTTP.Client
-import Numeric
-import           Servant.Common.BaseUrl
+--import           Control.Monad.Log                  hiding (Handler)
+--import           Control.Monad.Reader
+--import Data.Aeson hiding (Error)
+--import qualified Data.ByteString.Char8 as BC
+--import qualified Data.ByteString.Lazy as BL
+--import qualified Data.ByteString.Lazy.Char8 as BLC
+--import qualified Data.ByteString.Base16 as B16
+--import Data.IORef
+--import Data.Map (Map)
+--import qualified Data.Map as Map
+--import Data.Pool
+--import           Database.PostgreSQL.Simple
+--import Network.HTTP.Client
+--import Numeric
+--import           Servant.Common.BaseUrl
 
-import BlockApps.Bloc22.Database.Queries
-import BlockApps.Bloc22.Monad
-import BlockApps.Ethereum
-import BlockApps.Solidity.Contract
-import BlockApps.Solidity.Xabi
-import BlockApps.Storage
-import BlockApps.Strato.Client
-import qualified BlockApps.Strato.Types as BA
-import BlockApps.XAbiConverter
+--import BlockApps.Bloc22.Database.Queries
+--import BlockApps.Bloc22.Monad
+--import BlockApps.Ethereum
+--import BlockApps.Solidity.Contract
+--import BlockApps.Solidity.Xabi
+--import BlockApps.Storage
+--import BlockApps.Strato.Client
+--import qualified BlockApps.Strato.Types as BA
+--import BlockApps.XAbiConverter
 
-import BlockApps.SolidityVarReader
+--import BlockApps.SolidityVarReader
 
-import Events hiding (Address)
+--import Events hiding (Address)
 
-import Debug.Trace
-import GHC.Generics
-import Control.Exception
-import GHC.Int
+--import Debug.Trace
+--import GHC.Generics
+--import Control.Exception
+--import GHC.Int
 
-import qualified Data.Map as M
-import qualified Data.HashMap.Strict as H
-import qualified Data.Aeson as A
-import qualified Data.ByteString as B
-import qualified Data.Text as T
-import Database.PostgreSQL.Typed
-import Database.PostgreSQL.Typed.Query
-import Network
+--import qualified Data.Map as M
+--import qualified Data.HashMap.Strict as H
+--import qualified Data.Aeson as A
+--import qualified Data.ByteString as B
+--import qualified Data.Text as T
+--import Database.PostgreSQL.Typed
+--import Database.PostgreSQL.Typed.Query
+--import Network
 import Network.Kafka
-import Network.Kafka.Consumer
+--import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
-import Control.Monad.Trans.State.Lazy    (StateT(..))
-import qualified Data.List.NonEmpty as NE
-import Data.String
-import Control.Lens
+--import Control.Monad.Trans.State.Lazy    (StateT(..))
+--import qualified Data.List.NonEmpty as NE
+--import Data.String
+--import Control.Lens
 import HFlags
-import Options
-import System.IO.Unsafe
-import qualified Data.Vector as V
-import Language.Haskell.TH.Syntax
-import Language.Haskell.TH.Lib
-import Data.List
+--import Options
+--import System.IO.Unsafe
+--import qualified Data.Vector as V
+--import Language.Haskell.TH.Syntax
+--import Language.Haskell.TH.Lib
+--import Data.List
 import Data.Time
 
+--import Slipstream.Events
+import Slipstream.MessageConsumer
+import Slipstream.Processor
+import Slipstream.OutputData
 
+{-
 data ActionType = Create | Delete | Update deriving (Show)
 
 data Action = Action ActionType String String (Maybe [(String, String)])
@@ -152,13 +157,8 @@ addStorageIfNeeded (Action theType address codehash Nothing)= do
   return $ Action theType address codehash (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
 
-prefix :: String -> String -> Bool
-prefix [] ys = True
-prefix (x:xs) [] = False
-prefix (x:xs) (y:ys) = (x == y) && prefix xs ys
-
 isString :: Value -> Bool
-isString (String x) = not (prefix "function" (T.unpack x))
+isString (String x) = not (isPrefixOf "function" (T.unpack x))
 isString _ = True
 
 listToKeyStatement :: String -> [(T.Text, b)] -> String
@@ -227,11 +227,15 @@ dbInsert insrt = do
 
 convertRet :: String -> String -> String -> BLC.ByteString -> IO()
 convertRet address codehash abi x = do
+  liftIO $ putStrLn $ "address: " ++ show address
+  liftIO $ putStrLn $ "codehash: " ++ show codehash
+  liftIO $ putStrLn $ "abi" ++ show abi
+  liftIO $ putStrLn $ "contract: " ++ show x
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object x) -> do
 
-      let contractName = take 30 codehash
+      let contractName = take 63 codehash
 
       let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
       let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
@@ -382,7 +386,7 @@ getAndProcessMessages offset = do
   messages <- getTheMessages offset
   liftIO $ processTheMessages messages
   getAndProcessMessages $ (offset + fromIntegral (length messages))
-
+-}
 
 main::IO ()
 main = do
