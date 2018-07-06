@@ -5,31 +5,15 @@
 module Blockchain.MilenaTools where
 
 
-import           Control.Applicative
 import           Control.Concurrent     (threadDelay)
 import           Control.Monad.Except   (throwError)
-import           Control.Monad.IO.Class
-import           Control.Exception           (IOException)
-import           Control.Exception.Lifted    (catch)
 import           Control.Lens
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), MonadError (..), runExceptT)
+import           Control.Monad.Except        (ExceptT (..), runExceptT)
 import           Control.Monad.Trans.State
-import           Control.Monad.State.Class   (MonadState)
-import           Data.ByteString.Char8       (ByteString)
-import           Data.List.NonEmpty          (NonEmpty (..))
-import qualified Data.List.NonEmpty          as NE
-import           Data.Monoid                 ((<>))
-import qualified Data.Pool                   as Pool
-import qualified Data.Map                    as M
-import           Data.Set                    (Set)
-import qualified Data.Set                    as Set
-import qualified Network
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
-import           System.IO
 
 
 _kMetadata::Metadata->KafkaString

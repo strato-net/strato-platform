@@ -59,22 +59,9 @@ extra-lib-dirs:
 - /usr/local/lib
 
 ghc-options:
-  ethereum-discovery:      -Wall -Werror -fno-warn-warnings-deprecations
-  ethereum-encryption:     -Wall -Werror -fno-warn-warnings-deprecations
-  merkle-patricia-db:      -Wall -Werror -fno-warn-warnings-deprecations
-  strato-init:             -Wall -Werror -fno-warn-warnings-deprecations
-  strato-p2p:              -Wall -Werror -fno-warn-warnings-deprecations
-  strato-redis-blockdb:    -Wall -Werror -fno-warn-warnings-deprecations
-  blockapps-tools:         -Wall -Werror -fno-warn-warnings-deprecations
-  strato-index:            -Wall -Werror
-  strato-api:              -fno-warn-orphans
-  blockapps-tools:         -Wall -Werror
-  strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
-  strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
-  strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
-  strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
-  blockapps-data:          -Wall -Werror
-  ethereum-vm:             -Wall -Werror -fno-warn-warnings-deprecations
+  "$locals": -Wall -Werror
+  strato-api: -Wall -Werror -fno-warn-orphans
+  strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
 
 docker:
   enable: true

@@ -6,9 +6,6 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
--- TODO(tim): Replace runInsert with runInsertMany
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
 module BlockApps.Bloc22.Server.Users where
 
 import           Control.Concurrent
