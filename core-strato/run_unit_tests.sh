@@ -4,6 +4,7 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
+  ethereum-rlp
   ethereum-vm
   merkle-patricia-db
   statsdi

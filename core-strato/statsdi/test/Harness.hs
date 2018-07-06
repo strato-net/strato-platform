@@ -5,12 +5,9 @@ module Harness
 
 import           Control.Concurrent
 import           Control.Concurrent.STM
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Stats
 import           Data.ByteString           (ByteString)
-import qualified Data.ByteString           as ByteString
-import           Data.Time.Clock.POSIX
 import           Network.Socket            hiding (recv)
 import           Network.Socket.ByteString (recv)
 
@@ -22,9 +19,9 @@ harnessLock = unsafePerformIO $ newTMVarIO 0
 
 tQueueToList :: TQueue a -> IO [a]
 tQueueToList = fmap reverse . loop []
-    where loop read q = atomically (tryReadTQueue q) >>= \case
-                Nothing -> return read
-                Just x  -> loop (x:read) q
+    where loop read' q = atomically (tryReadTQueue q) >>= \case
+                Nothing -> return read'
+                Just x  -> loop (x:read') q
 
 listenForUDP :: (MonadIO m) => StatsTConfig -> TMVar [ByteString] -> m ThreadId
 listenForUDP cfg var = liftIO . withSocketsDo $ do
@@ -58,12 +55,12 @@ forkAndListen cfg = do
 runStatsTCapturingOutput :: (MonadIO m) => StatsTConfig -> Int -> StatsT m a ->  m ([ByteString], a)
 runStatsTCapturingOutput c lingerTime m = do
     (tid, var)  <- liftIO $ do
-        atomically $ takeTMVar harnessLock
+        _ <- atomically $ takeTMVar harnessLock
         forkAndListen c
     ret <- runStatsT m c
     liftIO $ do
         threadDelay $ lingerTime * 1000
         killThread tid
         val <- atomically (takeTMVar var)
-        atomically (putTMVar harnessLock 0)
+        _ <- atomically (putTMVar harnessLock 0)
         return (val, ret)

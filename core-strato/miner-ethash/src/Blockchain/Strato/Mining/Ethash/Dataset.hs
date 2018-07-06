@@ -8,7 +8,6 @@ module Blockchain.Strato.Mining.Ethash.Dataset (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3                          as SHA3
 import qualified Data.Array.Base                           as A
 import qualified Data.Array.IO                             as A
 import           Data.Bits
@@ -17,6 +16,7 @@ import           Data.Word
 import           Blockchain.Strato.Mining.Ethash.Cache
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Model.SHA               (keccak512)
 
 
 type Slice = A.IOUArray Word32 Word32
@@ -37,14 +37,14 @@ calcDatasetItem cache i = do
   A.writeArray mix 0 =<< (fmap (xor i) $ A.readArray mix 0)
 
   mixBytes' <- sequence $ map (A.readArray mix) [0..15]
-  let theHash = shatter $ SHA3.hash 512 $ repair mixBytes'
+  let theHash = shatter $ keccak512 $ repair mixBytes'
   sequence_ $ map (uncurry $ A.writeArray mix) $ zip [0..] theHash
 
   forM_ [0..fromIntegral $ datasetParents-1] $ \j ->
     cacheFunc cache i j mix
 
   mixBytes'' <- sequence $ map (A.readArray mix) [0..15]
-  let theHash' = shatter $ SHA3.hash 512 $ repair mixBytes''
+  let theHash' = shatter $ keccak512 $ repair mixBytes''
   sequence_ $ map (uncurry $ A.writeArray mix) $ zip [0..] theHash'
 
   return mix

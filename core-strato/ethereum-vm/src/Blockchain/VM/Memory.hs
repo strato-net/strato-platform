@@ -17,7 +17,7 @@ module Blockchain.VM.Memory (
 
 import           Control.Monad
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
@@ -93,7 +93,7 @@ setNewMaxSize newSize' = do
   if vmGasRemaining state < gasCharge
      then do
           setGasRemaining 0
-          left OutOfGasException
+          throwE OutOfGasException
     else do
     when (newSize > fromIntegral oldSize) $ do
       liftIO $ writeIORef (mSize $ memory state) (fromInteger newSize)

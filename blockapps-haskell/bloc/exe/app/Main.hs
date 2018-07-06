@@ -32,8 +32,6 @@ import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
 
-import           BlockApps.Strato.StratoURLResolver
-
 import           Options
 
 
@@ -72,7 +70,7 @@ main = do
 
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
-  stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
+  stratoUrl <- parseBaseUrl flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
   let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 (toEnum flags_loglevel) mode

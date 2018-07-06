@@ -6,8 +6,6 @@ where
 
 import           BlockApps.ECRecover.Prelude
 import qualified Data.ByteString.Internal       as D
-import qualified Data.ByteString.Short          as B
-import qualified Data.ByteString.Short.Internal as A
 import qualified Data.ByteString.Unsafe         as C
 
 
@@ -33,11 +31,11 @@ pokeInteger :: Ptr Word8 -> Int -> Integer -> IO ()
 pokeInteger ptr size integer =
   recur (pred size) (plusPtr ptr (pred size)) integer
   where
-    recur i ptr state =
+    recur i ptr' state =
       if i >= 0
         then do
-          poke ptr chunk
-          recur (pred i) (plusPtr ptr (-1)) nextState
+          poke ptr' chunk
+          recur (pred i) (plusPtr ptr' (-1)) nextState
         else return ()
       where
         chunk =

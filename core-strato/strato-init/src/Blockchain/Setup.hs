@@ -246,7 +246,8 @@ createKafkaTopic topic = do
 topics  ::  [String]
 topics = [ "unminedblock"
          , "statediff"
-         , "seqevents"
+         , "seq_vm_events"
+         , "seq_p2p_events"
          , "unseqevents"
          , "jsonrpcresponse"
          , "indexevents"

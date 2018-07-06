@@ -1,4 +1,4 @@
-
+{-# LANGUAGE PackageImports #-}
 module Blockchain.AESCTR (
   encrypt,
   decrypt,
@@ -6,9 +6,9 @@ module Blockchain.AESCTR (
   aesIV_
   ) where
 
-import           Crypto.Cipher.AES
-import           Data.Bits
-import qualified Data.ByteString   as B
+import "cipher-aes" Crypto.Cipher.AES
+import              Data.Bits
+import qualified    Data.ByteString   as B
 
 
 data AESCTRState = AESCTRState AES AESIV Int

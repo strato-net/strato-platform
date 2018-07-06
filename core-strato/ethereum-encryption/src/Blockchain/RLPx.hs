@@ -1,37 +1,40 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
 
 module Blockchain.RLPx (
   ethCryptConnect,
   ethCryptAccept
   ) where
 
-import           Control.Exception
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Crypto.Cipher.AES
-import qualified Crypto.Hash.SHA3                  as SHA3
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Random
-import           Crypto.Types.PubKey.ECC
-import           Data.Binary
-import           Data.Bits
-import qualified Data.ByteString                   as B
-import qualified Data.ByteString.Lazy              as BL
-import           Data.Conduit
-import qualified Data.Conduit.Binary               as CB
-import           Data.Maybe
-import qualified Network.Haskoin.Internals         as H
+import                 Control.Exception
+import                 Control.Monad
+import                 Control.Monad.IO.Class
+import "cipher-aes"    Crypto.Cipher.AES
+import "cryptonite"    Crypto.Hash                       (hashInitWith, hashUpdate)
+import                 Crypto.Hash.Algorithms            (Keccak_256(..))
+import "crypto-pubkey" Crypto.PubKey.ECC.DH
+import "crypto-random" Crypto.Random
+import                 Crypto.Types.PubKey.ECC
+import                 Data.Binary
+import                 Data.Bits
+import qualified       Data.ByteString                   as B
+import qualified       Data.ByteString.Lazy              as BL
+import                 Data.Conduit
+import qualified       Data.Conduit.Binary               as CB
+import                 Data.Maybe
+import qualified       Network.Haskoin.Internals         as H
 
-import qualified Blockchain.AESCTR                 as AES
-import           Blockchain.Data.PubKey
-import           Blockchain.Data.RLP
-import qualified Blockchain.ECIES                  as ECIES
-import           Blockchain.Error
-import           Blockchain.EthEncryptionException
-import           Blockchain.ExtendedECDSA
-import           Blockchain.ExtWord
-import           Blockchain.Frame
-import           Blockchain.Handshake
+import qualified       Blockchain.AESCTR                 as AES
+import                 Blockchain.Data.PubKey
+import                 Blockchain.Data.RLP
+import qualified       Blockchain.ECIES                  as ECIES
+import                 Blockchain.Error
+import                 Blockchain.EthEncryptionException
+import                 Blockchain.ExtendedECDSA
+import                 Blockchain.ExtWord
+import                 Blockchain.Frame
+import                 Blockchain.Handshake
+import                 Blockchain.Strato.Model.SHA        (keccak256)
 
 intToBytes :: Integer -> [Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
@@ -71,12 +74,12 @@ ethCryptConnect myPriv otherPubKey = do
   return (
           EthCryptState { --encrypt
                           aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-                          mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` otherNonce) `B.append` egressCipher,
+                          mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` egressCipher,
                           key=macEncKey
           },
           EthCryptState { --decrypt
                           aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-                          mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` myNonce) `B.append` ingressCipher,
+                          mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonce) `B.append` ingressCipher,
                           key=macEncKey
           }
          )
@@ -84,7 +87,7 @@ ethCryptConnect myPriv otherPubKey = do
 add :: B.ByteString
     -> B.ByteString
     -> B.ByteString
-add acc val | B.length acc ==32 && B.length val == 32 = SHA3.hash 256 $ val `B.append` acc
+add acc val | B.length acc ==32 && B.length val == 32 = keccak256 $ val `B.append` acc
 add _ _     = error "add called with ByteString of length not 32"
 
 hPubKeyToPubKey :: H.PubKey -> Point
@@ -174,12 +177,12 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
   return (
       EthCryptState { --encrypt
          aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-         mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
+         mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
          key=macEncKey
          },
       EthCryptState { --decrypt
         aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-        mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
+        mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
         key=macEncKey
         }
       )
@@ -229,12 +232,12 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
     return $ Just (
       EthCryptState { --encrypt
          aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-         mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
+         mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
          key=macEncKey
          },
       EthCryptState { --decrypt
         aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-        mac=SHA3.update (SHA3.init 256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
+        mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
         key=macEncKey
         }
       )
