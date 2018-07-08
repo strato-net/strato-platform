@@ -2,7 +2,7 @@
 
 module Blockchain.Sequencer.DB.SeenBlockDB where
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Sequencer.Event    (OutputBlock(..))
 import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class (blockHeaderHash)
@@ -17,7 +17,7 @@ data SeenBlockDB =
      SeenBlockDB { size       :: Int
                  , operations :: Int -- track number of pushes to start popping after `size`
                  , clearQueue :: Q.Seq SHA
-                 , seen       :: Map SHA BlockData
+                 , seen       :: Map SHA OutputBlock
                  }
 
 mkSeenBlockDB :: Int -> SeenBlockDB
@@ -27,8 +27,8 @@ mkSeenBlockDB dbSize = SeenBlockDB { size       = dbSize
                                    , seen       = M.empty
                                    }
 
-instance Witnessable BlockData where
-    witnessableHash = blockHeaderHash
+instance Witnessable OutputBlock where
+    witnessableHash = blockHeaderHash . obBlockData
 
 class (MonadResource m) => HasSeenBlockDB m where
     getSeenBlockDB :: m SeenBlockDB
@@ -38,10 +38,10 @@ class (MonadResource m) => HasSeenBlockDB m where
     wasBlockHashWitnessed :: SHA -> m Bool
     wasBlockHashWitnessed sha = (M.member sha . seen) <$> getSeenBlockDB
 
-    witnessedBlock :: SHA -> m (Maybe BlockData)
+    witnessedBlock :: SHA -> m (Maybe OutputBlock)
     witnessedBlock sha = (M.lookup sha . seen) <$> getSeenBlockDB
 
-    witnessBlockHash :: SHA -> BlockData -> m ()
+    witnessBlockHash :: SHA -> OutputBlock -> m ()
     witnessBlockHash sha bd = do
         stxdb     <- getSeenBlockDB
         let withClear = stxdb { operations = operations stxdb + 1
@@ -62,5 +62,5 @@ class (MonadResource m) => HasSeenBlockDB m where
     wasBlockWitnessed :: Witnessable t => t -> m Bool
     wasBlockWitnessed = wasBlockHashWitnessed . witnessableHash
 
-    witnessBlock :: BlockData -> m ()
+    witnessBlock :: OutputBlock -> m ()
     witnessBlock bd = witnessBlockHash (witnessableHash bd) bd
