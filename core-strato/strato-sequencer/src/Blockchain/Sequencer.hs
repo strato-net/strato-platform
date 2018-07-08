@@ -35,6 +35,7 @@ import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.SeenHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.DB.TxBlockDB
+import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.Sequencer.Event
 
 import           Blockchain.Sequencer.Kafka

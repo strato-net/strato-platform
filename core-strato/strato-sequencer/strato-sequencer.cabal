@@ -28,8 +28,10 @@ library
                      , Blockchain.Sequencer.DB.PrivateTxDB
                      , Blockchain.Sequencer.DB.SeenChainDB
                      , Blockchain.Sequencer.DB.SeenHashDB
+                     , Blockchain.Sequencer.DB.SeenBlockDB
                      , Blockchain.Sequencer.DB.SeenTransactionDB
                      , Blockchain.Sequencer.DB.TxBlockDB
+                     , Blockchain.Sequencer.DB.Witnessable
                      , Blockchain.Sequencer.Monad
                      , Blockchain.Sequencer.Event
                      , Blockchain.Sequencer.Kafka

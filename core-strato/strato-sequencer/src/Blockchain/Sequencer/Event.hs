@@ -26,7 +26,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
-import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 

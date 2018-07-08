@@ -1,9 +1,13 @@
+{-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Sequencer.DB.SeenBlockDB where
 
-import           Blockchain.Data.DataDefs     (BlockData(..))
-import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Data.BlockDB
+import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Class (blockHeaderHash)
+
+import           Control.Monad.Trans.Resource
 
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -23,23 +27,26 @@ mkSeenBlockDB dbSize = SeenBlockDB { size       = dbSize
                                    , seen       = M.empty
                                    }
 
+instance Witnessable BlockData where
+    witnessableHash = blockHeaderHash
+
 class (MonadResource m) => HasSeenBlockDB m where
     getSeenBlockDB :: m SeenBlockDB
     putSeenBlockDB :: SeenBlockDB -> m ()
     {-# MINIMAL getSeenBlockDB, putSeenBlockDB #-}
 
-    wasBlockHashWitnessed :: HasSeenBlockDB m => SHA -> m Bool
+    wasBlockHashWitnessed :: SHA -> m Bool
     wasBlockHashWitnessed sha = (M.member sha . seen) <$> getSeenBlockDB
 
-    witnessedBlock :: HasSeenBlockDB m => SHA -> m (Maybe BlockData)
+    witnessedBlock :: SHA -> m (Maybe BlockData)
     witnessedBlock sha = (M.lookup sha . seen) <$> getSeenBlockDB
 
-    witnessBlockHash :: HasSeenBlockDB m => SHA -> m ()
-    witnessBlockHash sha = do
+    witnessBlockHash :: SHA -> BlockData -> m ()
+    witnessBlockHash sha bd = do
         stxdb     <- getSeenBlockDB
         let withClear = stxdb { operations = operations stxdb + 1
                               , clearQueue = clearQueue stxdb Q.|> sha
-                              , seen       = sha `M.insert` seen stxdb
+                              , seen       = M.insert sha bd $ seen stxdb
                               }
             withIntBoundFix = if operations withClear >= 0
                     then withClear
@@ -52,8 +59,8 @@ class (MonadResource m) => HasSeenBlockDB m where
                                 (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `M.delete` seen withIntBoundFix }
         putSeenBlockDB withPop
 
-    wasBlockWitnessed :: (HasSeenBlockDB m, Witnessable t) => t -> m Bool
-    wasBlockWitnessed  = wasBlockHashWitnessed . witnessableHash
+    wasBlockWitnessed :: Witnessable t => t -> m Bool
+    wasBlockWitnessed = wasBlockHashWitnessed . witnessableHash
 
-    witnessBlock      :: (HasSeenBlockDB m, Witnessable t) => t -> m ()
-    witnessBlock       = witnessBlockHash . witnessableHash
+    witnessBlock :: BlockData -> m ()
+    witnessBlock bd = witnessBlockHash (witnessableHash bd) bd
