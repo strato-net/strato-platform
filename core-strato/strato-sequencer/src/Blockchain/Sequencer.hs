@@ -360,35 +360,6 @@ getNextIngestedOffset = do
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
 
-deflatePrivateTransaction :: Timestamp -> OutputTx -> SequencerM [OutputEvent]
-deflatePrivateTransaction ts otx =
-  let baseTx = otBaseTx otx
-   in case TD.transactionChainId baseTx of
-        Nothing -> return [OETx ts otx]
-        Just cid -> do
-          chainSeen <- lookupSeenChain cid
-          if chainSeen
-            then do
-              (SHA th, SHA ch) <- insertPrivateHash baseTx
-              $logInfoS "transformEvents/deflatePrivateTransaction" . T.pack $ "Got chainHash " ++ format (SHA ch) ++ " for txHash " ++ format (SHA th)
-              return [OETx ts otx, OETx ts otx{otBaseTx = TD.PrivateHashTX th ch, otSigner = A.Address 0}]
-            else do
-              insertSeenChain cid
-              insertMissingChainTx cid (otHash otx)
-              return [OEGetChain cid]
-
-inflatePrivateTransaction :: OutputTx -> SequencerM OutputTx
-inflatePrivateTransaction otx =
-   case txType otx of
-        Message -> return otx
-        ContractCreation -> return otx
-        PrivateHash -> do
-          let TD.PrivateHashTX tHash _ = otBaseTx otx
-          mTx <- lookupTransaction (SHA tHash)
-          case mTx of
-            Just tx -> return otx{otBaseTx = tx, otSigner = maybe (A.Address (-1)) id $ TX.whoSignedThisTransaction tx}
-            Nothing -> return otx -- TODO: Use chainHash to lookup chainId and retrieve from P2P
-
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
