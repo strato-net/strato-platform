@@ -27,6 +27,7 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
@@ -49,6 +50,7 @@ instance (MonadResource m) => MonadResource (StatsT m) where
 
 data SequencerContext = SequencerContext
                       { dependentBlockDB    :: DependentBlockDB
+                      , seenBlockDB         :: SeenBlockDB
                       , seenTransactionDB   :: SeenTransactionDB
                       , privateHashDB       :: PrivateHashDB
                       , getChainsDB         :: S.Set Word256
@@ -94,6 +96,12 @@ instance HasPrivateHashDB SequencerM where
         ctx <- get
         put $ ctx { privateHashDB = new }
 
+instance HasSeenBlockDB SequencerM where
+    getSeenBlockDB = seenBlockDB <$> get
+    putSeenBlockDB new = do
+        ctx <- get
+        put $ ctx { seenBlockDB = new }
+
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = seenTransactionDB <$> get
     putSeenTransactionDB new = do
@@ -122,6 +130,7 @@ runSequencerM c m = do
 
         runStateT m SequencerContext
             { dependentBlockDB    = depBlock
+            , seenBlockDB         = mkSeenBlockDB stxSize
             , seenTransactionDB   = mkSeenTxDB stxSize
             , privateHashDB       = emptyPrivateHashDB
             , getChainsDB         = S.empty

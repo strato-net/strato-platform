@@ -2,7 +2,7 @@
 module Blockchain.Sequencer.DB.SeenBlockDB where
 
 import           Blockchain.Data.DataDefs     (BlockData(..))
-module           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.SHA
 
 import           Data.Map.Strict              (Map)
@@ -16,12 +16,12 @@ data SeenBlockDB =
                  , seen       :: Map SHA BlockData
                  }
 
-mkSeenTxDB :: Int -> SeenBlockDB
-mkSeenTxDB dbSize = SeenBlockDB { size       = dbSize
-                                , operations = 0
-                                , clearQueue = Q.empty
-                                , seen       = M.empty
-                                }
+mkSeenBlockDB :: Int -> SeenBlockDB
+mkSeenBlockDB dbSize = SeenBlockDB { size       = dbSize
+                                   , operations = 0
+                                   , clearQueue = Q.empty
+                                   , seen       = M.empty
+                                   }
 
 class (MonadResource m) => HasSeenBlockDB m where
     getSeenBlockDB :: m SeenBlockDB
