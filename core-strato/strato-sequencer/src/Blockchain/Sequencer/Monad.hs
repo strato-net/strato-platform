@@ -17,6 +17,7 @@ import           Control.Monad.State
 import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
+import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 
 import           Blockchain.Constants
@@ -27,6 +28,7 @@ import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.StatsConf
 
@@ -51,6 +53,8 @@ data SequencerContext = SequencerContext
                       , privateHashDB       :: PrivateHashDB
                       , getChainsDB         :: S.Set Word256
                       , getTransactionsDB   :: S.Set SHA
+                      , vmEvents            :: Q.Seq OutputEvent
+                      , p2pEvents           :: Q.Seq OutputEvent
                       , sequencerKafkaState :: K.KafkaState
                       }
 
@@ -122,6 +126,8 @@ runSequencerM c m = do
             , privateHashDB       = emptyPrivateHashDB
             , getChainsDB         = S.empty
             , getTransactionsDB   = S.empty
+            , vmEvents            = Q.empty
+            , p2pEvents           = Q.empty
             , sequencerKafkaState = kState
             }
     return $ fst a
