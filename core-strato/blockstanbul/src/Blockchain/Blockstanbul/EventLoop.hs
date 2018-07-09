@@ -49,6 +49,9 @@ data BlockstanbulContext = BlockstanbulContext {
 
 makeLenses ''BlockstanbulContext
 
+selfAddr :: (StateMachineM m) => m Address
+selfAddr = uses prvkey prvKey2Address
+
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized (IMsg wm) = do
   let MsgAuth addr _ = getAuth wm
@@ -83,7 +86,11 @@ nextRound nt = do
     Round r -> view . round .= r
   vals <- use validators
   thisR <- use $ view . round
-  proposer .= vals !! (fromIntegral thisR  `mod` length vals)
+  let nextP = vals !! (fromIntegral thisR `mod` length vals)
+  proposer .= nextP
+  self <- selfAddr
+  when (nextP == self) $ do
+    leftover $ error "TODO(tim): determine how to announce a proposal"
 
   prepared .= M.empty
   committed .= M.empty
