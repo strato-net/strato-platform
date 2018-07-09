@@ -23,7 +23,9 @@ RUN apt-get update && \
     mv postgrest /usr/local/bin/postgrest && \
     rm $POSTGREST_FILE
 
-COPY doit.sh postgrest.conf.tpl licenses /
+COPY doit.sh postgrest.conf.tpl /
+
+COPY licenses /licenses
 
 EXPOSE 3001
 
