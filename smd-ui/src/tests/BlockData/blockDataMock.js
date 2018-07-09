@@ -1,4 +1,5 @@
-
+export const blocksMock = [
+  {
     "next": "",
     "kind": "Block",
     "blockUncles": [
