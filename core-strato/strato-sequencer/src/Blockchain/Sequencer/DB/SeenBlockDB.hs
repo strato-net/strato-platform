@@ -1,7 +1,6 @@
 module Blockchain.Sequencer.DB.SeenBlockDB where
 
-import           Blockchain.Sequencer.Event    (OutputBlock(..))
-import           Blockchain.Sequencer.DB.Witnessable
+import           Blockchain.Sequencer.Event    (SequencedBlock(..))
 import           Blockchain.SHA
 
 import           Control.Monad.Trans.Resource
@@ -14,7 +13,7 @@ data SeenBlockDB =
      SeenBlockDB { size       :: Int
                  , operations :: Int -- track number of pushes to start popping after `size`
                  , clearQueue :: Q.Seq SHA
-                 , seen       :: Map SHA OutputBlock
+                 , seen       :: Map SHA SequencedBlock
                  }
 
 mkSeenBlockDB :: Int -> SeenBlockDB
@@ -32,10 +31,10 @@ class (MonadResource m) => HasSeenBlockDB m where
     wasBlockHashWitnessed :: SHA -> m Bool
     wasBlockHashWitnessed sha = (M.member sha . seen) <$> getSeenBlockDB
 
-    witnessedBlock :: SHA -> m (Maybe OutputBlock)
+    witnessedBlock :: SHA -> m (Maybe SequencedBlock)
     witnessedBlock sha = (M.lookup sha . seen) <$> getSeenBlockDB
 
-    witnessBlockHash :: SHA -> OutputBlock -> m ()
+    witnessBlockHash :: SHA -> SequencedBlock -> m ()
     witnessBlockHash sha bd = do
         stxdb     <- getSeenBlockDB
         let withClear = stxdb { operations = operations stxdb + 1
@@ -52,9 +51,3 @@ class (MonadResource m) => HasSeenBlockDB m where
                                 Q.EmptyL    -> withIntBoundFix
                                 (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `M.delete` seen withIntBoundFix }
         putSeenBlockDB withPop
-
-    wasBlockWitnessed :: Witnessable t => t -> m Bool
-    wasBlockWitnessed = wasBlockHashWitnessed . witnessableHash
-
-    witnessBlock :: OutputBlock -> m ()
-    witnessBlock bd = witnessBlockHash (witnessableHash bd) bd

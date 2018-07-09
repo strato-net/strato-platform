@@ -3,7 +3,7 @@
 module Blockchain.Sequencer.DB.PrivateHashDB where
 
 import           Blockchain.ExtWord           (Word256)
-import           Blockchain.Data.Transaction
+import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Monad.Trans.Resource
 
@@ -15,7 +15,7 @@ import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 
 data PrivateHashDB =
-     PrivateHashDB { txHashMap      :: Map SHA Transaction              -- TODO: Make these LDB entries
+     PrivateHashDB { txHashMap      :: Map SHA OutputTx                 -- TODO: Make these LDB entries
                    , chainHashMap   :: Map SHA (Bool, Word256)
                    , chainBuffers   :: Map Word256 (CircularBuffer SHA) -- TODO: Use buffers to remove old entries
                    , seenChains     :: S.Set Word256

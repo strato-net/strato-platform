@@ -9,6 +9,7 @@ module Blockchain.Sequencer.Monad (
   , runSequencerM
   , getKafkaClientID
   , getKafkaConsumerGroup
+  , addLdbBatchOps
 ) where
 
 import           Control.Monad.Logger
@@ -55,6 +56,7 @@ data SequencerContext = SequencerContext
                       , privateHashDB       :: PrivateHashDB
                       , getChainsDB         :: S.Set Word256
                       , getTransactionsDB   :: S.Set SHA
+                      , ldbBatchOps         :: Q.Seq LDB.BatchOp
                       , vmEvents            :: Q.Seq OutputEvent
                       , p2pEvents           :: Q.Seq OutputEvent
                       , sequencerKafkaState :: K.KafkaState
@@ -135,11 +137,21 @@ runSequencerM c m = do
             , privateHashDB       = emptyPrivateHashDB
             , getChainsDB         = S.empty
             , getTransactionsDB   = S.empty
+            , ldbBatchOps         = Q.empty
             , vmEvents            = Q.empty
             , p2pEvents           = Q.empty
             , sequencerKafkaState = kState
             }
     return $ fst a
+
+addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
+addLdbBatchOps ops = do
+  st <- get
+  let existingOps = ldbBatchOps st
+      go e [] = e
+      go e (o:os) = go (e Q.|> o) os
+      newOps = go existingOps ops
+  put st{ldbBatchOps = newOps}
 
 getKafkaClientID :: SequencerM K.KafkaClientId
 getKafkaClientID = kafkaClientId <$> ask
