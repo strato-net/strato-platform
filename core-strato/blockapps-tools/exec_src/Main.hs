@@ -43,6 +43,8 @@ data Options = State{root::String, db::String}
              | Checkpoints{service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
              | DumpKafkaBlocks{startingBlock::Int}
              | DumpKafkaSequencer{startingBlock::Int}
+             | DumpKafkaSequencerVM{startingBlock::Int}
+             | DumpKafkaSequencerP2P{startingBlock::Int}
              | DumpKafkaUnSequencer{startingBlock::Int}
              | DumpKafkaUnminedBlocks{startingBlock::Int}
              | DumpKafkaRaw{streamName::String, startingBlock::Int}
@@ -134,6 +136,18 @@ dumpKafkaSequencerOptions =
     startingBlock := 0 += typ "INT"
     ]
 
+dumpKafkaSequencerVmOptions:: Annotate Ann
+dumpKafkaSequencerVmOptions =
+  record DumpKafkaSequencerVM{startingBlock = undefined} [
+    startingBlock := 0 += typ "INT"
+    ]
+
+dumpKafkaSequencerP2pOptions:: Annotate Ann
+dumpKafkaSequencerP2pOptions =
+  record DumpKafkaSequencerP2P{startingBlock = undefined} [
+    startingBlock := 0 += typ "INT"
+    ]
+
 dumpKafkaUnSequencerOptions:: Annotate Ann
 dumpKafkaUnSequencerOptions =
   record DumpKafkaUnSequencer{startingBlock = undefined} [
@@ -192,6 +206,8 @@ options = modes_ [blockGoOptions
                 , dumpKafkaBlocksOptions
                 , dumpKafkaRawOptions
                 , dumpKafkaSequencerOptions
+                , dumpKafkaSequencerVmOptions
+                , dumpKafkaSequencerP2pOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
                 , dumpKafkaUnminedBlocksOptions
@@ -227,6 +243,8 @@ run RLP{..}                    = RLP.doit filename
 run RawMP{..}                  = RawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
 run FRawMP{..}                 = FRawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
 run DumpKafkaSequencer{..}     = dumpKafkaSequencer (fromIntegral startingBlock)
+run DumpKafkaSequencerVM{..}   = dumpKafkaSequencerVM (fromIntegral startingBlock)
+run DumpKafkaSequencerP2P{..}  = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer{..}   = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)

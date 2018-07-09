@@ -17,9 +17,21 @@ library
   ghc-options: -Wall -O2 -threaded
   hs-source-dirs:      src
   exposed-modules:     Blockchain.Sequencer
+                     , Blockchain.Sequencer.DB.ChainHashDB
                      , Blockchain.Sequencer.DB.DependentBlockDB
-                     , Blockchain.Sequencer.DB.SeenTransactionDB
+                     , Blockchain.Sequencer.DB.DependentTxDB
+                     , Blockchain.Sequencer.DB.GetChainsDB
+                     , Blockchain.Sequencer.DB.GetTransactionsDB
+                     , Blockchain.Sequencer.DB.MissingChainDB
+                     , Blockchain.Sequencer.DB.MissingTxDB
                      , Blockchain.Sequencer.DB.PrivateHashDB
+                     , Blockchain.Sequencer.DB.PrivateTxDB
+                     , Blockchain.Sequencer.DB.SeenChainDB
+                     , Blockchain.Sequencer.DB.SeenHashDB
+                     , Blockchain.Sequencer.DB.SeenBlockDB
+                     , Blockchain.Sequencer.DB.SeenTransactionDB
+                     , Blockchain.Sequencer.DB.TxBlockDB
+                     , Blockchain.Sequencer.DB.Witnessable
                      , Blockchain.Sequencer.Monad
                      , Blockchain.Sequencer.Event
                      , Blockchain.Sequencer.Kafka
@@ -29,12 +41,14 @@ library
   build-depends:       base >=4.8 && <4.10
                      , strato-model
                      , strato-genesis
+                     , bimap
                      , blockapps-data
                      , blockapps-util
                      , strato-conf
                      , clock
                      , containers
                      , directory
+                     , exceptions
                      , mtl
                      , resourcet
                      , monad-logger
@@ -77,6 +91,7 @@ test-suite strato-sequencer-spec
     build-depends:    base >=4.8 && <4.10
                     , strato-sequencer
                     , strato-conf
+                    , strato-genesis
                     , blockapps-util
                     , hflags
                     , monad-logger

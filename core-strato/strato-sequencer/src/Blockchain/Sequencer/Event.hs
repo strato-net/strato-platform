@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
@@ -25,13 +26,21 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
-import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
+
+data IngestEventType = IETTransaction | IETBlock | IETGenesis deriving (Eq, Ord, Show)
+
+iEventType :: IngestEvent -> IngestEventType
+iEventType = \case
+  IETx _ _    -> IETTransaction
+  IEBlock _   -> IETBlock
+  IEGenesis _ -> IETGenesis
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -202,6 +211,9 @@ instance Witnessable IngestTx where
 
 instance Witnessable OutputTx where
     witnessableHash = otHash
+
+instance Witnessable SequencedBlock where
+    witnessableHash = blockHeaderHash . sbBlockData
 
 instance Eq SequencedBlock where
     a == b = sbHash a == sbHash b

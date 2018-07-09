@@ -72,6 +72,7 @@ import           Blockchain.Format
 import qualified Blockchain.Mining                       as Mining
 import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
+import           Blockchain.Util
 import           Blockchain.Verifier
 import           Blockchain.VM
 import           Blockchain.VM.Code
@@ -304,7 +305,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
 addBlockTransactions :: Bool -> OutputBlock -> ContextM ()
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
-  let chains' = Bagger.partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ (trace ("addBlockTransactions: all transactions: " ++ show transactions) transactions)
+  let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ (trace ("addBlockTransactions: all transactions: " ++ show transactions) transactions)
       chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
   forM_ chains $ \(chainId, txs) -> do
     withBlockchain (blockHeaderHash bd) (trace ("addBlockTransactions: Running chain " ++ show chainId ++ " with " ++ show txs) chainId) $ do

@@ -16,7 +16,7 @@ import qualified Blockchain.MilenaTools     as K
 import qualified Network.Kafka.Protocol     as KP
 
 import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka (readSeqEvents, seqEventsTopicName)
+import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
 
 seqEventNotificationSource :: ( MonadIO m
                               , MonadBaseControl IO m
@@ -26,10 +26,10 @@ seqEventNotificationSource :: ( MonadIO m
                               )
                            => Source m OutputEvent
 seqEventNotificationSource = do
-    ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqEventsTopicName
+    ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
     loop ofs'
     where loop nextOffset = do
-              events <- lift $ K.withKafkaViolently $ readSeqEvents nextOffset
+              events <- lift $ K.withKafkaViolently $ readSeqP2pEvents nextOffset
               unless (null events) $ do -- stop bloating the logs
                 $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
                 forM_ events $ \e -> do
