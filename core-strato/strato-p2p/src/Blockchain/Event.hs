@@ -19,6 +19,7 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
+import           Data.Maybe
 --import qualified Data.Set as S
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Base16                as BC16
@@ -252,52 +253,45 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     -- private chains
-    
-    -- TODO:  should take [ChainId] so that Transactions handler can request multiple
-    --          chain details in one messag
-    --        should these be calls to ChainInfoDB functions????e
-    --        should these be calls to ChainInfoDB functions????
-    MsgEvt (GetChainDetails cid) -> do
+    MsgEvt (GetChainDetails cids) -> do
       stampActionTimestamp
-      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainID " ++ (show cid)
-      chDet <- lift (RBDB.withRedisBlockDB $ RBDB.getChainInfo cid)
-      case chDet of
-        Nothing ->  
-          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "No information " ++ 
-            "found about the chain with chainID " ++ (show cid)
-        Just (ci) -> do
-          -- check that the peer is authorized to receive these chain details, by verifying that their 
-          -- IPaddress is associated with one of the Enodes in the chain's member list
-          let pIp = readIP $ T.unpack (pPeerIp peer)
-          let enodeList = members ci
-          let ipList = ipAddress <$> enodeList 
-          let match = find (==pIp) ipList
+      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
+      chDets <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
+      let unfilteredPairs =  makePairs cids chDets
+      let chPairs = fmap fromJust <$> filter (isJust . snd) unfilteredPairs -- remove pairs where ChainInfo is Nothing
+      let finalPairs = filter ((checkPeerIsMember peer) . snd) chPairs -- remove pairs where peer is not a member
 
-          case match of
-            Nothing -> do 
-              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cid)
-            Just _ -> do 
-              $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "sending ChainDetails for chainID " ++ (show cid)
-              yield $ ChainDetails cid ci
-              stampActionTimestamp
-      
-    -- TODO: should take [ChainID] [ChainInfo] 
-    MsgEvt (ChainDetails cId cInfo) -> do
-      stampActionTimestamp
-      SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer) cId cInfo
-
-    MsgEvt (GetTransactions chid req) -> do
-      stampActionTimestamp
-      $logInfoS "handleEvents/GetTransactions" $ T.pack $ "transaction info for chainID " ++ (show chid)
-        ++ "\n  " ++ (show req)
-      tr <- case req of 
-        (Explicit ids) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions ids
-        (Implicit ha _ _ _) -> lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions [ha]
-      case tr of
-        ((Just ts):_) -> do
-          yield $ Transactions ts
+      case finalPairs of 
+        [] -> return ()
+        _ -> do
+          yield $ ChainDetails finalPairs
           stampActionTimestamp
-        _ -> return ()
+          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++ 
+            (intercalate "\n" $ show <$> finalPairs)
+
+    MsgEvt (ChainDetails chpairs) -> do
+      stampActionTimestamp
+      RBDB.withRedisBlockDB $ mapM_ (uncurry RBDB.putChainInfo) chpairs
+      mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
+
+    -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
+    MsgEvt (GetTransactions trHashes) -> do
+      stampActionTimestamp
+      $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: " 
+        ++ (intercalate "\n" (show <$> trHashes))
+      unfilteredTrs::[Maybe [Transaction]] <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
+      let trs::[Transaction] = head <$> (fmap fromJust $ filter isJust unfilteredTrs) -- all non-Nothing TXs
+      
+      -- yield all of the first list, do auth check for second list and send the ones that peer is allowed to see
+      let splitTrs::([Transaction],[Transaction]) = partition ((== Nothing) . txChainId) trs
+      unfilteredChInfos::[Maybe ChainInfo] <- (lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
+      let justChInfos::[ChainInfo] = fromJust <$> unfilteredChInfos
+      
+      -- Make pairs of Transactions and their corresponding ChainInfos, do auth check, yield resultant TXs
+      let txChInfoPairs::[(Transaction, ChainInfo)] = makePairs (snd splitTrs) justChInfos
+      let validPairs::[(Transaction, ChainInfo)] = filter ((checkPeerIsMember peer) . snd) txChInfoPairs
+      let finalTrs::[Transaction] = (fst splitTrs) ++ (fst <$> validPairs)
+      yield $ Transactions finalTrs
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -331,7 +325,7 @@ handleEvents mode peer = awaitForever $ \case
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
             Just _ -> do 
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
-              yield $ ChainDetails cId cInfo
+              yield $ ChainDetails [(cId, cInfo)]
       _ -> return () -- shouldn't happen but our types don't prohibit us
 
     TimerEvt -> do
@@ -379,3 +373,23 @@ shouldSend peer tx = case tx of
     Origin.Morphism      -> -- probably means it was converted, see if this is a problem
         trace "NewTx of type Morphism came in. Should this even happen?" True
 
+
+-- TODO: Instead of making this a boolean function, how about it takes [ChainInfo] and returns a [ChainInfo]
+--       with all of the unauthorized chainInfos removed? or maybe thats too specific a case...
+
+-- check that the peer is authorized to receive these chain details, by verifying that their
+-- IPaddress is associated with one of the Enodes in the chain's member list
+checkPeerIsMember :: PPeer -> ChainInfo -> Bool
+checkPeerIsMember peer ci = 
+  case match of
+    Nothing -> False 
+    Just _ -> True
+  where 
+    pIp = readIP $ T.unpack (pPeerIp peer)
+    ipList = ipAddress <$> (members ci)
+    match = find (==pIp) ipList
+
+makePairs :: [a] -> [b] -> [(a,b)]
+makePairs [] _ = []
+makePairs _ [] = []
+makePairs (x:xs) (y:ys) = (x,y) : makePairs xs ys 

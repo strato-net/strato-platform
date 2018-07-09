@@ -159,9 +159,9 @@ data Message =
   NewBlock Block Integer |
   
   -- private chains
-  GetChainDetails Word256 |
-  ChainDetails Word256 ChainInfo |
-  GetTransactions Word256 TransactionRequest deriving (Eq,Show) 
+  GetChainDetails [Word256] |
+  ChainDetails [(Word256, ChainInfo)] |
+  GetTransactions [SHA] deriving (Eq,Show) 
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -207,15 +207,20 @@ instance Format Message where
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
   
   -- private chains
-  format (GetChainDetails cid) = CL.blue "GetChainDetails\n" ++ "  chainID: " ++ (show cid)
-  format (ChainDetails chid ci) = 
-    CL.blue "Chain Details\n" ++ 
-    "  chainID: " ++ show chid ++ "\n" ++
-    "  chainInfo: " ++ show ci ++ "\n"
-  format (GetTransactions cid3 tr) = "GetTransactions\n" ++
-    "  chainID: " ++ show cid3 ++ "\n" ++
-    "  transactionData: " ++ show tr ++ "\n"
+  format (GetChainDetails cids) = CL.blue "GetChainDetails\n" ++ "  for chainIDs: " ++ (intercalate "\n" (show <$> cids))
 
+  format (ChainDetails chPairs) = 
+    CL.blue "Chain Details\n" ++ formatPairs chPairs
+    where 
+      formatPairs :: [(Word256, ChainInfo)] -> String
+      formatPairs [] = ""
+      formatPairs ((chID, chInfo):xs) =
+        "\n  chainID: "  ++ show chID ++
+        "\n  chainInfo: " ++ show chInfo ++ formatPairs xs
+
+  format (GetTransactions txHashes) = 
+    CL.blue "GetTransactions\n" ++ "requested transaction hashes: " ++ (intercalate "\n" (show <$> txHashes))
+    
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
 -- Convert RLPObject and message code into corresponding Message
@@ -256,12 +261,12 @@ obj2WireMessage 0x17 (RLPArray [b, td]) =
   NewBlock (rlpDecode b) (rlpDecode td)
 
 -- private chains
-obj2WireMessage 0x1c cid = 
-  GetChainDetails (rlpDecode cid)
-obj2WireMessage 0x1d (RLPArray [chid, ci]) =
-  ChainDetails (rlpDecode chid) (rlpDecode ci) 
-obj2WireMessage 0x1e (RLPArray [c, tr]) =
-  GetTransactions (rlpDecode c) (rlpDecode tr)
+obj2WireMessage 0x1c (RLPArray cids) = 
+  GetChainDetails (rlpDecode <$> cids)
+obj2WireMessage 0x1d (RLPArray chDetPairs) =
+  ChainDetails $ rlpDecode <$> chDetPairs
+obj2WireMessage 0x1e (RLPArray trHashes) =
+  GetTransactions $ rlpDecode <$> trHashes
 
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
 
@@ -304,14 +309,14 @@ wireMessage2Obj (NewBlock b d) =
   (0x17, RLPArray [rlpEncode b, rlpEncode d])
 
 -- private chains
-wireMessage2Obj (GetChainDetails c) = 
-  (0x1c, rlpEncode c)
+wireMessage2Obj (GetChainDetails cIds) = 
+  (0x1c, RLPArray $ rlpEncode <$> cIds)
 
-wireMessage2Obj (ChainDetails chid ci) =  
-  (0x1d, RLPArray [rlpEncode chid, rlpEncode ci])
+wireMessage2Obj (ChainDetails chpairs) =  
+  (0x1d, RLPArray $ rlpEncode <$> chpairs)
 
-wireMessage2Obj (GetTransactions c tr) = 
-  (0x1e, RLPArray [rlpEncode c, rlpEncode tr])
+wireMessage2Obj (GetTransactions trhashes) = 
+  (0x1e, RLPArray $ rlpEncode <$> trhashes)
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x
 
