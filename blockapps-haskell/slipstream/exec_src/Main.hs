@@ -71,8 +71,9 @@ import Data.Time
 
 --import Slipstream.Events
 import Slipstream.MessageConsumer
-import Slipstream.Processor
+--import Slipstream.Processor
 import Slipstream.OutputData
+import Slipstream.Options
 
 {-
 data ActionType = Create | Delete | Update deriving (Show)
@@ -403,8 +404,9 @@ main = do
   let state = mkConfiguredKafkaState kafkaID
 
   msg <- runKafka state $ (getAndProcessMessages offset)
+
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
-
+  print messages
   return ()

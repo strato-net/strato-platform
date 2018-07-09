@@ -208,7 +208,7 @@ blocConn = do
 
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
-
+  _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
 
   let conHost = flags_pghost
@@ -230,12 +230,19 @@ processTheMessages messages = do
 
   mgr <- newManager defaultManagerSettings
 
+  --Set Flag on startup
+  let deployFlag = BlockApps.Bloc22.Monad.Public
+
+  cirrusUrl <- parseBaseUrl flags_cirrusurl
+
   let env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
+            , urlCirrus= cirrusUrl
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
-            , logLevel=Error    -- :: Severity
+            , logLevel=Error
+            , deployMode= deployFlag   -- :: Severity
             }
 
   cachedContractsIORef <- newIORef Map.empty

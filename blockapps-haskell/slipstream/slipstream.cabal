@@ -85,7 +85,8 @@ executable slipstream
                  --, transformers
                  --, unordered-containers
                  --, vector
-    -- other-modules: Events
+    -- other-modules: Options
+                  --, Events
                   --, Options
     main-is: Main.hs
     ghc-options: -Wall -O2 -threaded

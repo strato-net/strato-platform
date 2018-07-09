@@ -1,5 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
+      , TemplateHaskell
 #-}
 
 module Slipstream.OutputData where
@@ -13,7 +14,7 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import Network
-import HFlags
+--import HFlags
 import Slipstream.Options
 import qualified Data.Vector as V
 import Data.List

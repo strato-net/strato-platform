@@ -1,3 +1,4 @@
+
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -13,3 +14,4 @@ defineFlag "database" ("cirrus" :: String) "Postgres database"
 defineFlag "stratourl" ("http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2"::String) "URL of the Strato server Bloc will connect to"
 defineFlag "kafkahost" ("kafka" :: String) "Kafka host"
 defineFlag "kafkaport" (9092 :: Int) "Kafka port"
+defineFlag "cirrusurl" ("http://strato-int.centralus.cloudapp.azure.com/cirrus"::String) "URL of the Cirrus server Bloc will connect to"
