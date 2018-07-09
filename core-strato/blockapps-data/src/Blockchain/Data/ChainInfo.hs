@@ -27,11 +27,10 @@ instance FromJSON AccountBalance where
   parseJSON x = error $ "couldn't parse JSON for account balance: " ++ show x
 
 instance ToJSON AccountBalance where
-  toEncoding (AccountBalance (addr, bal)) =
-      pairs (
-        "address" .= addr <>
-        "balance" .= bal
-      )  
+  toJSON (AccountBalance (addr, bal)) =
+      object [ "address" .= addr
+             , "balance" .= bal
+             ]
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
@@ -60,14 +59,13 @@ instance FromJSON ChainInfo where
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toEncoding (ChainInfo cl ar rr ms ab) =
-    pairs (
-      "chainLabel" .= cl <>
-      "addRule" .= ar <>
-      "removeRule" .= rr <>
-      "members" .= ms <>
-      "accountBalance" .= (map AccountBalance ab)
-    )
+  toJSON (ChainInfo cl ar rr ms ab) =
+    object [ "chainLabel" .= cl
+           , "addRule" .= ar
+           , "removeRule" .= rr
+           , "members" .= ms
+           , "accountBalance" .= (map AccountBalance ab)
+           ]
 
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
