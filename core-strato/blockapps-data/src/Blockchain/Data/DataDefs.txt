@@ -11,7 +11,6 @@ BlockData
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    --TODO(tim): write a migration
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
