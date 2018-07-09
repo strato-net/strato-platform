@@ -9,6 +9,7 @@ module Blockchain.Sequencer.Monad (
   , runSequencerM
   , getKafkaClientID
   , getKafkaConsumerGroup
+  , clearLdbBatchOps
   , addLdbBatchOps
 ) where
 
@@ -143,6 +144,9 @@ runSequencerM c m = do
             , sequencerKafkaState = kState
             }
     return $ fst a
+
+clearLdbBatchOps :: SequencerM ()
+clearLdbBatchOps = modify (\st -> st{ldbBatchOps = Q.empty})
 
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do

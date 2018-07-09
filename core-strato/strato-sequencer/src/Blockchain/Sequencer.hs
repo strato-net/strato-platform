@@ -61,6 +61,7 @@ sequencer :: SequencerM ()
 sequencer = forever $ do
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
+    clearLdbBatchOps
     clearGetChainsDB
     clearGetTransactionsDB
     clearEvents
@@ -112,18 +113,28 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
+  $logInfoS "transformPrivateHashTXs" . T.pack $ "Transforming transaction " ++ format (SHA th') ++ " with chain hash " ++ format (SHA ch')
   let th = SHA th'
       ch = SHA ch'
   lookupSeenTxHash th >>= \case
-    Just _ -> return ()
+    Just _ -> do
+      $logInfoS "transformPrivateHashTXs" "Transaction hash seen before!"
+      return ()
     Nothing -> do
+      $logInfoS "transformPrivateHashTXs" "Transaction hash not seen before! Inserting it into SeenTxHashDB"
       insertSeenTxHash th ch
       lookupTransaction th >>= \case
-        Just tx -> useChainHash ch (fromJust . TD.transactionChainId $ otBaseTx tx)
+        Just tx -> do
+          $logInfoS "transformPrivateHashTXs" . T.pack $ "We have this transaction's body. It's: " ++ prettyOTx tx
+          useChainHash ch (fromJust . TD.transactionChainId $ otBaseTx tx)
         Nothing -> do
+          $logInfoS "transformPrivateHashTXs" "We don't have this transaction's body. Looking it up by chain hash"
           lookupChainHash ch >>= \case
-            Nothing -> return ()
+            Nothing -> do
+              $logInfoS "transformPrivateHashTXs" "We don't know this transaction's chain Id. Oh well..."
+              return ()
             Just (_, cid) -> do
+              $logInfoS "transformPrivateHashTXs" . T.pack $ "We know this transaction's chain Id. It's " ++ format (SHA cid) ++ ". Inserting into MissingTxDB and GetTransactions list"
               useChainHash ch cid
               insertMissingTx th
               insertGetTransactionsDB th
@@ -149,19 +160,25 @@ transformFullTransactions pairs = do
   forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) -> do
     if not isPrivateChain
       then do
+        $logInfoS "transformFullTransactions" . T.pack $ "Sending " ++ show (length txs) ++ "public transactions to P2P and the VM"
         mapM_ (markForVM . pairToOETx) txs
         mapM_ (markForP2P . pairToOETx) txs
       else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \((Just chainId), ptxs) -> do
+        $logInfoS "transformFullTransactions" . T.pack $ "Transforming " ++ show (length txs) ++ "private transactions on chain " ++ format (SHA chainId)
         lookupSeenChain chainId >>= \case
           False -> do
+            $logInfoS "transformFullTransactions" . T.pack $ "We haven't seen the details for chain " ++ format (SHA chainId) ++ ". Inserting all transactions into MissingChainTxDB and inserting the chain Id into the GetChains list"
             insertMissingChainTxs chainId $ map (txHash . otBaseTx . snd) ptxs
             insertGetChainsDB chainId
           True -> forM_ ptxs $ \(ts, ptx) -> do
+            $logInfoS "transformFullTransactions" . T.pack $ "We know the details for chain " ++ format (SHA chainId) ++ ". Inserting " ++ prettyOTx ptx ++ "into PrivateHashDB"
             (tHash, cHash) <- insertPrivateHash ptx
             insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+            $logInfoS "transformFullTransactions" . T.pack $ "Got chain hash " ++ format cHash ++ " for transaction " ++ format tHash
             removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
             lookupTxBlocks tHash >>= \case
               Nothing -> do -- if it's not already in a block, send it to the world
+                $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block. Sending it to P2P!"
                 let SHA th' = tHash
                     SHA ch' = cHash
                     phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
@@ -171,6 +188,7 @@ transformFullTransactions pairs = do
                 depTxs | not (S.member tHash depTxs) ->
                   error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
                 depTxs | depTxs == S.singleton tHash -> do
+                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
@@ -178,6 +196,7 @@ transformFullTransactions pairs = do
                     let Just block = mBlock
                     hydrateAndEmit block
                 depTxs -> do
+                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
                   mapM_ insertMissingTx depTxs'
@@ -205,22 +224,29 @@ hydrateAndEmit sb = do
           mapM_ (markForP2P . OEBlock . snd) dryChain
           ldbOps <- forM dryChain $ \(ldbOp, ob) -> do
             let bHash = blockHeaderHash $ obBlockData ob
+            $logInfoS "hydrateAndEmit" . T.pack $ prettyOBlock ob
             forM_ (obReceiptTransactions ob) $ \tx -> do
               when (isPrivateHashTX tx) $ do
                 let TD.PrivateHashTX{TD.transactionTxHash = th'} = otBaseTx tx
                     th = SHA th'
+                $logInfoS "hydrateAndEmit" . T.pack $ "Looking up transaction hash " ++ format th ++ " in MissingTxDB"
                 lookupMissingTx th >>= \case
-                  False -> return ()
+                  False -> do
+                    $logInfoS "hydrateAndEmit" . T.pack $ "Transaction hash " ++ format th ++ " is not missing"
+                    return ()
                   True -> do
+                    $logInfoS "hydrateAndEmit" . T.pack $ "Transaction hash " ++ format th ++ " is missing. Inserting into TxBlockDB and DependentTxDB"
                     insertTxBlock th bHash
                     insertDependentTx bHash th
             lookupDependentTxs bHash >>= \case
               s | s == S.empty -> do
+                $logInfoS "hydrateAndEmit" . T.pack $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
                 hydratedBlock <- hydrateBlock ob
                 tickBy 1 ctr_sequencer_blocks_released
-                markForVM $ OEBlock ob
+                markForVM $ OEBlock hydratedBlock
                 return ldbOp
               s -> do
+                $logInfoS "hydrateAndEmit" . T.pack $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
                 mapM_ insertGetTransactionsDB s
                 return Nothing
           addLdbBatchOps $ catMaybes ldbOps
@@ -244,9 +270,14 @@ transformGenesis chains = forM_ chains $ \ig -> do
   let og = ingestGenesisToOutputGenesis ig
       (cId, cInfo) = ogGenesisInfo og
   markForP2P (OEGenesis og)
+  $logInfoS "transformGenesis" . T.pack $ "Transforming ChainInfo for chain " ++ format (SHA cId) ++ " with info " ++ show cInfo
   lookupSeenChain cId >>= \case
-    True -> return ()
+    True -> do
+      $logInfoS "transformGenesis" "We've seen this chain before. Not emitting to VM"
+      return ()
     False -> do
+      $logInfoS "transformGenesis" "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
+      insertChainInfo cId cInfo
       insertSeenChain cId
       markForVM $ OEGenesis og
       lookupMissingChainTxs cId >>= \case
@@ -254,6 +285,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
         ths -> forM_ ths $ \th -> lookupTransaction th >>= \case
           Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show cId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
           Just tx -> do
+            $logInfoS "transformGenesis" . T.pack $ "Inserting transaction " ++ prettyOTx tx
             (tHash, cHash) <- insertPrivateHash tx
             insertSeenTxHash tHash cHash
             removeMissingTx tHash
@@ -266,6 +298,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                 depTxs | not (S.member tHash depTxs) ->
                   error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
                 depTxs | depTxs == S.singleton tHash -> do
+                  $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
@@ -273,6 +306,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                     let Just block = mBlock
                     hydrateAndEmit block
                 depTxs -> do
+                  $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
                   mapM_ insertMissingTx depTxs'
@@ -280,16 +314,16 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   insertDependentTxs bHash depTxs'
 
 clearEvents :: SequencerM ()
-clearEvents = get >>= \st -> put st{vmEvents = Q.empty, p2pEvents = Q.empty}
+clearEvents = modify (\st -> st{vmEvents = Q.empty, p2pEvents = Q.empty})
 
 pairToOETx :: (Timestamp, OutputTx) -> OutputEvent
 pairToOETx = uncurry OETx
 
 markForVM :: OutputEvent -> SequencerM ()
-markForVM oe = get >>= \st -> put st{vmEvents = (vmEvents st) Q.|> oe}
+markForVM oe = modify (\st -> st{vmEvents = (vmEvents st) Q.|> oe})
 
 markForP2P :: OutputEvent -> SequencerM ()
-markForP2P oe = get >>= \st -> put st{p2pEvents = (p2pEvents st) Q.|> oe}
+markForP2P oe = modify (\st -> st{p2pEvents = (p2pEvents st) Q.|> oe})
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
@@ -302,22 +336,39 @@ hydrateBlock ob = do
   otxs' <- forM (obReceiptTransactions ob) $ \otx -> do
     case txType (otBaseTx otx) of
       PrivateHash -> do
-        mOtx' <- lookupTransaction (SHA . TD.transactionTxHash $ otBaseTx otx)
+        let sha = SHA . TD.transactionTxHash $ otBaseTx otx
+        $logInfoS "hydrateBlock" . T.pack $ "Looking up transaction hash " ++ format sha
+        mOtx' <- lookupTransaction sha
         case mOtx' of
-          Nothing -> return otx
-          Just otx' -> return otx'
+          Nothing -> do
+            $logInfoS "hydrateBlock" . T.pack $ "Transaction hash " ++ format sha ++ " not found."
+            return otx
+          Just otx' -> do
+            $logInfoS "hydrateBlock" . T.pack $ "Transaction hash " ++ format sha ++ " found: " ++ prettyOTx otx'
+            return otx'
       _ -> return otx
   return ob{obReceiptTransactions = otxs'}
 
 splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
   case eventType of
-    IETTransaction -> transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
-    IETBlock -> transformBlocks $ map (\(IEBlock ob) -> ob) events
-    IETGenesis -> transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETTransaction -> do
+      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestTransactions"
+      transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
+    IETBlock -> do
+      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlocks"
+      transformBlocks $ map (\(IEBlock ob) -> ob) events
+    IETGenesis -> do
+      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
+      transformGenesis $ map (\(IEGenesis og) -> og) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
+  where blockNonce = show . BDB.blockDataNumber $ bd
+        bHash  = format . BDB.blockHeaderHash $ bd
+
+prettyOBlock :: OutputBlock -> String
+prettyOBlock OutputBlock{obOrigin=o,obBlockData=bd,obReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where blockNonce = show . BDB.blockDataNumber $ bd
         bHash  = format . BDB.blockHeaderHash $ bd
 
@@ -328,6 +379,15 @@ prettyBlock SequencedBlock{sbOrigin=o,sbBlockData=bd,sbReceiptTransactions=txs} 
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+
+            shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
+            shortOrigin x                    = format x
+
+prettyOTx :: OutputTx -> String
+prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin o
       where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
             prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
             prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
