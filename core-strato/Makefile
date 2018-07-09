@@ -4,6 +4,8 @@ NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
+LICENSE_DIR=$(FAKEROOT)/licenses
+LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
@@ -16,6 +18,7 @@ prebuild:
 	mkdir -p $(FAKEROOT)/usr/lib
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(STRATOHOME)
+	mkdir -p $(LICENSE_SOURCE_DIR)
 	mkdir -p /tmp/docker-dummy
 
 build_buildbase: prebuild
@@ -32,6 +35,7 @@ build_haskell: prebuild build_buildbase
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy
+	cp -f licenses/* ${LICENSE_SOURCE_DIR}
 	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
 	rm -f /tmp/docker-dummy/Dockerfile.deploybase
 

@@ -12,7 +12,7 @@ RUN apt-get update && \
 
 COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
 
-COPY docker-run.sh /
+COPY docker-run.sh licenses /
 
 RUN chmod a+x /docker-run.sh
 
