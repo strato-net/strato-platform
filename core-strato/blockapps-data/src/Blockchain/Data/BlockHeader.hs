@@ -39,7 +39,7 @@ data BlockHeader =
     gasLimit         :: Integer,
     gasUsed          :: Integer,
     timestamp        :: UTCTime,
-    extraData        :: Integer,
+    extraData        :: B.ByteString,
     mixHash          :: SHA,
     nonce            :: Word64
     } deriving (Eq, Read, Show)
