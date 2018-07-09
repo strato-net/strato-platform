@@ -34,6 +34,7 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Data.Word
 
+import           Control.Lens.TH                         (makeLensesFor)
 import           Data.Aeson
 import           GHC.Generics
 
@@ -47,3 +48,6 @@ instance ToJSON AddressState
 
 -- todo newtype me
 type Difficulty = Integer
+
+makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
+makeLensesFor [("blockBlockData", "blockDataLens")] ''Block

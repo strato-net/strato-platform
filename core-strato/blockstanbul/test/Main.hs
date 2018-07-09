@@ -4,7 +4,7 @@ import Test.Hspec.Runner
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (p0:_, _) = p0 == "Message"
+predicate (p0:_, _) = p0 /= "StateMachine"
 predicate _ = False
 
 main :: IO ()

@@ -6,10 +6,14 @@ dependencies:
   - blockapps-data
   - blockapps-haskoin
   - blockapps-util
+  - bytestring
   - containers
   - conduit-combinators
+  - crypto-api
   - ethereum-encryption
   - ethereum-rlp
+  - ghc
+  - fast-ecrecover
   - lens
   - mtl
   - QuickCheck
@@ -27,7 +31,6 @@ tests:
     dependencies:
       - base16-bytestring
       - blockstanbul
-      - bytestring
       - hspec
       - hspec-expectations-lifted
       - merkle-patricia-db
