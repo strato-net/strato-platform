@@ -25,8 +25,8 @@ import qualified Prelude            as P
 accountInfo :: [(Text, Text)] -> Handler Value
 accountInfo params = do
     limit <- liftIO $ myFetchLimit
-
-    chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+ 
+    chainIds <- lookupGetParams "chainid"
 
     let index'   = fromIntegral $ (maybe 0 id $ extractPage "index" params) :: Int64
     let paramMap = Map.fromList params
@@ -39,13 +39,23 @@ accountInfo params = do
             True ->  runDB $ E.select . E.distinct $
               E.from $ \(accStateRef) -> do
 
-              let criteria = P.map (getAccFilter (accStateRef)) $ params
-              let chainCriteria = case chainId of
-                    Nothing -> (E.isNothing $ accStateRef E.^. AddressStateRefChainId)
-                    Just c -> ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val c))
-              let allCriteria = chainCriteria : ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
-
-              E.where_ (P.foldl1 (E.&&.) allCriteria)
+              let criteria = P.map (getAccFilter (accStateRef)) $ params 
+              let matchChainId cid = (accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)
+              let chainCriteria = case chainIds of
+                    [] -> [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
+                    [cid] -> do
+                        if (T.unpack cid == "main") 
+                            then [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
+                            else if (T.unpack cid == "all")
+                                     then [] 
+                                     else [matchChainId cid]
+                    cids -> P.map matchChainId cids 
+              let otherCriteria = ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
+              let allCriteria = case chainCriteria of 
+                     [] -> [otherCriteria]
+                     _ -> P.map (\cc -> cc : otherCriteria) chainCriteria
+ 
+              E.where_ (P.foldl1 (E.||.) (P.map (P.foldl1 (E.&&.)) allCriteria))
 
               E.limit $ limit
 

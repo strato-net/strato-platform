@@ -17,7 +17,7 @@ import           Blockchain.Data.Enode
 import           Control.Monad.Trans.Resource
 import           Data.Maybe
 
-getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe ChainInfo)
+getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (Word256, ChainInfo))
 getChainInfo chainId = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
@@ -39,31 +39,35 @@ getChainInfo chainId = do
           --   E.where_ (abRef E.^. AccountInfoRefChainId E.==. E.val chainInfoRefId)
           -- cInfos <- E.select . E.from $ \ciRef -> do
           --   E.where_ (abRef E.^. CodeInfoRefChainId E.==. E.val chainInfoRefId)
-          return . Just $ ChainInfo
-                            chainInfoRefChainLabel
-                            chainInfoRefAddRule
-                            chainInfoRefRemoveRule
-                            (map name members)
-                            (map anb accts)
+          return . Just $ (chainId,  
+                           ChainInfo
+                             chainInfoRefChainLabel
+                             chainInfoRefAddRule
+                             chainInfoRefRemoveRule
+                             (map name members)
+                             (map anb accts))
           where name = readEnode . chainMemberRefName . entityVal
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
 
-getAllChainInfos :: (HasSQLDB m) => m [ChainInfo]
-getAllChainInfos = do
-  db <- getSQLDB
-  cids <- runResourceT . flip SQL.runSqlPool db $ do  
-    chains <- E.select . E.from $ \cRef -> do
-              return cRef
-    case chains of
-      [] -> return []
-      cIds -> return $ map (chainInfoRefChainId . E.entityVal) cIds
+getChainInfos :: (HasSQLDB m) => [Word256] -> m [(Word256, ChainInfo)]
+getChainInfos chainIds = do
+  cids <- case chainIds of
+              [] -> do
+                  db <- getSQLDB
+                  runResourceT . flip SQL.runSqlPool db $ do  
+                      chains <- E.select . E.from $ \cRef -> do
+                          return cRef
+                      case chains of
+                          [] -> return []
+                          cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
+              cIds -> return cIds
   chainInfos <- mapM getChainInfo cids      
   let cInfos = sequence $ filter isJust chainInfos
   case cInfos of 
-    Nothing -> return [] 
-    Just cis -> return cis
+      Nothing -> return [] 
+      Just cis -> return cis
 
 putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId ChainInfo{..} = do

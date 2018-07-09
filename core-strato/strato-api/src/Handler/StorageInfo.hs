@@ -20,6 +20,7 @@ import           Blockchain.ExtWord      (Word256)
 
 import qualified Database.Esqueleto      as E
 import qualified Prelude                 as P
+import qualified Data.Text               as T
 
 data StorageAddress = StorageAddress {
     key     :: Word256,
@@ -36,7 +37,7 @@ getStorageInfoR :: Handler Value
 getStorageInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 
-                 chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
+                 chainIds <- lookupGetParams "chainid"
 
                  limit <- liftIO $ myFetchLimit
 
@@ -46,11 +47,20 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        let chainCriteria = case chainId of
-                                              Nothing -> (E.isNothing $ addrStRef E.^. AddressStateRefChainId)
-                                              Just c -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val c))
+                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)) 
 
-                                        E.on ( ( storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId ) E.&&. chainCriteria )
+                                        let chainCriteria = case chainIds of
+                                              [] -> [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
+                                              [cid] -> if (T.unpack cid == "main")
+                                                           then  [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
+                                                           else if (T.unpack cid == "all")
+                                                                    then []
+                                                                    else [matchChainId cid]
+                                              cids -> P.map matchChainId cids
+
+                                        let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
+                                        
+                                        E.on (P.foldl1 (E.||.) $ P.map (criteria E.&&.) chainCriteria)
 
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
 

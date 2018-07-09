@@ -16,6 +16,22 @@ import qualified Data.Text                       as T
 import           Data.Text.Encoding              (encodeUtf8, decodeUtf8)
 
 import           Test.QuickCheck.Arbitrary
+import           Control.Applicative
+
+newtype AccountBalance = AccountBalance {
+    unAccountBalance :: (Address, Word256)
+} deriving (Eq, Read, Show, GHCG.Generic)
+
+instance FromJSON AccountBalance where
+  parseJSON (Object a) = AccountBalance <$> liftA2 (,) (a .: "address") (a .: "balance")    
+  parseJSON x = error $ "couldn't parse JSON for account balance: " ++ show x
+
+instance ToJSON AccountBalance where
+  toEncoding (AccountBalance (addr, bal)) =
+      pairs (
+        "address" .= addr <>
+        "balance" .= bal
+      )  
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
@@ -40,7 +56,7 @@ instance FromJSON ChainInfo where
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    o .: "accountBalance"
+    (map unAccountBalance <$> (o .: "accountBalance"))
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
@@ -50,7 +66,7 @@ instance ToJSON ChainInfo where
       "addRule" .= ar <>
       "removeRule" .= rr <>
       "members" .= ms <>
-      "accountBalance" .= ab
+      "accountBalance" .= (map AccountBalance ab)
     )
 
 instance RLPSerializable ChainInfo where
@@ -69,3 +85,19 @@ instance RLPSerializable ChainInfo where
       (rlpDecode <$> ms)
       (rlpDecode <$> ab)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
+
+newtype ChainIdChainInfo = ChainIdChainInfo {
+    unChainIdChainInfo :: (Word256, ChainInfo)
+} deriving (Eq, Read, Show, GHCG.Generic)
+
+instance FromJSON ChainIdChainInfo where
+  parseJSON (Object a) =
+    ChainIdChainInfo <$> liftA2 (,) (a .: "chainId") (a .: "chainInfo")
+  parseJSON x = error $ "couldn't parse JSON for (chainId, chainInfo): " ++ show x
+
+instance ToJSON ChainIdChainInfo where
+  toEncoding (ChainIdChainInfo (cid, cinfo)) =
+    pairs (
+      "chainId" .= cid <>
+      "chainInfo" .= cinfo
+    )
