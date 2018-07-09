@@ -35,7 +35,7 @@ build_haskell: prebuild build_buildbase
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy
-	cp -f licenses/* ${LICENSE_SOURCE_DIR}
+	cp -f licenses/* ${LICENSE_DIR}
 	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
 	rm -f /tmp/docker-dummy/Dockerfile.deploybase
 
