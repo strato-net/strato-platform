@@ -106,11 +106,6 @@ Test-suite test-suite
     other-modules:
         --Blockchain.Strato.RedisBlockDB.RedisBlockDBSpec
         Blockchain.Strato.RedisBlockDB.Chain
-        Blockchain.Strato.Model.BlockHeaderModel
-        Blockchain.Strato.Model.BlockModel
-        Blockchain.Strato.Model.BlockchainClassSpec
-        Blockchain.Strato.Model.Constants
-        Blockchain.Strato.Model.TransactionModel
 
     build-depends: base
                  , aeson
