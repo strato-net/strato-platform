@@ -125,17 +125,17 @@ describe('File', function () {
       _contractAddress = result.body.contractAddress;
     });
 
-    it('replies 500', async function () {
+    it('replies 400 with incorrect password', async function () {
       let res = await chai.request(app)
         .post('/bloc/file/upload')
         .field('username', 'test18@test.com')
-        .field('address', '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad')
-        .field('password', 'password')
+        .field('address', accountAddress)
+        .field('password', 'passwo')
         .field('metadata', 'Nature Pics')
         .field('provider', 's3')
         .attach('content', './test/testdata/testImage.png')
         .type('form').catch(error => {
-          assert.equal(error.message, 'Internal Server Error')
+          assert.equal(error.status, '400');
         })
     });
 

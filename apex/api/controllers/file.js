@@ -7,6 +7,7 @@ const s3 = require('../lib/s3');
 const uploader = require('../lib/uploader');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const crypto = require('crypto');
+var rp = require('request-promise');
 
 module.exports = {
   upload: function (req, res, next) {
@@ -32,6 +33,25 @@ module.exports = {
         Key: `${Date.now()}-${req.file.originalname}`,
         Body: req.file.buffer,
       };
+
+      const options = {
+        method: 'POST',
+        uri: `${process.env.blocRoot}/users/${username}/${address}/send?resolve`,
+        body: {
+          value: 1,
+          password: password,
+          toAddress: address
+        },
+        json: true
+      };
+
+      try {
+        yield rp.post(options);
+      } catch (error) {
+        let err = new Error(error.message);
+        err.status = 400;
+        return next(err);
+      }
 
       const uploadedFile = yield uploader.upload(params);
 
