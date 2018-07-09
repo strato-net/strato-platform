@@ -1,11 +1,8 @@
-{-# OPTIONS -fno-warn-orphans #-}
-
 module Blockchain.Sequencer.DB.SeenBlockDB where
 
 import           Blockchain.Sequencer.Event    (OutputBlock(..))
 import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.SHA
-import           Blockchain.Strato.Model.Class (blockHeaderHash)
 
 import           Control.Monad.Trans.Resource
 
@@ -26,9 +23,6 @@ mkSeenBlockDB dbSize = SeenBlockDB { size       = dbSize
                                    , clearQueue = Q.empty
                                    , seen       = M.empty
                                    }
-
-instance Witnessable OutputBlock where
-    witnessableHash = blockHeaderHash . obBlockData
 
 class (MonadResource m) => HasSeenBlockDB m where
     getSeenBlockDB :: m SeenBlockDB

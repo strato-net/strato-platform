@@ -212,6 +212,9 @@ instance Witnessable IngestTx where
 instance Witnessable OutputTx where
     witnessableHash = otHash
 
+instance Witnessable OutputBlock where
+    witnessableHash = blockHeaderHash . obBlockData
+
 instance Eq SequencedBlock where
     a == b = sbHash a == sbHash b
 
