@@ -175,7 +175,7 @@ runTest test = do
              blockDataGasUsed = 0, --error "gasUsed not set",
              blockDataTimestamp = currentTimestamp . env $ test,
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
-             blockDataExtraData = 0, --error "extraData not set",
+             blockDataExtraData = "", --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
              blockDataMixHash=SHA 0 --error "mixHash not set"
              },

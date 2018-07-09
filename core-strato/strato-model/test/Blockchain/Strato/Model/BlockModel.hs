@@ -25,9 +25,6 @@ module Blockchain.Strato.Model.BlockModel
 
 import           Data.Bits
 
-import qualified Data.Map                                 as M
-import           Data.Maybe
-
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 
@@ -35,7 +32,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.BlockHeaderModel
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Constants
-import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.TransactionModel
 
 type Difficulty = Integer
@@ -94,14 +90,6 @@ homesteadNextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
         if periodCount > 1
         then 2^(periodCount - 2)
         else 0
-
-addDifficulties::M.Map SHA Integer->[(SHA, Integer, SHA)]->M.Map SHA Integer
-addDifficulties dm [] = dm
-addDifficulties dm ((hash', blockDifficulty, parentHash'):rest) =
-  let parentDifficulty = fromMaybe (error $ "missing hash in difficulty map in addDifficulties: " ++ (show parentHash') ++ ", hash=" ++ (show hash')) $ M.lookup parentHash' dm
-      dm' = M.insert hash' (parentDifficulty + blockDifficulty) dm
-  in addDifficulties dm' rest
-
 
 instance RLPSerializable Block where
   rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles]) =
