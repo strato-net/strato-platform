@@ -82,8 +82,9 @@ sequencer = forever $ do
     unless (Q.length p2pEvs == 0) $ do
       writeSeqP2pEvents' $ toList p2pEvs
       $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-    let ofs = maximum $ map fst inEvents
-    setNextIngestedOffset ofs
+    unless (null inEvents) $ do
+      let ofs = maximum $ map fst inEvents
+      setNextIngestedOffset ofs
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock
