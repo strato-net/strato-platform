@@ -27,9 +27,9 @@ module.exports = {
   SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
   s3: {
     bucket: {
-      Bucket: process.env.awsBucketName || "strato-external-storage"
+      Bucket: process.env.awsBucketName
     },
-    accessKeyId: process.env.awsAccessKeyId || "AKIAJWOO7U4OR4YY6ZOA",
-    secretAccessKey: process.env.awsSecretAccessKey || "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"
+    accessKeyId: process.env.awsAccessKeyId,
+    secretAccessKey: process.env.awsSecretAccessKey
   }
 };

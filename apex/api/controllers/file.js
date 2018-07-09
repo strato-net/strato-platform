@@ -34,6 +34,8 @@ module.exports = {
         Body: req.file.buffer,
       };
 
+      // Checking if the username/password pair is correct
+      // TODO: this is the only way to find out if credentials are correct but it costs some wei - change this request once there's another way in our APIs
       const options = {
         method: 'POST',
         uri: `${process.env.blocRoot}/users/${username}/${address}/send?resolve`,
