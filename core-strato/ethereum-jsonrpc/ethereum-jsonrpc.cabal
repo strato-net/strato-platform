@@ -29,6 +29,7 @@ executable ethereum-jsonrpc
                      , mtl
                      , random
                      , strato-conf
+                     , strato-model
                      , strato-sequencer
                      , text
                      , unordered-containers

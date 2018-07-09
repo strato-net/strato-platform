@@ -32,6 +32,7 @@ executable test-suite-exe
                  , monad-logger
                  , mtl
                  , nibblestring
+                 , strato-model
                  , strato-sequencer
                  , text
                  , time

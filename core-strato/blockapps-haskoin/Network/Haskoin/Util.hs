@@ -56,7 +56,7 @@ module Network.Haskoin.Util
 ) where
 
 import Control.Monad (guard)
-import Control.Monad.Trans.Either (EitherT, hoistEither)
+import Control.Monad.Trans.Except (ExceptT(..))
 import Control.Monad.State (MonadState, get, put)
 
 import Data.Word (Word8)
@@ -237,12 +237,12 @@ eitherToMaybe _ = Nothing
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m
 
--- | Lift a Either computation into the EitherT monad
-liftEither :: Monad m => Either b a -> EitherT b m a
-liftEither = hoistEither
+-- | Lift a Either computation into the ExceptT monad
+liftEither :: Monad m => Either b a -> ExceptT b m a
+liftEither = ExceptT . return
 
--- | Lift a Maybe computation into the EitherT monad
-liftMaybe :: Monad m => b -> Maybe a -> EitherT b m a
+-- | Lift a Maybe computation into the ExceptT monad
+liftMaybe :: Monad m => b -> Maybe a -> ExceptT b m a
 liftMaybe err = liftEither . (maybeToEither err)
 
 -- Various helpers

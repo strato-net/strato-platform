@@ -1,14 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS -fno-warn-warnings-deprecations #-}
 module Blockchain.Strato.Model.SHA where
 
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.Util
 import           Control.Monad                        (replicateM)
-import qualified Crypto.Hash.SHA3                     as SuperProprietaryWrongFuckingHash
+import           Crypto.Hash                          (Digest, hash)
+import           Crypto.Hash.Algorithms               (Keccak_256, Keccak_512)
 import qualified Data.Aeson                           as Ae
 import qualified Data.Aeson.Encoding                  as Enc
 import           Data.Binary
+import           Data.ByteArray                       (convert)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as S8
@@ -49,4 +50,10 @@ shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
 superProprietaryStratoSHAHash :: S8.ByteString -> SHA
-superProprietaryStratoSHAHash = SHA . fromIntegral . byteString2Integer . SuperProprietaryWrongFuckingHash.hash 256
+superProprietaryStratoSHAHash = SHA . fromIntegral . byteString2Integer . keccak256
+
+keccak256 :: S8.ByteString -> S8.ByteString
+keccak256 bs = convert (hash bs :: Digest Keccak_256)
+
+keccak512 :: S8.ByteString -> S8.ByteString
+keccak512 bs = convert (hash bs :: Digest Keccak_512)

@@ -17,9 +17,8 @@ import           Data.Typeable             (Typeable)
 import           Data.Word                 (Word8)
 
 import           Blockchain.ExtendedECDSA  (ExtendedSignature, extSignMsg)
+import           Blockchain.Strato.Model.SHA (keccak256)
 
-
-import qualified Crypto.Hash.SHA3          as SHA3
 import           Crypto.Types.PubKey.ECC   (Point (..))
 import           Network.Haskoin.Crypto    (Word256)
 import qualified Network.Haskoin.Internals as H
@@ -40,7 +39,7 @@ add :: B.ByteString
     -> B.ByteString
     -> Either DiscoverException B.ByteString
 add acc val
-  | B.length acc == 32 && B.length val == 32 = Right $ SHA3.hash 256 $ val `B.append` acc
+  | B.length acc == 32 && B.length val == 32 = Right $ keccak256 $ val `B.append` acc
   | otherwise = Left $ ByteStringLengthException $ "Expected length 32 summands, got " ++
       show (B.length acc, B.length val)
 
