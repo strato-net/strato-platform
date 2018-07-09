@@ -21,6 +21,8 @@ then
     git clone --single-branch --branch v${VERSION} https://github.com/ethereum/solidity ${SOURCE_OUTPUT_DIR}
 else
     cd ${SOURCE_OUTPUT_DIR}
-    git pull https://github.com/ethereum/solidity v${VERSION}
+    git pull https://github.com/ethereum/solidity v${VERSION} ||
+      rm -rf ${SOURCE_OUTPUT_DIR}/* &&
+      git clone --single-branch --branch v${VERSION} https://github.com/ethereum/solidity ${SOURCE_OUTPUT_DIR}
 fi
 
