@@ -49,14 +49,9 @@ import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Aeson.TH                as AT
 import qualified Data.Binary                  as Binary
---import qualified Data.ByteString              as B
---import qualified Data.ByteString.Char8        as C8
---import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Lazy         as Lazy
---import qualified Data.Bits                    as Bits
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
---import           Data.List
 import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
@@ -72,7 +67,6 @@ import           Data.Time
 import           Data.Word
 import           Generic.Random.Generic
 import           GHC.Generics
---import           Network.Socket.Internal
 import           Numeric
 import           Numeric.Natural
 import           Servant.API
