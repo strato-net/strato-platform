@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
 
 module Blockchain.ECIES (
   decrypt,
@@ -6,22 +7,22 @@ module Blockchain.ECIES (
   theCurve
   ) where
 
-import           Codec.Utils
-import           Control.Monad
-import           Crypto.Cipher.AES
-import           Crypto.Hash.SHA256
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Types.PubKey.ECC
-import           Data.Binary
-import           Data.Binary.Get
-import           Data.Binary.Put
-import           Data.Bits
-import qualified Data.ByteString         as B
-import qualified Data.ByteString.Lazy    as BL
-import           Data.HMAC
-import           System.Entropy
+import                 Codec.Utils
+import                 Control.Monad
+import "cipher-aes"    Crypto.Cipher.AES
+import                 Crypto.Hash.SHA256
+import "crypto-pubkey" Crypto.PubKey.ECC.DH
+import                 Crypto.Types.PubKey.ECC
+import                 Data.Binary
+import                 Data.Binary.Get
+import                 Data.Binary.Put
+import                 Data.Bits
+import qualified       Data.ByteString         as B
+import qualified       Data.ByteString.Lazy    as BL
+import                 Data.HMAC
+import                 System.Entropy
 
-import           Blockchain.ExtWord
+import                 Blockchain.ExtWord
 
 theCurve :: Curve
 theCurve = getCurveByName SEC_p256k1

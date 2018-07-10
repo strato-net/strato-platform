@@ -49,4 +49,4 @@ library
                       , OverloadedStrings
                       , TypeFamilies
                       , ViewPatterns
-  ghc-options:        -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-orphans -fno-warn-unused-imports
+  ghc-options:        -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports

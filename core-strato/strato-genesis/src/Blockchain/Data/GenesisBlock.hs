@@ -13,6 +13,7 @@ module Blockchain.Data.GenesisBlock (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
+import           Crypto.Util                          (i2bs_unsized)
 
 import           Blockchain.Database.MerklePatricia
 
@@ -110,7 +111,7 @@ genesisInfoToGenesisBlock gi = do
             blockDataGasLimit = genesisInfoGasLimit gi,
             blockDataGasUsed = genesisInfoGasUsed gi,
             blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = genesisInfoExtraData gi,
+            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
             blockDataNonce = genesisInfoNonce gi
         },

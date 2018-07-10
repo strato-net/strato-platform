@@ -39,6 +39,7 @@ library
                  , ansi-wl-pprint
                  , containers
                  , mtl
+                 , strato-model
     exposed-modules: Blockchain.Database.MerklePatricia
                    , Blockchain.Database.MerklePatriciaMem
                    , Blockchain.Database.KeyVal
@@ -76,6 +77,7 @@ Test-Suite test-merkle-patricia-db
                   , HUnit
                   , containers
                   , blockapps-util
+                  , strato-model
                   , aeson
                   , mtl
                   , hspec

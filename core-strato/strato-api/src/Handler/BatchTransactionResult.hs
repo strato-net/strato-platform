@@ -8,7 +8,6 @@ import           Data.Aeson.Encoding
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 import           Handler.Common
-import           Handler.Filters (fromHexText)
 import           Import
 import           Numeric         (readHex)
 import qualified Prelude         as P
