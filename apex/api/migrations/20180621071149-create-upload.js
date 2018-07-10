@@ -9,9 +9,15 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       contractAddress: {
+        allowNull: false,
         type: Sequelize.STRING
       },
       uri: {
+        allowNull: false,
+        type: Sequelize.STRING
+      },
+      hash: {
+        allowNull: false,
         type: Sequelize.STRING
       },
       createdAt: {
