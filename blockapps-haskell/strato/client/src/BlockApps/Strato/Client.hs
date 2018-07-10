@@ -129,7 +129,7 @@ getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
-postChain :: GenesisInfo -> ClientM Text
+postChain :: ChainInfo -> ClientM Text
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
