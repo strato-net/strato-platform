@@ -7,6 +7,7 @@ import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { isModePublic } from '../../lib/checkMode';
+import { isS3Available } from '../../lib/checkS3Credentials';
 
 class SideBar extends Component {
 
@@ -47,7 +48,7 @@ class SideBar extends Component {
               </NavLink>
             )
           }
-          {!isModePublic() &&
+          {isS3Available() && !isModePublic() &&
             <NavLink
               id={'external_storage'}
               to={'/external_storage'}

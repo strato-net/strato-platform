@@ -27,9 +27,9 @@ module.exports = {
   SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
   s3: {
     bucket: {
-      Bucket: process.env.awsBucketName
+      Bucket: process.env.EXT_STORAGE_S3_BUCKET
     },
-    accessKeyId: process.env.awsAccessKeyId,
-    secretAccessKey: process.env.awsSecretAccessKey
+    accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
   }
 };

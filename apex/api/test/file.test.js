@@ -51,14 +51,14 @@ describe('File', function () {
     app = require('../app');
 
     await models.TempUser.create({
-      email: 'test18@test.com',
+      email: 'test01@test.com',
       password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
       verified: true
     });
     const res1 = await chai.request(app)
       .post('/users')
       .send({
-        username: "test18@test.com",
+        username: "test01@test.com",
         password: "password"
       });
 
@@ -111,9 +111,9 @@ describe('File', function () {
     });
 
     it('replies 200 with file uplaod and data entry', async function () {
-      let result = await chai.request(app)
+      const result = await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'test18@test.com')
+        .field('username', 'test01@test.com')
         .field('address', accountAddress)
         .field('password', 'password')
         .field('metadata', 'Nature Pics')
@@ -122,13 +122,14 @@ describe('File', function () {
         .type('form')
 
       expect(result).to.have.status(200);
+      // all the below testcases are dependent on contractAddress assigned here
       _contractAddress = result.body.contractAddress;
     });
 
     it('replies 400 with incorrect password', async function () {
-      let res = await chai.request(app)
+      await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'test18@test.com')
+        .field('username', 'test01@test.com')
         .field('address', accountAddress)
         .field('password', 'passwo')
         .field('metadata', 'Nature Pics')
@@ -139,12 +140,40 @@ describe('File', function () {
         })
     });
 
+    describe('rejects', async function () {
+
+      beforeEach(function () {
+        sinon.stub(externalStorage, 'uploadContract').rejects('Internal server error');
+      });
+
+      afterEach(function () {
+        externalStorage.getExternalStorage.restore();
+      })
+
+      it('throws 500', async function () {
+        await chai.request(app)
+          .post('/bloc/file/upload')
+          .field('username', 'test01@test.com')
+          .field('address', accountAddress)
+          .field('password', 'password')
+          .field('metadata', 'Nature Pics')
+          .field('provider', 's3')
+          .attach('content', './test/testdata/testImage.png')
+          .type('form')
+          .catch((err) => {
+            const res = err.response;
+            assert.equal(res.status, '500');
+          });
+      });
+
+    });
+
   });
 
   describe('get /bloc/file/list', async function () {
 
     it('replies 200 with list of uploads', async function () {
-      let res = await chai.request(app)
+      const res = await chai.request(app)
         .get('/bloc/file/list')
 
       assert.equal(res.status, '200');
@@ -200,7 +229,7 @@ describe('File', function () {
       });
 
       it('replies 200 with data exists', async function () {
-        let res = await chai.request(app)
+        const res = await chai.request(app)
           .get('/bloc/file/verify')
           .query({
             'contractAddress': _contractAddress
@@ -222,7 +251,7 @@ describe('File', function () {
       })
 
       it('throws 500', async function () {
-        let res = await chai.request(app)
+        await chai.request(app)
           .get('/bloc/file/verify')
           .query({
             'contractAddress': _contractAddress
@@ -287,7 +316,7 @@ describe('File', function () {
       });
 
       it('replies 200 with valid data', async function () {
-        let res = await chai.request(app)
+        const res = await chai.request(app)
           .post('/bloc/file/attest')
           .send({
             contractAddress: _contractAddress,
@@ -304,7 +333,7 @@ describe('File', function () {
       });
 
       it('replies 400 with signer already exists', async function () {
-        let res = await chai.request(app)
+        await chai.request(app)
           .post('/bloc/file/attest')
           .send({
             contractAddress: _contractAddress,
@@ -331,7 +360,7 @@ describe('File', function () {
       })
 
       it('throws 500', async function () {
-        let res = await chai.request(app)
+        await chai.request(app)
           .post('/bloc/file/attest')
           .send({
             contractAddress: _contractAddress,
@@ -397,7 +426,7 @@ describe('File', function () {
       });
 
       it('replies 200 with data exists', async function () {
-        let res = await chai.request(app)
+        const res = await chai.request(app)
           .get('/bloc/file/download')
           .query({
             'contractAddress': _contractAddress
@@ -409,7 +438,6 @@ describe('File', function () {
     });
 
     describe('rejects', async function () {
-      let storage;
 
       beforeEach(function () {
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
