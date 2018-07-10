@@ -26,6 +26,8 @@ bloc = (return gitInfo)
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
+  :<|> getUsersKeyStore
+  :<|> postUsersKeyStore
   :<|> postUsersFill
   :<|> postUsersSend
   :<|> postUsersContract
