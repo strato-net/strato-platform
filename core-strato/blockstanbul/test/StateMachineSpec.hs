@@ -40,8 +40,16 @@ testContext = BlockstanbulContext
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext
 
-sendMessages :: (StateMachineM m) => [InEvent] -> m [OutEvent]
-sendMessages wms = runConduit (yieldMany wms .| eventLoop .| sinkList)
+sendMessages :: [InEvent] -> StateT BlockstanbulContext IO [OutEvent]
+sendMessages wms = do
+  -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
+  -- Every run of the conduit has one, but the test itself also preserves the context
+  -- between runs.
+  ctx <- get
+  let base = yieldMany wms .| eventLoop ctx
+  (ctx', evs) <- runConduit $ fuseBoth base sinkList
+  put ctx'
+  return evs
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk as = do

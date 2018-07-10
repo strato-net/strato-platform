@@ -17,7 +17,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
-type StateMachineM m = (MonadIO m, MonadState BlockstanbulContext m)
+type StateMachineM m = (MonadState BlockstanbulContext m)
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 
@@ -99,8 +99,8 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-eventLoop :: (StateMachineM m) => Conduit InEvent m OutEvent
-eventLoop = awaitForever $ \ev -> do
+eventLoop :: (Monad m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
+eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of

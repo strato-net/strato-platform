@@ -8,6 +8,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - containers
+  - conduit
   - conduit-combinators
   - crypto-api
   - ethereum-encryption
