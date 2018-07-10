@@ -14,7 +14,6 @@ import           Control.Monad                     (liftM)
 import           Data.Aeson
 import qualified Data.ByteString.Lazy              as L
 import qualified Data.Map                          as Map
-import           Data.Maybe                        (catMaybes)
 import qualified Network.Kafka                     as K
 import qualified Network.Kafka.Producer            as KW
 import qualified Network.Kafka.Protocol            as KP
@@ -23,7 +22,6 @@ import           Blockchain.KafkaTopics            (lookupTopic)
 
 import           Blockchain.Strato.StateDiff
 import           Blockchain.Strato.StateDiff.Event
-import           Blockchain.Stream.Raw             (fetchBytes, setDefaultKafkaState)
 
 stateDiffTopicName :: KP.TopicName
 stateDiffTopicName = lookupTopic "statediff"

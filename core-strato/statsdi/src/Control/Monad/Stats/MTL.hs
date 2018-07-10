@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Control.Monad.Stats.MTL
     ( MonadStats
-    , StatsT(..)
+    , StatsT
     , runStatsT
     , runNoStatsT
     , tick

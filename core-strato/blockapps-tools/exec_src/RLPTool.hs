@@ -1,5 +1,4 @@
 
-import qualified Crypto.Hash.SHA3 as SHA3
 import Data.Binary
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -10,6 +9,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import Blockchain.Format
+import Blockchain.Strato.Model.SHA  (keccak256)
 
 getColumn::Int->[String]->String
 getColumn i inputColumns = inputColumns !! i
@@ -54,11 +54,11 @@ main = do
                                getColumn 1,
                                getColumn 2,
                                getColumn 3,
-                               format . SHA3.hash 256 . fst . B16.decode . BC.pack . getColumn 0
+                               format . keccak256 . fst . B16.decode . BC.pack . getColumn 0
                                ]) contents
 
 
-  
+
 --  putStrLn $ unlines $ map (getOutput [getColumn 0, unlines . map showIt . rlpMap getTransaction . getAtRLPArray 0 . decodeBase16 . getColumn 1]) contents
 --  putStrLn $ unlines $ map (getOutput [getColumn 0, decodeRLP . getAtRLPArray 0 . decodeBase16 . getColumn 1, show . rlpMap getTransaction . getAtRLPArray 0 . decodeBase16 . getColumn 1]) contents
 --  putStrLn $ unlines $ map (getOutput [getColumn 0, decodeRLP . decodeBase16 . getColumn 1]) contents

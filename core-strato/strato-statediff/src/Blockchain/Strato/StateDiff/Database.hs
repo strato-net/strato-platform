@@ -25,11 +25,8 @@ import           Blockchain.Util
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class                   (lift)
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                                    as Map
-import Data.Time.Clock
-import Data.Time.Clock.POSIX
 
 import           Blockchain.Strato.StateDiff
 
@@ -59,8 +56,8 @@ createAccount chainId blockNumber codeSource codeContractName addressDiffs = do
         name' = codeContractName $ codeHash diff
     return $ addrRef address diff src name'
   addrIDs <- SQL.insertMany newAccounts
-  
-  newStorage <- 
+
+  newStorage <-
     forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
       let (_, diff) = addressDiff
       return [Storage addrID k v | (k, Value v) <- Map.toList $ storage diff]

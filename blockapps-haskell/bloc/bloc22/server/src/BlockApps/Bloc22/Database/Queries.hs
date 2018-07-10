@@ -9,9 +9,6 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
--- TODO(tim): Replace runInsertReturning with runInsertManyReturning
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
 module BlockApps.Bloc22.Database.Queries where
 
 

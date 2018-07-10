@@ -25,9 +25,10 @@ library
                       , ethereum-rlp
                       , binary
                       , bytestring
+                      , cryptonite
                       , path-pieces
+                      , memory
                       , nibblestring
-                      , cryptohash
                       , blockapps-haskoin
                       , text
                       , time
@@ -44,7 +45,7 @@ library
                       , LambdaCase
                       , RecordWildCards
                       , FunctionalDependencies
-  ghc-options:        -Wall -Werror -fno-warn-warnings-deprecations
+  ghc-options:        -Wall -Werror
 
 test-suite strato-model-test
     type: exitcode-stdio-1.0

@@ -2,10 +2,6 @@
 
 module Main where
 
-import Data.Functor
-import Data.List
-import Data.Monoid
-import System.Exit
 import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.HUnit
@@ -18,8 +14,8 @@ testNumber = do
   assertEqual "rlp encoding failed for small number" (rlpDecode $ rlpDeserialize $ rlpSerialize $ rlpEncode n) n
 
 main::IO ()
-main = 
-  defaultMainWithOpts 
+main =
+  defaultMainWithOpts
   [
    testCase "test RLP number encoding" testNumber
   ] mempty
