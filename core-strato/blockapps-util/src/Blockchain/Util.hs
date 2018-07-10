@@ -6,7 +6,6 @@ import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
 import           Data.Char
-import           Data.List
 import qualified Data.Map.Strict          as M
 import qualified Data.NibbleString        as N
 import           Data.Word

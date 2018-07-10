@@ -24,7 +24,6 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Format
 import           Blockchain.SHA
-import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Monad                               (when)
@@ -36,7 +35,6 @@ import           Data.Maybe
 import           Data.String
 
 import           Data.ByteString                             (ByteString)
-import qualified Data.ByteString                             as BS
 
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
