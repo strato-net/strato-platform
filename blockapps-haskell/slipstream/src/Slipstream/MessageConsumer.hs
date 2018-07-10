@@ -9,19 +9,19 @@ module Slipstream.MessageConsumer where
 import Control.Monad.Reader
 import Data.Aeson hiding (Error)
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import Slipstream.Events hiding (Address)
+--import qualified Data.ByteString.Lazy.Char8 as BLC
+--import Slipstream.Events hiding (Address)
 import GHC.Generics
 import qualified Data.Map as M
 import qualified Data.ByteString as B
 import Network.Kafka
 import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
-import Control.Monad.Trans.State.Lazy    (StateT(..))
+--import Control.Monad.Trans.State.Lazy    (StateT(..))
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
-import HFlags
+--import HFlags
 import Slipstream.Options
 import Data.List
 import Slipstream.Processor
@@ -60,7 +60,7 @@ makeKafkaState cid addy =
 
 mkConfiguredKafkaState :: KafkaClientId -> KafkaState
 mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
-  where k = defaultKafkaConfig 
+  where k = defaultKafkaConfig
         kh = fromString $ kafkaHost k
         kp = fromIntegral $ kafkaPort k
 

@@ -16,13 +16,13 @@ import HFlags
 import Data.Time
 import Slipstream.MessageConsumer
 import Slipstream.OutputData
---import Slipstream.Options
+import Slipstream.Options ()
 
 main::IO ()
 main = do
+  _ <- $initHFlags "Setup Slipstream Variables"
   currentTime <- getCurrentTime
   liftIO $ putStrLn $ "Main -> " ++ show(currentTime)
-  _ <- $initHFlags "Setup Slipstream Variables"
 
   --Indexing on
   let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); CREATE INDEX IF NOT EXISTS idx ON contract (\"codeHash\"); COMMIT;"

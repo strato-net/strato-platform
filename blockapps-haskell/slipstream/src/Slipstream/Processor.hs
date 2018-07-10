@@ -15,10 +15,10 @@ import           Control.Monad.Except
 import           Control.Monad.Log                  hiding (Handler)
 import           Control.Monad.Reader
 import Data.Aeson hiding (Error)
-import qualified Data.ByteString.Char8 as BC
+--import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.ByteString.Base16 as B16
+--import qualified Data.ByteString.Lazy.Char8 as BLC
+--import qualified Data.ByteString.Base16 as B16
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -42,34 +42,34 @@ import BlockApps.SolidityVarReader
 
 import Slipstream.Events hiding (Address)
 
-import Debug.Trace
-import GHC.Generics
-import Control.Exception
-import GHC.Int
+--import Debug.Trace
+--import GHC.Generics
+--import Control.Exception
+--import GHC.Int
 
-import qualified Data.Map as M
-import qualified Data.HashMap.Strict as H
-import qualified Data.Aeson as A
+--import qualified Data.Map as M
+--import qualified Data.HashMap.Strict as H
+--import qualified Data.Aeson as A
 import qualified Data.ByteString as B
-import qualified Data.Text as T
-import Database.PostgreSQL.Typed
-import Database.PostgreSQL.Typed.Query
-import Network
-import Network.Kafka
-import Network.Kafka.Consumer
-import qualified Network.Kafka.Protocol as K hiding (Message)
-import Control.Monad.Trans.State.Lazy    (StateT(..))
-import qualified Data.List.NonEmpty as NE
-import Data.String
-import Control.Lens
+--import qualified Data.Text as T
+--import Database.PostgreSQL.Typed
+--import Database.PostgreSQL.Typed.Query
+--import Network
+--import Network.Kafka
+--import Network.Kafka.Consumer
+--import qualified Network.Kafka.Protocol as K hiding (Message)
+--import Control.Monad.Trans.State.Lazy    (StateT(..))
+--import qualified Data.List.NonEmpty as NE
+--import Data.String
+--import Control.Lens
 import HFlags
 import Slipstream.Options
-import System.IO.Unsafe
-import qualified Data.Vector as V
-import Language.Haskell.TH.Syntax
-import Language.Haskell.TH.Lib
-import Data.List
-import Data.Time
+--import System.IO.Unsafe
+--import qualified Data.Vector as V
+--import Language.Haskell.TH.Syntax
+--import Language.Haskell.TH.Lib
+--import Data.List
+--import Data.Time
 
 import Slipstream.OutputData
 
