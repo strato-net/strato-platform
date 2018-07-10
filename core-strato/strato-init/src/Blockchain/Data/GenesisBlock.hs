@@ -12,6 +12,7 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
+import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.JsonStream.Parser               as JS
@@ -197,7 +198,7 @@ genesisInfoToGenesisBlock gi gn as = do
             blockDataGasLimit = genesisInfoGasLimit gi,
             blockDataGasUsed = genesisInfoGasUsed gi,
             blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = genesisInfoExtraData gi,
+            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
             blockDataNonce = genesisInfoNonce gi
         },

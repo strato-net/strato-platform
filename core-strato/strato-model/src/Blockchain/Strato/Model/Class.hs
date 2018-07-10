@@ -2,7 +2,6 @@ module Blockchain.Strato.Model.Class where
 
 import qualified Data.ByteString                 as B
 import           Data.Time
--- import           Data.Time.Clock.POSIX
 import           Data.Word
 
 import           Blockchain.Data.RLP
@@ -41,7 +40,7 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderGasUsed          :: h -> Integer -- todo: ditto
     blockHeaderDifficulty       :: h -> Integer
     blockHeaderNonce            :: h -> Word64 -- todo: nonce newtype
-    blockHeaderExtraData        :: h -> Integer -- todo: extradata newtype
+    blockHeaderExtraData        :: h -> B.ByteString -- todo: extradata newtype
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
 

@@ -3,7 +3,7 @@
   "blockUncles":[],
   "receiptTransactions":[],
   "blockData":{
-    "extraData":0,
+    "extraData":"",
     "gasUsed":0,
     "gasLimit":195271942704008643674781994909976,
     "kind":"BlockData",

@@ -985,7 +985,7 @@ getFromSelector sel isRunningTests' b codeHash = do
             blockDataGasLimit = 10000000000000000000,
             blockDataGasUsed = 0,
             blockDataTimestamp = posixSecondsToUTCTime 0,
-            blockDataExtraData = 0,
+            blockDataExtraData = "",
             blockDataNonce = 0,
             blockDataMixHash = SHA 0
             },

@@ -29,6 +29,7 @@ executable strato-setup
                  , strato-index
                  , bytestring
                  , containers
+                 , crypto-api
                  , directory
                  , entropy
                  , ethereum-discovery
