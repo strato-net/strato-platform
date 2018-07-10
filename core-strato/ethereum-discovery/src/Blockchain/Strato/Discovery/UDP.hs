@@ -27,7 +27,6 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import qualified Crypto.Hash.SHA3                      as SHA3
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
@@ -51,6 +50,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
+import           Blockchain.Strato.Model.SHA           (keccak256)
 import           Blockchain.Util
 
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -219,7 +219,7 @@ sendPacket sock prv addr packet = do
       r' = H.sigR signature'
       s' = H.sigS signature'
       theSignature = word256ToBytes (fromIntegral r') ++ word256ToBytes (fromIntegral s') ++ [v']
-      theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType'] ++ theData
+      theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType'] ++ theData
 
   _ <- liftIO $ NB.sendTo sock ( B.pack $ theHash ++ theSignature ++ [theType'] ++ theData) addr
   return ()
@@ -309,7 +309,7 @@ getServerPubKey myPriv domain port =
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-          theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
+          theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType] ++ theData
 
       _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
 
@@ -342,7 +342,7 @@ findNeighbors myPriv domain port =
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-          theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
+          theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType] ++ theData
 
       _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
 

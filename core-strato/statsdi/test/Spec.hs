@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 import           Control.Concurrent
 import           Control.Monad
@@ -11,7 +12,6 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Char8   as Char8
 import           Data.Char               (isNumber)
-import           Data.Proxy
 import           Data.Time.Clock.POSIX
 
 import           Harness
@@ -19,10 +19,6 @@ import           Harness
 import           Test.Hspec
 import           Test.Tasty
 import           Test.Tasty.Hspec
-import           Test.Tasty.Options      (OptionDescription (..))
-import           Test.Tasty.Runners      (NumThreads (..))
-
-import Debug.Trace (traceShowId)
 
 -- these tests effectively test the TH for sanity
 -- otherwise the test suite wouldnt even compile
@@ -124,7 +120,8 @@ timerTests = describe "A Timer" $ do
         capture `shouldSatisfy` (not . null)
         capture `shouldSatisfy` (isRoughlyMillis 250 10 . head)
 
-        where isRoughlyMillis target leeway bs = abs (actual - target) <= leeway
+        where isRoughlyMillis :: Int -> Int -> Char8.ByteString -> Bool
+              isRoughlyMillis target leeway bs = abs (actual - target) <= leeway
                     where actual = read pluckedTime
                           pluckedTime = takeWhile isNumber nameStripped
                           nameStripped = drop (ByteString.length (timerName time_test) + 1) (Char8.unpack bs)

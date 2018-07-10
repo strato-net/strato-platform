@@ -6,11 +6,9 @@
 module Control.Monad.Stats.Types where
 
 import           Control.Concurrent.STM (TMVar)
-import           Control.Monad.Ether
 import           Control.Monad.IO.Class
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
-import qualified Data.ByteString.Char8  as Char8
 import           Data.Dequeue
 import           Data.Hashable
 import           Data.HashMap.Strict    (HashMap)
@@ -66,11 +64,11 @@ keyTags (HistogramKey m) = histogramTags m
 keyTags (SetKey m)       = setTags m
 
 keyKind :: MetricStoreKey -> ByteString
-keyKind (CounterKey m)   = "|c"
-keyKind (GaugeKey m)     = "|g"
-keyKind (TimerKey m)     = "|ms"
-keyKind (HistogramKey m) = "|h"
-keyKind (SetKey m)       = "|s"
+keyKind (CounterKey _)   = "|c"
+keyKind (GaugeKey _)     = "|g"
+keyKind (TimerKey _)     = "|ms"
+keyKind (HistogramKey _) = "|h"
+keyKind (SetKey _)       = "|s"
 
 data Counter = Counter { counterName :: !ByteString, counterTags :: !Tags }
     deriving (Eq, Ord, Read, Show, Generic, Typeable)

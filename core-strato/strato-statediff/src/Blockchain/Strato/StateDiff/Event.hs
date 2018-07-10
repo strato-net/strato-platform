@@ -5,15 +5,12 @@ module Blockchain.Strato.StateDiff.Event
     ) where
 
 import           Data.Aeson
-import           Data.Aeson.Types                (typeMismatch)
 import           Data.Binary
 import           Data.Binary.Put                 (putLazyByteString)
-import qualified Data.HashMap.Strict             as H
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import qualified Data.Text                       as T
 
-import           Blockchain.Format
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.StateDiff
 

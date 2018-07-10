@@ -1,11 +1,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.Util where
 
+import           Control.Monad.State.Lazy           (State, execState, get, put)
 import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
 import           Data.Char
-import           Data.List
+import qualified Data.Map.Strict          as M
 import qualified Data.NibbleString        as N
 import           Data.Word
 import           Numeric
@@ -16,6 +17,20 @@ import           Data.Ratio               (numerator)
 import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import qualified Data.Binary              as Binary
+
+buildState :: s -> [a] -> (a -> State s ()) -> s
+buildState s [] _ = s
+buildState s (a:as) run =
+  let s' = execState (run a) s
+   in buildState s' as run
+
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
+partitionWith f as = M.toList . buildState M.empty as $ \a -> do
+  s <- get
+  let k = f a
+  case M.lookup k s of
+    Nothing -> put (M.insert k [a] s)
+    Just _  -> put (M.update (Just . (++ [a])) k s)
 
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput

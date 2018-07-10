@@ -43,5 +43,5 @@ instance Binary TXOrigin where
 
 instance Format TXOrigin where
     format (BlockHash sha) = "BlockHash " ++ shaToHex sha
-    format (PeerString p ) = "Peer " ++ p
+    format (PeerString p ) = "Peer " ++ show p
     format               x = show x

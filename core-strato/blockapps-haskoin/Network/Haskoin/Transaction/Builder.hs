@@ -21,7 +21,7 @@ module Network.Haskoin.Transaction.Builder
 
 import Control.Monad (mzero, foldM, unless)
 import Control.Monad.Trans (lift)
-import Control.Monad.Trans.Either (EitherT, left)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Identity (runIdentity)
 import Control.DeepSeq (NFData, rnf)
 
@@ -268,9 +268,9 @@ signTx :: Monad m
        => Tx                        -- ^ Transaction to sign
        -> [SigInput]                -- ^ SigInput signing parameters
        -> [PrvKey]                  -- ^ List of private keys to use for signing
-       -> EitherT String (SecretT m) Tx -- ^ Signed transaction
+       -> ExceptT String (SecretT m) Tx -- ^ Signed transaction
 signTx otx@(Tx _ ti _ _) sigis allKeys
-    | null ti   = left "signTx: Transaction has no inputs"
+    | null ti   = throwE "signTx: Transaction has no inputs"
     | otherwise = foldM go otx $ findSigInput sigis ti
   where
     go tx (sigi@(SigInput so _ _ rdmM), i) = do
@@ -279,7 +279,7 @@ signTx otx@(Tx _ ti _ _) sigis allKeys
 
 -- | Sign a single input in a transaction within the 'SecretT' monad.
 signInput :: Monad m => Tx -> Int -> SigInput -> PrvKey
-          -> EitherT String (SecretT m) Tx
+          -> ExceptT String (SecretT m) Tx
 signInput tx i (SigInput so _ sh rdmM) key = do
     sig <- flip TxSignature sh <$> lift (signMsg msg key)
     si  <- liftEither $ buildInput tx i so rdmM sig $ derivePubKey key

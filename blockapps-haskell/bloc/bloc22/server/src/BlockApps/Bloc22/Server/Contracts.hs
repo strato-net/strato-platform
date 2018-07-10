@@ -77,75 +77,75 @@ translateStorageMap storage' =
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
-                  -> Maybe ChainId
+                  -> [ChainId]
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
                   -> Bool
-                  -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
-  eitherErrorOrContract' <- toUserError
-    (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
-      $ xAbiToContract <$> getContractXabi contract contractId
+                  -> Bloc [(ChainId, GetContractsStateResponses)] -- state-translation
+getContractsState contract@(ContractName contractName) contractId chainIds mName mCount mOffset mLength = do
+  forM chainIds $ \chainId -> do
+    eitherErrorOrContract' <- toUserError
+      (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
+        $ xAbiToContract <$> getContractXabi contract contractId
 
-  contract' <-
-    either (throwError . UserError . Text.pack) return eitherErrorOrContract'
+    contract' <-
+      either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
-  address <- case contractId of
-    Unnamed addr -> return addr
-    Named "Latest" -> do
-      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-      blocQuery1 $ proc () -> do
-        (_,cmId',addr,_) <-
-          (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
-            (queryTable contractsInstanceTable) -< ()
-        restrict -< cmId' .== constant (metadataId::Int32)
-        returnA -< addr
-    Named somethingElse -> blocError $ UserError $
-      "Expected address or \"Latest\": saw " <> somethingElse
+    address <- case contractId of
+      Unnamed addr -> return addr
+      Named "Latest" -> do
+        metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+        blocQuery1 $ proc () -> do
+          (_,cmId',addr,_) <-
+            (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+              (queryTable contractsInstanceTable) -< ()
+          restrict -< cmId' .== constant (metadataId::Int32)
+          returnA -< addr
+      Named somethingElse -> blocError $ UserError $
+        "Expected address or \"Latest\": saw " <> somethingElse
 
-  storage' <- case mName of
-    Nothing -> blocStrato $ getStorage
-      storageFilterParams{qsAddress = Just address}
-    Just name ->
-      let ranges = decodeStorageKey
-               (typeDefs contract')
-               (mainStruct contract')
-               [name]
-               0
-               mOffset
-               mCount
-               mLength
-      in join <$> mapM (getStorageRange address) ranges
+    storage' <- case mName of
+      Nothing -> blocStrato $ getStorage
+        storageFilterParams{qsAddress = Just address}
+      Just name ->
+        let ranges = decodeStorageKey
+                 (typeDefs contract')
+                 (mainStruct contract')
+                 [name]
+                 0
+                 mOffset
+                 mCount
+                 mLength
+        in join <$> mapM (\(o, c) -> getStorageRange address (o, c) chainId) ranges
 
-  let storage = translateStorageMap storage'
+    let storage = translateStorageMap storage'
 
-  ret <- case mName of
-    Nothing ->
-      let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
-          solVals = map (fmap valueToSolidityValue) vals
-      in return solVals
-    Just name ->
-      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
-          solVals = map (fmap valueToSolidityValue) vals
-      in return solVals
+    ret <- case mName of
+      Nothing ->
+        let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+            solVals = map (fmap valueToSolidityValue) vals
+        in return solVals
+      Just name ->
+        let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
+            solVals = map (fmap valueToSolidityValue) vals
+        in return solVals
 
-  logWith logNotice $ Text.unlines
-    [ "Storage:"
-    , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
-    , "End of storage"
-    ]
-  return $ Map.fromList ret
-  where
-    getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
-    getStorageRange a (o,c) = do
-      blocStrato $ getStorage
-        storageFilterParams{ qsAddress = Just a
-                           , qsMinKey = Just . fromInteger $ toInteger o
-                           , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId
-                           }
-
+    logWith logNotice $ Text.unlines
+      [ "Storage:"
+      , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
+      , "End of storage"
+      ]
+    return $ (chainId, Map.fromList ret)
+    where
+      getStorageRange :: Address -> (Word256, Word256) -> ChainId -> Bloc [T.Storage]
+      getStorageRange a (o,c) ci = do
+        blocStrato $ getStorage
+          storageFilterParams{ qsAddress = Just a
+                             , qsMinKey = Just . fromInteger $ toInteger o
+                             , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                             , qsChainId = Just ci
+                             }
 
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do

@@ -105,7 +105,7 @@ txRoundTrip  = it "preserves transactions in json -> hs -> json" $ do
     compareJSON input tx
 
 codeRoundTrip :: Spec
-codeRoundTrip = it "preservers code in json -> hs -> json" $ do
+codeRoundTrip = it "preserves code in json -> hs -> json" $ do
     let input = C8.pack "\"de5f72fd\""
     let code = Ae.eitherDecode input :: Either String Code
     compareJSON input code
