@@ -82,17 +82,17 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEBlock OutputBlock
                  | OEGenesis OutputGenesis
                  | OEJsonRpcCommand JsonRpcCommand
-                 | OEGetChain Word256
-                 | OEGetTx SHA
+                 | OEGetChain [Word256]
+                 | OEGetTx [SHA]
                  deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx ts o)   = show ts ++ " " ++ format o
-  format (OEBlock o)   = format o
-  format (OEGenesis o) = show o
-  format (OEGetChain c) = show c
-  format (OEGetTx sha) = format sha
-  format x             = show x
+  format (OETx ts o)       = show ts ++ " " ++ format o
+  format (OEBlock o)       = format o
+  format (OEGenesis o)     = show o
+  format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format x                 = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA

@@ -45,7 +45,7 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
--- import           Blockchain.Verification
+import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
@@ -236,8 +236,8 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (BlockBodies bodies) -> do
         stampActionTimestamp
         headers <- lift getBlockHeaders
-        -- let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
-        -- unless verified $ error "headers don't match bodies"
+        let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
+        unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
@@ -326,6 +326,8 @@ handleEvents mode peer = awaitForever $ \case
             Just _ -> do 
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
               yield $ ChainDetails [(cId, cInfo)]
+      OEGetChain chainIds -> yield $ GetChainDetails chainIds
+      OEGetTx shas -> yield $ GetTransactions shas
       _ -> return () -- shouldn't happen but our types don't prohibit us
 
     TimerEvt -> do

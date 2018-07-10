@@ -74,11 +74,17 @@ sequencer = forever $ do
     tick ctr_sequencer_ldb_batch_writes
     setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
     $logInfoS "sequencer" "Applied pending LDB writes"
-    vmEvs <- vmEvents <$> get
+    chainIds <- gets getChainsDB
+    unless (S.null chainIds) $ do
+      markForP2P . OEGetChain $ toList chainIds
+    txHashes <- gets getTransactionsDB
+    unless (S.null txHashes) $ do
+      markForP2P . OEGetTx $ toList txHashes
+    vmEvs <- gets vmEvents
     unless (Q.length vmEvs == 0) $ do
       writeSeqVmEvents' $ toList vmEvs
       $logInfoS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- p2pEvents <$> get
+    p2pEvs <- gets p2pEvents
     unless (Q.length p2pEvs == 0) $ do
       writeSeqP2pEvents' $ toList p2pEvs
       $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
@@ -173,10 +179,18 @@ transformFullTransactions pairs = do
             insertGetChainsDB chainId
           True -> forM_ ptxs $ \(ts, ptx) -> do
             $logInfoS "transformFullTransactions" . T.pack $ "We know the details for chain " ++ format (SHA chainId) ++ ". Inserting " ++ prettyOTx ptx ++ "into PrivateHashDB"
-            (tHash, cHash) <- insertPrivateHash ptx
-            insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
-            $logInfoS "transformFullTransactions" . T.pack $ "Got chain hash " ++ format cHash ++ " for transaction " ++ format tHash
-            removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+            let tHash = txHash ptx
+            cHash <- lookupSeenTxHash tHash >>= \case
+              Just ch -> do
+                $logInfoS "transformFullTransactions" . T.pack $ "We have this transaction's chain hash. It's: " ++ format ch
+                return ch
+              Nothing -> do
+                (_, cHash) <- insertPrivateHash ptx
+                insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
+                $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash
+                removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
+                return cHash
+            markForP2P $ pairToOETx (ts, ptx)
             lookupTxBlocks tHash >>= \case
               Nothing -> do -- if it's not already in a block, send it to the world
                 $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block. Sending it to P2P!"

@@ -283,6 +283,8 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
             ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
         unless s3 $ error "addToBalance failed even after a check in addBlock"
 
+    flushMemAddressStateDB -- needed in case there are no transactions in the block
+
     addBlockTransactions True b
 
     db <- getStateDB
