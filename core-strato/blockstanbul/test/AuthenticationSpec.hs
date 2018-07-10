@@ -2,9 +2,10 @@
 module AuthenticationSpec where
 
 import Control.Lens
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.Monoid ((<>))
 import Data.Time.Clock.POSIX
 import Test.Hspec
 import Test.QuickCheck
@@ -32,7 +33,7 @@ testBlock =
       blockDataGasLimit = 0,
       blockDataGasUsed = 0,
       blockDataTimestamp = posixSecondsToUTCTime 0,
-      blockDataExtraData = 0,
+      blockDataExtraData = "",
       blockDataNonce = 0,
       blockDataMixHash = SHA 0x0
     },
@@ -58,32 +59,43 @@ spec = do
 
   describe "Proposal seals" $ do
     it "verifies the signatures, without including the seals" $ do
-      let initialExtra = extra2Integer $ IstanbulExtra 876 testValidators Nothing []
+      let istExtra = IstanbulExtra testValidators Nothing []
+          initialExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
       sig <- proposerSeal (set (blockDataLens . extraDataLens) initialExtra testBlock) private
       let
-          sealedExtra = extra2Integer $ IstanbulExtra 876 testValidators (Just sig) []
+          sealedExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
           sealedBlock = set (blockDataLens . extraDataLens) sealedExtra testBlock
           got = verifyProposerSeal sealedBlock sig
           want = Just . prvKey2Address $ private
       got `shouldBe` want
 
   describe "Istanbul extra data" $ do
-    it "preserves data in round trips" $ property $ \iex ->
-      integer2Extra (extra2Integer iex) `shouldBe` iex
+    let trim :: Bool -> B.ByteString -> B.ByteString
+        trim exact bs = B.take 32 bs <> if exact
+                                          then B.replicate (32 - B.length bs) 0
+                                          else B.empty
+    it "preserves data in round trips" $ property $ \ist bs' ->
+      let bs = trim (isJust ist) bs'
+          iex = ExtraData bs ist
+      in do
+        bs `shouldSatisfy` (== 32) . B.length
+        cookRawExtra (uncookRawExtra iex) `shouldBe` iex
 
     it "by default only populates vanity" $ do
-      integer2Extra 25 `shouldBe` IstanbulExtra 25 [] Nothing []
-      integer2Extra 9290 `shouldBe` IstanbulExtra 9290 [] Nothing []
-      let maxUint256 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-      integer2Extra maxUint256 `shouldBe` IstanbulExtra (fromIntegral maxUint256) [] Nothing []
+      cookRawExtra "h" `shouldBe` ExtraData "h" Nothing
+      cookRawExtra "abc" `shouldBe` ExtraData "abc" Nothing
+      let maxBs = B.replicate 32 0xff
+      cookRawExtra maxBs `shouldBe` ExtraData maxBs Nothing
 
-    it "can remove all seals" $ property $ \iex ->
-      let payload = extra2Integer iex
-          want = iex{_proposal = Nothing, _commitment=[]}
-          got = integer2Extra . scrubAllSeals $ payload
-      in got `shouldBe` want
-    it "can remove commitment seals" $ property $ \iex ->
-      let payload = extra2Integer iex
-          want = iex{_commitment=[]}
-          got = integer2Extra . scrubCommitmentSeals $ payload
-      in got `shouldBe` want
+    it "can remove all seals" $ property $ \ist bs ->
+      let iex = ExtraData (trim (isJust ist) bs) ist
+          payload = uncookRawExtra iex
+          wantIst = fmap (\i -> i{_proposal=Nothing, _commitment = []}) ist
+          got = cookRawExtra . scrubAllSeals $ payload
+      in got `shouldBe` iex{_istanbul=wantIst}
+    it "can remove commitment seals" $ property $ \ist bs ->
+      let iex = ExtraData (trim (isJust ist) bs) ist
+          payload = uncookRawExtra iex
+          wantIst = fmap (\i -> i{_commitment=[]}) ist
+          got = cookRawExtra . scrubCommitmentSeals $ payload
+      in got `shouldBe` iex{_istanbul=wantIst}

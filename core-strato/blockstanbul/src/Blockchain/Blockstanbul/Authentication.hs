@@ -1,14 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Blockstanbul.Authentication where
 
-import Control.Exception (SomeException, catch, evaluate)
-import Control.Monad (liftM4)
+import Control.Monad (liftM2, liftM3)
 import Control.Monad.IO.Class
 import Control.Lens
-import Crypto.Util (bs2i, i2bs_unsized)
 import qualified Data.ByteString as B
+import Data.Monoid ((<>))
 import MonadUtils (liftIO1)
-import System.IO.Unsafe (unsafePerformIO)
 import Test.QuickCheck
 
 import Blockchain.Data.Address
@@ -22,58 +20,64 @@ import Blockchain.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Crypto as HK
 
-type ExtraData = Integer
+type RawExtraData = B.ByteString
 
--- TODO(tim): Separate vanity out into the non-rlp encoded parts.
--- This is made difficult by extraData :: Integer, which means that
--- the vanity would need to be used in the lower 256 bits to preserve
--- a 0 vanity (or having a leading sentinal 1 bit).
 data IstanbulExtra = IstanbulExtra {
-  _vanity :: HK.Word256,
   _validators :: [Address],
   _proposal :: Maybe ExtendedSignature,
   _commitment :: [ExtendedSignature]
 } deriving (Eq, Show)
 makeLenses ''IstanbulExtra
 
+data ExtraData = ExtraData {
+  _vanity :: B.ByteString,
+  _istanbul :: Maybe IstanbulExtra
+} deriving (Eq, Show)
+makeLenses ''ExtraData
+
+
 instance Arbitrary IstanbulExtra where
-  arbitrary = liftM4 IstanbulExtra arbitrary arbitrary arbitrary arbitrary
+  arbitrary = liftM3 IstanbulExtra arbitrary arbitrary arbitrary
+
+instance Arbitrary ExtraData where
+  arbitrary = liftM2 ExtraData arbitrary arbitrary
 
 instance RLPSerializable IstanbulExtra where
-  rlpEncode (IstanbulExtra vn vls mp cs) =
-      RLPArray [rlpEncode vn,
-                RLPArray . map rlpEncode $ vls,
+  rlpEncode (IstanbulExtra vls mp cs) =
+      RLPArray [RLPArray . map rlpEncode $ vls,
                 maybe (RLPScalar 0) rlpEncode mp,
                 RLPArray . map rlpEncode $ cs]
-  rlpDecode (RLPArray [rvn, RLPArray rvls, rp, RLPArray rcs]) =
-      IstanbulExtra (rlpDecode rvn)
-                    (map rlpDecode rvls)
+  rlpDecode (RLPArray [RLPArray rvls, rp, RLPArray rcs]) =
+      IstanbulExtra (map rlpDecode rvls)
                     (case rp of
                         RLPScalar _ -> Nothing
                         _ -> Just . rlpDecode $ rp)
                     (map rlpDecode rcs)
-  rlpDecode (RLPScalar x) = IstanbulExtra (fromIntegral x) [] Nothing []
-  rlpDecode (RLPString xs) = IstanbulExtra (fromIntegral . bs2i $ xs) [] Nothing []
   rlpDecode x = error $ "invalid rlp for istanbul extra: " ++ show x
 
--- Why the hell is extraData :: Integer
-extra2Integer :: IstanbulExtra -> ExtraData
-extra2Integer = bs2i . rlpSerialize . rlpEncode
+uncookRawExtra :: ExtraData -> RawExtraData
+uncookRawExtra (ExtraData vn ist') =
+  case ist' of
+    Nothing -> B.take 32 vn
+    Just ist -> B.take 32 vn <> B.replicate (32 - B.length vn) 0 <> rlpSerialize (rlpEncode ist)
 
-integer2Extra :: ExtraData -> IstanbulExtra
-integer2Extra n = let fallback :: SomeException -> IO IstanbulExtra
-                      fallback = const . return $ IstanbulExtra (fromIntegral n) [] Nothing []
-                      action :: IO IstanbulExtra
-                      action = evaluate . rlpDecode . rlpDeserialize . i2bs_unsized $ n
-                  -- TODO(tim): is backwards compatibility worth the unsafety of
-                  -- suppressing rlp errors?
-                  in unsafePerformIO $ catch action fallback
+cookRawExtra :: RawExtraData -> ExtraData
+cookRawExtra bs =
+  let (vn, rest) = B.splitAt 32 bs
+  in ExtraData vn $ if B.null rest
+                      then Nothing
+                      else Just . rlpDecode . rlpDeserialize $ rest
 
-scrubAllSeals :: ExtraData -> ExtraData
-scrubAllSeals = extra2Integer . set proposal Nothing . set commitment [] . integer2Extra
+scrubAllSeals :: RawExtraData -> RawExtraData
+scrubAllSeals = uncookRawExtra
+              . set (istanbul . _Just . proposal) Nothing
+              . set (istanbul . _Just . commitment) []
+              . cookRawExtra
 
-scrubCommitmentSeals :: ExtraData -> ExtraData
-scrubCommitmentSeals = extra2Integer . set commitment [] . integer2Extra
+scrubCommitmentSeals :: RawExtraData -> RawExtraData
+scrubCommitmentSeals = uncookRawExtra
+                     . set (istanbul . _Just . commitment) []
+                     . cookRawExtra
 
 proposalMessage :: Block -> HK.Word256
 -- TODO(tim): Clear everything out of extraData except vanity and validators

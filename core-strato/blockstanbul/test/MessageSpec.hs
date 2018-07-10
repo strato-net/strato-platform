@@ -39,7 +39,7 @@ spec = parallel $ do
                 blockDataGasLimit = 0,
                 blockDataGasUsed = 0,
                 blockDataTimestamp = posixSecondsToUTCTime 0,
-                blockDataExtraData = 0,
+                blockDataExtraData = "",
                 blockDataNonce = 0,
                 blockDataMixHash = SHA 0x0
               },
