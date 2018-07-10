@@ -17,8 +17,6 @@ module BlockApps.Bloc22.Client
   , postContractsCompile
   , postContractsXabi
   , getSearchContract
-  , getSearchContractState
-  , getSearchContractStateReduced
   , getUsers
   , getUsersUser
   , postUsersUser
@@ -98,13 +96,6 @@ postContractsXabi = client (Proxy @ PostContractsXabi)
 
 getSearchContract :: ContractName -> ClientM [MaybeNamed Address]
 getSearchContract = client (Proxy @ GetSearchContract)
-
-getSearchContractState :: ContractName -> ClientM [SearchContractState]
-getSearchContractState = client (Proxy @ GetSearchContractState)
-
-getSearchContractStateReduced
-  :: ContractName -> [Text] -> ClientM [SearchContractState]
-getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
 
 getUsers :: ClientM [UserName]
 getUsers = client (Proxy @ GetUsers)

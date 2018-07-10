@@ -47,8 +47,6 @@ bloc = (return gitInfo)
   :<|> postContractsCompile
   :<|> postContractsXabi
   :<|> getSearchContract
-  :<|> getSearchContractState
-  :<|> getSearchContractStateReduced
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
 

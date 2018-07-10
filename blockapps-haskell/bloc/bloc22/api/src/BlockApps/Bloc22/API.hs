@@ -61,8 +61,6 @@ type BlocAPI =
   :<|> PostContractsXabi
   -- /search endpoints
   :<|> GetSearchContract
-  :<|> GetSearchContractState
-  :<|> GetSearchContractStateReduced
   :<|> GetBlocTransactionResult
   :<|> PostBlocTransactionResults
 
