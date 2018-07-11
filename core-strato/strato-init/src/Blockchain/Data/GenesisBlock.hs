@@ -212,7 +212,10 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let [theJSON] = JS.parseLazyByteString genesisParser theJSONString
+    let genesis = JS.parseLazyByteString genesisParser theJSONString
+        theJSON = case genesis of
+                      [x] -> x
+                      _ -> error $ "invalid genesis: " ++ show genesis
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
     genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
 
