@@ -40,6 +40,7 @@ module BlockApps.Strato.Types
   , CodeInfo (..)
   , AccountInfo (..)
   , ChainInfo (..)
+  , AccountBalance (..)
   ) where
 
 import           Control.Applicative
@@ -106,6 +107,9 @@ instance (Integral n, Show n) => ToJSON (Hex n) where
 
 instance (Integral n, Show n) => ToHttpApiData (Hex n) where
   toUrlPiece = Text.pack . show
+
+instance (ToHttpApiData a) => ToHttpApiData [a] where
+  toUrlPiece = Text.pack . show . map toUrlPiece 
 
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
@@ -655,3 +659,13 @@ instance FromJSON AccountBalance where
 
 instance ToSchema AccountBalance
 
+{- NOT IN USE YET - trying to use QueryParameters instead of sample body 
+ 
+instance (ToParamSchema a) => ToParamSchema (Maybe a) where
+  toParamSchema _ = mempty & type_ .~ SwaggerString
+
+instance ToParamSchema AccountBalance where
+  toParamSchema _ = mempty & type_ .~ SwaggerArray . (SwaggerString, SwaggerString)
+
+instance ToHttpApiData AccountBalance where
+  toUrlPiece = Text.pack . show -}
