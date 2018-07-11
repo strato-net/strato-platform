@@ -5,6 +5,10 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Sequencer where
 
+import           ClassyPrelude                             (atomically)
+
+import           Control.Concurrent.AlarmClock
+import           Control.Concurrent.STM.TMVar
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Stats                       hiding (prefix)
@@ -12,8 +16,10 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe)
+import           Data.Maybe                                (catMaybes, fromMaybe, isJust)
 import qualified Data.Text                                 as T
+
+import           Blockchain.Blockstanbul
 
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -35,9 +41,26 @@ import qualified Database.LevelDB                          as LDB
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
 
+createBlockstanbulRoundTimer :: MonotonicTime -> IO (TMVar ())
+createBlockstanbulRoundTimer dt = do
+  var <- atomically $ newEmptyTMVar
+  let act :: AlarmClock MonotonicTime -> IO ()
+      act alarm' = do
+        _ <- atomically $ tryPutTMVar var ()
+        setAlarm alarm' dt
+  alarm <- newAlarmClock act
+  setAlarm alarm dt
+  return var
+
 sequencer :: SequencerM ()
-sequencer = forever $ do
-    inEvents <- readUnseqEvents'        
+sequencer = do
+  var <- liftIO $ createBlockstanbulRoundTimer (MonotonicTime (TimeSpec 10 0))
+  forever $ do
+    signal <- atomically $ tryReadTMVar var
+    when (isJust signal) $ do
+      _ <- sendMessages [Timeout]
+      return ()
+    inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
         t0 <- liftIO $ getTime Realtime

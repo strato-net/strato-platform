@@ -10,6 +10,8 @@ build-type:          Simple
 
 dependencies:
   - base >=4.8 && <4.10
+  - alarmclock
+  - classy-prelude
   - strato-model
   - blockapps-data
   - blockapps-util
@@ -29,12 +31,16 @@ dependencies:
   - ethereum-rlp
   - time
   - statsdi
+  - stm
   - conduit-combinators
+  - blockstanbul
+  - lens
+  - blockapps-haskoin
 
 ghc-options: -Wall -O2 -threaded
 
 library:
-  source-dirs:      src
+  source-dirs:     src
 
 executable:
   source-dirs:      exec-src

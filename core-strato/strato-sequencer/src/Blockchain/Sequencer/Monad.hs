@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 module Blockchain.Sequencer.Monad (
     SequencerContext(..)
@@ -11,12 +12,15 @@ module Blockchain.Sequencer.Monad (
   , getKafkaConsumerGroup
 ) where
 
+import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
+import           Data.Maybe                                (fromMaybe)
 
+import           Blockchain.Blockstanbul
 import           Blockchain.Constants
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -29,8 +33,7 @@ import qualified Database.LevelDB                          as LDB
 import qualified Network.Kafka                             as K
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
-
-type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
+import qualified Network.Haskoin.Crypto                    as HK
 
 instance (MonadLogger m) => MonadLogger (StatsT m) where
     monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
@@ -39,10 +42,13 @@ instance (MonadResource m) => MonadResource (StatsT m) where
     liftResourceT = lift . liftResourceT
 
 data SequencerContext = SequencerContext
-                      { dependentBlockDB    :: DependentBlockDB
-                      , seenTransactionDB   :: SeenTransactionDB
-                      , sequencerKafkaState :: K.KafkaState
+                      { _dependentBlockDB    :: DependentBlockDB
+                      , _seenTransactionDB   :: SeenTransactionDB
+                      , _sequencerKafkaState :: K.KafkaState
+                      , _blockstanbulContext :: BlockstanbulContext
                       }
+makeLenses ''SequencerContext
+
 
 data SequencerConfig =
      SequencerConfig { depBlockDBCacheSize   :: Int
@@ -56,23 +62,24 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      }
 
+type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
 
 instance HasDependentBlockDB SequencerM where
-    getDependentBlockDB = dependentBlockDB <$> get
+    getDependentBlockDB = use dependentBlockDB
     getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
     getReadOptions      = return LDB.defaultReadOptions
 
 instance HasSeenTransactionDB SequencerM where
-    getSeenTransactionDB = seenTransactionDB <$> get
-    putSeenTransactionDB new = do
-        ctx <- get
-        put $ ctx { seenTransactionDB = new }
+    getSeenTransactionDB = use seenTransactionDB
+    putSeenTransactionDB = assign seenTransactionDB
 
 instance K.HasKafkaState SequencerM where
-    getKafkaState = sequencerKafkaState <$> get
-    putKafkaState newS = do
-        ctx <- get
-        put $ ctx { sequencerKafkaState = newS }
+    getKafkaState = use sequencerKafkaState
+    putKafkaState = assign sequencerKafkaState
+
+instance HasBlockstanbulContext SequencerM where
+    getBlockstanbulContext = use blockstanbulContext
+    putBlockstanbulContext = assign blockstanbulContext
 
 runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
 runSequencerM c m = do
@@ -87,11 +94,14 @@ runSequencerM c m = do
         let kState = case mAddr of
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
+        -- TODO(tim): Use proper values
+        let ctx = newContext (View 0 0) [] (fromMaybe (error "invalid argument")  $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
         runStateT m SequencerContext
-            { dependentBlockDB    = depBlock
-            , seenTransactionDB   = mkSeenTxDB stxSize
-            , sequencerKafkaState = kState
+            { _dependentBlockDB    = depBlock
+            , _seenTransactionDB   = mkSeenTxDB stxSize
+            , _sequencerKafkaState = kState
+            , _blockstanbulContext = ctx
             }
     return $ fst a
 

@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
 
 import Test.Hspec (Spec, describe, it, parallel, pendingWith)
@@ -24,32 +26,14 @@ import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
-testContext = BlockstanbulContext
-  (View 20 18)
-  (const True)
-  Nothing
-  (Address 0x0)
-  []
-  M.empty
-  M.empty
-  False
-  Nothing
-  M.empty
-  (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
+testContext = newContext (View 20 18) [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext IO () -> IO ()
 runTest = flip evalStateT testContext
 
-sendMessages :: [InEvent] -> StateT BlockstanbulContext IO [OutEvent]
-sendMessages wms = do
-  -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
-  -- Every run of the conduit has one, but the test itself also preserves the context
-  -- between runs.
-  ctx <- get
-  let base = yieldMany wms .| eventLoop ctx
-  (ctx', evs) <- runConduit $ fuseBoth base sinkList
-  put ctx'
-  return evs
+instance HasBlockstanbulContext (StateT BlockstanbulContext IO) where
+  putBlockstanbulContext = put
+  getBlockstanbulContext = get
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk as = do

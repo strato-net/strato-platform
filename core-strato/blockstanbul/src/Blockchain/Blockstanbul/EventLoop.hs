@@ -46,8 +46,26 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
 }
-
 makeLenses ''BlockstanbulContext
+
+newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
+newContext v as pk =
+  let prop = case as of
+                 [] -> 0x0 -- TODO(tim): C? In my Haskell? It's more likely than you think.
+                 (a:_) -> a
+  in BlockstanbulContext
+     { _view = v
+     , _authenticator = const True
+     , _proposal = Nothing
+     , _proposer = prop
+     , _validators = as
+     , _prepared = M.empty
+     , _committed = M.empty
+     , _hasPrepared = False
+     , _pendingRound = Nothing
+     , _roundChanged = M.empty
+     , _prvkey = pk
+     }
 
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
@@ -148,3 +166,18 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       return ()
     Timeout -> roundChange
     CommitFailure _ -> roundChange
+
+class (Monad m) => HasBlockstanbulContext m where
+  getBlockstanbulContext :: m BlockstanbulContext
+  putBlockstanbulContext :: BlockstanbulContext -> m ()
+
+sendMessages :: HasBlockstanbulContext m => [InEvent] -> m [OutEvent]
+sendMessages wms = do
+  -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
+  -- Every run of the conduit has one, but the test itself also preserves the context
+  -- between runs.
+  ctx <- getBlockstanbulContext
+  let base = yieldMany wms .| eventLoop ctx
+  (ctx', evs) <- runConduit $ fuseBoth base sinkList
+  putBlockstanbulContext ctx'
+  return evs
