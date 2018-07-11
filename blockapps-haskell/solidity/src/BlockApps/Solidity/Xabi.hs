@@ -371,11 +371,12 @@ instance ToParamSchema (MaybeNamed ChainId) where
   toParamSchema _ = toParamSchema (Proxy :: Proxy ChainId)
 
 instance ToSchema (MaybeNamed ChainId) where
-  declareNamedSchema _ = return $ NamedSchema (Just "ChainId")
+  declareNamedSchema _ = return $ NamedSchema (Just "main, Or all, Or ChainId")
       ( mempty
         & type_ .~ SwaggerString
         & example ?~ toJSON (Unnamed (ChainId 0xdeadbeef))
-        & description ?~ "Private chain id, 32 byte hex encoded string" )   
+        & description ?~ "main, Or all, Or ChainId" )   
+
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions
   { fieldLabelModifier = camelCase . dropFPrefix
