@@ -147,7 +147,7 @@ describe('File', function () {
       });
 
       afterEach(function () {
-        externalStorage.getExternalStorage.restore();
+        externalStorage.uploadContract.restore();
       })
 
       it('throws 500', async function () {
