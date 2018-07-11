@@ -78,32 +78,36 @@ isString :: Value -> Bool
 isString (String x) = not (isPrefixOf "function" (T.unpack x))
 isString _ = True
 
-convertRet :: String -> String -> String -> BLC.ByteString -> IO()
-convertRet address codehash abi x = do
+convertRet :: String -> String -> String -> String -> BLC.ByteString -> IO()
+convertRet address codehash abi name x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object y) -> do
 
-      let contractName = take 63 codehash
+      --let contractName = take 63 codehash
 
-      let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
+      --let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
+      let conVals = "('" ++ codehash ++ "', ' ++ name ++ ', '" ++ abi ++ "')"
       let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
 
       let list = H.toList $ H.filter isString y
 
       let beg = "BEGIN;"
       let comm = "COMMIT;"
-      let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ", created_at timestamp default now());"
+      --let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
+      let createSt = "create table if not exists " ++ name ++ " (address text, " ++ tableColumns list ++ ");"
 
       let indFlag = True
       let ind = if (indFlag)
                   --Index in contract already
-                  then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
+                  --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
+                  then "create index if not exists idx ON " ++ name ++ " (address);"
                   else ""
 
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
-      let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
+      --let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
+      let ins = "insert into " ++ name ++ " " ++ keys ++ " values " ++ vals ++ ";"
       let oneIns = beg ++ conIns ++ createSt ++ ind ++ ins ++ comm
       p <- dbInsert oneIns
       print p

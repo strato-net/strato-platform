@@ -41,6 +41,7 @@ import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
 
 import Slipstream.Events hiding (Address)
+import Data.List.Utils (replace)
 
 --import Debug.Trace
 --import GHC.Generics
@@ -110,15 +111,16 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::String->String->Bloc (Either String Contract, String)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ (Left "Blank contract", "Blank ABI")
+getContract::String->String->Bloc (Either String Contract, String, String)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ (Left "Blank contract", "Blank ABI", "Blank")
 getContract address _ = do
   qqqq <-
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
 
-  let ret2 = show $ toJSON $ contractdetailsXabi qqqq
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  return (ret1, ret2)
+  let ret2 = show $ toJSON $ contractdetailsXabi qqqq
+  let ret3 = show $ contractdetailsName qqqq
+  return (ret1, ret2, ret3)
 
 fetchABI :: String -> Bloc String
 fetchABI address = do
@@ -206,6 +208,15 @@ blocConn = do
   return env
   -}
 
+first :: (a, b, c) -> a
+first (x, _, _) = x
+
+second :: (a, b, c) -> b
+second (_, x, _) = x
+
+third :: (a, b, c) -> c
+third (_, _, x) = x
+
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
   _ <- $initHFlags "Setup Slipstream Variables"
@@ -259,24 +270,27 @@ processTheMessages messages = do
              Action _ a c (Just s) -> (a, c, storageToFunction s)
              Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
 
-      cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String))
+      cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
          Just c -> do
            return c
          Nothing -> do
-           (contractOrError, abi) <- getContract address codehash
+           (contractOrError, abi, name) <- getContract address codehash
            case contractOrError of
             Left e -> error e
             Right c -> do
-              liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi) cachedContracts)
-              return (c, abi)
+              liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi, name) cachedContracts)
+              return (c, abi, name)
 
-      let strAbi = snd contractMetaData
+      let strAbi = replace "\'" "\'\'" $ second contractMetaData
+
+      let name = third contractMetaData
+      liftIO $ putStrLn $ "CONTRACT NAME: " ++ name
 
       let ret =
             Map.fromList $ map (fmap valueToSolidityValue) $
-            decodeValues (typeDefs $ fst contractMetaData) (mainStruct $ fst contractMetaData) storage 0
-      liftIO $ convertRet address codehash strAbi $ encode ret
+            decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
+      liftIO $ convertRet address codehash strAbi name $ encode ret
 
   return()
