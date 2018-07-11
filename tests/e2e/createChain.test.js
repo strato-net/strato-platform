@@ -49,7 +49,7 @@ describe("Create Chain", function() {
 
     yield promiseTimeout(1000);
 
-    const chainInfo = yield rest.getChainInfo(chainId);
+    const chainInfo = yield rest.getChainInfo([chainId]);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
     assert.equal(label, chainInfo.label, "chain labels should be identical");
