@@ -103,5 +103,5 @@ type API =
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
   :<|> "chain"
-    :> ReqBody '[JSON] GenesisInfo
+    :> ReqBody '[JSON] ChainInfo
     :> Post '[PlainText] Text

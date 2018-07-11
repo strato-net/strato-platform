@@ -39,12 +39,12 @@ module BlockApps.Strato.Types
   , exampleTxResult
   , CodeInfo (..)
   , AccountInfo (..)
-  , GenesisInfo (..)
+  , ChainInfo (..)
   ) where
 
 import           Control.Applicative
 import           Control.Lens                 (mapped, (&), (.~), (?~))
-import           Data.Aeson
+import           Data.Aeson                   
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Aeson.TH                as AT
@@ -590,71 +590,68 @@ instance ToSchema AccountInfo where
     & mapped.schema.description ?~ "AccountInfo"
     & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
 
-data GenesisInfo =
-  GenesisInfo {
-    genesisInfoParentHash       :: Keccak256,
-    genesisInfoUnclesHash       :: Keccak256,
-    genesisInfoCoinbase         :: Address,
-    genesisInfoAccountInfo      :: [AccountInfo],
-    genesisInfoCodeInfo         :: [CodeInfo],
-    genesisInfoTransactionsRoot :: Keccak256,
-    genesisInfoReceiptsRoot     :: Keccak256,
-    genesisInfoLogBloom         :: String,
-    genesisInfoDifficulty       :: Integer,
-    genesisInfoNumber           :: Integer,
-    genesisInfoGasLimit         :: Integer,
-    genesisInfoGasUsed          :: Integer,
-    genesisInfoTimestamp        :: UTCTime,
-    genesisInfoExtraData        :: Integer,
-    genesisInfoMixHash          :: Keccak256,
-    genesisInfoNonce            :: Word64,
-    genesisInfoChainId          :: Maybe ChainId
-} deriving (Show, Eq, Generic)
+data ChainInfo = ChainInfo
+  {  chainLabel      :: Text
+  ,  addRule         :: Text
+  ,  removeRule      :: Text
+  ,  members         :: [Text]
+  ,  ciAccountBalance  :: [AccountBalance] 
+  } 
+  deriving (Eq, Read, Show, Generic)
 
-instance FromJSON GenesisInfo where
+instance ToSchema ChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainInfo"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ChainInfo
+      ex = ChainInfo
+        {
+           chainLabel = "myChain"
+        ,  addRule = "majorityRules"
+        ,  removeRule = "majorityRules"
+        ,  members = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303", "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"]
+        ,  ciAccountBalance = [AccountBalance "5815b9975001135697b5739956b9a6c87f1c575c" "0000000000000000000000000000000000000000000001999999999999999977", AccountBalance "93fdd1d21502c4f87295771253f5b71d897d911c" "0000000000000000000000000000000000000000000000000000000000002000"]
+        }
+
+instance FromJSON ChainInfo where
   parseJSON (Object o) =
-    GenesisInfo <$>
-    o .: "parentHash" <*>
-    o .: "unclesHash" <*>
-    o .: "coinbase" <*>
-    o .: "accountInfo" <*>
-    o .:? "codeInfo" .!= [] <*>
-    o .: "transactionRoot" <*>
-    o .: "receiptsRoot" <*>
-    o .: "logBloom" <*>
-    o .: "difficulty" <*>
-    o .: "number" <*>
-    o .: "gasLimit" <*>
-    o .: "gasUsed" <*>
-    o .: "timestamp" <*>
-    o .: "extraData" <*>
-    o .: "mixHash" <*>
-    o .: "nonce" <*>
-    o .:? "chainId"
-  parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
+    ChainInfo <$>
+    o .: "chainLabel" <*>
+    o .: "addRule" <*>
+    o .: "removeRule" <*>
+    o .: "members" <*>
+    o .: "accountBalance"
+  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
-instance ToJSON GenesisInfo where
-  toEncoding x = pairs (
-      "parentHash" .= genesisInfoParentHash x <>
-      "unclesHash" .= genesisInfoUnclesHash x <>
-      "coinbase" .= genesisInfoCoinbase x <>
-      "codeInfo" .= genesisInfoCodeInfo x <>
-      "transactionRoot" .= genesisInfoTransactionsRoot x <>
-      "receiptsRoot" .= genesisInfoReceiptsRoot x <>
-      "logBloom" .= genesisInfoLogBloom x <>
-      "difficulty" .= genesisInfoDifficulty x <>
-      "number" .= genesisInfoNumber x <>
-      "gasLimit" .= genesisInfoGasLimit x <>
-      "gasUsed" .= genesisInfoGasUsed x <>
-      "timestamp" .= genesisInfoTimestamp x <>
-      "extraData" .= genesisInfoExtraData x <>
-      "mixHash" .= genesisInfoMixHash x <>
-      "nonce" .= genesisInfoNonce x <>
-      "accountInfo" .= genesisInfoAccountInfo x <>
-      "chainId" .= genesisInfoChainId x
+instance ToJSON ChainInfo where
+  toJSON x = 
+    object [
+       "chainLabel" .= chainLabel x
+    ,  "addRule" .= addRule x
+    ,  "removeRule" .= removeRule x
+    ,  "members" .= members x 
+    ,  "accountBalance" .= ciAccountBalance x  
+    ]
+
+data AccountBalance = AccountBalance {
+  address :: Text,
+  balance :: Text
+} deriving (Eq, Read, Show, Generic)
+
+instance ToJSON AccountBalance where
+  toEncoding x = 
+    pairs (
+      "address" .= address x <>
+      "balance" .= balance x
     )
 
-instance ToSchema GenesisInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "GenesisInfo"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
+instance FromJSON AccountBalance where
+  parseJSON (Object o) =
+    AccountBalance <$>
+    o .: "address" <*>
+    o .: "balance"
+  parseJSON x = error $ "couldn't parse JSON for Account Balance: " ++ show x
+
+instance ToSchema AccountBalance
+
