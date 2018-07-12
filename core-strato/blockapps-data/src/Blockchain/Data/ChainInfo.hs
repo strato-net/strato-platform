@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric     #-}
 
-module Blockchain.Data.ChainInfo where
+module Blockchain.Data.ChainInfo
+  ( AccountBalance(..)
+  , ChainInfo (..)
+  , ChainIdChainInfo (..)
+  ) where
 
 import           Data.Aeson
 

@@ -112,15 +112,15 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
-  :> QueryParams "chainid" ChainId
+  :> QueryParams "chainid" (MaybeNamed ChainId)
   :> QueryParam "name" Text
   :> QueryParam "count" Int
   :> QueryParam "offset" Int
   :> QueryFlag "length"
-  :> Get '[JSON] [(ChainId, GetContractsStateResponses)] -- change to HTML
+  :> Get '[JSON] [(MaybeNamed ChainId, GetContractsStateResponses)] -- change to HTML
 
-instance ToParam (QueryParams "chainid" ChainId) where
-  toParam _ = DocQueryParam "chainid" [] "ChainIds" Normal
+instance ToParam (QueryParams "chainid" (MaybeNamed ChainId)) where
+  toParam _ = DocQueryParam "chainid" [] "ChainIds of private chains" Normal
 
 instance ToParam (QueryParam "name" Text) where
   toParam _ = DocQueryParam "name" [] "Names of contract variables" Normal
