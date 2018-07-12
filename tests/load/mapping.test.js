@@ -28,7 +28,6 @@ describe('LOAD TEST: mapping', function() {
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(admin);
     contract = yield titleManagerJs.uploadContract(admin);
-    console.log('I am in');
     console.log(contract);
   });
 
