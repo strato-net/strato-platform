@@ -308,11 +308,26 @@ handleEvents mode peer = awaitForever $ \case
               when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
-      OETx ts tx -> do
-          $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ show (otHash tx) ++ " at " ++ show ts
-          $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
-          when (shouldSend peer $ otOrigin tx) . yield $ Transactions [tx'] where
-              tx' = otBaseTx $ tx
+      OETx _ tx -> do
+        when (shouldSend peer $ otOrigin tx) $ do
+          let cId = txChainId tx
+          match <- case cId of
+            Nothing -> return True
+            Just cid' -> do
+              mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cid'
+              case mCInfo of
+                Nothing -> return False
+                Just cInfo -> do
+                  let pIp = readIP $ T.unpack (pPeerIp peer)
+                      ipList = ipAddress <$> members cInfo
+                  return $ pIp `elem` ipList
+
+          if not match
+            then $logInfoS "handleEvents/OETx" $ T.pack $ "peer is not authorized for chainID " ++ show cId
+            else do
+              $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
+              $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
+              yield $ Transactions [otBaseTx tx]
       OEGenesis (OutputGenesis og (cId, cInfo)) -> do
         when (shouldSend peer og) $ do
           $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show cInfo
