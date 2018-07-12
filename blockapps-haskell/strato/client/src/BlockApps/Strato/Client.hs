@@ -142,8 +142,8 @@ getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
-postChain :: ChainInfo -> ClientM Text
-getChain :: Maybe Text -> ClientM ChainInfo
+postChain :: {- Maybe Text -> Maybe Text -> Maybe Text -> Maybe [Text] -> Maybe [AccountBalance] -> -} ChainInfo -> ClientM Text
+getChain :: Maybe [Text] -> ClientM [ChainInfo]
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx

@@ -659,13 +659,14 @@ instance FromJSON AccountBalance where
 
 instance ToSchema AccountBalance
 
-{- NOT IN USE YET - trying to use QueryParameters instead of sample body 
- 
 instance (ToParamSchema a) => ToParamSchema (Maybe a) where
   toParamSchema _ = mempty & type_ .~ SwaggerString
 
 instance ToParamSchema AccountBalance where
-  toParamSchema _ = mempty & type_ .~ SwaggerArray . (SwaggerString, SwaggerString)
+  toParamSchema _ = mempty 
+    & type_ .~ SwaggerArray
+--    & items_ .~ SwaggerItemsArray [Text]
+    & enum_ ?~ ["address", "balance"]
 
 instance ToHttpApiData AccountBalance where
-  toUrlPiece = Text.pack . show -}
+  toUrlPiece = Text.pack . show
