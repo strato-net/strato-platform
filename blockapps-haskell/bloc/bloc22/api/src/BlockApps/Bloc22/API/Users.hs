@@ -182,6 +182,7 @@ type GetUsersUser = "users"
   :> Capture "user" UserName
   :> Get '[JSON] [Address]
 
+
 type PostUsersUser = "users"
   :> Capture "user" UserName
   :> ReqBody '[JSON, FormUrlEncoded] Password
@@ -191,6 +192,43 @@ instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
 
+-- It would probably better to use the Authorization header
+-- and make this a GET request.
+type GetUsersKeyStore = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "keystore"
+  :> ReqBody '[JSON, FormUrlEncoded] Password
+  :> Post '[JSON] KeyStore
+
+
+type PostUsersKeyStore = "users"
+  :> Capture "user" UserName
+  :> "keystore"
+  :> ReqBody '[JSON] PostUsersKeyStoreRequest
+  :> Post '[JSON] Bool
+
+data PostUsersKeyStoreRequest = PostUsersKeyStoreRequest
+  { postuserskeystorerequestPassword :: Password
+  , postuserskeystorerequestKeyStore :: KeyStore
+  } deriving (Generic)
+
+instance ToJSON PostUsersKeyStoreRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostUsersKeyStoreRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample PostUsersKeyStoreRequest where
+  toSamples _ = noSamples
+
+instance ToSchema PostUsersKeyStoreRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "KeyStore entry"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostUsersKeyStoreRequest
+      ex = PostUsersKeyStoreRequest (Password "hunter2") exKeyStore
 --------------------------------------------------------------------------------
 
 type PostUsersFill = "users"

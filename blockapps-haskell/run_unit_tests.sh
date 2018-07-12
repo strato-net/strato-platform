@@ -7,6 +7,7 @@ TESTS=(
   blockapps-solidity
   blockapps-strato-api
   blockapps-bloc22-server
+  blockapps-bloc22-api
 )
 
 for tst in ${TESTS[@]}; do

@@ -17,6 +17,8 @@ dependencies:
   - base
   - aeson
   - aeson-casing
+  - base16-bytestring
+  - base64-bytestring
   - blockapps-ethereum
   - blockapps-solidity
   - blockapps-strato-api
@@ -43,3 +45,11 @@ dependencies:
 
 library:
   source-dirs: src/
+
+tests:
+  api-test:
+    source-dirs: test/
+    main: APISpec.hs
+    dependencies:
+      - blockapps-bloc22-api
+      - hspec
