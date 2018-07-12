@@ -13,10 +13,11 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
+import           Data.Time.Clock
 import           System.Clock
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe, isJust)
+import           Data.Maybe                                (catMaybes, fromMaybe)
 import qualified Data.Text                                 as T
 
 import           Blockchain.Blockstanbul
@@ -41,24 +42,28 @@ import qualified Database.LevelDB                          as LDB
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
 
-createBlockstanbulRoundTimer :: MonotonicTime -> IO (TMVar ())
+createBlockstanbulRoundTimer :: NominalDiffTime -> IO (TMVar Bool)
 createBlockstanbulRoundTimer dt = do
-  var <- atomically $ newEmptyTMVar
-  let act :: AlarmClock MonotonicTime -> IO ()
+  var <- atomically $ newTMVar False
+  let act :: AlarmClock UTCTime -> IO ()
       act alarm' = do
-        _ <- atomically $ tryPutTMVar var ()
-        setAlarm alarm' dt
-  alarm <- newAlarmClock act
-  setAlarm alarm dt
+        _ <- atomically $ swapTMVar var True
+        next <- addUTCTime dt <$> getCurrentTime
+        setAlarm alarm' next
+  alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
+  next <- addUTCTime dt <$> getCurrentTime
+  setAlarm alarm next
   return var
 
 sequencer :: SequencerM ()
 sequencer = do
-  var <- liftIO $ createBlockstanbulRoundTimer (MonotonicTime (TimeSpec 10 0))
+  var <- liftIO $ createBlockstanbulRoundTimer 7
   forever $ do
-    signal <- atomically $ tryReadTMVar var
-    when (isJust signal) $ do
-      _ <- sendMessages [Timeout]
+    ready <- atomically $ swapTMVar var False
+    $logInfoS "isReady" . T.pack . show $ ready
+    when ready $ do
+      resp <- sendMessages [Timeout]
+      $logInfoS "outer blockstanbul" . T.pack $ "Response from blockastanbul: " ++ show resp
       return ()
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
