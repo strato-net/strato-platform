@@ -10,6 +10,7 @@
 module Slipstream.Events where
 
 import Data.Aeson
+--import Data.Aeson.Types
 import Data.Map (Map)
 
 import GHC.Generics
@@ -51,6 +52,7 @@ instance (FromJSON a) => FromJSON (Diff a) where
            old <- x .:? "oldValue"
            new <- x .: "newValue"
            return $ Diff old new
+         --parseJSON x = typeMismatch "Not an object" x
          parseJSON x = do
            y <- parseJSON x
            return $ Diff Nothing y
@@ -65,11 +67,13 @@ data AccountDiff =
     -- change
     code         :: Maybe String,
     -- | Since we want to always be able to identify account-type
+    --codeHash :: SHA,
     codeHash     :: String,
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot),
     -- | Only the storage keys that change are present in this map.
+    --storage :: Map Word256 (Diff Word256)
     storage      :: Map String (Diff String)
     }
     deriving (Generic, Show)

@@ -86,7 +86,13 @@ stateDiffToChanges StateDiff{..} =
   ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
-
+  {-
+  (map (\(x, y) -> Action Create x (show $ codeHash y) (Just $ map (fmap newValue) $ Map.toList $ Map.mapKeys show $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> Action Delete x (show $ codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> Action Update x (show $ codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  where
+    newValue (Diff _ x) = show x
+  -}
 
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
@@ -222,6 +228,8 @@ processTheMessages messages = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
 
+  --liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
+
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -285,8 +293,10 @@ processTheMessages messages = do
 
       let strAbi = replace "\'" "\'\'" $ second contractMetaData
 
-      let name = third contractMetaData
+      let name = replace "\"" "" $ third contractMetaData
       liftIO $ putStrLn $ "CONTRACT NAME: " ++ name
+
+      --TODO: Add parsing of contract info to get flags (indexing, history)
 
       let ret =
             Map.fromList $ map (fmap valueToSolidityValue) $

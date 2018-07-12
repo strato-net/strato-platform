@@ -27,8 +27,8 @@ valueToText (_) = "text"
 
 listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement _ [] = []
-listToKeyStatement _ [(x, _)] = T.unpack x
-listToKeyStatement s ((x,_):es) = T.unpack x ++ s ++ (listToKeyStatement s es)
+listToKeyStatement _ [(x, _)] = "\"" ++ T.unpack x ++ "\""
+listToKeyStatement s ((x,_):es) = "\"" ++ T.unpack x ++ "\"" ++ s ++ (listToKeyStatement s es)
 
 valueToString :: String -> Value -> String
 valueToString s (String x) = s ++ T.unpack x ++ s
@@ -46,8 +46,8 @@ listToValueStatement s ((_, y):es) = valueToString "\'" y ++ s ++ (listToValueSt
 
 tableColumns :: [(T.Text, Value)] -> String
 tableColumns [] = []
-tableColumns [(x, y)] = T.unpack x ++ " " ++ valueToText y
-tableColumns ((x, y):es) = T.unpack x ++ " " ++ valueToText y ++ ", " ++ tableColumns es
+tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToText y
+tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToText y ++ ", " ++ tableColumns es
 
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
@@ -83,32 +83,41 @@ convertRet address codehash abi name x = do
   case decode x of
     Nothing -> putStrLn $ "Error"
     Just (Object y) -> do
-
+      --Revisit to fix table name duplicates
       --let contractName = take 63 codehash
 
+      --Indexing flag
+      let indFlag = True
+      let ind = if (indFlag)
+                  --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
+                  then "create index if not exists idx ON \"" ++ name ++ "\" (address);"
+                  else ""
+
+      --History flag
+      let histFlag = True
+      let hist = if (histFlag)
+                  --TODO: Add history insert statement (block ID, state, ???)
+                  then ""
+                  else ""
+
       --let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
-      let conVals = "('" ++ codehash ++ "', ' ++ name ++ ', '" ++ abi ++ "')"
+      let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "')"
       let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
 
       let list = H.toList $ H.filter isString y
+      putStrLn $ "{}{}{}list{}{}{}: " ++ show list
 
       let beg = "BEGIN;"
       let comm = "COMMIT;"
       --let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
-      let createSt = "create table if not exists " ++ name ++ " (address text, " ++ tableColumns list ++ ");"
-
-      let indFlag = True
-      let ind = if (indFlag)
-                  --Index in contract already
-                  --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
-                  then "create index if not exists idx ON " ++ name ++ " (address);"
-                  else ""
+      let createSt = "create table if not exists \"" ++ name ++ "\" (address text, " ++ tableColumns list ++ ");"
 
       let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
       let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
       --let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
-      let ins = "insert into " ++ name ++ " " ++ keys ++ " values " ++ vals ++ ";"
-      let oneIns = beg ++ conIns ++ createSt ++ ind ++ ins ++ comm
+      let ins = "insert into \"" ++ name ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
+      let oneIns = beg ++ conIns ++ createSt ++ ind ++ hist ++ ins ++ comm
+      putStrLn $ "^^^STATEMENT^^^: " ++ createSt
       p <- dbInsert oneIns
       print p
     Just(_) -> putStrLn $ "Received Non-Object"

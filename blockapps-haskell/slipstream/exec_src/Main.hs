@@ -9,7 +9,7 @@
     , FlexibleContexts
 #-}
 
-import           Control.Monad.Except
+import Control.Monad.Except
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
 import HFlags
@@ -24,8 +24,9 @@ main = do
   currentTime <- getCurrentTime
   liftIO $ putStrLn $ "Main -> " ++ show(currentTime)
 
-  --Indexing on
-  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); CREATE INDEX IF NOT EXISTS idx ON contract (\"codeHash\"); COMMIT;"
+  --Indexing off
+  --  CREATE INDEX IF NOT EXISTS idx ON contract (\"codeHash\");
+  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); COMMIT;" 
   dbInsert conCreate
 
   let offset = 0 :: K.Offset
