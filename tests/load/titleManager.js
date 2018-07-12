@@ -14,7 +14,6 @@ function* uploadContract(admin) {
   // for testing purposes the creator is the admin user
   const args = {_creator: admin.address};
   const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  console.log('Here is the contract that was uploaded', contract);
   yield compileSearch(contract.codeHash);
   contract.src = 'removed';
   return bind(admin, contract);
