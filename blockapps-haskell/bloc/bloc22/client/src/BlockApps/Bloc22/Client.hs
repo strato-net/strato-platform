@@ -21,6 +21,8 @@ module BlockApps.Bloc22.Client
   , getSearchContractStateReduced
   , getUsers
   , getUsersUser
+  , getUsersKeyStore
+  , postUsersKeyStore
   , postUsersUser
   , postUsersFill
   , postUsersSend
@@ -114,6 +116,12 @@ getUsersUser = client (Proxy @ GetUsersUser)
 
 postUsersUser :: UserName -> Password -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
+
+getUsersKeyStore :: UserName -> Address -> Password -> ClientM KeyStore
+getUsersKeyStore = client (Proxy @ GetUsersKeyStore)
+
+postUsersKeyStore :: UserName -> PostUsersKeyStoreRequest -> ClientM Bool
+postUsersKeyStore = client (Proxy @ PostUsersKeyStore)
 
 postUsersFill :: UserName -> Address -> Bool -> ClientM BlocTransactionResult
 postUsersFill = client (Proxy @ PostUsersFill)

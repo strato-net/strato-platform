@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Users where
 
 import           Control.Concurrent
 import           Control.Arrow
+import           Control.Exception.Lifted          (catch)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -37,6 +38,7 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Opaleye                           hiding (not, null, index)
+import           Database.PostgreSQL.Simple        (SqlError(..))
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -97,7 +99,43 @@ postUsersUser (UserName name) pass = blocTransaction $ do
   unless createdUser (throwError (DBError "failed to create user"))
   return $ keystoreAcctAddress keyStore
 
-postUsersFill :: UserName -> Address -> Bool -> Bloc BlocTransactionResult
+getUsersKeyStore :: UserName -> Address -> Password -> Bloc KeyStore
+getUsersKeyStore userName addr password = do
+  let err = throwError . UserError $ "invalid username or password"
+  uids <- blocQuery . getUserIdQuery $ userName
+  cryptos <- case listToMaybe uids of
+    Nothing -> err
+    Just uid -> blocQuery $ proc () -> do
+      (_, salt, pw, nonce, seckey, pubkey, addr', uid') <- queryTable keyStoreTable -< ()
+      restrict -< uid' .== constant (uid :: Int32)
+              .&& addr' .== constant addr
+      returnA -< (salt, pw, nonce, seckey, pubkey, addr')
+  case listToMaybe cryptos of
+    Nothing -> err
+    Just (salt, pw, nonce, seckey, pubkey, addr') ->
+      case decryptSecKey password salt nonce seckey of
+        Nothing -> err
+        Just _ -> return $ KeyStore salt pw nonce seckey pubkey addr'
+
+postUsersKeyStore :: UserName -> PostUsersKeyStoreRequest -> Bloc Bool
+postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
+  let err = throwError . UserError $ "invalid username or password"
+  uids <- blocQuery . getUserIdQuery $ username
+  uid <- case uids of
+    [] -> err
+    uid':_ -> return uid'
+  cryptos <- blocQuery $ proc () -> do
+      (_, salt, _, nonce, seckey, _, _, uid') <- queryTable keyStoreTable -< ()
+      restrict -< uid' .== constant (uid :: Int32)
+      returnA -< (salt, nonce, seckey)
+  case catMaybes . map (\(s, n, sk) -> decryptSecKey password s n sk) $ cryptos of
+    [] -> err
+    _ -> blocModify (insertKeyStore uid keystore) `catch`
+          \s@SqlError{..} -> throwError . AlreadyExists $
+            "keystore could not be inserted: " <> Text.pack (show s)
+
+
+postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
@@ -717,10 +755,7 @@ prepareTx sk txHeader = do
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
-  uIds <- blocQuery $ proc () -> do
-    (uId,name) <- queryTable usersTable -< ()
-    restrict -< name .== constant userName
-    returnA -< uId
+  uIds <- blocQuery . getUserIdQuery $ userName
   cryptos <- case listToMaybe uIds of
     Nothing -> throwError . UserError $
       "no user found with name: " <> getUserName userName

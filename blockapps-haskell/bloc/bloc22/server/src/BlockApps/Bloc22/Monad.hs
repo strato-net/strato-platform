@@ -118,20 +118,9 @@ data BlocError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
+  | AlreadyExists Text
   | RuntimeError SomeException
   deriving Show
-
-
-
-
-
-
-
-
-
-
-
-
 
 --------------------------------------------------------------------------------
 boxIt::String->String
@@ -221,6 +210,7 @@ enterBloc env x
                    ]}
           CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
           UserError err -> err400{errBody = fromString $ show err}
+          AlreadyExists err -> err409{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
             err500{errBody = fromString $ unlines
