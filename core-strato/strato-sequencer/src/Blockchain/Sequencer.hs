@@ -117,7 +117,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> do
                                     let rawBlock = ingestBlockToBlock bk
-                                    resp <- sendMessages [NewBlock rawBlock]
+                                    resp <- sendAllMessages [NewBlock rawBlock]
                                     $logInfoS "unboxAndTransform" . T.pack $ "Response from blockstanbul: " ++ show resp
                                     emitBlocks bk (ingestBlockToSequencedBlock bk)
 
