@@ -113,6 +113,10 @@ data StorageFilterParams = StorageFilterParams
   , qsChainId  :: Maybe ChainId
   }
 
+storageFilterParams :: StorageFilterParams
+storageFilterParams = StorageFilterParams
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
 {-data ChainInfoFilterParams = ChainInfoFilterParams
   { ciChainLabel     :: Maybe (Maybe Natural)
   , ciAddRule        :: Maybe Natural
@@ -125,9 +129,6 @@ chainInfoFilterParams :: ChainInfoFilterParams
 chainInfoFilterParams = ChainInfoFilterParams
   Nothing Nothing Nothing Nothing Nothing
 -}
-storageFilterParams :: StorageFilterParams
-storageFilterParams = StorageFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]
@@ -142,7 +143,7 @@ getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
-postChain :: {- Maybe Text -> Maybe Text -> Maybe Text -> Maybe [Text] -> Maybe [AccountBalance] -} ChainInfo -> ClientM Text
+postChain :: ChainInfo -> ClientM Text
 getChain :: Maybe [ChainId] -> ClientM [ChainInfo]
 getTxsFilter
   :<|> getTxsLast

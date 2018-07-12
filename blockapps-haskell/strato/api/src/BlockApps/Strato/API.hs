@@ -103,11 +103,6 @@ type API =
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
   :<|> "chain"
---    :> QueryParam "chainLabel" Text
---    :> QueryParam "addRule" Text
---    :> QueryParam "removeRule" Text
---    :> QueryParam "members" [Text]
---    :> QueryParam "accountBalance" [AccountBalance]
     :> ReqBody '[JSON] ChainInfo
     :> Post '[PlainText] Text
   :<|> "chain"
