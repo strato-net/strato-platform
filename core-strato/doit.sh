@@ -37,8 +37,13 @@ function newnode {
        runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
+  minLogLevel=LevelInfo
+  if [ "${evmDebugMode}" = true ] ; then
+      minLogLevel=LevelDebug
+  fi
+
   echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer >> logs/strato-sequencer 2>&1
+  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -49,10 +54,6 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
-  minLogLevel=LevelInfo
-  if [ "${evmDebugMode}" = true ] ; then
-      minLogLevel=LevelDebug
-  fi
 
   echo "Starting ethereum-vm"
   runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \

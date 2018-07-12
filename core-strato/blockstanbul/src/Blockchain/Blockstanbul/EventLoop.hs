@@ -128,10 +128,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   when authz $ case ev of
     IMsg (Preprepare auth v' pp) -> do
       pr <- use proposer
+      $logDebugS "blockstanbul" . T.pack $ "received preprepare: " ++ show pp
       when (sender auth == pr) $ do
-        proposal .= Just pp
+        $logDebugS "blockstanbul" "confirmed from the proposer"
         if v == v'
           then do
+            proposal .= Just pp
             pk <- use prvkey
             out <- signMessage pk $ Prepare (error "TODO(tim): refactor message types") v (blockHash pp)
             yield . OMsg $ out
