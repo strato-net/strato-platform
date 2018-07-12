@@ -3,6 +3,7 @@ module Blockchain.Blockstanbul
   , HasBlockstanbulContext(..)
   , newContext
   , sendMessages
+  , sendAllMessages
   , RoundNumber
   , SequenceNumber
   , View(..)

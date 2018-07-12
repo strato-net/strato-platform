@@ -1,23 +1,28 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
+import Data.Maybe (catMaybes)
+import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
+import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
-type StateMachineM m = (MonadState BlockstanbulContext m)
+type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m)
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 
@@ -88,7 +93,9 @@ hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
 roundChange = do
   nextView <- uses view (over round (+1))
-  yield . OMsg . RoundChange (error "TODO(tim): supply a private key to StateMachineM") $ nextView
+  pk <- use prvkey
+  out <- signMessage pk $ RoundChange (error "TODO(tim): refactor types") nextView
+  yield . OMsg $ out
 
 -- TODO(tim): Define an exit type from the conduit for sending blocks to the EVM
 -- TODO(tim): what to do if the block hasn't arrived yet?
@@ -117,7 +124,11 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-eventLoop :: (Monad m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
+loopback :: OutEvent -> Maybe InEvent
+loopback (OMsg x) = Just $ IMsg x
+loopback _ = Nothing
+
+eventLoop :: (MonadIO m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
@@ -127,8 +138,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (sender auth == pr) $ do
         proposal .= Just pp
         if v == v'
-          -- TODO(tim): use own auth
-          then yield . OMsg $ Prepare auth v (blockHash pp)
+          then do
+            pk <- use prvkey
+            out <- signMessage pk $ Prepare (error "TODO(tim): refactor message types") v (blockHash pp)
+            yield . OMsg $ out
           else roundChange
     IMsg (Prepare auth v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
@@ -138,8 +151,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       hasSent <- use hasPrepared
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
-        -- TODO(tim): use own auth
-        yield . OMsg $ Commit auth v di (error "TODO(tim): sign the hash")
+        pk <- use prvkey
+        out <- signMessage pk $ Commit (error "TODO(tim): refactor message types")
+                                       v
+                                       di
+                                       (error "TODO(tim): seal the commit")
+        yield . OMsg $ out
     IMsg (Commit auth v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- uses validators length
@@ -156,8 +173,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let sameRNCount = M.size . M.filter (== rn) $ rs
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
-        -- TODO(tim): use own auth
-        yield . OMsg $ RoundChange auth vn
+        pk <- use prvkey
+        out <- signMessage pk $ RoundChange (error "TODO(tim): refactor types") vn
+        yield . OMsg $ out
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of
@@ -171,13 +189,20 @@ class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m BlockstanbulContext
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
-sendMessages :: HasBlockstanbulContext m => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendMessages wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
-  -- Every run of the conduit has one, but the test itself also preserves the context
-  -- between runs.
+  -- Every run of the conduit has one, but the outer monad preserves the context between runs.
   ctx <- getBlockstanbulContext
   let base = yieldMany wms .| eventLoop ctx
   (ctx', evs) <- runConduit $ fuseBoth base sinkList
   putBlockstanbulContext ctx'
   return evs
+
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m ()
+sendAllMessages wms = do
+  out <- sendMessages wms
+  $logInfoS "sendAllMessages" . T.pack . show $ out
+  case catMaybes . map loopback $ out of
+    [] -> return ()
+    wms' -> sendAllMessages wms'

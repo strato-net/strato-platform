@@ -9,6 +9,7 @@ import Data.Monoid ((<>))
 import MonadUtils (liftIO1)
 import Test.QuickCheck
 
+import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB()
 import Blockchain.Data.ArbitraryInstances()
@@ -23,8 +24,8 @@ import qualified Network.Haskoin.Crypto as HK
 type RawExtraData = B.ByteString
 
 data IstanbulExtra = IstanbulExtra {
-  _validators :: [Address],
-  _proposal :: Maybe ExtendedSignature,
+  _validatorList :: [Address],
+  _proposedSig :: Maybe ExtendedSignature,
   _commitment :: [ExtendedSignature]
 } deriving (Eq, Show)
 makeLenses ''IstanbulExtra
@@ -70,7 +71,7 @@ cookRawExtra bs =
 
 scrubAllSeals :: RawExtraData -> RawExtraData
 scrubAllSeals = uncookRawExtra
-              . set (istanbul . _Just . proposal) Nothing
+              . set (istanbul . _Just . proposedSig) Nothing
               . set (istanbul . _Just . commitment) []
               . cookRawExtra
 
@@ -118,3 +119,23 @@ finalHash = hash
           . rlpEncode
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
+
+signMessage :: (MonadIO m) => HK.PrvKey -> WireMessage -> m WireMessage
+signMessage pk wm = do
+  let msg = getHash wm
+      addr = prvKey2Address pk
+  sig <- HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+  let auth = MsgAuth addr sig
+  return $ case wm of
+      Preprepare _ b c -> Preprepare auth b c
+      Prepare _ b c -> Prepare auth b c
+      Commit _ b c d -> Commit auth b c d
+      RoundChange _ b -> RoundChange auth b
+
+authenticate :: WireMessage -> Bool
+authenticate msg =
+  let MsgAuth addr sig = getAuth msg
+      msgHash = getHash msg
+      mKey = getPubKeyFromSignature sig msgHash
+      mAddress = pubKey2Address <$> mKey
+  in mAddress == Just addr

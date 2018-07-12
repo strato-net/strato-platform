@@ -21,6 +21,7 @@ dependencies:
   - strato-model
   - text
   - transformers
+  - monad-logger
 
 library:
   source-dirs: src/

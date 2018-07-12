@@ -62,8 +62,8 @@ sequencer = do
     ready <- atomically $ swapTMVar var False
     $logInfoS "isReady" . T.pack . show $ ready
     when ready $ do
-      resp <- sendMessages [Timeout]
-      $logInfoS "outer blockstanbul" . T.pack $ "Response from blockastanbul: " ++ show resp
+      resp <- sendAllMessages [Timeout]
+      $logInfoS "outer blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
       return ()
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"

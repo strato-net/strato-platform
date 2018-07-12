@@ -60,22 +60,14 @@ getAuth (Prepare a _ _) = a
 getAuth (Commit a _ _ _) = a
 getAuth (RoundChange a _) = a
 
-getHash :: WireMessage -> SHA
+getHash :: WireMessage -> Word256
 -- This is wrong, because this means that the prepare and commits
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
-getHash (Preprepare _ _ blk) = blockHash $ blk
-getHash (Prepare _ _ di) = di
-getHash (Commit _ _ di _) = di
-getHash (RoundChange _ _) = error "not yet defined for roundchange"
-
-authenticate :: WireMessage -> Bool
-authenticate msg =
-  let MsgAuth addr sig = getAuth msg
-      msgHash = getHash msg
-      mKey = getPubKeyFromSignature sig . unSHA $ msgHash
-      mAddress = pubKey2Address <$> mKey
-  in mAddress == Just addr
+getHash (Preprepare _ _ blk) = unSHA . blockHash $ blk
+getHash (Prepare _ _ di) = unSHA di
+getHash (Commit _ _ di _) = unSHA di
+getHash (RoundChange _ _) = unSHA $ hash "TODO(tim): this signature is predictable"
 
 -- TODO(tim): JSON instances
 
