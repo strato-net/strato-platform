@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it.only('resolve==true', function* () {
+  it('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -49,7 +49,7 @@ describe("Send Transaction List", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it('resolve==false', function* () {
+  it.only('resolve==false', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -66,10 +66,9 @@ describe("Send Transaction List", function() {
     const resolve = false;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
-
     const results = [];
     for (let receipt of receipts) {
-      const result = yield rest.waitTransactionResult(receipt.senderBalance);
+      const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
     const failed = results.filter(function (result) {
