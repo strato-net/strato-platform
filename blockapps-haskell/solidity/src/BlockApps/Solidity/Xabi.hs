@@ -352,31 +352,6 @@ instance ToSchema (MaybeNamed Address) where
         & example ?~ toJSON (Unnamed (Address 0xdeadbeef))
         & description ?~ "Contract Name, \"Latest\", Or Address" )
 
-instance ToHttpApiData (MaybeNamed ChainId) where
-  toUrlPiece (Named _name)  = _name
-  toUrlPiece (Unnamed cid) = Text.pack . chainIdString $ cid
-
-instance FromHttpApiData (MaybeNamed ChainId) where
-  parseUrlPiece txt = case stringChainId (Text.unpack txt) of
-    Nothing   -> Right $ Named txt
-    Just cid -> Right $ Unnamed cid
-
-instance ToSample (MaybeNamed ChainId) where
-  toSamples _ = [("Sample", Unnamed (ChainId 0xdeadbeef))]
-
-instance ToCapture (Capture "chainid" (MaybeNamed ChainId)) where
-  toCapture _ = DocCapture "chainid" "a chainId or Chain Label"
-
-instance ToParamSchema (MaybeNamed ChainId) where
-  toParamSchema _ = toParamSchema (Proxy :: Proxy ChainId)
-
-instance ToSchema (MaybeNamed ChainId) where
-  declareNamedSchema _ = return $ NamedSchema (Just "main, Or all, Or ChainId")
-      ( mempty
-        & type_ .~ SwaggerString
-        & example ?~ toJSON (Unnamed (ChainId 0xdeadbeef))
-        & description ?~ "main, Or all, Or ChainId" )   
-
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions
   { fieldLabelModifier = camelCase . dropFPrefix

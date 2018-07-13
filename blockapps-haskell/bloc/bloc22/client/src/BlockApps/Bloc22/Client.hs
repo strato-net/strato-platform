@@ -62,12 +62,12 @@ getContractsContract = client (Proxy @ GetContractsContract)
 getContractsState
   :: ContractName 
   -> MaybeNamed Address 
-  -> [MaybeNamed ChainId]
+  -> Maybe ChainId
   -> Maybe Text 
   -> Maybe Int
   -> Maybe Int
   -> Bool
-  -> ClientM (Either (Map Text SolidityValue) [(MaybeNamed ChainId, Map Text SolidityValue)])
+  -> ClientM (Map Text SolidityValue)
 getContractsState = client (Proxy @ GetContractsState)
 
 getContractsDetails
