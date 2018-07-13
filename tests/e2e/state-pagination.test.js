@@ -24,19 +24,19 @@ describe('State pagination', function () {
     contract = yield rest.uploadContract(admin, contractArrayName, contractArrayFilename, {}, false);
   });
 
-  it('should get the state of the uint by name', function * () {
+  it.only('should get the state of the uint by name', function * () {
     const state = yield rest.getStateVar(contract,'y');
     assert.equal(state.y, 5, "Variable y did not match expected state");
     assert.equal(state.x, null, "State path returned more data than expected");
   })
-  
+
   it('should get the state of the array by name', function * () {
     const state = yield rest.getStateVar(contract,'x');
     assert.equal(state.x.length, 10, "Variable x was not the correct length");
     assert.equal(state.x[0], 1, "Variable x was not in the correct state");
     assert.equal(state.y, null, "State path returned more data than expected");
   })
-  
+
   it('should get the only the second half of the array by name', function * () {
     const arrLength = 5;
     const arrOffset = 5;
@@ -46,7 +46,7 @@ describe('State pagination', function () {
     assert.equal(state.x[0], 6, "Variable x was not in the correct state");
     assert.equal(state.y, null, "State path returned more data than expected");
   })
-  
+
   it('should get the length of the array', function * () {
     const state = yield rest. getState(contract, 'x', null, null, true);
     assert.equal(state.x.length, 10, "Array length was not returned properly");
@@ -68,4 +68,3 @@ describe('State pagination', function () {
   }
 
 });
-
