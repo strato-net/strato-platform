@@ -199,7 +199,7 @@ ChainMemberRef
 ChainAccountBalanceRef
     chainInfoId ChainInfoRefId
     address Address
-    balance Word256
+    balance Integer
     deriving Eq Generic Read Show
 
 AccountInfoRef
