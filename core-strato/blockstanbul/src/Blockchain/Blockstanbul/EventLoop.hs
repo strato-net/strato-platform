@@ -180,10 +180,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Just r -> nextRound (Round r)
       return ()
     Timeout -> do
-      $logInfoS "blockstanbul" "Round timed out"
+      $logWarnS "blockstanbul" "Round timed out"
       roundChange
     CommitResult (Left err) -> do
-      $logInfoS "blockstanbul" err
+      $logWarnS "blockstanbul" err
       roundChange
     CommitResult (Right ()) -> do
       s <- use $ view . sequence
