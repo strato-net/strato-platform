@@ -97,8 +97,11 @@ spec = do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
-            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> shuffled)
-            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            outBlocks <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IEBlock <$> inChain)
+              oes <- toList <$> gets vmEvents
+              return [block | OEBlock block <- oes ]
+            ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
 
         it "should not deduplicate incoming transactions that are unique" $ do
