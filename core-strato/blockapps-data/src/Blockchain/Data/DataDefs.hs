@@ -48,6 +48,6 @@ instance ToJSON AddressState
 -- todo newtype me
 type Difficulty = Integer
 
-type AddressBalancePair = (Address, Word256)
+type AddressBalancePair = (Address, Integer)
 
 type MapPair = (Word256, Word256)

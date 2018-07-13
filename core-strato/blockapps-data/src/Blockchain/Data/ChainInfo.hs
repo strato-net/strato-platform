@@ -23,7 +23,7 @@ import           Test.QuickCheck.Arbitrary
 import           Control.Applicative
 
 newtype AccountBalance = AccountBalance {
-    unAccountBalance :: (Address, Word256)
+    unAccountBalance :: (Address, Integer)
 } deriving (Eq, Read, Show, GHCG.Generic)
 
 instance FromJSON AccountBalance where
@@ -41,7 +41,7 @@ data ChainInfo = ChainInfo {
     addRule         :: String,
     removeRule      :: String,
     members         :: [Enode],
-    accountBalance  :: [(Address, Word256)]
+    accountBalance  :: [(Address, Integer)]
 } deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Arbitrary ChainInfo where
