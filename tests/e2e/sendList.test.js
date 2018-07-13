@@ -77,7 +77,7 @@ describe("Send Transaction List", function() {
       return result.status != 'success';
     });
     assert.equal(failed.length, 0, 'some transactions failed ' + JSON.stringify(failed,null,2));
-
+    console.log('Here are the results', results);
     // check balances
     alice.endBalance = yield rest.getBalance(alice.address);
     bob.endBalance = yield rest.getBalance(bob.address);
