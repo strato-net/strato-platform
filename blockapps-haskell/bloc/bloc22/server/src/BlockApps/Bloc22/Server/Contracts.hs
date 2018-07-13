@@ -155,24 +155,27 @@ getContractsState :: ContractName
                   -> Maybe Int
                   -> Maybe Int
                   -> Bool
-                  -> Bloc [(MaybeNamed ChainId, GetContractsStateResponses)] -- state-translation
+                  -> Bloc (Either GetContractsStateResponses [(MaybeNamed ChainId, GetContractsStateResponses)]) -- state-translation
 getContractsState contract contractId chainIds mName mCount mOffset mLength = do
   case chainIds of 
-    [] -> do 
-      sequence $ [getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength] 
+    [] -> do
+      states <- getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength
+      sequence $ Left (snd states) 
     [cid] -> do
       case cid of
         Named "main" -> do
-          sequence $ [getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength] 
+          states <- getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength
+          sequence $ Left (snd states) 
         Named "all" -> do 
           throwError $ UserError "unimplemented"
         Named _ -> do 
           throwError $ UserError "invalid chainId"
         Unnamed ci -> do 
-          sequence $ [getContractsStateHelper contract contractId (Unnamed ci) mName mCount mOffset mLength] 
+          states <- getContractsStateHelper contract contractId (Unnamed ci) mName mCount mOffset mLength
+          sequence $ Left (snd states)
     cids -> do
-      forM cids $ \cid -> do 
-          getContractsStateHelper contract contractId cid mName mCount mOffset mLength
+      let states = mapM (\cid -> getContractsStateHelper contract contractId cid mName mCount mOffset mLength) cids
+      sequence $ Right states 
 
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do

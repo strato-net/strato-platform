@@ -117,7 +117,7 @@ type GetContractsState = "contracts"
   :> QueryParam "count" Int
   :> QueryParam "offset" Int
   :> QueryFlag "length"
-  :> Get '[JSON] [(MaybeNamed ChainId, GetContractsStateResponses)] -- change to HTML
+  :> Get '[JSON] (Either GetContractsStateResponses [(MaybeNamed ChainId, GetContractsStateResponses)]) -- change to HTML
 
 instance ToParam (QueryParams "chainid" (MaybeNamed ChainId)) where
   toParam _ = DocQueryParam "chainid" [] "ChainIds of private chains" Normal
