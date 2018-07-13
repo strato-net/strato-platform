@@ -22,6 +22,7 @@ import           Data.Maybe                                (fromMaybe)
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Constants
+import           Blockchain.Data.Address
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
@@ -95,7 +96,10 @@ runSequencerM c m = do
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
         -- TODO(tim): Use proper values
-        let ctx = newContext (View 0 0) [] (fromMaybe (error "invalid argument")  $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
+        let ctx = newContext
+                   (View 0 0)
+                   [Address 0x80976e7d04c8ae9b3a1c08278a5c385e5b0ff446]
+                   (fromMaybe (error "invalid argument")  $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
