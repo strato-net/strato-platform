@@ -28,27 +28,28 @@ describe('Throughput - fx call', function () {
   });
 
   it('should calculate method call throughput for network', function * () {
-   for(var k = 0; k < 1000; k++) {    
+   for(var k = 0; k < 1000; k++) {
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = yield createBatchTx(user, contracts[node.id]);      
-      generators.push(rest.callList(user, user.address, txs, true, node.id));
+      const txs = yield createBatchTx(user, contracts[node.id]);
+      generators.push(rest.callList(user, txs, true, node.id));
     }
 
     const bStartTime = moment();
     yield generators;
     const bEndTime = moment();
-
+    console.log('HERE I AM!');
     // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
-
+    var count = 1;
     let statesMatch = false;
     while (!statesMatch) {
       statesMatch = yield checkStates(k+1);
       yield promiseTimeout(1000);
+      console.log("Count: ", count++);
     }
 
     const endTime = moment();
@@ -91,6 +92,7 @@ describe('Throughput - fx call', function () {
     let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
+      console.log('state.x is', state);
       stateMatches &= (state.x == k*config.batchSize);
       if(!stateMatches)  {
         break;
@@ -118,4 +120,3 @@ describe('Throughput - fx call', function () {
   }
 
 });
-
