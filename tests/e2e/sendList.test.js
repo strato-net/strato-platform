@@ -66,7 +66,14 @@ describe("Send Transaction List", function() {
     // send List
     const resolve = false;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
+    console.log('About to enter the sendList function');
     const receipts = yield rest.sendList(alice, txs, resolve);
+    alice.endBalance = yield rest.getBalance(alice.address);
+    bob.endBalance = yield rest.getBalance(bob.address);
+    console.log('Here is Alice starting balance', alice.startingBalance);
+    console.log('Here is Alice end balance', alice.endBalance);
+    console.log('Here is Bob starting balance', bob.startingBalance);
+    console.log('Here is Bob end balance', bob.endBalance);
     const results = [];
 
     for (let receipt of receipts) {
@@ -77,14 +84,14 @@ describe("Send Transaction List", function() {
       return result.status != 'success';
     });
     assert.equal(failed.length, 0, 'some transactions failed ' + JSON.stringify(failed,null,2));
-    console.log('Here are the results', results);
+
     // check balances
-    alice.endBalance = yield rest.getBalance(alice.address);
-    bob.endBalance = yield rest.getBalance(bob.address);
-    console.log('Here is Alice starting balance', alice.startingBalance);
-    console.log('Here is Alice end balance', alice.endBalance);
-    console.log('Here is Bob starting balance', bob.startingBalance);
-    console.log('Here is Bob end balance', bob.endBalance);
+    // alice.endBalance = yield rest.getBalance(alice.address);
+    // bob.endBalance = yield rest.getBalance(bob.address);
+    // console.log('Here is Alice starting balance', alice.startingBalance);
+    // console.log('Here is Alice end balance', alice.endBalance);
+    // console.log('Here is Bob starting balance', bob.startingBalance);
+    // console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
     const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     console.log('HERE IS DELTA', delta);
