@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it('resolve==true', function* () {
+  it.only('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -31,16 +31,20 @@ describe("Send Transaction List", function() {
 
     assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
     // send List
-    const resolve = true;
+    const resolve = false;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
-
+    console.log('HERE IS THE RECEIPT', receipts);
     // check balances
     alice.endBalance = yield rest.getBalance(alice.address);
     bob.endBalance = yield rest.getBalance(bob.address);
-
+    console.log('Here is Alice starting balance', alice.startingBalance);
+    console.log('Here is Alice end balance', alice.endBalance.c[1]);
+    console.log('Here is Bob starting balance', bob.startingBalance);
+    console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
     const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
+    console.log('HERE IS DELTA', delta);
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
