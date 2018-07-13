@@ -27,7 +27,7 @@ describe('State pagination', function () {
   it('should get the state of the uint by name', function * () {
     const state = yield rest.getStateVar(contract,'y');
     assert.equal(state.y, 5, "Variable y did not match expected state");
-    assert.isUndefined(state.x, "State path returned more data than expected")
+    assert.isUndefined(state.x, "State path returned more data than expected");
   })
 
   it('should get the state of the array by name', function * () {
