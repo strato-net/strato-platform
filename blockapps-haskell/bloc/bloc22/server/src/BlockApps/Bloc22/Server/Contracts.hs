@@ -75,15 +75,15 @@ translateStorageMap storage' =
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
-getContractsStateHelper :: ContractName
-                        -> MaybeNamed Address
-                        -> MaybeNamed ChainId
-                        -> Maybe Text
-                        -> Maybe Int
-                        -> Maybe Int
-                        -> Bool
-                        -> Bloc (MaybeNamed ChainId, GetContractsStateResponses) -- state-translation
-getContractsStateHelper contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
+getContractsState :: ContractName
+                  -> MaybeNamed Address
+                  -> Maybe ChainId
+                  -> Maybe Text
+                  -> Maybe Int
+                  -> Maybe Int
+                  -> Bool
+                  -> Bloc GetContractsStateResponses -- state-translation
+getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -135,7 +135,7 @@ getContractsStateHelper contract@(ContractName contractName) contractId chainId 
     , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
     , "End of storage"
     ]
-  return $ (chainId, Map.fromList ret)
+  return $ Map.fromList ret
   where
     getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
     getStorageRange a (o,c) = do
@@ -143,37 +143,9 @@ getContractsStateHelper contract@(ContractName contractName) contractId chainId 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = case chainId of 
-                                 Named _ -> Nothing 
-                                 Unnamed cid -> Just cid
+                           , qsChainId = chainId 
                            }
  
-getContractsState :: ContractName
-                  -> MaybeNamed Address
-                  -> [MaybeNamed ChainId]
-                  -> Maybe Text
-                  -> Maybe Int
-                  -> Maybe Int
-                  -> Bool
-                  -> Bloc [(MaybeNamed ChainId, GetContractsStateResponses)] -- state-translation
-getContractsState contract contractId chainIds mName mCount mOffset mLength = do
-  case chainIds of 
-    [] -> do 
-      sequence $ [getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength] 
-    [cid] -> do
-      case cid of
-        Named "main" -> do
-          sequence $ [getContractsStateHelper contract contractId (Named "main") mName mCount mOffset mLength] 
-        Named "all" -> do 
-          throwError $ UserError "unimplemented"
-        Named _ -> do 
-          throwError $ UserError "invalid chainId"
-        Unnamed ci -> do 
-          sequence $ [getContractsStateHelper contract contractId (Unnamed ci) mName mCount mOffset mLength] 
-    cids -> do
-      forM cids $ \cid -> do 
-          getContractsStateHelper contract contractId cid mName mCount mOffset mLength
-
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError
