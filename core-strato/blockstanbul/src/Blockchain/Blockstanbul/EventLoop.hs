@@ -106,9 +106,6 @@ nextRound nt = do
   thisR <- use $ view . round
   let nextP = vals !! (fromIntegral thisR `mod` length vals)
   proposer .= nextP
-  self <- selfAddr
-  when (nextP == self) $ do
-    leftover $ error "TODO(tim): determine how to announce a proposal"
 
   prepared .= M.empty
   committed .= M.empty
@@ -123,6 +120,7 @@ loopback _ = Nothing
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
+  $logDebugS "blockstanbul" . T.pack $ "event: " ++ show ev
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
@@ -191,7 +189,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       nextRound . Sequence $ s+1
     NewBlock blk -> do
       ppl <- use proposal
-      when (isNothing ppl) $ do
+      leader <- use proposer
+      self <- selfAddr
+      when (isNothing ppl && leader == self) $ do
         proposal .= Just blk
         pk <- use prvkey
         out <- signMessage pk $ Preprepare (error "TODO(tim): refactor types") v blk
