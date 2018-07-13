@@ -7,7 +7,6 @@ module BlockApps.Strato.API
 where
 
 import           BlockApps.Strato.Types
-import           Data.Text              (Text)
 import           Numeric.Natural
 import           Servant.API
 
@@ -104,7 +103,7 @@ type API =
     :> Post '[PlainText] Keccak256
   :<|> "chain"
     :> ReqBody '[JSON] ChainInfo
-    :> Post '[PlainText] Text
+    :> Post '[JSON] ChainId
   :<|> "chain"
-    :> QueryParam "chainId" [ChainId]
-    :> Get '[JSON] [ChainInfo]
+    :> QueryParams "chainid" ChainId
+    :> Get '[JSON] [ChainIdChainInfo]

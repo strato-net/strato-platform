@@ -29,7 +29,6 @@ module BlockApps.Strato.Client
   ) where
 
 import           Data.Proxy
-import           Data.Text       (Text)
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
@@ -143,8 +142,8 @@ getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
-postChain :: ChainInfo -> ClientM Text
-getChain :: Maybe [ChainId] -> ClientM [ChainInfo]
+postChain :: ChainInfo -> ClientM ChainId
+getChain :: [ChainId] -> ClientM [ChainIdChainInfo]
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx

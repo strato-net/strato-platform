@@ -258,6 +258,7 @@ instance ToSchema ChainId where
     NamedSchema (Just "ChainId")
       ( mempty
         & type_ .~ SwaggerString
+        & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Private chain id, 32 byte hex encoded string" )
 
 newSecKey :: IO SecKey
