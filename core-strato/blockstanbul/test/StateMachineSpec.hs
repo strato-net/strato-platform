@@ -239,3 +239,11 @@ spec = parallel $ do
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
+    it "Round changes are idempotent" $ property $ \blk a ->
+      runTest $ do
+        _ <- setupRound blk [sender a]
+        next <- uses view (over round (+1))
+        _ <- sendMessages [IMsg $ RoundChange a next]
+        use view `shouldReturn` next
+        sendMessages [IMsg $ RoundChange a next] `shouldReturn` []
+        use view `shouldReturn` next

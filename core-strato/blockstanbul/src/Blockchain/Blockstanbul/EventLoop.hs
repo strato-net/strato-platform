@@ -116,15 +116,12 @@ nextRound nt = do
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
-  $logDebugS "blockstanbul" . T.pack $ "event: " ++ show ev
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
     IMsg (Preprepare auth v' pp) -> do
       pr <- use proposer
-      $logDebugS "blockstanbul" . T.pack $ "received preprepare: " ++ show pp
       when (sender auth == pr) $ do
-        $logDebugS "blockstanbul" "confirmed from the proposer"
         if v == v'
           then do
             proposal .= Just pp
@@ -158,7 +155,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         case ppl of
           Nothing -> error "TODO(tim): Decide how to handle this"
           Just blk -> yield . ReadyBlock $ blk
-    IMsg (RoundChange auth vn) -> when (_round v <= _round vn) $ do
+    IMsg (RoundChange auth vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
       total <- uses validators length
@@ -208,7 +205,10 @@ sendMessages wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
   ctx <- getBlockstanbulContext
-  let base = yieldMany wms .| eventLoop ctx
+  let base = yieldMany wms
+          .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . show)
+          .| eventLoop ctx
+          `fuseUpstream` iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show)
   (ctx', evs) <- runConduit $ fuseBoth base sinkList
   putBlockstanbulContext ctx'
   return evs
@@ -217,6 +217,6 @@ sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEv
 sendAllMessages wms = do
   out <- sendMessages wms
   $logInfoS "sendAllMessages" . T.pack . show $ out
-  out ++ case catMaybes . map loopback $ out of
-             [] -> return []
-             wms' -> out ++ sendAllMessages wms'
+  case catMaybes . map loopback $ out of
+             [] -> return out
+             wms' -> (out ++) <$> sendAllMessages wms'
