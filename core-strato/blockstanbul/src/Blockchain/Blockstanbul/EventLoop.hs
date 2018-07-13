@@ -145,10 +145,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
         pk <- use prvkey
+        seal <- commitmentSeal di pk
         out <- signMessage pk $ Commit (error "TODO(tim): refactor message types")
                                        v
                                        di
-                                       (error "TODO(tim): seal the commit")
+                                       seal
         yield . OMsg $ out
     IMsg (Commit auth v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
