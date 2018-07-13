@@ -7,15 +7,13 @@ module Blockchain.JCommand (
                  jcompile
                 ) where
 
-import           Prelude               hiding (EQ, GT, LT)
+import           Prelude               hiding (EQ, GT, LT, Word)
 
-import           Control.Applicative
 import           Control.Monad
 
 import           Blockchain.Data.Code
 import           Blockchain.Util
 import           Blockchain.VM.Opcodes
-
 import           Blockchain.ExtWord
 
 data Storage = PermStorage Word | MemStorage Word deriving (Show)
@@ -143,3 +141,4 @@ jCommand2Op (ReturnCode (Code codeBytes')) = do
               RETURN
              ]
              ++ [LABEL codeBegin, DATA codeBytes', LABEL codeEnd]
+jCommand2Op (ReturnCode (PrecompiledCode _)) = error "jcommand: not implemented"
