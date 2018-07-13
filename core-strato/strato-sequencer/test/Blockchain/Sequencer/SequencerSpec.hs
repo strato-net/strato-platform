@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.SequencerSpec where
 
+import           Data.Foldable                       (toList)
 import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
 import           Control.Exception                   (finally)
 import           Control.Monad.Logger
+import           Control.Monad.State                 (gets)
 
 import           Blockchain.Format
 import           Blockchain.Output
@@ -84,8 +86,11 @@ spec = do
         it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
-            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> inChain)
-            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            outBlocks <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IEBlock <$> inChain)
+              oes <- toList <$> gets vmEvents
+              return [block | OEBlock block <- oes ]
+            ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
 
         it "transformEvents should output blocks in partial order based on parent hash when input is out of order" $ do
