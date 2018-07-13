@@ -114,10 +114,6 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-loopback :: OutEvent -> Maybe InEvent
-loopback (OMsg x) = Just $ IMsg x
-loopback _ = Nothing
-
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   $logDebugS "blockstanbul" . T.pack $ "event: " ++ show ev
@@ -176,7 +172,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of
-          Nothing -> error "a round was voted on without existing"
+          Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
       return ()
     Timeout -> do
@@ -195,12 +191,17 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         proposal .= Just blk
         pk <- use prvkey
+        -- TODO(tim): Seal proposal in extraData
         out <- signMessage pk $ Preprepare (error "TODO(tim): refactor types") v blk
         yield . OMsg $ out
 
 class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m BlockstanbulContext
   putBlockstanbulContext :: BlockstanbulContext -> m ()
+
+loopback :: OutEvent -> Maybe InEvent
+loopback (OMsg x) = Just $ IMsg x
+loopback _ = Nothing
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendMessages wms = do
@@ -212,10 +213,10 @@ sendMessages wms = do
   putBlockstanbulContext ctx'
   return evs
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m ()
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   out <- sendMessages wms
   $logInfoS "sendAllMessages" . T.pack . show $ out
-  case catMaybes . map loopback $ out of
-    [] -> return ()
-    wms' -> sendAllMessages wms'
+  out ++ case catMaybes . map loopback $ out of
+             [] -> return []
+             wms' -> out ++ sendAllMessages wms'

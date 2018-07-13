@@ -60,10 +60,9 @@ sequencer = do
   var <- liftIO $ createBlockstanbulRoundTimer 100
   forever $ do
     ready <- atomically $ swapTMVar var False
-    $logInfoS "isReady" . T.pack . show $ ready
     when ready $ do
       resp <- sendAllMessages [Timeout]
-      $logInfoS "outer blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
+      $logDebugS "seq/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
       return ()
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
