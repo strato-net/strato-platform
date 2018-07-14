@@ -7,24 +7,21 @@
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..)
-  , ChainIdChainInfo (..)
   ) where
 
-import           Data.Aeson
-
 import           Blockchain.Data.ArbitraryInstances()
-import           Blockchain.Data.RLP
-import           Blockchain.ExtWord              (Word256)
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.Enode
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
-import qualified GHC.Generics                              as GHCG
-import           Data.Monoid ((<>))
-import qualified Data.Text                       as T
-import           Data.Text.Encoding              (encodeUtf8, decodeUtf8)
+
+import           Data.Aeson
+import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
+
+import qualified GHC.Generics                         as GHCG
 
 import           Test.QuickCheck.Arbitrary
-import           Control.Applicative
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
@@ -80,19 +77,3 @@ instance RLPSerializable ChainInfo where
       (rlpDecode <$> ms)
       (rlpDecode <$> ab)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
-
-newtype ChainIdChainInfo = ChainIdChainInfo {
-    unChainIdChainInfo :: (Word256, ChainInfo)
-} deriving (Eq, Read, Show, GHCG.Generic)
-
-instance FromJSON ChainIdChainInfo where
-  parseJSON (Object a) =
-    ChainIdChainInfo <$> liftA2 (,) (a .: "chainId") (a .: "chainInfo")
-  parseJSON x = error $ "couldn't parse JSON for (chainId, chainInfo): " ++ show x
-
-instance ToJSON ChainIdChainInfo where
-  toEncoding (ChainIdChainInfo (cid, cinfo)) =
-    pairs (
-      "chainId" .= cid <>
-      "chainInfo" .= cinfo
-    )
