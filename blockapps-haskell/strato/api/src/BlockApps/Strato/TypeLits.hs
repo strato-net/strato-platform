@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE KindSignatures        #-}
@@ -19,9 +20,11 @@ import           Data.Aeson
 import           Data.Aeson.Types    (Parser)
 import           Data.Proxy
 import qualified Data.Text           as Text
+import           GHC.Generics
 import           GHC.TypeLits
 
 data NamedTuple (k :: Symbol) a (v :: Symbol) b = NamedTuple (a,b)
+  deriving (Eq, Ord, Show, Generic)
 
 type NamedTupleParser k a v b = Parser (NamedTuple k a v b)
 
