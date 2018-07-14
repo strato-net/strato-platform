@@ -80,8 +80,7 @@ import           Text.Read.Lex
 import           BlockApps.Ethereum           (Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
-                                               keccak256lazy, stringAddress,
-                                               stringChainId)
+                                               keccak256lazy, stringAddress)
 import           BlockApps.Strato.TypeLits
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
@@ -656,17 +655,14 @@ instance ToJSON ChainInfo where
     ,  "accountBalance" .= ciAccountBalance x
     ]
 
-data ChainIdChainInfo = ChainIdChainInfo (ChainId, ChainInfo) deriving (Eq, Show, Generic)
+type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
 
 instance ToSchema ChainIdChainInfo where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "(ChainId, ChainInfo)"
+    & mapped.schema.description ?~ "ChainId and ChainInfo pair"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: ChainIdChainInfo
-      ex = ChainIdChainInfo (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
-        , exampleChainInfo)
-
-instance FromJSON ChainIdChainInfo
-
-instance ToJSON ChainIdChainInfo
+      ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleChainInfo)
