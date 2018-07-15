@@ -638,21 +638,21 @@ instance ToSchema ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "chainLabel" <*>
+    o .: "label" <*>
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    o .: "accountBalance"
+    o .: "balances"
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON x =
     object [
-       "chainLabel" .= chainLabel x
+       "label" .= chainLabel x
     ,  "addRule" .= addRule x
     ,  "removeRule" .= removeRule x
     ,  "members" .= members x
-    ,  "accountBalance" .= ciAccountBalance x
+    ,  "balances" .= ciAccountBalance x
     ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo

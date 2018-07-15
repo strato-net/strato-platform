@@ -42,20 +42,20 @@ instance Arbitrary ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "chainLabel" <*>
+    o .: "label" <*>
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    (map toTuple <$> ((o .: "accountBalance") :: NamedMapParser "address" Address "balance" Integer))
+    (map toTuple <$> ((o .: "balances") :: NamedMapParser "address" Address "balance" Integer))
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON (ChainInfo cl ar rr ms ab) =
-    object [ "chainLabel" .= cl
+    object [ "label" .= cl
            , "addRule" .= ar
            , "removeRule" .= rr
            , "members" .= ms
-           , "accountBalance" .= ((map fromTuple ab) :: NamedMap "address" Address "balance" Integer)
+           , "balances" .= ((map fromTuple ab) :: NamedMap "address" Address "balance" Integer)
            ]
 
 instance KnownSymbol "address" where
