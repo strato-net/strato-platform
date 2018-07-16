@@ -38,7 +38,7 @@ class UplaodFile extends Component {
             this.props.closeUploadModal();
           }}
           iconName={result ? 'saved' : 'pt-icon-upload'}
-          title={result ? 'URI Upload Success' : 'Upload'}
+          title={result ? 'URI Upload Success' : 'Upload & attest'}
           className="pt-dark upload-dialog"
         >
           {result ? <UploadData result={this.props.result} closeModal={() => this.props.closeUploadModal()} /> : <UploadForm />}

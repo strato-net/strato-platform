@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { Button } from '@blueprintjs/core';
+import { Button, Tooltip, Position } from '@blueprintjs/core';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { openUploadModal } from './UploadFile/uploadFile.actions';
 import UploadFile from './UploadFile';
@@ -30,13 +30,18 @@ class ExternalStorage extends Component {
             <h3>External Storage</h3>
           </div>
           <div className="col-sm-8 text-right">
-            <Button
-              onClick={() => {
-                mixpanelWrapper.track('open_upload_modal');
-                this.props.openUploadModal();
-              }}
-              className="pt-intent-primary button-spacing pt-icon-upload"
-              text="Upload" />
+            <Tooltip
+              content={<span>Upload a file and verify it with a cryptographic signature</span>}
+              position={Position.TOP}
+            >
+              <Button
+                onClick={() => {
+                  mixpanelWrapper.track('open_upload_modal');
+                  this.props.openUploadModal();
+                }}
+                className="pt-intent-primary button-spacing pt-icon-upload"
+                text="Upload" />
+            </Tooltip>
             <Button
               onClick={() => {
                 mixpanelWrapper.track('open_attest_modal');

@@ -71,7 +71,9 @@ exports[`ExternalStorage: index render component with values 1`] = `
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
-      <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-upload\\" text=\\"Upload\\" />
+      <Blueprint.Tooltip content={{...}} position={1} hoverCloseDelay={0} hoverOpenDelay={100} isDisabled={false} openOnTargetFocus={true} rootElementTag=\\"span\\" transitionDuration={100} useSmartArrowPositioning={true} useSmartPositioning={false}>
+        <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-upload\\" text=\\"Upload\\" />
+      </Blueprint.Tooltip>
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-tick\\" text=\\"Attest\\" />
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-info-sign\\" text=\\"Verify\\" />
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-download\\" text=\\"Download\\" />
@@ -94,7 +96,9 @@ exports[`ExternalStorage: index render component without values 1`] = `
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
-      <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-upload\\" text=\\"Upload\\" />
+      <Blueprint.Tooltip content={{...}} position={1} hoverCloseDelay={0} hoverOpenDelay={100} isDisabled={false} openOnTargetFocus={true} rootElementTag=\\"span\\" transitionDuration={100} useSmartArrowPositioning={true} useSmartPositioning={false}>
+        <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-upload\\" text=\\"Upload\\" />
+      </Blueprint.Tooltip>
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-tick\\" text=\\"Attest\\" />
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-info-sign\\" text=\\"Verify\\" />
       <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary button-spacing pt-icon-download\\" text=\\"Download\\" />
