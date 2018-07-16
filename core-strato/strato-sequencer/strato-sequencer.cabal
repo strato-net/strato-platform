@@ -92,6 +92,7 @@ test-suite strato-sequencer-spec
                     , strato-sequencer
                     , strato-conf
                     , strato-genesis
+                    , strato-model
                     , blockapps-util
                     , hflags
                     , monad-logger
