@@ -44,14 +44,12 @@ describe('Throughput - fx call', function () {
     const bStartTime = moment();
     yield generators;
     const bEndTime = moment();
-    console.log('HERE I AM!');
     // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
-    var count = 1;
+    console.log('Here is k', k);
     let statesMatch = false;
     while (!statesMatch) {
       statesMatch = yield checkStates(k+1);
       yield promiseTimeout(1000);
-      console.log("Count: ", count++);
     }
 
     const endTime = moment();
@@ -94,7 +92,6 @@ describe('Throughput - fx call', function () {
     let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
-      console.log('state.x is', state);
       stateMatches &= (state.x == k*batchSize);
       if(!stateMatches)  {
         break;
