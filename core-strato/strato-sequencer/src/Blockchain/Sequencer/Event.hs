@@ -88,6 +88,7 @@ data JsonRpcCommand
 data OutputEvent = OETx Timestamp OutputTx
                  | OEBlock OutputBlock
                  | OEGenesis OutputGenesis
+                 | OEUpdate OutputUpdate
                  | OEJsonRpcCommand JsonRpcCommand
                  | OEGetChain [Word256]
                  | OEGetTx [SHA]
@@ -97,6 +98,7 @@ instance Format OutputEvent where
   format (OETx ts o)       = show ts ++ " " ++ format o
   format (OEBlock o)       = format o
   format (OEGenesis o)     = show o
+  format (OEUpdate o)      = show o
   format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
   format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format x                 = show x
@@ -118,8 +120,15 @@ data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
                                    } deriving (Eq, Read, Show, GHCG.Generic)
 
+data OutputUpdate = OutputUpdate { ouOrigin :: TO.TXOrigin
+                                 , ouUpdate :: (Word256, [Enode])
+                                 } deriving (Eq, Read, Show, GHCG.Generic)
+
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
+
+ingestUpdateToOutputUpdate :: IngestUpdate -> OutputUpdate
+ingestUpdateToOutputUpdate (IngestUpdate o u) = OutputUpdate o u 
 
 blockToIngestBlock :: TO.TXOrigin -> DD.Block -> IngestBlock
 blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
@@ -236,6 +245,7 @@ instance Binary SequencedBlock where
 instance Binary OutputTx where
 instance Binary OutputBlock where
 instance Binary OutputGenesis where
+instance Binary OutputUpdate where
 
 instance Binary IngestEvent where
     -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
@@ -282,6 +292,7 @@ instance Binary OutputEvent where
     put (OEGenesis g)        = putWord8 4 >> put g
     put (OEGetChain cid)     = putWord8 5 >> put cid
     put (OEGetTx tx)         = putWord8 6 >> put tx
+    put (OEUpdate u)         = putWord8 7 >> put u
     get = do
         tag <- getWord8
         case tag of
@@ -292,6 +303,7 @@ instance Binary OutputEvent where
             4 -> OEGenesis <$> get
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
+            7 -> OEUpdate <$> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

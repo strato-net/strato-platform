@@ -376,6 +376,9 @@ splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETUpdate -> do
+      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestUpdates"
+      mapM_ (\(IEUpdate u) -> markForVM (OEUpdate $ ingestUpdateToOutputUpdate u)) events     
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
