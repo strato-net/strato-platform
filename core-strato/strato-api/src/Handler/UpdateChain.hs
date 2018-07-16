@@ -13,6 +13,7 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IEUpdate), IngestU
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
 
+import           Blockchain.Data.ChainInfoDB
 import           Blockchain.Data.Enode
 import           Blockchain.ExtWord             (Word256)
 
@@ -26,14 +27,16 @@ emitKafkaTransactions us = do
         Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
-
-postUpdateChainR :: Handler Text
+postUpdateChainR :: Handler Value
 postUpdateChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
   ci <- parseJsonBody :: Handler (Result (Word256, [Enode]))
   case ci of
-    Success gen -> do 
+    Success gen@(cid, _) -> do 
       liftIO $ putStrLn $ T.pack $ show gen 
       emitKafkaTransactions [gen]
-      return . T.pack . show $ gen
+      chainInfo <- getChainInfos [cid]
+      case chainInfo of
+        [] -> invalidArgs ["the target chain does not exit"]
+        cInfo -> returnJson cInfo 
     _ -> invalidArgs ["could not parse the args"]
