@@ -6,8 +6,7 @@ import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
 import { closeVerifyModal, verifyDocumentRequest, resetError } from './verify.actions';
-import moment from 'moment';
-import { parseDateFromString } from '../../../lib/dateUtils';
+import { parseDateFromTimestamp } from '../../../lib/dateUtils';
 import { toasts } from '../../Toasts';
 
 import './verify.css';
@@ -105,7 +104,7 @@ class Verify extends Component {
               <label> Date Uploaded </label>
             </div>
             <div className="col-sm-9">
-              <label> {data.timestamp && parseDateFromString(moment(data.timestamp).toISOString())} </label>
+              <label> { parseDateFromTimestamp(data.timeStamp) } </label>
             </div>
           </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import Verify, { mapStateToProps } from '../../../components/ExternalStorage/Verify';
 import { createStore, combineReducers } from 'redux';
 import { reducer as formReducer } from 'redux-form';
+import * as dateUtils from "../../../lib/dateUtils";
 
 describe('Verify: index', () => {
   let store
@@ -11,6 +12,9 @@ describe('Verify: index', () => {
   });
 
   describe('render component', () => {
+    beforeEach(() => {
+      dateUtils.parseDateFromTimestamp = jest.fn().mockReturnValue('2018-07-16 01:49:16 AM');
+    });
 
     test('without values', () => {
       const props = {
@@ -39,7 +43,7 @@ describe('Verify: index', () => {
         isLoading: false,
         verifyDocument: {
           "uri": "https://strato-external-storage.s3.amazonaws.com/1530182373708-widescreen.jpeg",
-          "timeStamp": null,
+          "timeStamp": 1531721964,
           "signers": [
             "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
             "a51f27e78aef85a06631f0725f380001e0ae9fb6"
