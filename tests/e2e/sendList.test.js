@@ -138,6 +138,7 @@ function createBatchTx(batchSize, batchValue, toUser, nonce) {
       txParams: {nonce: nonce+i},
     });
   }
+  console.log('Here are the txs', txs);
   return txs;
 }
 
