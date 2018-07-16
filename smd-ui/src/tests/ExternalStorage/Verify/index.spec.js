@@ -2,7 +2,6 @@ import React from 'react';
 import Verify, { mapStateToProps } from '../../../components/ExternalStorage/Verify';
 import { createStore, combineReducers } from 'redux';
 import { reducer as formReducer } from 'redux-form';
-import * as dateUtils from "../../../lib/dateUtils";
 
 describe('Verify: index', () => {
   let store
@@ -12,9 +11,6 @@ describe('Verify: index', () => {
   });
 
   describe('render component', () => {
-    beforeEach(() => {
-      dateUtils.parseDateFromTimestamp = jest.fn().mockReturnValue('2018-07-16 01:49:16 AM');
-    });
 
     test('without values', () => {
       const props = {
