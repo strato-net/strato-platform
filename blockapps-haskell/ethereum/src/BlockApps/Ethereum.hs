@@ -83,6 +83,9 @@ import           Test.QuickCheck
 import           Text.Read              hiding (String)
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
+instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
+  arbitrary = LargeKey <$> arbitrary <*> arbitrary
+
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
 
