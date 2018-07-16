@@ -83,9 +83,6 @@ import           BlockApps.Ethereum           (Address (..), ChainId (..),
                                                keccak256lazy, stringAddress)
 import           BlockApps.Strato.TypeLits
 
-instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = LargeKey <$> arbitrary <*> arbitrary
-
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)

@@ -33,6 +33,7 @@ import           Blockchain.Bagger.BaggerState (defaultBaggerState)
 import           Blockchain.Constants
 import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
@@ -77,6 +78,10 @@ runContextM' f = do
                         (error "Postgres connection no initialized") --conn
                         M.empty
                         M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
                         defaultBaggerState
                         (error "Kafka not initialized") --initialKafkaState
                         Unspecified
@@ -102,7 +107,7 @@ spec = do
           txInit = Code i
 
         _ <- create isRunningTests isHomestead S.empty blockData 0 tAddr tAddr txValue txGasPrice availableGas newAddress txInit
-        addressState <- getAddressState Nothing newAddress
+        addressState <- getAddressState newAddress
         liftIO . putStrLn $ show addressState
         code <- fromMaybe C8.empty <$> getCode (addressStateCodeHash addressState)
         liftIO . putStrLn $ show $ B16.encode code
