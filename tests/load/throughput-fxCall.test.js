@@ -28,15 +28,15 @@ describe('Throughput - fx call', function () {
   });
 
   it('should calculate method call throughput for network', function * () {
-    
+
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = createBatchTx(user, contracts[node.id]);      
-      generators.push(rest.callList(user, user.address, txs, true, node.id));
+      const txs = createBatchTx(user, contracts[node.id]);
+      generators.push(rest.callList(user, txs, true, node.id));
     }
 
     console.log('Submitting txs');
@@ -118,4 +118,3 @@ describe('Throughput - fx call', function () {
   }
 
 });
-
