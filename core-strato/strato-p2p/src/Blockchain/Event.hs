@@ -275,12 +275,6 @@ handleEvents mode peer = awaitForever $ \case
       stampActionTimestamp
       RBDB.withRedisBlockDB $ mapM_ (uncurry RBDB.putChainInfo) chpairs
       mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
-      
-      let pIp = readIP $ T.unpack (pPeerIp peer)
-      let ipList::[IPAddress] = ipAddress <$> (concat $ members <$> (snd <$> chpairs))
-       
-      peerListFromSQL::[Maybe (SQL.Entity PPeer)] <- (fromJust <$> (map (getPeerByIP) (showIP <$> ipList)))
-      return ()
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
