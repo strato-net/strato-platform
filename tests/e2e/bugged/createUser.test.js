@@ -63,6 +63,7 @@ describe("Create User - isAsync (do not resolve)", function() {
     // create user
     const isAsync = true;
     const user = yield rest.createUser(username, password, isAsync);
+    ba.util.sleep(36000)
     // fill
     const resolve = true;
     const txResult = yield rest.fill(user, resolve);
@@ -87,6 +88,7 @@ describe("Create User - sync (resolve)", function() {
     const username = 'User' + uid;
     // create user
     const user = yield rest.createUser(username, password);
+    ba.util.sleep(36000)
     assert.isDefined(user, "should exist");
     assert.isDefined(user.address, "should be defined");
     assert.notEqual(user.address, 0, "should be a nonzero address");
