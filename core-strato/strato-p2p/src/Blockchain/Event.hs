@@ -27,8 +27,6 @@ import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 
-import qualified Database.Persist.Sql                  as SQL
-
 import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
