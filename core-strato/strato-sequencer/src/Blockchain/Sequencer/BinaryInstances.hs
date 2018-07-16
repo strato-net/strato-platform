@@ -15,9 +15,19 @@ import           Blockchain.Data.RLP
 import           Blockchain.ExtWord          ()
 import           Blockchain.SHA              ()
 
+import           Data.Time.Clock             (UTCTime)
 import           Data.Time.Clock.POSIX
 
 import           Data.ByteString             ()
+
+utcTimeToInteger :: UTCTime -> Integer
+utcTimeToInteger = (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
+
+integerToUtcTime :: Integer -> UTCTime
+integerToUtcTime = posixSecondsToUTCTime . fromInteger
+
+-- roundedTimestamp :: UTCTime -> UTCTime
+-- roundedTimestamp = integerToUtcTime . utcTimeToInteger
 
 instance Binary TX.Transaction where
     put = put . rlpSerialize . rlpEncode
@@ -38,7 +48,7 @@ instance Binary DD.BlockData where
         , put . DD.blockDataNumber
         , put . DD.blockDataGasLimit
         , put . DD.blockDataGasUsed
-        , put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds . DD.blockDataTimestamp
+        , put . utcTimeToInteger . DD.blockDataTimestamp
         , put . DD.blockDataExtraData
         , put . DD.blockDataNonce
         , put . DD.blockDataMixHash
@@ -55,7 +65,7 @@ instance Binary DD.BlockData where
         number           <- get
         gasLimit         <- get
         gasUsed          <- get
-        timestamp        <- (posixSecondsToUTCTime . fromInteger) <$> get
+        timestamp        <- integerToUtcTime <$> get
         extraData        <- get
         nonce            <- get
         mixHash          <- get
