@@ -45,7 +45,6 @@ describe('Throughput - fx call', function () {
     yield generators;
     const bEndTime = moment();
     // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
-    console.log('Here is k', k);
     let statesMatch = false;
     while (!statesMatch) {
       statesMatch = yield checkStates(k+1);
