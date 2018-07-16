@@ -94,6 +94,10 @@ describe('Throughput - fx call', function () {
     let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
+      console.log('HERE IS COMMON', common);
+      console.log('Here is config', config);
+      console.log('Here is state.x', state.x);
+      console.log('Here is config.batchSize', config.batchSize);
       stateMatches &= (state.x == config.batchSize);
       if(!stateMatches)  {
         break;
