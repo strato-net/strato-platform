@@ -54,6 +54,7 @@ library
                      Handler.LogInfo
                      Handler.UUIDInfo
                      Handler.Peers
+                     Handler.UpdateChain
                      Versioning
 
     if flag(dev) || flag(library-only)

@@ -12,6 +12,7 @@ import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -32,20 +33,22 @@ import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
-data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
+data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis | IEUpdate IngestUpdate deriving (Eq, Read, Show, GHCG.Generic)
 
-data IngestEventType = IETTransaction | IETBlock | IETGenesis deriving (Eq, Ord, Show)
+data IngestEventType = IETTransaction | IETBlock | IETGenesis | IETUpdate deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
 iEventType = \case
   IETx _ _    -> IETTransaction
   IEBlock _   -> IETBlock
   IEGenesis _ -> IETGenesis
+  IEUpdate _  -> IETUpdate
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
+  format (IEUpdate o) = show o
 
 type Timestamp = Microtime
 
@@ -62,6 +65,10 @@ data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
 data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
                                    , igGenesisInfo     :: (Word256, ChainInfo)
                                    } deriving (Eq, Read, Show, GHCG.Generic)
+
+data IngestUpdate = IngestUpdate { iuOrigin :: TO.TXOrigin
+                                 , iuUpdate :: (Word256, [Enode])
+                                 } deriving (Eq, Read, Show, GHCG.Generic)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbHash                :: SHA
@@ -81,6 +88,7 @@ data JsonRpcCommand
 data OutputEvent = OETx Timestamp OutputTx
                  | OEBlock OutputBlock
                  | OEGenesis OutputGenesis
+                 | OEUpdate OutputUpdate
                  | OEJsonRpcCommand JsonRpcCommand
                  | OEGetChain [Word256]
                  | OEGetTx [SHA]
@@ -90,6 +98,7 @@ instance Format OutputEvent where
   format (OETx ts o)       = show ts ++ " " ++ format o
   format (OEBlock o)       = format o
   format (OEGenesis o)     = show o
+  format (OEUpdate o)      = show o
   format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
   format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format x                 = show x
@@ -111,8 +120,15 @@ data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
                                    } deriving (Eq, Read, Show, GHCG.Generic)
 
+data OutputUpdate = OutputUpdate { ouOrigin :: TO.TXOrigin
+                                 , ouUpdate :: (Word256, [Enode])
+                                 } deriving (Eq, Read, Show, GHCG.Generic)
+
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
+
+ingestUpdateToOutputUpdate :: IngestUpdate -> OutputUpdate
+ingestUpdateToOutputUpdate (IngestUpdate o u) = OutputUpdate o u 
 
 blockToIngestBlock :: TO.TXOrigin -> DD.Block -> IngestBlock
 blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
@@ -224,16 +240,19 @@ instance Ord OutputTx where
 instance Binary IngestTx where
 instance Binary IngestBlock where
 instance Binary IngestGenesis where
+instance Binary IngestUpdate where
 instance Binary SequencedBlock where
 instance Binary OutputTx where
 instance Binary OutputBlock where
 instance Binary OutputGenesis where
+instance Binary OutputUpdate where
 
 instance Binary IngestEvent where
     -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
     put (IETx ts t) = putWord8 2 >> put ts >> put t
     put (IEBlock b) = putWord8 1 >> put b
     put (IEGenesis g) = putWord8 3 >> put g
+    put (IEUpdate u) = putWord8 4 >> put u
     get = do
         tag <- getWord8
         case tag of
@@ -241,6 +260,7 @@ instance Binary IngestEvent where
             1 -> IEBlock  <$> get
             2 -> IETx <$> get <*> get
             3 -> IEGenesis <$> get
+            4 -> IEUpdate <$> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where
@@ -272,6 +292,7 @@ instance Binary OutputEvent where
     put (OEGenesis g)        = putWord8 4 >> put g
     put (OEGetChain cid)     = putWord8 5 >> put cid
     put (OEGetTx tx)         = putWord8 6 >> put tx
+    put (OEUpdate u)         = putWord8 7 >> put u
     get = do
         tag <- getWord8
         case tag of
@@ -282,6 +303,7 @@ instance Binary OutputEvent where
             4 -> OEGenesis <$> get
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
+            7 -> OEUpdate <$> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where
