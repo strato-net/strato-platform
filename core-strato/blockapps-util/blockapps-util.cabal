@@ -17,6 +17,7 @@ library
                      , Blockchain.MiscJSON
                      , Blockchain.Output
                      , Blockchain.SHA
+                     , Blockchain.TypeLits
                      , Blockchain.Util
   build-depends:       base
                      , aeson

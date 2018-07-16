@@ -1,4 +1,8 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS -fno-warn-missing-methods #-}
+{-# OPTIONS -fno-warn-orphans         #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE RecordWildCards          #-}
 
 module Blockchain.Data.ChainInfoDB where
 
@@ -9,6 +13,7 @@ import qualified Database.Persist.Postgresql        as SQL
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                 (Word256)
+import           Blockchain.TypeLits
 
 import           Blockchain.DB.SQLDB
 
@@ -17,7 +22,7 @@ import           Blockchain.Data.Enode
 import           Control.Monad.Trans.Resource
 import           Data.Maybe
 
-getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (Word256, ChainInfo))
+getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
@@ -39,34 +44,34 @@ getChainInfo chainId = do
           --   E.where_ (abRef E.^. AccountInfoRefChainId E.==. E.val chainInfoRefId)
           -- cInfos <- E.select . E.from $ \ciRef -> do
           --   E.where_ (abRef E.^. CodeInfoRefChainId E.==. E.val chainInfoRefId)
-          return . Just $ (chainId,  
-                           ChainInfo
-                             chainInfoRefChainLabel
-                             chainInfoRefAddRule
-                             chainInfoRefRemoveRule
-                             (map name members)
-                             (map anb accts))
+          return . Just . fromTuple $ (chainId,
+                                       ChainInfo
+                                         chainInfoRefChainLabel
+                                         chainInfoRefAddRule
+                                         chainInfoRefRemoveRule
+                                         (map name members)
+                                         (map anb accts))
           where name = readEnode . chainMemberRefName . entityVal
                 anb  = (address &&& balance) . entityVal
                 address = chainAccountBalanceRefAddress
                 balance = chainAccountBalanceRefBalance
 
-getChainInfos :: (HasSQLDB m) => [Word256] -> m [(Word256, ChainInfo)]
+getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do
   cids <- case chainIds of
               [] -> do
                   db <- getSQLDB
-                  runResourceT . flip SQL.runSqlPool db $ do  
+                  runResourceT . flip SQL.runSqlPool db $ do
                       chains <- E.select . E.from $ \cRef -> do
                           return cRef
                       case chains of
                           [] -> return []
                           cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
               cIds -> return cIds
-  chainInfos <- mapM getChainInfo cids      
+  chainInfos <- mapM getChainInfo cids
   let cInfos = sequence $ filter isJust chainInfos
-  case cInfos of 
-      Nothing -> return [] 
+  case cInfos of
+      Nothing -> return []
       Just cis -> return cis
 
 putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
@@ -78,3 +83,6 @@ putChainInfo chainId ChainInfo{..} = do
     insertMany_ $ map (ChainMemberRef chainInfoRefId . showEnode) members
     insertMany_ $ map (uncurry (ChainAccountBalanceRef chainInfoRefId)) accountBalance
     return chainInfoRefId
+
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where

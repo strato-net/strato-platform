@@ -1,40 +1,27 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric     #-}
+{-# OPTIONS -fno-warn-missing-methods #-}
+{-# OPTIONS -fno-warn-orphans         #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE DeriveGeneric            #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE OverloadedStrings        #-}
 
 module Blockchain.Data.ChainInfo
-  ( AccountBalance(..)
-  , ChainInfo (..)
-  , ChainIdChainInfo (..)
+  ( ChainInfo (..)
   ) where
 
-import           Data.Aeson
-
 import           Blockchain.Data.ArbitraryInstances()
-import           Blockchain.Data.RLP
-import           Blockchain.ExtWord              (Word256)
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.Enode
-import qualified GHC.Generics                              as GHCG
-import           Data.Monoid ((<>))
-import qualified Data.Text                       as T
-import           Data.Text.Encoding              (encodeUtf8, decodeUtf8)
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Address
+import           Blockchain.TypeLits
+
+import           Data.Aeson
+import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
+
+import qualified GHC.Generics                         as GHCG
 
 import           Test.QuickCheck.Arbitrary
-import           Control.Applicative
-
-newtype AccountBalance = AccountBalance {
-    unAccountBalance :: (Address, Integer)
-} deriving (Eq, Read, Show, GHCG.Generic)
-
-instance FromJSON AccountBalance where
-  parseJSON (Object a) = AccountBalance <$> liftA2 (,) (a .: "address") (a .: "balance")    
-  parseJSON x = error $ "couldn't parse JSON for account balance: " ++ show x
-
-instance ToJSON AccountBalance where
-  toJSON (AccountBalance (addr, bal)) =
-      object [ "address" .= addr
-             , "balance" .= bal
-             ]
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
@@ -55,21 +42,24 @@ instance Arbitrary ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "chainLabel" <*>
+    o .: "label" <*>
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    (map unAccountBalance <$> (o .: "accountBalance"))
+    (map toTuple <$> ((o .: "balances") :: NamedMapParser "address" Address "balance" Integer))
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON (ChainInfo cl ar rr ms ab) =
-    object [ "chainLabel" .= cl
+    object [ "label" .= cl
            , "addRule" .= ar
            , "removeRule" .= rr
            , "members" .= ms
-           , "accountBalance" .= (map AccountBalance ab)
+           , "balances" .= ((map fromTuple ab) :: NamedMap "address" Address "balance" Integer)
            ]
+
+instance KnownSymbol "address" where
+instance KnownSymbol "balance" where
 
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
@@ -87,19 +77,3 @@ instance RLPSerializable ChainInfo where
       (rlpDecode <$> ms)
       (rlpDecode <$> ab)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
-
-newtype ChainIdChainInfo = ChainIdChainInfo {
-    unChainIdChainInfo :: (Word256, ChainInfo)
-} deriving (Eq, Read, Show, GHCG.Generic)
-
-instance FromJSON ChainIdChainInfo where
-  parseJSON (Object a) =
-    ChainIdChainInfo <$> liftA2 (,) (a .: "chainId") (a .: "chainInfo")
-  parseJSON x = error $ "couldn't parse JSON for (chainId, chainInfo): " ++ show x
-
-instance ToJSON ChainIdChainInfo where
-  toEncoding (ChainIdChainInfo (cid, cinfo)) =
-    pairs (
-      "chainId" .= cid <>
-      "chainInfo" .= cinfo
-    )

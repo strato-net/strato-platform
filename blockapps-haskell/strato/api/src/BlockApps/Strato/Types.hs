@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
+{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Strato.Types
@@ -40,13 +41,12 @@ module BlockApps.Strato.Types
   , CodeInfo (..)
   , AccountInfo (..)
   , ChainInfo (..)
-  , AccountBalance (..)
   , ChainIdChainInfo
   ) where
 
 import           Control.Applicative
 import           Control.Lens                 (mapped, (&), (.~), (?~))
-import           Data.Aeson                   
+import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Aeson.TH                as AT
@@ -80,8 +80,8 @@ import           Text.Read.Lex
 import           BlockApps.Ethereum           (Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
-                                               keccak256lazy, stringAddress,
-                                               stringChainId)
+                                               keccak256lazy, stringAddress)
+import           BlockApps.Strato.TypeLits
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
@@ -596,15 +596,29 @@ instance ToSchema AccountInfo where
     & mapped.schema.description ?~ "AccountInfo"
     & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
 
+type AccountBalance = NamedTuple "address" Address "balance" Integer
+instance KnownSymbol "address" where
+instance KnownSymbol "balance" where
+
+instance ToSchema AccountBalance where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "Account balances"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex = exampleAccountBalances
+
+exampleAccountBalances :: [AccountBalance]
+exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+                                       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
 
 data ChainInfo = ChainInfo
   {  chainLabel      :: Text
   ,  addRule         :: Text
   ,  removeRule      :: Text
   ,  members         :: [Text]
-  ,  ciAccountBalance  :: [AccountBalance] 
-  } 
-  deriving (Eq, Read, Show, Generic)
+  ,  ciAccountBalance :: [AccountBalance]
+  }
+  deriving (Eq, Show, Generic)
 
 exampleChainInfo :: ChainInfo
 exampleChainInfo = ChainInfo
@@ -613,7 +627,7 @@ exampleChainInfo = ChainInfo
   ,  addRule = "majorityRules"
   ,  removeRule = "majorityRules"
   ,  members = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303", "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"]
-  ,  ciAccountBalance = [AccountBalance "5815b9975001135697b5739956b9a6c87f1c575c" 20000000, AccountBalance "93fdd1d21502c4f87295771253f5b71d897d911c" 999999]
+  ,  ciAccountBalance = exampleAccountBalances
   }
 
 instance ToSchema ChainInfo where
@@ -624,59 +638,31 @@ instance ToSchema ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "chainLabel" <*>
+    o .: "label" <*>
     o .: "addRule" <*>
     o .: "removeRule" <*>
     o .: "members" <*>
-    o .: "accountBalance"
+    o .: "balances"
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON x = 
+  toJSON x =
     object [
-       "chainLabel" .= chainLabel x
+       "label" .= chainLabel x
     ,  "addRule" .= addRule x
     ,  "removeRule" .= removeRule x
-    ,  "members" .= members x 
-    ,  "accountBalance" .= ciAccountBalance x  
+    ,  "members" .= members x
+    ,  "balances" .= ciAccountBalance x
     ]
 
-data AccountBalance = AccountBalance {
-  address :: Text,
-  balance :: Integer
-} deriving (Eq, Read, Show, Generic)
-
-instance ToJSON AccountBalance where
-  toEncoding x = 
-    pairs (
-      "address" .= address x <>
-      "balance" .= balance x
-    )
-
-instance FromJSON AccountBalance where
-  parseJSON (Object o) =
-    AccountBalance <$>
-    o .: "address" <*>
-    o .: "balance"
-  parseJSON x = error $ "couldn't parse JSON for Account Balance: " ++ show x
-
-instance ToSchema AccountBalance
-
-instance ToHttpApiData AccountBalance where
-  toUrlPiece = Text.pack . show
-
-
-data ChainIdChainInfo = ChainIdChainInfo (ChainId, ChainInfo) deriving (Eq, Show, Generic)
+type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
 
 instance ToSchema ChainIdChainInfo where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "(ChainId, ChainInfo)"
+    & mapped.schema.description ?~ "ChainId and ChainInfo pair"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: ChainIdChainInfo
-      ex = ChainIdChainInfo (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
-        , exampleChainInfo)
-
-instance FromJSON ChainIdChainInfo
-
-instance ToJSON ChainIdChainInfo
+      ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleChainInfo)
