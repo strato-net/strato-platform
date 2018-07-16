@@ -19,6 +19,8 @@ describe('Throughput - fx call', function () {
   let users;
   let contracts = [];
 
+  const batchSize = util.getArgInt('--batchSize', 1);
+
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
@@ -56,7 +58,7 @@ describe('Throughput - fx call', function () {
     assert.isOk(statesMatch, "All states should match");
     const seconds = endTime.diff(startTime, 'seconds');
     const seconds2 = endTime.diff(bEndTime, 'seconds');
-    const numTxs = (config.batchSize * nodes.length);
+    const numTxs = (batchSize * nodes.length);
     console.log(`${numTxs/seconds2}, ${numTxs/seconds}`);
    }
   })
@@ -93,7 +95,7 @@ describe('Throughput - fx call', function () {
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
       console.log('state.x is', state);
-      stateMatches &= (state.x == k*config.batchSize);
+      stateMatches &= (state.x == k*batchSize);
       if(!stateMatches)  {
         break;
       }
@@ -106,14 +108,14 @@ describe('Throughput - fx call', function () {
 
     acct = yield rest.getAccount(fromUser.address);
 
-    for (var i = 0; i < config.batchSize; i++) {
+    for (var i = 0; i < batchSize; i++) {
       txs.push({
         contractAddress: contract.address,
         contractName: contract.name,
         args: {},
         value: 0,
         methodName: 'increment',
-	txParams: { nonce: acct[0].nonce }
+	      txParams: { nonce: acct[0].nonce }
       });
     }
     return txs;
