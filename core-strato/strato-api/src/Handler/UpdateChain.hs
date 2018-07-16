@@ -12,13 +12,9 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEUpdate), IngestUpdate (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Import
-import           Numeric                        (showHex)
 
 import           Blockchain.Data.Enode
-import           System.Entropy
-import           Blockchain.Util
 import           Blockchain.ExtWord             (Word256)
-import           Handler.Filters
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, [Enode])] -> m ()
 emitKafkaTransactions us = do
@@ -32,9 +28,8 @@ emitKafkaTransactions us = do
 
 
 postUpdateChainR :: Handler Text
-postChainR = do
+postUpdateChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
-
   ci <- parseJsonBody :: Handler (Result (Word256, [Enode]))
   case ci of
     Success gen -> do 
