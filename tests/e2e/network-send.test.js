@@ -19,13 +19,13 @@ describe("Send Transaction Test", function() {
   const password = '1234';
   const value = new BigNumber(8).mul(constants.ETHER); // 8 eth in wei
 
-  before(function* () {
+  beforeEach(function* () {
     // create a pair of users on every node
     yield createUserPairs(uid, password, userPairs);
     yield sleep(30);
   });
 
-  it.skip('should send correct amount ONCE between all pairs', function* () {
+  it('should send correct amount ONCE between all pairs', function* () {
     // for each node
     for (let node of nodes) {
       // send alice->bob on that node
@@ -36,7 +36,7 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it.skip('should send to one node, and check results on all nodes', function* () {
+  it('should send to one node, and check results on all nodes', function* () {
     const nodeId = 0;
     const pair = userPairs[nodeId];
     const nonce = undefined;
@@ -49,7 +49,7 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it.skip('should send to one node, and check results on all nodes in PARALLEL', function* () {
+  it('should send to one node, and check results on all nodes in PARALLEL', function* () {
     const nodeId = 0;
     const pair = userPairs[nodeId];
     const nonce = undefined;
@@ -75,36 +75,40 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it.skip('should send correct amount multiple time to ONE pair.', function* () {
+  it('should send correct amount multiple time to ONE pair.', function* () {
     const count = 2;
     const node = nodes[0];
+    var nonce = 0;
     // send alice->bob on that node
     const pair = userPairs[node.id];
     for (var i = 0; i < count; i++) {
-      yield send(node.id, pair.alice, pair.bob, value);
+      yield send(node.id, pair.alice, pair.bob, value, nonce++);
       yield checkBalance(pair.alice, pair.bob, value.times(i+1));
     }
   });
 
-  it.skip('should send correct amount multiple time to ONE pair.  https://blockapps.atlassian.net/browse/API-20', function* () {
+  it('should send correct amount multiple time to ONE pair.  https://blockapps.atlassian.net/browse/API-20', function* () {
     const count = 2;
     const node = nodes[0];
+    var nonce = 0;
     // send alice->bob on that node
     const pair = userPairs[node.id];
     for (var i = 0; i < count; i++) {
-      yield send(node.id, pair.alice, pair.bob, value);
+      yield send(node.id, pair.alice, pair.bob, value, nonce++);
       yield checkBalance(pair.alice, pair.bob, value.times(i+1));
     }
   });
 
-  it.only('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
+  it('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
     const count = 2;
+    var nonce = 0;
     // send multiple
+    console.log('Here are the nodes', nodes);
     for (var i=0; i < count; i++) {
       for (let node of nodes) {
         // send alice->bob on that node
         const pair = userPairs[node.id];
-        yield send(node.id, pair.alice, pair.bob, value);
+        yield send(node.id, pair.alice, pair.bob, value, nonce++);
       }
     }
     // check balance for those accounts on each node
@@ -113,7 +117,7 @@ describe("Send Transaction Test", function() {
     yield checkBalance(pair.alice, pair.bob, total);
   });
 
-  it.skip('send parallel - https://blockapps.atlassian.net/browse/API-20', function* () {
+  it('send parallel - https://blockapps.atlassian.net/browse/API-20', function* () {
     const promises = [];
     const count = 1;
     var nonce = 0;
@@ -135,7 +139,7 @@ describe("Send Transaction Test", function() {
     yield checkBalance(pair.alice, pair.bob, total);
   });
 
-  it.skip('should send correct amount of ether', function* () {
+  it('should send correct amount of ether', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -198,7 +202,7 @@ describe("Send Transaction Test", function() {
   function* send(nodeId, alice, bob, value, nonce) {
     // it is OK for nonce to be undefined!
     console.log('send', nodeId, alice.name, bob.name, value.toString(), nonce);
-    const receipt = yield rest.send(alice, bob, value, nonce, nodeId);
+    const receipt = yield rest.send(alice, bob, value, false, nonce, nodeId);
     const txResult = yield rest.transactionResult(receipt.hash, nodeId);
     assert.equal(txResult[0].status, 'success', 'tx status');
     return txResult[0];
