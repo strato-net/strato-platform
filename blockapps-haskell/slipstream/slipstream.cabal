@@ -18,6 +18,7 @@ library
                   , Slipstream.Events
                   , Slipstream.MessageConsumer
                   , Slipstream.Processor
+                  , Slipstream.SolidityValue2
   build-depends: base >= 4 && < 5
                   , aeson
                   , base16-bytestring

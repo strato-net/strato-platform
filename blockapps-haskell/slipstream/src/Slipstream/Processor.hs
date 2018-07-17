@@ -7,27 +7,23 @@
     , DataKinds
     , TemplateHaskell
     , FlexibleContexts
+    , GeneralizedNewtypeDeriving
 #-}
 
 module Slipstream.Processor where
 
-import           Control.Monad.Except
-import           Control.Monad.Log                  hiding (Handler)
-import           Control.Monad.Reader
-import Data.Aeson hiding (Error)
---import qualified Data.ByteString.Char8 as BC
+import Control.Monad.Except
+import Control.Monad.Log    hiding (Handler)
+import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as BL
---import qualified Data.ByteString.Lazy.Char8 as BLC
---import qualified Data.ByteString.Base16 as B16
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
-import           Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple
 import Network.HTTP.Client
 import Numeric
-import           Servant.Common.BaseUrl
-
+import Servant.Common.BaseUrl
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
@@ -37,40 +33,13 @@ import BlockApps.Storage
 import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
-
 import BlockApps.SolidityVarReader
-
 import Slipstream.Events hiding (Address)
 import Data.List.Utils (replace)
-
---import Debug.Trace
---import GHC.Generics
---import Control.Exception
---import GHC.Int
-
---import qualified Data.Map as M
---import qualified Data.HashMap.Strict as H
---import qualified Data.Aeson as A
+import qualified Data.Aeson as A
 import qualified Data.ByteString as B
---import qualified Data.Text as T
---import Database.PostgreSQL.Typed
---import Database.PostgreSQL.Typed.Query
---import Network
---import Network.Kafka
---import Network.Kafka.Consumer
---import qualified Network.Kafka.Protocol as K hiding (Message)
---import Control.Monad.Trans.State.Lazy    (StateT(..))
---import qualified Data.List.NonEmpty as NE
---import Data.String
---import Control.Lens
 import HFlags
 import Slipstream.Options
---import System.IO.Unsafe
---import qualified Data.Vector as V
---import Language.Haskell.TH.Syntax
---import Language.Haskell.TH.Lib
---import Data.List
---import Data.Time
 
 import Slipstream.OutputData
 
@@ -96,7 +65,7 @@ stateDiffToChanges StateDiff{..} =
 
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
-  case eitherDecode x of
+  case A.eitherDecode x of
     --Slipstream shouldn't crash here?
    Left e -> error $ show e
    --Right y -> traceShow(y) y
@@ -124,14 +93,14 @@ getContract address _ = do
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
 
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  let ret2 = show $ toJSON $ contractdetailsXabi qqqq
+  let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
   let ret3 = show $ contractdetailsName qqqq
   return (ret1, ret2, ret3)
 
 fetchABI :: String -> Bloc String
 fetchABI address = do
   conDet <- getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
-  let ret = show $ toJSON $ contractdetailsXabi conDet
+  let ret = show $ A.toJSON $ contractdetailsXabi conDet
   return ret
 
 storageToFunction::[(String, String)]->Storage
@@ -152,67 +121,6 @@ addStorageIfNeeded (Action theType address codehash Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
   return $ Action theType address codehash (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
-{-}
-parseChanges :: BlocEnv -> B.ByteString -> [B.ByteString]
-parseChanges env changes = do
-  filledInChange <- addStorageIfNeeded change
-
-  let (address, codehash, storage) =
-        case filledInChange of
-         Action _ a c (Just s) -> (a, c, storageToFunction s)
-         Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-
-  cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String))
-  contractMetaData <-
-    case Map.lookup codehash cachedContracts of
-     Just c -> do
-       return c
-     Nothing -> do
-       (contractOrError, abi) <- getContract address codehash
-       case contractOrError of
-        Left e -> error e
-        Right c -> do
-          liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi) cachedContracts)
-          return (c, abi)
-
-  let strAbi = snd contractMetaData
-
-  let ret =
-        Map.fromList $ map (fmap valueToSolidityValue) $
-        decodeValues (typeDefs $ fst contractMetaData) (mainStruct $ fst contractMetaData) storage 0
-  return ret
--}
-{-
-blocConn :: BlocEnv
-blocConn = do
-  let conHost = flags_pghost
-  let conPort = read flags_pgport
-  let conUser = flags_pguser
-  let conPass = flags_password
-  let conDB = flags_database
-
-  let dbConnectInfo = ConnectInfo { connectHost = conHost
-                                 , connectPort = conPort
-                                 , connectUser = conUser
-                                 , connectPassword = conPass
-                                 , connectDatabase = conDB
-                                 }
-
-  let pool = createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
-  let strato = flags_stratourl
-  let stratoUrl = parseBaseUrl strato
-
-  let mgr = newManager defaultManagerSettings
-
-  let env = BlocEnv
-            {
-              urlStrato=stratoUrl   -- :: BaseUrl
-            , httpManager=mgr -- :: Manager
-            , dbPool=pool     --  :: Pool Connection
-            , logLevel=Error    -- :: Severity
-            }
-  return env
-  -}
 
 first :: (a, b, c) -> a
 first (x, _, _) = x
@@ -227,9 +135,11 @@ processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-
-  --liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
-
+{-
+  if (length changes > 0)
+    then liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
+    else return ()
+-}
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -294,13 +204,17 @@ processTheMessages messages = do
       let strAbi = replace "\'" "\'\'" $ second contractMetaData
 
       let name = replace "\"" "" $ third contractMetaData
-      liftIO $ putStrLn $ "CONTRACT NAME: " ++ name
+
+      --liftIO $ putStrLn $ "~~~~~contractMetaData~~~~~: " ++ show contractMetaData
 
       --TODO: Add parsing of contract info to get flags (indexing, history)
 
-      let ret =
-            Map.fromList $ map (fmap valueToSolidityValue) $
-            decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      liftIO $ convertRet address codehash strAbi name $ encode ret
+      --let preSol = decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
+      --liftIO $ putStrLn $ "(((((((())))))))" ++ show preSol
+
+      let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
+
+      --liftIO $ putStrLn $ "|..........| RET: " ++ show ret
+      liftIO $ convertRet address codehash strAbi name ret
 
   return()

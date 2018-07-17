@@ -5,49 +5,51 @@
 
 module Slipstream.OutputData where
 
-import Data.Aeson hiding (Error)
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.HashMap.Strict as H
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import Network
 import Slipstream.Options
-import qualified Data.Vector as V
-import Data.List
+import Slipstream.SolidityValue2
+import qualified Data.Map as Map
+import BlockApps.Solidity.Value
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
 
-valueToText :: Value -> String
-valueToText (Number _) = "bigint"
-valueToText (_) = "text"
+valueToTxt :: SolidityValue2 -> String
+valueToTxt (SolidityNum _) = "bigint"
+valueToTxt (_) = "text"
 
 listToKeyStatement :: String -> [(T.Text, b)] -> String
 listToKeyStatement _ [] = []
 listToKeyStatement _ [(x, _)] = "\"" ++ T.unpack x ++ "\""
 listToKeyStatement s ((x,_):es) = "\"" ++ T.unpack x ++ "\"" ++ s ++ (listToKeyStatement s es)
 
-valueToString :: String -> Value -> String
-valueToString s (String x) = s ++ T.unpack x ++ s
-valueToString s (Number x) = s ++ show x ++ s
-valueToString s (Array x) = s ++ (show $ V.toList x) ++ s
---TODO: add correct response
-valueToString s (Object _) = s ++ "" ++ s
-valueToString s (Bool x) = s ++ show x ++ s
-valueToString s (Null) = s ++ "" ++ s
+valueToString :: String -> SolidityValue2 -> String
+valueToString s (SolidityValueAsString2 x) = s ++ T.unpack x ++ s
+valueToString s (SolidityBool2 x) = s ++ show x ++ s
+valueToString s (SolidityNum x ) = s ++ show x ++ s
+valueToString s (SolidityArray2 x) = s ++ show x ++ s
+valueToString s (SolidityBytes2 x) = s ++ show x ++ s
+valueToString s (SolidityObject2 x) = s ++ show x ++ s
 
-listToValueStatement :: String -> [(a, Value)] -> String
+listToValueStatement :: String -> [(a, SolidityValue2)] -> String
 listToValueStatement _ [] = []
 listToValueStatement _ [(_, y)] = valueToString "\'" y
 listToValueStatement s ((_, y):es) = valueToString "\'" y ++ s ++ (listToValueStatement s es)
 
-tableColumns :: [(T.Text, Value)] -> String
+tableColumns :: [(T.Text, SolidityValue2)] -> String
 tableColumns [] = []
-tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToText y
-tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToText y ++ ", " ++ tableColumns es
+tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y
+tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y ++ ", " ++ tableColumns es
+
+conflictList :: [(T.Text, SolidityValue2)] -> String
+conflictList [] = []
+conflictList [(x, _)] = "\"" ++ T.unpack x ++ "\"=excluded.\"" ++ T.unpack x ++ "\""
+conflictList ((x, _):es) = "\"" ++ T.unpack x ++ "\"=excluded.\"" ++ T.unpack x ++ "\", " ++ conflictList es
 
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
@@ -74,50 +76,50 @@ dbInsert insrt = do
     --(x, _) -> putStrLn "Successfully wrote to the database"
   pgDisconnect conn
 
-isString :: Value -> Bool
-isString (String x) = not (isPrefixOf "function" (T.unpack x))
-isString _ = True
+isFunction :: Value -> Bool
+isFunction (ValueFunction _ _ _) = False
+isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> BLC.ByteString -> IO()
+convertRet :: String -> String -> String -> String -> Map.Map T.Text Value -> IO()
 convertRet address codehash abi name x = do
-  case decode x of
-    Nothing -> putStrLn $ "Error"
-    Just (Object y) -> do
       --Revisit to fix table name duplicates
       --let contractName = take 63 codehash
 
-      --Indexing flag
-      let indFlag = True
-      let ind = if (indFlag)
-                  --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
-                  then "create index if not exists idx ON \"" ++ name ++ "\" (address);"
-                  else ""
+  --Indexing flag
+  let indFlag = True
+  let ind = if (indFlag)
+              --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
+              then "create index if not exists idx ON \"" ++ name ++ "\" (address);"
+              else ""
 
-      --History flag
-      let histFlag = True
-      let hist = if (histFlag)
-                  --TODO: Add history insert statement (block ID, state, ???)
-                  then ""
-                  else ""
+  --History flag
+  let histFlag = True
+  let hist = if (histFlag)
+              --TODO: Add history insert statement (block ID, state)
+              then
+                ""
+                --let histCreate = "create table if not exists \"History\" (\"codeHash\" text, contract text, block_id text, state text)"
+              else ""
 
-      --let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
-      let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "')"
-      let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ ";"
+  --let conVals = "('" ++ codehash ++ "', '" ++ contractName ++ "', '" ++ abi ++ "')"
+  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "')"
+  let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
 
-      let list = H.toList $ H.filter isString y
-      putStrLn $ "{}{}{}list{}{}{}: " ++ show list
+  --let list = Map.toList $ Map.filter isString x
+  let list = Map.toList $ Map.map valueToSolidityValue2 $ Map.filter isFunction x
+  --putStrLn $ "{}{}{}list{}{}{}: " ++ show list
 
-      let beg = "BEGIN;"
-      let comm = "COMMIT;"
-      --let createSt = "create table if not exists \"" ++ contractName ++ "\" (address text, " ++ tableColumns list ++ ");"
-      let createSt = "create table if not exists \"" ++ name ++ "\" (address text, " ++ tableColumns list ++ ");"
+  let beg = "BEGIN;"
+  let comm = "COMMIT;"
+  let createSt = "create table if not exists \"" ++ name ++ "\" (address text primary key, " ++ tableColumns list ++ ");"
+  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "';"
 
-      let keys = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
-      let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
-      --let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
-      let ins = "insert into \"" ++ name ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
-      let oneIns = beg ++ conIns ++ createSt ++ ind ++ hist ++ ins ++ comm
-      putStrLn $ "^^^STATEMENT^^^: " ++ createSt
-      p <- dbInsert oneIns
-      print p
-    Just(_) -> putStrLn $ "Received Non-Object"
+  let keySt = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
+  let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
+  let conflict = conflictList list
+  --let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
+  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ "  on conflict(address) do update set" ++ conflict ++ ";"
+  let oneIns = beg ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ comm
+  putStrLn $ "^^^STATEMENT^^^: " ++ oneIns
+  p <- dbInsert oneIns
+  print p
