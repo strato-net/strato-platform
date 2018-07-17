@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedLists       #-} 
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -42,6 +44,7 @@ module BlockApps.Strato.Types
   , AccountInfo (..)
   , ChainInfo (..)
   , ChainIdChainInfo
+  , UpdateInfo
   ) where
 
 import           Control.Applicative
@@ -597,16 +600,30 @@ type AccountBalance = NamedTuple "address" Address "balance" Integer
 instance KnownSymbol "address" where
 instance KnownSymbol "balance" where
 
+{-
 instance ToSchema AccountBalance where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "Account balances"
     & mapped.schema.example ?~ toJSON ex
     where
       ex = exampleAccountBalances
+-}
 
 exampleAccountBalances :: [AccountBalance]
 exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
                                        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
+
+instance ToSchema AccountBalance where
+  declareNamedSchema _ = do
+    addressSchema <- declareSchemaRef (Proxy :: Proxy Address)
+    balanceSchema <- declareSchemaRef (Proxy :: Proxy Integer)
+    return $ NamedSchema (Just "AccountBalance") $ mempty
+      & type_ .~ SwaggerObject
+      & properties .~
+          [ ("address", addressSchema)
+          , ("balance", balanceSchema)
+          ]
+      & required .~ [ "address", "balance" ]
 
 data ChainInfo = ChainInfo
   {  chainLabel      :: Text
@@ -655,7 +672,7 @@ instance ToJSON ChainInfo where
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
-
+{-
 instance ToSchema ChainIdChainInfo where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "ChainId and ChainInfo pair"
@@ -663,3 +680,44 @@ instance ToSchema ChainIdChainInfo where
     where
       ex :: ChainIdChainInfo
       ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleChainInfo)
+-}
+
+instance ToSchema ChainIdChainInfo where
+  declareNamedSchema _ = do
+    idSchema <- declareSchemaRef (Proxy :: Proxy ChainId)
+    infoSchema <- declareSchemaRef (Proxy :: Proxy ChainInfo)
+    return $ NamedSchema (Just "ChainIdChainInfo") $ mempty
+      & type_ .~ SwaggerObject
+      & properties .~
+          [ ("id",idSchema)
+          , ("info", infoSchema)
+          ]
+      & required .~ [ "id", "info" ]
+
+
+type UpdateInfo = NamedTuple "id" ChainId "members" [Text]
+instance KnownSymbol "members" where
+{-
+exampleMembers :: [Text]
+exampleMembers = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303", "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"]
+
+instance ToSchema UpdateInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainId and [Text] pair"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: UpdateInfo
+      ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleMembers)
+-}
+
+instance ToSchema UpdateInfo where
+  declareNamedSchema _ = do
+    idSchema <- declareSchemaRef (Proxy :: Proxy ChainId)
+    membersSchema <- declareSchemaRef (Proxy :: Proxy [Text])
+    return $ NamedSchema (Just "UpdateInfo") $ mempty
+      & type_ .~ SwaggerObject
+      & properties .~
+          [ ("id", idSchema)
+          , ("members", membersSchema)
+          ]
+      & required .~ [ "id", "members" ]

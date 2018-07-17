@@ -107,3 +107,6 @@ type API =
   :<|> "chain"
     :> QueryParams "chainid" ChainId
     :> Get '[JSON] [ChainIdChainInfo]
+  :<|> "update"
+    :> ReqBody '[JSON] UpdateInfo
+    :> Post '[JSON] ChainInfo

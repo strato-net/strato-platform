@@ -26,6 +26,7 @@ module BlockApps.Strato.Client
   , postFaucet
   , postChain
   , getChain
+  , updateChain
   ) where
 
 import           Data.Proxy
@@ -144,6 +145,7 @@ getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
 postChain :: ChainInfo -> ClientM ChainId
 getChain :: [ChainId] -> ClientM [ChainIdChainInfo]
+updateChain :: UpdateInfo -> ClientM ChainInfo
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
@@ -158,7 +160,8 @@ getTxsFilter
   :<|> getStorage
   :<|> postFaucet
   :<|> postChain
-  :<|> getChain =
+  :<|> getChain 
+  :<|> updateChain =
     uncurryTxsFilterParams getTxsFilter'
     :<|> getTxsLast'
     :<|> postTx'
@@ -174,6 +177,7 @@ getTxsFilter
     :<|> postFaucet'
     :<|> postChain'
     :<|> getChain'
+    :<|> updateChain'
   where
     getTxsFilter'
       :<|> getTxsLast'
@@ -189,7 +193,8 @@ getTxsFilter
       :<|> getStorage'
       :<|> postFaucet'
       :<|> postChain' 
-      :<|> getChain' =
+      :<|> getChain'
+      :<|> updateChain' =
         client (Proxy @ API)
     uncurryTxsFilterParams f TxsFilterParams{..} = f
       qtFrom qtTo qtAddress qtValue qtMaxValue qtMinValue qtGasPrice
