@@ -12,6 +12,7 @@ module Blockchain.Blockstanbul
   , InEvent(..)
   , OutEvent(..)
   , finalHash
+  , currentView
 ) where
 
 import Blockchain.Blockstanbul.EventLoop

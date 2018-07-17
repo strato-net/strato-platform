@@ -47,6 +47,7 @@ roundchangeCode = 3
 
 data InEvent = IMsg {unIMsg :: WireMessage}
              | Timeout
+             -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
              deriving (Eq, Show)

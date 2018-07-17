@@ -223,3 +223,6 @@ sendAllMessages wms = do
   case catMaybes . map loopback $ out of
              [] -> return out
              wms' -> (out ++) <$> sendAllMessages wms'
+
+currentView :: (HasBlockstanbulContext m) => m View
+currentView = _view <$> getBlockstanbulContext
