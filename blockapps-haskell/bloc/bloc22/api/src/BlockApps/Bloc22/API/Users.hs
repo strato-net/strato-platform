@@ -109,11 +109,12 @@ instance ToSample BlocTransactionData where
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
       , contractdetailsName       = "Contract Name"
       , contractdetailsXabi       = Xabi {
-                                      xabiFuncs     = Map.fromList []
-                                    , xabiConstr    = Map.fromList []
-                                    , xabiVars      = Map.fromList []
-                                    , xabiTypes     = Map.fromList []
-                                    , xabiModifiers = Map.fromList []
+                                      xabiFuncs     = Map.empty
+                                    , xabiConstr    = Map.empty
+                                    , xabiVars      = Map.empty
+                                    , xabiTypes     = Map.empty
+                                    , xabiModifiers = Map.empty
+                                    , xabiEvents    = Map.empty
                                     }
       }
     , Call [] -- probably make a better Call sample
