@@ -8,6 +8,8 @@ import           HFlags
 -- core flags
 defineFlag "q:txdedupwindow" (2000 :: Int) "Transaction window to deduplicate any given Tx (i.e., after N transactions have passed, a previously seen Tx can be reemitted)"
 
+-- TODO(tim): This should instead specify validators, a private key file, and perhaps a starting view
+defineFlag "tmpblockstanbul" (False :: Bool) "Whether to run blockstanbul"
 
 -- leveldb related flags
 defineFlag "b:depblockdbpath" (dbDir "h" ++ sequencerDependentBlockDBPath) "Where to store/load the dependent block db"

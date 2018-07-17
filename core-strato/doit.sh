@@ -43,7 +43,7 @@ function newnode {
   fi
 
   echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel >> logs/strato-sequencer 2>&1
+  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
