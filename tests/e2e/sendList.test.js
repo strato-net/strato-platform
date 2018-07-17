@@ -50,7 +50,7 @@ describe("Send Transaction List", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it.only('resolve==false', function* () {
+  it('resolve==false', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -80,6 +80,7 @@ describe("Send Transaction List", function() {
       const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
+    console.log('HERE IS THE RESULT OF waitTransactionResult()', results);
     const failed = results.filter(function (result) {
       return result.status != 'success';
     });
@@ -100,7 +101,7 @@ describe("Send Transaction List", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it.skip('resolve==false, insufficient funds https://blockapps.atlassian.net/browse/API-12', function* () {
+  it('resolve==false, insufficient funds https://blockapps.atlassian.net/browse/API-12', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -121,7 +122,8 @@ describe("Send Transaction List", function() {
 
     const results = [];
     for (let receipt of receipts) {
-      const result = yield rest.waitTransactionResult(receipt.senderBalance);
+      console.log(receipt);
+      const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
   });
