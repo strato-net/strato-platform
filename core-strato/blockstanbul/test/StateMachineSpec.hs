@@ -226,8 +226,6 @@ spec = parallel $ do
         unless (null as) $
           sendMessages tippingPoint `shouldReturn` [ToCommit blk]
 
-    it "only commits once" $ pendingWith "Requires a signal counting number of commits"
-
   describe "A round change message" $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3 ->
       runTest $ do
