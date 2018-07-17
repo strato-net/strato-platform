@@ -59,12 +59,13 @@ createBlockstanbulRoundTimer dt = do
 
 sequencer :: SequencerM ()
 sequencer = do
-  var <- liftIO $ createBlockstanbulRoundTimer 100
+  -- TODO(tim): Pipe time window in through a flag
+  timer <- liftIO $ createBlockstanbulRoundTimer 100
   forever $ do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
-    ready <- atomically $ swapTMVar var False
-    when ready $ do
+    roundTimeout <- atomically $ swapTMVar timer False
+    when roundTimeout $ do
       oevs <- blockstanbulSend [Timeout]
       void . writeSeqVmEvents' $ oevs
     inEvents <- readUnseqEvents'
