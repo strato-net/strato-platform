@@ -106,12 +106,12 @@ spec = parallel $ do
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
       runTest $ do
-        liftIO $ pendingWith "TODO(tim): set auths appropriately"
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
         let hsh = blockHash blk
-        sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` [OMsg auth $ Prepare curView hsh]
+        omsgs <- sendMessages [IMsg auth $ Preprepare curView blk]
+        map oMessage omsgs `shouldBe` [Prepare curView hsh]
         use proposal `shouldReturn` Just blk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
@@ -150,11 +150,11 @@ spec = parallel $ do
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk seal ->
       runTest $ do
-        liftIO $ pendingWith "TODO(tim): calculate the seal"
+        liftIO $ pendingWith "Calculate the seal"
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
-        sendMessages [IMsg auth $ Prepare curView di] `shouldReturn`
-          [OMsg auth $ Commit curView di seal]
+        omsgs <- sendMessages [IMsg auth $ Prepare curView di]
+        map oMessage omsgs `shouldBe` [Commit curView di seal]
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
@@ -229,7 +229,6 @@ spec = parallel $ do
   describe "A round change message" $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3 ->
       runTest $ do
-        liftIO $ pendingWith "TODO(tim): fix your auth"
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
@@ -239,7 +238,8 @@ spec = parallel $ do
         use roundChanged `shouldReturn` M.singleton (sender a1) roundNext
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
-        sendMessages [IMsg a2 $ RoundChange next] `shouldReturn` [OMsg a2 $ RoundChange next]
+        omsgs <- sendMessages [IMsg a2 $ RoundChange next]
+        map oMessage omsgs `shouldBe` [RoundChange next]
         use pendingRound `shouldReturn` Just roundNext
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
