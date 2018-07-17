@@ -157,7 +157,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         ppl <- use proposal
         case ppl of
           Nothing -> error "TODO(tim): Decide how to handle this"
-          Just blk -> yield . ReadyBlock $ blk
+          Just blk -> yield . ToCommit $ blk
     IMsg (RoundChange auth vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn

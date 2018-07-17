@@ -119,7 +119,7 @@ blockstanbulSend msgs = do
     resp <- sendAllMessages msgs
     $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
     -- TODO(tim): Use the wiremessages in the response
-    let blocks = [b | ReadyBlock b <- resp]
+    let blocks = [b | ToCommit b <- resp]
     unless (null blocks) $
       -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
       void $ sendAllMessages [CommitResult (Right ())]

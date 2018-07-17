@@ -182,7 +182,7 @@ spec = parallel $ do
     it "returns a ready block" $ property $ \auth blk seal ->
       runTest $ do
         (curView, di) <- setupRound blk [sender auth]
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` [ReadyBlock blk]
+        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` [ToCommit blk]
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
@@ -224,7 +224,7 @@ spec = parallel $ do
         use committed `shouldReturn` M.fromList (map (, (di, seal)) front)
         use view `shouldReturn` curView
         unless (null as) $
-          sendMessages tippingPoint `shouldReturn` [ReadyBlock blk]
+          sendMessages tippingPoint `shouldReturn` [ToCommit blk]
 
     it "only commits once" $ pendingWith "Requires a signal counting number of commits"
 

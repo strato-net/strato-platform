@@ -53,7 +53,7 @@ data InEvent = IMsg {unIMsg :: WireMessage}
              deriving (Eq, Show)
 
 data OutEvent = OMsg {unOMsg :: WireMessage}
-              | ReadyBlock Block
+              | ToCommit Block
               deriving (Eq, Show)
 
 getAuth :: WireMessage -> MsgAuth
