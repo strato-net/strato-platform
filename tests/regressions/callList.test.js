@@ -13,7 +13,7 @@ const constants = common.constants;
 const path = require('path');
 
 const ErrorCodes = rest.getEnums(path.join(config.contractsPath, "ErrorCodes.sol")).ErrorCodes;
-const titleManagerJs = require(`./titleManager`);
+const titleManagerJs = require(`../load/titleManager`);
 const contractName = 'Title';
 
 const adminName = util.uid('Admin');
