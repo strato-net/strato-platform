@@ -315,4 +315,4 @@ shouldSend peer tx = case tx of
     Origin.Quarry        -> True -- this should never reach this far anyway
     Origin.Morphism      -> -- probably means it was converted, see if this is a problem
         trace "NewTx of type Morphism came in. Should this even happen?" True
-
+    Origin.Blockstanbul -> False
