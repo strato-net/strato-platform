@@ -21,12 +21,14 @@ describe('Throughput - upload', function () {
   let contracts = [];
   let txs = []
 
+  const batchSize = util.getArgInt('--batchSize', 1);
+
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
       yield rest.compileSearch([contractName], contractName, contractFilename, i);
     }
-    for (var i = 0; i < config.batchSize; i++) {
+    for (var i = 0; i < batchSize; i++) {
       txs.push({
         contractName: contractName,
         args: {},
@@ -40,7 +42,7 @@ describe('Throughput - upload', function () {
     const generators = [];
 
     for(let node of nodes) {
-      const user = users[node.id];    
+      const user = users[node.id];
       generators.push(rest.uploadContractList(user, txs, true, node.id));
     }
 
@@ -66,7 +68,7 @@ describe('Throughput - upload', function () {
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
     console.log(`Total Seconds: ${seconds}`);
-    console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
+    console.log(`Approx TPS: ${(batchSize * nodes.length) / seconds} tx/sec`);
   })
 
   // HELPER FUNCTIONS FOR TESTS
@@ -103,10 +105,10 @@ describe('Throughput - upload', function () {
     }
     const counts = yield Promise.all(promises);
     return counts.reduce((check, count) => {
-      return check && count == config.batchSize; 
+      return check && count == batchSize;
     }, true);
   }
-  
+
 
   function * getContractCount(user) {
     const results = yield api.strato.transaction(`from=${user.address}`);
@@ -114,4 +116,3 @@ describe('Throughput - upload', function () {
   }
 
 });
-
