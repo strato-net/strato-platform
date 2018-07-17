@@ -95,7 +95,6 @@ library
                  , strato-model
                  , strato-redis-blockdb
                  , hedis
-                 , lifted-async
 
     exposed-modules:
                    Blockchain.Context
