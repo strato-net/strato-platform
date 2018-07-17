@@ -8,7 +8,7 @@ MONITORING_TIMER=5;
 
 function newnode {
   initialize=false
-  
+
   mkdir -p logs/rotation
 
   if [[ ! -d .ethereumH ]]
@@ -92,7 +92,12 @@ function newnode {
 }
 
 function cleanupDB {
-  db_conn_params="-U $pgUser -h $pgHost"
+  db_conn_params="-U ${pgUser} -h ${pgHost}"
+  PGPASSWORD=$pgPass psql ${db_conn_params} -c "
+    SELECT pg_terminate_backend(pg_stat_activity.pid)
+    FROM pg_stat_activity
+    WHERE pg_stat_activity.datname like '%eth_%';"
+
   PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
     echo "dropping the old db: $line"
     PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"
