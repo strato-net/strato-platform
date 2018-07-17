@@ -209,7 +209,7 @@ describe("Send Transaction List with nonces", function() {
 
     const results = [];
     for (let receipt of receipts) {
-      const result = yield rest.waitTransactionResult(receipt.senderBalance);
+      const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
     const failed = results.filter(function (result) {
