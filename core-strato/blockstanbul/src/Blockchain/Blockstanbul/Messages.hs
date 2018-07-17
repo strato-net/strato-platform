@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE LambdaCase #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.Lens
@@ -32,12 +33,17 @@ data MsgAuth = MsgAuth {
 instance Arbitrary MsgAuth where
   arbitrary = liftM2 MsgAuth arbitrary arbitrary
 
-data WireMessage = Preprepare MsgAuth View Block
-                 | Prepare MsgAuth View SHA
-                 | Commit MsgAuth View SHA ExtendedSignature
-                 | RoundChange {roundchangeAuth :: MsgAuth,
-                                roundchangeView :: View }
-                 deriving (Eq, Show)
+data TrustedMessage = Preprepare View Block
+                    | Prepare View SHA
+                    | Commit View SHA ExtendedSignature
+                    | RoundChange {roundchangeView :: View }
+                    deriving (Eq, Show)
+
+data WireMessage = WireMessage {
+  _msgAuth :: MsgAuth,
+  _message :: TrustedMessage
+} deriving (Eq, Show)
+makeLenses ''WireMessage
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -45,31 +51,26 @@ prepareCode = 1
 commitCode = 2
 roundchangeCode = 3
 
-data InEvent = IMsg {unIMsg :: WireMessage}
+data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
              deriving (Eq, Show)
 
-data OutEvent = OMsg {unOMsg :: WireMessage}
+data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               deriving (Eq, Show)
 
-getAuth :: WireMessage -> MsgAuth
-getAuth (Preprepare a _ _) = a
-getAuth (Prepare a _ _) = a
-getAuth (Commit a _ _ _) = a
-getAuth (RoundChange a _) = a
-
-getHash :: WireMessage -> Word256
+getHash :: TrustedMessage -> Word256
 -- This is wrong, because this means that the prepare and commits
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
-getHash (Preprepare _ _ blk) = unSHA . blockHash $ blk
-getHash (Prepare _ _ di) = unSHA di
-getHash (Commit _ _ di _) = unSHA di
-getHash (RoundChange _ _) = unSHA $ hash "TODO(tim): this signature is predictable"
+getHash = \case
+              (Preprepare _ blk) -> unSHA . blockHash $ blk
+              (Prepare _ di) -> unSHA di
+              (Commit _ di _) -> unSHA di
+              (RoundChange _) -> unSHA $ hash "TODO(tim): this signature is predictable"
 
 -- TODO(tim): JSON instances
 
@@ -80,7 +81,7 @@ instance RLPSerializable View where
   rlpDecode x = error $ "cannot rlpDecode value as as View: " ++ show x
 
 instance RLPSerializable WireMessage where
-  rlpEncode (Preprepare (MsgAuth addr sig) vw blk) = RLPArray
+  rlpEncode (WireMessage (MsgAuth addr sig) (Preprepare vw blk)) = RLPArray
       [ rlpEncode preprepareCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw
@@ -88,7 +89,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
-  rlpEncode (Prepare (MsgAuth addr sig) vw digest) = RLPArray
+  rlpEncode (WireMessage (MsgAuth addr sig) (Prepare vw digest)) = RLPArray
       [ rlpEncode prepareCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw
@@ -96,7 +97,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
-  rlpEncode (Commit (MsgAuth addr sig) vw digest seal) = RLPArray
+  rlpEncode (WireMessage (MsgAuth addr sig) (Commit vw digest seal)) = RLPArray
       [ rlpEncode commitCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw
@@ -104,7 +105,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , rlpEncode seal ]
-  rlpEncode (RoundChange (MsgAuth addr sig) vw) = RLPArray
+  rlpEncode (WireMessage (MsgAuth addr sig) (RoundChange vw)) = RLPArray
       [ rlpEncode roundchangeCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw,
@@ -115,24 +116,38 @@ instance RLPSerializable WireMessage where
   rlpDecode (RLPArray [code, (RLPString payload), addr, sig, seals ]) =
       let auth = MsgAuth (rlpDecode addr) (rlpDecode sig)
           body = rlpDeserialize payload
-      in case (rlpDecode code :: Integer) of
-          0 ->
-            case body of
-                RLPArray [vw, blk] -> Preprepare auth (rlpDecode vw) (rlpDecode blk)
-                _ -> error $ "invalid rlp payload for preprepare: " ++ show body
-          1 ->
-            case body of
-                RLPArray [vw, digest] -> Prepare auth (rlpDecode vw) (rlpDecode digest)
-                _ -> error $ "invalid rlp payload for preprepare: " ++ show body
-          2 ->
-            case body of
-                RLPArray [vw, digest] -> Commit auth (rlpDecode vw) (rlpDecode digest) (rlpDecode seals)
-                _ -> error $ "invalid rlp payload for commit: " ++ show body
+      in WireMessage auth $
+        case (rlpDecode code :: Integer) of
+            0 ->
+              case body of
+                  RLPArray [vw, blk] -> Preprepare (rlpDecode vw) (rlpDecode blk)
+                  _ -> error $ "invalid rlp payload for preprepare: " ++ show body
+            1 ->
+              case body of
+                  RLPArray [vw, digest] -> Prepare (rlpDecode vw) (rlpDecode digest)
+                  _ -> error $ "invalid rlp payload for preprepare: " ++ show body
+            2 ->
+              case body of
+                  RLPArray [vw, digest] -> Commit (rlpDecode vw) (rlpDecode digest) (rlpDecode seals)
+                  _ -> error $ "invalid rlp payload for commit: " ++ show body
+            3 ->
+              case body of
+                  RLPArray [vw, _] -> RoundChange (rlpDecode vw)
+                  _ -> error $ "invalid rlp payload for roundchange: " ++ show body
 
-          3 ->
-            case body of
-                RLPArray [vw, _] -> RoundChange auth (rlpDecode vw)
-                _ -> error $ "invalid rlp payload for roundchange: " ++ show body
-
-          _ -> error $ "invalid code for blockstanbul message: " ++ show code
+            _ -> error $ "invalid code for blockstanbul message: " ++ show code
   rlpDecode x = error $ "invalid rlp for blockstanbul message: " ++ show x
+
+-- While it is of course possible to rlpEncode inevents and rlpdecode
+-- outevents (they are isomorphic on the parts that can be encoded),
+-- the intent is that if you are trying to encode an InEvent you
+-- have made a mistake.
+instance RLPSerializable InEvent where
+  rlpEncode _ = error "cannot rlpencode InEvents"
+  rlpDecode x = let WireMessage a m = rlpDecode x
+                in IMsg a m
+
+instance RLPSerializable OutEvent where
+  rlpDecode _ = error "cannot rlpdecode OutEvents"
+  rlpEncode (OMsg a m) = rlpEncode (WireMessage a m)
+  rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x

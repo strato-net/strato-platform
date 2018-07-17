@@ -30,7 +30,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
     _view :: View
   -- authenticator authenticates wire messages are coming from the right sender
-  , _authenticator :: WireMessage -> Bool
+  , _authenticator :: InEvent -> Bool
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
@@ -76,16 +76,13 @@ selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
-isAuthorized (IMsg wm) = do
-  let MsgAuth addr _ = getAuth wm
+isAuthorized iev = do
   authn <- use authenticator
-  if not (authn wm)
+  if not (authn iev)
     then return False
-    else do
-      authorized <- use validators
-      return $ addr `elem` authorized
--- Internally generated events are trusted implicitly
-isAuthorized _ = return True
+    else case iev of
+            IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
+            _ -> return True -- No sender for timeouts!
 
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
@@ -94,8 +91,7 @@ roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
 roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
-  out <- signMessage pk $ RoundChange (error "TODO(tim): refactor types") nextView
-  yield . OMsg $ out
+  yield =<< signMessage pk (RoundChange nextView)
 
 nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
 nextRound nt = do
@@ -122,17 +118,16 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    IMsg (Preprepare auth v' pp) -> do
+    IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       when (sender auth == pr) $ do
         if v == v'
           then do
             proposal .= Just pp
             pk <- use prvkey
-            out <- signMessage pk $ Prepare (error "TODO(tim): refactor message types") v (blockHash pp)
-            yield . OMsg $ out
+            yield =<< signMessage pk (Prepare v (blockHash pp))
           else roundChange
-    IMsg (Prepare auth v' di) -> when (v <= v') $ do
+    IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
       let sameVoteCount = M.size . M.filter (==di) $ ps
@@ -142,12 +137,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         pk <- use prvkey
         seal <- commitmentSeal di pk
-        out <- signMessage pk $ Commit (error "TODO(tim): refactor message types")
-                                       v
-                                       di
-                                       seal
-        yield . OMsg $ out
-    IMsg (Commit auth v' di seal) -> when (v <= v') $ do
+        yield =<< signMessage pk (Commit v di seal)
+    IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- uses validators length
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
@@ -158,7 +149,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         case ppl of
           Nothing -> error "TODO(tim): Decide how to handle this"
           Just blk -> yield . ToCommit $ blk
-    IMsg (RoundChange auth vn) -> when (_round v < _round vn) $ do
+    IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
       total <- uses validators length
@@ -167,8 +158,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
-        out <- signMessage pk $ RoundChange (error "TODO(tim): refactor types") vn
-        yield . OMsg $ out
+        yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of
@@ -192,15 +182,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         proposal .= Just blk
         pk <- use prvkey
         -- TODO(tim): Seal proposal in extraData
-        out <- signMessage pk $ Preprepare (error "TODO(tim): refactor types") v blk
-        yield . OMsg $ out
+        yield =<< signMessage pk (Preprepare v blk)
 
 class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m (Maybe BlockstanbulContext)
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
 loopback :: OutEvent -> Maybe InEvent
-loopback (OMsg x) = Just $ IMsg x
+loopback (OMsg a m) = Just $ IMsg a m
 loopback _ = Nothing
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]

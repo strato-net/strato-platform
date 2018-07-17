@@ -34,7 +34,7 @@ runTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
-  getBlockstanbulContext = get
+  getBlockstanbulContext = Just <$> get
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk as = do
@@ -51,7 +51,7 @@ spec = parallel $ do
     it "requests a round changes round in response to a timeout or insertion failure" $
       runTest $ do
         got <- sendMessages [Timeout, CommitResult (Left  "invalid hash")]
-        map (_round . roundchangeView . unOMsg) got `shouldBe` [21, 21]
+        map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
 
     it "can handle several rounds in succession" $ property $ \blk blk2 as seal ->
       not (null as) ==> runTest $ do
@@ -61,10 +61,10 @@ spec = parallel $ do
             wantBroadcaster = as !! (length as `div` 3)
             wantDecider = as !! (2 * length as `div` 3)
         proposer .= sender ppr
-        sendMessages [IMsg $ Preprepare ppr v blk] `shouldReturn` [OMsg $ Prepare ppr v hsh]
-        let preps = map (\a -> IMsg $ Prepare a v hsh) as
-        sendMessages preps `shouldReturn` [OMsg $ Commit wantDecider v hsh seal]
-        let coms = map (\a -> IMsg $ Commit a v hsh seal) as
+        sendMessages [IMsg ppr $ Preprepare v blk] `shouldReturn` [OMsg ppr $ Prepare v hsh]
+        let preps = map (\a -> IMsg a $ Prepare v hsh) as
+        sendMessages preps `shouldReturn` [OMsg wantDecider $ Commit v hsh seal]
+        let coms = map (\a -> IMsg a $ Commit v hsh seal) as
         sendMessages coms `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
@@ -73,22 +73,22 @@ spec = parallel $ do
         v2 `shouldBe` over sequence (+1) v
         -- TODO(tim): blk2 should probably have blk as a parent
         let hsh2 = blockHash blk2
-        sendMessages [IMsg $ Preprepare nextPpr v2 blk2, IMsg $ Preprepare ppr v2 blk2]
+        sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
           `shouldReturn`
             if ppr == nextPpr
-              then [OMsg $ Prepare nextPpr v2 hsh2, OMsg $ Prepare ppr v2 hsh2]
-              else [OMsg $ Prepare ppr v2 hsh2]
+              then [OMsg nextPpr $ Prepare v2 hsh2, OMsg ppr $ Prepare v2 hsh2]
+              else [OMsg ppr $ Prepare v2 hsh2]
         -- Old prepares are now ignored
         sendMessages preps `shouldReturn` []
-        let preps2 = map (\a -> IMsg $ Prepare a v2 hsh2) as
-        sendMessages preps2 `shouldReturn` [OMsg $ Commit wantDecider v2 hsh2 seal]
+        let preps2 = map (\a -> IMsg a $ Prepare v2 hsh2) as
+        sendMessages preps2 `shouldReturn` [OMsg wantDecider $ Commit v2 hsh2 seal]
         -- Old commits are now ignored
         sendMessages coms `shouldReturn` []
         use view `shouldReturn` v2
         -- Lets abort this round
         next <- uses view (over round (+1))
-        let aborts = map (\a -> IMsg $ RoundChange a next) as
-        sendMessages aborts `shouldReturn` [OMsg $ RoundChange wantBroadcaster next]
+        let aborts = map (\a -> IMsg a $ RoundChange next) as
+        sendMessages aborts `shouldReturn` [OMsg wantBroadcaster $ RoundChange next]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -96,9 +96,9 @@ spec = parallel $ do
       not (null as) ==> runTest $ do
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
-        void $ sendMessages $ [IMsg $ Preprepare ppr v blk]
-                           ++ [IMsg $ Prepare a v hsh | a <- as]
-                           ++ [IMsg $ Commit a v hsh seal | a <- as]
+        void $ sendMessages $ [IMsg ppr $ Preprepare v blk]
+                           ++ [IMsg a $ Prepare v hsh | a <- as]
+                           ++ [IMsg a $ Commit v hsh seal | a <- as]
                            ++ [CommitResult (Right ())]
         use view `shouldReturn` over sequence (+1) v
         use proposal `shouldReturn` Nothing
@@ -111,7 +111,7 @@ spec = parallel $ do
         validators .= [sender auth]
         curView <- use view
         let hsh = blockHash blk
-        sendMessages [IMsg $ Preprepare auth curView blk] `shouldReturn` [OMsg $ Prepare auth curView hsh]
+        sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` [OMsg auth $ Prepare curView hsh]
         use proposal `shouldReturn` Just blk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
@@ -120,7 +120,7 @@ spec = parallel $ do
         validators .= [sender auth]
         authenticator .= const False
         curView <- use view
-        sendMessages [IMsg $ Preprepare auth curView blk] `shouldReturn` []
+        sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
@@ -128,7 +128,7 @@ spec = parallel $ do
         proposer .= addr
         validators .= [sender auth, addr]
         curView <- use view
-        sendMessages [IMsg $ Preprepare auth curView blk] `shouldReturn` []
+        sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-validator" $ property $ \auth blk ->
@@ -136,7 +136,7 @@ spec = parallel $ do
         proposer .= sender auth
         validators .= []
         curView <- use view
-        sendMessages [IMsg $ Preprepare auth curView blk] `shouldReturn` []
+        sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
 
     it "round-changes an old preprepare" $ property $ \auth blk ->
@@ -144,8 +144,8 @@ spec = parallel $ do
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
-        got <- sendMessages [IMsg $ Preprepare auth curView{_round = 3} blk]
-        map (_round . roundchangeView . unOMsg) got `shouldBe` [21]
+        got <- sendMessages [IMsg auth $ Preprepare curView{_round = 3} blk]
+        map (_round . roundchangeView . oMessage) got `shouldBe` [21]
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk seal ->
@@ -153,28 +153,28 @@ spec = parallel $ do
         liftIO $ pendingWith "TODO(tim): calculate the seal"
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
-        sendMessages [IMsg $ Prepare auth curView di] `shouldReturn`
-          [OMsg $ Commit auth curView di seal]
+        sendMessages [IMsg auth $ Prepare curView di] `shouldReturn`
+          [OMsg auth $ Commit curView di seal]
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
         validators .= [sender auth]
         curView <- use view
-        sendMessages [IMsg $ Prepare auth curView di] `shouldReturn` []
+        sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk seal ->
       runTest $ do
         liftIO $ pendingWith "TODO(tim): seal the commit"
         (curView, di) <- setupRound blk [a1, a2, a3]
-        let input = map (\a -> IMsg $ Prepare (MsgAuth a sig) curView di) [a1, a2, a3]
+        let input = map (\a -> IMsg (MsgAuth a sig) $ Prepare curView di) [a1, a2, a3]
         -- TODO(tim): rewrite the seal on `got` to be the generated one
-        sendMessages input `shouldReturn` [OMsg $ Commit (MsgAuth a3 sig) curView di seal]
+        sendMessages input `shouldReturn` [OMsg (MsgAuth a3 sig) $ Commit curView di seal]
         use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
     it "only sends one commit message" $ property $ \sig as blk ->
       runTest $ do
         (curView, di) <- setupRound blk as
-        let input = map (\a -> IMsg $ Prepare (MsgAuth a sig) curView di) as
+        let input = map (\a -> IMsg (MsgAuth a sig) $ Prepare  curView di) as
         got <- sendMessages input
         got `shouldSatisfy` (== min (length as) 1) . length
 
@@ -182,33 +182,33 @@ spec = parallel $ do
     it "returns a ready block" $ property $ \auth blk seal ->
       runTest $ do
         (curView, di) <- setupRound blk [sender auth]
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` [ToCommit blk]
+        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` [ToCommit blk]
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
       runTest $ do
         (curView, _) <- setupRound blk [sender auth]
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
+        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
         validators .= [sender auth]
         curView <- use view
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
+        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "rejects a message from a non-validator" $ property $ \auth blk seal ->
       runTest $ do
         (curView, di) <- setupRound blk []
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
+        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView
     it "rejects a message from an unauthenticated peer" $ property $ \auth blk seal ->
       runTest $ do
         (curView, di) <- setupRound blk [sender auth]
         authenticator .= const False
-        sendMessages [IMsg $ Commit auth curView di seal] `shouldReturn` []
+        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView
 
@@ -217,7 +217,7 @@ spec = parallel $ do
         (curView, di) <- setupRound blk as
         let count =  2 * length as `div` 3
             (front, back) = splitAt count as
-            toCommit a = IMsg $ Commit (MsgAuth a sig) curView di seal
+            toCommit a = IMsg (MsgAuth a sig) $ Commit curView di seal
             earlyCommits = map toCommit front
             tippingPoint = map toCommit . take 1 $ back
         sendMessages earlyCommits `shouldReturn` []
@@ -233,18 +233,18 @@ spec = parallel $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
-        sendMessages [IMsg $ RoundChange a1 next] `shouldReturn` []
+        sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` []
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.singleton (sender a1) roundNext
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
-        sendMessages [IMsg $ RoundChange a2 next] `shouldReturn` [OMsg $ RoundChange a2 next]
+        sendMessages [IMsg a2 $ RoundChange next] `shouldReturn` [OMsg a2 $ RoundChange next]
         use pendingRound `shouldReturn` Just roundNext
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg $ RoundChange a3 next] `shouldReturn` []
+        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` []
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -252,7 +252,7 @@ spec = parallel $ do
       runTest $ do
         _ <- setupRound blk [sender a]
         next <- uses view (over round (+1))
-        _ <- sendMessages [IMsg $ RoundChange a next]
+        _ <- sendMessages [IMsg a $ RoundChange next]
         use view `shouldReturn` next
-        sendMessages [IMsg $ RoundChange a next] `shouldReturn` []
+        sendMessages [IMsg a $ RoundChange next] `shouldReturn` []
         use view `shouldReturn` next

@@ -120,22 +120,17 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signMessage :: (MonadIO m) => HK.PrvKey -> WireMessage -> m WireMessage
-signMessage pk wm = do
-  let msg = getHash wm
+signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
+signMessage pk tm = do
+  let msg = getHash tm
       addr = prvKey2Address pk
   sig <- HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
-  let auth = MsgAuth addr sig
-  return $ case wm of
-      Preprepare _ b c -> Preprepare auth b c
-      Prepare _ b c -> Prepare auth b c
-      Commit _ b c d -> Commit auth b c d
-      RoundChange _ b -> RoundChange auth b
+  return . OMsg (MsgAuth addr sig) $ tm
 
-authenticate :: WireMessage -> Bool
-authenticate msg =
-  let MsgAuth addr sig = getAuth msg
-      msgHash = getHash msg
+authenticate :: InEvent -> Bool
+authenticate (IMsg (MsgAuth addr sig) tm) =
+  let msgHash = getHash tm
       mKey = getPubKeyFromSignature sig msgHash
       mAddress = pubKey2Address <$> mKey
   in mAddress == Just addr
+authenticate _ = True -- Non-messages are trusted implicitly
