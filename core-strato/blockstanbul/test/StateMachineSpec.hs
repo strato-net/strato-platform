@@ -5,11 +5,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
 
-import Test.Hspec (Spec, describe, it, parallel, pendingWith)
+import Test.Hspec (Spec, describe, it, parallel)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck
 
-import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
@@ -21,6 +20,7 @@ import Prelude hiding (round, sequence)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
+import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.SHA
@@ -55,17 +55,23 @@ spec = parallel $ do
 
     it "can handle several rounds in succession" $ property $ \blk blk2 as seal ->
       not (null as) ==> runTest $ do
-        liftIO $ pendingWith "TODO(tim): calculate seal"
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
-            wantBroadcaster = as !! (length as `div` 3)
-            wantDecider = as !! (2 * length as `div` 3)
         proposer .= sender ppr
-        sendMessages [IMsg ppr $ Preprepare v blk] `shouldReturn` [OMsg ppr $ Prepare v hsh]
+        omsgs1 <- sendMessages [IMsg ppr $ Preprepare v blk]
+        map oMessage omsgs1 `shouldBe` [Prepare v hsh]
         let preps = map (\a -> IMsg a $ Prepare v hsh) as
-        sendMessages preps `shouldReturn` [OMsg wantDecider $ Commit v hsh seal]
+        omsgs2 <- sendMessages preps
+        let [Commit v' hsh' seal'] = map oMessage omsgs2
+        (v', hsh') `shouldBe` (v, hsh)
+        me <- selfAddr
+        seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
         let coms = map (\a -> IMsg a $ Commit v hsh seal) as
-        sendMessages coms `shouldReturn` []
+        xsp <- sendMessages coms
+        length xsp `shouldBe` 1
+        xsp `shouldBe` [ToCommit blk]
+        -- Pretend that in this interval, the block was committed
+        sendMessages [CommitResult (Right ())] `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
@@ -73,22 +79,26 @@ spec = parallel $ do
         v2 `shouldBe` over sequence (+1) v
         -- TODO(tim): blk2 should probably have blk as a parent
         let hsh2 = blockHash blk2
-        sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
-          `shouldReturn`
+        omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
+        map oMessage omsgs3 `shouldMatchList`
             if ppr == nextPpr
-              then [OMsg nextPpr $ Prepare v2 hsh2, OMsg ppr $ Prepare v2 hsh2]
-              else [OMsg ppr $ Prepare v2 hsh2]
+              then [Prepare v2 hsh2, Prepare v2 hsh2]
+              else [Prepare v2 hsh2]
         -- Old prepares are now ignored
         sendMessages preps `shouldReturn` []
         let preps2 = map (\a -> IMsg a $ Prepare v2 hsh2) as
-        sendMessages preps2 `shouldReturn` [OMsg wantDecider $ Commit v2 hsh2 seal]
+        omsgs4 <- sendMessages preps2
+        let [Commit v2' hsh2' seal2'] = map oMessage omsgs4
+        (v2', hsh2') `shouldBe` (v2, hsh2)
+        seal2' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh2
         -- Old commits are now ignored
         sendMessages coms `shouldReturn` []
         use view `shouldReturn` v2
         -- Lets abort this round
         next <- uses view (over round (+1))
         let aborts = map (\a -> IMsg a $ RoundChange next) as
-        sendMessages aborts `shouldReturn` [OMsg wantBroadcaster $ RoundChange next]
+        omsgs5 <- sendMessages aborts
+        map oMessage omsgs5 `shouldBe` [RoundChange next]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -148,13 +158,16 @@ spec = parallel $ do
         map (_round . roundchangeView . oMessage) got `shouldBe` [21]
 
   describe "A prepare message" $ do
-    it "sets the prepared state of a validator" $ property $ \auth blk seal ->
+    it "sets the prepared state of a validator" $ property $ \auth blk ->
       runTest $ do
-        liftIO $ pendingWith "Calculate the seal"
+        me <- selfAddr
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
         omsgs <- sendMessages [IMsg auth $ Prepare curView di]
-        map oMessage omsgs `shouldBe` [Commit curView di seal]
+        let [Commit v di' seal] = map oMessage omsgs
+        (v, di') `shouldBe` (curView, di)
+        seal `shouldSatisfy` (== Just me) . verifyCommitmentSeal di
+
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
@@ -162,13 +175,17 @@ spec = parallel $ do
         curView <- use view
         sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
-    it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk seal ->
+    it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
       runTest $ do
-        liftIO $ pendingWith "TODO(tim): seal the commit"
         (curView, di) <- setupRound blk [a1, a2, a3]
-        let input = map (\a -> IMsg (MsgAuth a sig) $ Prepare curView di) [a1, a2, a3]
-        -- TODO(tim): rewrite the seal on `got` to be the generated one
-        sendMessages input `shouldReturn` [OMsg (MsgAuth a3 sig) $ Commit curView di seal]
+        let upgrade a = IMsg (MsgAuth a sig) $ Prepare curView di
+        sendMessages (map upgrade [a1, a2]) `shouldReturn` []
+        sendMessages [upgrade a2] `shouldReturn` []
+        omsgs <- sendMessages [upgrade a3]
+        let [Commit v d s] = map oMessage omsgs
+        (v, d) `shouldBe` (curView, di)
+        me <- selfAddr
+        s `shouldSatisfy` (== Just me) . verifyCommitmentSeal di
         use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
     it "only sends one commit message" $ property $ \sig as blk ->

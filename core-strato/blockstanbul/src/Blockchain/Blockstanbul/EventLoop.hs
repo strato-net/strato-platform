@@ -44,6 +44,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPrepared :: Bool
+  , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
@@ -67,6 +68,7 @@ newContext v as pk =
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPrepared = False
+     , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
      , _prvkey = pk
@@ -110,6 +112,7 @@ nextRound nt = do
   committed .= M.empty
   roundChanged .= M.empty
 
+  hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
 
@@ -144,7 +147,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
-      when (3 * sameVoteCount > 2 * total && sameHash) $ do
+      hasSent <- use hasCommitted
+      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent ) $ do
+        hasCommitted .= True
         ppl <- use proposal
         case ppl of
           Nothing -> error "TODO(tim): Decide how to handle this"
