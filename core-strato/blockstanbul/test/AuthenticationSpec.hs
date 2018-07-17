@@ -90,7 +90,7 @@ spec = do
     it "can remove all seals" $ property $ \ist bs ->
       let iex = ExtraData (trim (isJust ist) bs) ist
           payload = uncookRawExtra iex
-          wantIst = fmap (\i -> i{_proposal=Nothing, _commitment = []}) ist
+          wantIst = fmap (\i -> i{_proposedSig=Nothing, _commitment = []}) ist
           got = cookRawExtra . scrubAllSeals $ payload
       in got `shouldBe` iex{_istanbul=wantIst}
     it "can remove commitment seals" $ property $ \ist bs ->

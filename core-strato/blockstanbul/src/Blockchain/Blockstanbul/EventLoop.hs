@@ -10,7 +10,7 @@ import Control.Monad hiding (sequence)
 import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
+import Data.Maybe
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 
@@ -97,13 +97,6 @@ roundChange = do
   out <- signMessage pk $ RoundChange (error "TODO(tim): refactor types") nextView
   yield . OMsg $ out
 
--- TODO(tim): Define an exit type from the conduit for sending blocks to the EVM
--- TODO(tim): what to do if the block hasn't arrived yet?
-commit :: (StateMachineM m) => Maybe Block -> Conduit InEvent m OutEvent
-commit _ = do
-  s <- use $ view . sequence
-  nextRound . Sequence $ s+1
-
 nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
 nextRound nt = do
   case nt of
@@ -128,7 +121,7 @@ loopback :: OutEvent -> Maybe InEvent
 loopback (OMsg x) = Just $ IMsg x
 loopback _ = Nothing
 
-eventLoop :: (MonadIO m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
+eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
@@ -164,7 +157,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
       when (3 * sameVoteCount > 2 * total && sameHash) $ do
-        join $ uses proposal commit
+        ppl <- use proposal
+        case ppl of
+          Nothing -> error "TODO(tim): Decide how to handle this"
+          Just blk -> yield . ReadyBlock $ blk
     IMsg (RoundChange auth vn) -> when (_round v <= _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
@@ -182,14 +178,28 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Nothing -> error "a round was voted on without existing"
           Just r -> nextRound (Round r)
       return ()
-    Timeout -> roundChange
-    CommitFailure _ -> roundChange
+    Timeout -> do
+      $logInfoS "blockstanbul" "Round timed out"
+      roundChange
+    CommitResult (Left err) -> do
+      $logInfoS "blockstanbul" err
+      roundChange
+    CommitResult (Right ()) -> do
+      s <- use $ view . sequence
+      nextRound . Sequence $ s+1
+    NewBlock blk -> do
+      ppl <- use proposal
+      when (isNothing ppl) $ do
+        proposal .= Just blk
+        pk <- use prvkey
+        out <- signMessage pk $ Preprepare (error "TODO(tim): refactor types") v blk
+        yield . OMsg $ out
 
 class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m BlockstanbulContext
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
-sendMessages :: (MonadIO m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendMessages wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.

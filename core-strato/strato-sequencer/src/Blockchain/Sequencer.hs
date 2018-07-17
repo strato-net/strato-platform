@@ -57,7 +57,7 @@ createBlockstanbulRoundTimer dt = do
 
 sequencer :: SequencerM ()
 sequencer = do
-  var <- liftIO $ createBlockstanbulRoundTimer 7
+  var <- liftIO $ createBlockstanbulRoundTimer 100
   forever $ do
     ready <- atomically $ swapTMVar var False
     $logInfoS "isReady" . T.pack . show $ ready
@@ -115,7 +115,11 @@ transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEven
 transformEvents input = unzip . join <$> forM input unboxAndTransform
     where unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
-                                  IEBlock bk -> emitBlocks bk (ingestBlockToSequencedBlock bk)
+                                  IEBlock bk -> do
+                                    let rawBlock = ingestBlockToBlock bk
+                                    resp <- sendMessages [NewBlock rawBlock]
+                                    $logInfoS "unboxAndTransform" . T.pack $ "Response from blockstanbul: " ++ show resp
+                                    emitBlocks bk (ingestBlockToSequencedBlock bk)
 
           emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
             case wrappedTx of

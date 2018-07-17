@@ -47,7 +47,8 @@ roundchangeCode = 3
 
 data InEvent = IMsg {unIMsg :: WireMessage}
              | Timeout
-             | CommitFailure Text
+             | CommitResult (Either Text ())
+             | NewBlock Block
              deriving (Eq, Show)
 
 data OutEvent = OMsg {unOMsg :: WireMessage}
