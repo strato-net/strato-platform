@@ -3,6 +3,8 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
@@ -17,7 +19,7 @@ import           Data.Time.Clock
 import           System.Clock
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe)
+import           Data.Maybe                                (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Text                                 as T
 
 import           Blockchain.Blockstanbul
@@ -59,11 +61,12 @@ sequencer :: SequencerM ()
 sequencer = do
   var <- liftIO $ createBlockstanbulRoundTimer 100
   forever $ do
+    v <- currentView
+    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
     ready <- atomically $ swapTMVar var False
     when ready $ do
-      resp <- sendAllMessages [Timeout]
-      $logDebugS "seq/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
-      return ()
+      oevs <- blockstanbulSend [Timeout]
+      void . writeSeqVmEvents' $ oevs
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
@@ -110,15 +113,34 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                   writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
+
+blockstanbulSend :: [InEvent] -> SequencerM [OutputEvent]
+blockstanbulSend msgs = do
+    resp <- sendAllMessages msgs
+    $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
+    -- TODO(tim): Use the wiremessages in the response
+    let blocks = [b | ReadyBlock b <- resp]
+    unless (null blocks) $
+      -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
+      void $ sendAllMessages [CommitResult (Right ())]
+    $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
+    let rewriteBlock = fmap OEBlock
+                     . fmap (flip sequencedBlockToOutputBlock 1)
+                     . ingestBlockToSequencedBlock
+                     . blockToIngestBlock TO.Blockstanbul
+        evs = mapMaybe rewriteBlock blocks
+    $logDebugS "seq/pbft/send" . T.pack . show $ evs
+    return evs
+
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
 transformEvents input = unzip . join <$> forM input unboxAndTransform
     where unboxAndTransform e = case e of
                                   IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> do
-                                    let rawBlock = ingestBlockToBlock bk
-                                    resp <- sendAllMessages [NewBlock rawBlock]
-                                    $logInfoS "unboxAndTransform" . T.pack $ "Response from blockstanbul: " ++ show resp
-                                    emitBlocks bk (ingestBlockToSequencedBlock bk)
+                                    hasPBFT <- blockstanbulRunning
+                                    if hasPBFT
+                                      then fmap (map (Nothing, )) . blockstanbulSend . (:[]) . NewBlock . ingestBlockToBlock $ bk
+                                      else emitBlocks bk (ingestBlockToSequencedBlock bk)
 
           emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
             case wrappedTx of

@@ -46,7 +46,7 @@ data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
                       , _seenTransactionDB   :: SeenTransactionDB
                       , _sequencerKafkaState :: K.KafkaState
-                      , _blockstanbulContext :: BlockstanbulContext
+                      , _blockstanbulContext :: Maybe BlockstanbulContext
                       }
 makeLenses ''SequencerContext
 
@@ -80,7 +80,7 @@ instance K.HasKafkaState SequencerM where
 
 instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
-    putBlockstanbulContext = assign blockstanbulContext
+    putBlockstanbulContext = assign (blockstanbulContext . _Just)
 
 runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
 runSequencerM c m = do
@@ -105,7 +105,7 @@ runSequencerM c m = do
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _sequencerKafkaState = kState
-            , _blockstanbulContext = ctx
+            , _blockstanbulContext = Just ctx
             }
     return $ fst a
 

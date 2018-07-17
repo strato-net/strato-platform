@@ -196,7 +196,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield . OMsg $ out
 
 class (Monad m) => HasBlockstanbulContext m where
-  getBlockstanbulContext :: m BlockstanbulContext
+  getBlockstanbulContext :: m (Maybe BlockstanbulContext)
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
 loopback :: OutEvent -> Maybe InEvent
@@ -207,14 +207,19 @@ sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent
 sendMessages wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
-  ctx <- getBlockstanbulContext
-  let base = yieldMany wms
-          .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . show)
-          .| eventLoop ctx
-          `fuseUpstream` iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show)
-  (ctx', evs) <- runConduit $ fuseBoth base sinkList
-  putBlockstanbulContext ctx'
-  return evs
+  mCtx <- getBlockstanbulContext
+  case mCtx of
+    Nothing -> do
+      $logErrorS "blockstanbul" "cannot send messages without a BlockstanbulContext"
+      return []
+    Just ctx -> do
+      let base = yieldMany wms
+              .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . show)
+              .| eventLoop ctx
+              `fuseUpstream` iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show)
+      (ctx', evs) <- runConduit $ fuseBoth base sinkList
+      putBlockstanbulContext ctx'
+      return evs
 
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
@@ -225,4 +230,7 @@ sendAllMessages wms = do
              wms' -> (out ++) <$> sendAllMessages wms'
 
 currentView :: (HasBlockstanbulContext m) => m View
-currentView = _view <$> getBlockstanbulContext
+currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
+
+blockstanbulRunning :: HasBlockstanbulContext m => m Bool
+blockstanbulRunning = isJust <$> getBlockstanbulContext
