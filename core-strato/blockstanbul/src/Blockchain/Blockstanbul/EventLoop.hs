@@ -99,6 +99,8 @@ roundChange = do
 
 nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
 nextRound nt = do
+  -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
+  -- rather than reset everything in the state.
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> view . round .= r
@@ -106,6 +108,7 @@ nextRound nt = do
   thisR <- use $ view . round
   let nextP = vals !! (fromIntegral thisR `mod` length vals)
   proposer .= nextP
+  proposal .= Nothing
 
   prepared .= M.empty
   committed .= M.empty

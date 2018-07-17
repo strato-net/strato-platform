@@ -92,6 +92,17 @@ spec = parallel $ do
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
+    it "increments sequence number" $ property $ \blk as seal ->
+      not (null as) ==> runTest $ do
+        (v, hsh) <- setupRound blk . map sender $ as
+        let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
+        void $ sendMessages $ [IMsg $ Preprepare ppr v blk]
+                           ++ [IMsg $ Prepare a v hsh | a <- as]
+                           ++ [IMsg $ Commit a v hsh seal | a <- as]
+                           ++ [CommitResult (Right ())]
+        use view `shouldReturn` over sequence (+1) v
+        use proposal `shouldReturn` Nothing
+
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
       runTest $ do
