@@ -323,4 +323,4 @@ bootstrapSequencer gb = do
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
                                             }
-    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) printLogMsg
+    runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg

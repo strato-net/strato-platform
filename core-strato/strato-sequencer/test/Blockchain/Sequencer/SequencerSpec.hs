@@ -53,7 +53,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , statsConfig           = Nothing
                                }
 
-    runLoggingT (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
+    runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
