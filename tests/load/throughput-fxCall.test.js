@@ -19,6 +19,8 @@ describe('Throughput - fx call', function () {
   let users;
   let contracts = [];
 
+  const batchSize = util.getArgInt('--batchSize', 1);
+
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
@@ -28,15 +30,15 @@ describe('Throughput - fx call', function () {
   });
 
   it('should calculate method call throughput for network', function * () {
-    
+
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = createBatchTx(user, contracts[node.id]);      
-      generators.push(rest.callList(user, user.address, txs, true, node.id));
+      const txs = createBatchTx(user, contracts[node.id]);
+      generators.push(rest.callList(user, txs, true, node.id));
     }
 
     console.log('Submitting txs');
@@ -60,7 +62,7 @@ describe('Throughput - fx call', function () {
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
     console.log(`Total Seconds: ${seconds}`);
-    console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
+    console.log(`Approx TPS: ${(batchSize * nodes.length) / seconds} tx/sec`);
   })
 
   // HELPER FUNCTIONS FOR TESTS
@@ -94,7 +96,7 @@ describe('Throughput - fx call', function () {
     let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
-      stateMatches &= (state.x == config.batchSize);
+      stateMatches &= (state.x == batchSize);
       if(!stateMatches)  {
         break;
       }
@@ -105,7 +107,7 @@ describe('Throughput - fx call', function () {
   function createBatchTx(fromUser, contract) {
     var txs = [];
 
-    for (var i = 0; i < config.batchSize; i++) {
+    for (var i = 0; i < batchSize; i++) {
       txs.push({
         contractAddress: contract.address,
         contractName: contract.name,
@@ -118,4 +120,3 @@ describe('Throughput - fx call', function () {
   }
 
 });
-
