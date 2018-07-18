@@ -40,7 +40,7 @@ instance (RLPSerializable a) => RLPSerializable (Maybe a) where
   rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
 
 
-data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, GHCG.Generic)
+data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic)
 
 instance Arbitrary IPAddress where
   arbitrary = IPv4 <$> arbitrary
@@ -56,7 +56,7 @@ data Enode = Enode
   , ipAddress  :: IPAddress
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
-  } deriving (Show, Read, Eq, GHCG.Generic)
+  } deriving (Show, Read, Eq, Ord, GHCG.Generic)
         
 instance Arbitrary Enode where
   arbitrary = Enode
