@@ -9,6 +9,8 @@ module Blockchain.Data.ChainInfo
   ( ChainInfo (..),
     AccountInfo (..),
     CodeInfo (..),
+    accountInfo,
+    accountExtractor
   ) where
 
 
@@ -20,7 +22,7 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
-import           Blockchain.TypeLits
+-- import           Blockchain.TypeLits
 
 import           Data.Aeson
 import           Data.Aeson.TH                        as AT
