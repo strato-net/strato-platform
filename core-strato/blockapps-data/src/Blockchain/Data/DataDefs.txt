@@ -187,8 +187,6 @@ BlockOffset
 ChainInfoRef
     chainId Word256
     chainLabel String
-    addRule String
-    removeRule String
     deriving Eq Generic Read Show
 
 ChainMemberRef
