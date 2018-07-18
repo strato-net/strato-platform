@@ -17,6 +17,7 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           GHC.Int
 
+import           BlockApps.Ethereum                (AccountInfo(..))
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Selector
 import           BlockApps.Solidity.Struct
@@ -26,6 +27,9 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
+
+transformXabi :: Xabi -> Map.Map Text Text -> AccountInfo
+transformXabi _ _ = undefined
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
