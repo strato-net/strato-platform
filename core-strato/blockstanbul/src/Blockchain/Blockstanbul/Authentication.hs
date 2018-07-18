@@ -5,6 +5,7 @@ import Control.Monad (liftM2, liftM3)
 import Control.Monad.IO.Class
 import Control.Lens
 import qualified Data.ByteString as B
+import Data.List (sort)
 import Data.Monoid ((<>))
 import MonadUtils (liftIO1)
 import Test.QuickCheck
@@ -69,16 +70,25 @@ cookRawExtra bs =
                       then Nothing
                       else Just . rlpDecode . rlpDeserialize $ rest
 
+truncateExtra :: Block -> Block
+truncateExtra = over (blockDataLens . extraDataLens) $ B.take 32
+
 addValidators :: [Address] -> Block -> Block
 addValidators vs = over (blockDataLens . extraDataLens) $
     uncookRawExtra
-  . set istanbul (Just (IstanbulExtra vs Nothing []))
+  . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
   . cookRawExtra
 
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over (blockDataLens . extraDataLens) $
     uncookRawExtra
   . set (istanbul . _Just . proposedSig) (Just sig)
+  . cookRawExtra
+
+addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
+addCommitmentSeals sigs = over (blockDataLens . extraDataLens) $
+    uncookRawExtra
+  . set (istanbul . _Just . commitment) sigs
   . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData

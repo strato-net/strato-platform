@@ -121,7 +121,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBlock blk -> do
+    NewBlock blk' -> do
+      let blk = truncateExtra blk'
       ppl <- use proposal
       leader <- use proposer
       self <- selfAddr
@@ -165,7 +166,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         ppl <- use proposal
         case ppl of
           Nothing -> error "TODO(tim): Decide how to handle this"
-          Just blk -> yield . ToCommit $ blk
+          Just blk -> do
+            let seals = map snd . M.elems $ cs
+            yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn

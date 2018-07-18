@@ -12,9 +12,11 @@ import Test.QuickCheck
 import Control.Lens hiding (view)
 import qualified Control.Lens as L
 import Control.Monad hiding (sequence)
+import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.State
 import qualified Data.ByteString as BS
+import Data.List
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Prelude hiding (round, sequence)
@@ -40,13 +42,16 @@ instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) wher
   getBlockstanbulContext = Just <$> get
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
-setupRound blk as = do
+setupRound blk' as = do
+  let blk = truncateExtra blk'
   proposal .= Just blk
   validators .= as
   v <- use view
   let di = blockHash blk
   return (v, di)
 
+compareNoExtra :: (MonadIO m) => Block -> Block -> m ()
+compareNoExtra b1 b2 = set (blockDataLens . extraDataLens) "" b1 `shouldBe` set (blockDataLens . extraDataLens) "" b2
 
 spec :: Spec
 spec = parallel $ do
@@ -56,8 +61,9 @@ spec = parallel $ do
         got <- sendMessages [Timeout, CommitResult (Left  "invalid hash")]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
 
-    it "can handle several rounds in succession" $ property $ \blk blk2 as seal ->
+    it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
       not (null as) ==> runTest $ do
+        let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
@@ -199,10 +205,21 @@ spec = parallel $ do
         got `shouldSatisfy` (== min (length as) 1) . length
 
   describe "A commit message" $ do
-    it "returns a ready block" $ property $ \auth blk seal ->
+    it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
-        (curView, di) <- setupRound blk [sender auth]
-        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` [ToCommit blk]
+        let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
+        validators .= [sender auth]
+        proposal .= Just blk
+        curView <- use view
+        let di = blockHash blk
+        omsgs <- sendMessages [IMsg auth $ Commit curView di seal]
+        let [ToCommit b] = omsgs
+        b `compareNoExtra` blk
+        let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
+            want = ExtraData
+                      (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+                      (Just $ IstanbulExtra [sender auth] (Just seal) [seal])
+        got `shouldBe` want
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
@@ -232,9 +249,13 @@ spec = parallel $ do
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView
 
-    it "waits for 2/3s of commits" $ property $ \sig blk as seal ->
+    it "waits for 2/3s of commits" $ property $ \sig blk' as seal ->
       runTest $ do
-        (curView, di) <- setupRound blk as
+        let blk = addProposerSeal seal . addValidators as $ blk'
+        validators .= as
+        proposal .= Just blk
+        curView <- use view
+        let di = blockHash blk
         let count =  2 * length as `div` 3
             (front, back) = splitAt count as
             toCommit a = IMsg (MsgAuth a sig) $ Commit curView di seal
@@ -243,8 +264,17 @@ spec = parallel $ do
         sendMessages earlyCommits `shouldReturn` []
         use committed `shouldReturn` M.fromList (map (, (di, seal)) front)
         use view `shouldReturn` curView
-        unless (null as) $
-          sendMessages tippingPoint `shouldReturn` [ToCommit blk]
+        unless (null as) $ do
+          omsgs <- sendMessages tippingPoint
+          let [ToCommit b] = omsgs
+          b `compareNoExtra` blk
+          let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
+          _vanity got `shouldBe` (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+          let Just ist = _istanbul got
+          _validatorList ist `shouldBe` sort as
+          _proposedSig ist `shouldBe` Just seal
+          _commitment ist `shouldSatisfy` (== count+1) . length
+          finalHash b `shouldBe` di
 
   describe "A round change message" $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3 ->
