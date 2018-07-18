@@ -10,9 +10,11 @@ import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck
 
 import Control.Lens hiding (view)
+import qualified Control.Lens as L
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
 import Control.Monad.Trans.State
+import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Prelude hiding (round, sequence)
@@ -20,6 +22,7 @@ import Prelude hiding (round, sequence)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
+import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
@@ -273,3 +276,25 @@ spec = parallel $ do
         use view `shouldReturn` next
         sendMessages [IMsg a $ RoundChange next] `shouldReturn` []
         use view `shouldReturn` next
+
+  describe "A new block message" $ do
+    it "seals the block" $ property $ \blk'' ->
+      runTest $ do
+        let blk = over (blockDataLens . extraDataLens) (BS.take 32) blk''
+        me <- selfAddr
+        validators .= [me]
+        proposer .= me
+        v <- use view
+        omsgs <- sendMessages [NewBlock blk]
+        let [Preprepare v' blk'] = map oMessage omsgs
+        v' `shouldBe` v
+        let initData = L.view (blockDataLens . extraDataLens) blk
+        set (blockDataLens . extraDataLens) initData blk' `shouldBe` blk
+        blk' `shouldNotBe` blk
+        let parsedExtra = cookRawExtra . L.view (blockDataLens . extraDataLens) $ blk'
+        L.view vanity parsedExtra `shouldBe` initData
+        let Just ist = _istanbul parsedExtra
+        L.view validatorList ist `shouldBe` [me]
+        L.view commitment ist `shouldBe` []
+        L.view proposedSig ist `shouldSatisfy`
+          (== Just me) . (>>= verifyProposerSeal blk')

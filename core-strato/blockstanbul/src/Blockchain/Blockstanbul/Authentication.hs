@@ -69,6 +69,18 @@ cookRawExtra bs =
                       then Nothing
                       else Just . rlpDecode . rlpDeserialize $ rest
 
+addValidators :: [Address] -> Block -> Block
+addValidators vs = over (blockDataLens . extraDataLens) $
+    uncookRawExtra
+  . set istanbul (Just (IstanbulExtra vs Nothing []))
+  . cookRawExtra
+
+addProposerSeal :: ExtendedSignature -> Block -> Block
+addProposerSeal sig = over (blockDataLens . extraDataLens) $
+    uncookRawExtra
+  . set (istanbul . _Just . proposedSig) (Just sig)
+  . cookRawExtra
+
 scrubAllSeals :: RawExtraData -> RawExtraData
 scrubAllSeals = uncookRawExtra
               . set (istanbul . _Just . proposedSig) Nothing

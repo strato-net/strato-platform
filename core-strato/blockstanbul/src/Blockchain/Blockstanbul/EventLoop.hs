@@ -121,6 +121,18 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
+    NewBlock blk -> do
+      ppl <- use proposal
+      leader <- use proposer
+      self <- selfAddr
+      when (isNothing ppl && leader == self) $ do
+        pk <- use prvkey
+        vs <- use validators
+        let blockWithVs = addValidators vs blk
+        pseal <- proposerSeal blockWithVs pk
+        let sealedBlk = addProposerSeal pseal blockWithVs
+        proposal .= Just sealedBlk
+        yield =<< signMessage pk (Preprepare v sealedBlk)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       when (sender auth == pr) $ do
@@ -179,15 +191,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     CommitResult (Right ()) -> do
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
-    NewBlock blk -> do
-      ppl <- use proposal
-      leader <- use proposer
-      self <- selfAddr
-      when (isNothing ppl && leader == self) $ do
-        proposal .= Just blk
-        pk <- use prvkey
-        -- TODO(tim): Seal proposal in extraData
-        yield =<< signMessage pk (Preprepare v blk)
 
 class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m (Maybe BlockstanbulContext)
