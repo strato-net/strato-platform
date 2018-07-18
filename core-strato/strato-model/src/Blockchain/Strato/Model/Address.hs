@@ -76,6 +76,10 @@ instance PathPiece Address where
 
 formatAddress :: Address -> String
 formatAddress (Address x) = padZeros 40 $ showHex x ""
+
+readAddress :: String -> Address
+readAddress str = read (dropWhile (=='0') str) 
+
 {-
  make into a string rather than an object
 -}
@@ -95,6 +99,9 @@ instance AS.FromJSON Address where
 --        error $ "error converting json to Address: " ++ show s
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ T.unpack s
   parseJSON _          = mzero
+
+instance AS.FromJSONKey Address where
+  fromJSONKey = FromJSONKeyText (readAddress . T.unpack)
 
 instance Lei.Pretty Address where
   pretty = Lei.text . CL.yellow . formatAddress
