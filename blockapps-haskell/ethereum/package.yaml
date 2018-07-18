@@ -19,14 +19,17 @@ dependencies:
   - base16-bytestring
   - binary
   - bytestring
+  - containers
   - cryptonite
   - deepseq
+  - generic-random
   - hashable
   - http-api-data
   - largeword
   - lens
   - memory
   - QuickCheck
+  - quickcheck-instances
   - relapse
   - secp256k1
   - servant
