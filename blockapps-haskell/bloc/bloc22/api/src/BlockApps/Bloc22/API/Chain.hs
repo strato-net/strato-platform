@@ -15,86 +15,92 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
-import qualified Data.ByteString.Lazy               as ByteString.Lazy
-import           Data.Map                           (Map)
-import qualified Data.Map                           as Map
-import           Data.Proxy
 import           Data.Text                          (Text)
-import qualified Data.Text.Encoding                 as Text
 import           Generic.Random.Generic
 import           GHC.Generics
-import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
 import           BlockApps.Ethereum
-import           BlockApps.Solidity.ArgValue
-import           BlockApps.Solidity.SolidityValue
-import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Types
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
-
-data ChainInfo = ChainInfo
-  { chainInfoSrc            :: Text
-  , chainInfoLabel          :: Text
-  , chainInfoAccountInfo    :: [(Address, Integer)]
-  , chainInfoVariableValues :: [(Text, Text)]
+{-
+data AccountBalance = AccountBalance 
+  { accountBalanceAddress :: Address
+  , accountBalanceBalance :: Integer
   } deriving (Eq, Show, Generic)
 
-instance Arbitrary ChainInfo where
+instance Arbitrary AccountBalance where
   arbitrary = genericArbitrary uniform
 
-instance FromJSON ChainInfo where
-  genericParseJSON (aesonPrefix camelCase)
+instance FromJSON AccountBalance where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-instance ToJSON ChainInfo where
-  genericToJSON (aesonPrefix camelCase)
+instance ToJSON AccountBalance where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+-}
 
-instance ToSample ChainInfo where
-  toSamples _ = singleSample ChainInfo
-    { chainInfoSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
-    , chainInfoLabel = "my chain"
-    , chainInfoAccountInfo = [
-         ("5815b9975001135697b5739956b9a6c87f1c575c", "20000000")
-       , ("93fdd1d21502c4f87295771253f5b71d897d911c", "999999")
+data ChainInput  = ChainInput
+  { chainInputSrc            :: Text
+  , chainInputLabel          :: Text
+  , chainInputAccountInfo    :: [(Address, Integer)]
+  , chainInputVariableValues :: [(Text, Text)]
+  , chainInputMembers        :: [(Address, Text)]
+  } deriving (Eq, Show, Generic)
+
+instance Arbitrary ChainInput where
+  arbitrary = genericArbitrary uniform
+
+instance FromJSON ChainInput where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToJSON ChainInput where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance ToSample ChainInput where
+  toSamples _ = singleSample ChainInput
+    { chainInputSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+    , chainInputLabel = "my chain"
+    , chainInputAccountInfo = [
+         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
-    , chainInfoVariableValues = [
+    , chainInputVariableValues = [
          ("addRule", "AUTO_APPROVE")
        , ("removeRule", "AUTO_APPROVE")
        ]
+    , chainInputMembers = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")] 
     }
 
-instance ToSchema ChainInfo where
+instance ToSchema ChainInput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Send ether from one account to another (value is in Wei)"
     & mapped.schema.example ?~ toJSON ex
     where
-      ex :: ChainInfo
-      ex = ChainInfo
-        { chainInfoSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
-        , chainInfoLabel = "my chain"
-        , chainInfoAccountInfo = [
-            ("5815b9975001135697b5739956b9a6c87f1c575c", "20000000")
-          , ("93fdd1d21502c4f87295771253f5b71d897d911c", "999999")
+      ex :: ChainInput
+      ex = ChainInput
+        { chainInputSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+        , chainInputLabel = "my chain"
+        , chainInputAccountInfo = [
+            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
           ]
-        , chainInfoVariableValues = [
+        , chainInputVariableValues = [
             ("addRule", "AUTO_APPROVE")
           , ("removeRule", "AUTO_APPROVE")
           ]
-        }
+        , chainInputMembers = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")] 
+       }
 
 --------------------------------------------------------------------------------
 
 -- POST /chain
 
 type PostChain = "chain"
-  :> ReqBody '[JSON] ChainInfo 
-  :> Post '[JSON] ChainInfo
+  :> ReqBody '[JSON] ChainInput
+  :> Post '[JSON] ChainInput
 
