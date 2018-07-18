@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
     , kafkaClientIds
@@ -31,7 +32,7 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Sequencer.Event
 
 import           Data.Ord
-import           Database.Persist.Sql
+import qualified Database.Persist.Sql               as SQL
 
 apiIndexer :: LoggingT IO ()
 apiIndexer =  runIContextM "strato-api-indexer" $ do
@@ -45,6 +46,24 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
         forM_ chainInfos $ uncurry putChainInfo
+  
+{-      TODO: Finish this - automatically add peers from ChainInfo to Postgres
+        
+        let enodeList::[String] = showEnode <$> (concat (members <$> (snd <$> chainInfos)))
+        let peerList::[Either String PPeer] = createPeer <$> enodeList
+        let finalPeerList::[PPeer] = parsePeers peerList
+        where
+          parsePeers::[Either String PPeer] -> [PPeer]
+          parsePeers [] = []
+          parsePeers (x:xs) = 
+            case x of
+              Left _ -> parsePeers xs
+              Right p -> p:parsePeers xs
+
+        -- use repSert to insert PPeers on a chain ??
+        -- (mapM_ SQL.insert finalPeerList)
+        --  mapM_ addPeer finalPeerList -}
+
         let blocks = [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks
@@ -63,8 +82,9 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
             maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock
             num <- case maybeOldBestBlock of
                 Just x -> return x
-                Nothing -> blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
-            --num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
+                Nothing -> blockDataNumber . blockBlockData <$> sqlQuery (SQL.getJust bestBid)
+            --num <- blockDataNumber . blockBlockData <$> sqlQuery (SQL.getJust bestBid)
+
             numTime <- liftIO $ getTime Realtime
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids
             zipTime <- liftIO $ getTime Realtime
@@ -106,6 +126,7 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
                 ] ++ icMsgs ++ ["insert to Kafka:          "]
         $logDebug "----- apiIndexer -----"
         $logDebug . T.pack . unlines $ zipWith (\s t -> "Time to " ++ s ++ n2s t) tags times
+
 
 n2s :: Integer -> String
 n2s i =
