@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -14,8 +13,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Strato.Types
-  ( Hex (..)
-  , Strung (..)
+  ( Strung (..)
   , Address (..)
   , addressString
   , stringAddress
@@ -38,8 +36,6 @@ module BlockApps.Strato.Types
   , Storage (..)
   , AbiBin (..)
   , exampleTxResult
-  , CodeInfo (..)
-  , AccountInfo (..)
   , ChainInfo (..)
   , ChainIdChainInfo
   ) where
@@ -49,7 +45,6 @@ import           Control.Lens                 (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
-import qualified Data.Aeson.TH                as AT
 import qualified Data.Binary                  as Binary
 import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
@@ -76,8 +71,7 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
-import           Text.Read.Lex
-import           BlockApps.Ethereum           (Address (..), ChainId (..),
+import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
                                                keccak256lazy, stringAddress)
@@ -85,33 +79,8 @@ import           BlockApps.Strato.TypeLits
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
-
-instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex n ""
-
-instance (Eq n, Num n) => Read (Hex n) where
-  readPrec = Hex <$> readP_to_Prec (const readHexP)
-  --I'm not sure what `d` precision parameter is used for
-
-instance Num n => FromJSON (Hex n) where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe ("0x" ++ string)) of
-      Nothing -> fail $ "not hex encoded: " ++ string
-      Just n  -> return $ Hex n
-
-instance (Integral n, Show n) => ToJSON (Hex n) where
-  toJSON = toJSON . show
-
-instance (Integral n, Show n) => ToHttpApiData (Hex n) where
-  toUrlPiece = Text.pack . show
-
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece 
-
-instance Arbitrary x => Arbitrary (Hex x) where
-  arbitrary = genericArbitrary uniform
 
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
@@ -556,42 +525,6 @@ instance ToJSON BatchTransactionResult where
 
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
-
-data CodeInfo = CodeInfo String String String
-  deriving (Show, Read, Eq, Generic)
-
-instance FromJSON CodeInfo where
-  parseJSON (Object o) =
-    CodeInfo
-    <$> o .: "code"
-    <*> o .: "src"
-    <*> o .: "name"
-  parseJSON _ = error "parseJSON CodeInfo: expected Object"
-
-instance ToJSON CodeInfo where
-  toEncoding (CodeInfo bs s1 s2) =
-    pairs (
-      "code" .= bs <>
-      "src"  .= s1 <>
-      "name" .= s2
-    )
-
-instance ToSchema CodeInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "CodeInfo"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
-
-data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer Keccak256
-                 | ContractWithStorage Address Integer Keccak256 [(Hex Word256, Hex Word256)]
-   deriving (Show, Eq, Generic)
-
-$(AT.deriveJSON defaultOptions{AT.sumEncoding = AT.UntaggedValue} ''AccountInfo)
-
-instance ToSchema AccountInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "AccountInfo"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
 
 type AccountBalance = NamedTuple "address" Address "balance" Integer
 instance KnownSymbol "address" where
