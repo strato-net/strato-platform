@@ -21,6 +21,7 @@ defaultMaxB = 32 * 1024 * 1024
 
 valueToTxt :: SolidityValue2 -> String
 valueToTxt (SolidityNum _) = "bigint"
+valueToTxt (SolidityBool2 _) = "bool"
 valueToTxt (_) = "text"
 
 listToKeyStatement :: String -> [(T.Text, b)] -> String
@@ -86,7 +87,7 @@ convertRet address codehash abi name x = do
       --let contractName = take 63 codehash
 
   --Indexing flag
-  let indFlag = True
+  let indFlag = False
   let ind = if (indFlag)
               --then "create index if not exists idx ON \"" ++ contractName ++ "\" (address);"
               then "create index if not exists idx ON \"" ++ name ++ "\" (address);"
@@ -116,10 +117,10 @@ convertRet address codehash abi name x = do
 
   let keySt = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
   let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
-  let conflict = conflictList list
-  --let ins = "insert into \"" ++ contractName ++ "\" " ++ keys ++ " values " ++ vals ++ ";"
-  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ "  on conflict(address) do update set" ++ conflict ++ ";"
+  --let conflict = conflictList list
+  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
+  --let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ "  on conflict(address) do update set" ++ conflict ++ ";"
   let oneIns = beg ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ comm
-  putStrLn $ "^^^STATEMENT^^^: " ++ oneIns
+  --putStrLn $ "^^^STATEMENT^^^: " ++ ins
   p <- dbInsert oneIns
   print p
