@@ -40,6 +40,7 @@ import           Data.Text                        (Text)
 import           Servant.Client
 
 import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi

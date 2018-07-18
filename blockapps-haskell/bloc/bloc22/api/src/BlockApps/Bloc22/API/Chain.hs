@@ -102,5 +102,5 @@ instance ToSchema ChainInput where
 
 type PostChain = "chain"
   :> ReqBody '[JSON] ChainInput
-  :> Post '[JSON] ChainInput
+  :> Post '[JSON] ChainId
 
