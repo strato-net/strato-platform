@@ -23,6 +23,7 @@ import           Servant.Docs
 import           Servant.Mock
 
 import           BlockApps.Bloc22.API.Addresses
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Git
 import           BlockApps.Bloc22.API.Search

@@ -172,4 +172,5 @@ getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
 postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 
-postChain :: ChainInfo -> ChainId
+postChain :: ChainInput -> ClientM ChainId
+postChain = client (Proxy @ PostChain)
