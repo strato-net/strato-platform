@@ -45,6 +45,7 @@ solidityContract = do
 
   let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
+  let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -58,6 +59,7 @@ solidityContract = do
                [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
+             , xabiEvents = Map.fromList events
            },
         map (Text.pack . fst) baseConstrs
       )
@@ -252,19 +254,20 @@ eventDeclaration = do
   reserved "event"
   name <- identifier
   logs <- tupleDeclaration
-  optional $ reserved "anonymous"
+  anon <- option False (reserved "anonymous" >> return True)
   semi
   return
     (
       name,
       EventDeclaration Xabi.Event{
-        Xabi.eventLogs = undefined logs
+          Xabi.eventAnonymous = anon
+        , Xabi.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,
 --         objDefn = "",
 --         objIsPublic = False -- We only care about public variables
-         }
+        }
     )
 
 -- | Parses a function modifier definition.  At the moment we don't do

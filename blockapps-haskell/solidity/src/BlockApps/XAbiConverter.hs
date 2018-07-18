@@ -263,7 +263,8 @@ contractToXabi Contract{..} =
       xabiConstr = Map.empty,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
-      xabiModifiers = Map.empty
+      xabiModifiers = Map.empty,
+      xabiEvents = Map.empty
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType
