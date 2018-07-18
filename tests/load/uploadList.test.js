@@ -49,7 +49,7 @@ describe('LOAD TEST: Upload List', function() {
     console.log(`Total:  seconds: ${seconds}  txs: ${batchCount*batchSize}  TPS ${(batchCount*batchSize)/seconds}`);
   });
 
-  it.skip(`Upload plain.  Batch count ${batchCount}`, function * () {
+  it(`Upload plain.  Batch count ${batchCount}`, function * () {
     console.log(`Upload plain, Batch count ${batchCount}`);
     const contractName = 'TitleManager';
     const contractFilename = path.join(config.contractsPath,"TitleManager.sol");
