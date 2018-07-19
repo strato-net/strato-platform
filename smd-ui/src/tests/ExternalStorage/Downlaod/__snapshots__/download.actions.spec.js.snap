@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Download: actions Downlaod: failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "DOWNLOAD_FAILURE",
+}
+`;
+
+exports[`Download: actions Downlaod: request 1`] = `
+Object {
+  "contractAddress": "c918420c68346af5fe2aef067faf7b103afde5ed",
+  "type": "DOWNLOAD_REQUEST",
+}
+`;
+
+exports[`Download: actions Downlaod: success 1`] = `
+Object {
+  "type": "DOWNLOAD_SUCCESS",
+  "url": "https://strato-external-storage.s3.amazonaws.com/1529915329415-widescreen.jpeg",
+}
+`;
+
+exports[`Download: actions Modal: close 1`] = `
+Object {
+  "type": "CLOSE_DOWNLOAD_MODAL",
+}
+`;
+
+exports[`Download: actions Modal: open 1`] = `
+Object {
+  "type": "OPEN_DOWNLOAD_MODAL",
+}
+`;
+
+exports[`Download: actions clear Url 1`] = `
+Object {
+  "type": "CLEAR_URL",
+}
+`;
+
+exports[`Download: actions reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;

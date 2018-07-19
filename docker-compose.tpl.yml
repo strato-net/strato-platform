@@ -23,6 +23,9 @@ services:
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - STRATO_URL=${STRATO_URL}
     - SMD_MODE=${SMD_MODE}
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
@@ -40,6 +43,9 @@ services:
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
