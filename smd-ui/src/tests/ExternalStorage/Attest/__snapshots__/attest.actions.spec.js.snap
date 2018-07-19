@@ -1,0 +1,58 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Attest: actions Attest: failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "ATTEST_DOCUMENT_FAILURE",
+}
+`;
+
+exports[`Attest: actions Attest: request 1`] = `
+Object {
+  "type": "ATTEST_DOCUMENT_REQUEST",
+  "values": Object {
+    "address": "23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c",
+    "contractAddress": "9fe7af972b28469858d6ea78b06dbefb0b8f4edb",
+    "password": "s3",
+    "username": "tanuj55@mailinator.com",
+  },
+}
+`;
+
+exports[`Attest: actions Attest: success 1`] = `
+Object {
+  "data": Object {
+    "signers": Array [
+      "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
+    ],
+    "timeStamp": 1530165910,
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1530165910145-widescreen.jpeg",
+  },
+  "type": "ATTEST_DOCUMENT_SUCCESS",
+}
+`;
+
+exports[`Attest: actions Modal: close 1`] = `
+Object {
+  "type": "CLOSE_ATTEST_MODAL",
+}
+`;
+
+exports[`Attest: actions Modal: open 1`] = `
+Object {
+  "type": "OPEN_ATTEST_MODAL",
+}
+`;
+
+exports[`Attest: actions change username 1`] = `
+Object {
+  "type": "USERNAME_FORM_CHANGE",
+  "username": "tanuj1000",
+}
+`;
+
+exports[`Attest: actions reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;
