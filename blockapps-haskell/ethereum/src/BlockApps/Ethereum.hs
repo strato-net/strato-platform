@@ -703,6 +703,14 @@ instance ToJSON CodeInfo where
       "name" Aeson..= s2
     )
 
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
+        & description ?~ "Code Info" )
+
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer Keccak256
                  | ContractWithStorage Address Integer Keccak256 (Map.Map Word256 Word256)
@@ -740,3 +748,11 @@ instance FromJSON AccountInfo where
             let s = Map.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
             return $ ContractWithStorage a b c s
   parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
+
+instance ToSchema AccountInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "AccountInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer)) 
+        & description ?~ "Account Info" )
