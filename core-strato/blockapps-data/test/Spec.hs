@@ -48,13 +48,13 @@ rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
 
 enodeRLP :: Spec
 enodeRLP = do
-  it "should convert an Enode address to and from its RLP encoding" $ do
-    quickCheck $ uncurry (==) . (id &&& (rlpRT :: Enode -> Enode))
+  it "should convert an Enode address to and from its RLP encoding" $ property $
+    uncurry (==) . (id &&& (rlpRT :: Enode -> Enode))
 
 chainInfoRLP :: Spec
 chainInfoRLP = do
-  it "should convert a Bytestring to and from Word256" $ do
-    quickCheck $ uncurry (==) . (id &&& (rlpRT :: ChainInfo -> ChainInfo))
+  it "should convert a ChainInfo to and from its RLP encoding" $ property $
+    uncurry (==) . (id &&& (rlpRT :: ChainInfo -> ChainInfo))
 
 addressTesting :: Spec
 addressTesting = forM_ testAddresses $ \input -> do
