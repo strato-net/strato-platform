@@ -3,6 +3,7 @@ const co = require('co');
 require('co-mocha');
 const rest = ba.rest;
 const common = ba.common;
+const api = common.api;
 const config = common.config;
 const util = common.util;
 const assert = common.assert;
@@ -11,32 +12,38 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-describe('Throughput - fx call', function () {
+describe('Throughput - upload', function () {
 
   this.timeout(config.timeout);
-  const contractName = 'SimpleIncrement';
-  const contractFilename = path.join(config.contractsPath, 'SimpleIncrement.sol');
+  const contractName = 'SimpleStorage';
+  const contractFilename = path.join(config.contractsPath, 'SimpleStorage.sol');
   let users;
   let contracts = [];
+  let txs = []
+
+  const batchSize = util.getArgInt('--batchSize', 1);
 
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
-      contract = yield rest.uploadContract(users[i], contractName, contractFilename, {}, false, {}, i);
-      contracts.push(contract);
+      yield rest.compileSearch([contractName], contractName, contractFilename, i);
+    }
+    for (var i = 0; i < batchSize; i++) {
+      txs.push({
+        contractName: contractName,
+        args: {},
+      });
     }
   });
 
-  it('should calculate method call throughput for network', function * () {
-    
+  it('should calculate contract upload throughput for network', function * () {
+
     const startTime = moment();
-    let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = createBatchTx(user, contracts[node.id]);      
-      generators.push(rest.callList(user, user.address, txs, true, node.id));
+      generators.push(rest.uploadContractList(user, txs, true, node.id));
     }
 
     console.log('Submitting txs');
@@ -45,22 +52,23 @@ describe('Throughput - fx call', function () {
     const bEndTime = moment();
     console.log('Submitted txs');
 
-    // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
 
-    let statesMatch = false;
-    let stateCheck = 1;
-    while (!statesMatch) {
-      console.log(`Checking balances ${stateCheck++}`);
-      statesMatch = yield checkStates();
+    let countMatch = false;
+    let countCheck = 1;
+    while (!countMatch) {
+      console.log(`Checking count ${countCheck++}`);
+      countMatch = yield checkCounts();
       yield promiseTimeout(300);
     }
 
+    const secondsToRemove = 0; // bEndTime.diff(bStartTime, 'seconds');
+
     const endTime = moment();
-    assert.isOk(statesMatch, "All states should match");
+    assert.isOk(countMatch, "All counts should match");
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
     console.log(`Total Seconds: ${seconds}`);
-    console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
+    console.log(`Approx TPS: ${(batchSize * nodes.length) / seconds} tx/sec`);
   })
 
   // HELPER FUNCTIONS FOR TESTS
@@ -90,32 +98,21 @@ describe('Throughput - fx call', function () {
     });
   }
 
-  function * checkStates() {
-    let stateMatches = true;
+  function * checkCounts(userPairs) {
+    const promises = [];
     for (let node of nodes) {
-      state = yield rest.getState(contracts[node.id]);
-      stateMatches &= (state.x == config.batchSize);
-      if(!stateMatches)  {
-        break;
-      }
+      promises.push(co(getContractCount(users[node.id])));
     }
-    return stateMatches;
+    const counts = yield Promise.all(promises);
+    return counts.reduce((check, count) => {
+      return check && count == batchSize;
+    }, true);
   }
 
-  function createBatchTx(fromUser, contract) {
-    var txs = [];
 
-    for (var i = 0; i < config.batchSize; i++) {
-      txs.push({
-        contractAddress: contract.address,
-        contractName: contract.name,
-        args: {},
-        value: 0,
-        methodName: 'increment'
-      });
-    }
-    return txs;
+  function * getContractCount(user) {
+    const results = yield api.strato.transaction(`from=${user.address}`);
+    return results.length;
   }
 
 });
-

@@ -21,7 +21,7 @@ export const blocksMock = [
       }
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.7640800523559524e+31,
       "kind": "BlockData",
@@ -62,7 +62,7 @@ export const blocksMock = [
       }
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.7613833888902394e+31,
       "kind": "BlockData",
@@ -103,7 +103,7 @@ export const blocksMock = [
       }
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.7586893563157125e+31,
       "kind": "BlockData",
@@ -144,7 +144,7 @@ export const blocksMock = [
       }
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.755997952065648e+31,
       "kind": "BlockData",
@@ -185,7 +185,7 @@ export const blocksMock = [
       }
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.753309173575828e+31,
       "kind": "BlockData",
@@ -214,7 +214,7 @@ export const blockMockWithoutTx = [
     "receiptTransactions": [
     ],
     "blockData": {
-      "extraData": 0,
+      "extraData": "",
       "gasUsed": 0,
       "gasLimit": 2.7640800523559524e+31,
       "kind": "BlockData",

@@ -17,18 +17,21 @@ describe('Throughput - send', function () {
 
   let userPairs;
 
+  const batchSize = util.getArgInt('--batchSize', 1);
+  const batchValue = util.getArgInt('--batchValue', 8);
+
   before(function * () {
     userPairs = yield createUserPairs();
   });
 
   it('should calculate send throughput for network', function * () {
-    
+
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
-      const txs = createBatchTx(userPairs[node.id].bob);      
+      const txs = createBatchTx(userPairs[node.id].bob);
       generators.push(rest.sendList(userPairs[node.id].alice, txs, true, node.id));
     }
 
@@ -53,7 +56,7 @@ describe('Throughput - send', function () {
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
     console.log(`Total Seconds: ${seconds}`);
-    console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
+    console.log(`Approx TPS: ${(batchSize * nodes.length) / seconds} tx/sec`);
   })
 
   // HELPER FUNCTIONS FOR TESTS
@@ -70,7 +73,7 @@ describe('Throughput - send', function () {
       console.log(`Creating user ${aliceName} on node ${node.id}`);
       const alice = yield rest.createUser(aliceName, password, false, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
-      console.log(`Creating user ${bobName} on node ${node.id}`);      
+      console.log(`Creating user ${bobName} on node ${node.id}`);
       const bob = yield rest.createUser(bobName, password, true, node.id);
       userPairs.push({alice: alice, bob: bob});
     }
@@ -87,7 +90,7 @@ describe('Throughput - send', function () {
   }
 
   function * checkBalances(userPairs) {
-    const expectedBalance = new BigNumber(config.batchValue * config.batchSize)
+    const expectedBalance = new BigNumber(batchValue * batchSize)
       .times(constants.ETHER);
     const promises = [];
     for (let node of nodes) {
@@ -103,8 +106,8 @@ describe('Throughput - send', function () {
 
   function createBatchTx(toUser) {
     var txs = [];
-    weiValue = new BigNumber(config.batchValue).times(constants.ETHER).toNumber();
-    for (var i = 0; i < config.batchSize; i++) {
+    weiValue = new BigNumber(batchValue).times(constants.ETHER).toNumber();
+    for (var i = 0; i < batchSize; i++) {
       txs.push({
         value: weiValue,
         toAddress: toUser.address
@@ -114,4 +117,3 @@ describe('Throughput - send', function () {
   }
 
 });
-
