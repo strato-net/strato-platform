@@ -12,7 +12,6 @@ module Blockchain.Database.MerklePatricia.InternalMem (
   keyToSafeKeyMem
   ) where
 
-import qualified Crypto.Hash.SHA3                             as SHA3
 import qualified Data.ByteString                              as B
 import           Data.Function
 import           Data.List
@@ -24,6 +23,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.Database.MerklePatricia.StateRoot
 import           Blockchain.Format
+import           Blockchain.Strato.Model.SHA                  (keccak256)
 
 type MPMap = Map.Map B.ByteString B.ByteString
 
@@ -55,7 +55,7 @@ unsafeDeleteKeyMem db key = do
 
 keyToSafeKeyMem::N.NibbleString->N.NibbleString
 keyToSafeKeyMem key =
-  N.EvenNibbleString $ SHA3.hash 256 keyByteString
+  N.EvenNibbleString $ keccak256 keyByteString
   where
     N.EvenNibbleString keyByteString = key
 
@@ -222,7 +222,7 @@ getNodeDataMem db (PtrRef ptr@(StateRoot p)) = do
 putNodeDataMem::Monad m=>MPMem->NodeData->m MPMem
 putNodeDataMem db nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      ptr = SHA3.hash 256 bytes
+      ptr = keccak256 bytes
       map' = Map.insert ptr bytes (mpMap db)
   return $ MPMem { mpMap = map', mpStateRoot = StateRoot ptr }
 

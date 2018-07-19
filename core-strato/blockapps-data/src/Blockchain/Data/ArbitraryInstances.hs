@@ -73,7 +73,7 @@ instance Arbitrary BlockData where
         gasLimit         <- unboxPI <$> arbitrary
         gasUsed          <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit)
         timestamp        <- arbitrary
-        extraData        <- unboxPI <$> arbitrary
+        extraData        <- arbitrary
         nonce            <- arbitrary
         mixHash          <- arbitrary
         return BlockData { blockDataParentHash       = parentHash

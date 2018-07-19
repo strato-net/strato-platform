@@ -21,7 +21,7 @@ import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
-import qualified Database.Persist.Postgresql           as SQL
+import qualified Database.Persist.Types                as SQL
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf

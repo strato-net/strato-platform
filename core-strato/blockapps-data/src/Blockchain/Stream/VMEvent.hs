@@ -18,12 +18,15 @@ module Blockchain.Stream.VMEvent (
   fetchLastVMEvents,
   fetchVMEventsFromTopic,
   defaultVMEventsTopicName,
-  getBestKafkaBlockNumber
+  getBestKafkaBlockNumber,
+  HasVMEventsSink(..)
 ) where
+
+import           Conduit
 
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
-
+import           Data.Void
 
 import           Network.Kafka
 import           Network.Kafka.Producer
@@ -67,6 +70,9 @@ bytesToVMEvent = Binary.decode . BL.fromStrict
 
 vmEventToBytes :: VMEvent -> B.ByteString
 vmEventToBytes = BL.toStrict . Binary.encode
+
+class HasVMEventsSink k where
+  getVMEventsSink :: k (Conduit [VMEvent] k Void)
 
 produceVMEventsM :: (HasSQLDB m, HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do

@@ -52,7 +52,33 @@ Stack commands (like `stack build`, `stack test` etc.) can only be used once the
 This is a part of main build process described in this readme but you can also build it manually by running
 ```make build_buildbase``` in `core-strato/` and `blockapps-haskell/` directories (for core-strato and bloc accordingly)
 
-## Appendix: Libraries used in build process
+### Building the list of 3rd party dependencies and their licenses
+
+#### NodeJS apps
+
+```
+npm i npm-license-crawler -g
+```
+
+E.g. for SMD:
+```
+cd strato-platform/smd-ui
+npm-license-crawler  --omitVersion --onlyDirectDependencies --dependencies --csv smd.csv
+```
+
+#### Haskell apps
+
+E.g. for core-strato:
+```
+cd strato-platform/core-strato
+stack ls dependencies --license --no-include-base --depth 1
+```
+
+#### Other (binary installations etc)
+
+TBD
+
+## APPENDIX: Libraries used in build process
 For the list of currenty used libraries see Dockerfile.deploybase for run-time libs and Dockerfile.buildbase for compilation lib requirements
 These libraries are no longer required to be installed on the host since we use docker-enabled Stack. So we keep them here just in case:
 

@@ -10,7 +10,6 @@ module Blockchain.Output
 
 import           Control.Concurrent     (ThreadId, myThreadId)
 import           Control.Monad
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8  as BC
 import qualified Data.Text              as Text

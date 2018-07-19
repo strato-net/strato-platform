@@ -413,7 +413,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
                         , DD.blockDataGasLimit         = nextGasLimit $ DD.blockDataGasLimit parentHeader
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
-                        , DD.blockDataExtraData        = 0
+                        , DD.blockDataExtraData        = ""
                         , DD.blockDataMixHash          = SHA 0
                         , DD.blockDataNonce            = 5
                         }

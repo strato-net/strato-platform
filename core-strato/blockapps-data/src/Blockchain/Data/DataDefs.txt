@@ -11,7 +11,7 @@ BlockData
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    extraData Integer
+    extraData BS.ByteString
     nonce Word64
     mixHash SHA
     deriving Eq Read Show
@@ -29,7 +29,7 @@ BlockDataRef
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    extraData Integer
+    extraData BS.ByteString
     nonce Word64
     mixHash SHA
     hash SHA

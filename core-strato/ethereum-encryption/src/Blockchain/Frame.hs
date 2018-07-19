@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Frame
@@ -9,20 +10,22 @@ module Blockchain.Frame
   , cbSafeTake
   ) where
 
-import qualified Blockchain.AESCTR                 as AES
-import           Blockchain.Error
-import           Blockchain.EthEncryptionException
-import           Control.Exception.Lifted
-import           Control.Monad
-import           Control.Monad.Logger
-import           Crypto.Cipher.AES
-import qualified Crypto.Hash.SHA3                  as SHA3
-import           Data.Bits
-import qualified Data.ByteString                   as B
-import qualified Data.ByteString.Lazy              as BL
-import           Data.Conduit
-import qualified Data.Conduit.Binary               as CB
-import           Data.Maybe
+import qualified    Blockchain.AESCTR                 as AES
+import              Blockchain.Error
+import              Blockchain.EthEncryptionException
+import              Control.Exception.Lifted
+import              Control.Monad
+import              Control.Monad.Logger
+import "cipher-aes" Crypto.Cipher.AES
+import "cryptonite" Crypto.Hash                       (Context, hashUpdate, hashFinalize)
+import              Crypto.Hash.Algorithms            (Keccak_256)
+import              Data.Bits
+import              Data.ByteArray                    (convert)
+import qualified    Data.ByteString                   as B
+import qualified    Data.ByteString.Lazy              as BL
+import              Data.Conduit
+import qualified    Data.Conduit.Binary               as CB
+import              Data.Maybe
 
 bXor :: B.ByteString->B.ByteString->B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
@@ -31,27 +34,27 @@ bXor x y = error' $
            show (B.length x) ++ ", length string2 = " ++ show (B.length y)
 
 data EthCryptState = EthCryptState { aesState :: AES.AESCTRState
-                                   , mac      :: SHA3.Ctx
+                                   , mac      :: Context Keccak_256
                                    , key      :: B.ByteString
                                    }
 
 instance Show EthCryptState where
   show = show . key
 
-rawUpdateMac :: SHA3.Ctx
+rawUpdateMac :: Context Keccak_256
              -> B.ByteString
-             -> (SHA3.Ctx, B.ByteString)
+             -> (Context Keccak_256, B.ByteString)
 rawUpdateMac theMac value =
-  let mac' = SHA3.update theMac value
-  in (mac', B.take 16 $ SHA3.finalize mac')
+  let mac' = hashUpdate theMac value
+  in (mac', B.take 16 . convert . hashFinalize $ mac')
 
-updateMac :: SHA3.Ctx
+updateMac :: Context Keccak_256
           -> B.ByteString
           -> B.ByteString
-          -> (SHA3.Ctx, B.ByteString)
+          -> (Context Keccak_256, B.ByteString)
 updateMac theMac theKey value =
   rawUpdateMac theMac $
-    value `bXor` (encryptECB (initAES theKey) (B.take 16 $ SHA3.finalize theMac))
+    value `bXor` (encryptECB (initAES theKey) (B.take 16 . convert . hashFinalize $ theMac))
 
 ethEncrypt :: (MonadLogger m, Monad m)
            => EthCryptState

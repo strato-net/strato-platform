@@ -25,7 +25,6 @@ data DiscoverException = AffineException
 
 instance Exception DiscoverException
 
-
 --I need to use two definitions of PubKey (internally they represent the same thing)
 --The one in the Haskoin package allows me to recover signatures.
 --The one in the crypto packages let me do AES encryption.

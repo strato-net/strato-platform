@@ -65,7 +65,7 @@ connectMe port' = do
                                   (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                                   Nothing (Just (show port'))
   sock <- liftIO $ socket (addrFamily serveraddr) Datagram defaultProtocol
-  liftIO $ bindSocket sock (addrAddress serveraddr)
+  liftIO $ bind sock (addrAddress serveraddr)
 
   return sock
 

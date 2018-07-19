@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
 
 module Blockchain.Handshake (
   AckMessage(..),
@@ -6,22 +7,22 @@ module Blockchain.Handshake (
   bytesToAckMsg
   ) where
 
-import qualified Crypto.Hash.SHA3          as SHA3
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Types.PubKey.ECC
-import           Data.Binary
-import           Data.Binary.Get
-import           Data.Binary.Put
-import           Data.Bits
-import qualified Data.ByteString           as B
-import qualified Data.ByteString.Lazy      as BL
-import           Data.Maybe
-import qualified Network.Haskoin.Internals as H
+import "crypto-pubkey" Crypto.PubKey.ECC.DH
+import                 Crypto.Types.PubKey.ECC
+import                 Data.Binary
+import                 Data.Binary.Get
+import                 Data.Binary.Put
+import                 Data.Bits
+import qualified       Data.ByteString             as B
+import qualified       Data.ByteString.Lazy        as BL
+import                 Data.Maybe
+import qualified       Network.Haskoin.Internals   as H
 
-import           Blockchain.Data.PubKey
-import qualified Blockchain.ECIES          as ECIES
-import           Blockchain.ExtendedECDSA
-import           Blockchain.ExtWord
+import                 Blockchain.Data.PubKey
+import qualified       Blockchain.ECIES            as ECIES
+import                 Blockchain.ExtendedECDSA
+import                 Blockchain.ExtWord
+import                 Blockchain.Strato.Model.SHA (keccak256)
 
 sigToBytes::ExtendedSignature->[Word8]
 sigToBytes (ExtendedSignature signature yIsOdd) =
@@ -93,7 +94,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
     ephemeral =
       fromMaybe (error "malformed signature given to call getHandshakeBytes") $
       getPubKeyFromSignature sig msg
-    hepubk = SHA3.hash 256 $ B.pack $ pubKeyToBytes ephemeral
+    hepubk = keccak256 $ B.pack $ pubKeyToBytes ephemeral
     pubk = B.pack $ pointToBytes myPublic
     theData = B.pack (sigToBytes sig) `B.append`
                 hepubk `B.append`

@@ -26,6 +26,8 @@ import qualified Database.Persist.Postgresql        as SQL
 
 import           Data.Bits
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
 
 import           Data.List
 import qualified Data.Map                           as M
@@ -60,8 +62,8 @@ import           Control.Monad.Trans.Resource
 
 import           Blockchain.Strato.Model.Class
 
-
-
+instance Pretty B.ByteString where
+  pretty = blue . text . BC.unpack . B16.encode
 
 blk2BlkDataRef :: (HasSQLDB m) =>
                   M.Map SHA Integer->(Block, SHA)->Bool->m BlockDataRef

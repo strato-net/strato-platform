@@ -7,7 +7,7 @@
 
 module Control.Monad.Stats.MTL
     ( MonadStats
-    , StatsT(..)
+    , StatsT
     , runStatsT
     , runNoStatsT
     , tick
@@ -22,7 +22,6 @@ module Control.Monad.Stats.MTL
     , MTLStatsT
     ) where
 
-import           Ether
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Stats.Monad as Ethereal
 import           Control.Monad.Stats.Types

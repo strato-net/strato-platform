@@ -20,7 +20,7 @@ Object {
       "blockData": Object {
         "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
         "difficulty": 143854,
-        "extraData": 0,
+        "extraData": "",
         "gasLimit": 2.7640800523559524e+31,
         "gasUsed": 0,
         "kind": "BlockData",
@@ -57,7 +57,7 @@ Object {
       "blockData": Object {
         "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
         "difficulty": 143784,
-        "extraData": 0,
+        "extraData": "",
         "gasLimit": 2.7613833888902394e+31,
         "gasUsed": 0,
         "kind": "BlockData",
@@ -96,7 +96,7 @@ Object {
       "blockData": Object {
         "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
         "difficulty": 143854,
-        "extraData": 0,
+        "extraData": "",
         "gasLimit": 2.7586893563157125e+31,
         "gasUsed": 0,
         "kind": "BlockData",
@@ -135,7 +135,7 @@ Object {
       "blockData": Object {
         "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
         "difficulty": 143784,
-        "extraData": 0,
+        "extraData": "",
         "gasLimit": 2.755997952065648e+31,
         "gasUsed": 0,
         "kind": "BlockData",
@@ -174,7 +174,7 @@ Object {
       "blockData": Object {
         "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
         "difficulty": 143854,
-        "extraData": 0,
+        "extraData": "",
         "gasLimit": 2.753309173575828e+31,
         "gasUsed": 0,
         "kind": "BlockData",

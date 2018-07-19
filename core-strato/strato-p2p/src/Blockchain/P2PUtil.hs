@@ -27,7 +27,7 @@ sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
 sockAddrToIP s@S.SockAddrInet{}           = takeWhile (/=':') (show s)
 sockAddrToIP (S.SockAddrUnix str)         = str
-sockAddrToIP (S.SockAddrCan addr)         = show addr -- the guy who wanted to run us on RasPi can now do it with CANBus
+sockAddrToIP _ = error "unsupported socket type"
 
 looksLikeHostname :: String -> Bool
 looksLikeHostname = stringToIAddr >>> \case

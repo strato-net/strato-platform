@@ -3,7 +3,6 @@
 module Blockchain.Strato.Mining.Ethash.Hashimoto where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3                          as SHA3
 import qualified Data.Array.IO                             as MA
 import           Data.Binary.Get
 import           Data.Binary.Put
@@ -15,6 +14,7 @@ import           Data.Word
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Dataset
 import           Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Model.SHA               (keccak256, keccak512)
 
 --import Debug.Trace
 
@@ -54,7 +54,7 @@ wordPack = B.concat . fmap (BL.toStrict . runPut . putWord32le)
 hashimoto::B.ByteString->B.ByteString->Int->(Word32->IO Slice)->IO (B.ByteString, B.ByteString)
 hashimoto header nonce fullSize' dataset = do
   let mixhashes = mixBytes `div` hashBytes
-      s = SHA3.hash 512 $ header `B.append` B.reverse nonce
+      s = keccak512 $ header `B.append` B.reverse nonce
 
   mix <- MA.newArray (0,31) 0
 
@@ -73,7 +73,7 @@ hashimoto header nonce fullSize' dataset = do
         return $ v1 `fnv` v2 `fnv`  v3 `fnv` v4
 
   cmix <- fmap repair $ sequence $ map f2 [0,4..31]
-  return (cmix, SHA3.hash 256 (s `B.append` cmix))
+  return (cmix, keccak256 (s `B.append` cmix))
 
 
 f::(Word32->IO Slice, Int, Integer, B.ByteString)->Word32->MA.IOUArray Word32 Word32->IO ()

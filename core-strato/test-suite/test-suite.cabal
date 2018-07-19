@@ -32,6 +32,7 @@ executable test-suite-exe
                  , monad-logger
                  , mtl
                  , nibblestring
+                 , strato-model
                  , strato-sequencer
                  , text
                  , time
@@ -103,14 +104,8 @@ Test-suite test-suite
     ghc-options: -Wall -Werror -threaded
     main-is: Spec.hs
     other-modules:
-        Blockchain.Database.MerklePatriciaSpec
         --Blockchain.Strato.RedisBlockDB.RedisBlockDBSpec
         Blockchain.Strato.RedisBlockDB.Chain
-        Blockchain.Strato.Model.BlockHeaderModel
-        Blockchain.Strato.Model.BlockModel
-        Blockchain.Strato.Model.BlockchainClassSpec
-        Blockchain.Strato.Model.Constants
-        Blockchain.Strato.Model.TransactionModel
 
     build-depends: base
                  , aeson

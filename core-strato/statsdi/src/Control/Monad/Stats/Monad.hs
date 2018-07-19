@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeApplications      #-}
 module Control.Monad.Stats.Monad
     ( MonadStats
-    , StatsT(..)
+    , StatsT
     , runStatsT
     , runNoStatsT
     , borrowTMVar
@@ -35,10 +35,8 @@ import           Data.ByteString           (ByteString)
 import           Data.ByteString           as ByteString
 import qualified Data.ByteString.Char8     as Char8
 import           Data.Dequeue
-import           Data.HashMap.Strict       (HashMap)
 import qualified Data.HashMap.Strict       as HashMap
 import           Data.IORef
-import           Data.Time                 (NominalDiffTime)
 import           Data.Time.Clock.POSIX     (POSIXTime, getPOSIXTime)
 import qualified Network.Socket            as Socket hiding (recv, recvFrom,
                                                       send, sendTo)
@@ -54,17 +52,14 @@ borrowTMVar tmvar m = do
     liftIO . atomically $ putTMVar tmvar var
     return v
 
-withSocket :: forall tag m.(MonadStats tag m) => (Socket.Socket -> m ()) -> m ()
-withSocket m = withEnvironment @tag $ \e -> borrowTMVar (envSocket e) m
-
 withEnvironment :: forall tag m.(MonadStats tag m) => (StatsTEnvironment -> m ()) -> m ()
 withEnvironment f = ask @tag >>= \case
     NoStatsTEnvironment -> return ()
     env -> f env
 
 withSTS :: forall tag m.(MonadStats tag m) => (StatsTState -> StatsTState) -> m ()
-withSTS f = withEnvironment @tag $ \(StatsTEnvironment (_, _, state)) ->
-    liftIO $ atomicModifyIORef' state (\x -> (f x, ()))
+withSTS f = withEnvironment @tag $ \(StatsTEnvironment (_, _, theState)) ->
+    liftIO $ atomicModifyIORef' theState (\x -> (f x, ()))
 
 tick :: forall tag m.(MonadStats tag m) => Counter -> m ()
 tick = tickBy @tag 1
@@ -101,7 +96,7 @@ histoSample v Histogram{..} = withEnvironment @tag $ \env -> do
     where rendered = renderSimpleMetric histogramName v "|h" histogramTags (Just _histogramSampleRate)
 
 renderTimestamp :: POSIXTime -> ByteString
-renderTimestamp time = ByteString.concat ["|d:", Char8.pack . show $ posixToMillis time]
+renderTimestamp time' = ByteString.concat ["|d:", Char8.pack . show $ posixToMillis time']
 
 renderKeyedField :: ByteString -> Maybe ByteString -> ByteString
 renderKeyedField x = maybe "" (\y -> ByteString.concat [x,y])
@@ -115,7 +110,6 @@ renderSimpleMetric name value kind tags sampleRate env =
                       , allTags
                       ]
     where sampleRateBit = maybe "" (ByteString.append "|@" . Char8.pack . show) sampleRate
-          fullName = ByteString.concat [prefix cfg, name, suffix cfg]
           cfg      = envConfig env
           allTags  = renderAllTags [defaultTags cfg, tags]
 
@@ -179,16 +173,17 @@ mkStatsDSocket cfg = do
           opts' = Nothing
 
 forkStatsThread :: (MonadIO m) => StatsTEnvironment -> m ThreadId
-forkStatsThread env@(StatsTEnvironment (cfg, socket, state)) = do
+forkStatsThread NoStatsTEnvironment = error "cannot fork without statst env"
+forkStatsThread env@(StatsTEnvironment (cfg, socket, _)) = do
     me <- liftIO myThreadId
     liftIO . forkFinally loop $ \e -> do
         borrowTMVar socket $ \s -> do
             isConnected <- Socket.isConnected s
             when isConnected $ Socket.close s
         case e of
-            Left e -> case (fromException e :: Maybe AsyncException) of
+            Left e' -> case (fromException e' :: Maybe AsyncException) of
                 Just ThreadKilled -> return ()
-                _                 -> throwTo me e
+                _                 -> throwTo me e'
             Right () -> return ()
     where loop = forever $ do
               let interval = flushInterval cfg
@@ -198,7 +193,8 @@ forkStatsThread env@(StatsTEnvironment (cfg, socket, state)) = do
               threadDelay (interval * 1000 - fromIntegral (end - start))
 
 reportSamples :: MonadIO m => StatsTEnvironment -> m ()
-reportSamples env@(StatsTEnvironment (cfg, socket, state)) = do
+reportSamples NoStatsTEnvironment = return ()
+reportSamples env@(StatsTEnvironment (_, socket, theState)) = do
     (samples, queuedEvents) <- getAndWipeStates
     borrowTMVar socket $ \sock -> do
         forM_ samples (reportSample sock)
@@ -210,13 +206,12 @@ reportSamples env@(StatsTEnvironment (cfg, socket, state)) = do
                                then ByteString.concat [msg' 0, "\n", msg' value]
                                else msg' value
                     msg' v     = renderSimpleMetric (keyName key) v (keyKind key) (keyTags key) sampleRate env
-                    value'     = Char8.pack (show value)
                     sampleRate = if isHistogram key
                                  then Just $ histogramSampleRate key
                                  else Nothing
 
           getAndWipeStates :: (MonadIO m) => m ([(MetricStoreKey, MetricStore)], BankersDequeue ByteString)
-          getAndWipeStates = liftIO . atomicModifyIORef' state $ \(StatsTState m q) ->
+          getAndWipeStates = liftIO . atomicModifyIORef' theState $ \(StatsTState m q) ->
                 (StatsTState HashMap.empty Data.Dequeue.empty, (HashMap.toList m, q))
 
 

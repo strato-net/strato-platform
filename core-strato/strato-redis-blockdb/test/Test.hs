@@ -37,7 +37,7 @@ main = hspec specTest
 
 openConn :: Integer -> IO Connection
 openConn num = do
-    let connInfo = defaultConnectInfo{connectHost="localhost", connectDatabase = num}
+    let connInfo = defaultConnectInfo{connectHost="localhost", connectDatabase = num, connectPort=PortNumber 2023}
     -- liftIO $ putStrLn $ "Opening connection to Redis database: " ++ show connInfo
     connect connInfo
 
@@ -344,7 +344,6 @@ specTest = around (withConn 1) $ do
 
     flushDB
     it "Should fork a chain and call commonAncestorHelper with the new chain data being the shorter chain" $ \conn -> do
-      pending
       g <- makeGenesisBlock
       chain <- extendChain 4 [g]
       oldChain <- extendChain 7 chain
