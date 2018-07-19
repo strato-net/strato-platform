@@ -75,7 +75,7 @@ pipeline {
               set -x
               echo 'Running BlockApps BA deploy script and tests'
               rm -rf blockapps-ba
-              git clone https://github.com/blockapps/blockapps-ba.git -b private-chain # TODO: Switch back to blockapps-ba master'
+              git clone https://github.com/blockapps/blockapps-ba.git -b master
               cd blockapps-ba
               npm i
               SERVER=localhost npm run deploy
