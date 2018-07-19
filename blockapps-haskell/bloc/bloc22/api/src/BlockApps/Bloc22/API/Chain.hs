@@ -45,9 +45,18 @@ instance FromJSON ChainInput where
 instance ToJSON ChainInput where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
+exampleSrc :: Text
+exampleSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+
+exampleEnode1 :: Text
+exampleEnode1 = "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+
+exampleEnode2 :: Text
+exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+
 instance ToSample ChainInput where
   toSamples _ = singleSample ChainInput
-    { chainInputSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+    { chainInputSrc = exampleSrc
     , chainInputLabel = "my chain"
     , chainInputAccountInfo = [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
@@ -57,7 +66,10 @@ instance ToSample ChainInput where
          ("addRule", "AUTO_APPROVE")
        , ("removeRule", "AUTO_APPROVE")
        ]
-    , chainInputMembers = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")] 
+    , chainInputMembers = [
+         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
+       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
+       ] 
     }
 
 instance ToSchema ChainInput where
@@ -67,7 +79,7 @@ instance ToSchema ChainInput where
     where
       ex :: ChainInput
       ex = ChainInput
-        { chainInputSrc = "contract Governance { enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+        { chainInputSrc = exampleSrc
         , chainInputLabel = "my chain"
         , chainInputAccountInfo = [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
@@ -77,7 +89,10 @@ instance ToSchema ChainInput where
             ("addRule", "AUTO_APPROVE")
           , ("removeRule", "AUTO_APPROVE")
           ]
-        , chainInputMembers = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")] 
+        , chainInputMembers = [
+            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
+          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
+          ] 
        }
 
 --------------------------------------------------------------------------------

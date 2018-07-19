@@ -68,17 +68,14 @@ import           BlockApps.XAbiConverter
 postChain :: ChainInput -> Bloc ChainId
 postChain (ChainInput src label accountInfo variableNames members) = do
   idsAndDetails <- compileContract src
-  contractDetails <- case Map.toList idsAndDetails of 
+  ContractDetails{..} <- case Map.toList idsAndDetails of 
             [] -> throwError $ UserError "You need to supply at least one governance contract"
             [(_, x)] -> return $ snd x
             _ -> throwError $ UserError "Multiple governance contracts are not allowed" 
-  let xabi = contractdetailsXabi contractDetails
-  let byteCode = contractdetailsBin contractDetails
-  let contractName = contractdetailsName contractDetails
-  contractAcctInfo <- transformXabi xabi (Map.fromList variableNames)
+  contractAcctInfo <- transformXabi contractdetailsXabi (Map.fromList variableNames)
   let nonContractAcctInfo = map (\(a, b) -> NonContract a b) accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
-      codeInfo = CodeInfo byteCode src contractName
+      codeInfo = CodeInfo contractdetailsBin src contractdetailsName
       chainInfo = ChainInfo label acctInfo codeInfo members
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId 
