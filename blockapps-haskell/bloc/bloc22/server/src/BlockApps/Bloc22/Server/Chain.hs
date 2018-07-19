@@ -76,6 +76,6 @@ postChain (ChainInput src label accountInfo variableNames members) = do
   let nonContractAcctInfo = map (\(a, b) -> NonContract a b) accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
       codeInfo = CodeInfo contractdetailsBin src contractdetailsName
-      chainInfo = ChainInfo label acctInfo codeInfo members
+      chainInfo = ChainInfo label acctInfo [codeInfo] members
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId 
