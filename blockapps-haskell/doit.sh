@@ -8,6 +8,12 @@ cirrusRoot=http://${cirrusHost}
 kafkaPort=9092
 kafkaHost="kafka"
 
+isPublic=false
+if [ "${SMD_MODE}" == public ]; then
+  isPublic=true
+fi
+
+
 echo "Environment variables:
 slipstream:
 --pghost=\$postgres_host="${postgres_host}"
@@ -59,7 +65,7 @@ mkdir logs
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
-until nc -z $kafkaHost 9092 >&/dev/null
+until nc -z $kafkaHost $KafkaPort >&/dev/null
 do  echo "Waiting for Kafka to become available"
     sleep 1
 done
