@@ -1,0 +1,106 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`UploadData: index render component with values 1`] = `
+"<div>
+  <div className=\\"pt-dialog-body\\">
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           Contract Address 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+          23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c
+           
+        </label>
+      </div>
+    </div>
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           URI 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+          https://strato-external-storage.s3.amazonaws.com/1529905060401-widescreen.jpeg
+           
+        </label>
+      </div>
+    </div>
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           Description 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+          widescreen is one of the most important factor
+           
+        </label>
+      </div>
+    </div>
+  </div>
+  <div className=\\"pt-dialog-footer\\">
+    <div className=\\"pt-dialog-footer-actions button-center\\">
+      <Blueprint.Button intent={0} onClick={[Function: onClick]} text=\\"Close\\" />
+    </div>
+  </div>
+</div>"
+`;
+
+exports[`UploadData: index render component without values 1`] = `
+"<div>
+  <div className=\\"pt-dialog-body\\">
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           Contract Address 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+           
+        </label>
+      </div>
+    </div>
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           URI 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+           
+        </label>
+      </div>
+    </div>
+    <div className=\\"row content-margin\\">
+      <div className=\\"col-sm-4\\">
+        <label>
+           Description 
+        </label>
+      </div>
+      <div className=\\"col-sm-8\\">
+        <label>
+           
+           
+        </label>
+      </div>
+    </div>
+  </div>
+  <div className=\\"pt-dialog-footer\\">
+    <div className=\\"pt-dialog-footer-actions button-center\\">
+      <Blueprint.Button intent={0} onClick={[Function: onClick]} text=\\"Close\\" />
+    </div>
+  </div>
+</div>"
+`;

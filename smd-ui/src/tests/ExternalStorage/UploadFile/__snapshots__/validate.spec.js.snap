@@ -1,0 +1,14 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`UploadFile: validate with empty values 1`] = `
+Object {
+  "address": "Address required",
+  "content": "Attach file",
+  "description": "Attach file",
+  "password": "Password required",
+  "provider": "Select provider",
+  "username": "Select username",
+}
+`;
+
+exports[`UploadFile: validate with values 1`] = `Object {}`;
