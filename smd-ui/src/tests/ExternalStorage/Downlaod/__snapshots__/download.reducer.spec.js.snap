@@ -1,0 +1,57 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Download: reducer Modal close 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "url": null,
+}
+`;
+
+exports[`Download: reducer Modal open 1`] = `
+Object {
+  "error": null,
+  "isOpen": true,
+  "url": null,
+}
+`;
+
+exports[`Download: reducer clear URL 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "url": null,
+}
+`;
+
+exports[`Download: reducer create user on failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isOpen": false,
+  "url": null,
+}
+`;
+
+exports[`Download: reducer create user on success 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "url": "https://strato-external-storage.s3.amazonaws.com/1529915329415-widescreen.jpeg",
+}
+`;
+
+exports[`Download: reducer reset Error 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "url": null,
+}
+`;
+
+exports[`Download: reducer set initial state 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "url": null,
+}
+`;

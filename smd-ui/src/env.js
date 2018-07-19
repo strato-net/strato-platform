@@ -13,5 +13,8 @@ export const env = {
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
   SOCKET_SERVER: window.APEX_URL && window.APEX_URL !== '__APEX_URL__' ? `${WS_PROTOCOL}://${(new URL(window.APEX_URL)).host}/` : `${WS_PROTOCOL}://localhost`,
-  SMD_MODE: window.SMD_MODE && window.SMD_MODE !== '__SMD_MODE__' ? window.SMD_MODE : 'enterprise'
+  SMD_MODE: window.SMD_MODE && window.SMD_MODE !== '__SMD_MODE__' ? window.SMD_MODE : 'enterprise',
+  S3_CREDENTIALS: (window.EXT_STORAGE_S3_SECRET_ACCESS_KEY && window.EXT_STORAGE_S3_SECRET_ACCESS_KEY !== '__EXT_STORAGE_S3_SECRET_ACCESS_KEY__') &&
+                  (window.EXT_STORAGE_S3_ACCESS_KEY_ID && window.EXT_STORAGE_S3_ACCESS_KEY_ID !== '__EXT_STORAGE_S3_ACCESS_KEY_ID__') &&
+                  (window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__')
 };

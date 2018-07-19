@@ -9,6 +9,26 @@ const dappController = require('../controllers/dapp');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
 const checkMode = require('../lib/checkMode').checkMode;
+const fileController = require('../controllers/file');
+const multer = require('multer');
+
+var upload = multer({ storage: multer.memoryStorage() });
+
+const multerMiddleware = (req, res, next) => {
+  upload.single('content')(req, res, (error) => {
+    if (!req.file) {
+      let err = new Error('wrong params, expected: {content(file), username, password, address, provider, metadata}');
+      err.status = 400;
+      return next(err);
+    }
+    if (error) {
+      if (error.status)
+        return res.status(error.status).send({ reason: error.message });
+      return res.status(400).send({ reason: error.message });
+    }
+    next();
+  })
+}
 
 router.post('/dapps', dappController.upload);
 
@@ -19,6 +39,13 @@ router.post('/users', checkMode, authController.create);
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
+
+router.post('/bloc/file/upload', multerMiddleware, fileController.upload);
+router.post('/bloc/file/attest', fileController.attest);
+router.get('/bloc/file/verify', fileController.verify);
+router.get('/bloc/file/download', fileController.download);
+router.get('/bloc/file/list', fileController.list)
+
 
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);

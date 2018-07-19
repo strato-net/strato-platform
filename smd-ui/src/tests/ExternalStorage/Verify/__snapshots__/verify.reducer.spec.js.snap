@@ -1,0 +1,67 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ExternalStorage: reducer Uplaod Modal close 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "verifyDocument": null,
+}
+`;
+
+exports[`ExternalStorage: reducer Uplaod Modal open 1`] = `
+Object {
+  "error": null,
+  "isOpen": true,
+  "verifyDocument": null,
+}
+`;
+
+exports[`ExternalStorage: reducer create user on failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isLoading": false,
+  "isOpen": false,
+  "verifyDocument": null,
+}
+`;
+
+exports[`ExternalStorage: reducer create user on request 1`] = `
+Object {
+  "error": null,
+  "isLoading": true,
+  "isOpen": false,
+  "verifyDocument": null,
+}
+`;
+
+exports[`ExternalStorage: reducer create user on success 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "verifyDocument": Object {
+    "signers": Array [
+      "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
+      "a51f27e78aef85a06631f0725f380001e0ae9fb6",
+    ],
+    "timeStamp": 1530182371,
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1530182373708-widescreen.jpeg",
+  },
+}
+`;
+
+exports[`ExternalStorage: reducer on request 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "verifyDocument": null,
+}
+`;
+
+exports[`ExternalStorage: reducer set initial state 1`] = `
+Object {
+  "error": null,
+  "isOpen": false,
+  "verifyDocument": null,
+}
+`;
