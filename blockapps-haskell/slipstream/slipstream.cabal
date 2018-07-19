@@ -1,0 +1,81 @@
+name: slipstream
+version: 0.1.0.0
+synopsis: Solidity datatypes
+description: Solidity datatypes
+homepage: https://github.com/blockapps/blockapps-haskell/slipstream
+license: BSD3
+license-file: LICENSE
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src/
+  default-language: Haskell98
+  exposed-modules: Slipstream.Converter
+  build-depends: base >= 4 && < 5
+
+executable slipstream
+    default-language: Haskell98
+    build-depends: base >= 4 && < 5
+                 , aeson
+                 , base16-bytestring
+                 , base
+                 , blockapps-bloc22-server
+                 , blockapps-ethereum
+                 , blockapps-solidity
+                 , blockapps-strato-client
+                 , blockapps-strato-api
+                 , bytestring
+                 , containers
+                 , hflags
+                 , http-client
+                 , lens
+                 , logging-effect
+                 , milena
+                 , monad-control
+                 , mtl
+                 , network
+                 , postgresql-simple
+                 , postgresql-typed
+                 , resource-pool
+                 , semigroups
+                 , servant-client
+                 , slipstream
+                 , template-haskell
+                 , text
+                 , time
+                 , transformers-base
+                 , transformers
+                 , unordered-containers
+                 , vector
+    other-modules: Events
+                  , Options
+    main-is: Main.hs
+    ghc-options: -Wall -O2 -threaded
+    buildable: True
+    hs-source-dirs: exec_src/
+
+test-suite test
+  default-language: Haskell98
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests/
+  ghc-options: -Wall -Werror
+  main-is: Test.hs
+  build-depends: base >=4 && < 5
+               , aeson
+               , base16-bytestring
+               , bytestring
+               , containers
+               , hspec
+               , largeword
+               , parsec
+               , QuickCheck
+               , raw-strings-qq
+               , slipstream
+               , text
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-solidity

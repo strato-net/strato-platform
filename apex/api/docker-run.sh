@@ -2,7 +2,7 @@
 set -e
 set -x
 
-cirrusRoot=http://${cirrusHost}
+#cirrusRoot=http://${cirrusHost}
 export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
@@ -44,13 +44,14 @@ do
 done
 echo 'strato is available'
 
-echo 'Waiting for cirrus to be available...'
-until curl --silent --output /dev/null --fail --location ${cirrusRoot}
-do
-  echo "Check at $(date)"
-  sleep 1
-done
-echo 'cirrus is available'
+#TODO: commented out in slipstream branch - might need the check for postgrest container instead (URI /cirrus/search) or both
+#echo 'Waiting for cirrus to be available...'
+#until curl --silent --output /dev/null --fail --location ${cirrusRoot}
+#do
+#  echo "Check at $(date)"
+#  sleep 1
+#done
+#echo 'cirrus is available'
 
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}
