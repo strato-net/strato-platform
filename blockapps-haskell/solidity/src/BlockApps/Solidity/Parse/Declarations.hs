@@ -92,7 +92,7 @@ data Declaration =
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
   | VariableDeclaration Xabitype.Type Bool Bool (Maybe String)
-  deriving Show
+  deriving (Eq, Show)
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
