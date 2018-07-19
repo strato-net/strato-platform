@@ -28,22 +28,6 @@ import           BlockApps.Ethereum
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
-{-
-data AccountBalance = AccountBalance 
-  { accountBalanceAddress :: Address
-  , accountBalanceBalance :: Integer
-  } deriving (Eq, Show, Generic)
-
-instance Arbitrary AccountBalance where
-  arbitrary = genericArbitrary uniform
-
-instance FromJSON AccountBalance where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToJSON AccountBalance where
-  toJSON = genericToJSON (aesonPrefix camelCase)
--}
-
 data ChainInput  = ChainInput
   { chainInputSrc            :: Text
   , chainInputLabel          :: Text
