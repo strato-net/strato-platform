@@ -1,7 +1,9 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
+{-# LANGUAGE FlexibleContexts               #-}
+{-# LANGUAGE FlexibleInstances              #-}
+{-# LANGUAGE MultiParamTypeClasses          #-}
+{-# LANGUAGE TemplateHaskell                #-}
+{-# OPTIONS_GHC -fno-warn-orphans           #-}
+{-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
 module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
@@ -13,6 +15,7 @@ module Blockchain.Sequencer.Monad (
   , addLdbBatchOps
 ) where
 
+import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -22,6 +25,7 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 
+import           Blockchain.Blockstanbul
 import           Blockchain.Constants
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.ExtWord                        (Word256)
@@ -42,8 +46,6 @@ import qualified Network.Kafka                             as K
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
 
-type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
-
 instance (MonadLogger m) => MonadLogger (StatsT m) where
     monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
 
@@ -51,17 +53,20 @@ instance (MonadResource m) => MonadResource (StatsT m) where
     liftResourceT = lift . liftResourceT
 
 data SequencerContext = SequencerContext
-                      { dependentBlockDB    :: DependentBlockDB
-                      , seenBlockDB         :: SeenBlockDB
-                      , seenTransactionDB   :: SeenTransactionDB
-                      , privateHashDB       :: PrivateHashDB
-                      , getChainsDB         :: S.Set Word256
-                      , getTransactionsDB   :: S.Set SHA
-                      , ldbBatchOps         :: Q.Seq LDB.BatchOp
-                      , vmEvents            :: Q.Seq OutputEvent
-                      , p2pEvents           :: Q.Seq OutputEvent
-                      , sequencerKafkaState :: K.KafkaState
+                      { _dependentBlockDB    :: DependentBlockDB
+                      , _seenBlockDB         :: SeenBlockDB
+                      , _seenTransactionDB   :: SeenTransactionDB
+                      , _privateHashDB       :: PrivateHashDB
+                      , _getChainsDB         :: S.Set Word256
+                      , _getTransactionsDB   :: S.Set SHA
+                      , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+                      , _vmEvents            :: Q.Seq OutputEvent
+                      , _p2pEvents           :: Q.Seq OutputEvent
+                      , _sequencerKafkaState :: K.KafkaState
+                      , _blockstanbulContext :: Maybe BlockstanbulContext
                       }
+makeLenses ''SequencerContext
+
 
 data SequencerConfig =
      SequencerConfig { depBlockDBCacheSize   :: Int
@@ -75,50 +80,51 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      }
 
+type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
 
 instance HasDependentBlockDB SequencerM where
-    getDependentBlockDB = dependentBlockDB <$> get
+    getDependentBlockDB = use dependentBlockDB
     getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
     getReadOptions      = return LDB.defaultReadOptions
 
 instance HasGetChainsDB SequencerM where
-    getGetChainsDB = getChainsDB <$> get
+    getGetChainsDB = _getChainsDB <$> get
     putGetChainsDB new = do
         ctx <- get
-        put $ ctx { getChainsDB = new }
+        put $ ctx { _getChainsDB = new }
 
 instance HasGetTransactionsDB SequencerM where
-    getGetTransactionsDB = getTransactionsDB <$> get
+    getGetTransactionsDB = _getTransactionsDB <$> get
     putGetTransactionsDB new = do
         ctx <- get
-        put $ ctx { getTransactionsDB = new }
+        put $ ctx { _getTransactionsDB = new }
 
 instance HasPrivateHashDB SequencerM where
-    getPrivateHashDB = privateHashDB <$> get
+    getPrivateHashDB = _privateHashDB <$> get
     putPrivateHashDB new = do
         ctx <- get
-        put $ ctx { privateHashDB = new }
+        put $ ctx { _privateHashDB = new }
 
 instance HasSeenBlockDB SequencerM where
-    getSeenBlockDB = seenBlockDB <$> get
+    getSeenBlockDB = _seenBlockDB <$> get
     putSeenBlockDB new = do
         ctx <- get
-        put $ ctx { seenBlockDB = new }
+        put $ ctx { _seenBlockDB = new }
 
 instance HasSeenTransactionDB SequencerM where
-    getSeenTransactionDB = seenTransactionDB <$> get
-    putSeenTransactionDB new = do
-        ctx <- get
-        put $ ctx { seenTransactionDB = new }
+    getSeenTransactionDB = use seenTransactionDB
+    putSeenTransactionDB = assign seenTransactionDB
 
 instance K.HasKafkaState SequencerM where
-    getKafkaState = sequencerKafkaState <$> get
-    putKafkaState newS = do
-        ctx <- get
-        put $ ctx { sequencerKafkaState = newS }
+    getKafkaState = use sequencerKafkaState
+    putKafkaState = assign sequencerKafkaState
 
-runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
-runSequencerM c m = do
+instance HasBlockstanbulContext SequencerM where
+    getBlockstanbulContext = use blockstanbulContext
+    putBlockstanbulContext = assign (blockstanbulContext . _Just)
+
+runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM c mbc m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     a <- runResourceT . EC.runStatsT (statsConfig c) . flip runReaderT c $ do
         dbCS     <- asks depBlockDBCacheSize
@@ -132,30 +138,31 @@ runSequencerM c m = do
                          Just addr -> K.mkKafkaState kClId addr
 
         runStateT m SequencerContext
-            { dependentBlockDB    = depBlock
-            , seenBlockDB         = mkSeenBlockDB stxSize
-            , seenTransactionDB   = mkSeenTxDB stxSize
-            , privateHashDB       = emptyPrivateHashDB
-            , getChainsDB         = S.empty
-            , getTransactionsDB   = S.empty
-            , ldbBatchOps         = Q.empty
-            , vmEvents            = Q.empty
-            , p2pEvents           = Q.empty
-            , sequencerKafkaState = kState
+            { _dependentBlockDB    = depBlock
+            , _seenBlockDB         = mkSeenBlockDB stxSize
+            , _seenTransactionDB   = mkSeenTxDB stxSize
+            , _privateHashDB       = emptyPrivateHashDB
+            , _getChainsDB         = S.empty
+            , _getTransactionsDB   = S.empty
+            , _ldbBatchOps         = Q.empty
+            , _vmEvents            = Q.empty
+            , _p2pEvents           = Q.empty
+            , _sequencerKafkaState = kState
+            , _blockstanbulContext = mbc
             }
     return $ fst a
 
 clearLdbBatchOps :: SequencerM ()
-clearLdbBatchOps = modify (\st -> st{ldbBatchOps = Q.empty})
+clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
 
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do
   st <- get
-  let existingOps = ldbBatchOps st
+  let existingOps = _ldbBatchOps st
       go e [] = e
       go e (o:os) = go (e Q.|> o) os
       newOps = go existingOps ops
-  put st{ldbBatchOps = newOps}
+  put st{_ldbBatchOps = newOps}
 
 getKafkaClientID :: SequencerM K.KafkaClientId
 getKafkaClientID = kafkaClientId <$> ask

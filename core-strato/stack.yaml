@@ -27,6 +27,7 @@ packages:
 - blockapps-haskoin/
 - statsdi/
 - ethereum-rlp/
+- blockstanbul/
 extra-deps:
 - Crypto-4.2.5.1
 - bytestring-arbitrary-0.1.1

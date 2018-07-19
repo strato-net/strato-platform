@@ -4,23 +4,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS -fno-warn-unused-local-binds #-}
-{-# OPTIONS -fno-warn-unused-matches #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
+import           ClassyPrelude                             (atomically)
+
+import           Control.Concurrent.AlarmClock
+import           Control.Concurrent.STM.TMVar
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
+import           Data.Time.Clock
 import           System.Clock
 
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust)
+import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
+
+import           Blockchain.Blockstanbul
 
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
@@ -57,8 +64,30 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
+createBlockstanbulRoundTimer :: NominalDiffTime -> IO (TMVar Bool)
+createBlockstanbulRoundTimer dt = do
+  var <- atomically $ newTMVar False
+  let act :: AlarmClock UTCTime -> IO ()
+      act alarm' = do
+        _ <- atomically $ swapTMVar var True
+        next <- addUTCTime dt <$> getCurrentTime
+        setAlarm alarm' next
+  alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
+  next <- addUTCTime dt <$> getCurrentTime
+  setAlarm alarm next
+  return var
+
 sequencer :: SequencerM ()
-sequencer = forever $ do
+sequencer = do
+  -- TODO(tim): Pipe time window in through a flag
+  timer <- liftIO $ createBlockstanbulRoundTimer 100
+  forever $ do
+    v <- currentView
+    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
+    roundTimeout <- atomically $ swapTMVar timer False
+    when roundTimeout $ do
+      oevs <- blockstanbulSend [Timeout]
+      void . writeSeqVmEvents' $ oevs
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
@@ -69,22 +98,22 @@ sequencer = forever $ do
     splitEvents $ map snd inEvents
     t1 <- liftIO $ getTime Realtime
     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
-    pendingLDBWrites <- gets ldbBatchOps
+    pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
     tick ctr_sequencer_ldb_batch_writes
     setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
     $logInfoS "sequencer" "Applied pending LDB writes"
-    chainIds <- gets getChainsDB
+    chainIds <- gets _getChainsDB
     unless (S.null chainIds) $ do
       markForP2P . OEGetChain $ toList chainIds
-    txHashes <- gets getTransactionsDB
+    txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
-    vmEvs <- gets vmEvents
+    vmEvs <- gets _vmEvents
     unless (Q.length vmEvs == 0) $ do
       writeSeqVmEvents' $ toList vmEvs
       $logInfoS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- gets p2pEvents
+    p2pEvs <- gets _p2pEvents
     unless (Q.length p2pEvs == 0) $ do
       writeSeqP2pEvents' $ toList p2pEvs
       $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
@@ -117,6 +146,24 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                   writeSeqVmEvents' [OEBlock shortCircuit]  -- todo handle the error :)
                   writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
+
+blockstanbulSend :: [InEvent] -> SequencerM [OutputEvent]
+blockstanbulSend msgs = do
+    resp <- sendAllMessages msgs
+    $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
+    -- TODO(tim): Use the wiremessages in the response
+    let blocks = [b | ToCommit b <- resp]
+    unless (null blocks) $
+      -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
+      void $ sendAllMessages [CommitResult (Right ())]
+    $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
+    let rewriteBlock = fmap OEBlock
+                     . fmap (flip sequencedBlockToOutputBlock 1)
+                     . ingestBlockToSequencedBlock
+                     . blockToIngestBlock TO.Blockstanbul
+        evs = mapMaybe rewriteBlock blocks
+    $logDebugS "seq/pbft/send" . T.pack . show $ evs
+    return evs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
@@ -270,15 +317,21 @@ hydrateAndEmit sb = do
           tick ctr_sequencer_blocks_enqueued
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks blocks = forM_ blocks $ \ib -> do
-  let mSb = ingestBlockToSequencedBlock ib
-  case mSb of
-    Nothing -> do
-      $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-      tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-    Just sb -> do
-      witnessBlockHash (sbHash sb) sb
-      hydrateAndEmit sb
+transformBlocks blocks = do
+  hasPBFT <- blockstanbulRunning
+  if hasPBFT
+    then do
+      outEvents <- blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
+      mapM_ markForVM outEvents
+    else forM_ blocks $ \ib -> do
+      let mSb = ingestBlockToSequencedBlock ib
+      case mSb of
+        Nothing -> do
+          $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+          tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+        Just sb -> do
+          witnessBlockHash (sbHash sb) sb
+          hydrateAndEmit sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
@@ -329,16 +382,16 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   insertDependentTxs bHash depTxs'
 
 clearEvents :: SequencerM ()
-clearEvents = modify (\st -> st{vmEvents = Q.empty, p2pEvents = Q.empty})
+clearEvents = modify (\st -> st{_vmEvents = Q.empty, _p2pEvents = Q.empty})
 
 pairToOETx :: (Timestamp, OutputTx) -> OutputEvent
 pairToOETx = uncurry OETx
 
 markForVM :: OutputEvent -> SequencerM ()
-markForVM oe = modify (\st -> st{vmEvents = (vmEvents st) Q.|> oe})
+markForVM oe = modify (\st -> st{_vmEvents = (_vmEvents st) Q.|> oe})
 
 markForP2P :: OutputEvent -> SequencerM ()
-markForP2P oe = modify (\st -> st{p2pEvents = (p2pEvents st) Q.|> oe})
+markForP2P oe = modify (\st -> st{_p2pEvents = (_p2pEvents st) Q.|> oe})
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType

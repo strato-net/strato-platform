@@ -34,6 +34,7 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Data.Word
 
+import           Control.Lens.TH                         (makeLensesFor)
 import           Data.Aeson
 import           GHC.Generics
 
@@ -51,3 +52,6 @@ type Difficulty = Integer
 type AddressBalancePair = (Address, Integer)
 
 type MapPair = (Word256, Word256)
+
+makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
+makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
