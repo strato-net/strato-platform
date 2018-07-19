@@ -119,7 +119,6 @@ convertRet address codehash abi name x = do
   let keySt = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
   let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
   let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-  putStrLn $ "Insert: " ++ ins
   let oneIns = "BEGIN;" ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ "COMMIT;"
 
   dbInsert oneIns

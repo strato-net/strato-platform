@@ -55,13 +55,6 @@ stateDiffToChanges StateDiff{..} =
   ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
-  {-
-  (map (\(x, y) -> Action Create x (show $ codeHash y) (Just $ map (fmap newValue) $ Map.toList $ Map.mapKeys show $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> Action Delete x (show $ codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (show $ codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
-  where
-    newValue (Diff _ x) = show x
-  -}
 
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
@@ -202,19 +195,11 @@ processTheMessages messages = do
               return (c, abi, name)
 
       let strAbi = replace "\'" "\'\'" $ second contractMetaData
-
       let name = replace "\"" "" $ third contractMetaData
-
-      --liftIO $ putStrLn $ "~~~~~contractMetaData~~~~~: " ++ show contractMetaData
 
       --TODO: Add parsing of contract info to get flags (indexing, history)
 
-      --let preSol = decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      --liftIO $ putStrLn $ "(((((((())))))))" ++ show preSol
-
       let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-
-      --liftIO $ putStrLn $ "|..........| RET: " ++ show ret
       liftIO $ convertRet address codehash strAbi name ret
 
   return()
