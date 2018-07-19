@@ -43,24 +43,28 @@ main = hspec $ do
 
   describe "Message Conversion Test" $ do
     it "Returns the correctly converted message to a statediff" $ do
+      pendingWith "TODO: (Carlo) Simulate successful message conversion"
       let conversionExpected = ""
       let conversionActual = ""
       conversionExpected `shouldBe` conversionActual
 
   describe "failed Kafka Message Test" $ do
     it "Returns the appropriate response to a failed Kafka message" $ do
+      pendingWith "TODO: (Carlo) Simulate kafka message failure"
       let failedKafkaExpected = ""
       let failedKafkaActual = ""
       failedKafkaExpected `shouldBe` failedKafkaActual
 
   describe "Failed Conversion Test" $ do
     it "Returns the correct message when message conversion fails" $ do
+      pendingWith "TODO: (Carlo) Simulate failing message conversion"
       let failedConversionExpected = ""
       let failedConversionActual = ""
       failedConversionExpected `shouldBe` failedConversionActual
 
   describe "Successful DB Writes Test" $ do
     it "Confirms a successful db write" $ do
+      pendingWith "TODO: (Carlo) Simulate successful db writes"
       _ <- $initHFlags "Setup Test Variables"
       let address = "362fdc66a650bb11d61d9d046829d294cad82b70"
       let codeHash = "0b49343ea28762c009cae266ebdb389601a28c9e814033fb9bf1b5ce89590388"
@@ -79,6 +83,7 @@ main = hspec $ do
       dbWritesExpected `shouldBe` dbWritesActual
 
   describe "DB Write Failure Test" $ do
+    pendingWith "TODO: (Carlo) Simulate failing db writes"
     it "Returns correct message when " $ do
       let dbFailureExpected = ""
       let dbFailureActual = ""
@@ -86,6 +91,7 @@ main = hspec $ do
 
 
   describe "Index Accuracy Test" $ do
+    pendingWith "TODO: (Carlo) Simulate accurate indexing"
     it "" $ do
       let x = ""
       let y = ""
