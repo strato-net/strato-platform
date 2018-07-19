@@ -74,7 +74,8 @@ import           Text.Read
 import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
-                                               keccak256lazy, stringAddress)
+                                               keccak256lazy, stringAddress,
+                                               AccountInfo(..), CodeInfo(..))
 import           BlockApps.Strato.TypeLits
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
@@ -542,22 +543,20 @@ exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9
                                        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
 
 data ChainInfo = ChainInfo
-  {  chainLabel      :: Text
-  ,  addRule         :: Text
-  ,  removeRule      :: Text
-  ,  members         :: [Text]
-  ,  ciAccountBalance :: [AccountBalance]
-  }
-  deriving (Eq, Show, Generic)
+  {  chainLabel         :: Text
+  ,  accountInfo   :: [AccountInfo]
+  ,  codeInfo      :: [CodeInfo]
+  ,  members       :: [(Address, Text)]
+  } deriving (Eq, Show, Generic)
 
 exampleChainInfo :: ChainInfo
 exampleChainInfo = ChainInfo
   {
      chainLabel = "myChain"
-  ,  addRule = "majorityRules"
-  ,  removeRule = "majorityRules"
-  ,  members = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303", "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"]
-  ,  ciAccountBalance = exampleAccountBalances
+  ,  accountInfo = []
+  ,  codeInfo = []
+  ,  members = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303")
+               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")]
   }
 
 instance ToSchema ChainInfo where
@@ -568,21 +567,19 @@ instance ToSchema ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "label" <*>
-    o .: "addRule" <*>
-    o .: "removeRule" <*>
-    o .: "members" <*>
-    o .: "balances"
+    o .: "chainLabel" <*>
+    o .: "accountInfo" <*>
+    o .: "codeInfo" <*>
+    o .: "members"
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON x =
     object [
-       "label" .= chainLabel x
-    ,  "addRule" .= addRule x
-    ,  "removeRule" .= removeRule x
+       "chainLabel" .= chainLabel x
+    ,  "accountInfo" .= accountInfo x
+    ,  "codeInfo" .= codeInfo x
     ,  "members" .= members x
-    ,  "balances" .= ciAccountBalance x
     ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
