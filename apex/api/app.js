@@ -18,15 +18,16 @@ app.set('views', path.join(__dirname, 'views'));
 
 // uncomment after placing your favicon in /public // TODO
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(logger('dev', {stream: process.stdout}));
+app.use(logger('dev', { stream: process.stdout }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb', parameterLimit:50000 }));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
+
 
 if (process.env.NODE_ENV !== 'production' || process.env.PROD_DEV_MODE === 'true') {
   const corsOptions = {
     origin: function (origin, callback) {
-      if(!origin) {
+      if (!origin) {
         callback(null, '*');
       }
       else if (appConfig.jwtConfig.domainWhiteList.indexOf(origin) !== -1) {
@@ -53,14 +54,14 @@ app.use('/', index);
 // app.use('/users', users);
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   var err = new Error('Not Found');
   err.status = 404;
   next(err);
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
 
   res.status(err.status || 500);
 

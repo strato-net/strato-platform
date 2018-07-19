@@ -1,0 +1,128 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Verify: index form submit with values 1`] = `
+Object {
+  "errors": Object {},
+}
+`;
+
+exports[`Verify: index form submit without values 1`] = `
+Object {
+  "errors": Object {
+    "contractAddress": "Can't be blank",
+  },
+}
+`;
+
+exports[`Verify: index mapStateToProps 1`] = `
+Object {
+  "isLoading": false,
+  "isOpen": false,
+  "verifyDocument": Object {
+    "signers": Array [
+      "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
+      "a51f27e78aef85a06631f0725f380001e0ae9fb6",
+    ],
+    "timeStamp": 1530182371,
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1530182373708-widescreen.jpeg",
+  },
+  "verifyError": null,
+}
+`;
+
+exports[`Verify: index render component with values 1`] = `
+"<div>
+  <form>
+    <Blueprint.Dialog isOpen={true} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"Valid Resource\\" className=\\"pt-dark verify-dialog\\" canOutsideClickClose={true}>
+      <div>
+        <div className=\\"pt-dialog-body\\">
+          <div className=\\"row content-margin\\">
+            <div className=\\"col-sm-3\\">
+              <label>
+                 URI 
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <label>
+                 
+                https://strato-external-storage.s3.amazonaws.com/1530182373708-widescreen.jpeg
+                 
+              </label>
+            </div>
+          </div>
+          <div className=\\"row content-margin\\">
+            <div className=\\"col-sm-3\\">
+              <label>
+                 Date Uploaded 
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <label>
+                 
+                2018-07-16 01:19:24 AM
+                 
+              </label>
+            </div>
+          </div>
+          <div className=\\"row content-margin verify-result\\">
+            <div className=\\"col-sm-3\\">
+              <label>
+                 Signatures 
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <ul>
+                 
+                <li>
+                   
+                  6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad
+                   
+                </li>
+                <li>
+                   
+                  a51f27e78aef85a06631f0725f380001e0ae9fb6
+                   
+                </li>
+                 
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center\\">
+            <Blueprint.Button intent={0} onClick={[Function: onClick]} text=\\"Close\\" />
+          </div>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`Verify: index render component without values 1`] = `
+"<div>
+  <form>
+    <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-info-sign\\" title=\\"Verify\\" className=\\"pt-dark verify-dialog\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body upload-form\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Contract Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <Field name=\\"contractAddress\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Contract Address\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center smd-margin-8\\">
+            <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Attest\\" />
+          </div>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
