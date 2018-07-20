@@ -381,18 +381,6 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   mapM_ insertGetTransactionsDB depTxs'
                   insertDependentTxs bHash depTxs'
 
-clearEvents :: SequencerM ()
-clearEvents = modify (\st -> st{_vmEvents = Q.empty, _p2pEvents = Q.empty})
-
-pairToOETx :: (Timestamp, OutputTx) -> OutputEvent
-pairToOETx = uncurry OETx
-
-markForVM :: OutputEvent -> SequencerM ()
-markForVM oe = modify (\st -> st{_vmEvents = (_vmEvents st) Q.|> oe})
-
-markForP2P :: OutputEvent -> SequencerM ()
-markForP2P oe = modify (\st -> st{_p2pEvents = (_p2pEvents st) Q.|> oe})
-
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
 
