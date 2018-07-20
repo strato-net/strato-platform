@@ -88,28 +88,20 @@ instance HasDependentBlockDB SequencerM where
     getReadOptions      = return LDB.defaultReadOptions
 
 instance HasGetChainsDB SequencerM where
-    getGetChainsDB = _getChainsDB <$> get
-    putGetChainsDB new = do
-        ctx <- get
-        put $ ctx { _getChainsDB = new }
+    getGetChainsDB = use getChainsDB
+    putGetChainsDB = assign getChainsDB
 
 instance HasGetTransactionsDB SequencerM where
-    getGetTransactionsDB = _getTransactionsDB <$> get
-    putGetTransactionsDB new = do
-        ctx <- get
-        put $ ctx { _getTransactionsDB = new }
+    getGetTransactionsDB = use getTransactionsDB
+    putGetTransactionsDB = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
-    getPrivateHashDB = _privateHashDB <$> get
-    putPrivateHashDB new = do
-        ctx <- get
-        put $ ctx { _privateHashDB = new }
+    getPrivateHashDB = use privateHashDB
+    putPrivateHashDB = assign privateHashDB
 
 instance HasSeenBlockDB SequencerM where
-    getSeenBlockDB = _seenBlockDB <$> get
-    putSeenBlockDB new = do
-        ctx <- get
-        put $ ctx { _seenBlockDB = new }
+    getSeenBlockDB = use seenBlockDB
+    putSeenBlockDB = assign seenBlockDB
 
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
