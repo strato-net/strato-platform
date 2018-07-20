@@ -116,19 +116,6 @@ storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
-{-data ChainInfoFilterParams = ChainInfoFilterParams
-  { ciChainLabel     :: Maybe (Maybe Natural)
-  , ciAddRule        :: Maybe Natural
-  , ciRemoveRule     :: Maybe Natural
-  , ciMembers        :: Maybe [Natural]
-  , ciAccountBalance :: Maybe [AccountBalance]
-  } deriving (Eq, Show, Generic)
-
-chainInfoFilterParams :: ChainInfoFilterParams
-chainInfoFilterParams = ChainInfoFilterParams
-  Nothing Nothing Nothing Nothing Nothing
--}
-
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256

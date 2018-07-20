@@ -29,7 +29,7 @@ import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 
 transformXabi :: Xabi -> Map.Map Text Text -> AccountInfo
-transformXabi _ _ = undefined
+transformXabi _ _ = error "transformXabi not implemented"
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
