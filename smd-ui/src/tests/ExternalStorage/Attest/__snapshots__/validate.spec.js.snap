@@ -1,0 +1,12 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Attest: validate with empty values 1`] = `
+Object {
+  "address": "Address required",
+  "contractAddress": "Can't be blank",
+  "password": "Password required",
+  "username": "Select username",
+}
+`;
+
+exports[`Attest: validate with values 1`] = `Object {}`;

@@ -1,0 +1,85 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`UploadFile: reducer Uplaod File on failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isLoading": false,
+  "isOpen": false,
+  "result": null,
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer Uplaod File on request 1`] = `
+Object {
+  "error": null,
+  "isLoading": true,
+  "isOpen": false,
+  "result": null,
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer Uplaod File on success 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "result": Object {
+    "contractAddress": "23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c",
+    "metadata": "widescreen is one of the most important factor",
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1529905060401-widescreen.jpeg",
+  },
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer Uplaod Modal close 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "result": null,
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer Uplaod Modal open 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": true,
+  "result": null,
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer change username 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "result": null,
+  "username": undefined,
+}
+`;
+
+exports[`UploadFile: reducer reset error 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "result": null,
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer set initial state 1`] = `
+Object {
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "result": null,
+  "username": null,
+}
+`;
