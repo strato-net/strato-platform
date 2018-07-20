@@ -1,0 +1,47 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ExternalStorage: actions Modal: close 1`] = `
+Object {
+  "type": "CLOSE_VERIFY_MODAL",
+}
+`;
+
+exports[`ExternalStorage: actions Modal: open 1`] = `
+Object {
+  "type": "OPEN_VERIFY_MODAL",
+}
+`;
+
+exports[`ExternalStorage: actions Verify: failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "VERIFY_DOCUMENT_FAILURE",
+}
+`;
+
+exports[`ExternalStorage: actions Verify: request 1`] = `
+Object {
+  "contractAddress": "23fe0e0ab7bd95fbcdff877660c595d24c6dcf5c",
+  "type": "VERIFY_DOCUMENT_REQUEST",
+}
+`;
+
+exports[`ExternalStorage: actions Verify: success 1`] = `
+Object {
+  "data": Object {
+    "signers": Array [
+      "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
+      "a51f27e78aef85a06631f0725f380001e0ae9fb6",
+    ],
+    "timeStamp": 1530182371,
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1530182373708-widescreen.jpeg",
+  },
+  "type": "VERIFY_DOCUMENT_SUCCESS",
+}
+`;
+
+exports[`ExternalStorage: actions reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;
