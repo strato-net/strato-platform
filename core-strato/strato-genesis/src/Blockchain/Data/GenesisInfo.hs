@@ -46,8 +46,7 @@ data GenesisInfo =
     genesisInfoTimestamp        :: UTCTime,
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: SHA,
-    genesisInfoNonce            :: Word64,
-    genesisInfoChainId          :: Maybe Word256
+    genesisInfoNonce            :: Word64
 } deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
@@ -71,8 +70,7 @@ defaultGenesisInfo =
     genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC"  ::  UTCTime,
     genesisInfoExtraData = 0,
     genesisInfoMixHash = SHA 0,
-    genesisInfoNonce = 42,
-    genesisInfoChainId = Nothing
+    genesisInfoNonce = 42
 }
 
 instance FromJSON GenesisInfo where
@@ -93,8 +91,7 @@ instance FromJSON GenesisInfo where
     o .: "timestamp" <*>
     o .: "extraData" <*>
     o .: "mixHash" <*>
-    o .: "nonce" <*>
-    o .:? "chainId"
+    o .: "nonce"
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
@@ -114,8 +111,7 @@ instance ToJSON GenesisInfo where
       "extraData" .= genesisInfoExtraData x <>
       "mixHash" .= genesisInfoMixHash x <>
       "nonce" .= genesisInfoNonce x <>
-      "accountInfo" .= genesisInfoAccountInfo x <>
-      "chainId" .= genesisInfoChainId x
+      "accountInfo" .= genesisInfoAccountInfo x
     )
 
 genesisParser :: JS.Parser GenesisInfo
@@ -136,6 +132,5 @@ genesisParser = GenesisInfo
             <*> "extraData" JS..: JS.value
             <*> "mixHash" JS..: JS.value
             <*> "nonce" JS..: JS.value
-            <*> "chainId" JS..:? JS.value
 
 

@@ -57,7 +57,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , statsConfig           = Nothing
                                }
 
-    runLoggingT (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
+    runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -90,7 +90,7 @@ spec = do
             inChain <- buildIngestChain gb 8 2
             outBlocks <- withTemporaryDepBlockDB gb $ do
               splitEvents (IEBlock <$> inChain)
-              oes <- toList <$> gets vmEvents
+              oes <- toList <$> gets _vmEvents
               return [block | OEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
@@ -101,7 +101,7 @@ spec = do
             shuffled <- generate $ shuffle inChain
             outBlocks <- withTemporaryDepBlockDB gb $ do
               splitEvents (IEBlock <$> shuffled)
-              oes <- toList <$> gets vmEvents
+              oes <- toList <$> gets _vmEvents
               return [block | OEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
@@ -113,13 +113,13 @@ spec = do
             inTxs  <- generate $ vectorOf inTxSize arbitrary
             outTxs <- withTemporaryDepBlockDB gb $ do
               splitEvents (IETx ts <$> inTxs)
-              oes <- toList <$> gets vmEvents
+              oes <- toList <$> gets _vmEvents
               return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
             dedupedOut <- withTemporaryDepBlockDB gb $ do
               splitEvents dedupedIn
-              toList <$> gets vmEvents
+              toList <$> gets _vmEvents
             assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
                 length dedupedIn == (length dedupedOut)
 
@@ -130,7 +130,7 @@ spec = do
             inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
             outTxs <- withTemporaryDepBlockDB gb $ do
               splitEvents (IETx ts <$> inTxs)
-              oes <- toList <$> gets vmEvents
+              oes <- toList <$> gets _vmEvents
               return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn          = feedBackOutputsToInput outTxs
@@ -138,7 +138,7 @@ spec = do
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
             dedupedOut <- withTemporaryDepBlockDB gb $ do
               splitEvents replicatedIn
-              oes <- toList <$> gets vmEvents
+              oes <- toList <$> gets _vmEvents
               return [o | o@(OETx _ _) <- oes]
             assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
                 length replicatedIn == (length dedupedOut)

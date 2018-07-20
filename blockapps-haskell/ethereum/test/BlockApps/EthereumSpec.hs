@@ -3,6 +3,7 @@
 
 module BlockApps.EthereumSpec where
 
+import Control.Applicative (liftA2)
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.ByteString.Base16 as Base16
@@ -10,6 +11,7 @@ import Data.RLP
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
+import Text.Read
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
@@ -17,6 +19,10 @@ import BlockApps.Ethereum
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
+
+  describe "Hex" $ do
+    prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
+    prop "has inverse read/show" $ readShowProp @ (Hex Word)
 
   describe "Address" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Address
@@ -90,6 +96,9 @@ spec = modifyMaxSuccess (const 10) $ do
 
 jsonProp :: (Eq x, Show x, FromJSON x, ToJSON x) => x -> Property
 jsonProp x = decode (encode x) === Just x
+
+readShowProp :: (Eq x, Read x, Show x) => x -> Property
+readShowProp = liftA2 (===) (readMaybe . show) Just
 
 httpApiDataProp
   :: (Eq x, Show x, FromHttpApiData x, ToHttpApiData x) => x -> Property

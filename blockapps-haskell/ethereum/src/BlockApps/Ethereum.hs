@@ -11,7 +11,8 @@
 
 module BlockApps.Ethereum
   ( -- * Addresses
-    Address (..)
+    Hex (..)
+  , Address (..)
   , deriveAddress
   , addressString
   , stringAddress
@@ -48,6 +49,8 @@ module BlockApps.Ethereum
   -- , eth
   , Gas (..)
   , BloomFilter (..)
+  , CodeInfo (..)
+  , AccountInfo (..)
   ) where
 
 import           Control.Lens.Operators
@@ -66,6 +69,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
 import           Data.LargeWord
+import qualified Data.Map.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
@@ -74,13 +78,16 @@ import           Data.Swagger
 import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
+import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances    ()
 import           Text.Read              hiding (String)
+import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
@@ -88,6 +95,31 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
 
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
+
+newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
+
+instance (Integral n, Show n) => Show (Hex n) where
+  show (Hex n) = showHex n ""
+
+instance (Eq n, Num n) => Read (Hex n) where
+  readPrec = Hex <$> readP_to_Prec (const readHexP)
+  --I'm not sure what `d` precision parameter is used for
+
+instance Num n => FromJSON (Hex n) where
+  parseJSON value = do
+    string <- parseJSON value
+    case fmap fromInteger (readMaybe ("0x" ++ string)) of
+      Nothing -> fail $ "not hex encoded: " ++ string
+      Just n  -> return $ Hex n
+
+instance (Integral n, Show n) => ToJSON (Hex n) where
+  toJSON = toJSON . show
+
+instance (Integral n, Show n) => ToHttpApiData (Hex n) where
+  toUrlPiece = Text.pack . show
+
+instance Arbitrary x => Arbitrary (Hex x) where
+  arbitrary = genericArbitrary uniform
 
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Generic, Bounded)
@@ -648,3 +680,79 @@ newtype BloomFilter = BloomFilter
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
   ) deriving (Eq,Show,Generic)
+
+data CodeInfo = CodeInfo
+  { codeInfoCode   :: Text.Text
+  , codeInfoSource :: Text.Text
+  , codeInfoName   :: Text.Text
+  } deriving (Show, Read, Eq, Generic)
+
+instance FromJSON CodeInfo where
+  parseJSON (Object o) =
+    CodeInfo
+    <$> o .: "code"
+    <*> o .: "src"
+    <*> o .: "name"
+  parseJSON _ = error "parseJSON CodeInfo: expected Object"
+
+instance ToJSON CodeInfo where
+  toEncoding (CodeInfo bs s1 s2) =
+    pairs (
+      "code" Aeson..= bs <>
+      "src"  Aeson..= s1 <>
+      "name" Aeson..= s2
+    )
+
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
+        & description ?~ "Code Info" )
+
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer Keccak256
+                 | ContractWithStorage Address Integer Keccak256 (Map.Map Word256 Word256)
+   deriving (Show, Eq, Generic)
+
+instance ToJSON AccountInfo where
+  toJSON (NonContract a b) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    ]
+  toJSON (ContractNoStorage a b c) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    , "codeHash" Aeson..= c
+    ]
+  toJSON (ContractWithStorage a b c s) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    , "codeHash" Aeson..= c
+    , "storage" Aeson..= (map (\(w1,w2) -> (Hex w1, Hex w2)) $ Map.toList s)
+    ]
+
+instance FromJSON AccountInfo where
+  parseJSON (Object o) = do
+    a <- (o .: "address")
+    b <- (o .: "balance")
+    mc <- (o .:? "codeHash")
+    case mc of
+      Nothing -> return $ NonContract a b
+      Just c -> do
+        ms <- (o .:? "storage")
+        case ms of
+          Nothing -> return $ ContractNoStorage a b c
+          Just s' -> do
+            let s = Map.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
+            return $ ContractWithStorage a b c s
+  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
+
+instance ToSchema AccountInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "AccountInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer)) 
+        & description ?~ "Account Info" )

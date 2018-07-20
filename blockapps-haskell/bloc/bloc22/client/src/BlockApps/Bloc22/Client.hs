@@ -5,6 +5,7 @@
 module BlockApps.Bloc22.Client
   ( getGitInfo
   , getAddresses
+  , postChain
   , getContracts
   , getContractsData
   , getContractsContract
@@ -39,6 +40,7 @@ import           Data.Text                        (Text)
 import           Servant.Client
 
 import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
@@ -170,3 +172,6 @@ getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
 
 postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
+
+postChain :: ChainInput -> ClientM ChainId
+postChain = client (Proxy @ PostChain)

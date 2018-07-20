@@ -89,7 +89,7 @@ ethereumVM = void . execContextM $ do
             let number = blockDataNumber . obBlockData $ b
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
-            putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
+            writeBlockSummary b
         addBlocks blocks
 
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -142,7 +142,7 @@ getFirstBlockFromSequencer = do
 initializeCheckpointAndBlockSummary :: ContextM ()
 initializeCheckpointAndBlockSummary = do
     block <- getFirstBlockFromSequencer
-    initBlockSummary block
+    writeBlockSummary  block
     let sha    = outputBlockHash block
         header = obBlockData block
         txs    = obReceiptTransactions block
@@ -154,8 +154,8 @@ initializeCheckpointAndBlockSummary = do
     setCheckpoint 1 (EVMCheckpoint sha header txHs cbbi)
 
 
-initBlockSummary :: OutputBlock -> ContextM ()
-initBlockSummary block =
+writeBlockSummary :: OutputBlock -> ContextM ()
+writeBlockSummary block =
     let sha    = outputBlockHash block
         header = obBlockData block
         td     = obTotalDifficulty block

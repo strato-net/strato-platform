@@ -45,7 +45,7 @@ blockHeaderToBSum b totalDiff txCount =
 
 instance RLPSerializable BlockSummary where
   rlpEncode (BlockSummary p d td sr gl ts n txcnt) =
-    RLPArray $ [
+    RLPArray [
       rlpEncode p,
       rlpEncode d,
       rlpEncode td,

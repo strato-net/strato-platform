@@ -132,6 +132,7 @@ test-suite strato-genesis-test
                  , merkle-patricia-db
                  , scientific
                  , strato-model
+                 , strato-genesis
                  , text
                  , time
                  , vector

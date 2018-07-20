@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -14,8 +13,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Strato.Types
-  ( Hex (..)
-  , Strung (..)
+  ( Strung (..)
   , Address (..)
   , addressString
   , stringAddress
@@ -38,8 +36,6 @@ module BlockApps.Strato.Types
   , Storage (..)
   , AbiBin (..)
   , exampleTxResult
-  , CodeInfo (..)
-  , AccountInfo (..)
   , ChainInfo (..)
   , ChainIdChainInfo
   ) where
@@ -49,7 +45,6 @@ import           Control.Lens                 (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
-import qualified Data.Aeson.TH                as AT
 import qualified Data.Binary                  as Binary
 import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
@@ -76,42 +71,17 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
-import           Text.Read.Lex
-import           BlockApps.Ethereum           (Address (..), ChainId (..),
+import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
-                                               keccak256lazy, stringAddress)
+                                               keccak256lazy, stringAddress,
+                                               AccountInfo(..), CodeInfo(..))
 import           BlockApps.Strato.TypeLits
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
-
-instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex n ""
-
-instance (Eq n, Num n) => Read (Hex n) where
-  readPrec = Hex <$> readP_to_Prec (const readHexP)
-  --I'm not sure what `d` precision parameter is used for
-
-instance Num n => FromJSON (Hex n) where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe ("0x" ++ string)) of
-      Nothing -> fail $ "not hex encoded: " ++ string
-      Just n  -> return $ Hex n
-
-instance (Integral n, Show n) => ToJSON (Hex n) where
-  toJSON = toJSON . show
-
-instance (Integral n, Show n) => ToHttpApiData (Hex n) where
-  toUrlPiece = Text.pack . show
-
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece 
-
-instance Arbitrary x => Arbitrary (Hex x) where
-  arbitrary = genericArbitrary uniform
 
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
@@ -557,42 +527,6 @@ instance ToJSON BatchTransactionResult where
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
 
-data CodeInfo = CodeInfo String String String
-  deriving (Show, Read, Eq, Generic)
-
-instance FromJSON CodeInfo where
-  parseJSON (Object o) =
-    CodeInfo
-    <$> o .: "code"
-    <*> o .: "src"
-    <*> o .: "name"
-  parseJSON _ = error "parseJSON CodeInfo: expected Object"
-
-instance ToJSON CodeInfo where
-  toEncoding (CodeInfo bs s1 s2) =
-    pairs (
-      "code" .= bs <>
-      "src"  .= s1 <>
-      "name" .= s2
-    )
-
-instance ToSchema CodeInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "CodeInfo"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
-
-data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer Keccak256
-                 | ContractWithStorage Address Integer Keccak256 [(Hex Word256, Hex Word256)]
-   deriving (Show, Eq, Generic)
-
-$(AT.deriveJSON defaultOptions{AT.sumEncoding = AT.UntaggedValue} ''AccountInfo)
-
-instance ToSchema AccountInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "AccountInfo"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
-
 type AccountBalance = NamedTuple "address" Address "balance" Integer
 instance KnownSymbol "address" where
 instance KnownSymbol "balance" where
@@ -609,22 +543,20 @@ exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9
                                        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
 
 data ChainInfo = ChainInfo
-  {  chainLabel      :: Text
-  ,  addRule         :: Text
-  ,  removeRule      :: Text
-  ,  members         :: [Text]
-  ,  ciAccountBalance :: [AccountBalance]
-  }
-  deriving (Eq, Show, Generic)
+  {  chainLabel         :: Text
+  ,  accountInfo   :: [AccountInfo]
+  ,  codeInfo      :: [CodeInfo]
+  ,  members       :: [(Address, Text)]
+  } deriving (Eq, Show, Generic)
 
 exampleChainInfo :: ChainInfo
 exampleChainInfo = ChainInfo
   {
      chainLabel = "myChain"
-  ,  addRule = "majorityRules"
-  ,  removeRule = "majorityRules"
-  ,  members = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303", "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"]
-  ,  ciAccountBalance = exampleAccountBalances
+  ,  accountInfo = []
+  ,  codeInfo = []
+  ,  members = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303")
+               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")]
   }
 
 instance ToSchema ChainInfo where
@@ -635,21 +567,19 @@ instance ToSchema ChainInfo where
 instance FromJSON ChainInfo where
   parseJSON (Object o) =
     ChainInfo <$>
-    o .: "label" <*>
-    o .: "addRule" <*>
-    o .: "removeRule" <*>
-    o .: "members" <*>
-    o .: "balances"
+    o .: "chainLabel" <*>
+    o .: "accountInfo" <*>
+    o .: "codeInfo" <*>
+    o .: "members"
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON x =
     object [
-       "label" .= chainLabel x
-    ,  "addRule" .= addRule x
-    ,  "removeRule" .= removeRule x
+       "chainLabel" .= chainLabel x
+    ,  "accountInfo" .= accountInfo x
+    ,  "codeInfo" .= codeInfo x
     ,  "members" .= members x
-    ,  "balances" .= ciAccountBalance x
     ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo

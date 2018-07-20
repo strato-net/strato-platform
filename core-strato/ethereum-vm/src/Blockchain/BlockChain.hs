@@ -207,7 +207,7 @@ addBlocks blocks' = do
     Unspecified -> return () -- TODO: bootstrap private chains
     ContextBestBlockInfo (_, oldHeader, _, _, _) -> do
       let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
-      lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
+      $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
@@ -217,8 +217,8 @@ addBlocks blocks' = do
             cache <- Bagger.miningCache <$> Bagger.getBaggerState
             let currentBaggerSR = Bagger.lastRewardedStateRoot cache
                 blockSR = blockDataStateRoot $ obBlockData block
-            lift $ $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
-            lift $ $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
             if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
               then do
                 putBlockHeaderInChainDB (blockHeader block)
@@ -226,8 +226,10 @@ addBlocks blocks' = do
                 let lastRun = Bagger.lastExecutedTxs cache
                     updates = if (flags_miner == Mining.Instant)
                                 then lastRun
-                                else [trr | trr <- lastRun, otx <- obReceiptTransactions block, otx == trrTransaction trr]
-                lift $ $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
+                                else [trr | trr <- lastRun,
+                                            otx <- obReceiptTransactions block,
+                                            (otHash otx) == (otHash $ trrTransaction trr)]
+                $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
                 addBlockTransactions False block
                 Bagger.updateTxCallback
                   updates
@@ -262,7 +264,7 @@ setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot b@OutputBlock{..} = do
     bSum <- BSDB.getBSum (blockDataParentHash obBlockData)
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
-    lift $ $logInfoS "setParentStateRoot" . T.pack $ "Inserting block #" ++ show (blockDataNumber obBlockData) ++ " (" ++ format (outputBlockHash b) ++ ")."
+    $logInfoS "setParentStateRoot" . T.pack $ "Inserting block #" ++ show (blockDataNumber obBlockData) ++ " (" ++ format (outputBlockHash b) ++ ")."
     setStateDBStateRoot (bSumStateRoot bSum)
     return bSum
 
@@ -365,7 +367,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     let isHomestead   = blockIsHomestead $ blockDataNumber b
         intrinsicGas' = intrinsicGas isHomestead t
 
-    when flags_debug . lift $ do
+    when flags_debug $ do
         $logDebugS "addTx" . T.pack $ "bytes cost: " ++ show (gTXDATAZERO * fromIntegral (zeroBytesLength t) + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - fromIntegral (zeroBytesLength t)))
         $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
         $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
@@ -387,7 +389,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                       lift $ incrementNonce tAddr
                       return (transactionTo bt)
     success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
-    when flags_debug . lift $ $logDebugS "addTx" "running code"
+    when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then ctr_vm_tx_creation else ctr_vm_tx_call
     lift $ tick txTypeCounter
     if success
@@ -398,7 +400,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             lift $ tick ctr_vm_txs_processed
             case result of
                 Left e -> do
-                    when flags_debug . lift . $logDebugS "addTx" . T.pack . CL.red $ show e
+                    when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ tick ctr_vm_txs_unsuccessful
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erRemainingTxGas     = if e == RevertException
@@ -416,7 +418,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + vmGasRemaining newVMState') * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
 
-                    when flags_debug . lift . $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
+                    when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
                     forM_ (S.toList $ suicideList newVMState') $ \address' -> do
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
@@ -433,7 +435,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
-            lift . $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
+            $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return ExecResults { erRemainingBlockGas=remainingBlockGas
                                , erRemainingTxGas=transactionGasLimit bt
                                , erReturnVal=Nothing

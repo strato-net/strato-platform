@@ -200,7 +200,7 @@ spec = do
       struct' `shouldBe` struct
 
   describe "Declarations - solidityContract" $ do
-    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
     let nameOf (NamedXabi n _) = n
         nameOf _ = error "unexpected pragma"
     it "should parse an empty contract" $ do
@@ -298,6 +298,26 @@ spec = do
       let funcString = "constructor(){}"
           eRes = runParser functionDeclaration "Contract" "" funcString
       (fst <$> eRes) `shouldBe` Right "Contract"
+
+  describe "Declarations - events" $ do
+    it "should parse an event" $ do
+      let eventString = "event MemberAdded (address member);"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+    it "should parse an anonymous event" $ do
+      let eventString = "event MemberAdded (address member) anonymous;"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+      (snd <$> eRes) `shouldBe` Right (EventDeclaration (Event True [("member", (IndexedType 0 Address))]))
+    it "should parse an event with multiple fields" $ do
+      let eventString = "event MemberAdded (address indexed member, uint indexed count, string name);"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+      (snd <$> eRes) `shouldBe` Right (EventDeclaration (Event False
+                                                               [("member", (IndexedType 0 Address))
+                                                               ,("count", (IndexedType 1 (Int (Just False) Nothing)))
+                                                               ,("name", (IndexedType 2 (String (Just True))))
+                                                               ]))
 
   describe "Declarations - variableDeclaration" $ do
     let parseVarName = fmap fst . runParser variableDeclaration "" ""

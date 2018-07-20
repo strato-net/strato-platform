@@ -7,12 +7,13 @@ module Blockchain.GenesisBlock (
   BackupType(..)
 ) where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.JsonStream.Parser               as JS
 
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.BlockDB
@@ -53,9 +54,27 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
+
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
+
+readSupplementaryAccounts :: String -> IO [AccountInfo]
+readSupplementaryAccounts genesisBlockName = do
+  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
+  let parseAccounts :: String -> [AccountInfo]
+      parseAccounts line = case words line of
+                              [] -> []
+                              "s":_ -> []
+                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                              _ -> error $ "invalid AccountInfo line: " ++ line
+  return . concatMap parseAccounts . lines $ accountInfoString
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
@@ -63,8 +82,12 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let theJSON = either error id (eitherDecode theJSONString)
-    genesisInfoToGenesisBlock theJSON
+    let genesis = JS.parseLazyByteString genesisParser theJSONString
+        theJSON = case genesis of
+                      [x] -> x
+                      _ -> error $ "invalid genesis: " ++ show genesis
+    extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+    genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
@@ -173,4 +196,4 @@ bootstrapSequencer gb = do
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
                                             }
-    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) printLogMsg
+    runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg
