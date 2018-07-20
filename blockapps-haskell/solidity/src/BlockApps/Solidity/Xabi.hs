@@ -36,6 +36,7 @@ data Xabi = Xabi
   , xabiVars      :: Map Text Xabi.VarType
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
+  , xabiEvents    :: Map Text Event
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -49,6 +50,7 @@ instance FromJSON Xabi where
          <*> v .:? "vars" .!= Map.empty
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
+         <*> v .:? "events" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -80,6 +82,7 @@ instance ToSchema Xabi where
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+        , xabiEvents = Map.empty
         }
 --------------------------------------------------------------------------------
 
@@ -231,8 +234,39 @@ instance ToSchema Modifier where
         , modifierContents = Nothing
         }
 
-newtype Event = Event { eventLogs :: Map Text Xabi.IndexedType }
+data Event = Event { eventAnonymous :: Bool
+                   , eventLogs :: [(Text, Xabi.IndexedType)]
+                   }
               deriving (Eq,Show,Generic)
+
+instance ToJSON Event where
+  toJSON e = object [
+      "anonymous" .= eventAnonymous e
+    , "logs" .= eventLogs e
+    ]
+
+instance FromJSON Event where
+  parseJSON (Object o) = Event
+                     <$> (o .: "anonymous")
+                     <*> (o .: "logs")
+  parseJSON o = error $ "parseJSON Xabi.Event: Expected Object, got: " ++ show o
+
+instance Arbitrary Event where arbitrary = genericArbitrary uniform
+
+instance ToSchema Event where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Event schema"
+    & mapped.schema.description ?~ "Xabi Event"
+    & mapped.schema.example ?~ toJSON sampleEvent
+    where
+      sampleEvent :: Event
+      sampleEvent = Event
+        { eventAnonymous = True
+        , eventLogs =
+          [ ("_from", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Address})
+          , ("_to", Xabi.IndexedType {indexedTypeIndex = 1, indexedTypeType = Xabi.Address})
+          ]
+        }
 
 data Using = Using {} deriving (Eq,Show,Generic)
 
@@ -308,6 +342,7 @@ instance ToSchema ContractDetails where
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+        , xabiEvents = Map.empty
         }
 
 --------------------------------------------------------------------------------

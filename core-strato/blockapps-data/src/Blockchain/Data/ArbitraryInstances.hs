@@ -114,18 +114,19 @@ instance Arbitrary Transaction where
         value     <- unboxPI <$> arbitrary
         prvKey    <- unboxPK <$> arbitrary
         isMessage <- arbitrary :: Gen Bool
+        chainId   <- arbitrary
         case isMessage of
             True  -> do
                 to     <- arbitrary
                 txData <- arbitrary
                 return . unsafePerformIO .
                     H.withSource H.devURandom $
-                        createMessageTX nonce gasPrice gasLimit to value txData prvKey
+                        createChainMessageTX nonce gasPrice gasLimit to value txData chainId prvKey
             False -> do
                 contractCode <- arbitrary
                 return . unsafePerformIO .
                     H.withSource H.devURandom $
-                        createContractCreationTX nonce gasPrice gasLimit value contractCode prvKey
+                        createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId prvKey
 
 instance Arbitrary Code where
     -- PrecompiledCode can't be serialized!

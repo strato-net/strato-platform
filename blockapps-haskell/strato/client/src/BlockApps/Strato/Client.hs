@@ -24,6 +24,8 @@ module BlockApps.Strato.Client
   , getTotalTx
   , getStorage
   , postFaucet
+  , postChain
+  , getChain
   ) where
 
 import           Data.Proxy
@@ -50,12 +52,13 @@ data TxsFilterParams = TxsFilterParams
   , qtMinGasLimit :: Maybe Natural
   , qtBlockNumber :: Maybe Natural
   , qtHash        :: Maybe Keccak256
+  , qtChainId     :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data BlocksFilterParams = BlocksFilterParams
   { qbNumber     :: Maybe Natural
@@ -74,12 +77,14 @@ data BlocksFilterParams = BlocksFilterParams
   , qbAddress    :: Maybe Address
   , qbCoinbase   :: Maybe Address
   , qbHash       :: Maybe Keccak256
+  , qbChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams = BlocksFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing
 
 data AccountsFilterParams = AccountsFilterParams
   { qaAddress    :: Maybe Address
@@ -89,11 +94,12 @@ data AccountsFilterParams = AccountsFilterParams
   , qaNonce      :: Maybe Natural
   , qaMinNonce   :: Maybe Natural
   , qaMaxNonce   :: Maybe Natural
+  , qaChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data StorageFilterParams = StorageFilterParams
   { qsAddress  :: Maybe Address
@@ -103,25 +109,28 @@ data StorageFilterParams = StorageFilterParams
   , qsValue    :: Maybe Natural
   , qsMinValue :: Maybe Natural
   , qsMaxValue :: Maybe Natural
+  , qsChainId  :: Maybe ChainId
   }
 
 storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
-getTxsLast :: Natural -> ClientM [WithNext Transaction]
+getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256
 postTxList :: [PostTransaction] -> ClientM [Keccak256]
-getTxResult :: Keccak256 -> ClientM [TransactionResult]
-postTxResultBatch :: [Keccak256] -> ClientM BatchTransactionResult
+getTxResult :: Keccak256 -> Maybe ChainId -> ClientM [TransactionResult]
+postTxResultBatch :: Maybe ChainId -> [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
-getBlocksLast :: Natural -> ClientM [WithNext Block]
+getBlocksLast :: Natural -> Maybe ChainId -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
+postChain :: ChainInfo -> ClientM ChainId
+getChain :: [ChainId] -> ClientM [ChainIdChainInfo]
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
@@ -134,7 +143,9 @@ getTxsFilter
   :<|> getDifficulty
   :<|> getTotalTx
   :<|> getStorage
-  :<|> postFaucet =
+  :<|> postFaucet
+  :<|> postChain
+  :<|> getChain =
     uncurryTxsFilterParams getTxsFilter'
     :<|> getTxsLast'
     :<|> postTx'
@@ -148,6 +159,8 @@ getTxsFilter
     :<|> getTotalTx'
     :<|> uncurryStorageFilterParams getStorage'
     :<|> postFaucet'
+    :<|> postChain'
+    :<|> getChain'
   where
     getTxsFilter'
       :<|> getTxsLast'
@@ -161,19 +174,21 @@ getTxsFilter
       :<|> getDifficulty'
       :<|> getTotalTx'
       :<|> getStorage'
-      :<|> postFaucet' =
+      :<|> postFaucet'
+      :<|> postChain' 
+      :<|> getChain' =
         client (Proxy @ API)
     uncurryTxsFilterParams f TxsFilterParams{..} = f
       qtFrom qtTo qtAddress qtValue qtMaxValue qtMinValue qtGasPrice
       qtMaxGasPrice qtMinGasPrice qtGasLimit qtMaxGasLimit qtMinGasLimit
-      qtBlockNumber qtHash
+      qtBlockNumber qtHash qtChainId
     uncurryBlocksFilterParams f BlocksFilterParams{..} = f
       qbNumber qbMinNumber qbMaxNumber qbGasLim qbMinGasLim
       qbMaxGasLim qbGasUsed qbMinGasUsed qbMaxGasUsed qbDiff qbMinDiff
-      qbMaxDiff qbTxAddress qbAddress qbCoinbase qbHash
+      qbMaxDiff qbTxAddress qbAddress qbCoinbase qbHash qbChainId
     uncurryAccountsFilterParams f AccountsFilterParams{..} = f
       qaAddress qaBalance qaMinBalance qaMaxBalance
-      qaNonce qaMinNonce qaMaxNonce
+      qaNonce qaMinNonce qaMaxNonce qaChainId
     uncurryStorageFilterParams f StorageFilterParams{..} = f
       qsAddress qsKey qsMinKey qsMaxKey
-      qsValue qsMinValue qsMaxValue
+      qsValue qsMinValue qsMaxValue qsChainId
