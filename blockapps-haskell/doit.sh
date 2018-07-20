@@ -9,10 +9,9 @@ kafkaPort=9092
 kafkaHost="kafka"
 
 isPublic=false
-if [ "${SMD_MODE}" == public ]; then
-  isPublic=true
-fi
-
+ if [ "${SMD_MODE}" == public ]; then
+   isPublic=true
+ fi
 
 echo "Environment variables:
 slipstream:
@@ -25,10 +24,8 @@ slipstream:
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
 --cirrusurl=\$cirrusHost="${cirrusHost}"
-
 strato-server:
 no vars/flags set
-
 bloc:
 stratoHost="${stratoHost}"
 --cirrusurl=\$cirrusHost="${cirrusHost}"
@@ -65,7 +62,7 @@ mkdir logs
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
-until nc -z $kafkaHost $KafkaPort >&/dev/null
+until nc -z $kafkaHost $kafkaPort >&/dev/null
 do  echo "Waiting for Kafka to become available"
     sleep 1
 done

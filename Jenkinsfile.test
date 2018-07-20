@@ -61,14 +61,14 @@ pipeline {
     stage('Test') {
       steps {
         parallel (
-//          'Apex tests': {
-//            sh '''#!/bin/bash -le
-//              set -x
-//              echo "Running apex unit tests"
-//              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-//              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
-//            '''
-//          },
+          'Apex tests': {
+            sh '''#!/bin/bash -le
+              set -x
+              echo "Running apex unit tests"
+              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
+              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
+            '''
+          },
 
           'E2E-Test': {
             sh '''#!/bin/bash -le
