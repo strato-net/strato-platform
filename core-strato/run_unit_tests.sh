@@ -9,6 +9,7 @@ TESTS=(
   ethereum-vm
   merkle-patricia-db
   statsdi
+  strato-genesis
   strato-init
   strato-p2p
   strato-redis-blockdb
