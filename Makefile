@@ -28,9 +28,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: bloc strato apex docs cirrus dappstore nginx postgrest smd
+build_all: bloc strato apex docs cirrus dappstore nginx postgrest smd oauth
 
-.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd
+.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd oauth
 
 apex:
 	@echo Now building apex...
@@ -67,6 +67,10 @@ smd:
 strato:
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
+
+oauth:
+	@echo Now building oauth...
+	BASIL_DOCKER_TAG=${REPO_URL}oauth:${VERSION} make --directory=oauth/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
