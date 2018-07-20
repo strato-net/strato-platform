@@ -27,10 +27,10 @@ import qualified Network.Haskoin.Crypto             as H
 -- via https://gist.github.com/agrafix/2b48ec069693e3ab851e
 instance Arbitrary UTCTime where
     arbitrary =
-        do randomDay <- choose (1, 29) :: Gen Int
+        do randomDay <- choose (1, 28) :: Gen Int
            randomMonth <- choose (1, 12) :: Gen Int
-           randomYear <- choose (2001, 2002) :: Gen Integer
-           randomTime <- choose (0, 86401) :: Gen Int
+           randomYear <- choose (1970, 2018) :: Gen Integer
+           randomTime <- choose (0, 86399) :: Gen Int
            return $ UTCTime (fromGregorian randomYear randomMonth randomDay) (fromIntegral randomTime)
 
 instance Arbitrary Microtime where
