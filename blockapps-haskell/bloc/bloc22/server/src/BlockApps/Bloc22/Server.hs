@@ -17,6 +17,7 @@ import           Servant.Swagger
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Addresses
+import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Search
 import           BlockApps.Bloc22.Server.Users
@@ -51,6 +52,7 @@ bloc = (return gitInfo)
   :<|> getSearchContract
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
+  :<|> postChain
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
