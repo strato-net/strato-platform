@@ -37,24 +37,34 @@ getChainInfo chainId = do
           members <- E.select . E.from $ \mRef -> do
             E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
             return mRef
-          accts <- E.select . E.from $ \abRef -> do
-            E.where_ (abRef E.^. ChainAccountBalanceRefChainInfoId E.==. E.val chainInfoRefId)
-            return abRef
-          -- aInfos <- E.select . E.from $ \aiRef -> do
-          --   E.where_ (abRef E.^. AccountInfoRefChainId E.==. E.val chainInfoRefId)
-          -- cInfos <- E.select . E.from $ \ciRef -> do
-          --   E.where_ (abRef E.^. CodeInfoRefChainId E.==. E.val chainInfoRefId)
+          --accts <- E.select . E.from $ \abRef -> do
+            --E.where_ (abRef E.^. ChainAccountBalanceRefChainInfoId E.==. E.val chainInfoRefId)
+            --return abRef
+          aInfos <- E.select . E.from $ \aiRef -> do
+            E.where_ (aiRef E.^. AccountInfoRefChainInfoId E.==. E.val chainInfoRefId)
+          cInfos <- E.select . E.from $ \ciRef -> do
+            E.where_ (ciRef E.^. CodeInfoRefChainInfoId E.==. E.val chainInfoRefId)
           return . Just . fromTuple $ (chainId,
                                        ChainInfo
                                          chainInfoRefChainLabel
-                                         chainInfoRefAddRule
-                                         chainInfoRefRemoveRule
-                                         (map name members)
-                                         (map anb accts))
+                                         (map ai aInfos)
+                                         (map ci acInfos)
+                                         (map name members) )
           where name = readEnode . chainMemberRefName . entityVal
-                anb  = (address &&& balance) . entityVal
-                address = chainAccountBalanceRefAddress
-                balance = chainAccountBalanceRefBalance
+                ai 
+                  | (AccountInfoRefCodeHash . entityVal) == Nothing 
+                    = \_ -> NonContract (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
+                  | (AccountInfoRefMap . entityVal) == Nothing
+                    = ContractNoStorage (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
+                        (AccountInfoRefCodeHash . entityVal)
+                  | Otherwise 
+                    = ContractWithStorage (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
+                        (AccountInfoRefCodeHash . entityVal) (AccountInfoRefMap . entityVal)
+                ci = CodeInfo (CodeInfoRefEvmByteCode . entityVal) (CodeInfoRefContractCode . entityVal) 
+                       (CodeInfoRefContractName . entityVal)
+--                anb  = (address &&& balance) . entityVal
+--                address = chainAccountBalanceRefAddress
+--                balance = chainAccountBalanceRefBalance
 
 getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do

@@ -192,12 +192,7 @@ ChainInfoRef
 ChainMemberRef
     chainInfoId ChainInfoRefId
     name String
-    deriving Eq Generic Read Show
-
-ChainAccountBalanceRef
-    chainInfoId ChainInfoRefId
     address Address
-    balance Integer
     deriving Eq Generic Read Show
 
 AccountInfoRef
