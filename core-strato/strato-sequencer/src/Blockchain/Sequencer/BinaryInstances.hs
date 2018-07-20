@@ -74,49 +74,6 @@ instance Binary DD.BlockData where
             difficulty number gasLimit gasUsed timestamp extraData
             nonce mixHash
 
-instance Binary GI.GenesisInfo where
-    put gi = sequence_ $ map ($ gi) $
-        [ put . GI.genesisInfoParentHash
-        , put . GI.genesisInfoUnclesHash
-        , put . GI.genesisInfoCoinbase
-        , put . GI.genesisInfoAccountInfo
-        , put . GI.genesisInfoCodeInfo
-        , put . GI.genesisInfoTransactionsRoot
-        , put . GI.genesisInfoReceiptsRoot
-        , put . GI.genesisInfoLogBloom
-        , put . GI.genesisInfoDifficulty
-        , put . GI.genesisInfoNumber
-        , put . GI.genesisInfoGasLimit
-        , put . GI.genesisInfoGasUsed
-        , put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds . GI.genesisInfoTimestamp
-        , put . GI.genesisInfoExtraData
-        , put . GI.genesisInfoMixHash
-        , put . GI.genesisInfoNonce
-        , put . GI.genesisInfoChainId
-        ]
-    get = do
-        parentHash       <- get
-        unclesHash       <- get
-        coinbase         <- get
-        accountInfo      <- get
-        codeInfo         <- get
-        transactionsRoot <- get
-        receiptsRoot     <- get
-        logBloom         <- get
-        difficulty       <- get
-        number           <- get
-        gasLimit         <- get
-        gasUsed          <- get
-        timestamp        <- (posixSecondsToUTCTime . fromInteger) <$> get
-        extraData        <- get
-        mixHash          <- get
-        nonce            <- get
-        chainId          <- get
-        return $ GI.GenesisInfo parentHash unclesHash coinbase
-            accountInfo codeInfo transactionsRoot receiptsRoot logBloom
-            difficulty number gasLimit gasUsed timestamp extraData
-            mixHash nonce chainId
-
 instance Binary CI.ChainInfo where
     put gi = sequence_ $ map ($ gi) $
         [ put. CI.chainLabel

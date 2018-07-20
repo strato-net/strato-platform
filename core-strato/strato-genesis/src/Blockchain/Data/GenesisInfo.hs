@@ -38,11 +38,11 @@ data CodeInfo = CodeInfo B.ByteString String String
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
 instance RLPSerializable CodeInfo where
-  rlpEncode (CodeInfo a b c) = 
+  rlpEncode (CodeInfo a b c) =
     RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
-  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
-    
+  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
+
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
@@ -78,8 +78,7 @@ data GenesisInfo =
     genesisInfoTimestamp        :: UTCTime,
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: SHA,
-    genesisInfoNonce            :: Word64,
-    genesisInfoChainId          :: Maybe Word256
+    genesisInfoNonce            :: Word64
 } deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
@@ -103,8 +102,7 @@ defaultGenesisInfo =
     genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC"  ::  UTCTime,
     genesisInfoExtraData = 0,
     genesisInfoMixHash = SHA 0,
-    genesisInfoNonce = 42,
-    genesisInfoChainId = Nothing
+    genesisInfoNonce = 42
 }
 
 instance FromJSON GenesisInfo where
@@ -125,8 +123,7 @@ instance FromJSON GenesisInfo where
     o .: "timestamp" <*>
     o .: "extraData" <*>
     o .: "mixHash" <*>
-    o .: "nonce" <*>
-    o .:? "chainId"
+    o .: "nonce"
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
@@ -146,8 +143,7 @@ instance ToJSON GenesisInfo where
       "extraData" .= genesisInfoExtraData x <>
       "mixHash" .= genesisInfoMixHash x <>
       "nonce" .= genesisInfoNonce x <>
-      "accountInfo" .= genesisInfoAccountInfo x <>
-      "chainId" .= genesisInfoChainId x
+      "accountInfo" .= genesisInfoAccountInfo x
     )
 
 genesisParser :: JS.Parser GenesisInfo
@@ -168,7 +164,6 @@ genesisParser = GenesisInfo
             <*> "extraData" JS..: JS.value
             <*> "mixHash" JS..: JS.value
             <*> "nonce" JS..: JS.value
-            <*> "chainId" JS..:? JS.value
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)

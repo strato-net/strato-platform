@@ -17,10 +17,6 @@ main = hspec spec
 
 spec :: Spec
 spec = parallel $ do
-    describe "Integer" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: Integer)
-
     describe "Transaction" $ do
         it "should be serializable and deserializable" $ property $ do
             \x -> (decode . encode) x == (x :: TX.Transaction)
@@ -29,13 +25,17 @@ spec = parallel $ do
         it "should be serializable and deserializable" $ property $ do
             \x -> (decode . encode) x == (x :: DD.BlockData)
 
+    describe "AccountInfo" $ do
+        it "should be serializable and deserializable" $ property $ do
+            \x -> (decode . encode) x == (x :: GI.AccountInfo)
+
+    describe "CodeInfo" $ do
+        it "should be serializable and deserializable" $ property $ do
+            \x -> (decode . encode) x == (x :: GI.CodeInfo)
+
     describe "ChainInfo" $ do
         it "should be serializable and deserializable" $ property $ do
             \x -> (decode . encode) x == (x :: CI.ChainInfo)
-
-    describe "GenesisInfo" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: GI.GenesisInfo)
 
     describe "IngestTx" $ do
         it "should be serializable and deserializable" $ property $ do
