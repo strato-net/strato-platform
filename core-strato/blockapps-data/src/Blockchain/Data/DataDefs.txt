@@ -198,7 +198,7 @@ ChainMemberRef
 AccountInfoRef
     chainInfoId ChainInfoRefId
     address Address
-    balance Int
+    balance Integer
     codeHash SHA Maybe
     map [MapPair] Maybe
     deriving Eq Generic Read Show

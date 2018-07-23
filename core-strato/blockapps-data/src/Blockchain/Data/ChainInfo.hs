@@ -89,10 +89,6 @@ instance Arbitrary ChainInfo where
           <*> arbitrary
           <*> arbitrary
           <*> arbitrary
-          <*> (do
-                  array <- arbitrary
-                  return $ map (\(a,b) -> (a, abs b)) array
-              )
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) =

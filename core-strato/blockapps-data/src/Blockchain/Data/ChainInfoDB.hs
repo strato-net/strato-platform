@@ -3,10 +3,15 @@
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE RecordWildCards          #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
+import           Control.Monad.Trans.Resource
+import           Data.Map                           as M
+import           Data.Maybe
+
 import qualified Database.Esqueleto                 as E
 import           Database.Persist                   hiding (get)
 import qualified Database.Persist.Postgresql        as SQL
@@ -14,13 +19,9 @@ import qualified Database.Persist.Postgresql        as SQL
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                 (Word256)
 import           Blockchain.TypeLits
-
 import           Blockchain.DB.SQLDB
-
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
-import           Control.Monad.Trans.Resource
-import           Data.Maybe
 
 getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
@@ -42,29 +43,28 @@ getChainInfo chainId = do
             --return abRef
           aInfos <- E.select . E.from $ \aiRef -> do
             E.where_ (aiRef E.^. AccountInfoRefChainInfoId E.==. E.val chainInfoRefId)
+            return aiRef
           cInfos <- E.select . E.from $ \ciRef -> do
             E.where_ (ciRef E.^. CodeInfoRefChainInfoId E.==. E.val chainInfoRefId)
+            return ciRef
           return . Just . fromTuple $ (chainId,
                                        ChainInfo
                                          chainInfoRefChainLabel
-                                         (map ai aInfos)
-                                         (map ci acInfos)
-                                         (map name members) )
-          where name = readEnode . chainMemberRefName . entityVal
-                ai 
-                  | (AccountInfoRefCodeHash . entityVal) == Nothing 
-                    = \_ -> NonContract (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
-                  | (AccountInfoRefMap . entityVal) == Nothing
-                    = ContractNoStorage (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
-                        (AccountInfoRefCodeHash . entityVal)
-                  | Otherwise 
-                    = ContractWithStorage (AccountInfoRefAddress . entityVal) (AccountInfoRefBalance . entityVal)
-                        (AccountInfoRefCodeHash . entityVal) (AccountInfoRefMap . entityVal)
-                ci = CodeInfo (CodeInfoRefEvmByteCode . entityVal) (CodeInfoRefContractCode . entityVal) 
-                       (CodeInfoRefContractName . entityVal)
---                anb  = (address &&& balance) . entityVal
---                address = chainAccountBalanceRefAddress
---                balance = chainAccountBalanceRefBalance
+                                         (Prelude.map ai aInfos)
+                                         (Prelude.map ci cInfos)
+                                         (M.fromList (Prelude.map makePairs members)))
+          where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
+                ai = \aInfo ->
+                        if (accountInfoRefCodeHash $ entityVal aInfo) == Nothing
+                          then NonContract ((accountInfoRefAddress $ entityVal aInfo)) (accountInfoRefBalance $ entityVal aInfo)
+                          else if (accountInfoRefMap $ entityVal aInfo) == Nothing
+                            then ContractNoStorage (accountInfoRefAddress $ entityVal aInfo) (accountInfoRefBalance $ entityVal aInfo)
+                                 (fromJust (accountInfoRefCodeHash $ entityVal aInfo))
+                            else ContractWithStorage (accountInfoRefAddress $ entityVal aInfo) (accountInfoRefBalance $ entityVal aInfo)
+                               (fromJust (accountInfoRefCodeHash $ entityVal aInfo)) (fromJust (accountInfoRefMap $ entityVal aInfo))
+                ci = \codeInfo ->
+                        CodeInfo (codeInfoRefEvmByteCode $ entityVal codeInfo) (codeInfoRefContractCode $ entityVal codeInfo) 
+                          (codeInfoRefContractName $ entityVal codeInfo)
 
 getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do
@@ -76,10 +76,10 @@ getChainInfos chainIds = do
                           return cRef
                       case chains of
                           [] -> return []
-                          cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
+                          cs -> return $ Prelude.map (chainInfoRefChainId . E.entityVal) cs
               cIds -> return cIds
   chainInfos <- mapM getChainInfo cids
-  let cInfos = sequence $ filter isJust chainInfos
+  let cInfos = sequence $ Prelude.filter isJust chainInfos
   case cInfos of
       Nothing -> return []
       Just cis -> return cis
@@ -88,11 +88,19 @@ putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId ChainInfo{..} = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
-    let chainInfoRef = ChainInfoRef chainId chainLabel addRule removeRule
-    chainInfoRefId <- E.insert chainInfoRef
-    insertMany_ $ map (ChainMemberRef chainInfoRefId . showEnode) members
-    insertMany_ $ map (uncurry (ChainAccountBalanceRef chainInfoRefId)) accountBalance
-    return chainInfoRefId
+    let chainInfoRef = ChainInfoRef chainId chainLabel
+    cirId <- E.insert chainInfoRef
+    insertMany_ $ Prelude.map (parseAInfo cirId) acctInfo
+    insertMany_ $ Prelude.map (parseMember cirId) (M.toList members)
+    return cirId
+      where
+        parseAInfo chid aInfo = 
+          case aInfo of
+            NonContract a i -> AccountInfoRef chid a i Nothing Nothing
+            ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
+            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
+        parseMember chi (ad, en) = 
+          ChainMemberRef chi (showEnode en) ad
 
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
