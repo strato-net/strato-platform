@@ -8,4 +8,4 @@ import           Servant
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type PostSignature = "signature" :> ReqBody [JSON] User :> Get '[JSON] User
+type PostSignature = "signature" :> ReqBody '[JSON] String :> Get '[JSON] String

@@ -5,8 +5,6 @@ module Strato.Strato23.API.API
   ( module Strato.Strato23.API.Transaction
   ) where
 
-import           Servant
-
 import           Strato.Strato23.API.Transaction
 
 type StratoAPI =
