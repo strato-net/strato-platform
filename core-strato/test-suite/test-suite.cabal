@@ -32,6 +32,7 @@ executable test-suite-exe
                  , monad-logger
                  , mtl
                  , nibblestring
+                 , strato-genesis
                  , strato-model
                  , strato-sequencer
                  , text
@@ -87,6 +88,7 @@ Test-suite vm-tests
                  , nibblestring
                  , resourcet
                  , strato-conf
+                 , strato-genesis
                  , strato-model
                  , strato-p2p
                  , strato-redis-blockdb
@@ -145,6 +147,7 @@ Test-suite test-suite
                  , nibblestring
                  , resourcet
                  , strato-conf
+                 , strato-genesis
                  , strato-model
                  , strato-p2p
                  , strato-redis-blockdb

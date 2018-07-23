@@ -50,6 +50,7 @@ library
                  , monad-control
                  , monad-logger
                  , mtl
+                 , network
                  , nibblestring
                  , persistent
                  , persistent-postgresql
@@ -61,7 +62,6 @@ library
                  , text
                  , time
                  , transformers
-
     exposed-modules:
                    Blockchain.Constants
                    Blockchain.Data.ArbitraryInstances
@@ -70,8 +70,12 @@ library
                    Blockchain.Data.Blockchain
                    Blockchain.Data.BlockDB
                    Blockchain.Data.BlockHeader
+                   Blockchain.Data.ChainId
+                   Blockchain.Data.ChainInfo
+                   Blockchain.Data.ChainInfoDB
                    Blockchain.Data.Code
                    Blockchain.Data.DataDefs
+                   Blockchain.Data.Enode
                    Blockchain.Data.Extra
                    Blockchain.Data.Json
                    Blockchain.Data.Log
@@ -86,6 +90,7 @@ library
                    Blockchain.Data.TXOrigin
                    Blockchain.DBM
                    Blockchain.DB.AddressStateDB
+                   Blockchain.DB.ChainDB
                    Blockchain.DB.CodeDB
                    Blockchain.DB.DetailsDB
                    Blockchain.DB.HashDB
@@ -127,7 +132,9 @@ test-suite blockapps-data-test
                          base16-bytestring,
                          blockapps-data,
                          bytestring,
+                         ethereum-rlp,
                          hspec,
+                         QuickCheck,
                          strato-model,
                          text,
                          time,

@@ -4,14 +4,19 @@ module Handler.TxLast where
 
 import qualified Database.Esqueleto as E
 import           Handler.Common
+import           Handler.Filters
 import           Import
 import qualified Prelude            as P
 
 getTxLastR ::  Integer -> Handler Value
 getTxLastR  num = do
+  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
   tx <- runDB $ E.select $
         E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
+          E.on $ case chainId of
+                Nothing -> (E.isNothing $ rawTX E.^. RawTransactionChainId)
+                Just c -> ((rawTX E.^. RawTransactionChainId) E.==. (E.just $ E.val c))
           E.on (b E.^. BlockId E.==. btx E.^. BlockTransactionBlockId)
           E.on (btx E.^. BlockTransactionTransaction E.==. rawTX E.^. RawTransactionId)
           E.limit $ P.max 1 $ P.min (fromIntegral num :: Int64) fetchLimit

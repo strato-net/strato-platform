@@ -10,12 +10,12 @@
     "test:upload": "mocha load/uploadString.test.js --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.js --batchCount 10 --batchSize 10"
   },
   "dependencies": {
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#private-chain",
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",
     "json-to-csv": "^1.0.0",
     "mocha": "^3.4.2",
-    "moment": "^2.18.1"
+    "moment": "^2.22.2"
   }
 }

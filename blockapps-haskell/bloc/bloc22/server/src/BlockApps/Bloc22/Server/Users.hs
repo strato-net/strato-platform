@@ -71,6 +71,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderValue    :: Wei
   , transactionheaderCode     :: ByteString
   , transactionheaderNonceInc :: Int
+  , transactionheaderChainId  :: Maybe ChainId
   }
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
@@ -134,7 +135,7 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
             "keystore could not be inserted: " <> Text.pack (show s)
 
 
-postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
+postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
@@ -145,13 +146,13 @@ postUsersFill _ addr resolve = blocTransaction $ do
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
     )]
-  getBlocTransactionResult' hash resolve
+  getBlocTransactionResult' Nothing hash resolve
 
-postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
-postUsersSend userName addr resolve
+postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
+postUsersSend userName addr chainId resolve
   (PostSendParameters toAddr value password mTxParams) = do
     sk <- getAccountSecKey userName password addr
-    txParams <- getAccountTxParams addr mTxParams
+    txParams <- getAccountTxParams addr chainId mTxParams
     tx <- prepareTx sk $
       TransactionHeader
         (Just toAddr)
@@ -160,6 +161,7 @@ postUsersSend userName addr resolve
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
         0
+        chainId
     hash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
@@ -168,13 +170,13 @@ postUsersSend userName addr resolve
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
-    getBlocTransactionResult' hash resolve
+    getBlocTransactionResult' chainId hash resolve
 
-postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
-postUsersContract userName addr resolve
+postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
+postUsersContract userName addr chainId resolve
   (PostUsersContractRequest src password maybeContract args mTxParams value) = blocTransaction $ do
     sk <- getAccountSecKey userName password addr
-    txParams <- getAccountTxParams addr mTxParams
+    txParams <- getAccountTxParams addr chainId mTxParams
     --TODO: check what happens with mismatching args
     idsAndDetails <- compileContract src
     logWith logNotice ("constructor arguments: " <> Text.pack (show args))
@@ -201,6 +203,7 @@ postUsersContract userName addr resolve
         (Wei (fromIntegral (maybe 0 unStrung value)))
         (bin <> argsBin)
         0
+        chainId
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -210,16 +213,16 @@ postUsersContract userName addr resolve
       , constant (1 :: Int32)
       , constant contractdetailsName
       )]
-    getBlocTransactionResult' hash resolve
+    getBlocTransactionResult' chainId hash resolve
 
-postUsersUploadList :: UserName -> Address -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
-postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resolve) = do
+postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
+postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts _resolve) = do
   sk <- getAccountSecKey userName pw addr
   if (null contracts)
     then return []
     else do
       let UploadListContract _ _ mtp _ = head contracts
-      txParams <- getAccountTxParams addr mtp
+      txParams <- getAccountTxParams addr chainId mtp
       (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           (names, cmIds, fIds) <- get
@@ -253,6 +256,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 (bin <> argsBin)
                 nonceIncr
+                chainId
           put (names', cmIds', fIds')
           return ((name,cmId),tx)
       let
@@ -267,16 +271,16 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
         )
         | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
         ]
-      getBatchBlocTransactionResult' hashes (resolve || _resolve)
+      getBatchBlocTransactionResult' chainId hashes (resolve || _resolve)
 
-postUsersSendList :: UserName -> Address -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
-postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = do
+postUsersSendList :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
+postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve' txs) = do
   sk <- getAccountSecKey userName pw addr
   if (null txs)
     then return []
     else do
       let SendTransaction _ _ mtp = head txs
-      txParams <- getAccountTxParams addr mtp
+      txParams <- getAccountTxParams addr chainId mtp
       txHeaders <- zipWithM
         (\(SendTransaction toAddr (Strung value) _) i -> do
             return $ TransactionHeader
@@ -286,6 +290,7 @@ postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = 
               (Wei $ fromIntegral value)
               (ByteString.empty)
               i
+              chainId
         ) txs [0..]
       txs' <- mapM (prepareTx sk) txHeaders
       hashes <- blocStrato $ postTxList txs'
@@ -298,7 +303,7 @@ postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = 
         )
         | (tx,hash) <- zip txs' hashes
         ]
-      getBatchBlocTransactionResult' hashes (resolve || resolve')
+      getBatchBlocTransactionResult' chainId hashes (resolve || resolve')
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -315,16 +320,17 @@ ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
 postUsersContractMethodList
   :: UserName
   -> Address
+  -> Maybe ChainId
   -> Bool
   -> PostMethodListRequest
   -> Bloc [BlocTransactionResult]
-postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} = do
+postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequest{..} = do
   sk <- getAccountSecKey userName postmethodlistrequestPassword userAddr
   if (null postmethodlistrequestTxs)
     then return []
     else do
       let mc = head postmethodlistrequestTxs
-      txParams <- getAccountTxParams userAddr $ methodcallTxParams mc
+      txParams <- getAccountTxParams userAddr chainId $ methodcallTxParams mc
       (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip postmethodlistrequestTxs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
           (names, cmIds, fIds) <- get
@@ -362,6 +368,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
               nonceIncr
+              chainId
           put (names', cmIds', fIds')
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -377,13 +384,14 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
         )
         | (hash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
         ]
-      getBatchBlocTransactionResult' hashes (resolve || postmethodlistrequestResolve)
+      getBatchBlocTransactionResult' chainId hashes (resolve || postmethodlistrequestResolve)
 
 postUsersContractMethod
   :: UserName
   -> Address
   -> ContractName
   -> Address
+  -> Maybe ChainId
   -> Bool
   -> PostUsersContractMethodRequest
   -> Bloc BlocTransactionResult
@@ -392,10 +400,11 @@ postUsersContractMethod
   userAddr
   (ContractName contractName)
   contractAddr
+  chainId
   resolve
   (PostUsersContractMethodRequest password funcName args value mTxParams) = do
     sk <- getAccountSecKey userName password userAddr
-    txParams <- getAccountTxParams userAddr mTxParams
+    txParams <- getAccountTxParams userAddr chainId mTxParams
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
 
     contract' <- getContractContractByMetadataId cmId
@@ -416,6 +425,7 @@ postUsersContractMethod
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         ((sel::ByteString) <> (argsBin::ByteString))
         0
+        chainId
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -425,7 +435,7 @@ postUsersContractMethod
       , constant (2 :: Int32)
       , constant funcName
       )]
-    getBlocTransactionResult' hash resolve
+    getBlocTransactionResult' chainId hash resolve
 
 data TRD = TRD -- transaction resolution data
        { trdStatus :: BlocTransactionStatus
@@ -453,26 +463,26 @@ data BatchState = BatchState
 emptyBatchState :: BatchState
 emptyBatchState = BatchState [] Map.empty Map.empty Map.empty Map.empty
 
-getBlocTransactionResult' :: Keccak256 -> Bool -> Bloc BlocTransactionResult
-getBlocTransactionResult' hash resolve =
+getBlocTransactionResult' :: Maybe ChainId -> Keccak256 -> Bool -> Bloc BlocTransactionResult
+getBlocTransactionResult' chainId hash resolve =
   if resolve
-    then (getBlocTransactionResult hash True)
+    then (getBlocTransactionResult hash chainId True)
     else return (BlocTransactionResult Pending hash Nothing Nothing)
 
-getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
-getBlocTransactionResult hash resolve = fmap head $ postBlocTransactionResults resolve [hash]
+getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> Bloc BlocTransactionResult
+getBlocTransactionResult hash chainId resolve = fmap head $ postBlocTransactionResults chainId resolve [hash]
 
-getBatchBlocTransactionResult' :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
-getBatchBlocTransactionResult' hashes resolve = do
+getBatchBlocTransactionResult' :: Maybe ChainId -> [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
+getBatchBlocTransactionResult' chainId hashes resolve = do
   if resolve
-    then (postBlocTransactionResults True hashes)
+    then (postBlocTransactionResults chainId True hashes)
     else do
       forM hashes $ \h -> return (BlocTransactionResult Pending h Nothing Nothing)
 
-postBlocTransactionResults :: Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
-postBlocTransactionResults resolve hashes = do
+postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
+postBlocTransactionResults chainId resolve hashes = do
   let resolutions' = zipWith (\h i -> TRD Pending h i Nothing) hashes [0..]
-  resolutions <- recurse (0 :: Int) resolve resolutions' -- recursively batch resolve transactions
+  resolutions <- recurseTRDs chainId (0 :: Int) resolve resolutions' -- recursively batch resolve transactions
   evalAndReturn resolutions -- evaluate transaction results
 
 merge :: [a] -> [a] -> (a -> a -> Bool) -> [a]
@@ -483,13 +493,14 @@ merge (d:ds) (p:ps) c =
     then (d : merge ds (p:ps) c)
     else (p : merge (d:ds) ps c)
 
-recurse :: Int
+recurseTRDs :: Maybe ChainId
+        -> Int
         -> Bool
         -> [TRD]
         -> Bloc [TRD]
-recurse num resolve list = do
+recurseTRDs chainId num resolve list = do
   let his = map (arr trdHash &&& arr trdIndex) list
-  statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
+  statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus chainId (map fst his)
   let (pending', done) = partitionEithers $
                   flip map statusAndMtxrs
                     (\((s,r),(h,i)) ->
@@ -505,7 +516,7 @@ recurse num resolve list = do
           logWith logNotice . Text.pack $
             "Polling BlocTransactionStatus for transaction hashes: " ++ (show $ map trdHash pending')
           void . liftIO $ threadDelay 1000000
-          recurse (num + 1) resolve pending'
+          recurseTRDs chainId (num + 1) resolve pending'
   return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
 
 evalAndReturn :: [TRD]
@@ -720,8 +731,8 @@ constructArgValues args argNamesTypes = do
         let vals = map snd (sortOn fst (toList argsVals))
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
-getAccountTxParams :: Address -> Maybe TxParams -> Bloc TxParams
-getAccountTxParams addr = \case
+getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
+getAccountTxParams addr chainId = \case
   Nothing -> getAcctNonce >>= \n -> return emptyTxParams{txparamsNonce = Just n}
   Just params@TxParams{..} ->
     case txparamsNonce of
@@ -730,7 +741,7 @@ getAccountTxParams addr = \case
   where
     getAcctNonce = do
       accts <- blocStrato $ getAccountsFilter
-        accountsFilterParams{qaAddress = Just addr}
+        accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
       case listToMaybe accts of
         Nothing   -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
@@ -775,6 +786,7 @@ prepareUnsignedTx TransactionHeader{..} =
   , unsignedTransactionTo = transactionheaderToAddr
   , unsignedTransactionValue = transactionheaderValue
   , unsignedTransactionInitOrData = transactionheaderCode
+  , unsignedTransactionChainId = transactionheaderChainId
   }
 
 prepareSignedTx
@@ -794,6 +806,7 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
   , posttransactionS = Hex $ fromIntegral s
   , posttransactionV = Hex v
   , posttransactionNonce = fromIntegral nonce'
+  , posttransactionChainId = chainId
   }
   where
     tx = signTransaction sk unsignedTx
@@ -807,3 +820,4 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
     Wei value = transactionValue tx
     code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
     toAddr = transactionTo tx
+    chainId = transactionChainId tx
