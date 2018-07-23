@@ -91,6 +91,7 @@ putChainInfo chainId ChainInfo{..} = do
     let chainInfoRef = ChainInfoRef chainId chainLabel
     cirId <- E.insert chainInfoRef
     insertMany_ $ Prelude.map (parseAInfo cirId) acctInfo
+    insertMany_ $ Prelude.map (parseCInfo cirId) codeInfo
     insertMany_ $ Prelude.map (parseMember cirId) (M.toList members)
     return cirId
       where
@@ -99,6 +100,8 @@ putChainInfo chainId ChainInfo{..} = do
             NonContract a i -> AccountInfoRef chid a i Nothing Nothing
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
+        parseCInfo ch (CodeInfo bc cc cn)  = 
+          CodeInfoRef ch bc cc cn
         parseMember chi (ad, en) = 
           ChainMemberRef chi (showEnode en) ad
 
