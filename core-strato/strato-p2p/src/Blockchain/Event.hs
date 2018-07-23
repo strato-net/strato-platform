@@ -19,6 +19,7 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
+import           Data.Map                              (toList)
 import           Data.Maybe
 --import qualified Data.Set as S
 import qualified Data.ByteString                       as BS
@@ -404,7 +405,7 @@ checkPeerIsMember peer ci =
     Just _ -> True
   where 
     pIp = readIP $ T.unpack (pPeerIp peer)
-    ipList = ipAddress <$> (members ci)
+    ipList = ipAddress <$> (snd <$> (toList $ members ci))
     match = find (==pIp) ipList
 
 makePairs :: [a] -> [b] -> [(a,b)]
