@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -23,7 +24,9 @@ module Blockchain.Data.Transaction (
   insertTXIfNew,
   insertTXIfNew',
   createMessageTX,
+  createChainMessageTX,
   createContractCreationTX,
+  createChainContractCreationTX,
   isMessageTX,
   isContractCreationTX,
   whoSignedThisTransaction,
@@ -62,6 +65,7 @@ import           Control.DeepSeq
 import           System.Clock
 
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 instance NFData Address
 instance NFData Code
@@ -71,30 +75,54 @@ instance NFData Transaction
 instance NFData RawTransaction
 
 instance TransactionLike Transaction where
-    txHash        = hash . rlpSerialize . rlpEncode
-    txPartialHash = hash . rlpSerialize . partialRLPEncode
-    txSigner      = whoSignedThisTransaction
-    txNonce       = transactionNonce
-    txSignature t = (transactionR t, transactionS t, transactionV t)
-    txValue       = transactionValue
-    txGasPrice    = transactionGasPrice
-    txGasLimit    = transactionGasLimit
+    txHash        = \case
+                       PrivateHashTX{..} -> SHA transactionTxHash
+                       t -> hash . rlpSerialize $ rlpEncode t
+    txPartialHash = \case
+                       PrivateHashTX{..} -> SHA transactionTxHash -- TODO: Should this be an error instead?
+                       t -> hash . rlpSerialize $ partialRLPEncode t
+    txSigner      = \case
+                       PrivateHashTX{} -> Just (Address 0) -- TODO: Should this be an error instead?
+                       t -> whoSignedThisTransaction t
+    txNonce       = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionNonce t
+    txSignature   = \case
+                       PrivateHashTX{..} -> (fromIntegral transactionTxHash, fromIntegral transactionChainHash, 0)
+                       t -> (transactionR t, transactionS t, transactionV t)
+    txValue       = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionValue t
+    txGasPrice    = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionGasPrice t
+    txGasLimit    = \case
+                       PrivateHashTX{} -> 0
+                       t -> transactionGasLimit t
+    txChainId     = \case
+                       PrivateHashTX{} -> Nothing
+                       t -> transactionChainId t
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation
+    txType PrivateHashTX{}      = PrivateHash
 
     txDestination MessageTX{..}        = Just transactionTo
     txDestination ContractCreationTX{} = Nothing
+    txDestination PrivateHashTX{}      = Nothing
 
     txCode MessageTX{}            = Nothing
     txCode ContractCreationTX{..} = Just transactionInit
+    txCode PrivateHashTX{}        = Nothing
 
     txData MessageTX{..}        = Just transactionData
     txData ContractCreationTX{} = Nothing
+    txData PrivateHashTX{}      = Nothing
 
     morphTx t = case type' of
-        Message          -> MessageTX n gp gl dest val dat r s v
-        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        Message          -> MessageTX n gp gl dest val dat chainId r s v
+        ContractCreation -> ContractCreationTX n gp gl val code chainId r s v
+        PrivateHash      -> PrivateHashTX (fromInteger r) (fromInteger s)
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -104,20 +132,24 @@ instance TransactionLike Transaction where
               dat       = fromJust (txData t)
               code      = fromJust (txCode t)
               (r, s, v) = txSignature t
+              chainId   = txChainId t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = MessageTX nonce' gp gl to' val dat r s v
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v _ _ _) = MessageTX nonce' gp gl to' val dat cid r s v
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' Nothing h ch 0 _ _ _) | init' == B.empty = PrivateHashTX (fromInteger h) (fromInteger ch)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') cid r s v
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat r s v) ->
-        RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) ->
+    (MessageTX nonce' gp gl to' val dat cid r s v) ->
+        RawTransaction time signer nonce' gp gl (Just to') val dat cid r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _ _) ->
         error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
-    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->
-        RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val (Code init') cid r s v) ->
+        RawTransaction time signer nonce' gp gl Nothing val init' cid r s v (fromIntegral blkNum) (txHash tx) origin
+    (PrivateHashTX h ch) ->
+        RawTransaction time signer 0 0 0 Nothing 0 B.empty Nothing (fromIntegral h) (fromIntegral ch) 0 (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -155,7 +187,19 @@ addLeadingZerosTo64::String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
 
 createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString->PrvKey->SecretT m Transaction
-createMessageTX n gp gl to' val theData prvKey = do
+createMessageTX n gp gl to' val theData prvKey = createChainMessageTX n gp gl to' val theData Nothing prvKey
+
+createChainMessageTX :: MonadIO m
+                     => Integer
+                     -> Integer
+                     -> Integer
+                     -> Address
+                     -> Integer
+                     -> B.ByteString
+                     -> Maybe Word256
+                     -> PrvKey
+                     -> SecretT m Transaction
+createChainMessageTX n gp gl to' val theData cid prvKey = do
   let unsignedTX = MessageTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
@@ -163,6 +207,7 @@ createMessageTX n gp gl to' val theData prvKey = do
                      transactionTo = to',
                      transactionValue = val,
                      transactionData = theData,
+                     transactionChainId = cid,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0
@@ -183,13 +228,25 @@ createMessageTX n gp gl to' val theData prvKey = do
     }
 
 createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code->PrvKey->SecretT m Transaction
-createContractCreationTX n gp gl val init' prvKey = do
+createContractCreationTX n gp gl val init' prvKey = createChainContractCreationTX n gp gl val init' Nothing prvKey
+
+createChainContractCreationTX :: MonadIO m
+                              => Integer
+                              -> Integer
+                              -> Integer
+                              -> Integer
+                              -> Code
+                              -> Maybe Word256
+                              -> PrvKey
+                              -> SecretT m Transaction
+createChainContractCreationTX n gp gl val init' cid prvKey = do
   let unsignedTX = ContractCreationTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
                      transactionGasLimit = gl,
                      transactionValue = val,
                      transactionInit = init',
+                     transactionChainId = cid,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0
@@ -215,7 +272,9 @@ createContractCreationTX n gp gl val init' prvKey = do
   Switch to Either?
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
+whoSignedThisTransaction tx = case tx of
+  PrivateHashTX{} -> Just (Address 0)
+  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
@@ -229,7 +288,11 @@ isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False
 
 transactionHash::Transaction->SHA
-transactionHash = hash . rlpSerialize . rlpEncode
+transactionHash = \case
+                     PrivateHashTX{..} -> SHA transactionTxHash
+                     t -> hash . rlpSerialize $ rlpEncode t
 
 partialTransactionHash::Transaction->SHA
-partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+partialTransactionHash = \case
+                            PrivateHashTX{..} -> SHA transactionTxHash -- TODO: Should this be an error instead?
+                            t -> hash . rlpSerialize $ partialRLPEncode t

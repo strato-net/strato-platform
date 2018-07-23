@@ -7,15 +7,17 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
+{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Strato.Types
-  ( Hex (..)
-  , Strung (..)
+  ( Strung (..)
   , Address (..)
   , addressString
   , stringAddress
+  , ChainId (..)
   , Keccak256 (..)
   , WithNext (..)
   , FaucetResponse(..)
@@ -34,6 +36,8 @@ module BlockApps.Strato.Types
   , Storage (..)
   , AbiBin (..)
   , exampleTxResult
+  , ChainInfo (..)
+  , ChainIdChainInfo
   ) where
 
 import           Control.Applicative
@@ -48,6 +52,7 @@ import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
+import           Data.Monoid                  ((<>))
 import           Data.Proxy
 import           Data.Swagger
 import qualified Data.Swagger                 as Sw
@@ -66,38 +71,17 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
-import           Text.Read.Lex
-import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
-                                               Nonce (..), addressString,
-                                               keccak256, keccak256lazy,
-                                               stringAddress)
+import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
+                                               Keccak256 (..), Nonce (..),
+                                               addressString, keccak256,
+                                               keccak256lazy, stringAddress,
+                                               AccountInfo(..), CodeInfo(..))
+import           BlockApps.Strato.TypeLits
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
-
-instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex n ""
-
-instance (Eq n, Num n) => Read (Hex n) where
-  readPrec = Hex <$> readP_to_Prec (const readHexP)
-  --I'm not sure what `d` precision parameter is used for
-
-instance Num n => FromJSON (Hex n) where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe ("0x" ++ string)) of
-      Nothing -> fail $ "not hex encoded: " ++ string
-      Just n  -> return $ Hex n
-
-instance (Integral n, Show n) => ToJSON (Hex n) where
-  toJSON = toJSON . show
-
-instance (Integral n, Show n) => ToHttpApiData (Hex n) where
-  toUrlPiece = Text.pack . show
-
-instance Arbitrary x => Arbitrary (Hex x) where
-  arbitrary = genericArbitrary uniform
+instance (ToHttpApiData a) => ToHttpApiData [a] where
+  toUrlPiece = Text.pack . show . map toUrlPiece 
 
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
@@ -158,6 +142,7 @@ instance ToSchema Transaction where
           , transactionV               = Hex 0x1c
           , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
           , transactionOrigin          = "API"
+          , transactionChainId         = Nothing
           }
 
 instance ToSchema TransactionType
@@ -177,6 +162,7 @@ instance ToSchema Account where
           , accountKind           = "AddressStateRef"
           , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
+          , accountChainId        = Nothing
           , accountLatestBlockNum = 23
           , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
           , accountContractName   = Just "SimpleStorage"
@@ -190,6 +176,17 @@ instance ToSchema Word160 where
 -- add min max
 
 instance ToSchema AbiBin
+
+instance ToParamSchema Word256 where
+  toParamSchema _ = mempty & type_ .~ SwaggerString
+
+instance ToHttpApiData Word256 where
+  toUrlPiece = Text.pack . ("0x" ++ ) . flip showHex ""
+
+instance FromHttpApiData Word256 where
+  parseUrlPiece text = case readMaybe (Text.unpack text) of
+    Nothing      -> Left $ "Could not decode Word256: " <> text
+    Just (Hex w256) -> Right w256
 
 instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
@@ -240,6 +237,7 @@ data Transaction = Transaction
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
   , transactionOrigin          :: Text
+  , transactionChainId         :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Transaction where
@@ -260,6 +258,7 @@ data PostTransaction = PostTransaction
   , posttransactionS          :: Hex Natural
   , posttransactionV          :: Hex Word8
   , posttransactionNonce      :: Natural
+  , posttransactionChainId    :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -284,6 +283,7 @@ instance ToSample PostTransaction where
     , posttransactionS = Hex 1 -- make valid examples
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
+    , posttransactionChainId = Nothing
     }
 
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
@@ -299,6 +299,7 @@ defaultPostTx = PostTransaction
     , posttransactionS = Hex 1 -- make valid examples
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
+    , posttransactionChainId = Nothing
     }
 
 instance ToSchema PostTransaction where
@@ -319,6 +320,7 @@ instance ToSchema PostTransaction where
         , posttransactionS = Hex 1 -- make valid examples
         , posttransactionV = Hex 0x1c
         , posttransactionNonce = 0
+        , posttransactionChainId = Nothing
         }
 
 
@@ -335,6 +337,7 @@ toPostTx Transaction{..} = PostTransaction
   , posttransactionS = transactionS
   , posttransactionV = transactionV
   , posttransactionNonce = unStrung transactionNonce
+  , posttransactionChainId = transactionChainId
   }
 
 
@@ -354,6 +357,7 @@ data BlockData = BlockData
   , blockdataNonce            :: Word64
   , blockdataStateRoot        :: Keccak256
   , blockdataTransactionsRoot :: Keccak256
+  , blockdataChainId          :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON BlockData where
@@ -383,6 +387,7 @@ data Account = Account
   , accountContractRoot   :: Keccak256
   , accountCode           :: Text
   , accountCodeHash       :: Keccak256
+  , accountChainId        :: Maybe ChainId
   , accountLatestBlockNum :: Natural
   , accountSource         :: Text
   , accountContractName   :: Maybe Text
@@ -418,6 +423,7 @@ data Storage = Storage
   { storageAddress :: Address
   , storageKey     :: Hex Word256
   , storageValue   :: Hex Word256
+  , storageChainId :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Storage where
@@ -472,6 +478,7 @@ data TransactionResult = TransactionResult
   , transactionresultTime             :: Double
   , transactionresultNewStorage       :: Text
   , transactionresultDeletedStorage   :: Text
+  , transactionresultChainId          :: Maybe ChainId
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
@@ -505,7 +512,7 @@ instance ToSchema TransactionResult where
     where ex = exampleTxResult
 
 exampleTxResult :: TransactionResult
-exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage"
+exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage" Nothing
 
 stratoSchemaOptions :: SchemaOptions
 stratoSchemaOptions = defaultSchemaOptions {Sw.fieldLabelModifier = camelCase . dropFPrefix}
@@ -519,3 +526,70 @@ instance ToJSON BatchTransactionResult where
 
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
+
+type AccountBalance = NamedTuple "address" Address "balance" Integer
+instance KnownSymbol "address" where
+instance KnownSymbol "balance" where
+
+instance ToSchema AccountBalance where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "Account balances"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex = exampleAccountBalances
+
+exampleAccountBalances :: [AccountBalance]
+exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+                                       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
+
+data ChainInfo = ChainInfo
+  {  chainLabel         :: Text
+  ,  accountInfo   :: [AccountInfo]
+  ,  codeInfo      :: [CodeInfo]
+  ,  members       :: [(Address, Text)]
+  } deriving (Eq, Show, Generic)
+
+exampleChainInfo :: ChainInfo
+exampleChainInfo = ChainInfo
+  {
+     chainLabel = "myChain"
+  ,  accountInfo = []
+  ,  codeInfo = []
+  ,  members = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303")
+               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")]
+  }
+
+instance ToSchema ChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainInfo"
+    & mapped.schema.example ?~ toJSON exampleChainInfo
+
+instance FromJSON ChainInfo where
+  parseJSON (Object o) =
+    ChainInfo <$>
+    o .: "chainLabel" <*>
+    o .: "accountInfo" <*>
+    o .: "codeInfo" <*>
+    o .: "members"
+  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
+
+instance ToJSON ChainInfo where
+  toJSON x =
+    object [
+       "chainLabel" .= chainLabel x
+    ,  "accountInfo" .= accountInfo x
+    ,  "codeInfo" .= codeInfo x
+    ,  "members" .= members x
+    ]
+
+type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
+
+instance ToSchema ChainIdChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainId and ChainInfo pair"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ChainIdChainInfo
+      ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleChainInfo)

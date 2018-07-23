@@ -7,52 +7,74 @@ module Blockchain.GenesisBlock (
   BackupType(..)
 ) where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import           Data.Aeson
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.JsonStream.Parser               as JS
 
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
+import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
-import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash))
-import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
+import           Blockchain.MilenaTools               (commitSingleOffset)
 import           Blockchain.Output                    (printLogMsg)
 import           Blockchain.Sequencer                 (bootstrap)
 import qualified Blockchain.Sequencer.Constants       as SeqConstants
 import           Blockchain.Sequencer.Event           (OutputBlock)
 import           Blockchain.Sequencer.Monad
 import           Control.Monad.Logger                 (runLoggingT)
+import qualified Network.Kafka                        as K
 import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured, ethConf)
+import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.Address      as Ad
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-import           Network.Kafka.Consumer               (commitSingleOffset)
+
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
+
+readSupplementaryAccounts :: String -> IO [AccountInfo]
+readSupplementaryAccounts genesisBlockName = do
+  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
+  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
+  let parseAccounts :: String -> [AccountInfo]
+      parseAccounts line = case words line of
+                              [] -> []
+                              "s":_ -> []
+                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                              _ -> error $ "invalid AccountInfo line: " ++ line
+  return . concatMap parseAccounts . lines $ accountInfoString
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
@@ -60,8 +82,12 @@ getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Me
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
-    let theJSON = either error id (eitherDecode theJSONString)
-    genesisInfoToGenesisBlock theJSON
+    let genesis = JS.parseLazyByteString genesisParser theJSONString
+        theJSON = case genesis of
+                      [x] -> x
+                      _ -> error $ "invalid genesis: " ++ show genesis
+    extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
+    genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
@@ -99,17 +125,18 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    return (gb, undefined)
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState . Map.fromList $ map (\(_,a,s) -> (a,s)) genAddrStates
+    accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {
-        StateDiff.chainId   = genesisChainId,
-        blockNumber         = 0,
-        StateDiff.blockHash = blockHash genesisBlock,
-        createdAccounts     = accountDiffs,
-        deletedAccounts     = Map.empty,
-        updatedAccounts     = Map.empty
-    }
-    commitSqlDiffs diff Nothing Nothing
+          StateDiff.chainId   = genesisChainId,
+          blockNumber         = 0,
+          StateDiff.blockHash = blockHash genesisBlock,
+          StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
+          createdAccounts     = accountDiffs,
+          deletedAccounts     = Map.empty,
+          updatedAccounts     = Map.empty
+        }
+    commitSqlDiffs diff (const "") (const "")
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
@@ -148,10 +175,10 @@ bootstrapIndexer key obGB =
                     IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
                 putStrLn "bootstrapIndex genesis seed successful!"
             Right (Left l) -> do
-                putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show l
+                putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
                 runner
-            l -> do
-                putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show l
+            (Left l) -> do
+                putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
                 runner
     in runner
 
@@ -169,4 +196,4 @@ bootstrapSequencer gb = do
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
                                             }
-    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) printLogMsg
+    runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg
