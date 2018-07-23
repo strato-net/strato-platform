@@ -15,8 +15,8 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
-addToBalance::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
-              Address->Integer->m Bool
+addToBalance :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m) =>
+              Address -> Integer -> m Bool
 addToBalance address val = do
   addressState <- getAddressState address
 
@@ -28,8 +28,8 @@ addToBalance address val = do
     putAddressState address addressState{addressStateBalance = newVal}
     return True
 
-pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m)=>
-     String->Address->Address->Integer->m Bool
+pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m) =>
+     String -> Address -> Address -> Integer -> m Bool
 pay _description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.

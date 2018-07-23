@@ -36,7 +36,9 @@ postBatchTransactionResultR = do
   hashesR <- parseJsonBody :: Handler (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
-        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes),  TransactionResultMiningStatus ==. Mined ] [] :: Handler [Entity TransactionResult]
+        txrs <- runDB $ selectList [ TransactionResultTransactionHash <-. (unStrungSHA <$> hashes)
+                                   , TransactionResultMiningStatus ==. Mined
+                                   ] [] :: Handler [Entity TransactionResult]
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m
                 Just vs -> M.insert k (v:vs) m
