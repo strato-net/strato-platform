@@ -8,7 +8,7 @@ MONITORING_TIMER=5;
 
 function newnode {
   initialize=false
-  
+
   mkdir -p logs/rotation
 
   if [[ ! -d .ethereumH ]]
@@ -37,8 +37,13 @@ function newnode {
        runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
+  minLogLevel=LevelInfo
+  if [ "${evmDebugMode}" = true ] ; then
+      minLogLevel=LevelDebug
+  fi
+
   echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer >> logs/strato-sequencer 2>&1
+  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -49,10 +54,6 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
-  minLogLevel=LevelInfo
-  if [ "${evmDebugMode}" = true ] ; then
-      minLogLevel=LevelDebug
-  fi
 
   echo "Starting ethereum-vm"
   runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
@@ -92,7 +93,12 @@ function newnode {
 }
 
 function cleanupDB {
-  db_conn_params="-U $pgUser -h $pgHost"
+  db_conn_params="-U ${pgUser} -h ${pgHost}"
+  PGPASSWORD=$pgPass psql ${db_conn_params} -c "
+    SELECT pg_terminate_backend(pg_stat_activity.pid)
+    FROM pg_stat_activity
+    WHERE pg_stat_activity.datname like '%eth_%';"
+
   PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
     echo "dropping the old db: $line"
     PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"

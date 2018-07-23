@@ -166,7 +166,7 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack::Address->VMM ()
+accountCreationHack :: Address -> VMM ()
 accountCreationHack address' = do
   exists <- addressStateExists address'
   when (not exists) $ do
@@ -719,7 +719,7 @@ runOperation SUICIDE = do
   guardStorage
   address' <- pop
   owner <- getEnvVar envOwner
-  addressState <- getAddressState $ owner
+  addressState <- getAddressState owner
 
   let allFunds = addressStateBalance addressState
   pay' "transferring all funds upon suicide" owner address' allFunds
@@ -957,18 +957,18 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> BlockData -> SHA -> ContextM String
+getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> BlockData -> SHA -> ContextM String
+getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
-getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
-getFromSelector sel isRunningTests' b codeHash = do
+getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
+getFromSelector sel isRunningTests' sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
   stateRoot <- getStateRoot
-  setStateDBStateRoot (blockDataStateRoot b)
+  setStateDBStateRoot sr
   let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
@@ -985,7 +985,7 @@ getFromSelector sel isRunningTests' b codeHash = do
             blockDataGasLimit = 10000000000000000000,
             blockDataGasUsed = 0,
             blockDataTimestamp = posixSecondsToUTCTime 0,
-            blockDataExtraData = 0,
+            blockDataExtraData = "",
             blockDataNonce = 0,
             blockDataMixHash = SHA 0
             },

@@ -23,6 +23,7 @@ import           Servant.Docs
 import           Servant.Mock
 
 import           BlockApps.Bloc22.API.Addresses
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Git
 import           BlockApps.Bloc22.API.Search
@@ -37,6 +38,8 @@ type BlocAPI =
   :<|> GetUsers
   :<|> PostUsersUser
   :<|> GetUsersUser
+  :<|> GetUsersKeyStore
+  :<|> PostUsersKeyStore
   :<|> PostUsersFill
   :<|> PostUsersSend
   :<|> PostUsersContract
@@ -61,10 +64,10 @@ type BlocAPI =
   :<|> PostContractsXabi
   -- /search endpoints
   :<|> GetSearchContract
-  :<|> GetSearchContractState
-  :<|> GetSearchContractStateReduced
   :<|> GetBlocTransactionResult
   :<|> PostBlocTransactionResults
+  -- /chain endpoints
+  :<|> PostChain
 
 markdownBloc :: String
 markdownBloc = markdown $ docs blocApi

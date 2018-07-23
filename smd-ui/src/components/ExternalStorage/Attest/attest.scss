@@ -1,0 +1,15 @@
+.attest-result ul {
+  list-style-type: none;
+}
+
+.attest-result li {
+  color: lightgreen; 
+}
+
+.attest-result li:before {
+  font-family: 'FontAwesome';
+  content: '\F00C';
+  margin: 0 5px 0 0px;
+  color: lightgreen;
+  font-size: 20px;
+}

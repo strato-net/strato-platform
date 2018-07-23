@@ -16,6 +16,7 @@ import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import AccountDetail from './components/AccountDetail';
+import ExternalStorage from './components/ExternalStorage';
 import { isModePublic } from './lib/checkMode';
 
 const CommonRoute = (props) => {
@@ -52,6 +53,7 @@ export const routes = isModePublic() ? (
       <Route exact path="/home" component={Dashboard} />
       <Route exact path="/apps" component={Applications} />
       <Route exact path="/accounts" component={Accounts} />
+      <Route exact path="/external_storage" component={ExternalStorage} />
       <CommonRoute route="public" />
       <Route component={SideBar} />
     </Switch>

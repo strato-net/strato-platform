@@ -100,6 +100,7 @@ instance ToSample BlocTransactionData where
       , posttransactionS          = Hex 0xdeadbeef
       , posttransactionV          = Hex 0x1c
       , posttransactionNonce      = 9876
+      , posttransactionChainId    = Nothing
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
@@ -108,11 +109,12 @@ instance ToSample BlocTransactionData where
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
       , contractdetailsName       = "Contract Name"
       , contractdetailsXabi       = Xabi {
-                                      xabiFuncs     = Map.fromList []
-                                    , xabiConstr    = Map.fromList []
-                                    , xabiVars      = Map.fromList []
-                                    , xabiTypes     = Map.fromList []
-                                    , xabiModifiers = Map.fromList []
+                                      xabiFuncs     = Map.empty
+                                    , xabiConstr    = Map.empty
+                                    , xabiVars      = Map.empty
+                                    , xabiTypes     = Map.empty
+                                    , xabiModifiers = Map.empty
+                                    , xabiEvents    = Map.empty
                                     }
       }
     , Call [] -- probably make a better Call sample
@@ -128,10 +130,10 @@ instance ToSchema BlocTransactionData where
         ex = Call [] -- probably make a better ToSchema example
 
 data BlocTransactionResult = BlocTransactionResult
-  { blocTransactionStatus :: BlocTransactionStatus
-  , blocTransactionHash   :: Keccak256
+  { blocTransactionStatus   :: BlocTransactionStatus
+  , blocTransactionHash     :: Keccak256
   , blocTransactionTxResult :: Maybe TransactionResult
-  , blocTransactionData   :: Maybe BlocTransactionData
+  , blocTransactionData     :: Maybe BlocTransactionData
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionResult where
@@ -167,11 +169,13 @@ instance ToSchema BlocTransactionResult where
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
   :> "result"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
 type PostBlocTransactionResults = "transactions"
   :> "results"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]
@@ -182,6 +186,7 @@ type GetUsersUser = "users"
   :> Capture "user" UserName
   :> Get '[JSON] [Address]
 
+
 type PostUsersUser = "users"
   :> Capture "user" UserName
   :> ReqBody '[JSON, FormUrlEncoded] Password
@@ -191,6 +196,43 @@ instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
 
+-- It would probably better to use the Authorization header
+-- and make this a GET request.
+type GetUsersKeyStore = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "keystore"
+  :> ReqBody '[JSON, FormUrlEncoded] Password
+  :> Post '[JSON] KeyStore
+
+
+type PostUsersKeyStore = "users"
+  :> Capture "user" UserName
+  :> "keystore"
+  :> ReqBody '[JSON] PostUsersKeyStoreRequest
+  :> Post '[JSON] Bool
+
+data PostUsersKeyStoreRequest = PostUsersKeyStoreRequest
+  { postuserskeystorerequestPassword :: Password
+  , postuserskeystorerequestKeyStore :: KeyStore
+  } deriving (Generic)
+
+instance ToJSON PostUsersKeyStoreRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostUsersKeyStoreRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample PostUsersKeyStoreRequest where
+  toSamples _ = noSamples
+
+instance ToSchema PostUsersKeyStoreRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "KeyStore entry"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostUsersKeyStoreRequest
+      ex = PostUsersKeyStoreRequest (Password "hunter2") exKeyStore
 --------------------------------------------------------------------------------
 
 type PostUsersFill = "users"
@@ -204,6 +246,7 @@ type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendParameters
   :> Post '[JSON] BlocTransactionResult
@@ -250,6 +293,7 @@ type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractRequest
   :> Post '[JSON] BlocTransactionResult
@@ -325,6 +369,7 @@ type PostUsersUploadList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "uploadList"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] [BlocTransactionResult]
@@ -423,6 +468,7 @@ type PostUsersContractMethod = "users"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
   :> Post '[JSON] BlocTransactionResult
@@ -503,6 +549,7 @@ type PostUsersSendList = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "sendList"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [BlocTransactionResult]
@@ -607,6 +654,7 @@ type PostUsersContractMethodList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "callList"
+  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [BlocTransactionResult]

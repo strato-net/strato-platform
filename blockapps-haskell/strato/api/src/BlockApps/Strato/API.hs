@@ -26,10 +26,12 @@ type API =
     :> QueryParam "mingaslimit" Natural
     :> QueryParam "blocknumber" Natural
     :> QueryParam "hash" Keccak256
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> "last"
     :> Capture "integer" Natural
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> ReqBody '[JSON] PostTransaction
@@ -39,9 +41,11 @@ type API =
       :> Post '[JSON] [Keccak256]
   :<|> "transactionResult"
     :> Capture "hash" Keccak256
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [TransactionResult]
   :<|> "transactionResult"
     :> "batch"
+    :> QueryParam "chainid" ChainId
     :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
   :<|> "block"
@@ -61,10 +65,12 @@ type API =
     :> QueryParam "address" Address
     :> QueryParam "coinbase" Address
     :> QueryParam "hash" Keccak256
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [WithNext Block]
   :<|> "block"
     :> "last"
     :> Capture "integer" Natural
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [WithNext Block]
   :<|> "account"
     :> QueryParam "address" Address
@@ -74,6 +80,7 @@ type API =
     :> QueryParam "nonce" Natural
     :> QueryParam "minnonce" Natural
     :> QueryParam "maxnonce" Natural
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [Account]
   :<|> "stats"
     :> "difficulty"
@@ -89,7 +96,14 @@ type API =
     :> QueryParam "value" Natural
     :> QueryParam "minvalue" Natural
     :> QueryParam "maxvalue" Natural
+    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] Keccak256
+  :<|> "chain"
+    :> ReqBody '[JSON] ChainInfo
+    :> Post '[JSON] ChainId
+  :<|> "chain"
+    :> QueryParams "chainid" ChainId
+    :> Get '[JSON] [ChainIdChainInfo]

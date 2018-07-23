@@ -16,7 +16,7 @@ import           Blockchain.SHA
 
 import           GHC.Generics
 
-data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism deriving (Show, Read, Eq, Generic)
+data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism | Blockstanbul deriving (Show, Read, Eq, Generic)
 
 derivePersistField "TXOrigin"
 
@@ -30,6 +30,7 @@ instance Binary TXOrigin where
     put Morphism        = putWord8 5 -- this was added even later
     put (BlockHash sha) = putWord8 2 >> put sha
     put (PeerString p)  = putWord8 3 >> put p
+    put Blockstanbul    = putWord8 6
     get = do
         tag <- getWord8
         case tag of
@@ -39,9 +40,10 @@ instance Binary TXOrigin where
             3 -> PeerString <$> get
             4 -> return Quarry
             5 -> return Morphism
+            6 -> return Blockstanbul
             _ -> error "the impossible happened in get of Binary instance of TXOrigin"
 
 instance Format TXOrigin where
     format (BlockHash sha) = "BlockHash " ++ shaToHex sha
-    format (PeerString p ) = "Peer " ++ p
+    format (PeerString p ) = "Peer " ++ show p
     format               x = show x

@@ -1,0 +1,39 @@
+name: blockstanbul
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - blockapps-data
+  - blockapps-haskoin
+  - blockapps-util
+  - bytestring
+  - containers
+  - conduit
+  - conduit-combinators
+  - crypto-api
+  - ethereum-encryption
+  - ethereum-rlp
+  - ghc
+  - fast-ecrecover
+  - lens
+  - mtl
+  - QuickCheck
+  - strato-model
+  - text
+  - transformers
+  - monad-logger
+
+library:
+  source-dirs: src/
+
+tests:
+  blockstanbul-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+      - base16-bytestring
+      - blockstanbul
+      - hspec
+      - hspec-expectations-lifted
+      - merkle-patricia-db
+      - time

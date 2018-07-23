@@ -1,0 +1,76 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`UploadFile: reducer attest file failure 1`] = `
+Object {
+  "attestDocument": null,
+  "error": "ERROR",
+  "isLoading": false,
+  "uploadList": Array [],
+}
+`;
+
+exports[`UploadFile: reducer attest file request 1`] = `
+Object {
+  "error": null,
+  "isLoading": true,
+  "uploadList": Array [],
+}
+`;
+
+exports[`UploadFile: reducer attest file success 1`] = `
+Object {
+  "attestDocument": Object {
+    "signers": Array [
+      "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad",
+    ],
+    "timeStamp": 1530165910,
+    "uri": "https://strato-external-storage.s3.amazonaws.com/1530165910145-widescreen.jpeg",
+  },
+  "error": null,
+  "isLoading": false,
+  "uploadList": Array [],
+}
+`;
+
+exports[`UploadFile: reducer attest modal close 1`] = `
+Object {
+  "attestDocument": null,
+  "error": null,
+  "isOpen": false,
+  "uploadList": Array [],
+  "username": null,
+}
+`;
+
+exports[`UploadFile: reducer attest modal open 1`] = `
+Object {
+  "error": null,
+  "isOpen": true,
+  "uploadList": Array [],
+}
+`;
+
+exports[`UploadFile: reducer change username 1`] = `
+Object {
+  "error": null,
+  "uploadList": Array [],
+  "username": undefined,
+}
+`;
+
+exports[`UploadFile: reducer reset error 1`] = `
+Object {
+  "error": null,
+  "uploadList": Array [],
+}
+`;
+
+exports[`UploadFile: reducer set initial state 1`] = `
+Object {
+  "attestDocument": null,
+  "error": null,
+  "isLoading": false,
+  "isOpen": false,
+  "username": null,
+}
+`;

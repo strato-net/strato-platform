@@ -77,12 +77,13 @@ translateStorageMap storage' =
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
+                  -> Maybe ChainId
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId mName mCount mOffset mLength = do
+getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -142,9 +143,9 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                           , qsChainId = chainId 
                            }
-
-
+ 
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError

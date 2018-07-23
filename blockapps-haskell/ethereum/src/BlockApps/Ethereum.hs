@@ -11,11 +11,15 @@
 
 module BlockApps.Ethereum
   ( -- * Addresses
-    Address (..)
+    Hex (..)
+  , Address (..)
   , deriveAddress
   , addressString
   , stringAddress
   , newSecKey
+  , ChainId (..)
+  , chainIdString
+  , stringChainId
     -- * Keccak 256 Hashes
   , Keccak256 (..)
   , keccak256
@@ -45,10 +49,11 @@ module BlockApps.Ethereum
   -- , eth
   , Gas (..)
   , BloomFilter (..)
+  , CodeInfo (..)
+  , AccountInfo (..)
   ) where
 
 import           Control.Lens.Operators
-import           Control.Monad (liftM2)
 import           Control.DeepSeq (NFData, rnf)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
@@ -64,6 +69,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
 import           Data.LargeWord
+import qualified Data.Map.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
@@ -72,20 +78,48 @@ import           Data.Swagger
 import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
+import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances    ()
 import           Text.Read              hiding (String)
+import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = (liftM2 LargeKey) arbitrary arbitrary
+  arbitrary = LargeKey <$> arbitrary <*> arbitrary
 
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
+
+newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
+
+instance (Integral n, Show n) => Show (Hex n) where
+  show (Hex n) = showHex n ""
+
+instance (Eq n, Num n) => Read (Hex n) where
+  readPrec = Hex <$> readP_to_Prec (const readHexP)
+  --I'm not sure what `d` precision parameter is used for
+
+instance Num n => FromJSON (Hex n) where
+  parseJSON value = do
+    string <- parseJSON value
+    case fmap fromInteger (readMaybe ("0x" ++ string)) of
+      Nothing -> fail $ "not hex encoded: " ++ string
+      Just n  -> return $ Hex n
+
+instance (Integral n, Show n) => ToJSON (Hex n) where
+  toJSON = toJSON . show
+
+instance (Integral n, Show n) => ToHttpApiData (Hex n) where
+  toUrlPiece = Text.pack . show
+
+instance Arbitrary x => Arbitrary (Hex x) where
+  arbitrary = genericArbitrary uniform
 
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Generic, Bounded)
@@ -102,11 +136,23 @@ instance ToJSONKey Address where
 padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
+show256 :: Word256 -> String
+show256 (LargeKey w64 w192) = (show192 w192) ++ (show64 w64)
+
+show192 :: Word192 -> String
+show192 (LargeKey w64 w128) = (show128 w128) ++ (show64 w64)
+
 show160 :: Word160 -> String
-show160 (LargeKey w32 w128) = (show128 w128) ++ (padZeros 8 (showHex w32 ""))
+show160 (LargeKey w32 w128) = (show128 w128) ++ (show32 w32)
 
 show128 :: Word128 -> String
-show128 (LargeKey w1 w2) = (padZeros 16 (showHex w2 "")) ++ (padZeros 16 (showHex w1 ""))
+show128 (LargeKey w1 w2) = (show64 w2) ++ (show64 w1)
+
+show64 :: Word64 -> String
+show64 w64 = padZeros 16 (showHex w64 "")
+
+show32 :: Word32 -> String
+show32 w32 = padZeros 8 (showHex w32 "")
 
 addressString :: Address -> String
 addressString (Address address) = show160 address
@@ -178,6 +224,77 @@ deriveAddress :: PubKey -> Address
 deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 
 --------------------------------------------------------------------------------
+
+newtype ChainId = ChainId { unChainId :: Word256 }
+  deriving (Eq, Ord, Generic, Bounded)
+
+instance NFData ChainId
+
+instance Show ChainId where show = chainIdString
+
+instance ToJSONKey ChainId where
+  toJSONKey = ToJSONKeyText f g
+    where f x = Text.pack $ chainIdString x
+          g x = AesonEnc.text . Text.pack $ chainIdString x
+
+chainIdString :: ChainId -> String
+chainIdString = show256 . unChainId
+
+stringChainId :: String -> Maybe ChainId
+stringChainId string = ChainId . fromInteger <$> readMaybe ("0x" ++ string)
+
+instance ToJSON ChainId where toJSON = toJSON . chainIdString
+
+instance FromJSON ChainId where
+  parseJSON value = do
+    string <- parseJSON value
+    case stringChainId string of
+      Nothing      -> fail $ "Could not decode ChainId: " <> string
+      Just chainId -> return chainId
+
+instance ToHttpApiData ChainId where
+  toUrlPiece = Text.pack . chainIdString
+
+instance FromHttpApiData ChainId where
+  parseUrlPiece text = case stringChainId (Text.unpack text) of
+    Nothing      -> Left $ "Could not decode ChainId: " <> text
+    Just chainId -> Right chainId
+
+instance ToForm ChainId where
+  toForm chainId = [("chainid", toQueryParam chainId)]
+
+instance FromForm ChainId where fromForm = parseUnique "chainid"
+
+instance Arbitrary ChainId where
+  arbitrary = ChainId . fromInteger <$> arbitrary
+
+instance ToSample ChainId where
+  toSamples _ = samples [ChainId 0xdeadbeef, ChainId 0x12345678]
+
+instance ToCapture (Capture "chainid" ChainId) where
+  toCapture _ = DocCapture "chainid" "a private chain Id"
+
+instance RLPEncodable ChainId where
+  rlpEncode chainId = rlpEncode . fst . Base16.decode . Char8.pack $ chainIdString chainId
+  rlpDecode obj = ChainId . fromInteger <$> rlpDecode obj
+
+instance ToParam (QueryParam "chainid" ChainId) where
+  toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal
+
+instance ToParamSchema ChainId where
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerString
+    & minimum_ ?~ fromInteger (toInteger . unChainId $ (minBound :: ChainId))
+    & maximum_ ?~ fromInteger (toInteger . unChainId $ (maxBound :: ChainId))
+    & format ?~ "hex string"
+
+instance ToSchema ChainId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "ChainId")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
+        & description ?~ "Private chain id, 32 byte hex encoded string" )
 
 newSecKey :: IO SecKey
 newSecKey = fromMaybe err . secKey <$> getEntropy 32
@@ -279,6 +396,7 @@ data AccountState = AccountState
   , accountStateBalance     :: Wei
   , accountStateStorageRoot :: Keccak256
   , accountStateCodeHash    :: Keccak256
+  , accountStateChainId     :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
@@ -288,6 +406,7 @@ data Transaction = Transaction
   , transactionTo         :: Maybe Address
   , transactionValue      :: Wei
   , transactionInitOrData :: ByteString
+  , transactionChainId    :: Maybe ChainId
   , transactionV          :: Word8
   , transactionR          :: Word256
   , transactionS          :: Word256
@@ -296,31 +415,42 @@ data Transaction = Transaction
 instance NFData Transaction
 
 instance RLPEncodable Transaction where
-  rlpEncode Transaction{..} = rlpEncode
-    ( transactionNonce
-    , transactionGasPrice
-    , transactionGasLimit
-    , transactionTo
-    , transactionValue
-    , transactionInitOrData
-    , transactionV
-    , transactionR
-    , transactionS
-    )
-  rlpDecode x = do
-    (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
-      <- rlpDecode x
-    return Transaction
-      { transactionNonce = nonce
-      , transactionGasPrice = gasPrice
-      , transactionGasLimit = gasLimit
-      , transactionTo = toAddr
-      , transactionValue = value
-      , transactionInitOrData = initOrData
-      , transactionV = v
-      , transactionR = r
-      , transactionS = s
-      }
+  rlpEncode Transaction{..} = Array $
+    [ rlpEncode transactionNonce
+    , rlpEncode transactionGasPrice
+    , rlpEncode transactionGasLimit
+    , rlpEncode transactionTo
+    , rlpEncode transactionValue
+    , rlpEncode transactionInitOrData
+    , rlpEncode transactionV
+    , rlpEncode transactionR
+    , rlpEncode transactionS
+    ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
+  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s', cid]) =
+    Transaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> (Just <$> rlpDecode cid)
+      <*> rlpDecode v'
+      <*> rlpDecode r'
+      <*> rlpDecode s'
+  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s']) =
+    Transaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> pure Nothing
+      <*> rlpDecode v'
+      <*> rlpDecode r'
+      <*> rlpDecode s'
+  rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
 
 data UnsignedTransaction = UnsignedTransaction
   { unsignedTransactionNonce      :: Nonce
@@ -329,6 +459,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionTo         :: Maybe Address
   , unsignedTransactionValue      :: Wei
   , unsignedTransactionInitOrData :: ByteString
+  , unsignedTransactionChainId    :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
 instance RLPEncodable UnsignedTransaction where
@@ -339,6 +470,7 @@ instance RLPEncodable UnsignedTransaction where
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionInitOrData = unsignedTransactionInitOrData
+    , transactionChainId = unsignedTransactionChainId
     , transactionV = 0
     , transactionR = 0
     , transactionS = 0
@@ -354,6 +486,7 @@ instance RLPEncodable UnsignedTransaction where
         , unsignedTransactionTo = transactionTo
         , unsignedTransactionValue = transactionValue
         , unsignedTransactionInitOrData = transactionInitOrData
+        , unsignedTransactionChainId = transactionChainId
         }
 
 rlpMsg :: RLPEncodable x => x -> Msg
@@ -377,29 +510,33 @@ signTransaction sk UnsignedTransaction{..} = Transaction
   , transactionR = r
   , transactionS = s
   , transactionInitOrData = unsignedTransactionInitOrData
+  , transactionChainId = unsignedTransactionChainId
   }
   where
     CompactRecSig r s testV =
-      exportCompactRecSig . signRecMsg sk $ rlpMsg
-        ( unsignedTransactionNonce
-        , unsignedTransactionGasPrice
-        , unsignedTransactionGasLimit
-        , unsignedTransactionTo
-        , unsignedTransactionValue
-        , unsignedTransactionInitOrData
-        )
+      exportCompactRecSig
+      . signRecMsg sk
+      . rlpMsg
+      . Array
+      $ [ rlpEncode unsignedTransactionNonce
+        , rlpEncode unsignedTransactionGasPrice
+        , rlpEncode unsignedTransactionGasLimit
+        , rlpEncode unsignedTransactionTo
+        , rlpEncode unsignedTransactionValue
+        , rlpEncode unsignedTransactionInitOrData
+        ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
 
 verifyTransaction :: PubKey -> Transaction -> Bool
 verifyTransaction pk Transaction{..} =
   let
-    message = rlpMsg
-      ( transactionNonce
-      , transactionGasPrice
-      , transactionGasLimit
-      , transactionTo
-      , transactionValue
-      , transactionInitOrData
-      )
+    message = rlpMsg . Array $
+      [ rlpEncode transactionNonce
+      , rlpEncode transactionGasPrice
+      , rlpEncode transactionGasLimit
+      , rlpEncode transactionTo
+      , rlpEncode transactionValue
+      , rlpEncode transactionInitOrData
+      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
   in
     case importCompactSig (CompactSig transactionR transactionS) of
       Nothing  -> False
@@ -408,14 +545,14 @@ verifyTransaction pk Transaction{..} =
 recoverTransaction :: Transaction -> Maybe PubKey
 recoverTransaction Transaction{..} = do
   let
-    message = rlpMsg
-      ( transactionNonce
-      , transactionGasPrice
-      , transactionGasLimit
-      , transactionTo
-      , transactionValue
-      , transactionInitOrData
-      )
+    message = rlpMsg . Array $
+      [ rlpEncode transactionNonce
+      , rlpEncode transactionGasPrice
+      , rlpEncode transactionGasLimit
+      , rlpEncode transactionTo
+      , rlpEncode transactionValue
+      , rlpEncode transactionInitOrData
+      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
     testV = transactionV - 27
     compactRecSig = CompactRecSig transactionR transactionS testV
   recSig <- importCompactRecSig compactRecSig
@@ -445,6 +582,7 @@ data BlockHeader = BlockHeader
   , blockHeaderExtraData        :: Word256
   , blockHeaderMixHash          :: Keccak256
   , blockHeaderNonce            :: Nonce
+  , blockHeaderChainId          :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
@@ -506,20 +644,24 @@ instance RLPEncodable Wei where
   rlpEncode (Wei n) = rlpEncode $ toInteger n
   rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
-newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
+newtype Gas = Gas Integer deriving (Eq,Show,Generic)
 
 instance NFData Gas
 
-instance Arbitrary Gas where arbitrary = Gas . fromInteger <$> arbitrary
+instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 
 instance ToJSON Gas where
-  toJSON (Gas g) = toJSON $ toInteger g
+  toJSON (Gas g) = toJSON g
 
 instance FromJSON Gas where
-  parseJSON = fmap (Gas . fromInteger) . parseJSON
+  parseJSON = fmap Gas . parseJSON
 
 instance ToParamSchema Gas where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerInteger
+    & minimum_ ?~ 0
+    & maximum_ ?~ (2^(256 :: Integer) - 1)
+    & format ?~ "hex string"
 
 instance ToSchema Gas where
   declareNamedSchema _ = return $
@@ -530,11 +672,87 @@ instance ToSchema Gas where
         & description ?~ "Number of Gas units" )
 
 instance RLPEncodable Gas where
-  rlpEncode (Gas n) = rlpEncode $ toInteger n
-  rlpDecode obj = Gas . fromInteger <$> rlpDecode obj
+  rlpEncode (Gas n) = rlpEncode n
+  rlpDecode obj = Gas <$> rlpDecode obj
 
 newtype BloomFilter = BloomFilter
   ( LargeKey
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
   ) deriving (Eq,Show,Generic)
+
+data CodeInfo = CodeInfo
+  { codeInfoCode   :: Text.Text
+  , codeInfoSource :: Text.Text
+  , codeInfoName   :: Text.Text
+  } deriving (Show, Read, Eq, Generic)
+
+instance FromJSON CodeInfo where
+  parseJSON (Object o) =
+    CodeInfo
+    <$> o .: "code"
+    <*> o .: "src"
+    <*> o .: "name"
+  parseJSON _ = error "parseJSON CodeInfo: expected Object"
+
+instance ToJSON CodeInfo where
+  toEncoding (CodeInfo bs s1 s2) =
+    pairs (
+      "code" Aeson..= bs <>
+      "src"  Aeson..= s1 <>
+      "name" Aeson..= s2
+    )
+
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
+        & description ?~ "Code Info" )
+
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer Keccak256
+                 | ContractWithStorage Address Integer Keccak256 (Map.Map Word256 Word256)
+   deriving (Show, Eq, Generic)
+
+instance ToJSON AccountInfo where
+  toJSON (NonContract a b) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    ]
+  toJSON (ContractNoStorage a b c) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    , "codeHash" Aeson..= c
+    ]
+  toJSON (ContractWithStorage a b c s) = object
+    [ "address" Aeson..= a
+    , "balance" Aeson..= b
+    , "codeHash" Aeson..= c
+    , "storage" Aeson..= (map (\(w1,w2) -> (Hex w1, Hex w2)) $ Map.toList s)
+    ]
+
+instance FromJSON AccountInfo where
+  parseJSON (Object o) = do
+    a <- (o .: "address")
+    b <- (o .: "balance")
+    mc <- (o .:? "codeHash")
+    case mc of
+      Nothing -> return $ NonContract a b
+      Just c -> do
+        ms <- (o .:? "storage")
+        case ms of
+          Nothing -> return $ ContractNoStorage a b c
+          Just s' -> do
+            let s = Map.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
+            return $ ContractWithStorage a b c s
+  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
+
+instance ToSchema AccountInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "AccountInfo")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer)) 
+        & description ?~ "Account Info" )

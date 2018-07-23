@@ -17,9 +17,6 @@ import           BlockApps.Strato.Types
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
-  describe "Hex" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
-    prop "has inverse read/show" $ readShowProp @ (Hex Word)
   describe "Strung" $
     prop "has inverse JSON decode/encode" $ jsonProp @ (Strung Integer)
   describe "TransactionType" $
@@ -54,7 +51,6 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ TxCount
   describe "Storage" $
     prop "has inverse JSON decode/encode" $ jsonProp @ Storage
-
 
 -- helpers
 

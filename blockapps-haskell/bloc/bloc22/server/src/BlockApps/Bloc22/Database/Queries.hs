@@ -77,6 +77,15 @@ getUsersQuery = proc () -> do
   returnA -< user
 
 {- |
+SELECT id FROM users WHERE name = $1;
+-}
+getUserIdQuery :: UserName -> Query (Column PGInt4)
+getUserIdQuery username = proc () -> do
+  (uid, name) <- queryTable usersTable -< ()
+  restrict -< name .== constant username
+  returnA -< uid
+
+{- |
 SELECT K.address FROM users U JOIN keystore K
   ON K.user_id = U.id WHERE U.name = $1;
 -}
@@ -105,8 +114,9 @@ WITH userid AS (
  SELECT $2, $3, $4, $5, $6, $7, uid.id FROM
 (SELECT id FROM userid UNION SELECT id FROM newUserId) uid;
 -}
+
 postUsersUserQuery :: Text -> KeyStore -> Connection -> IO Bool
-postUsersUserQuery userName KeyStore{..} conn = do
+postUsersUserQuery userName keystore conn = do
   userIds1 <- runQuery conn $ proc () -> do
     (userId,name) <- queryTable usersTable -< ()
     restrict -< name .== constant userName
@@ -117,18 +127,21 @@ postUsersUserQuery userName KeyStore{..} conn = do
     Just userId -> return [userId::Int32]
   case listToMaybe userIds2 of
     Nothing -> return False
-    Just userId -> do
-      _ <- runInsertMany conn keyStoreTable [
-        ( Nothing
-        , constant keystoreSalt
-        , constant keystorePasswordHash
-        , constant keystoreAcctNonce
-        , constant keystoreAcctEncSecKey
-        , constant keystorePubKey
-        , constant keystoreAcctAddress
-        , constant userId
-        )]
-      return True
+    Just userId -> insertKeyStore userId keystore conn
+
+insertKeyStore :: Int32 -> KeyStore -> Connection -> IO Bool
+insertKeyStore userId KeyStore{..} conn = do
+    _ <- runInsertMany conn keyStoreTable [
+      ( Nothing
+      , constant keystoreSalt
+      , constant keystorePasswordHash
+      , constant keystoreAcctNonce
+      , constant keystoreAcctEncSecKey
+      , constant keystorePubKey
+      , constant keystoreAcctAddress
+      , constant userId
+      )]
+    return True
 
 contractsJoinTable :: Query
   ( Column PGInt4
@@ -947,6 +960,12 @@ instance Default Constant SecretBox.Nonce (Column PGBytea) where
 instance Default Constant PubKey (Column PGBytea) where
   def = lmap (exportPubKey False) def
 
+instance QueryRunnerColumnDefault PGBytea PubKey where
+  queryRunnerColumnDefault =
+     queryRunnerColumn id toPubKey queryRunnerColumnDefault
+     where toPubKey :: ByteString -> PubKey
+           toPubKey = fromMaybe (error "could not import pubkey") . importPubKey
+
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
@@ -967,6 +986,7 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
         = Keccak256
         . fromMaybe (error "could not decode hash")
         . digestFromByteString
+
 instance Default Constant Keccak256 (Column PGBytea) where
   def = lmap fromKecc def
     where
@@ -1467,7 +1487,7 @@ getContractXabiByMetadataId metadataId = do
   constr <- getXabiConstrQuery metadataId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
-  return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
+  return $ Xabi funcs constr vars typeDefs Map.empty Map.empty -- TODO: Add modifiers table and pull modifiers from there
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
 getContractContractByMetadataId metadataId = getContractRetry 0
