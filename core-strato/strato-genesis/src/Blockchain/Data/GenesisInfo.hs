@@ -16,16 +16,15 @@ import           GHC.Generics (Generic)
 import           Data.Aeson
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
+import qualified Data.JsonStream.Parser             as JS
 import           Data.Monoid ((<>))
 import           Data.Time
 import           Data.Word
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.RLP
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.ExtWord
 import           Blockchain.SHA
 
 
