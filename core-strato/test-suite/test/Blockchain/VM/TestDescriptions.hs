@@ -43,7 +43,8 @@ data Env =
     currentNumber     ::  String,
     --currentTimestamp  ::  String,
     currentTimestamp  ::  UTCTime,
-    previousHash      ::  SHA
+    previousHash      ::  SHA,
+    chainId           :: Maybe Haskoin.Word256
     } deriving (Generic, Show)
 
 data AddressState' =
@@ -234,10 +235,11 @@ instance FromJSON Env where
     v .: "currentGasLimit" <*>
     v .: "currentNumber" <*>
     v .: "currentTimestamp" <*>
-    v .:? "previousHash" .!= SHA 0 --error "previousHash not set"
+    v .:? "previousHash" .!= SHA 0 <*> --error "previousHash not set"
+    v .:? "chainId"
     where
-      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 =
-        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6
+      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 v7 =
+        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6 v7
   parseJSON x = error $ "Wrong format when trying to parse Env from JSON: " ++ show x
 
 

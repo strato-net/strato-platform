@@ -29,6 +29,8 @@ import           Blockchain.ExtWord
 import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 
+-- TODO: Add private chain functionality to JSON RPC commands
+
 produceResponse::String->B.ByteString->IO ()
 produceResponse id theData = do
     ret <-
@@ -40,8 +42,8 @@ produceResponse id theData = do
         Right _ -> return ()
 
 
-runJsonRpcCommand::(MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m)=>
-                   JsonRpcCommand->m ()
+runJsonRpcCommand :: (MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m) =>
+                   JsonRpcCommand -> m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
