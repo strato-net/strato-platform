@@ -4,10 +4,12 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
+  blockstanbul
   ethereum-rlp
   ethereum-vm
   merkle-patricia-db
   statsdi
+  strato-genesis
   strato-init
   strato-p2p
   strato-redis-blockdb

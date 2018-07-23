@@ -22,6 +22,9 @@ import           Blockchain.Data.RLP
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 
+unSHA :: SHA -> Word256
+unSHA (SHA w) = w
+
 instance Binary SHA where
     put (SHA x) = sequence_ (put <$> word256ToBytes x)
     get = SHA . fromInteger . byteString2Integer . B.pack <$> replicateM 32 get

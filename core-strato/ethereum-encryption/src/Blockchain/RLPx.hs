@@ -134,7 +134,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
   let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
       otherNonce = rlpDecode otherNonceRLP
       pubKey = rlpDecode pubKeyRLP::B.ByteString
-      signatureBytes = rlpDecode signatureRLP
+      extSig = rlpDecode signatureRLP
       version = rlpDecode versionRLP::Integer
 
   let otherPoint = bytesToPoint $ B.unpack pubKey
@@ -143,12 +143,6 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
 
   let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
       msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
-      r = bytesToWord256 $ B.unpack $ B.take 32 $ signatureBytes
-      s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ signatureBytes
-      v = head . B.unpack $ B.take 1 $ B.drop 64 signatureBytes
-      yIsOdd = v == 1
-
-      extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
       otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg
@@ -198,12 +192,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
     let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
         otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
         msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
-        r = bytesToWord256 $ B.unpack $ B.take 32 $ eciesMsgIBytes
-        s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ eciesMsgIBytes
-        v = head . B.unpack $ B.take 1 $ B.drop 64 eciesMsgIBytes
-        yIsOdd = v == 1
-
-        extSig = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
+        extSig = rlpDecode . RLPString $ eciesMsgIBytes
         otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg

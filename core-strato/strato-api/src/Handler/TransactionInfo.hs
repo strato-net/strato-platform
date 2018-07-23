@@ -38,7 +38,7 @@ emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
     ts <- liftIO $ getCurrentMicrotime
     let ingestTxs = (\t -> (IETx ts (IngestTx API t))) <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " P.++ (show $ P.length ingestTxs) P.++ " tx(s) to unseqevents"        
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " P.++ (show $ P.length ingestTxs) P.++ " tx(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
@@ -123,6 +123,7 @@ getTransactionR = do
 
                  sortParam <- lookupGetParam "sortby"
                  showRejectedMaybe <- lookupGetParam "rejected"
+                 chainIds <- lookupGetParams "chainid"
 
                  let showReject = case showRejectedMaybe of
                                     Just "true"  -> -1
@@ -144,10 +145,21 @@ getTransactionR = do
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getTransFilter (rawTx)) $ getParameters ))
 
                                         let criteria = P.map (getTransFilter rawTx) $ getParameters
-                                        let allCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
-
+                                        let matchChainId cid = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val $ fromHexText cid))
+                                        let chainCriteria = case chainIds of
+                                              [] -> [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                              [cid] -> if (T.unpack cid == "main")
+                                                           then [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                                           else if (T.unpack cid == "all")
+                                                                    then []
+                                                                    else [matchChainId cid]             
+                                              cids -> P.map matchChainId cids 
+                                        let otherCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
+                                        let allCriteria = case chainCriteria of
+                                                [] -> [otherCriteria]
+                                                _ -> P.map (\cc -> cc : otherCriteria) chainCriteria
                                         -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
-                                        E.where_ (P.foldl1 (E.&&.) allCriteria)
+                                        E.where_ (P.foldl1 (E.||.) (P.map (P.foldl1 (E.&&.)) allCriteria))
 
                                         -- E.offset $ (limit * offset)
                                         E.limit $ (limit)

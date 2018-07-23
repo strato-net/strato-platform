@@ -16,7 +16,8 @@ module Blockchain.Sequencer.Kafka (
     HasUnseqSink(..),
     HasSeqSink(..),
     emitKafkaTransactions,
-    emitKafkaBlock
+    emitKafkaBlock,
+    emitKafkaChainDetails
 ) where
 
 import           Conduit
@@ -24,10 +25,12 @@ import           Data.Void
 import           Data.Binary                (Binary, decode, encode)
 
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.KafkaTopics     (lookupTopic)
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Stream.Raw
 import           Blockchain.Util
 
@@ -110,3 +113,9 @@ emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
     sink <- getUnseqSink
     runConduit (yield [ingestBlock] .| sink)
+
+emitKafkaChainDetails :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
+emitKafkaChainDetails origin chainId details = do
+    let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
+    sink <- getUnseqSink
+    runConduit (yield [ingestGenesis] .| sink)

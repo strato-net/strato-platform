@@ -5,6 +5,7 @@ module Blockchain.Strato.StateDiff
     , Diff(..)
     , Detail(..)
     , Detailed(..)
+    , chainDiff
     , stateDiff
     , eventualAccountState
     , incrementalAccountState
@@ -14,15 +15,18 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
-import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.Internal hiding (stateRoot)
+import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.ExtendedWord
 
+import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource
 
 import           Data.Aeson
@@ -43,8 +47,10 @@ import           GHC.Generics
 -- database in a given block.
 data StateDiff =
   StateDiff {
+    chainId         :: Maybe Word256,
     blockNumber     :: Integer,
     blockHash       :: SHA,
+    stateRoot       :: StateRoot,
     -- | The 'Eventual value is the initial state of the contract
     createdAccounts :: Map Address (AccountDiff 'Eventual),
     -- | The 'Eventual value is the pre-deletion state of the contract
@@ -144,20 +150,51 @@ instance Detailed (Diff SHA) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
 
+chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+             Integer -> SHA -> SHA -> m [StateDiff]
+chainDiff blockNumber oldBlockHash newBlockHash = do
+  mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
+  case mChainRoots of
+    (Just old, Just new) -> do
+      db <- getStateDB
+      diffs <- Diff.dbDiff db old new
+      go [] diffs
+    (Nothing, _) -> error $ "chainDiff: Missing chain root for block hash " ++ format oldBlockHash
+    (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
+  where
+    go sds [] = return sds
+    go sds (Diff.Create _ v : rest) = do
+      let (chainId, sr) = rlpDecode v
+      genSR <- maybe emptyTriePtr id <$> getGenesisStateRoot chainId
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash genSR sr
+      go (sd:sds) rest
+    go sds (Diff.Delete _ v : rest) = do
+      let (chainId, sr) = rlpDecode v
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
+      go (sd:sds) rest
+    go sds (Diff.Update _ v1 v2 : rest) = do
+      let (chainId, sr1) = rlpDecode v1
+          (chainId2, sr2) = rlpDecode v2
+      when (chainId /= chainId2) $
+        error $ "chainDiff.Update: decoded two different chainIds for Update: " ++ show chainId ++ " and " ++ show chainId2
+      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
+      go (sd:sds) rest
+
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
-             Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
-stateDiff blockNumber blockHash oldRoot newRoot = do
+             Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
+stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   db <- getStateDB
   diffs <- Diff.dbDiff db oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
-      StateDiff{
-        blockNumber,
-        blockHash,
-        createdAccounts,
-        deletedAccounts,
+      StateDiff
+        chainId
+        blockNumber
+        blockHash
+        newRoot
+        createdAccounts
+        deletedAccounts
         updatedAccounts
-        }
 
   where
     collectModes diffs f = do
@@ -234,7 +271,7 @@ eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                    StateRoot -> m (Map Word256 (Diff Word256 'Eventual))
 eventualStorage storageRoot = do
   db <- getStateDB
-  let storageDB = db{stateRoot = storageRoot}
+  let storageDB = db{MP.stateRoot = storageRoot}
   allStorageKV <- unsafeGetAllKeyVals storageDB
   storageAssoc <- mapM (uncurry decodeStorageKV) allStorageKV
   return $ Map.map Value $ Map.fromList storageAssoc

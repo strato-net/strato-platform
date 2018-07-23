@@ -64,8 +64,8 @@ import           Blockchain.VM.TestFiles
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
 
-populateAndConvertAddressState::Address->AddressState'->ContextM AddressState
-populateAndConvertAddressState owner addressState' = do
+populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
+populateAndConvertAddressState cid owner addressState' = do
   addCode . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
@@ -79,6 +79,7 @@ populateAndConvertAddressState owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
+      (cid)
 
 showHexInt::Integer->String
 showHexInt x
@@ -148,13 +149,14 @@ txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
 runTest::Test->ContextM (Either String String)
 runTest test = do
+  let cid = chainId $ env test
 
   MP.initializeBlank =<< getStateDB
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $
     \(addr, s) -> do
-      state' <- populateAndConvertAddressState addr s
+      state' <- populateAndConvertAddressState cid addr s
       putAddressState addr state'
 
   beforeAddressStates <- addressStates
