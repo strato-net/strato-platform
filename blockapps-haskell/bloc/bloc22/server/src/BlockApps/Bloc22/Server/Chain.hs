@@ -28,7 +28,8 @@ postChain (ChainInput src label accountInfo variableNames members) = do
             [] -> throwError $ UserError "You need to supply at least one governance contract"
             [(_, x)] -> return $ snd x
             _ -> throwError $ UserError "Multiple governance contracts are not allowed" 
-  let contractAcctInfo = transformXabi contractdetailsXabi (Map.fromList variableNames)
+  let varMap = transformXabi contractdetailsXabi (Map.fromList variableNames)
+      contractAcctInfo = ContractWithStorage (Address 0x100) (0::Integer) contractdetailsCodeHash varMap
       nonContractAcctInfo = map (uncurry NonContract) accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
       codeInfo = CodeInfo contractdetailsBin src contractdetailsName

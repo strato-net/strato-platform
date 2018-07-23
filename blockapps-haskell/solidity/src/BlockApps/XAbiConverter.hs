@@ -6,6 +6,7 @@
 module BlockApps.XAbiConverter where
 
 import qualified Data.Bimap                        as Bimap
+import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                          as Map
 import qualified Data.Map.Ordered                  as OMap
@@ -17,7 +18,6 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           GHC.Int
 
-import           BlockApps.Ethereum                (AccountInfo(..))
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Selector
 import           BlockApps.Solidity.Struct
@@ -28,7 +28,7 @@ import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 
-transformXabi :: Xabi -> Map.Map Text Text -> AccountInfo
+transformXabi :: Xabi -> Map.Map Text Text -> Map.Map Word256 Word256
 transformXabi _ _ = error "transformXabi not implemented"
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
