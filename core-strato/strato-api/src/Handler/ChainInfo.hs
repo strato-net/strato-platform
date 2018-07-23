@@ -5,6 +5,7 @@
 module Handler.ChainInfo where
 
 import           Data.Aeson
+import qualified Data.Map                       as M
 import qualified Data.Text                      as T
 
 import           Blockchain.Data.TXOrigin
@@ -38,12 +39,9 @@ postChainR = do
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ ar rr mb ab) -> do 
-      when (ar == "") $ invalidArgs ["add rule is empty"]
-      when (rr == "") $ invalidArgs ["remove rule is empty"]
-      when (length mb == 0) $ invalidArgs ["member list is empty"]
-      let balanceSum = Import.foldr (\cur acc -> acc + (snd cur)) 0 ab
-      when (balanceSum == 0) $ invalidArgs ["All balances are zero"]
+    Success gen@(ChainInfo _ _ _ mb) -> do 
+    -- add validity checks?
+      when (M.size mb == 0) $ invalidArgs ["member list is empty"]
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
