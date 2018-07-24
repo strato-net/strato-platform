@@ -57,6 +57,7 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
@@ -311,6 +312,8 @@ instance BlockHeaderLike BlockData where
     blockHeaderExtraData        = blockDataExtraData
     blockHeaderTimestamp        = blockDataTimestamp
     blockHeaderMixHash          = blockDataMixHash
+
+    blockHeaderModifyExtra      = over extraDataLens
 
     morphBlockHeader h2 =
         BlockData { blockDataNumber           = blockHeaderBlockNumber h2

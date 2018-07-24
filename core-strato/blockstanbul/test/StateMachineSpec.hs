@@ -123,8 +123,9 @@ spec = parallel $ do
         use proposal `shouldReturn` Nothing
 
   describe "A preprepare message" $ do
-    it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
+    it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
+        let blk = truncateExtra blk'
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
