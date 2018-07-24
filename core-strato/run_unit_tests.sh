@@ -8,6 +8,7 @@ TESTS=(
   blockapps-haskoin
   blockapps-ecrecover
   blockstanbul
+  ethereum-discovery
   ethereum-rlp
   ethereum-vm
   merkle-patricia-db
