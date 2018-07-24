@@ -26,6 +26,7 @@ library
                      Handler.AccountInfo
                      Handler.BlockInfo
                      Handler.BlkLast
+                     Handler.ChainInfo
                      Handler.Demo
                      Handler.Filters
                      Handler.Help
@@ -101,6 +102,7 @@ library
                  , file-embed
                  , filepath
                  , hjsmin                        >= 0.1
+                 , largeword
                  , mime-mail
                  , monad-logger                  >= 0.3
                  , persistent                    >= 2.0
@@ -109,6 +111,7 @@ library
                  , process
                  , shakespeare                   >= 2.0
                  , strato-conf
+                 , strato-genesis
                  , strato-model
                  , strato-sequencer
                  , template-haskell

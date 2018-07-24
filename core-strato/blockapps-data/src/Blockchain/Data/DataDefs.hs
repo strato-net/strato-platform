@@ -33,6 +33,7 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Data.Word
 
+import           Control.Lens.TH                         (makeLensesFor)
 import           GHC.Generics
 
 entityDefs :: [EntityDef]
@@ -45,3 +46,9 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"]  -- annoying: postgres doe
 
 -- todo newtype me
 type Difficulty = Integer
+
+type AddressBalancePair = (Address, Integer)
+
+type MapPair = (Word256, Word256)
+
+makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData

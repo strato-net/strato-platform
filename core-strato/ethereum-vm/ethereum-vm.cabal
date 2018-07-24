@@ -41,6 +41,7 @@ library
                  , leveldb-haskell
                  , merkle-patricia-db
                  , monad-logger
+                 , ordered-containers
                  , mtl
                  , persistent-postgresql
                  , postgresql-simple
@@ -48,6 +49,7 @@ library
                  , statsdi
                  , strato-adit
                  , strato-conf
+                 , strato-genesis
                  , strato-index
                  , strato-model
                  , strato-redis-blockdb

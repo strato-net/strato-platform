@@ -32,3 +32,4 @@ getBlkLastR n = do
                    Map.fromListWith (flip (++)) $ map (fmap (:[])) $ P.map (\(x, y) -> (blockTransactionBlockDataRefId $ entityVal x, rawTX2TX $ entityVal y)) txs::(Key BlockDataRef->[Transaction]) 
             
   returnJson $ P.map (uncurry bToBPrime') $ map (\b -> (entityVal b, getTXLists $ entityKey b)) blks 
+

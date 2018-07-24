@@ -27,7 +27,7 @@ instance Format AddressStateModification where
   format (ASModification addressState) = "Address Modified:\n" ++ format addressState
   format ASDeleted                     = "Address Deleted"
 
-formatAddressStateDBMap::M.Map Address AddressStateModification->String
+formatAddressStateDBMap :: M.Map Address AddressStateModification -> String
 formatAddressStateDBMap theMap = unlines $
     map (\(a, am) -> format a ++ ": " ++ format am)
      (M.toList theMap)
@@ -36,8 +36,8 @@ class HasMemAddressStateDB m where
   getAddressStateDBMap :: m (M.Map Address AddressStateModification)
   putAddressStateDBMap :: M.Map Address AddressStateModification -> m ()
 
-getAddressState::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-                 Address->m AddressState
+getAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+                 Address -> m AddressState
 getAddressState address = do
   theMap <- getAddressStateDBMap
   case M.lookup address theMap of
@@ -49,8 +49,8 @@ getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
                      m [(Address, AddressState)]
 getAllAddressStates = DB.getAllAddressStates
 
-putAddressState::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-                 Address->AddressState->m ()
+putAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+                 Address -> AddressState -> m ()
 putAddressState address newState = do
   theMap <- getAddressStateDBMap
   putAddressStateDBMap (M.insert address (ASModification newState) theMap)
@@ -65,14 +65,14 @@ flushMemAddressStateDB = do
                              ASDeleted                   -> DB.deleteAddressState address
   putAddressStateDBMap M.empty
 
-deleteAddressState::(HasMemAddressStateDB m, HasStateDB m)=>Address->
-                    m ()
+deleteAddressState :: (HasMemAddressStateDB m, HasStateDB m) =>
+                    Address -> m ()
 deleteAddressState address = do
   theMap <- getAddressStateDBMap
   putAddressStateDBMap (M.insert address ASDeleted theMap)
 
-addressStateExists::(HasMemAddressStateDB m, HasStateDB m)=>Address->
-                    m Bool
+addressStateExists :: (HasMemAddressStateDB m, HasStateDB m) =>
+                    Address -> m Bool
 addressStateExists address = do
   theMap <- getAddressStateDBMap
   case M.lookup address theMap of

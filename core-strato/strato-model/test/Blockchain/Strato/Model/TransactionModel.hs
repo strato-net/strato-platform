@@ -18,6 +18,7 @@ import           Numeric
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Util
 
@@ -44,6 +45,7 @@ data Transaction =
     transactionTo       :: Address,
     transactionValue    :: Integer,
     transactionData     :: B.ByteString,
+    transactionChainId  :: Maybe Word256,
     transactionR        :: Integer,
     transactionS        :: Integer,
     transactionV        :: Word8
@@ -54,35 +56,58 @@ data Transaction =
     transactionGasLimit :: Integer,
     transactionValue    :: Integer,
     transactionInit     :: Code,
+    transactionChainId  :: Maybe Word256,
     transactionR        :: Integer,
     transactionS        :: Integer,
     transactionV        :: Word8
     } deriving (Show, Read, Eq, Ord, Generic)
 
 instance RLPSerializable Transaction where
+  rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal, cid]) =
+    partial {
+      transactionV = fromInteger $ rlpDecode vVal,
+      transactionR = rlpDecode rVal,
+      transactionS = rlpDecode sVal,
+      transactionChainId = Just $ rlpDecode cid
+      }
+        where
+          partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal]) =
     partial {
       transactionV = fromInteger $ rlpDecode vVal,
       transactionR = rlpDecode rVal,
-      transactionS = rlpDecode sVal
+      transactionS = rlpDecode sVal,
+      transactionChainId = Nothing
       }
         where
           partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i, RLPScalar 0, RLPScalar 0, RLPScalar 0]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
   rlpEncode t =
-      RLPArray [
+      RLPArray $ [
         n, gp, gl, toAddr, val, i,
         rlpEncode $ toInteger $ transactionV t,
         rlpEncode $ transactionR t,
         rlpEncode $ transactionS t
-        ]
+        ] ++ (maybeToList . fmap rlpEncode $ transactionChainId t)
       where
         (RLPArray [n, gp, gl, toAddr, val, i]) = partialRLPEncode t
 
 
 --partialRLP(De|En)code are used for the signing algorithm
 partialRLPDecode :: RLPObject->Transaction
+partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
+    ContractCreationTX {
+      transactionNonce = rlpDecode n,
+      transactionGasPrice = rlpDecode gp,
+      transactionGasLimit = rlpDecode gl,
+      transactionValue = rlpDecode val,
+      transactionInit = rlpDecode i,
+      transactionChainId = error "transactionChainId not initialized in partialRLPDecode",
+      transactionR = error "transactionR not initialized in partialRLPDecode",
+      transactionS = error "transactionS not initialized in partialRLPDecode",
+      transactionV = error "transactionV not initialized in partialRLPDecode"
+      }
 partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
     ContractCreationTX {
       transactionNonce = rlpDecode n,
@@ -90,6 +115,20 @@ partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _]) = --Note-
       transactionGasLimit = rlpDecode gl,
       transactionValue = rlpDecode val,
       transactionInit = rlpDecode i,
+      transactionChainId = error "transactionChainId not initialized in partialRLPDecode",
+      transactionR = error "transactionR not initialized in partialRLPDecode",
+      transactionS = error "transactionS not initialized in partialRLPDecode",
+      transactionV = error "transactionV not initialized in partialRLPDecode"
+      }
+partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _, _]) =
+    MessageTX {
+      transactionNonce = rlpDecode n,
+      transactionGasPrice = rlpDecode gp,
+      transactionGasLimit = rlpDecode gl,
+      transactionTo = rlpDecode toAddr,
+      transactionValue = rlpDecode val,
+      transactionData = rlpDecode i,
+      transactionChainId = error "transactionChainId not initialized in partialRLPDecode",
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"
@@ -102,6 +141,7 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
       transactionTo = rlpDecode toAddr,
       transactionValue = rlpDecode val,
       transactionData = rlpDecode i,
+      transactionChainId = error "transactionChainId not initialized in partialRLPDecode",
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"
@@ -109,24 +149,24 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
 partialRLPEncode :: Transaction->RLPObject
-partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
-      RLPArray [
+partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid} =
+      RLPArray $ [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode to',
         rlpEncode v,
         rlpEncode d
-        ]
-partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init'} =
-      RLPArray [
+        ] ++ (maybeToList $ fmap rlpEncode cid)
+partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=init', transactionChainId=cid} =
+      RLPArray $ [
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
         rlpEncode (0 :: Integer),
         rlpEncode v,
         rlpEncode init'
-        ]
+        ] ++ (maybeToList $ fmap rlpEncode cid)
 
 instance TransactionLike Transaction where
     txHash        = transactionHash
@@ -137,6 +177,7 @@ instance TransactionLike Transaction where
     txValue       = transactionValue
     txGasPrice    = transactionGasPrice
     txGasLimit    = transactionGasLimit
+    txChainId     = transactionChainId
 
     txType MessageTX{}          = Message
     txType ContractCreationTX{} = ContractCreation
@@ -151,8 +192,8 @@ instance TransactionLike Transaction where
     txData ContractCreationTX{} = Nothing
 
     morphTx t = case type' of
-        Message          -> MessageTX n gp gl dest val dat r s v
-        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        Message          -> MessageTX n gp gl dest val dat chainId r s v
+        ContractCreation -> ContractCreationTX n gp gl val code chainId r s v
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -162,12 +203,25 @@ instance TransactionLike Transaction where
               dat       = fromJust (txData t)
               code      = fromJust (txCode t)
               (r, s, v) = txSignature t
+              chainId   = txChainId t
 
 addLeadingZerosTo64 :: String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
 
 createMessageTX :: MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString->PrvKey->SecretT m Transaction
-createMessageTX n gp gl to' val theData prvKey = do
+createMessageTX n gp gl to' val theData prvKey = createChainMessageTX n gp gl to' val theData Nothing prvKey
+
+createChainMessageTX :: MonadIO m
+                     => Integer
+                     -> Integer
+                     -> Integer
+                     -> Address
+                     -> Integer
+                     -> B.ByteString
+                     -> Maybe Word256
+                     -> PrvKey
+                     -> SecretT m Transaction
+createChainMessageTX n gp gl to' val theData chainId prvKey = do
   let unsignedTX = MessageTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
@@ -175,6 +229,7 @@ createMessageTX n gp gl to' val theData prvKey = do
                      transactionTo = to',
                      transactionValue = val,
                      transactionData = theData,
+                     transactionChainId = chainId,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0
@@ -195,13 +250,25 @@ createMessageTX n gp gl to' val theData prvKey = do
     }
 
 createContractCreationTX :: MonadIO m=>Integer->Integer->Integer->Integer->Code->PrvKey->SecretT m Transaction
-createContractCreationTX n gp gl val init' prvKey = do
+createContractCreationTX n gp gl val init' prvKey = createChainContractCreationTX n gp gl val init' Nothing prvKey
+
+createChainContractCreationTX :: MonadIO m
+                              => Integer
+                              -> Integer
+                              -> Integer
+                              -> Integer
+                              -> Code
+                              -> Maybe Word256
+                              -> PrvKey
+                              -> SecretT m Transaction
+createChainContractCreationTX n gp gl val init' chainId prvKey = do
   let unsignedTX = ContractCreationTX {
                      transactionNonce = n,
                      transactionGasPrice = gp,
                      transactionGasLimit = gl,
                      transactionValue = val,
                      transactionInit = init',
+                     transactionChainId = chainId,
                      transactionR = 0,
                      transactionS = 0,
                      transactionV = 0

@@ -21,6 +21,7 @@ import           System.Clock
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ChainInfoDB        (putChainInfo)
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
@@ -43,6 +44,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         putIndexerBestBlockInfo bbi
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+        let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
+        forM_ chainInfos $ uncurry putChainInfo
         let blocks = [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks

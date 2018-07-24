@@ -33,6 +33,7 @@ import           Blockchain.Bagger.BaggerState (defaultBaggerState)
 import           Blockchain.Constants
 import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
@@ -77,6 +78,10 @@ runContextM' f = do
                         (error "Postgres connection no initialized") --conn
                         M.empty
                         M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
                         defaultBaggerState
                         (error "Kafka not initialized") --initialKafkaState
                         Unspecified

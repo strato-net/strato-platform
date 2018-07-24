@@ -39,7 +39,7 @@ import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
-import           Blockchain.Data.GenesisBlock
+import           Blockchain.GenesisBlock
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB

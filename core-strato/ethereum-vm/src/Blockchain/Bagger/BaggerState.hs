@@ -4,6 +4,8 @@ module Blockchain.Bagger.BaggerState where
 
 import           Control.Applicative                (Alternative, empty)
 
+import           Data.Map.Ordered                   (OMap)
+import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 
@@ -29,6 +31,7 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
+                               , privateHashes         :: OMap SHA OutputTx
                                , startTimestamp        :: UTCTime
                                } deriving (Show)
 
@@ -66,6 +69,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
+                                  , privateHashes         = OMap.empty
                                   , startTimestamp        = error "reached defaultMiningCache"
                                   }
 
@@ -94,7 +98,7 @@ calculateIntrinsicTxFee bs t@OutputTx{otBaseTx = bt} =
     TD.transactionGasPrice bt * calculateIntrinsicGasAtNextBlock bs t
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
-calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache{ bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
+calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache { bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
     cig (DD.blockDataNumber bh + 1)
 
 addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
@@ -111,11 +115,11 @@ removeFromSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.d
 
 trimBelowNonceFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimBelowNonceFromQueued a nonce s@BaggerState{queued = q} =
-    let (oldTX, newATL) = modifyATL (trimBelowNonce nonce) a q in (oldTX, s { queued = newATL })
+    let (oldTX, newATL) = modifyATL (trimBelowNonce nonce) a q in (oldTX, s {queued = newATL })
 
 trimBelowNonceFromPending :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimBelowNonceFromPending a nonce s@BaggerState{pending = p} =
-    let (oldTx, newATL) = modifyATL (trimBelowNonce nonce) a p in (oldTx, s { pending = newATL })
+    let (oldTX, newATL) = modifyATL (trimBelowNonce nonce) a p in (oldTX, s { pending = newATL })
 
 trimAboveCostFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimAboveCostFromQueued a maxCost s@BaggerState{queued = q} =
@@ -140,9 +144,8 @@ purgeFromQueued OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{queued = q}
     where newATL = purgeFromATL sender (TD.transactionNonce tx) q
 
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
-purgeFromPending OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{queued = p} = s { pending= newATL }
+purgeFromPending OutputTx{otSigner=sender, otBaseTx=tx} s@BaggerState{pending = p} = s { pending = newATL }
     where newATL = purgeFromATL sender (TD.transactionNonce tx) p
-
 
 addToPromotionCache :: OutputTx -> BaggerState -> BaggerState
 addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTransactions = pt } } =
