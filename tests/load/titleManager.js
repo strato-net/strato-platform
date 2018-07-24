@@ -14,7 +14,7 @@ function* uploadContract(admin) {
   // for testing purposes the creator is the admin user
   const args = {_creator: admin.address};
   const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  yield compileSearch();
+  yield compileSearch(contract.codeHash);
   contract.src = 'removed';
   return bind(admin, contract);
 }
@@ -35,10 +35,10 @@ function bind(admin, contract) {
   return contract;
 }
 
-function* compileSearch() {
+function* compileSearch(codeHash) {
   rest.verbose('compileSearch', contractName);
 
-  if (yield rest.isCompiled(contractName)) {
+  if (yield rest.isSearchable(codeHash)) {
     return;
   }
 

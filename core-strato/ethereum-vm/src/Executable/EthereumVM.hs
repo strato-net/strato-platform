@@ -12,6 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
+import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -19,9 +20,11 @@ import qualified Network.Kafka.Protocol                as KP
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.Format                     (format)
 import           Blockchain.JsonRpcCommand
@@ -36,6 +39,9 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
+import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
+import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
@@ -50,6 +56,7 @@ ethereumVM = void . execContextM $ do
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
+    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -58,14 +65,18 @@ ethereumVM = void . execContextM $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
-        
+
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
+
+        insertNewChains seqEvents
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
+        let allTxs = [OETx ts t | OETx ts t <- seqEvents]
+        $logInfoS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+        let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
@@ -78,7 +89,7 @@ ethereumVM = void . execContextM $ do
             let number = blockDataNumber . obBlockData $ b
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
-            putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
+            writeBlockSummary b
         addBlocks blocks
 
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -102,6 +113,21 @@ ethereumVM = void . execContextM $ do
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         setCheckpointNoMetadata newOffset
 
+insertNewChains :: [OutputEvent] -> ContextM ()
+insertNewChains events = do
+  let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
+
+  newChains <- forM newChainInfos $ \(cId, cInfo) -> do
+    sr <- chainInfoToGenesisState cInfo
+    mGSR <- getGenesisStateRoot cId
+    case mGSR of
+      Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
+      Nothing -> do
+        initializeChainDBs cId sr -- only needed to update Postgres with chain info for API calls
+        putGenesisStateRoot cId sr >> return [(cId, cInfo)]
+
+  void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
+
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
@@ -116,7 +142,7 @@ getFirstBlockFromSequencer = do
 initializeCheckpointAndBlockSummary :: ContextM ()
 initializeCheckpointAndBlockSummary = do
     block <- getFirstBlockFromSequencer
-    initBlockSummary block
+    writeBlockSummary  block
     let sha    = outputBlockHash block
         header = obBlockData block
         txs    = obReceiptTransactions block
@@ -128,8 +154,8 @@ initializeCheckpointAndBlockSummary = do
     setCheckpoint 1 (EVMCheckpoint sha header txHs cbbi)
 
 
-initBlockSummary :: OutputBlock -> ContextM ()
-initBlockSummary block =
+writeBlockSummary :: OutputBlock -> ContextM ()
+writeBlockSummary block =
     let sha    = outputBlockHash block
         header = obBlockData block
         td     = obTotalDifficulty block

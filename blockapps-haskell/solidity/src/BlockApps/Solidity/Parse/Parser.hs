@@ -55,11 +55,12 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
   Xabi{
-    xabiFuncs=xabiFuncs x `Map.union` xabiFuncs y,
-    xabiConstr=xabiConstr x,
+    xabiFuncs = xabiFuncs x `Map.union` xabiFuncs y,
+    xabiConstr = xabiConstr x,
     xabiVars= fmap (bumpAtBytes bumper) (xabiVars x) `Map.union` xabiVars y,
     xabiTypes=xabiTypes x `Map.union` xabiTypes y,
-    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
+    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y,
+    xabiEvents = xabiEvents x `Map.union` xabiEvents y
     }
   where
     bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32

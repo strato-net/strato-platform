@@ -1,0 +1,81 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Download: index Modal Submit with empty value 1`] = `
+Object {
+  "errors": Object {
+    "contractAddress": "Can't be blank",
+  },
+}
+`;
+
+exports[`Download: index mapStateToProps with values 1`] = `
+Object {
+  "downloadError": "error",
+  "downloadUrl": "https://strato-external-storage.s3.amazonaws.com/1529905060401-widescreen.jpeg",
+  "isOpen": true,
+}
+`;
+
+exports[`Download: index mapStateToProps without values 1`] = `
+Object {
+  "downloadError": null,
+  "downloadUrl": null,
+  "isOpen": false,
+}
+`;
+
+exports[`Download: index render component with values 1`] = `
+"<div>
+  <Blueprint.Dialog isOpen={true} onClose={[Function: onClose]} iconName=\\"pt-icon-download\\" title=\\"Download\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body upload-form\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Contract Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <Field name=\\"contractAddress\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Contract Address\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center smd-margin-8\\">
+            <Blueprint.Button intent={0} onClick={[undefined]} text=\\"Download\\" />
+          </div>
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;
+
+exports[`Download: index render component without values 1`] = `
+"<div>
+  <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-download\\" title=\\"Download\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body upload-form\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Contract Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <Field name=\\"contractAddress\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Contract Address\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center smd-margin-8\\">
+            <Blueprint.Button intent={0} onClick={[undefined]} text=\\"Download\\" />
+          </div>
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;

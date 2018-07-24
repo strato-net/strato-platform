@@ -9,6 +9,7 @@
 
 module Blockchain.Strato.RedisBlockDB
     ( inNamespace, getSHAsByNumber
+    , getChainInfo, putChainInfo
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getUncles
@@ -25,6 +26,8 @@ module Blockchain.Strato.RedisBlockDB
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     ) where
 
+import           Blockchain.Data.ChainInfo
+import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -68,13 +71,34 @@ inNamespace :: RedisDBKeyable k
             -> S8.ByteString
 inNamespace ns k = ns' `S8.append` toKey k
     where ns' = case ns of
-            Headers      -> "h:"
-            Transactions -> "t:"
-            Numbers      -> "n:"
-            Uncles       -> "u:"
-            Parent       -> "p:"
-            Children     -> "c:"
-            Canonical    -> "q:"
+            Headers          -> "h:"
+            Transactions     -> "t:"
+            Numbers          -> "n:"
+            Uncles           -> "u:"
+            Parent           -> "p:"
+            Children         -> "c:"
+            Canonical        -> "q:"
+            PrivateChainInfo -> "x:"
+
+getChainInfo :: Word256
+             -> Redis (Maybe ChainInfo)
+getChainInfo cId = getInNamespace PrivateChainInfo cId >>= \case
+    Left _             -> return Nothing
+    Right Nothing      -> return Nothing
+    Right (Just rcInfo) -> let (RedisChainInfo cInfo) = fromValue rcInfo in
+        return $ Just cInfo
+
+putChainInfo :: Word256
+          -> ChainInfo
+          -> Redis (Either Reply Status)
+putChainInfo cId cInfo = do
+    let rChain    = RedisChainInfo cInfo
+
+    res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"

@@ -61,14 +61,28 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
             Just (DependentBlocks existingDeps) ->
                 LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks (b:existingDeps)
 
+    existingParent :: SequencedBlock -> m (Maybe DependentBlockEntry)
+    existingParent b = do
+        let parentHash = parentHashBS b
+        db                  <- getDependentBlockDB
+        readOptions         <- getReadOptions
+        maybeExistingParent <- LDB.get db readOptions parentHash
+        return $ decode . B.fromStrict <$> maybeExistingParent
+
+    readyToEmit :: SequencedBlock -> m Bool
+    readyToEmit b = do
+      ep <- existingParent b
+      case ep of
+        Just (Emitted _) -> return True
+        _ -> return False
+
     enqueueIfParentNotEmitted :: SequencedBlock -> m EmissionReadiness
     enqueueIfParentNotEmitted b = do
         let parentHash = parentHashBS b
         db                  <- getDependentBlockDB
-        readOptions         <- getReadOptions
         writeOptions        <- getWriteOptions
-        maybeExistingParent <- LDB.get db readOptions parentHash
-        case (decode . B.fromStrict) <$> maybeExistingParent of
+        ep <- existingParent b
+        case ep of
             Just (Emitted totalDifficulty') ->
                 return $ ReadyToEmit totalDifficulty'
             Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
@@ -79,7 +93,7 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
                 LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks [b]
                 return NotReadyToEmit
 
-    buildEmissionChain :: SequencedBlock -> Integer -> m [(Maybe LDB.BatchOp, OutputEvent)]
+    buildEmissionChain :: SequencedBlock -> Integer -> m [(Maybe LDB.BatchOp, OutputBlock)]
     buildEmissionChain b lastTotalDifficulty = do
         db           <- getDependentBlockDB
         readOptions  <- getReadOptions
@@ -95,4 +109,4 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
             totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
             thePutOperation  = Just . LDB.Put thisBlockHash . B.toStrict . encode $ Emitted totalDifficulty'
             theBlock         = sequencedBlockToOutputBlock b totalDifficulty'
-            theRet           = (thePutOperation, OEBlock theBlock)
+            theRet           = (thePutOperation, theBlock)
