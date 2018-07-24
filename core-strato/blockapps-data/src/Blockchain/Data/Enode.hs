@@ -30,15 +30,6 @@ import                  Blockchain.Data.RLP
 import                  Test.QuickCheck.Arbitrary
 import                  Test.QuickCheck.Gen
 
--- Move to ethereum-rlp (generic serialization of Maybe)
-instance (RLPSerializable a) => RLPSerializable (Maybe a) where
-  rlpEncode Nothing = RLPString ""
-  rlpEncode (Just a) = RLPArray [rlpEncode a]
-
-  rlpDecode (RLPString "") = Nothing
-  rlpDecode (RLPArray [x]) = Just (rlpDecode x)
-  rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
-
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic)
 
