@@ -39,8 +39,10 @@ postChainR = do
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ _ _ mb) -> do 
-    -- add validity checks?
+    Success gen@(ChainInfo _ acin cdin mb) -> do 
+    -- add more checks?
+      when (length acin == 0) $ invalidArgs ["account info is empty"]
+      when (length cdin == 0) $ invalidArgs ["code info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
