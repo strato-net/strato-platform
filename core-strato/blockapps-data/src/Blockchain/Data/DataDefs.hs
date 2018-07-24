@@ -13,8 +13,11 @@
 
 module Blockchain.Data.DataDefs where
 
+import           Control.Monad.Trans.Class (lift)
+
 import           Database.Persist
 import           Database.Persist.Quasi
+import           Database.Persist.Sql
 import           Database.Persist.TH
 
 import           Data.Time
@@ -39,10 +42,15 @@ import           GHC.Generics
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
-share [mkPersist sqlSettings, mkMigrate "migrateAll"]  -- annoying: postgres doesn't like tables called user
+share [mkPersist sqlSettings, mkMigrate "migrateAuto"]  -- annoying: postgres doesn't like tables called user
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
---instance ToJSON AddressState
+migrateAll :: Migration
+migrateAll = do
+  migrateAuto
+  let exec = lift . lift . flip rawExecute []
+  exec "ALTER TABLE block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  exec "ALTER TABLE block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
 
 -- todo newtype me
 type Difficulty = Integer
