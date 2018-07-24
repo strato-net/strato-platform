@@ -47,6 +47,19 @@ dependencies:
   - unordered-containers
   - vector
 
+executables:
+  slipstream:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - base
+      - hflags
+      - milena
+      - monad-control
+      - mtl
+      - slipstream
+      - time
+
 tests:
   slipstream-test:
     main: Spec.hs
