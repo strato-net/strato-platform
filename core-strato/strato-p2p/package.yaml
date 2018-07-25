@@ -63,6 +63,7 @@ dependencies:
   - strato-redis-blockdb
   - hedis
   - lifted-async
+  - blockstanbul
 
 ghc-options: -Wall -threaded
 
