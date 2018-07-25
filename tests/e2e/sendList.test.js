@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it.only('resolve==true', function* () {
+  it('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -50,7 +50,7 @@ describe("Send Transaction List", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it('resolve==false', function* () {
+  it.only('resolve==false', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -94,7 +94,7 @@ describe("Send Transaction List", function() {
     // console.log('Here is Bob starting balance', bob.startingBalance);
     // console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
-    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
+    const delta = batchValueEther.mul(batchSize);
     console.log('HERE IS DELTA', delta);
     console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
