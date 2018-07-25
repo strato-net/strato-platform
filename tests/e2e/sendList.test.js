@@ -43,7 +43,7 @@ describe("Send Transaction List", function() {
     console.log('Here is Bob starting balance', bob.startingBalance);
     console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
-    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
+    const delta = batchValueEther.mul(batchSize);
     console.log('HERE IS DELTA', delta);
     console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
