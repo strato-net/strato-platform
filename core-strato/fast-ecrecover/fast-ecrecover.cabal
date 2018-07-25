@@ -25,7 +25,7 @@ library
   exposed-modules:
     Blockchain.FastECRecover
   build-depends:
-    base >= 4.9 && < 4.10,
+    base,
     --
     blockapps-haskoin,
     ethereum-encryption,
@@ -74,6 +74,6 @@ benchmark benchmark
     binary < 0.9,
     criterion,
     -- basics:
-    base >= 4.8 && < 4.10,
+    base,
     binary
 

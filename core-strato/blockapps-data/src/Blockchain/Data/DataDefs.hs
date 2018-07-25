@@ -22,7 +22,6 @@ import           Data.Time
 import           Blockchain.Data.Address
 import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.PersistTypes            ()
-import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
@@ -35,7 +34,6 @@ import           Blockchain.SHA
 import           Data.Word
 
 import           Control.Lens.TH                         (makeLensesFor)
-import           Data.Aeson
 import           GHC.Generics
 
 entityDefs :: [EntityDef]
@@ -44,7 +42,7 @@ entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.t
 share [mkPersist sqlSettings, mkMigrate "migrateAll"]  -- annoying: postgres doesn't like tables called user
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
-instance ToJSON AddressState
+--instance ToJSON AddressState
 
 -- todo newtype me
 type Difficulty = Integer
@@ -54,4 +52,3 @@ type AddressBalancePair = (Address, Integer)
 type MapPair = (Word256, Word256)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
-makeLensesFor [("blockBlockData", "blockDataLens")] ''Block

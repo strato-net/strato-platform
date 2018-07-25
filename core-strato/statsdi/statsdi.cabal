@@ -22,7 +22,7 @@ library
                      , Control.Monad.Stats.Util
   other-modules:       Control.Monad.Stats.Monad
                      , Control.Monad.Stats.MTL
-  build-depends:       base >= 4.7 && < 5
+  build-depends:       base
                      , network
                      , random
                      , dequeue
@@ -30,9 +30,7 @@ library
                      , time
                      , bytestring
                      , ether
-                     , transformers
-                     , transformers-lift
-                     , template-haskell >= 2.11.1.0 && < 2.12
+                     , template-haskell
                      , unordered-containers >= 0.2.7.0 && < 0.3
                      , hashable >= 1.2.4.0 && < 1.3
   default-language:    Haskell2010

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 declare -i RESULT=0
 TESTS=(
   blockapps-ethereum

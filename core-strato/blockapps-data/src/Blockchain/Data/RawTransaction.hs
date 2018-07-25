@@ -13,9 +13,7 @@
 module Blockchain.Data.RawTransaction (
   RawTransaction(..),
   insertRawTX,
-  insertRawTX',
-  insertRawTXIfNew,
-  insertRawTXIfNew'
+  insertRawTX'
   ) where
 
 
@@ -30,13 +28,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 
-
-insertRawTXIfNew::HasSQLDB m=>[RawTransaction]->m ()
-insertRawTXIfNew = insertRawTX Fail
-
-insertRawTXIfNew'::(MonadBaseControl IO m, MonadIO m)=>
-                   [RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
-insertRawTXIfNew' = insertRawTX' Fail
 
 insertRawTX :: HasSQLDB m=>DebugMode->[RawTransaction]->m ()
 insertRawTX m rawTXs= do

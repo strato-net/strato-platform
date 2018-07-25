@@ -95,7 +95,6 @@ library
                  , conduit                       >= 1.0
                  , containers
                  , directory
-                 , either
                  , entropy
                  , esqueleto
                  , ethereum-discovery

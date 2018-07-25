@@ -418,7 +418,6 @@ oneTimeSetup genesisBlockName = do
          EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (block_id);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (number);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);" []
