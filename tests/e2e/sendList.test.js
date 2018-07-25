@@ -34,7 +34,6 @@ describe("Send Transaction List", function() {
     const resolve = true;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
-    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     for (let receipt of receipts) {
       yield rest.waitTransactionResult(receipt);
     }
@@ -43,6 +42,7 @@ describe("Send Transaction List", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
+    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
