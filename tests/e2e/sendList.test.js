@@ -10,7 +10,7 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
-const batchValueEther = new BigNumber(1).mul(constants.ETHER);
+const batchValueEther = 1;
 const password = '1234';
 
 describe("Send Transaction List", function() {
@@ -43,7 +43,7 @@ describe("Send Transaction List", function() {
     console.log('Here is Bob starting balance', bob.startingBalance);
     console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
-    const delta = batchValueEther.mul(batchSize);
+    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     console.log('HERE IS DELTA', delta);
     console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
@@ -94,14 +94,14 @@ describe("Send Transaction List", function() {
     // console.log('Here is Bob starting balance', bob.startingBalance);
     // console.log('Here is Bob end balance', bob.endBalance);
     //TODO Calculate gas cost and factor into balance
-    const delta = batchValueEther.mul(batchSize);
+    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     console.log('HERE IS DELTA', delta);
     console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it('resolve==false, insufficient funds https://blockapps.atlassian.net/browse/API-12', function* () {
+  it.skip('resolve==false, insufficient funds https://blockapps.atlassian.net/browse/API-12', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -133,9 +133,10 @@ describe("Send Transaction List", function() {
 
 function createBatchTx(batchSize, batchValue, toUser, nonce) {
   var txs = [];
+  const value = new BigNumber(batchValue).mul(constants.ETHER)
   for (var i = 0; i < batchSize; i++) {
     txs.push({
-      value: batchValue,
+      value: value,
       toAddress: toUser.address,
       txParams: {nonce: nonce+i},
     });
@@ -146,9 +147,10 @@ function createBatchTx(batchSize, batchValue, toUser, nonce) {
 
 function createBatchTxWithNonce(batchValue, toUser, nonces) {
   var txs = [];
+  const value = new BigNumber(batchValue).mul(constants.ETHER)
   return nonces.map(function(nonce) {
     return {
-      value: batchValue,
+      value: value,
       toAddress: toUser.address,
       txParams: {nonce: nonce},
     };
@@ -184,12 +186,12 @@ describe("Send Transaction List with nonces", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
-    const delta = batchValueEther.mul(nonces.length);
+    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it('resolve==false, list of nonces', function* () {
+  it.skip('resolve==false, list of nonces', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
