@@ -133,7 +133,7 @@ describe("Send Transaction List", function() {
 
 function createBatchTx(batchSize, batchValue, toUser, nonce) {
   var txs = [];
-  const value = new BigNumber(batchValue).mul(constants.ETHER)
+  const value = new BigNumber(batchValue).mul(constants.ETHER);
   for (var i = 0; i < batchSize; i++) {
     txs.push({
       value: value,
@@ -147,7 +147,7 @@ function createBatchTx(batchSize, batchValue, toUser, nonce) {
 
 function createBatchTxWithNonce(batchValue, toUser, nonces) {
   var txs = [];
-  const value = new BigNumber(batchValue).mul(constants.ETHER)
+  const value = new BigNumber(batchValue).mul(constants.ETHER);
   return nonces.map(function(nonce) {
     return {
       value: value,
@@ -168,7 +168,7 @@ describe("Send Transaction List with nonces", function() {
     const bobName = 'Bob' + uid;
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
-    const batchValueEther = new BigNumber(2).mul(constants.ETHER)
+    const batchValueEther = 2;
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
@@ -186,7 +186,7 @@ describe("Send Transaction List with nonces", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
-    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
+    const delta = new BigNumber(batchValueEther).mul(nonces.length).mul(constants.ETHER);
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
@@ -221,13 +221,13 @@ describe("Send Transaction List with nonces", function() {
 
   });
 
-  it('resolve==false, nonces and expected results', function* () {
+  it.only('resolve==false, nonces and expected results', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
-    const batchValueEther = new BigNumber(2).mul(constants.ETHER);
+    const batchValueEther = 2;
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
@@ -241,7 +241,9 @@ describe("Send Transaction List with nonces", function() {
     const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
     const receipts = yield rest.sendList(alice, txs, resolve);
     const results = yield Promise.all(checkResults(receipts));
+    console.log('Here are the results', results);
     const statii = getStatii(results);
+    console.log('Here are the getStatii', statii);
     assert.deepEqual(statii, expectedStatii);
   });
 
@@ -281,7 +283,8 @@ function getStatii(results) {
 // output: array of promises, checking the txResults of those hashes
 function checkResults(receipts) {
   return receipts.map(receipt => {
-    const hash = receipt.senderBalance;
+    const hash = receipt.hash;
+    console.log('Here is the hash', receipt);
     return co(rest.waitTransactionResult(hash, 5*1000))
       .catch(function(err) {
         // an HttpError should be thrown
