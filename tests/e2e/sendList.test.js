@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it('resolve==true', function* () {
+  it.only('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
