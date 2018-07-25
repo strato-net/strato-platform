@@ -50,7 +50,7 @@ describe("Send Transaction List", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it.only('resolve==false', function* () {
+  it('resolve==false', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -166,7 +166,7 @@ describe("Send Transaction List with nonces", function() {
     const bobName = 'Bob' + uid;
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
-    const batchValueEther = 2;
+    const batchValueEther = new BigNumber(2).mul(constants.ETHER)
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
@@ -184,7 +184,7 @@ describe("Send Transaction List with nonces", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
-    const delta = new BigNumber(batchValueEther).mul(nonces.length).mul(constants.ETHER);
+    const delta = batchValueEther.mul(nonces.length);
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
@@ -225,7 +225,7 @@ describe("Send Transaction List with nonces", function() {
     const bobName = 'Bob' + uid;
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
-    const batchValueEther = 2;
+    const batchValueEther = new BigNumber(2).mul(constants.ETHER);
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
