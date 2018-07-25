@@ -110,5 +110,7 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - persistent-sqlite
+      - stm-chans
+      - stm-conduit
       - strato-p2p
       - temporary
