@@ -6,8 +6,8 @@
 module Blockchain.Blockstanbul.Messages where
 
 import Control.Lens
-import Control.Monad
 import Data.Binary
+import Data.DeriveTH
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
@@ -34,9 +34,6 @@ data MsgAuth = MsgAuth {
   signature :: ExtendedSignature
 } deriving (Eq, Show, Generic)
 
-instance Arbitrary MsgAuth where
-  arbitrary = liftM2 MsgAuth arbitrary arbitrary
-
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
@@ -53,6 +50,11 @@ instance Binary MsgAuth where
 instance Binary View where
 instance Binary TrustedMessage where
 instance Binary WireMessage where
+
+derive makeArbitrary ''MsgAuth
+derive makeArbitrary ''View
+derive makeArbitrary ''TrustedMessage
+derive makeArbitrary ''WireMessage
 
 instance Format WireMessage where
   -- TODO(tim): Invest in better formatting.

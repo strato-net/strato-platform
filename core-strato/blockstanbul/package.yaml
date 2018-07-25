@@ -12,6 +12,7 @@ dependencies:
   - conduit
   - conduit-combinators
   - crypto-api
+  - derive
   - ethereum-encryption
   - ethereum-rlp
   - ghc
