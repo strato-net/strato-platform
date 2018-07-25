@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it('resolve==true', function* () {
+  it.only('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -35,15 +35,19 @@ describe("Send Transaction List", function() {
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
     console.log('HERE IS THE RECEIPT', receipts);
+    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
+    for (let receipt of receipts) {
+      yield rest.waitTransactionResult(receipt);
+    }
     // check balances
     alice.endBalance = yield rest.getBalance(alice.address);
     bob.endBalance = yield rest.getBalance(bob.address);
+
+    //TODO Calculate gas cost and factor into balance
     console.log('Here is Alice starting balance', alice.startingBalance);
     console.log('Here is Alice end balance', alice.endBalance);
     console.log('Here is Bob starting balance', bob.startingBalance);
     console.log('Here is Bob end balance', bob.endBalance);
-    //TODO Calculate gas cost and factor into balance
-    const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     console.log('HERE IS DELTA', delta);
     console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
@@ -221,7 +225,7 @@ describe("Send Transaction List with nonces", function() {
 
   });
 
-  it.only('resolve==false, nonces and expected results', function* () {
+  it('resolve==false, nonces and expected results', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
