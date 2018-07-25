@@ -108,6 +108,7 @@ tests:
     dependencies:
       - QuickCheck
       - hspec
+      - hspec-expectations-lifted
       - persistent-sqlite
       - strato-p2p
       - temporary

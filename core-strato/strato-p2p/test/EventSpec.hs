@@ -27,6 +27,7 @@ import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.RedisBlockDB.Models
 
 import Test.Hspec
+import qualified Test.Hspec.Expectations.Lifted as L
 import Test.QuickCheck
 
 -- testContext is useful for testing because it doesn't require
@@ -71,31 +72,25 @@ runTestPeer mv = do
   liftSqlPersistMPool migrateAll pool
   runLoggingT (runContextM ctx mv) printLogMsg
 
-expectAs :: (MonadIO m, Eq a, Show a) => a -> a -> m ()
-expectAs a b = liftIO $ a `shouldBe` b
-
 spec :: Spec
 spec = do
   describe "environment sanity checks" $ do
     it "has a PPeer table" $ do
       runTestPeer $ do
         pool <- gets contextSQLDB
-        peerCount <- liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool
-        peerCount `expectAs` 0
+        liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool `L.shouldReturn` 0
     it "can pretend to write to kafka" $ do
       quickCheck . once $ \ori txs -> runTestPeer (emitKafkaTransactions ori txs)
       quickCheck . once $ \ori blk -> runTestPeer (emitKafkaBlock ori blk)
     it "has a redis instance" $ do
       runTestPeer $ do
-        bb :: Maybe RedisBestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        bb `expectAs` Nothing
+        RBDB.withRedisBlockDB RBDB.getBestBlockInfo `L.shouldReturn` (Nothing :: Maybe RedisBestBlock)
 
   describe "handleEvents" $ do
     it "should pong a ping" $ do
       runTestPeer $ do
-        msgs <- runConduit $ yield (MsgEvt Ping) .| handleEvents Log testPeer .| sinkList
-        msgs `expectAs` [Pong]
+        runConduit $ yield (MsgEvt Ping) .| handleEvents Log testPeer .| sinkList `L.shouldReturn` [Pong]
     it "should return empty BlockBodies to empty BlockHeaders" $ do
       runTestPeer $ do
-        msgs <- runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents Log testPeer .| sinkList
-        msgs `expectAs` [GetBlockBodies []]
+        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents Log testPeer .| sinkList
+          `L.shouldReturn` [GetBlockBodies []]
