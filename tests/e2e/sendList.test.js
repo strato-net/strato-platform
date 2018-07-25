@@ -241,9 +241,7 @@ describe("Send Transaction List with nonces", function() {
     const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
     const receipts = yield rest.sendList(alice, txs, resolve);
     const results = yield Promise.all(checkResults(receipts));
-    console.log('Here are the results', results);
     const statii = getStatii(results);
-    console.log('Here are the getStatii', statii);
     assert.deepEqual(statii, expectedStatii);
   });
 
