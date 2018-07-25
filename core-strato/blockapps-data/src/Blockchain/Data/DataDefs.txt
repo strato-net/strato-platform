@@ -32,40 +32,17 @@ BlockDataRef
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    blockId BlockId
     hash SHA
+    blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
     deriving Eq Read Show
 
-Block
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    deriving Eq Read Show
-
-NewBlk
-    hash SHA
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    Primary hash
-    TheHash hash
-    deriving Eq Read Show
-
 BlockTransaction
-    blockId BlockId
+    blockDataRefId BlockDataRefId
     transaction RawTransactionId
     deriving Eq Read Show
-
-AddressState
-    nonce Integer sqltype=numeric(1000,0)
-    balance Integer sqltype=numeric(1000,0)
-    contractRoot StateRoot
-    codeHash SHA
-    chainId Word256 Maybe
-    deriving Eq Generic Read Show
 
 AddressStateRef
     address Address
@@ -175,14 +152,6 @@ LogDB
     theData BS.ByteString
     bloom Word512
     deriving Eq Read Show Generic
-
-BlockOffset
-    offset Integer
-    number Integer
-    hash SHA
-    Primary hash
-    UniqueH hash
-    deriving Eq Read Show
 
 ChainInfoRef
     chainId Word256

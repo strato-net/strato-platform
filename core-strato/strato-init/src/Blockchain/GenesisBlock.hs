@@ -17,6 +17,7 @@ import qualified Data.JsonStream.Parser               as JS
 
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
@@ -123,7 +124,7 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
-    [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
@@ -157,7 +158,7 @@ initializeGenesisBlock backupType genesisBlockName = do
        Right errs -> error . show $ errs
        Left err -> error . show $ err
 
-bootstrapIndexer :: SQL.Key Block -> OutputBlock -> IO ()
+bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds

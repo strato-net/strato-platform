@@ -68,6 +68,7 @@ library
                    Blockchain.Data.Address
                    Blockchain.Data.AddressStateDB
                    Blockchain.Data.Blockchain
+                   Blockchain.Data.Block
                    Blockchain.Data.BlockDB
                    Blockchain.Data.BlockHeader
                    Blockchain.Data.ChainId
@@ -81,7 +82,6 @@ library
                    Blockchain.Data.Log
                    Blockchain.Data.LogDB
                    Blockchain.Data.MiningStatus
-                   Blockchain.Data.NewBlk
                    Blockchain.Data.PersistTypes
                    Blockchain.Data.Transaction
                    Blockchain.Data.TransactionDef
@@ -103,7 +103,6 @@ library
                    Blockchain.Stream.VMEvent
                    Blockchain.Stream.UnminedBlock
     other-modules: Paths_blockapps_data
-                   Blockchain.Data.BlockOffset
                    Blockchain.Data.RawTransaction
     ghc-options: -Wall -O2
     extensions: TemplateHaskell

@@ -4,8 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Blockchain.GenesisBlockSetup (
-  genesisBlockSetup,
-  retrieveRandomPrivKey
+  genesisBlockSetup
   ) where
 
 import           Control.Monad               (forM, forM_)
@@ -48,10 +47,3 @@ writePrvKeys :: [(Int,PrvKey,Address)] -> IO ()
 writePrvKeys list = forM_ list $ \(index,priv, _) -> do
     encodeFile ("priv_" ++ (show index)) (show priv)
 
-readPrvKey :: FilePath -> IO PrvKey
-readPrvKey path = do
-    keyString <- decodeFile path :: IO String
-    return . read $ keyString
-
-retrieveRandomPrivKey :: Int -> IO PrvKey
-retrieveRandomPrivKey n = readPrvKey $ "priv_" ++ (show n)

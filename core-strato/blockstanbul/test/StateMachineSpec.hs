@@ -23,6 +23,7 @@ import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication

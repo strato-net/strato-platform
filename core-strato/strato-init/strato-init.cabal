@@ -45,6 +45,7 @@ executable strato-setup
                  , persistent-postgresql
                  , resourcet
                  , strato-conf
+                 , strato-genesis
                  , strato-redis-blockdb
                  , text
                  , time
@@ -79,6 +80,7 @@ executable strato-backup
                  , monad-logger
                  , persistent-postgresql
                  , strato-conf
+                 , strato-genesis
                  , transformers
     buildable: True
     main-is: Backup.hs
@@ -93,6 +95,7 @@ executable strato-block-backup
                  , bytestring
                  , blockapps-milena
                  , strato-conf
+                 , strato-genesis
     buildable: True
     main-is: BlockBackup.hs
     hs-source-dirs: src
@@ -115,3 +118,4 @@ executable strato-ez-restore
                  , blockapps-milena
                  , resourcet
                  , monad-control
+                 , strato-genesis
