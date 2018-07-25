@@ -10,7 +10,7 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
-const batchValueEther = 1;
+const batchValueEther = new BigNumber(1).mul(constants.ETHER);
 const password = '1234';
 
 describe("Send Transaction List", function() {
@@ -31,7 +31,7 @@ describe("Send Transaction List", function() {
 
     assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
     // send List
-    const resolve = false;
+    const resolve = true;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
     console.log('HERE IS THE RECEIPT', receipts);
