@@ -381,6 +381,9 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   mapM_ insertGetTransactionsDB depTxs'
                   insertDependentTxs bHash depTxs'
 
+transformBlockstanbul :: [WireMessage] -> SequencerM ()
+transformBlockstanbul = error "TODO(tim): implement"
+
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
 
@@ -417,6 +420,9 @@ splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETBlockstanbul -> do
+      $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
+      transformBlockstanbul $ map (\(IEBlockstanbul msg) -> msg) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

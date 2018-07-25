@@ -27,26 +27,38 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
+import qualified Blockchain.Blockstanbul                   as PBFT
+
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
-data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock | IEGenesis IngestGenesis deriving (Eq, Read, Show, GHCG.Generic)
+data IngestEvent = IETx Timestamp IngestTx
+                 | IEBlock IngestBlock
+                 | IEGenesis IngestGenesis
+                 | IEBlockstanbul PBFT.WireMessage
+                 deriving (Eq, Show, GHCG.Generic)
 
-data IngestEventType = IETTransaction | IETBlock | IETGenesis deriving (Eq, Ord, Show)
+data IngestEventType = IETTransaction
+                     | IETBlock
+                     | IETGenesis
+                     | IETBlockstanbul
+                     deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
 iEventType = \case
   IETx _ _    -> IETTransaction
   IEBlock _   -> IETBlock
   IEGenesis _ -> IETGenesis
+  IEBlockstanbul _ -> IETBlockstanbul
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
+  format (IEBlockstanbul o) = format o
 
 type Timestamp = Microtime
 
@@ -235,6 +247,7 @@ instance Binary IngestEvent where
     put (IETx ts t) = putWord8 2 >> put ts >> put t
     put (IEBlock b) = putWord8 1 >> put b
     put (IEGenesis g) = putWord8 3 >> put g
+    put (IEBlockstanbul m) = putWord8 4 >> put m
     get = do
         tag <- getWord8
         case tag of
@@ -242,6 +255,7 @@ instance Binary IngestEvent where
             1 -> IEBlock  <$> get
             2 -> IETx <$> get <*> get
             3 -> IEGenesis <$> get
+            4 -> IEBlockstanbul <$> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where
