@@ -24,6 +24,8 @@ dependencies:
 - API
 - text
 - servant-client
+- servant
+- aeson
 
 library:
   source-dirs: src

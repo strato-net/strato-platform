@@ -19,8 +19,15 @@ users1 =
   , User "Albert Einstein" 136 "ae@mc2.org"        
   ]
 
+postSignature :: SignatureDetails
+postSignature = SignatureDetails "12438971348519879" "21897342723782789" "28"
+
 serveBloc :: Server StratoAPI
-serveBloc = return users1
+serveBloc = users
+            :<|> signatureDetails
+  where 
+    users = return users1
+    signatureDetails = return postSignature
 
 serverProxy :: Proxy StratoAPI
 serverProxy = Proxy

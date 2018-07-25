@@ -3,12 +3,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Strato.Strato23.Client
-  ( getUsers
+  ( getUsers,
+    postSignature
   ) where
 
+import           Servant.API
 import           Servant.Client
 import           Data.Proxy
-import           Strato.Strato23.API (StratoAPI, User)
+import           Strato.Strato23.API
 
 getUsers :: ClientM [User]
-getUsers = client (Proxy @ StratoAPI)
+postSignature :: ClientM SignatureDetails
+getUsers :<|> postSignature = client (Proxy @ StratoAPI)

@@ -10,8 +10,8 @@ import           Servant
 import           GHC.Generics
 import           Data.Aeson.Types
 
-type StratoAPI = 
-  "users" :> Get '[JSON] [User]
+type StratoAPI = "users" :> Get '[JSON] [User]
+  :<|> "strato" :> "v2.3" :> "signature" :> Post '[JSON] SignatureDetails
 
 data User = User
   { name :: String
@@ -21,3 +21,12 @@ data User = User
 
 instance ToJSON User
 instance FromJSON User
+
+data SignatureDetails = SignatureDetails {
+  r :: String
+  , s :: String
+  , v :: String
+} deriving (Eq, Show, Generic)
+
+instance ToJSON SignatureDetails
+instance FromJSON SignatureDetails
