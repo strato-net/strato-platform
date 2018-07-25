@@ -17,7 +17,7 @@ describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
 
-  it.only('resolve==true', function* () {
+  it('resolve==true', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -34,7 +34,6 @@ describe("Send Transaction List", function() {
     const resolve = true;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
     const receipts = yield rest.sendList(alice, txs, resolve);
-    console.log('HERE IS THE RECEIPT', receipts);
     const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
     for (let receipt of receipts) {
       yield rest.waitTransactionResult(receipt);
@@ -44,12 +43,6 @@ describe("Send Transaction List", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
-    console.log('Here is Alice starting balance', alice.startingBalance);
-    console.log('Here is Alice end balance', alice.endBalance);
-    console.log('Here is Bob starting balance', bob.startingBalance);
-    console.log('Here is Bob end balance', bob.endBalance);
-    console.log('HERE IS DELTA', delta);
-    console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
@@ -70,37 +63,24 @@ describe("Send Transaction List", function() {
     // send List
     const resolve = false;
     const txs = createBatchTx(batchSize, batchValueEther, bob);
-    console.log('About to enter the sendList function');
     const receipts = yield rest.sendList(alice, txs, resolve);
-    alice.endBalance = yield rest.getBalance(alice.address);
-    bob.endBalance = yield rest.getBalance(bob.address);
-    console.log('Here is Alice starting balance', alice.startingBalance);
-    console.log('Here is Alice end balance', alice.endBalance);
-    console.log('Here is Bob starting balance', bob.startingBalance);
-    console.log('Here is Bob end balance', bob.endBalance);
-    const results = [];
 
+    const results = [];
     for (let receipt of receipts) {
       const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
-    console.log('HERE IS THE RESULT OF waitTransactionResult()', results);
     const failed = results.filter(function (result) {
       return result.status != 'success';
     });
     assert.equal(failed.length, 0, 'some transactions failed ' + JSON.stringify(failed,null,2));
 
     // check balances
-    // alice.endBalance = yield rest.getBalance(alice.address);
-    // bob.endBalance = yield rest.getBalance(bob.address);
-    // console.log('Here is Alice starting balance', alice.startingBalance);
-    // console.log('Here is Alice end balance', alice.endBalance);
-    // console.log('Here is Bob starting balance', bob.startingBalance);
-    // console.log('Here is Bob end balance', bob.endBalance);
+    alice.endBalance = yield rest.getBalance(alice.address);
+    bob.endBalance = yield rest.getBalance(bob.address);
+
     //TODO Calculate gas cost and factor into balance
     const delta = new BigNumber(batchValueEther).mul(batchSize).mul(constants.ETHER);
-    console.log('HERE IS DELTA', delta);
-    console.log('Alice starting balance minus delta',alice.startingBalance.minus(delta), 'should be greater than Alice end balance', alice.endBalance );
     assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
@@ -126,7 +106,6 @@ describe("Send Transaction List", function() {
 
     const results = [];
     for (let receipt of receipts) {
-      console.log(receipt);
       const result = yield rest.waitTransactionResult(receipt.hash);
       results.push(result[0])
     }
@@ -145,7 +124,6 @@ function createBatchTx(batchSize, batchValue, toUser, nonce) {
       txParams: {nonce: nonce+i},
     });
   }
-  console.log('Here are the txs', txs);
   return txs;
 }
 
@@ -184,7 +162,9 @@ describe("Send Transaction List with nonces", function() {
     const nonces = [0, 1, 2];
     const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
     const receipts = yield rest.sendList(alice, txs, resolve);
-
+    for (let receipt of receipts) {
+      yield rest.waitTransactionResult(receipt);
+    }
     // check balances
     alice.endBalance = yield rest.getBalance(alice.address);
     bob.endBalance = yield rest.getBalance(bob.address);
@@ -195,7 +175,7 @@ describe("Send Transaction List with nonces", function() {
     assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
 
-  it.skip('resolve==false, list of nonces', function* () {
+  it('resolve==false, list of nonces', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
@@ -225,7 +205,7 @@ describe("Send Transaction List with nonces", function() {
 
   });
 
-  it('resolve==false, nonces and expected results', function* () {
+  it.skip('resolve==false, nonces and expected results', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
