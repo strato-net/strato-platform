@@ -14,6 +14,7 @@ import Test.QuickCheck
 
 import Blockchain.Data.RLP
 import Blockchain.ExtWord
+import Blockchain.Format
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
@@ -52,6 +53,10 @@ instance Binary MsgAuth where
 instance Binary View where
 instance Binary TrustedMessage where
 instance Binary WireMessage where
+
+instance Format WireMessage where
+  -- TODO(tim): Invest in better formatting.
+  format = show
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
