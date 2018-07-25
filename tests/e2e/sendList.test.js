@@ -284,7 +284,6 @@ function getStatii(results) {
 function checkResults(receipts) {
   return receipts.map(receipt => {
     const hash = receipt.hash;
-    console.log('Here is the hash', receipt);
     return co(rest.waitTransactionResult(hash, 5*1000))
       .catch(function(err) {
         // an HttpError should be thrown
