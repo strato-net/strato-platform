@@ -14,6 +14,7 @@ import           Numeric
 
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction

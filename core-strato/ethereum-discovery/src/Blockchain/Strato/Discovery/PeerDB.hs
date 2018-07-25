@@ -4,25 +4,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Strato.Discovery.PeerDB where
+module Blockchain.Strato.Discovery.PeerDB (
+  getNumAvailablePeers,
+  getPeersClosestTo
+  ) where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control
 import           Crypto.Types.PubKey.ECC
-import           Data.Bits
-import qualified Data.ByteString                       as B
-import           Data.Function
-import           Data.List
-import           Data.Maybe
 import qualified Data.Text as T
 import           Data.Time.Clock
 import qualified Database.Persist.Postgresql           as SQL
 
 import           Blockchain.DB.SQLDB                   (withGlobalSQLPool)
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 
+{-
 getClosePeers :: (MonadBaseControl IO m, MonadIO m) => NodeID -> m [PPeer]
 getClosePeers target = do
   currentTime <- liftIO getCurrentTime
@@ -33,6 +31,7 @@ getClosePeers target = do
 
 distance :: NodeID -> NodeID -> Word512
 distance (NodeID x) (NodeID y) = bytesToWord512 $ zipWith (xor) (B.unpack x) (B.unpack y)
+-}
 
 getNumAvailablePeers :: (MonadBaseControl IO m, MonadIO m) => m Int
 getNumAvailablePeers = do

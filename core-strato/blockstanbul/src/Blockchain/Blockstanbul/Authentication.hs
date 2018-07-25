@@ -12,6 +12,7 @@ import Test.QuickCheck
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB()
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs

@@ -9,6 +9,7 @@ import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
 
 import qualified Blockchain.Data.Address                   as A
+import           Blockchain.Data.Block                     (Block)
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
@@ -114,7 +115,7 @@ data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
 
-blockToIngestBlock :: TO.TXOrigin -> DD.Block -> IngestBlock
+blockToIngestBlock :: TO.TXOrigin -> Block -> IngestBlock
 blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
     IngestBlock{ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
 
@@ -187,7 +188,7 @@ sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
 outputBlockHash :: OutputBlock -> SHA
 outputBlockHash = BDB.blockHeaderHash . obBlockData
 
-outputBlockToBlock :: OutputBlock -> DD.Block
+outputBlockToBlock :: OutputBlock -> Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
@@ -359,8 +360,8 @@ instance TransactionLike OutputTx where
                          }
 
 instance RLPSerializable OutputBlock where
-    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> DD.Block)
-    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> DD.Block)
+    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> Block)
+    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> Block)
 
 instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockHeader       = obBlockData

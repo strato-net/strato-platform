@@ -47,7 +47,6 @@ executable strato-redis-viz
         lens-family-th,
         lens-family,
         QuickCheck,
-        strato-redis-blockdb,
         strato-model
   default-language:    Haskell2010
   ghc-options: -threaded -Wall -Werror
