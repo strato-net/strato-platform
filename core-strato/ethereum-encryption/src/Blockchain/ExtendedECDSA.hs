@@ -1,4 +1,4 @@
-
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA (
   ExtendedSignature(..),
   extSignMsg,
@@ -9,7 +9,9 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
+import           Data.Binary
 import qualified Data.ByteString           as B
+import           GHC.Generics
 import           Test.QuickCheck
 
 import           Blockchain.Data.RLP
@@ -49,7 +51,9 @@ genKeyPair = do
 
 -----------------------
 
-data ExtendedSignature = ExtendedSignature Signature Bool deriving (Show, Eq)
+data ExtendedSignature = ExtendedSignature Signature Bool deriving (Show, Eq, Generic)
+
+instance Binary ExtendedSignature where
 
 unsafeExtSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe ExtendedSignature
 unsafeExtSignMsg _ 0 _ = Nothing

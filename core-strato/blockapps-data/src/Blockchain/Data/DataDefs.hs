@@ -10,6 +10,7 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Blockchain.Data.DataDefs where
 
@@ -18,6 +19,7 @@ import           Database.Persist.Quasi
 import           Database.Persist.TH
 
 import           Data.Time
+import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.MiningStatus
@@ -27,6 +29,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.MiscJSON                     ()
 
+import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
 
 import           Blockchain.ExtWord
@@ -52,3 +55,9 @@ type AddressBalancePair = (Address, Integer)
 type MapPair = (Word256, Word256)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
+
+instance BIN.Binary UTCTime where
+  put = BIN.put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
+  get = (posixSecondsToUTCTime . fromInteger) <$> BIN.get
+
+instance BIN.Binary BlockData where
