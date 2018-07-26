@@ -16,6 +16,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", function() {
+  this.timeout(999999 * 1000);
 
   let admin;
   const batchCount = util.getArgInt('--batchCount', 10);
@@ -30,6 +31,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, 1);
+
     const args = {_vin: 'Vin_' + uid };
     const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
     const state = yield rest.getState(contract);
@@ -37,11 +39,13 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     checkResultsFromContractString(state, 1);
   });
 
-  it.skip('should upload multiple contracts and should verify that all fields of each contract\'s metadata is correct', function* () {
+  it(`should upload multiple contracts and should verify that all fields of each contract\'s metadata is correct - Batch count: ${batchCount}`, function* () {
+    const uid = util.uid();
+    const contractName = 'TitleCA';
+    
     for(let i = 0; i < batchCount; i++){
-      const uid = util.uid();
-      const contractName = 'TitleCA';
       const contractString = getContractString(contractName, i);
+
       const args = {_vin: 'Vin_' + uid };
       const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
       const state = yield rest.getState(contract);
@@ -77,6 +81,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     return string;
   }
 
+  //Checks to make sure that the data inside the uploaded contract matches the expected data values
   function checkResultsFromContractString(results, count){
     assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
     assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');

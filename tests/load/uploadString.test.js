@@ -42,7 +42,7 @@ describe('LOAD TEST: Upload from string', function() {
     const results = rest.query(`${contractName}?address=eq.${contract.address}`);
   });
 
-  it.skip(`Stack Depth 1:`, function * () {
+  it.only(`Stack Depth 1:`, function * () {
     const uid = util.uid();
     const contractName = 'StackDepth';
     const contractFilename = path.join(config.contractsPath, "StackDepth.sol");
@@ -85,7 +85,7 @@ describe('LOAD TEST: Upload from string', function() {
     const results = rest.query(`${contractName}?address=eq.${contract.address}`);
   });
 
-  it.only(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, batchSize);
@@ -95,8 +95,6 @@ describe('LOAD TEST: Upload from string', function() {
     for (var i = 0; i < batchCount; i++) {
       console.log(`Batch: ${i}`);
       const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
-      console.log('HERE IS THE CONTRACT', contract);
-      console.log('HERE IS THE STATE', yield rest.getState(contract));
     }
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
