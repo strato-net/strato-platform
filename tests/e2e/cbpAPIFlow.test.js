@@ -20,24 +20,26 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
   let admin;
 
   before(function * () {
-  console.log(`Creating admin user`);
-  admin = yield rest.createUser(adminName, adminPassword);
-  console.log(admin);
+    console.log(`Creating admin user`);
+    admin = yield rest.createUser(adminName, adminPassword);
+    console.log(admin);
   });
 
   it('should upload ONE contract and should verify that all fields of metadata is correct', function* () {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, 1);
-    console.log('Here is the contractString', contractString);
-
     const args = {_vin: 'Vin_' + uid };
     const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
     const state = yield rest.getState(contract);
-    const results = yield rest.query(`${contractName}?address=eq.${contract.address}`);
-    console.log('Here are the results', results);
+
+    checkResultsFromContractString(state, 1);
   });
 
+
+  //Helper Functions
+
+  //Creates a contract using a template string
   function getContractString(contractName, count) {
     const template = ''+
       'contract $contractName$ {'+
@@ -47,20 +49,36 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
       '    vin = _vin;'+
       '  }'+
       '}';
-
+    const id = count - 1;
     const allVars = [];
-    for (var i = 0; i < count; i++) {
-      const stringVar = `string public s${i} = 's${i}'; `
-      allVars.push(stringVar);
-      const uintVar = `uint public u${i} = ${i}; `
-      allVars.push(uintVar);
-      const boolVar = `bool public b${i} = ${(i%2==1)?'false':'true'}; `
-      allVars.push(boolVar);
-      const addressVar = `address public a${i} = 0x100${i}; `
-      allVars.push(addressVar);
-    }
+
+    const stringVar = `string public testString = 's${id}'; `
+    allVars.push(stringVar);
+    const uintVar = `uint public testInt = ${id}; `
+    allVars.push(uintVar);
+    const boolVar = `bool public testBool = ${(id%2==1)?'false':'true'}; `
+    allVars.push(boolVar);
+    const addressVar = `address public testAddress = 0x100${id}; `
+    allVars.push(addressVar);
+
     const string = template.replace('$contractName$', contractName).replace('$vars$', allVars.join(' ') );
     return string;
+  }
+
+  function checkResultsFromContractString(results, batchCount){
+    for(let i = 0; i < batchCount; i++){
+      assert.equal(results.testString, `s${i}`, 'Variable \'testString\' matched with expected state');
+      assert.equal(results.testInt, `${i}`, 'Variable \'testInt\' matched with expected state');
+      assert.equal(results.testAddress, `000000000000000000000000000000000000100${i}`, 'Variable \'testAddress\' matched with expected state');
+
+      const correctBool = (i%2==1)? false : true;
+      
+      if(correctBool){
+        assert.isTrue(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
+      } else {
+        assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
+      }
+    }
   }
 
 });
