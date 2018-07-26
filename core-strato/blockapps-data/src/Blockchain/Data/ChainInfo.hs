@@ -173,4 +173,3 @@ accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)
 
 accountInfo :: JS.Parser AccountInfo
 accountInfo = JS.value
-
