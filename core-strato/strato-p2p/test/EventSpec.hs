@@ -104,6 +104,13 @@ spec = do
         runConduit $ yield (MsgEvt (Blockstanbul wm))
                            .| handleEvents Log testPeer
                            .| sinkList
-                           `L.shouldReturn` []
+           `L.shouldReturn` []
         atomically (closeTMChan ch >> readTMChan ch) `L.shouldReturn` Just ([IEBlockstanbul wm])
         atomically (readTMChan ch) `L.shouldReturn` Nothing
+
+    it "should broadcast blockstanbul messages" $ property $ \wm ->
+      runTestPeer . const $
+        runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
+                      .| handleEvents Log testPeer
+                      .| sinkList
+            `L.shouldReturn` [Blockstanbul wm]

@@ -344,7 +344,11 @@ handleEvents mode peer = awaitForever $ \case
               yield $ ChainDetails [(cId, cInfo)]
       OEGetChain chainIds -> yield $ GetChainDetails chainIds
       OEGetTx shas -> yield $ GetTransactions shas
-      _ -> return () -- shouldn't happen but our types don't prohibit us
+      OEBlockstanbul msg -> do
+        let outbound = Blockstanbul msg
+        $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
+        yield outbound
+      OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
