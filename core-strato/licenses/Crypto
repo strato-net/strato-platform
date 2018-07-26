@@ -1,0 +1,155 @@
+Licensing
+=========
+
+The modules in the library come from different authors and have been
+released under different licences.
+
+Contributors
+------------
+
+### Codec.Binary
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Codec.Binary.BubbleBabble & John Meacham & Copyright © 2008, All rights
+reserved & BSD\
+
+### Codec.Text
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Codec.Text.Raw & Dominic Steinitz & Copyright © 2006, All rights
+reserved & BSD\
+
+### Codec.Encryption
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Codec.Encryption.AES & Lukasz Anforowicz & Copyright © 2005, All rights
+reserved & BSD\
+Codec.Encryption.AESAux & Dominic Steinitz & Copyright © 2005, All
+rights reserved & BSD\
+Codec.Encryption.Blowfish & Doug Hoyte & Copyright © 2005, All rights
+reserved & BSD\
+Codec.Encryption.BlowfishAux & Dominic Steinitz & Copyright © 2005, All
+rights reserved & BSD\
+Codec.Encryption.TEA & John Meacham & Copyright © 2008, All rights
+reserved & BSD\
+Codec.Encryption.DES & Ian Lynagh & Copyright © 2005, All rights
+reserved & BSD\
+Codec.Encryption.DESAux & Dominic Steinitz & Copyright © 2005, All
+rights reserved & BSD\
+Codec.Encryption.Modes & Dominic Steinitz & Copyright © 2005, All rights
+reserved & BSD\
+Codec.Encryption.Padding & Dominic Steinitz & Copyright © 2005, All
+rights reserved & BSD\
+Codec.Encryption.RSA & David Sankel & Copyright © 2005, All rights
+reserved & GPL\
+Codec.Encryption.RSA.EMEOAEP & David Sankel & Copyright © 2005, All
+rights reserved & GPL\
+Codec.Encryption.RSA.MGF & Dominic Steinitz & Copyright © 2005, All
+rights reserved & BSD\
+Codec.Encryption.RSA.NumberTheory & David Sankel & Copyright © 2005, All
+rights reserved & GPL\
+
+### Codec
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Codec.Utils & Dominic Steinitz & Copyright © 2005, All rights reserved &
+BSD\
+
+### Data.Digest
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Data.Digest.MD5 & Dominic Steinitz & Copyright © 2005, All rights
+reserved & BSD\
+Data.Digest.MD5Aux & Ian Lynagh & Copyright © 2005, All rights reserved
+& BSD\
+Data.Digest.SHA1 & Dominic Steinitz & Copyright © 2005, All rights
+reserved & BSD\
+
+### Data
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+Data.LargeWord & Dominic Steinitz & Copyright © 2005, All rights
+reserved & BSD\
+
+### Tests and Examples
+
+<span>|p<span>6cm</span>|p<span>3cm</span>|p<span>3cm</span>|p<span>1cm</span>|</span>
+RSATest & Dominic Steinitz & Copyright © 2005, All rights reserved &
+BSD\
+QuickTest & Dominic Steinitz & Copyright © 2005, All rights reserved &
+BSD\
+SymmetricTest & Dominic Steinitz & Copyright © 2005, All rights reserved
+& BSD\
+
+The BSD License
+---------------
+
+This license is based on
+<span>http://www.opensource.org/licenses/bsd-license.php</span>.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+-   Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+-   Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+-   The names of its contributors may not be used to endorse or promote
+    products derived from this software without specific prior written
+    permission.
+
+This software is provided by the copyright holders and contributors “AS
+IS” and any express or implied warranties, including, but not limited
+to, the implied warranties of merchantability and fitness for a
+particular purpose are disclaimed. In no event shall the copyright
+onwers or contributors be liable for any direct, indirect, incidental,
+special, exemplary, or consequential damages (including, but not limited
+to, procurement of substitute goods or services; loss of use, data, or
+profits; or business interruption) however caused and on any theory of
+liability, whether in contract, strict liability, or tort (including
+negligence or otherwise) arising in any way out of the use of this
+software, even if advised of the possibility of such damage.
+
+The GNU General Public License (GPL)
+------------------------------------
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
+
+You can find a copy of the GNU General Public License
+<span>http://www.opensource.org/licenses/gpl-license.php</span> ; if
+not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite
+330, Boston, MA 02111-1307 USA
+
+Disclaimer
+==========
+
+Cryptography is a notoriously easy area in which to make mistakes, not
+necessarily with the algorithms but with how they are implemented (for
+example not protecting keys, using weak keys and so on). For a readable
+account of some of the pitfalls, see
+<span>http://www.cl.cam.ac.uk/users/rja14/</span> ’s book.
+
+This software is provided by the copyright holders and contributors “AS
+IS” and any express or implied warranties, including, but not limited
+to, the implied warranties of merchantability and fitness for a
+particular purpose are disclaimed. In no event shall the copyright
+onwers or contributors be liable for any direct, indirect, incidental,
+special, exemplary, or consequential damages (including, but not limited
+to, procurement of substitute goods or services; loss of use, data, or
+profits; or business interruption) however caused and on any theory of
+liability, whether in contract, strict liability, or tort (including
+negligence or otherwise) arising in any way out of the use of this
+software, even if advised of the possibility of such damage.
+
