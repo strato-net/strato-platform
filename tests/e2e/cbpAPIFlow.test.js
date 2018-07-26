@@ -18,6 +18,7 @@ const adminPassword = '1234';
 describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", function() {
 
   let admin;
+  const batchCount = util.getArgInt('--batchCount', 10);
 
   before(function * () {
     console.log(`Creating admin user`);
@@ -36,7 +37,18 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     checkResultsFromContractString(state, 1);
   });
 
+  it.skip('should upload multiple contracts and should verify that all fields of each contract\'s metadata is correct', function* () {
+    for(let i = 0; i < batchCount; i++){
+      const uid = util.uid();
+      const contractName = 'TitleCA';
+      const contractString = getContractString(contractName, i);
+      const args = {_vin: 'Vin_' + uid };
+      const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+      const state = yield rest.getState(contract);
 
+      checkResultsFromContractString(state, i);
+    }
+  });
   //Helper Functions
 
   //Creates a contract using a template string
@@ -49,35 +61,33 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
       '    vin = _vin;'+
       '  }'+
       '}';
-    const id = count - 1;
+
     const allVars = [];
 
-    const stringVar = `string public testString = 's${id}'; `
+    const stringVar = `string public testString = 's${count}'; `
     allVars.push(stringVar);
-    const uintVar = `uint public testInt = ${id}; `
+    const uintVar = `uint public testInt = ${count}; `
     allVars.push(uintVar);
-    const boolVar = `bool public testBool = ${(id%2==1)?'false':'true'}; `
+    const boolVar = `bool public testBool = ${(count%2==1)?'false':'true'}; `
     allVars.push(boolVar);
-    const addressVar = `address public testAddress = 0x100${id}; `
+    const addressVar = `address public testAddress = 0x100${count}; `
     allVars.push(addressVar);
 
     const string = template.replace('$contractName$', contractName).replace('$vars$', allVars.join(' ') );
     return string;
   }
 
-  function checkResultsFromContractString(results, batchCount){
-    for(let i = 0; i < batchCount; i++){
-      assert.equal(results.testString, `s${i}`, 'Variable \'testString\' matched with expected state');
-      assert.equal(results.testInt, `${i}`, 'Variable \'testInt\' matched with expected state');
-      assert.equal(results.testAddress, `000000000000000000000000000000000000100${i}`, 'Variable \'testAddress\' matched with expected state');
+  function checkResultsFromContractString(results, count){
+    assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
+    assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
+    assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state');
 
-      const correctBool = (i%2==1)? false : true;
-      
-      if(correctBool){
-        assert.isTrue(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
-      } else {
-        assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
-      }
+    const correctBool = (count%2==1)? false : true;
+
+    if(correctBool){
+      assert.isTrue(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
+    } else {
+      assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
     }
   }
 
