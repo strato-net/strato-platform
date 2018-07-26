@@ -56,6 +56,10 @@ nginx:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/
 
+oauth:
+	@echo Now building oauth...
+	BASIL_DOCKER_TAG=${REPO_URL}oauth:${VERSION} make --directory=oauth/
+
 postgrest:
 	@echo Now building postgrest...
 	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} make --directory=postgrest-packager/
@@ -67,10 +71,6 @@ smd:
 strato:
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
-
-oauth:
-	@echo Now building oauth...
-	BASIL_DOCKER_TAG=${REPO_URL}oauth:${VERSION} make --directory=oauth/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...

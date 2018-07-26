@@ -1,4 +1,4 @@
-FROM oauth-buildbase:latest
+FROM ubuntu:16.04
 
 COPY ./ /
 

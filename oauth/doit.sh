@@ -3,6 +3,4 @@
 set -e
 set -x
 
-echo "Environment variables:
---publicmode=isPublic=${isPublic}
-"
+/usr/bin/server

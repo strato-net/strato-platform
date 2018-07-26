@@ -1,6 +1,6 @@
-resolver: lts-12.1
-compiler: ghc-8.0.2
-compiler-check: newer-minor
+resolver: lts-12.1 #also duplicated in docker section below
+#compiler: ghc-8.0.2
+compiler-check: newer-minor # remove?
 
 packages:
 - Strato/Strato23/API
@@ -21,8 +21,8 @@ extra-package-dbs: []
 extra-include-dirs: [/usr/local/include]
 extra-lib-dirs: [/usr/local/lib]
 
-# docker:
-#   enable: true
-#   image: "stack-bloc-buildbase:lts-10.10"
-#   set-user: true
-#   run-args: ["--ulimit=nofile=60000"]
+docker:
+  enable: true
+  image: "stack-oauth-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]
