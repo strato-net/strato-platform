@@ -1,16 +1,22 @@
 const ba = require('blockapps-rest');
+const co = require('co');
 require('co-mocha');
-
 const rest = ba.rest;
 const common = ba.common;
 const api = common.api;
-const util = common.util;
-const BigNumber = common.BigNumber;
-const constants = common.constants;
-const assert = common.assert;
 const config = common.config;
+const util = common.util;
+const assert = common.assert;
+const nodes = config.nodes;
+const moment = require('moment');
+const constants = common.constants;
+const path = require('path');
 
-const password = '1234';
+const titleManagerJs = require(`./titleManager`);
+const contractName = 'Title';
+
+const adminName = util.uid('Admin');
+const adminPassword = '1234';
 
 describe("/'contract metadata (parsed via API)-> Bloc -> Postgres/' flow test", function() {
 
