@@ -14,6 +14,8 @@ COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
 
 COPY docker-run.sh /
 
+COPY licenses /licenses
+
 RUN chmod a+x /docker-run.sh
 
 ENTRYPOINT ["/docker-run.sh"]
