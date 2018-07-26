@@ -4,7 +4,7 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
-cirrusRoot=http://${cirrusHost}
+cirrusRoot=http://postgrest:3001
 kafkaPort=9092
 kafkaHost="kafka"
 
@@ -28,7 +28,6 @@ strato-server:
 no vars/flags set
 bloc:
 stratoHost="${stratoHost}"
---cirrusurl=\$cirrusHost="${cirrusHost}"
 --stratourl=\$stratoRoot="${stratoRoot}"
 --pghost=\$postgres_host="${postgres_host}"
 --pgport=\$postgres_port="${postgres_port}"
