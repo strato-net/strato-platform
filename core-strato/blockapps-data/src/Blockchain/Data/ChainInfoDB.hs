@@ -9,11 +9,11 @@ module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad.Trans.Resource
-import           Data.Map                           as M
+import           Data.Map                           as M        hiding (map, filter)
 import           Data.Maybe
 
 import qualified Database.Esqueleto                 as E
-import           Database.Persist                   hiding (get)
+import           Database.Persist                               hiding (get)
 import qualified Database.Persist.Postgresql        as SQL
 
 import           Blockchain.Data.ChainInfo
@@ -50,9 +50,9 @@ getChainInfo chainId = do
           return . Just . fromTuple $ (chainId,
                                        ChainInfo
                                          chainInfoRefChainLabel
-                                         (Prelude.map ai aInfos)
-                                         (Prelude.map ci cInfos)
-                                         (M.fromList (Prelude.map makePairs members)))
+                                         (map ai aInfos)
+                                         (map ci cInfos)
+                                         (M.fromList (map makePairs members)))
           where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
                 ai = \aInfo ->
                         if (accountInfoRefCodeHash $ entityVal aInfo) == Nothing
@@ -76,10 +76,10 @@ getChainInfos chainIds = do
                           return cRef
                       case chains of
                           [] -> return []
-                          cs -> return $ Prelude.map (chainInfoRefChainId . E.entityVal) cs
+                          cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
               cIds -> return cIds
   chainInfos <- mapM getChainInfo cids
-  let cInfos = sequence $ Prelude.filter isJust chainInfos
+  let cInfos = sequence $ filter isJust chainInfos
   case cInfos of
       Nothing -> return []
       Just cis -> return cis
@@ -90,9 +90,9 @@ putChainInfo chainId ChainInfo{..} = do
   runResourceT . flip SQL.runSqlPool db $ do
     let chainInfoRef = ChainInfoRef chainId chainLabel
     cirId <- E.insert chainInfoRef
-    insertMany_ $ Prelude.map (parseAInfo cirId) acctInfo
-    insertMany_ $ Prelude.map (parseCInfo cirId) codeInfo
-    insertMany_ $ Prelude.map (parseMember cirId) (M.toList members)
+    insertMany_ $ map (parseAInfo cirId) acctInfo
+    insertMany_ $ map (parseCInfo cirId) codeInfo
+    insertMany_ $ map (parseMember cirId) (M.toList members)
     return cirId
       where
         parseAInfo chid aInfo = 
