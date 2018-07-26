@@ -72,22 +72,22 @@ cookRawExtra bs =
                       else Just . rlpDecode . rlpDeserialize $ rest
 
 truncateExtra :: Block -> Block
-truncateExtra = over (blockDataLens . extraDataLens) $ B.take 32
+truncateExtra = over extraLens $ B.take 32
 
 addValidators :: [Address] -> Block -> Block
-addValidators vs = over (blockDataLens . extraDataLens) $
+addValidators vs = over extraLens $
     uncookRawExtra
   . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
   . cookRawExtra
 
 addProposerSeal :: ExtendedSignature -> Block -> Block
-addProposerSeal sig = over (blockDataLens . extraDataLens) $
+addProposerSeal sig = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . proposedSig) (Just sig)
   . cookRawExtra
 
 addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
-addCommitmentSeals sigs = over (blockDataLens . extraDataLens) $
+addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . commitment) sigs
   . cookRawExtra
