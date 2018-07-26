@@ -392,10 +392,6 @@ shouldSend peer tx = case tx of
         trace "NewTx of type Morphism came in. Should this even happen?" True
     Origin.Blockstanbul -> False
 
-
--- TODO: Instead of making this a boolean function, how about it takes [ChainInfo] and returns a [ChainInfo]
---       with all of the unauthorized chainInfos removed? or maybe thats too specific a case...
-
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
 checkPeerIsMember :: PPeer -> ChainInfo -> Bool
