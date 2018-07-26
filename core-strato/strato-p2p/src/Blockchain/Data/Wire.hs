@@ -32,15 +32,21 @@ import           Blockchain.Util
 import           Blockchain.ExtWord
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
+                | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.
                 | UNKNOWNCAP String Integer -- | ¯\_(ツ)_/¯
                 deriving (Eq, Read, Show)
 
 name2Cap::Integer->String->Capability
 name2Cap ver "eth" = ETH ver
+-- TODO(tim): This deviates from the Am.is implementation, but they don't
+-- follow the devp2p spec. Change to "istanbul" or convince them to change to
+-- "ist" if we require interop.
+name2Cap ver "ist" = IST ver
 name2Cap ver name  = UNKNOWNCAP name ver
 
 instance RLPSerializable Capability where
     rlpEncode (ETH ver)             = RLPArray [rlpEncode ("eth"::B.ByteString), rlpEncode ver]
+    rlpEncode (IST ver)             = RLPArray [rlpEncode ("ist"::B.ByteString), rlpEncode ver]
     rlpEncode (UNKNOWNCAP name ver) = RLPArray [rlpEncode name, rlpEncode ver]
 
     rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
