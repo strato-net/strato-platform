@@ -14,6 +14,14 @@ const password = '1234';
 
 describe("/'contract metadata (parsed via API)-> Bloc -> Postgres/' flow test", function() {
 
+  let admin;
+
+  before(function * () {
+  console.log(`Creating admin user`);
+  admin = yield rest.createUser(adminName, adminPassword);
+  console.log(admin);
+  });
+
   it('should upload a contract and should verify that all fields of metadata is correct', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
