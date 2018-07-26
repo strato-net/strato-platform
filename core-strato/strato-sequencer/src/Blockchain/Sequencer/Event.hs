@@ -97,7 +97,8 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEJsonRpcCommand JsonRpcCommand
                  | OEGetChain [Word256]
                  | OEGetTx [SHA]
-                 deriving (Eq, Read, Show, GHCG.Generic)
+                 | OEBlockstanbul PBFT.WireMessage
+                 deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
   format (OETx ts o)       = show ts ++ " " ++ format o
@@ -287,6 +288,7 @@ instance Binary OutputEvent where
     put (OEGenesis g)        = putWord8 4 >> put g
     put (OEGetChain cid)     = putWord8 5 >> put cid
     put (OEGetTx tx)         = putWord8 6 >> put tx
+    put (OEBlockstanbul m)   = putWord8 7 >> put m
     get = do
         tag <- getWord8
         case tag of
@@ -297,6 +299,7 @@ instance Binary OutputEvent where
             4 -> OEGenesis <$> get
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
+            7 -> OEBlockstanbul <$> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where
