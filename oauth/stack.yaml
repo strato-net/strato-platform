@@ -23,6 +23,6 @@ extra-lib-dirs: [/usr/local/lib]
 
 docker:
   enable: true
-  image: "stack-oauth-buildbase:lts-10.10"
+  image: "stack-oauth-buildbase:lts-12.1"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
