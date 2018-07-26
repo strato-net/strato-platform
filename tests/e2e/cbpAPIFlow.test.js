@@ -12,13 +12,10 @@ const moment = require('moment');
 const constants = common.constants;
 const path = require('path');
 
-const titleManagerJs = require(`./titleManager`);
-const contractName = 'Title';
-
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
-describe("/'contract metadata (parsed via API)-> Bloc -> Postgres/' flow test", function() {
+describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", function() {
 
   let admin;
 
@@ -28,17 +25,42 @@ describe("/'contract metadata (parsed via API)-> Bloc -> Postgres/' flow test", 
   console.log(admin);
   });
 
-  it('should upload a contract and should verify that all fields of metadata is correct', function* () {
-    this.timeout(config.timeout);
+  it('should upload ONE contract and should verify that all fields of metadata is correct', function* () {
     const uid = util.uid();
-    const username = 'User' + uid;
-    // create user
-    const isAsync = true;
-    const user = yield rest.createUser(username, password, isAsync);
-    assert.isDefined(user, "should exist");
-    assert.isDefined(user.address, "should be defined");
-    assert.notEqual(user.address, 0, "should be a nonzero address");
+    const contractName = 'TitleCA';
+    const contractString = getContractString(contractName, 1);
+    console.log('Here is the contractString', contractString);
+
+    const args = {_vin: 'Vin_' + uid };
+    const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+    const state = yield rest.getState(contract);
+    const results = yield rest.query(`${contractName}?address=eq.${contract.address}`);
+    console.log('Here are the results', results);
   });
 
+  function getContractString(contractName, count) {
+    const template = ''+
+      'contract $contractName$ {'+
+      '  string public vin;'+
+      '  $vars$'+
+      '  function Title(string _vin) public {'+
+      '    vin = _vin;'+
+      '  }'+
+      '}';
+
+    const allVars = [];
+    for (var i = 0; i < count; i++) {
+      const stringVar = `string public s${i} = 's${i}'; `
+      allVars.push(stringVar);
+      const uintVar = `uint public u${i} = ${i}; `
+      allVars.push(uintVar);
+      const boolVar = `bool public b${i} = ${(i%2==1)?'false':'true'}; `
+      allVars.push(boolVar);
+      const addressVar = `address public a${i} = 0x100${i}; `
+      allVars.push(addressVar);
+    }
+    const string = template.replace('$contractName$', contractName).replace('$vars$', allVars.join(' ') );
+    return string;
+  }
 
 });
