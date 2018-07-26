@@ -81,6 +81,7 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextInsertTxResultQueue :: [TransactionResult]
                        , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
                        , contextLogDBQueue          :: [LogDB]
+                       , contextHasBlockstanbul     :: Bool
                        }
 
 type ContextM = StateT Context (StatsT (ResourceT (LoggingT IO)))
@@ -229,7 +230,8 @@ runContextM f = do
                         initialKafkaState
                         Unspecified
                         redisPool
-                        [] [] [])
+                        [] [] []
+                        flags_tmpblockstanbul)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a
