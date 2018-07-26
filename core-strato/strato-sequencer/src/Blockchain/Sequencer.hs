@@ -160,7 +160,7 @@ blockstanbulSend msgs = do
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        vmevs = mapMaybe rewriteBlock blocks
+        vmevs = [OECreateBlockCommand | MakeBlockCommand <- resp] ++ mapMaybe rewriteBlock blocks
     $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
     mapM_ markForVM vmevs
     let p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]

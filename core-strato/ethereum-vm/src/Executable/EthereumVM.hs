@@ -10,6 +10,7 @@ module Executable.EthereumVM (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
@@ -96,7 +97,7 @@ ethereumVM = void . execContextM $ do
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
-        pbft <- gets flags_tmpblockstanbul
+        pbft <- gets contextHasBlockstanbul
         let pending = B.pending state
         let blockstanbulReady = not pbft || not (null [() | OECreateBlockCommand <- seqEvents])
         let shouldOutputBlocks = isCaughtUp && blockstanbulReady && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))

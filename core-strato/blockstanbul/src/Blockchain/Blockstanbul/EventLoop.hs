@@ -104,10 +104,12 @@ nextRound nt = do
     Round r -> view . round .= r
   vals <- use validators
   thisR <- use $ view . round
-  let nextP = vals !! (fromIntegral thisR `mod` length vals)
-  proposer .= nextP
+  let leader = vals !! (fromIntegral thisR `mod` length vals)
+  proposer .= leader
   proposal .= Nothing
-
+  self <- selfAddr
+  when (leader == self) $
+    yield MakeBlockCommand
   prepared .= M.empty
   committed .= M.empty
   roundChanged .= M.empty
