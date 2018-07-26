@@ -17,6 +17,7 @@ import CodeEditor from './components/CodeEditor';
 import SideBar from './components/SideBar';
 import AccountDetail from './components/AccountDetail';
 import ExternalStorage from './components/ExternalStorage';
+import Chains from './components/Chains'
 import { isModePublic } from './lib/checkMode';
 
 const CommonRoute = (props) => {
@@ -26,6 +27,7 @@ const CommonRoute = (props) => {
     <CommonRoute exact path="/nodes" component={Nodes} />
     <CommonRoute exact path="/blocks" component={Blocks} />
     <CommonRoute exact path="/blocks/:block" component={BlockView} />
+    <CommonRoute exact path="/chains" component={Chains} />
     <CommonRoute exact path="/transactions" component={Transactions} />
     <CommonRoute exact path="/transactions/:hash" component={TransactionView} />
     <CommonRoute exact path="/contracts" component={Contracts} />
