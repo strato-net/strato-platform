@@ -19,7 +19,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
   this.timeout(999999 * 1000);
 
   let admin;
-  const batchCount = util.getArgInt('--batchCount', 10);
+  const batchCount = util.getArgInt('--batchCount', 5);
 
   before(function * () {
     console.log(`Creating admin user`);
@@ -27,7 +27,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     console.log(admin);
   });
 
-  it('should upload ONE contract and should verify that all fields of metadata is correct', function* () {
+  it('should upload — from string — ONE contract and should verify that all fields of metadata is correct', function* () {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, 1);
@@ -39,11 +39,12 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     checkResultsFromContractString(state, 1);
   });
 
-  it(`should upload multiple contracts and should verify that all fields of each contract\'s metadata is correct - Batch count: ${batchCount}`, function* () {
+  it(`should upload — from string — multiple contracts and should verify that all fields of each contract\'s metadata is correct - Batch count: ${batchCount}`, function* () {
     const uid = util.uid();
     const contractName = 'TitleCA';
-    
-    for(let i = 0; i < batchCount; i++){
+
+    for(let i = 1; i <= batchCount; i++){
+      console.log(`------------------- Contract: ${i} ---------------------`);
       const contractString = getContractString(contractName, i);
 
       const args = {_vin: 'Vin_' + uid };
@@ -53,9 +54,30 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
       checkResultsFromContractString(state, i);
     }
   });
-  //Helper Functions
 
-  //Creates a contract using a template string
+  it(`should upload — from json array — multiple contracts and should verify that all fields of each contract\'s metadata is correct - Batch count: ${batchCount}`, function* () {
+    const uid = util.uid();
+    const titlesJsonArray = createTitlesJsonArray(batchCount);
+    console.log('titlesJsonArray', titlesJsonArray);
+
+    for(let i = 0; i < batchCount; i++){
+      console.log(`------------------- Contract: ${i}+1 ---------------------`);
+      const titleJson = titlesJsonArray[i];
+      const contractName = 'Title_' + uid;
+      const contractString = createContractStringFromJson(contractName, titleJson);
+
+      const args = {_vin: titleJson.vin};
+      const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+      const state = yield rest.getState(contract);
+
+      // checkResultsFromContractJson(state, i);
+    }
+  });
+
+  /****************
+  *Helper Functions*
+   ****************/
+
   function getContractString(contractName, count) {
     const template = ''+
       'contract $contractName$ {'+
@@ -81,11 +103,47 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     return string;
   }
 
-  //Checks to make sure that the data inside the uploaded contract matches the expected data values
+  function createTitlesJsonArray(count) {
+    const jsonArray = [];
+    for (var i = 1; i <= count; i++) {
+      const json = {
+        vin: `vin_${i}`,
+        data: {
+          amount: 1000 + i,
+          name: '"John Doe"',
+        },
+      };
+      jsonArray.push(json);
+    }
+    return jsonArray;
+  }
+
+  function createContractStringFromJson(contractName, titlesJson) {
+    const template = '\n'+
+    'contract TitleMT { \n' +
+    '  $vars$ \n'+
+    '} \n' +
+    'contract _contractName_ is TitleMT{ \n' +
+    '  string public vin; \n'+
+    '  function Title(string _vin) public { \n'+
+    '    vin = _vin; \n'+
+    '  } \n'+
+    '} \n';
+
+    const allVars = [];
+    const amount = `uint public amount = ${titlesJson.data.amount};`;
+    allVars.push(amount);
+    const name = `string public name = ${titlesJson.data.name};`;
+    allVars.push(name);
+
+    const string = template.replace(new RegExp('_contractName_', 'g'), contractName).replace('$vars$', allVars.join(' '));
+    return string;
+  }
+
   function checkResultsFromContractString(results, count){
     assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
     assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
-    assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state');
+    assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state'); //FIXME: change expected value to 0x100${count} bc this doesn't work for double digits
 
     const correctBool = (count%2==1)? false : true;
 
@@ -95,5 +153,19 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
       assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
     }
   }
+
+  // function checkResultsFromContractJson(results, count){
+  //   assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
+  //   assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
+  //   assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state'); //FIXME: change expected value to 0x100${count} bc this doesn't work for double digits
+  //
+  //   const correctBool = (count%2==1)? false : true;
+  //
+  //   if(correctBool){
+  //     assert.isTrue(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
+  //   } else {
+  //     assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
+  //   }
+  // }
 
 });
