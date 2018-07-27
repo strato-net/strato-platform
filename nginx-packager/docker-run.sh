@@ -125,5 +125,7 @@ do
 done
 echo 'apex is available'
 
+# TODO: add oauth check (if apex is not dependant on oauth)
+
 openresty
 tail -n0 -F /usr/local/openresty/nginx/logs/*.log

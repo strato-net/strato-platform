@@ -193,6 +193,7 @@ services:
     - smd
     - strato
     - apex
+    - oauth
     environment:
     - authBasic=${authBasic}
     - azureAD=${azureAD}

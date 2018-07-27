@@ -8,4 +8,4 @@ EXPOSE 8000
 #   CMD curl  --silent --output /dev/null --fail localhost:9000/strato/v2.3/ && \
 #         exit 1
 
-ENTRYPOINT ["/usr/bin/oauth/doit.sh"]
+ENTRYPOINT ["bash", "-c", "/usr/bin/oauth/doit.sh"]
