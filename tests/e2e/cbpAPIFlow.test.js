@@ -3,14 +3,11 @@ const co = require('co');
 require('co-mocha');
 const rest = ba.rest;
 const common = ba.common;
-const api = common.api;
 const config = common.config;
 const util = common.util;
 const assert = common.assert;
 const nodes = config.nodes;
-const moment = require('moment');
 const constants = common.constants;
-const path = require('path');
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
