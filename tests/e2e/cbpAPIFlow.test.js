@@ -16,7 +16,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
   this.timeout(999999 * 1000);
 
   let admin;
-  const batchCount = util.getArgInt('--batchCount', 5);
+  const batchCount = util.getArgInt('--batchCount', 10);
 
   before(function * () {
     console.log(`Creating admin user`);
@@ -147,7 +147,9 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
   function checkResultsFromContractString(results, count, contractName, expectedName, expectedVin){
     assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
     assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
-    assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state'); //FIXME: change expected value to 0x100${count} bc this doesn't work for double digits
+    let expectedAddress = parseInt(`0x100${count}`);
+    let contractAddress = parseInt(results.testAddress, 16);
+    assert.equal(contractAddress, expectedAddress, 'Variable \'testAddress\' matched with expected state');
 
     assert.equal(contractName, expectedName, 'The contract\'s name matches the expected name');
     assert.equal(results.vin, expectedVin, 'Variable \'vin\' matched with the expected state');
