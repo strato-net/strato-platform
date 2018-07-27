@@ -3,7 +3,7 @@
 set -e
 set -x
 
-MONITORED_PIDS=()
+declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
@@ -71,15 +71,15 @@ function newnode {
   echo "Monitoring the background processes..."
   while sleep ${MONITORING_TIMER}; do
     # check status for every monitored process
-    for monitored_pid in "${MONITORED_PIDS[@]}"; do
+    for monitored_pid in "${!MONITORED_PIDS[@]}"; do
       # if process with pid does not exist
       if ! (ps -p ${monitored_pid} > /dev/null); then
-        echo "Process with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+        echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
         # Kill all the rest of monitored processes
-        for pid_to_kill in "${MONITORED_PIDS[@]}"; do
-          if [ ${pid_to_kill} -ne ${monitored_pid} ]; then
-            echo "killing process ${pid_to_kill}..."
-            kill -9 ${pid_to_kill}
+        for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+          if ps -p ${pid_to_kill} > /dev/null; then
+            echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+            kill -9 ${pid_to_kill} || true
             echo "done"
           fi
         done
@@ -148,7 +148,7 @@ function cleanupLogs {
 function runBackgroundProcess {
   $@ &
   proc_pid=$!
-  MONITORED_PIDS+=(${proc_pid})
+  MONITORED_PIDS[${proc_pid}]=$@
   echo "process pid:: $proc_pid (command: $@)"
   disown %
 }
