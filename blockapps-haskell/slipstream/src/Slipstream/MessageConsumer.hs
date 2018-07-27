@@ -9,22 +9,19 @@ module Slipstream.MessageConsumer where
 import Control.Monad.Reader
 import Data.Aeson hiding (Error)
 import qualified Data.ByteString.Char8 as BC
---import qualified Data.ByteString.Lazy.Char8 as BLC
---import Slipstream.Events hiding (Address)
 import GHC.Generics
 import qualified Data.Map as M
 import qualified Data.ByteString as B
 import Network.Kafka
 import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
---import Control.Monad.Trans.State.Lazy    (StateT(..))
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
---import HFlags
 import Slipstream.Options
 import Data.List
 import Slipstream.Processor
+import Control.Concurrent
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
@@ -81,4 +78,7 @@ getAndProcessMessages :: Kafka a => K.Offset -> a ()
 getAndProcessMessages offset = do
   messages <- getTheMessages offset
   liftIO $ processTheMessages messages
+  if (length messages == 0)
+    then  liftIO $ threadDelay 1000000
+    else return()
   getAndProcessMessages $ (offset + fromIntegral (length messages))
