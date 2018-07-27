@@ -1,11 +1,11 @@
 export const FETCH_CHAINS = 'FETCH_CHAINS';
-export const FETCH_CHAINSS_SUCCESSFULL = 'FETCH_CHAINSS_SUCCESSFULL';
-export const FETCH_CHAINSS_FAILED = 'FETCH_CHAINS_FAILED';
+export const FETCH_CHAINS_SUCCESSFULL = 'FETCH_CHAINS_SUCCESSFULL';
+export const FETCH_CHAINS_FAILED = 'FETCH_CHAINS_FAILED';
 
 export const fetchChains = function (chainid) {
   return {
     type: FETCH_CHAINS,
-    chainId: chainId,
+    chainid: chainid,
   }
 };
 

@@ -1,7 +1,7 @@
 import {
   FETCH_CHAINS,
-  FETCH_CHAINSS_SUCCESSFULL,
-  FETCH_CHAINSS_FAILED
+  FETCH_CHAINS_SUCCESSFULL,
+  FETCH_CHAINS_FAILED
 } from './chains.actions';
 
 const initialState = {
@@ -24,8 +24,8 @@ const reducer = function (state = initialState, action) {
       }, {});
       return {
         ...state,
-        chains: chains
-        error: null,
+        chains: chains,
+        error: null
       };
     case FETCH_CHAINS_FAILED:
       return {
