@@ -18,6 +18,7 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract()
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
+import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
@@ -36,3 +37,19 @@ postChain (ChainInput src label accountInfo variableNames members) = do
       chainInfo = ChainInfo label acctInfo [codeInfo] members
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId 
+
+getChain :: ChainId -> Bloc (ChainId, ChainOutput)
+getChain chainId = do
+  chainIdChainInfos <- blocStrato $ Strato.getChain [chainId]
+  chainInfo@(ChainInfo cl ai ci mm) <- case chainIdChainInfos of
+    [] -> throwError $ DBError "No chain matches the chainId"
+    (idInfo:_) -> snd $ toTuple idInfo
+ 
+  let getAddrBalance acct = case acct of 
+                              NonContract a b -> (a, b)
+                              ContractNoStorage a b c -> (a, b)
+                              ContractWithStorage a b c s -> (a, b)
+
+  let acctInfo = map getAddrBalance ai
+ 
+  return $ (chainId, ChainOutput cl acctInfo mm) 
