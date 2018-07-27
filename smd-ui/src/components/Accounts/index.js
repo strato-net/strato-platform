@@ -100,7 +100,7 @@ class Accounts extends Component {
           name="accounts"
           steps={tourSteps}
           finalStepSelector='#contracts'
-          nextPage='contracts' />
+          nextPage='chains' />
 
         <div className="row">
           <div className="col-sm-4 text-left">
