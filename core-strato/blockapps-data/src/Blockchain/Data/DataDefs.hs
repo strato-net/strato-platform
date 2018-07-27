@@ -47,10 +47,12 @@ share [mkPersist sqlSettings, mkMigrate "migrateAuto"]  -- annoying: postgres do
 
 migrateAll :: Migration
 migrateAll = do
-  migrateAuto
   let exec = lift . lift . flip rawExecute []
-  exec "ALTER TABLE block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
-  exec "ALTER TABLE block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  exec "ALTER TABLE IF EXISTS block_data_ref DROP COLUMN IF EXISTS block_id;"
+  exec "ALTER TABLE IF EXISTS block_transaction DROP COLUMN IF EXISTS block_id;"
+  exec "ALTER TABLE IF EXISTS block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  exec "ALTER TABLE IF EXISTS block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  migrateAuto
 
 -- todo newtype me
 type Difficulty = Integer
