@@ -31,10 +31,13 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, 1);
+    console.log('Here is the contractString', contractString);
 
     const args = {_vin: 'Vin_' + uid };
     const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+    console.log('Here is the contract', contract);
     const state = yield rest.getState(contract);
+    console.log('Here is the state', state);
 
     checkResultsFromContractString(state, 1);
   });
@@ -61,7 +64,7 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     console.log('titlesJsonArray', titlesJsonArray);
 
     for(let i = 0; i < batchCount; i++){
-      console.log(`------------------- Contract: ${i}+1 ---------------------`);
+      console.log(`------------------- Contract: ${i+1} ---------------------`);
       const titleJson = titlesJsonArray[i];
       const contractName = 'Title_' + uid;
       const contractString = createContractStringFromJson(contractName, titleJson);
@@ -69,8 +72,8 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
       const args = {_vin: titleJson.vin};
       const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
       const state = yield rest.getState(contract);
-
-      // checkResultsFromContractJson(state, i);
+      console.log('Here is the state', state);
+      checkResultsFromContractJson(state, titleJson);
     }
   });
 
@@ -154,18 +157,10 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     }
   }
 
-  // function checkResultsFromContractJson(results, count){
-  //   assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
-  //   assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
-  //   assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state'); //FIXME: change expected value to 0x100${count} bc this doesn't work for double digits
-  //
-  //   const correctBool = (count%2==1)? false : true;
-  //
-  //   if(correctBool){
-  //     assert.isTrue(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
-  //   } else {
-  //     assert.isFalse(results.testBool, correctBool, 'Variable \'testBool\' matched with expected state');
-  //   }
-  // }
+  function checkResultsFromContractJson(results, titleJson){
+    const expectedName = titleJson.data.name.replace('"','').replace('"','');
+    assert.equal(results.amount, titleJson.data.amount, 'Variable \'amount\' matched with expected state');
+    assert.equal(results.name, expectedName, 'Variable \'name\' matched with expected state');
+  }
 
 });
