@@ -40,16 +40,16 @@ postChain (ChainInput src label accountInfo variableNames members) = do
 
 getChain :: ChainId -> Bloc (ChainId, ChainOutput)
 getChain chainId = do
-  chainIdChainInfos <- blocStrato $ Strato.getChain [chainId]
-  chainInfo@(ChainInfo cl ai ci mm) <- case chainIdChainInfos of
-    [] -> throwError $ DBError "No chain matches the chainId"
-    (idInfo:_) -> snd $ toTuple idInfo
- 
+  chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
+  chainInfo@(ChainInfo cl ai ci mm) <- case chainIdChainInfo of
+                                         [] -> throwError $ DBError "No chain matches the chainId"
+                                         (idInfo:_) -> return $ snd $ toTuple (idInfo::NamedTuple "id" ChainId "info" ChainInfo)
   let getAddrBalance acct = case acct of 
                               NonContract a b -> (a, b)
                               ContractNoStorage a b c -> (a, b)
                               ContractWithStorage a b c s -> (a, b)
-
   let acctInfo = map getAddrBalance ai
- 
-  return $ (chainId, ChainOutput cl acctInfo mm) 
+  return $ (chainId, ChainOutput cl acctInfo mm)
+
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
