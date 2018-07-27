@@ -3,6 +3,7 @@ set -e
 set -x
 
 #cirrusRoot=http://${cirrusHost}
+postgrestRoot=http://${postgrestHost}
 export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
@@ -10,7 +11,7 @@ export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
-sed -i -e 's|__searchUrl__|'"${cirrusRoot}"'|g' config-prod.yaml
+sed -i -e 's|__searchUrl__|'"${postgrestRoot}"'|g' config-prod.yaml
 
 # Set postgres configurations
 sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
@@ -45,13 +46,13 @@ done
 echo 'strato is available'
 
 #TODO: commented out in slipstream branch - might need the check for postgrest container instead (URI /cirrus/search) or both
-#echo 'Waiting for cirrus to be available...'
-#until curl --silent --output /dev/null --fail --location ${cirrusRoot}
-#do
-#  echo "Check at $(date)"
-#  sleep 1
-#done
-#echo 'cirrus is available'
+echo 'Waiting for cirrus to be available...'
+until curl --silent --output /dev/null --fail --location ${postgrestRoot}
+do
+  echo "Check at $(date)"
+  sleep 1
+done
+echo 'cirrus is available'
 
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}

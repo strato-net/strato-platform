@@ -15,7 +15,7 @@ services:
     - APEX_URL=${APEX_URL}
     - BLOC_DOC_URL=${BLOC_DOC_URL}
     - BLOC_URL=${BLOC_URL}
-#    - CIRRUS_URL=${CIRRUS_URL}
+    - CIRRUS_URL=postgrest:3001
     - NODE_NAME=${NODE_NAME}
     - SINGLE_NODE=${SINGLE_NODE}
     - ssl=${ssl:-false}
@@ -38,6 +38,7 @@ services:
     environment:
     - blocHost=bloc:8000
 #    - cirrusHost=cirrus:3333
+    - postgrestHost=postgrest:3001
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -63,7 +64,7 @@ services:
     - strato
     environment:
     - BLOC_URL=${BLOC_URL}
-#    - CIRRUS_URL=${CIRRUS_URL}
+    - CIRRUS_URL=postgrest:3001
     - STRATO_URL=${STRATO_URL}
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
@@ -74,7 +75,7 @@ services:
     - postgres
     environment:
     # cirrusHost is temporary here to be able to run bloc server, to be removed
-    - cirrusHost=cirrus:3333
+    # - cirrusHost=postgrest:3001
     - loglevel=${loglevel}
     - kafkaHost=${kafkaHost}
     - postgres_host=postgres

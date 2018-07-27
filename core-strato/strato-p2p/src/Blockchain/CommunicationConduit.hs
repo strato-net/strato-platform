@@ -7,7 +7,6 @@
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
-    , awaitMsg
     , mkEthP2PEventSource
     , mkEthP2PEventConduit
     ) where
@@ -31,6 +30,7 @@ import           Blockchain.MilenaTools
 
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire

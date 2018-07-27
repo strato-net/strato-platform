@@ -12,7 +12,7 @@ module Blockchain.Mining (Miner(..),
                           )
 where
 
-import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Block
 
 data MinerType = Normal | SHA | Instant deriving (Show, Read, Eq)
 

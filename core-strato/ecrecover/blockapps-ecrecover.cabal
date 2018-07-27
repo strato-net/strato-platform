@@ -67,7 +67,7 @@ test-suite tests
     blockapps-ecrecover,
     -- testing:
     tasty < 0.12,
-    tasty-quickcheck < 0.9,
+    tasty-quickcheck,
     tasty-hunit < 0.10,
     QuickCheck < 3,
     -- parallelism and concurrency:

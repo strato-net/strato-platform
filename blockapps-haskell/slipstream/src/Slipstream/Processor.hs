@@ -155,12 +155,12 @@ processTheMessages messages = do
   --Set Flag on startup
   let deployFlag = BlockApps.Bloc22.Monad.Public
 
-  cirrusUrl <- parseBaseUrl flags_cirrusurl
+  --cirrusUrl <- parseBaseUrl flags_cirrusurl
 
   let env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
-            , urlCirrus= cirrusUrl
+            --, urlCirrus= cirrusUrl
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
