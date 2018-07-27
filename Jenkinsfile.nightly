@@ -25,6 +25,7 @@ pipeline {
           cd strato-platform
           REPO=private make all
         '''
+        archive "strato-platform/docker-compose.yml"
       }
     }
 
@@ -130,7 +131,6 @@ pipeline {
 
   post {
     success {
-      archive "strato-platform/docker-compose.yml"
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
