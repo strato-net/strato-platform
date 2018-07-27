@@ -7,7 +7,7 @@ BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
-all: build_docker
+all: build_docker clean
 
 prebuild:
 	mkdir -p $(BASILWORK)
@@ -15,11 +15,11 @@ prebuild:
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(OAUTHHOME)
 	mkdir -p $(BUILDER_HOME)
-	mkdir -p /tmp/docker-dummy
+	mkdir -p /tmp/docker-dummy-oauth
 
 build_buildbase: prebuild
-	cp -f Dockerfile.buildbase /tmp/docker-dummy
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-oauth-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+	cp -f Dockerfile.buildbase /tmp/docker-dummy-oauth
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-oauth-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy-oauth/Dockerfile.buildbase /tmp/docker-dummy-oauth
 
 build_haskell: prebuild build_buildbase
 	stack setup
@@ -32,4 +32,4 @@ build_docker: build_haskell
 
 clean:
 	rm -rf $(BASILWORK)
-	rm -rf /tmp/docker-dummy
+	rm -rf /tmp/docker-dummy-oauth

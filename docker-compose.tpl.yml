@@ -29,13 +29,6 @@ services:
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
-  oauth:
-    environment:
-    - APEX_URL=${APEX_URL}
-    - SMD_MODE=${SMD_MODE}
-    build: .
-    image: ${SMD_IMAGE:-<REPO_URL>oauth:<VERSION>}
-    restart: always
   apex:
     depends_on:
     - bloc
@@ -97,6 +90,9 @@ services:
     image: redis:3.2
     restart: always
   oauth:
+    environment:
+    - APEX_URL=${APEX_URL}
+    - SMD_MODE=${SMD_MODE}
     build: .
     image: ${OAUTH_IMAGE:-<REPO_URL>oauth:<VERSION>}
     restart: always
