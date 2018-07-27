@@ -60,7 +60,9 @@ migrateAll :: ReaderT SqlBackend (NoLoggingT (ResourceT IO)) ()
 migrateAll = do
   -- TODO(tim): bracket and TRUNCATE the tables in a DBMS agnostic way
   _ <- runMigrationSilent DataBlock.migrateAll
-  _ <- runMigrationSilent DataDefs.migrateAll
+  -- SQLite doesn't have support for dropping columns, and since this is
+  -- a brand new file there's no need for the manual migration steps
+  _ <- runMigrationSilent DataDefs.migrateAuto
   _ <- runMigrationSilent DataPeer.migrateAll
   return ()
 
