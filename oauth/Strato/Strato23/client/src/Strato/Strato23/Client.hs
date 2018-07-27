@@ -4,7 +4,8 @@
 
 module Strato.Strato23.Client
   ( getUsers,
-    postSignature
+    postSignature,
+    getPing
   ) where
 
 import           Servant.API
@@ -14,4 +15,5 @@ import           Strato.Strato23.API
 
 getUsers :: ClientM [User]
 postSignature :: ClientM SignatureDetails
-getUsers :<|> postSignature = client (Proxy @ StratoAPI)
+getPing :: ClientM String
+getPing :<|> getUsers :<|> postSignature = client (Proxy @ StratoAPI)

@@ -22,10 +22,15 @@ users1 =
 postSignature :: SignatureDetails
 postSignature = SignatureDetails "12438971348519879" "21897342723782789" "28"
 
+pingDetail :: String
+pingDetail = "pong"
+
 serveBloc :: Server StratoAPI
-serveBloc = users
+serveBloc = getPing
+            :<|> users
             :<|> signatureDetails
   where 
+    getPing = return pingDetail
     users = return users1
     signatureDetails = return postSignature
 

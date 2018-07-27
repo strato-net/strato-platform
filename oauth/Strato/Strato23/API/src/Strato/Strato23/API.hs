@@ -10,7 +10,8 @@ import           Servant
 import           GHC.Generics
 import           Data.Aeson.Types
 
-type StratoAPI = "users" :> Get '[JSON] [User]
+type StratoAPI = "_ping" :> Get '[JSON] String
+  :<|> "users" :> Get '[JSON] [User]
   :<|> "strato" :> "v2.3" :> "signature" :> Post '[JSON] SignatureDetails
 
 data User = User
