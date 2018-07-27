@@ -18,14 +18,14 @@ export const closeCreateChainOverlay = function () {
   }
 }
 
-export const createChain = function (src, label, acctInfo, vars, members) {
+export const createChain = function (label, addRule, removeRule, members, acctBalance) {
   return {
     type: CREATE_CHAIN_REQUEST,
-    src,
     label,
-    acctInfo,
-    vars,
+    addRule,
+    removeRule,
     members,
+    acctBalance,
     spinning: true,
     isOpen: true,
   }

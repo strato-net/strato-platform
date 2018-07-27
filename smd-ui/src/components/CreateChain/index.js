@@ -47,7 +47,7 @@ class CreateChain extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="chain_label"
+                      name="label"
                       component="input"
                       type="text"
                       placeholder="Chain Label"
@@ -55,28 +55,46 @@ class CreateChain extends Component {
                       tabIndex="1"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.chain_label}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.label}</div>
+                  </div>
+                </div>
+
+                <div className="pt-form-group pt-intent-danger">
+                  <label className="pt-label" htmlFor="input-a">
+                    Add Rule
+                  </label>
+                  <div className="pt-form-content">
+                    <Field
+                      name="addRule"
+                      component="input"
+                      type="text"
+                      placeholder="Add Rule"
+                      className="pt-input form-width"
+                      tabIndex="1"
+                      required
+                    />
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.addRule}</div>
                   </div>
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
-                    Governance Contract
+                    Remove Rule
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="gov_contract"
+                      name="removeRule"
                       component="input"
                       type="text"
-                      placeholder="Governance Contract"
+                      placeholder="Remove Rule"
                       className="pt-input form-width"
                       tabIndex="2"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.gov_contract}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.removeRule}</div>
                   </div>
                 </div>
-
+              
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
                     Members
@@ -97,19 +115,19 @@ class CreateChain extends Component {
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
-                    Account Info
+                    Account Balance
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="acct_info"
+                      name="acctBalance"
                       component="input"
                       type="text"
-                      placeholder="Account Info"
+                      placeholder="Account Balance"
                       className="pt-input form-width"
                       tabIndex="4"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.acct_info}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.acctBalance}</div>
                   </div>
                 </div>
               </div>
