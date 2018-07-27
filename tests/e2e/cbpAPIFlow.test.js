@@ -31,15 +31,14 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, 1);
-    console.log('Here is the contractString', contractString);
 
     const args = {_vin: 'Vin_' + uid };
     const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
-    console.log('Here is the contract', contract);
+    yield rest.callMethod(admin, contract, "Title", args);
     const state = yield rest.getState(contract);
-    console.log('Here is the state', state);
+    const name = yield rest.callMethod(admin, contract, "__getContractName__");
 
-    checkResultsFromContractString(state, 1);
+    checkResultsFromContractString(state, 1, name, contractName, args._vin);
   });
 
   it(`should upload — from string — multiple contracts and should verify that all fields of each contract\'s metadata is correct - Batch count: ${batchCount}`, function* () {
@@ -52,9 +51,11 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
 
       const args = {_vin: 'Vin_' + uid };
       const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+      yield rest.callMethod(admin, contract, "Title", args);
       const state = yield rest.getState(contract);
+      const name = yield rest.callMethod(admin, contract, "__getContractName__");
 
-      checkResultsFromContractString(state, i);
+      checkResultsFromContractString(state, i, name, contractName, args._vin);
     }
   });
 
@@ -71,10 +72,13 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
 
       const args = {_vin: titleJson.vin};
       const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+      yield rest.callMethod(admin, contract, "Title", args);
       const state = yield rest.getState(contract);
-      console.log('Here is the state', state);
-      checkResultsFromContractJson(state, titleJson);
+      const name = yield rest.callMethod(admin, contract, "__getContractName__");
+
+      checkResultsFromContractJson(state, titleJson, name, contractName, args._vin);
     }
+
   });
 
   /****************
@@ -143,11 +147,13 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     return string;
   }
 
-  function checkResultsFromContractString(results, count){
+  function checkResultsFromContractString(results, count, contractName, expectedName, expectedVin){
     assert.equal(results.testString, `s${count}`, 'Variable \'testString\' matched with expected state');
     assert.equal(results.testInt, `${count}`, 'Variable \'testInt\' matched with expected state');
     assert.equal(results.testAddress, `000000000000000000000000000000000000100${count}`, 'Variable \'testAddress\' matched with expected state'); //FIXME: change expected value to 0x100${count} bc this doesn't work for double digits
 
+    assert.equal(contractName, expectedName, 'The contract\'s name matches the expected name');
+    assert.equal(results.vin, expectedVin, 'Variable \'vin\' matched with the expected state');
     const correctBool = (count%2==1)? false : true;
 
     if(correctBool){
@@ -157,10 +163,13 @@ describe("\'contract metadata (parsed via API)-> Bloc -> Postgres\' flow test", 
     }
   }
 
-  function checkResultsFromContractJson(results, titleJson){
+  function checkResultsFromContractJson(results, titleJson, contractName, expectedContractName, expectedVin){
     const expectedName = titleJson.data.name.replace('"','').replace('"','');
     assert.equal(results.amount, titleJson.data.amount, 'Variable \'amount\' matched with expected state');
     assert.equal(results.name, expectedName, 'Variable \'name\' matched with expected state');
+
+    assert.equal(contractName, expectedContractName, 'The contract\'s name matches the expected name');
+    assert.equal(results.vin, expectedVin, 'Variable \'vin\' matched with the expected state');
   }
 
 });
