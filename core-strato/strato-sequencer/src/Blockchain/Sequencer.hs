@@ -81,6 +81,8 @@ sequencer :: SequencerM ()
 sequencer = do
   -- TODO(tim): Pipe time window in through a flag
   timer <- liftIO $ createBlockstanbulRoundTimer 100
+  -- Bootstrap the block generation
+  markForVM OECreateBlockCommand
   forever $ do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
