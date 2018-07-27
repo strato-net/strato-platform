@@ -79,7 +79,7 @@ setNum :: Integer -> Block -> Block
 setNum n b = let bd = blockBlockData b
              in b { blockBlockData = bd { blockDataNumber = n} }
 
-insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [(Key Block, Key BlockDataRef)]
+insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [Key BlockDataRef]
 insertRandomBlocks start size = do
         blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
         let numberedBlocks = zipWith setNum [start..] blocks
@@ -139,9 +139,6 @@ spec = withApp $ do
       it "Indexing" $ do
         _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
         _ <- insertRandomBlocks 1 10
-        bs <- getBlocks
-        let nums = map (blockDataNumber . blockBlockData) bs
-        (sort nums) `equiv` [0..10]
         YT.request $ do
           setUrl BlockInfoR
           addGetParam "maxnumber" "5"
