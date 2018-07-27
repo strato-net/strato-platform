@@ -71,9 +71,10 @@ main = do
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl flags_stratourl
-  cirrusUrl <- parseBaseUrl flags_cirrusurl
+  -- cirrusUrl <- parseBaseUrl flags_cirrusurl
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
-  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 (toEnum flags_loglevel) mode
+  --let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 (toEnum flags_loglevel) mode
+  let blocEnv = Bloc22.BlocEnv stratoUrl mgr pool22 (toEnum flags_loglevel) mode
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv)
 

@@ -7,6 +7,7 @@ BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 DEPLOYBASE_NAME=bloch-deploybase
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
+SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
