@@ -125,7 +125,12 @@ do
 done
 echo 'apex is available'
 
-# TODO: add oauth check (if apex is not dependant on oauth)
+echo 'Waiting for oauth to be available...'
+until curl --silent --output /dev/null --fail --location http://oauth:8000/_ping
+do
+  sleep 0.5
+done
+echo 'oauth is available'
 
 openresty
 tail -n0 -F /usr/local/openresty/nginx/logs/*.log
