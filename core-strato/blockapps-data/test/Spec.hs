@@ -16,6 +16,7 @@ import qualified Data.Vector                     as V
 import           Test.Hspec
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
@@ -23,7 +24,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Data.Json
-import  Blockchain.Data.Transaction
+import           Blockchain.Data.Transaction
 
 import           Test.QuickCheck
 
@@ -39,6 +40,7 @@ main = hspec $ do
     matchingHash
     blockRoundTrip
     codeRoundTrip
+    chainInfoRoundTrip
     eventualHashIdempotency
     eventualFromIdempotency
     directComparison
@@ -109,6 +111,13 @@ codeRoundTrip = it "preserves code in json -> hs -> json" $ do
     let input = C8.pack "\"de5f72fd\""
     let code = Ae.eitherDecode input :: Either String Code
     compareJSON input code
+
+chainInfoRoundTrip :: Spec
+chainInfoRoundTrip = it "preserves chain info in json -> hs -> json" $ do
+    rawInput <- readFile "test/testdata/chaininfo.json"
+    let input = C8.pack rawInput
+    let ci = Ae.eitherDecode input :: Either String ChainInfo
+    compareJSON input ci
 
 -- compare checks that the parsed value (`actual`) is structurally equivalent
 -- to the bytestring by diffing the corresponding Aeson.Values
