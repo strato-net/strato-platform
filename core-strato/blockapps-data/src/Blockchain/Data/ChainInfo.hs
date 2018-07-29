@@ -4,12 +4,12 @@
 {-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..),
     AccountInfo (..),
     CodeInfo (..),
-    accountInfo,
     accountExtractor
   ) where
 
@@ -22,12 +22,12 @@ import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
--- import           Blockchain.TypeLits
+import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.JsonStream.Parser               as JS
-import qualified Data.Map                             as M
+import qualified Data.Map                             as M      hiding (map, filter)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 
@@ -112,32 +112,35 @@ instance RLPSerializable AccountInfo where
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
-    acctInfo        :: [AccountInfo],
+    accountInfo     :: [AccountInfo],
     codeInfo        :: [CodeInfo],
     members         :: M.Map Address Enode
 } deriving (Eq, Show, Read, GHCG.Generic)
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
-    cl <- (o .: "label")
-    ai <- (o .: "acctInfo")
+    cl <- (o .: "chainLabel")
+    ai <- (o .: "accountInfo")
     ci <- (o .: "codeInfo")
-    mb <- (o .: "members") 
+    mb <- (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
     return $ ChainInfo cl ai ci (M.fromList mb)
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON (ChainInfo cl ai ci ms) =
-    object [ "label" .= cl
-           , "acctInfo" .= ai
+    object [ "chainLabel" .= cl
+           , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= (M.toList ms)
+           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enodeURL" Enode)
            ]
+
+instance KnownSymbol "address" where
+instance KnownSymbol "enodeURL" where
 
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
     [ rlpEncode . encodeUtf8 . T.pack $ chainLabel ci
-    , RLPArray . map rlpEncode $ acctInfo ci
+    , RLPArray . map rlpEncode $ accountInfo ci
     , RLPArray . map rlpEncode $ codeInfo ci
     , rlpEncode $ members ci
     ]
@@ -151,7 +154,7 @@ instance RLPSerializable ChainInfo where
 
 
 accountExtractor :: JS.Parser [AccountInfo]
-accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)
+accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 
-accountInfo :: JS.Parser AccountInfo
-accountInfo = JS.value
+acctInfo :: JS.Parser AccountInfo
+acctInfo = JS.value
