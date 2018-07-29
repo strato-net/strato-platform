@@ -16,7 +16,7 @@ class CreateChain extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('create_chain_submit_click');
-    this.props.createChain(values.chain_label, values.gov_contract, values.members, values.acct_info);
+    this.props.createChain(values.label, values.addRule, values.removeRule, values.members, values.acctBalance);
   }
 
   render() {

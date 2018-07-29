@@ -19,6 +19,7 @@ const url = env.STRATO_URL + "/chain"
 
 export function createChainApiCall(label, addRule, removeRule, members, acctBalance){
   return fetch(
+    url,
     {
       method: 'POST',
       credentials: "include",
@@ -46,7 +47,7 @@ export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.addRule, action.removeRule, action.members, action.acctBalance);
     yield put(createChainSuccess(response));
-    yield put(fetchChains(false, false));
+    yield put(fetchChains(false));
   }
   catch (err) {
     yield put(createChainFailure(err));
