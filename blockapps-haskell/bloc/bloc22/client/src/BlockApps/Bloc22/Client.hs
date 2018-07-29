@@ -6,6 +6,7 @@ module BlockApps.Bloc22.Client
   ( getGitInfo
   , getAddresses
   , postChain
+  , getChain
   , getContracts
   , getContractsData
   , getContractsContract
@@ -175,3 +176,6 @@ postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 
 postChain :: ChainInput -> ClientM ChainId
 postChain = client (Proxy @ PostChain)
+
+getChain :: ChainId -> ClientM (ChainId, ChainOutput)
+getChain = client (Proxy @ GetChain)

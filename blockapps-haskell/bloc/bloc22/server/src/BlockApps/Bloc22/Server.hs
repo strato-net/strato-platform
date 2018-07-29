@@ -53,6 +53,7 @@ bloc = (return gitInfo)
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
   :<|> postChain
+  :<|> getChain
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc

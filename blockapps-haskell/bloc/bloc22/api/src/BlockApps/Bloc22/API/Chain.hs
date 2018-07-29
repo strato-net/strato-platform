@@ -74,7 +74,7 @@ instance ToSample ChainInput where
 
 instance ToSchema ChainInput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Send ether from one account to another (value is in Wei)"
+    & mapped.schema.description ?~ "Chain Input Info"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: ChainInput
@@ -95,6 +95,52 @@ instance ToSchema ChainInput where
           ] 
        }
 
+data ChainOutput = ChainOutput 
+  { chainOutputLabel       :: Text
+  , chainOutputAccountInfo :: [(Address, Integer)]
+  , chainOutputMembers     :: [(Address, Text)]
+  } deriving (Eq, Show, Generic)
+
+instance Arbitrary ChainOutput where
+  arbitrary = genericArbitrary uniform
+
+instance FromJSON ChainOutput where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToJSON ChainOutput where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance ToSample ChainOutput where
+  toSamples _ = singleSample ChainOutput
+    { chainOutputLabel = "my chain"
+    , chainOutputAccountInfo = [
+         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
+       ]
+    , chainOutputMembers = [
+         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
+       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
+       ] 
+    } 
+
+instance ToSchema ChainOutput where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Chain Output Info"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ChainOutput
+      ex = ChainOutput
+        { chainOutputLabel = "my chain"
+        , chainOutputAccountInfo = [
+            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
+          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
+          ]
+        , chainOutputMembers = [
+            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
+          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
+          ] 
+       }
+ 
 --------------------------------------------------------------------------------
 
 -- POST /chain
@@ -103,3 +149,6 @@ type PostChain = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
 
+type GetChain = "chain"
+  :> ReqBody '[JSON] ChainId
+  :> Get '[JSON] (ChainId, ChainOutput)

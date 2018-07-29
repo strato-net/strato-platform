@@ -18,6 +18,7 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract()
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
+import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
@@ -28,10 +29,27 @@ postChain (ChainInput src label accountInfo variableNames members) = do
             [] -> throwError $ UserError "You need to supply at least one governance contract"
             [(_, x)] -> return $ snd x
             _ -> throwError $ UserError "Multiple governance contracts are not allowed" 
-  let contractAcctInfo = transformXabi contractdetailsXabi (Map.fromList variableNames)
+  let varMap = Map.fromList $ transformXabi contractdetailsXabi (Map.fromList variableNames)
+      contractAcctInfo = ContractWithStorage (Address 0x100) (0::Integer) contractdetailsCodeHash varMap
       nonContractAcctInfo = map (uncurry NonContract) accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
       codeInfo = CodeInfo contractdetailsBin src contractdetailsName
       chainInfo = ChainInfo label acctInfo [codeInfo] members
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId 
+
+getChain :: ChainId -> Bloc (ChainId, ChainOutput)
+getChain chainId = do
+  chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
+  chainInfo@(ChainInfo cl ai ci mm) <- case chainIdChainInfo of
+                                         [] -> throwError $ DBError "No chain matches the chainId"
+                                         (idInfo:_) -> return $ snd $ toTuple (idInfo::NamedTuple "id" ChainId "info" ChainInfo)
+  let getAddrBalance acct = case acct of 
+                              NonContract a b -> (a, b)
+                              ContractNoStorage a b c -> (a, b)
+                              ContractWithStorage a b c s -> (a, b)
+  let acctInfo = map getAddrBalance ai
+  return $ (chainId, ChainOutput cl acctInfo mm)
+
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
