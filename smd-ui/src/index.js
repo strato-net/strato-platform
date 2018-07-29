@@ -69,6 +69,7 @@ import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
+import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
@@ -144,6 +145,7 @@ const rootSaga = function* startForeman() {
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
     fork(watchFetchUpload),
+    fork(watchFetchChains),
     fork(watchCreateChain)
   ])
 };
