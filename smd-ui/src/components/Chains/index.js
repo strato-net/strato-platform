@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-// import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDetail, resetUserAddress } from './chains.actions';
+import { fetchChains } from './chains.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -11,7 +11,6 @@ const tourSteps = [
   {
     title: 'View Chains',
     text: 'Scroll through all chains that you belong to',
-    /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
     selector: '#contracts',
     position: 'bottom',
     isFixed: true
@@ -25,6 +24,7 @@ class Chains extends Component {
   }
 
   componentDidMount() {
+    this.props.fetchChains(true);
     mixpanelWrapper.track('chains_page_load')
   }
 
@@ -75,4 +75,15 @@ class Chains extends Component {
   }
 }
 
-export default Chains;
+export function mapStateToProps(state) {
+  return {
+    chains: state.chains.chains
+  };
+}
+
+export default withRouter(
+  connect(mapStateToProps,
+    {
+      fetchChains
+    }
+  )(Chains));
