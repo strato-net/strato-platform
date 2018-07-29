@@ -140,7 +140,7 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           -> m StateRoot
 chainInfoToGenesisState ci = do
 --    let accounts = (\(a,w) -> NonContract a (fromIntegral w)) <$> accountBalance ci
-    let accounts = acctInfo ci
+    let accounts = accountInfo ci
     initializeStateDB accounts
     stateRoot <$> getStateDB
 
