@@ -7,8 +7,10 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_CHAINS,
-  FETCH_CHAINSS_SUCCESSFULL,
-  FETCH_CHAINSS_FAILED,
+  FETCH_CHAINS_SUCCESSFULL,
+  FETCH_CHAINS_FAILED,
+  fetchChainsSuccess,
+  fetchChainsFailure
 } from './chains.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -48,7 +50,7 @@ export function* getChains(action) {
   }
 }
 
-export default function* watcAccountActions() {
+export default function* watchFetchChains() {
   yield [
     takeLatest(FETCH_CHAINS, getChains),
   ];
