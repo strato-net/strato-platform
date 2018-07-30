@@ -2,6 +2,7 @@
 module Flags where
 
 import           Blockchain.Constants
+import           Blockchain.Data.Address
 import           Blockchain.Sequencer.Constants
 import           HFlags
 
@@ -20,3 +21,5 @@ defineFlag "s:syncwrites" False "Whether or not to sync() all dependent block DB
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
 
 defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to."
+
+defineEQFlag "validators" [| [] :: [Address] |] "ADDRESS_LIST" "Which validators initialize the consensus mechanism"

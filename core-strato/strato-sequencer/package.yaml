@@ -20,6 +20,7 @@ dependencies:
   - clock
   - containers
   - directory
+  - extra
   - mtl
   - resourcet
   - monad-logger
@@ -28,6 +29,7 @@ dependencies:
   - leveldb-haskell
   - blockapps-milena
   - binary
+  - base64-bytestring
   - bytestring
   - ethereum-rlp
   - time

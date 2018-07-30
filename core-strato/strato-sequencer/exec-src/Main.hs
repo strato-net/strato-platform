@@ -3,13 +3,15 @@
 module Main where
 
 import           Control.Monad.Logger
+import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
+import           Data.Either.Extra
 import           Data.Maybe                 (fromMaybe)
 import           HFlags
 import           Safe
+import           System.Environment
 
 import           Blockchain.Blockstanbul
-import           Blockchain.Data.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -28,14 +30,17 @@ main = do
                           (_, "") -> Nothing
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
-  -- TODO(tim): Use proper values
+  -- TODO(tim): Use proper initial values for the view
       ctx = newContext
                (View 0 0)
-               [Address 0x80976e7d04c8ae9b3a1c08278a5c385e5b0ff446]
-               (fromMaybe (error "invalid argument")  $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
-      mCtx = if flags_tmpblockstanbul
-               then Just ctx
-               else Nothing
+               flags_validators
+  mCtx <- if not flags_tmpblockstanbul
+             then return Nothing
+             else do
+                skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+                let bytes = fromEither (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                return . Just . ctx $ pkey
 
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize

@@ -115,6 +115,7 @@ services:
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
     - networkID=${networkID}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -129,6 +130,7 @@ services:
     - statsPrefix=${statsPrefix}
     - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
+    - validators=${validators:-}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
