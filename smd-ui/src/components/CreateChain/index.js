@@ -167,7 +167,7 @@ export function mapStateToProps(state) {
     errors = { errors: state.form["create-chain"].syncErrors }
   }
   return {
-    isOpen: state.createBlocUser.isOpen,
+    isOpen: state.createChain.isOpen,
     ...errors
   };
 }

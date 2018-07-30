@@ -40,6 +40,7 @@ import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
 import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
 import downloadReducer from './components/ExternalStorage/Download/download.reducer';
 import chainsReducer from './components/Chains/chains.reducer'
+import createChainReducer from './components/CreateChain/createChain.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -115,7 +116,8 @@ const rootReducer = combineReducers({
   externalStorage: externalStorageReducer,
   attest: attestReducer,
   verify: verifyReducer,
-  download: downloadReducer
+  download: downloadReducer,
+  createChain: createChainReducer
 });
 
 const rootSaga = function* startForeman() {
