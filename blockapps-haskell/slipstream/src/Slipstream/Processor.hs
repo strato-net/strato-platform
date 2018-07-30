@@ -86,8 +86,11 @@ getContract address _ = do
     getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
 
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
+  liftIO $ putStrLn $ "ret1: " ++ show ret1
   let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
+  liftIO $ putStrLn $ "ret2: " ++ show ret2
   let ret3 = show $ contractdetailsName qqqq
+  liftIO $ putStrLn $ "ret3" ++ show ret3
   return (ret1, ret2, ret3)
 
 fetchABI :: String -> Bloc String
@@ -126,6 +129,7 @@ third (_, _, x) = x
 
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
+  --liftIO $ putStrLn "<>____Process_____<>"
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
 {-
@@ -155,12 +159,9 @@ processTheMessages messages = do
   --Set Flag on startup
   let deployFlag = BlockApps.Bloc22.Monad.Public
 
-  --cirrusUrl <- parseBaseUrl flags_cirrusurl
-
   let env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
-            --, urlCirrus= cirrusUrl
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
@@ -170,17 +171,21 @@ processTheMessages messages = do
   cachedContractsIORef <- newIORef Map.empty
 
   _ <- enterBloc2 env $ do
+    --liftIO $ putStrLn "{{{}}}"
     forM (filter hasContract changes) $ \change -> do
 
---      liftIO $ convertRet address codehash strAbi $ encode $ parseChanges blocConn change
+      --liftIO $ putStrLn $ "{{{CHANGE}}} : " ++ show change
 
       filledInChange <- addStorageIfNeeded change
+
+      --liftIO $ putStrLn $ "{{{FILLED IN CHANGE}}} : " ++ show filledInChange
 
       let (address, codehash, storage) =
             case filledInChange of
              Action _ a c (Just s) -> (a, c, storageToFunction s)
              Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-
+      --liftIO $ putStrLn $ "======address=====: " ++ show address
+      --liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
@@ -200,6 +205,12 @@ processTheMessages messages = do
       --TODO: Add parsing of contract info to get flags (indexing, history)
 
       let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      liftIO $ convertRet address codehash strAbi name ret
+      --liftIO $ putStrLn $ "<>RET<>: " ++ show ret
+      let chain = case Map.lookup "chainId" ret of
+                    Nothing -> ""
+                    Just(x) -> show x
+      --liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
+
+      liftIO $ convertRet address codehash strAbi name chain ret
 
   return()
