@@ -116,7 +116,7 @@ chainInfoRoundTrip :: Spec
 chainInfoRoundTrip = it "preserves chain info in json -> hs -> json" $ do
     rawInput <- readFile "test/testdata/chaininfo.json"
     let input = C8.pack rawInput
-    let ci = Ae.eitherDecode input :: Either String ChainInfo
+    let ci = Ae.eitherDecode input :: Either String [ChainInfo]
     compareJSON input ci
 
 -- compare checks that the parsed value (`actual`) is structurally equivalent
