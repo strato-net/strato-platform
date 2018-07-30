@@ -23,7 +23,6 @@ import           System.Clock
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
-import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 
@@ -94,7 +93,6 @@ sequencer = do
     clearLdbBatchOps
     clearGetChainsDB
     clearGetTransactionsDB
-    clearEvents
     t0 <- liftIO $ getTime Realtime
     splitEvents $ map snd inEvents
     t1 <- liftIO $ getTime Realtime
@@ -110,13 +108,13 @@ sequencer = do
     txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
-    vmEvs <- gets _vmEvents
-    unless (Q.length vmEvs == 0) $ do
-      writeSeqVmEvents' $ toList vmEvs
+    vmEvs <- drainVM
+    unless (null vmEvs) $ do
+      writeSeqVmEvents' vmEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- gets _p2pEvents
-    unless (Q.length p2pEvs == 0) $ do
-      writeSeqP2pEvents' $ toList p2pEvs
+    p2pEvs <- drainP2P
+    unless (null p2pEvs) $ do
+      writeSeqP2pEvents' p2pEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
     unless (null inEvents) $ do
       let ofs = maximum $ map fst inEvents
