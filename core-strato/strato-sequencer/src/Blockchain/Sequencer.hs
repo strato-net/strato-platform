@@ -10,8 +10,11 @@ module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
 
+import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
+import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TMVar
+import           Control.Lens           hiding (op)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -76,12 +79,17 @@ createBlockstanbulRoundTimer dt = do
   setAlarm alarm next
   return var
 
+delayedCreation :: TMChan OutputEvent -> IO ()
+delayedCreation ch = do
+  threadDelay 10000000 -- 10 seconds
+  atomically $ writeTMChan ch OECreateBlockCommand
+
 sequencer :: SequencerM ()
 sequencer = do
   -- TODO(tim): Pipe time window in through a flag
   timer <- liftIO $ createBlockstanbulRoundTimer 100
   -- Bootstrap the block generation
-  markForVM OECreateBlockCommand
+  _ <- forkIO <$> uses vmEvents delayedCreation
   forever $ do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
@@ -150,22 +158,26 @@ blockstanbulSend :: [InEvent] -> SequencerM ()
 blockstanbulSend msgs = do
     resp <- sendAllMessages msgs
     $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
-    -- TODO(tim): Use the wiremessages in the response
     let blocks = [b | ToCommit b <- resp]
     unless (null blocks) $
       -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
       void $ sendAllMessages [CommitResult (Right ())]
+
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap OEBlock
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        vmevs = [OECreateBlockCommand | MakeBlockCommand <- resp] ++ mapMaybe rewriteBlock blocks
+        vmevs = mapMaybe rewriteBlock blocks
+        p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
     $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
     mapM_ markForVM vmevs
-    let p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
     $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
     mapM_ markForP2P p2pevs
+
+    unless (null [OECreateBlockCommand | MakeBlockCommand <- resp]) $
+      $logDebugS "seq/pbft/create" "Delaying a make block command"
+      void $ forkIO <$> uses vmEvents delayedCreation
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
