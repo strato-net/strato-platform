@@ -88,15 +88,15 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name x = do
+convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
+convertRet address codehash abi name chain x = do
   --Revisit to fix table name duplicates
   --let contractName = take 63 codehash
 
   --Indexing flag
   let indFlag = False
   let ind = if (indFlag)
-              then "create index if not exists idx ON \"" ++ name ++ "\" (address);"
+              then ""
               else ""
 
   --History flag
@@ -108,16 +108,16 @@ convertRet address codehash abi name x = do
                 --let histCreate = "create table if not exists \"History\" (\"codeHash\" text, contract text, block_id text, state text)"
               else ""
 
-  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "')"
-  let conIns = "insert into contract (\"codeHash\", contract, abi) values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
+  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
 
   let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
 
-  let createSt = "create table if not exists \"" ++ name ++ "\" (address text primary key, " ++ tableColumns list ++ ");"
-  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "';"
+  let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
+  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
 
-  let keySt = "(" ++ "address, " ++ listToKeyStatement ", " list ++ ")"
-  let vals = "(" ++ "'" ++ address ++ "', "  ++ listToValueStatement ", " list ++ ")"
+  let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
+  let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
   let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
   let oneIns = "BEGIN;" ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ "COMMIT;"
 
