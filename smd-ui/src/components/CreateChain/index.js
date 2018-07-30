@@ -27,7 +27,7 @@ class CreateChain extends Component {
           this.props.reset();
           this.props.openCreateChainOverlay();
         }} className="pt-intent-primary pt-icon-add"
-          id="accounts-create-chain-button"
+          id="chains-create-chain-button"
           text="Create Chain" />
 
 
@@ -60,7 +60,7 @@ class CreateChain extends Component {
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
+                  <label className="pt-label" htmlFor="input-b">
                     Add Rule
                   </label>
                   <div className="pt-form-content">
@@ -70,7 +70,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Add Rule"
                       className="pt-input form-width"
-                      tabIndex="1"
+                      tabIndex="2"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.addRule}</div>
@@ -78,7 +78,7 @@ class CreateChain extends Component {
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
+                  <label className="pt-label" htmlFor="input-c">
                     Remove Rule
                   </label>
                   <div className="pt-form-content">
@@ -88,7 +88,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Remove Rule"
                       className="pt-input form-width"
-                      tabIndex="2"
+                      tabIndex="3"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.removeRule}</div>
@@ -96,7 +96,7 @@ class CreateChain extends Component {
                 </div>
               
                 <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
+                  <label className="pt-label" htmlFor="input-d">
                     Members
                   </label>
                   <div className="pt-form-content">
@@ -106,7 +106,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Members"
                       className="pt-input form-width"
-                      tabIndex="3"
+                      tabIndex="4"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
@@ -114,7 +114,7 @@ class CreateChain extends Component {
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
+                  <label className="pt-label" htmlFor="input-e">
                     Account Balance
                   </label>
                   <div className="pt-form-content">
@@ -124,7 +124,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Account Balance"
                       className="pt-input form-width"
-                      tabIndex="4"
+                      tabIndex="5"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.acctBalance}</div>
