@@ -1,13 +1,19 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA.Model.ExtendedSignature where
 
 import Control.Monad
+import Data.Binary
 import qualified Data.ByteString as B
+import GHC.Generics
+import Test.QuickCheck
+
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Internals as HK
-import Test.QuickCheck
 
-data ExtendedSignature = ExtendedSignature HK.Signature Bool deriving (Show, Eq)
+data ExtendedSignature = ExtendedSignature HK.Signature Bool deriving (Show, Eq, Generic)
+
+instance Binary ExtendedSignature where
 
 instance Arbitrary ExtendedSignature where
   arbitrary = liftM2 ExtendedSignature arbitrary arbitrary
