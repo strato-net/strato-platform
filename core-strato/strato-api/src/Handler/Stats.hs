@@ -13,6 +13,8 @@ import           Import
 import qualified Database.Esqueleto as E
 import           Handler.Common
 
+import Blockchain.DB.DetailsDB
+
 data Stats = Stats
     { name    :: Text
     , version :: Int
@@ -33,18 +35,8 @@ getStatsR = selectRep $ do
 
 getStatDiffR :: Handler Value
 getStatDiffR  = do
-                   addHeader "Access-Control-Allow-Origin" "*"
-                   blks <- runDB $ E.select $
-                        E.from $ \(a, t) -> do
-                        E.where_ (  a E.^. BlockDataRefBlockId E.==. t E.^. BlockId)
-                        let sum' = E.sum_ (a E.^. BlockDataRefDifficulty)
-                        -- E.limit $ P.min (fromIntegral n :: Int64) fetchLimit
-                        -- E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
-                        return sum'
-                   return $ myval (blks :: [E.Value (Maybe Integer)])
-            where
-              myval ((E.Value (Just v)):_) = object ["difficulty" .= (v :: Integer)]
-              myval _                      = object ["difficulty" .= ("0" :: String)]
+  bestBlock <- getBestBlock
+  return $ object ["difficulty" .= blockDataRefTotalDifficulty bestBlock]
 
 getStatTxR :: Handler Value
 getStatTxR  = do

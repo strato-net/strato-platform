@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cat statediff6.data | slipstream

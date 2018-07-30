@@ -1,0 +1,116 @@
+name: strato-p2p
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:
+    The client described in the Ethereum Yellowpaper
+github: blockapps/strato-platform/core-strato/strato-p2p
+
+dependencies:
+  - array
+  - base >= 4 && < 5
+  - base16-bytestring
+  - binary
+  - aeson
+  - blockapps-data
+  - blockapps-util
+  - bytestring
+  - classy-prelude
+  - conduit
+  - conduit-combinators
+  - conduit-extra
+  - containers
+  - cryptohash
+  - crypto-pubkey
+  - crypto-pubkey-types
+  - dns
+  - esqueleto
+  - ethereum-discovery
+  - ethereum-encryption
+  - ethereum-rlp
+  - blockapps-haskoin
+  - hflags
+  - iproute
+  - json-rpc-server
+  - json-rpc-client
+  - lifted-base
+  - monad-control
+  - monad-logger
+  - monadIO
+  - blockapps-milena
+  - mtl
+  - network
+  - persistent
+  - resourcet
+  - SafeSemaphore
+  - stm
+  - stm-conduit
+  - streaming-commons
+  - strato-conf
+  - text
+  - time
+  - transformers
+  - transformers-base
+  - ansi-wl-pprint
+  - strato-conf
+  - strato-sequencer
+  - strato-model
+  - strato-redis-blockdb
+  - hedis
+  - lifted-async
+  - blockstanbul
+
+ghc-options: -Wall -threaded
+
+executables:
+  strato-p2p-client:
+    source-dirs: exec_src/
+    main: StratoP2PClientMain.hs
+    dependencies:
+      - strato-p2p
+
+  strato-p2p-server:
+    source-dirs: exec_src/
+    main: StratoP2PServerMain.hs
+    dependencies:
+      - strato-p2p
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Blockchain.Context
+    - Blockchain.Data.Wire
+    - Blockchain.Display
+    - Blockchain.EventException
+    - Blockchain.Event
+    - Blockchain.ExtMergeSources
+    - Blockchain.Options
+    - Blockchain.SeqEventNotify
+    - Blockchain.DeLoopNotify
+    - Blockchain.TCPClientWithTimeout
+    - Blockchain.ServOptions
+    - Blockchain.P2PRPC
+    - Executable.StratoP2PClient
+    - Executable.StratoP2PServer
+  ghc-options: -Wall -O2
+
+
+tests:
+  strato-p2p-client-test:
+    source-dirs: test
+    ghc-options: -Wall -Werror
+    main: Main.hs
+    dependencies:
+      - QuickCheck
+      - hspec
+      - hspec-expectations-lifted
+      - persistent-sqlite
+      - stm-chans
+      - stm-conduit
+      - strato-p2p
+      - temporary
