@@ -74,7 +74,8 @@ services:
     - postgres
     environment:
     - loglevel=${loglevel}
-    - kafkaHost=${kafkaHost}
+    - kafkaHost=kafka
+    - kafkaPort=9092
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
