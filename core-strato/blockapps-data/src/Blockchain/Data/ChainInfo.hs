@@ -117,6 +117,14 @@ data ChainInfo = ChainInfo {
     members         :: M.Map Address Enode
 } deriving (Eq, Show, Read, GHCG.Generic)
 
+
+{- instance (FromJSON a, FromJSON b, KnownSymbol c, KnownSymbol d) => FromJSON M.Map a b where
+  parseJSON (Object o
+
+instance (ToJSON a, ToJSON b, KnownSymbol c, KnwonSymbol d) => ToJSON M.Map a b where
+  toJSON (M.Map a b) = 
+    object [
+-}
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
     cl <- (o .: "chainLabel")
@@ -124,6 +132,15 @@ instance FromJSON ChainInfo where
     ci <- (o .: "codeInfo")
     mb <- (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
     return $ ChainInfo cl ai ci (M.fromList mb)
+
+
+{-  parseJSON (Object o) = 
+    ChainInfo <$>
+      o .: "chainLabel" <*>
+      o .: "accountInfo" <*>
+      o .: "codeInfo" <*>
+     (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
+-}
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
