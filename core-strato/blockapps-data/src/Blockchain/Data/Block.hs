@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Data.Block (
   Block(..),
-  blockDataLens
+  blockDataLens,
+  extraLens
   ) where
 
 import Data.Binary
@@ -9,7 +10,9 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
 import GHC.Generics
 
+import Control.Lens
 import Control.Lens.TH (makeLensesFor)
+import qualified Data.ByteString as BS
 
 data Block =
   Block{
@@ -19,5 +22,8 @@ data Block =
     } deriving (Eq, Read, Show, Generic)
 
 makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
+
+extraLens :: Lens' Block BS.ByteString
+extraLens = blockDataLens . extraDataLens
 
 instance Binary Block where
