@@ -12,17 +12,36 @@ const config = common.config;
 
 const password = '1234';
 
-const label = 'My chain label';
-const addRule = 'My add rule';
-const removeRule = 'My remove rule';
-const members = ["enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303","enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"];
-const balances = [
-           { address: "00000000000000000000000000000000deadbeef"
-           , balance: 1000000000000000000000
-           },
-           { address: "0000000000000000000000000000000012345678"
-           , balance: 0
-           }];
+const chainLabel = 'My chain label';
+const accountInfo = [
+       { address  : "0x5815b9975001135697b5739956b9a6c87f1c575c",
+         balance  : 2000
+       } ,
+       { address  : "0x93fdd1d21502c4f87295771253f5b71d897d911c",
+         balance  : 4000000
+       } ,
+       { address  : "0000000000000000000000000000000000deadbeef",
+         balance  : 12345,
+         codeHash : "6b0d5d3309777e2e799976ea377ce6aeb4a485b1e7cae56f41a85ada9855fb99"
+       }
+     ]
+const codeInfo = [
+       { code : "/BEF",
+         src  : "me",
+         name : "you"
+       },
+       { code : "aNoThErByTeStRiNg",
+         src  : "you",
+         name : "me"
+       }
+     ]
+const members = [
+       { address  : "00000000000000000000000000000000deadbeef" ,
+         enodeURL :"enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
+       } ,
+       { address  :  "0000000000000000000000000000000012345678" ,
+         enodeURL : "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+       }];
 
 describe("Create Chain", function() {
 
@@ -45,7 +64,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const chainId = yield rest.createChain(label, addRule, removeRule, members, bals);
+    const chainId = yield rest.createChain(label, accountInfo, codeInfo, members);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
@@ -86,7 +105,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, '', removeRule, members, balances);
+      chainId = yield rest.createChain(label, [], codeInfo, members);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -111,7 +130,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, '', members, balances);
+      chainId = yield rest.createChain(label, accountInfo, [], members);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -136,7 +155,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, removeRule, [], balances);
+      chainId = yield rest.createChain(label, accountInfo, codeInfo, []);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -158,7 +177,7 @@ describe("Create Chain", function() {
     assert.isDefined(bob, "should exist");
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
-
+/*
     const bals = [{ address: alice.address, balance: 0}
                  ,{ address: bob.address, balance: 0}
                  ];
@@ -168,9 +187,8 @@ describe("Create Chain", function() {
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
-    assert.isUndefined(chainId, "chainId not defined");
+    assert.isUndefined(chainId, "chainId not defined"); */
   });
-
 });
 
 function promiseTimeout(timeout) {
