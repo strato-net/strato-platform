@@ -3,3 +3,4 @@ genesis.json
 dist
 .DS_Store
 #*#
+strato-init.cabal

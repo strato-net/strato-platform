@@ -79,9 +79,9 @@ pipeline {
               git clone https://github.com/blockapps/blockapps-ba.git -b master
               cd blockapps-ba
               npm i
-              SERVER=localhost npm run deploy
+              SERVER=localhost npm run deploy --timeout=6000000
               sleep 5
-              SERVER=localhost npm run test
+              SERVER=localhost npm run test --timeout=6000000
             '''
           },
 
