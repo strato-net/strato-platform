@@ -22,8 +22,8 @@ class SideBar extends Component {
       [
         ...route,
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
         { path: '/chains', label: 'Chains', id: 'chains', icon: "fa-link"},
+        { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
         { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
         { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
