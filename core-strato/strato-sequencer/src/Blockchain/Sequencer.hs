@@ -10,7 +10,6 @@ module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
 
-import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TMVar
@@ -66,35 +65,44 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-createBlockstanbulRoundTimer :: NominalDiffTime -> IO (TMVar Bool)
-createBlockstanbulRoundTimer dt = do
+-- TODO(tim): Make these flag configurable
+blockPeriod :: NominalDiffTime
+blockPeriod = 1
+
+roundTimeout :: NominalDiffTime
+roundTimeout = 10
+
+createBlockstanbulRoundTimer :: IO (TMVar Bool)
+createBlockstanbulRoundTimer = do
   var <- atomically $ newTMVar False
   let act :: AlarmClock UTCTime -> IO ()
       act alarm' = do
         _ <- atomically $ swapTMVar var True
-        next <- addUTCTime dt <$> getCurrentTime
+        next <- addUTCTime roundTimeout <$> getCurrentTime
         setAlarm alarm' next
   alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
-  next <- addUTCTime dt <$> getCurrentTime
+  next <- addUTCTime roundTimeout <$> getCurrentTime
   setAlarm alarm next
   return var
 
 delayedCreation :: TMChan OutputEvent -> IO ()
 delayedCreation ch = do
-  threadDelay 10000000 -- 10 seconds
-  atomically $ writeTMChan ch OECreateBlockCommand
+  let action = const . atomically . writeTMChan ch $ OECreateBlockCommand
+  alarm <- newAlarmClock action :: IO (AlarmClock UTCTime)
+  next <- addUTCTime blockPeriod <$> getCurrentTime
+  setAlarm alarm next
 
 sequencer :: SequencerM ()
 sequencer = do
   -- TODO(tim): Pipe time window in through a flag
-  timer <- liftIO $ createBlockstanbulRoundTimer 100
+  timer <- liftIO $ createBlockstanbulRoundTimer
   -- Bootstrap the block generation
-  _ <- forkIO <$> uses vmEvents delayedCreation
+  join $ uses vmEvents (liftIO . delayedCreation)
   forever $ do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
-    roundTimeout <- atomically $ swapTMVar timer False
-    when roundTimeout $ do
+    timedOut <- atomically $ swapTMVar timer False
+    when timedOut $ do
       blockstanbulSend [Timeout]
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
@@ -156,12 +164,14 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
 
 blockstanbulSend :: [InEvent] -> SequencerM ()
 blockstanbulSend msgs = do
-    resp <- sendAllMessages msgs
-    $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
-    let blocks = [b | ToCommit b <- resp]
-    unless (null blocks) $
-      -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
-      void $ sendAllMessages [CommitResult (Right ())]
+    resp' <- sendAllMessages msgs
+    let blocks = [b | ToCommit b <- resp']
+    resp <- (resp'++) <$>
+        if null blocks
+            then return []
+            -- TODO(tim): Block insertion can potentially fail, so there
+            -- should be feedback here
+            else sendAllMessages [CommitResult (Right ())]
 
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap OEBlock
@@ -175,9 +185,9 @@ blockstanbulSend msgs = do
     $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
     mapM_ markForP2P p2pevs
 
-    unless (null [OECreateBlockCommand | MakeBlockCommand <- resp]) $
+    when (MakeBlockCommand `elem` resp) $ do
       $logDebugS "seq/pbft/create" "Delaying a make block command"
-      void $ forkIO <$> uses vmEvents delayedCreation
+      join $ uses vmEvents (liftIO . delayedCreation)
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
@@ -508,4 +518,3 @@ setNextIngestedOffset newOffset = do
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
         Right () -> return ()
-

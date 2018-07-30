@@ -20,7 +20,6 @@ import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
 import           Data.Maybe
---import qualified Data.Set as S
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
@@ -349,6 +348,7 @@ handleEvents mode peer = awaitForever $ \case
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
+      OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp

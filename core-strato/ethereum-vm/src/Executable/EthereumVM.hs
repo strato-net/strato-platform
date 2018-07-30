@@ -99,8 +99,10 @@ ethereumVM = void . execContextM $ do
         state <- Bagger.getBaggerState
         pbft <- gets contextHasBlockstanbul
         let pending = B.pending state
-        let blockstanbulReady = not pbft || not (null [() | OECreateBlockCommand <- seqEvents])
-        let shouldOutputBlocks = isCaughtUp && blockstanbulReady && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+        let shouldOutputBlocks = isCaughtUp && (
+              if pbft
+                then OECreateBlockCommand `elem` seqEvents
+                else not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
