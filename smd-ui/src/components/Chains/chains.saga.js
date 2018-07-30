@@ -16,11 +16,11 @@ import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
 
-const chainUrl = env.STRATO_URL + "/chain?chainid=:chainid"
+const chainUrl = env.STRATO_URL + "/chain"
 
-export function getChainsApi(chainid) {
+export function getChainsApi() {
   return fetch(
-    chainUrl.replace(':chainid',chainid),
+    chainUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -39,7 +39,11 @@ export function getChainsApi(chainid) {
 export function* getChains(action) {
   try {
     const response = yield call(getChainsApi);
-    yield put(fetchChainsSuccess(response));
+    const chains = [];
+    response.forEach(function(chain) {
+      chains.push(chain["chainLabel"]);
+    });
+    yield put(fetchChainsSuccess(chains));
   }
   catch (err) {
     yield put(fetchChainsFailure(err));
