@@ -1,0 +1,38 @@
+name:                blockapps-util
+version:             0.1.0.0
+license-file:        LICENSE
+author:              jamshid
+maintainer:          j
+build-type:          Simple
+license:             Apache-2.0
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - aeson
+    - base16-bytestring
+    - binary
+    - blockapps-milena
+    - bytestring
+    - containers
+    - cryptohash
+    - ethereum-rlp
+    - fast-logger
+    - global-lock
+    - hflags
+    - lens
+    - lifted-base
+    - monad-control
+    - monad-logger
+    - mtl
+    - network
+    - nibblestring
+    - path-pieces
+    - resource-pool
+    - transformers
+    - http-api-data
+    - text
+    - unix
+    - time
+    - strato-model
