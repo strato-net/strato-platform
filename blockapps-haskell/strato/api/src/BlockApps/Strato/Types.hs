@@ -543,7 +543,7 @@ exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9
                                        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
 
 data ChainInfo = ChainInfo
-  {  chainLabel         :: Text
+  {  chainLabel    :: Text
   ,  accountInfo   :: [AccountInfo]
   ,  codeInfo      :: [CodeInfo]
   ,  members       :: [(Address, Text)]

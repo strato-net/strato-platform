@@ -1,4 +1,6 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -20,36 +22,32 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
-import           BlockApps.XAbiConverter
 
 postChain :: ChainInput -> Bloc ChainId
-postChain (ChainInput src label accountInfo variableNames members) = do
+postChain (ChainInput src label accountInfo _ members) = do
   idsAndDetails <- compileContract src
-  ContractDetails{..} <- case Map.toList idsAndDetails of 
+  ContractDetails{..} <- case Map.toList idsAndDetails of
             [] -> throwError $ UserError "You need to supply at least one governance contract"
             [(_, x)] -> return $ snd x
-            _ -> throwError $ UserError "Multiple governance contracts are not allowed" 
-  let varMap = Map.fromList $ transformXabi contractdetailsXabi (Map.fromList variableNames)
+            _ -> throwError $ UserError "Multiple governance contracts are not allowed"
+  let varMap = Map.empty -- Map.fromList $ transformXabi contractdetailsXabi (Map.fromList variableNames) -- TODO: this
       contractAcctInfo = ContractWithStorage (Address 0x100) (0::Integer) contractdetailsCodeHash varMap
       nonContractAcctInfo = map (uncurry NonContract) accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
       codeInfo = CodeInfo contractdetailsBin src contractdetailsName
       chainInfo = ChainInfo label acctInfo [codeInfo] members
   chainId <- blocStrato $ Strato.postChain chainInfo
-  return chainId 
+  return chainId
 
 getChain :: ChainId -> Bloc (ChainId, ChainOutput)
 getChain chainId = do
   chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
-  chainInfo@(ChainInfo cl ai ci mm) <- case chainIdChainInfo of
+  (ChainInfo cl ai _ mm) <- case chainIdChainInfo of
                                          [] -> throwError $ DBError "No chain matches the chainId"
-                                         (idInfo:_) -> return $ snd $ toTuple (idInfo::NamedTuple "id" ChainId "info" ChainInfo)
-  let getAddrBalance acct = case acct of 
+                                         (idInfo:_) -> return $ snd (toTuple idInfo :: (ChainId, ChainInfo))
+  let getAddrBalance acct = case acct of
                               NonContract a b -> (a, b)
-                              ContractNoStorage a b c -> (a, b)
-                              ContractWithStorage a b c s -> (a, b)
+                              ContractNoStorage a b _ -> (a, b)
+                              ContractWithStorage a b _ _ -> (a, b)
   let acctInfo = map getAddrBalance ai
   return $ (chainId, ChainOutput cl acctInfo mm)
-
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
