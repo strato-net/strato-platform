@@ -5,8 +5,10 @@ set -e
 declare -i RESULT=0
 TESTS=(
   blockapps-data
+  blockapps-haskoin
   blockapps-ecrecover
   blockstanbul
+  ethereum-discovery
   ethereum-rlp
   ethereum-vm
   merkle-patricia-db

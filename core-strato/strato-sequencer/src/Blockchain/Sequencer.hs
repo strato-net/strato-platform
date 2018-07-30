@@ -86,8 +86,7 @@ sequencer = do
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
     roundTimeout <- atomically $ swapTMVar timer False
     when roundTimeout $ do
-      oevs <- blockstanbulSend [Timeout]
-      void . writeSeqVmEvents' $ oevs
+      blockstanbulSend [Timeout]
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
@@ -147,7 +146,7 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                   writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
-blockstanbulSend :: [InEvent] -> SequencerM [OutputEvent]
+blockstanbulSend :: [InEvent] -> SequencerM ()
 blockstanbulSend msgs = do
     resp <- sendAllMessages msgs
     $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
@@ -161,9 +160,12 @@ blockstanbulSend msgs = do
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        evs = mapMaybe rewriteBlock blocks
-    $logDebugS "seq/pbft/send" . T.pack . show $ evs
-    return evs
+        vmevs = mapMaybe rewriteBlock blocks
+    $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
+    mapM_ markForVM vmevs
+    let p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+    $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
+    mapM_ markForP2P p2pevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
@@ -320,9 +322,7 @@ transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks blocks = do
   hasPBFT <- blockstanbulRunning
   if hasPBFT
-    then do
-      outEvents <- blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
-      mapM_ markForVM outEvents
+    then blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
     else forM_ blocks $ \ib -> do
       let mSb = ingestBlockToSequencedBlock ib
       case mSb of
@@ -417,6 +417,9 @@ splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETBlockstanbul -> do
+      $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
+      blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

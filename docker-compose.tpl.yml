@@ -9,44 +9,43 @@ services:
     depends_on:
     - apex
     - bloc
-#    - cirrus
+    - postgrest
     - strato
     environment:
     - APEX_URL=${APEX_URL}
     - BLOC_DOC_URL=${BLOC_DOC_URL}
     - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=postgrest:3001
+    - CIRRUS_URL=${CIRRUS_URL}
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_NAME=${NODE_NAME}
     - SINGLE_NODE=${SINGLE_NODE}
+    - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - STRATO_DOC_URL=${STRATO_DOC_URL}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - STRATO_URL=${STRATO_URL}
-    - SMD_MODE=${SMD_MODE}
-    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
-    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
-    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
   apex:
     depends_on:
     - bloc
-#    - cirrus
     - postgres
+    - postgrest
     - strato
     environment:
     - blocHost=bloc:8000
-#    - cirrusHost=cirrus:3333
-    - postgrestHost=postgrest:3001
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
-    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
-    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+    - postgrestHost=postgrest:3001
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
@@ -60,11 +59,11 @@ services:
   dappstore:
     depends_on:
     - bloc
-#    - cirrus
+    - postgrest
     - strato
     environment:
     - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=postgrest:3001
+    - CIRRUS_URL=${CIRRUS_URL}
     - STRATO_URL=${STRATO_URL}
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
@@ -74,10 +73,9 @@ services:
     - strato
     - postgres
     environment:
-    # cirrusHost is temporary here to be able to run bloc server, to be removed
-    # - cirrusHost=postgrest:3001
     - loglevel=${loglevel}
-    - kafkaHost=${kafkaHost}
+    - kafkaHost=kafka
+    - kafkaPort=9092
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -95,28 +93,6 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
-#  cirrus:
-#    depends_on:
-#    - strato
-#    - postgres
-#    - postgrest
-#    - kafka
-#    - bloc
-#    environment:
-#    - blocHost=bloc:8000
-#    - postgres_db=cirrus
-#    - postgres_host=postgres
-#    - postgres_password=${postgres_password:-api}
-#    - postgres_port=5432
-#    - postgres_user=postgres
-#    - postgrestHost=postgrest:3001
-#    - SINGLE_NODE=${SINGLE_NODE}
-#    - stateDiffTopic=${stateDiffTopic}
-#    - stratoHost=strato:3000
-#    - zookeeper_conn=zookeeper
-#    build: .
-#    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
-#    restart: always
   strato:
     depends_on:
     - kafka
@@ -184,7 +160,6 @@ services:
   nginx:
     depends_on:
     - bloc
-#    - cirrus
     - postgrest
     - smd
     - strato

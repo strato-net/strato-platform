@@ -23,6 +23,8 @@ COPY nginx.conf /etc/nginx/
 ADD ./dist/* /usr/share/nginx/html/
 ADD ./docker-run.sh /usr/share/nginx/
 
+COPY licenses /licenses
+
 EXPOSE 8080
 
 CMD ["sh", "/usr/share/nginx/docker-run.sh"]

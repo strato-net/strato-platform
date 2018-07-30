@@ -27,6 +27,7 @@ pipeline {
           set -x
           REPO=private make all
         '''
+        archive "docker-compose.yml"
       }
     }
 
@@ -131,7 +132,6 @@ pipeline {
 
   post {
     success {
-      archive "docker-compose.yml"
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
