@@ -63,6 +63,7 @@ dependencies:
   - strato-redis-blockdb
   - hedis
   - lifted-async
+  - blockstanbul
 
 ghc-options: -Wall -threaded
 
@@ -107,6 +108,9 @@ tests:
     dependencies:
       - QuickCheck
       - hspec
+      - hspec-expectations-lifted
       - persistent-sqlite
+      - stm-chans
+      - stm-conduit
       - strato-p2p
       - temporary

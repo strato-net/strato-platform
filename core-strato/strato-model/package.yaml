@@ -15,13 +15,14 @@ library:
     - binary
     - bytestring
     - cryptonite
+    - lens
     - path-pieces
     - memory
     - nibblestring
     - blockapps-haskoin
     - text
     - time
-    - text
+    - QuickCheck
   source-dirs: src
   default-extensions:
     - MultiParamTypeClasses

@@ -7,6 +7,7 @@ import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
 
 import           Data.ByteString.Arbitrary
+import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Internal           as IB
 import           Data.Time
 
@@ -73,7 +74,9 @@ instance Arbitrary BlockData where
         gasLimit         <- unboxPI <$> arbitrary
         gasUsed          <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit)
         timestamp        <- arbitrary
-        extraData        <- arbitrary
+        -- TODO(tim): Rather than making an artificial dependent type, guard Block against
+        -- rogue long bytestrings.
+        extraData        <- B.take 32 <$> arbitrary
         nonce            <- arbitrary
         mixHash          <- arbitrary
         return BlockData { blockDataParentHash       = parentHash
