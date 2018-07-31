@@ -40,6 +40,7 @@ constructor() {
       this.props.resetChainId(label);
       this.setState({ selected: null });
     } else {
+      this.props.fetchChains(true, true);
       mixpanelWrapper.track('chains_row_click');
     }
   }
