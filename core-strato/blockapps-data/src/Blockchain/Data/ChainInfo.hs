@@ -25,6 +25,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
 
 import           Data.Aeson
+import qualified Data.Aeson.TH                        as AT
 import qualified Data.ByteString                      as B
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map                             as M      hiding (map, filter)
