@@ -33,7 +33,7 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: Handler Text
+postChainR :: Handler Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
@@ -48,7 +48,7 @@ postChainR = do
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
       emitKafkaTransactions [(cid, gen)]
-      return . T.pack $ showHex cid ""
+      return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 getChainR :: Handler Value

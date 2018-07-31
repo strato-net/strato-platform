@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
 import Numeric
 
+import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address

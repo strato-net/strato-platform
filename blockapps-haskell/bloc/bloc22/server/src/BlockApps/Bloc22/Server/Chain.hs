@@ -32,14 +32,14 @@ postChain (ChainInput src label accountInfo _ members) = do
             _ -> throwError $ UserError "Multiple governance contracts are not allowed"
   let varMap = Map.empty -- Map.fromList $ transformXabi contractdetailsXabi (Map.fromList variableNames) -- TODO: this
       contractAcctInfo = ContractWithStorage (Address 0x100) (0::Integer) contractdetailsCodeHash varMap
-      nonContractAcctInfo = map (uncurry NonContract) accountInfo
+      nonContractAcctInfo = map (uncurry NonContract) $ map toTuple accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
-      codeInfo = CodeInfo contractdetailsBin src contractdetailsName
+      codeInfo = CodeInfo contractdetailsBinRuntime src contractdetailsName
       chainInfo = ChainInfo label acctInfo [codeInfo] members
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId
 
-getChain :: ChainId -> Bloc (ChainId, ChainOutput)
+getChain :: ChainId -> Bloc ChainOutput
 getChain chainId = do
   chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
   (ChainInfo cl ai _ mm) <- case chainIdChainInfo of
@@ -49,5 +49,5 @@ getChain chainId = do
                               NonContract a b -> (a, b)
                               ContractNoStorage a b _ -> (a, b)
                               ContractWithStorage a b _ _ -> (a, b)
-  let acctInfo = map getAddrBalance ai
-  return $ (chainId, ChainOutput cl acctInfo mm)
+  let acctInfo = map (fromTuple . getAddrBalance) ai
+  return $ ChainOutput cl acctInfo mm

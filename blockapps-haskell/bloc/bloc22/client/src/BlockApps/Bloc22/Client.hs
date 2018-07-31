@@ -177,5 +177,5 @@ postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 postChain :: ChainInput -> ClientM ChainId
 postChain = client (Proxy @ PostChain)
 
-getChain :: ChainId -> ClientM (ChainId, ChainOutput)
+getChain :: ChainId -> ClientM ChainOutput
 getChain = client (Proxy @ GetChain)

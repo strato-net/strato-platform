@@ -22,7 +22,7 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
--- import           Blockchain.TypeLits
+import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -136,20 +136,20 @@ instance Arbitrary ChainInfo where
           <*> arbitrary
 
 instance FromJSON ChainInfo where
-  parseJSON (Object o) =
-    ChainInfo <$>
-    o .: "label" <*>
-    o .: "acctInfo" <*>
-    o .: "codeInfo" <*>
-    o .: "members" 
+  parseJSON (Object o) = do
+    l <- o .: "label"
+    as <- o .: "accountInfo"
+    cs <- o .: "codeInfo"
+    ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
+    return $ ChainInfo l as cs (M.fromList $ map toTuple ms)
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON (ChainInfo cl ai ci ms) =
     object [ "label" .= cl
-           , "acctInfo" .= ai
+           , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= ms
+           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            ]
 
 instance RLPSerializable ChainInfo where
