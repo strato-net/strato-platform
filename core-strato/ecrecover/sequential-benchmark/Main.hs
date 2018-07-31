@@ -3,7 +3,6 @@ module Main where
 import qualified BlockApps.ECRecover.BytesFormat   as A
 import qualified BlockApps.ECRecover.IntegerFormat as B
 import           Criterion.Main
-import           Prelude
 
 
 main =

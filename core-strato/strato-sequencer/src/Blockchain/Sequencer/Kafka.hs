@@ -17,13 +17,15 @@ module Blockchain.Sequencer.Kafka (
     HasSeqSink(..),
     emitKafkaTransactions,
     emitKafkaBlock,
-    emitKafkaChainDetails
+    emitKafkaChainDetails,
+    emitBlockstanbulMsg
 ) where
 
 import           Conduit
 import           Data.Void
 import           Data.Binary                (Binary, decode, encode)
 
+import qualified Blockchain.Blockstanbul as PBFT
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Transaction
@@ -119,3 +121,9 @@ emitKafkaChainDetails origin chainId details = do
     let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
     sink <- getUnseqSink
     runConduit (yield [ingestGenesis] .| sink)
+
+emitBlockstanbulMsg :: (MonadIO m, HasUnseqSink m) => PBFT.WireMessage -> m ()
+emitBlockstanbulMsg wm = do
+  let iem = IEBlockstanbul wm
+  sink <- getUnseqSink
+  runConduit (yield [iem] .| sink)

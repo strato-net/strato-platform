@@ -55,6 +55,9 @@ ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}
 
+blockstanbulVersion :: Int
+blockstanbulVersion = 1
+
 mkEthP2PEventSource :: ( Monad m
                        , MonadResource m
                        , MonadBaseControl IO m
@@ -89,7 +92,9 @@ handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
                 , clientId = stratoVersionString
-                , capability = [ETH . fromIntegral $ ethVersion]
+                , capability = [ ETH . fromIntegral $ ethVersion
+                               , IST . fromIntegral $ blockstanbulVersion
+                               ]
                 , port = 0
                 , nodeId = myId
                 }

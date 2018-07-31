@@ -25,7 +25,6 @@ import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
-import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
@@ -52,7 +51,7 @@ setupRound blk' as = do
   return (v, di)
 
 compareNoExtra :: (MonadIO m) => Block -> Block -> m ()
-compareNoExtra b1 b2 = set (blockDataLens . extraDataLens) "" b1 `shouldBe` set (blockDataLens . extraDataLens) "" b2
+compareNoExtra b1 b2 = set extraLens "" b1 `shouldBe` set extraLens "" b2
 
 spec :: Spec
 spec = parallel $ do
@@ -124,8 +123,9 @@ spec = parallel $ do
         use proposal `shouldReturn` Nothing
 
   describe "A preprepare message" $ do
-    it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
+    it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
+        let blk = truncateExtra blk'
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
@@ -216,9 +216,9 @@ spec = parallel $ do
         omsgs <- sendMessages [IMsg auth $ Commit curView di seal]
         let [ToCommit b] = omsgs
         b `compareNoExtra` blk
-        let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
+        let got = cookRawExtra . L.view extraLens $ b
             want = ExtraData
-                      (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+                      (BS.take 32 . L.view extraLens $ blk)
                       (Just $ IstanbulExtra [sender auth] (Just seal) [seal])
         got `shouldBe` want
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
@@ -269,8 +269,8 @@ spec = parallel $ do
           omsgs <- sendMessages tippingPoint
           let [ToCommit b] = omsgs
           b `compareNoExtra` blk
-          let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
-          _vanity got `shouldBe` (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+          let got = cookRawExtra . L.view extraLens $ b
+          _vanity got `shouldBe` (BS.take 32 . L.view extraLens $ blk)
           let Just ist = _istanbul got
           _validatorList ist `shouldBe` sort as
           _proposedSig ist `shouldBe` Just seal
@@ -311,7 +311,7 @@ spec = parallel $ do
   describe "A new block message" $ do
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over (blockDataLens . extraDataLens) (BS.take 32) blk''
+        let blk = over extraLens (BS.take 32) blk''
         me <- selfAddr
         validators .= [me]
         proposer .= me
@@ -319,10 +319,10 @@ spec = parallel $ do
         omsgs <- sendMessages [NewBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         v' `shouldBe` v
-        let initData = L.view (blockDataLens . extraDataLens) blk
-        set (blockDataLens . extraDataLens) initData blk' `shouldBe` blk
+        let initData = L.view extraLens blk
+        set extraLens initData blk' `shouldBe` blk
         blk' `shouldNotBe` blk
-        let parsedExtra = cookRawExtra . L.view (blockDataLens . extraDataLens) $ blk'
+        let parsedExtra = cookRawExtra . L.view extraLens $ blk'
         L.view vanity parsedExtra `shouldBe` initData
         let Just ist = _istanbul parsedExtra
         L.view validatorList ist `shouldBe` [me]
