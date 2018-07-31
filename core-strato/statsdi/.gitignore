@@ -10,3 +10,4 @@ dist/
 *.swp
 *.prof
 .DS_Store
+statsdi.cabal

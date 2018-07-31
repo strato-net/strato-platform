@@ -24,16 +24,17 @@ import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum
+import           BlockApps.Strato.TypeLits
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chainInputSrc            :: Text
-  , chainInputLabel          :: Text
-  , chainInputAccountInfo    :: [(Address, Integer)]
-  , chainInputVariableValues :: [(Text, Text)]
-  , chainInputMembers        :: [(Address, Text)]
+  { chaininputSrc      :: Text
+  , chaininputLabel    :: Text
+  , chaininputBalances :: NamedMap "address" Address "balance" Integer
+  , chaininputArgs     :: NamedMap "name" Text "value" Text
+  , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainInput where
@@ -56,20 +57,20 @@ exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 
 instance ToSample ChainInput where
   toSamples _ = singleSample ChainInput
-    { chainInputSrc = exampleSrc
-    , chainInputLabel = "my chain"
-    , chainInputAccountInfo = [
+    { chaininputSrc = exampleSrc
+    , chaininputLabel = "my chain"
+    , chaininputBalances = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
-    , chainInputVariableValues = [
-         ("addRule", "AUTO_APPROVE")
-       , ("removeRule", "AUTO_APPROVE")
+    , chaininputArgs = map fromTuple [
+         ("addRule" :: Text, "AUTO_APPROVE" :: Text)
+       , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
        ]
-    , chainInputMembers = [
+    , chaininputMembers = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-       ] 
+       ]
     }
 
 instance ToSchema ChainInput where
@@ -79,26 +80,26 @@ instance ToSchema ChainInput where
     where
       ex :: ChainInput
       ex = ChainInput
-        { chainInputSrc = exampleSrc
-        , chainInputLabel = "my chain"
-        , chainInputAccountInfo = [
+        { chaininputSrc = exampleSrc
+        , chaininputLabel = "my chain"
+        , chaininputBalances = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
           ]
-        , chainInputVariableValues = [
-            ("addRule", "AUTO_APPROVE")
-          , ("removeRule", "AUTO_APPROVE")
+        , chaininputArgs = map fromTuple [
+            ("addRule" :: Text, "AUTO_APPROVE" :: Text)
+          , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
           ]
-        , chainInputMembers = [
+        , chaininputMembers = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-          ] 
+          ]
        }
 
-data ChainOutput = ChainOutput 
-  { chainOutputLabel       :: Text
-  , chainOutputAccountInfo :: [(Address, Integer)]
-  , chainOutputMembers     :: [(Address, Text)]
+data ChainOutput = ChainOutput
+  { chainoutputLabel    :: Text
+  , chainoutputBalances :: NamedMap "address" Address "balance" Integer
+  , chainoutputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainOutput where
@@ -112,16 +113,16 @@ instance ToJSON ChainOutput where
 
 instance ToSample ChainOutput where
   toSamples _ = singleSample ChainOutput
-    { chainOutputLabel = "my chain"
-    , chainOutputAccountInfo = [
+    { chainoutputLabel = "my chain"
+    , chainoutputBalances = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
-    , chainOutputMembers = [
+    , chainoutputMembers = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-       ] 
-    } 
+       ]
+    }
 
 instance ToSchema ChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -130,25 +131,25 @@ instance ToSchema ChainOutput where
     where
       ex :: ChainOutput
       ex = ChainOutput
-        { chainOutputLabel = "my chain"
-        , chainOutputAccountInfo = [
+        { chainoutputLabel = "my chain"
+        , chainoutputBalances = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
           ]
-        , chainOutputMembers = [
+        , chainoutputMembers = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-          ] 
+          ]
        }
- 
+
 --------------------------------------------------------------------------------
 
 -- POST /chain
 
-type PostChain = "chain"
+type PostChainInfo = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
 
-type GetChain = "chain"
-  :> ReqBody '[JSON] ChainId
-  :> Get '[JSON] (ChainId, ChainOutput)
+type GetChainInfo = "chain"
+  :> Capture "chainid" ChainId
+  :> Get '[JSON] ChainOutput

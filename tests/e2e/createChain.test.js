@@ -65,20 +65,20 @@ describe("Create Chain", function() {
                  ,{ address: bob.address, balance: 0}
                  ];
     const chainId = yield rest.createChain(chainLabel, accountInfo, codeInfo, members);
+
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
 
     yield promiseTimeout(1000);
 
-    const chainInfo = yield rest.getChainInfo([chainId]);
+    const chainInfo = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
     assert.equal(chainLabel, chainInfo.chainLabel, "chain labels should be identical");
     assert.deepEqual(accountInfo, chainInfo.accountInfo, "chain account infos should be identical");
     assert.deepEqual(codeInfo, chainInfo.codeInfo, "chain code infos should be identical");
     assert.deepEqual(members, chainInfo.members, "chain members should be identical");
-
     for(var i=0; i < 10; i++) {
       const txResult = yield rest.send(alice, bob, 123456, chainId);
       console.log('### TRANSACTION RESULT ###', txResult);

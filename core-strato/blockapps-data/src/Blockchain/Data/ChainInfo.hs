@@ -75,19 +75,19 @@ data ChainInfo = ChainInfo {
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
-    cl <- (o .: "chainLabel")
-    ai <- (o .: "accountInfo")
-    ci <- (o .: "codeInfo")
-    mb <- (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
-    return $ ChainInfo cl ai ci (M.fromList mb)
+    l <- o .: "label"
+    as <- o .: "accountInfo"
+    cs <- o .: "codeInfo"
+    ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
+    return $ ChainInfo l as cs (M.fromList $ map toTuple ms)
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON (ChainInfo cl ai ci ms) =
-    object [ "chainLabel" .= cl
+    object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enodeURL" Enode)
+           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            ]
 
 instance KnownSymbol "address" where

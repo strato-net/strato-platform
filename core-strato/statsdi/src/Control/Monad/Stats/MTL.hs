@@ -2,6 +2,9 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
+
 module Control.Monad.Stats.MTL
     ( MonadStats
     , StatsT
@@ -16,49 +19,48 @@ module Control.Monad.Stats.MTL
     , addSetMember
     , reportEvent
     , reportServiceCheck
-    , MTLStatsT, mtlStatsT
+    , MTLStatsT
     ) where
 
-import           Control.Monad.Ether
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Stats.Monad as Ethereal
 import           Control.Monad.Stats.Types
 import           Data.Time.Clock           (NominalDiffTime)
 
-ethereal "MTLStatsT" "mtlStatsT"
+data MTLStatsT
 
 type MonadStats m = (Monad m, MonadIO m, Ethereal.MonadStats MTLStatsT m)
 type StatsT = Ethereal.StatsT MTLStatsT
 
-runStatsT :: (MonadIO m) => StatsT m a -> StatsTConfig -> m a
-runStatsT = Ethereal.runStatsT mtlStatsT
+runStatsT :: forall m a.(MonadIO m) => StatsT m a -> StatsTConfig -> m a
+runStatsT = Ethereal.runStatsT @m @MTLStatsT
 
-runNoStatsT :: (MonadIO m) => StatsT m a -> m a
-runNoStatsT = Ethereal.runNoStatsT mtlStatsT
+runNoStatsT :: forall m a.(MonadIO m) => StatsT m a -> m a
+runNoStatsT = Ethereal.runNoStatsT @m @MTLStatsT
 
 tick :: (MonadStats m) => Counter -> m ()
-tick = Ethereal.tick mtlStatsT
+tick = Ethereal.tick @MTLStatsT
 
 tickBy :: (MonadStats m) => Int -> Counter -> m ()
-tickBy = Ethereal.tickBy mtlStatsT
+tickBy = Ethereal.tickBy @MTLStatsT
 
 setCounter :: (MonadStats m) => Int -> Counter -> m ()
-setCounter = Ethereal.setCounter mtlStatsT
+setCounter = Ethereal.setCounter @MTLStatsT
 
 setGauge :: (MonadStats m) => Int -> Gauge -> m ()
-setGauge = Ethereal.setGauge mtlStatsT
+setGauge = Ethereal.setGauge @MTLStatsT
 
-time :: (MonadStats m) => NominalDiffTime -> Timer -> m ()
-time = Ethereal.time mtlStatsT
+time :: forall m.(MonadStats m) => NominalDiffTime -> Timer -> m ()
+time = Ethereal.time @NominalDiffTime @MTLStatsT
 
-histoSample  :: (MonadStats m) => Int -> Histogram -> m ()
-histoSample = Ethereal.histoSample mtlStatsT
+histoSample  :: forall m.(MonadStats m) => Int -> Histogram -> m ()
+histoSample = Ethereal.histoSample @m @MTLStatsT
 
-addSetMember :: (MonadStats m) => Int -> Set -> m ()
-addSetMember = Ethereal.addSetMember mtlStatsT
+addSetMember :: forall m.(MonadStats m) => Int -> Set -> m ()
+addSetMember = Ethereal.addSetMember @m @MTLStatsT
 
 reportEvent :: (MonadStats m) => Event -> m ()
-reportEvent = Ethereal.reportEvent mtlStatsT
+reportEvent = Ethereal.reportEvent @MTLStatsT
 
-reportServiceCheck :: (MonadStats m) => ServiceCheck -> ServiceCheckValue -> m ()
-reportServiceCheck = Ethereal.reportServiceCheck mtlStatsT
+reportServiceCheck :: forall m.(MonadStats m) => ServiceCheck -> ServiceCheckValue -> m ()
+reportServiceCheck = Ethereal.reportServiceCheck @m @MTLStatsT

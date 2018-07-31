@@ -52,8 +52,8 @@ bloc = (return gitInfo)
   :<|> getSearchContract
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
-  :<|> postChain
-  :<|> getChain
+  :<|> postChainInfo
+  :<|> getChainInfo
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc

@@ -12,6 +12,7 @@ import Test.QuickCheck
 
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.SHA
@@ -61,10 +62,10 @@ spec = do
     it "verifies the signatures, without including the seals" $ do
       let istExtra = IstanbulExtra testValidators Nothing []
           initialExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
-      sig <- proposerSeal (set (blockDataLens . extraDataLens) initialExtra testBlock) private
+      sig <- proposerSeal (set extraLens initialExtra testBlock) private
       let
           sealedExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
-          sealedBlock = set (blockDataLens . extraDataLens) sealedExtra testBlock
+          sealedBlock = set extraLens sealedExtra testBlock
           got = verifyProposerSeal sealedBlock sig
           want = Just . prvKey2Address $ private
       got `shouldBe` want
