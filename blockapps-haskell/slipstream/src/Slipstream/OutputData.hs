@@ -93,32 +93,44 @@ convertRet address codehash abi name chain x = do
   --Revisit to fix table name duplicates
   --let contractName = take 63 codehash
 
+  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
+  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+
   --Indexing flag
-  let indFlag = False
+  let indFlag = True
   let ind = if (indFlag)
-              then ""
+              then do
+                let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
+
+                let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
+                let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
+
+                let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
+                let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
+                let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
+                createSt ++ delRow ++ ins
               else ""
+
 
   --History flag
   let histFlag = True
   let hist = if (histFlag)
-              --TODO: Add history insert statement (block ID, state)
+              --TODO: Add history insert statement (transaction, state)
               then
                 ""
                 --let histCreate = "create table if not exists \"History\" (\"codeHash\" text, contract text, block_id text, state text)"
               else ""
 
-  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
-  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+  --let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
 
-  let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
+  --let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
+  --let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
 
-  let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
-  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
+  --let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
+  --let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
+  --let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
 
-  let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
-  let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
-  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-  let oneIns = "BEGIN;" ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ "COMMIT;"
+  --let oneIns = "BEGIN;" ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ "COMMIT;"
+  let oneIns = "BEGIN;" ++ conIns ++ ind ++ hist ++ "COMMIT;"
 
   dbInsert oneIns
