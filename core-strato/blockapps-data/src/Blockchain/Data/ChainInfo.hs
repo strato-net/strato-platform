@@ -40,20 +40,7 @@ data CodeInfo = CodeInfo
   , codeInfoName   :: String
   } deriving (Show, Read, Eq, GHCG.Generic)
 
-instance FromJSON CodeInfo where
-  parseJSON (Object o) =
-    CodeInfo
-    <$> o .: "code"
-    <*> o .: "src"
-    <*> o .: "name"
-  parseJSON _ = error "parseJSON CodeInfo: expected Object"
-
-instance ToJSON CodeInfo where
-  toJSON (CodeInfo bs s1 s2) = object
-    [ "code" .= bs
-    , "src"  .= s1
-    , "name" .= s2
-    ]
+$(AT.deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
 instance RLPSerializable CodeInfo where
   rlpEncode (CodeInfo a b c) = 
@@ -61,43 +48,12 @@ instance RLPSerializable CodeInfo where
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
 
-
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic)
 
-instance FromJSON AccountInfo where
-  parseJSON (Object o) = do
-    a <- (o .: "address")
-    b <- (o .: "balance")
-    mc <- (o .:? "codeHash")
-    case mc of
-      Nothing -> return $ NonContract a b
-      Just c -> do
-        ms <- (o .:? "storage")
-        case ms of
-          Nothing -> return $ ContractNoStorage a b c
-          Just s -> do
-            return $ ContractWithStorage a b c s
-  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
-
-instance ToJSON AccountInfo where
-  toJSON (NonContract a b) = object
-    [ "address" .= a
-    , "balance" .= b
-    ]
-  toJSON (ContractNoStorage a b c) = object
-    [ "address" .= a
-    , "balance" .= b
-    , "codeHash" .= c
-    ]
-  toJSON (ContractWithStorage a b c s) = object
-    [ "address" .= a
-    , "balance" .= b
-    , "codeHash" .= c
-    , "storage" .= s
-    ]
+$(AT.deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
 
 instance RLPSerializable AccountInfo where
   rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
@@ -117,14 +73,6 @@ data ChainInfo = ChainInfo {
     members         :: M.Map Address Enode
 } deriving (Eq, Show, Read, GHCG.Generic)
 
-
-{- instance (FromJSON a, FromJSON b, KnownSymbol c, KnownSymbol d) => FromJSON M.Map a b where
-  parseJSON (Object o
-
-instance (ToJSON a, ToJSON b, KnownSymbol c, KnwonSymbol d) => ToJSON M.Map a b where
-  toJSON (M.Map a b) = 
-    object [
--}
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
     cl <- (o .: "chainLabel")
@@ -132,15 +80,6 @@ instance FromJSON ChainInfo where
     ci <- (o .: "codeInfo")
     mb <- (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
     return $ ChainInfo cl ai ci (M.fromList mb)
-
-
-{-  parseJSON (Object o) = 
-    ChainInfo <$>
-      o .: "chainLabel" <*>
-      o .: "accountInfo" <*>
-      o .: "codeInfo" <*>
-     (map toTuple <$> ((o .: "members") :: NamedMapParser "address" Address "enodeURL" Enode))
--}
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
