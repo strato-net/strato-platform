@@ -58,5 +58,14 @@ mkdir logs
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
-/usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+until nc -z $kafkaHost $kafkaPort >&/dev/null
+do  echo "Waiting for Kafka to become available"
+    sleep 1
+done
+
+ /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+             --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+             --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+
+usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
