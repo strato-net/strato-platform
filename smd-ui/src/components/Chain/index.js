@@ -18,7 +18,7 @@ class Chain extends Component {
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h4>
           </div>
-          <div className="col-sm-2 text-right">
+          <div className="col-sm-4 text-right">
             <button
               className="pt-button pt-intent-primary pt-small"
               onClick={(e) => {
@@ -27,6 +27,8 @@ class Chain extends Component {
               }}>
               Add Member
               </button>
+          </div>
+          <div className="col-sm-4 text-right">
             <button
               className="pt-button pt-intent-primary pt-small"
               onClick={(e) => {
