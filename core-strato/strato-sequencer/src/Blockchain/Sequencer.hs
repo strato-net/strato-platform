@@ -111,11 +111,11 @@ sequencer = do
     vmEvs <- gets _vmEvents
     unless (Q.length vmEvs == 0) $ do
       writeSeqVmEvents' $ toList vmEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
     p2pEvs <- gets _p2pEvents
     unless (Q.length p2pEvs == 0) $ do
       writeSeqP2pEvents' $ toList p2pEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
     unless (null inEvents) $ do
       let ofs = maximum $ map fst inEvents
       setNextIngestedOffset ofs
