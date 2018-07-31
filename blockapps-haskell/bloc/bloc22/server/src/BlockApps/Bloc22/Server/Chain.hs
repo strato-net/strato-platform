@@ -23,8 +23,8 @@ import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 
-postChain :: ChainInput -> Bloc ChainId
-postChain (ChainInput src label accountInfo _ members) = do
+postChainInfo :: ChainInput -> Bloc ChainId
+postChainInfo (ChainInput src label accountInfo _ members) = do
   idsAndDetails <- compileContract src
   ContractDetails{..} <- case Map.toList idsAndDetails of
             [] -> throwError $ UserError "You need to supply at least one governance contract"
@@ -39,8 +39,8 @@ postChain (ChainInput src label accountInfo _ members) = do
   chainId <- blocStrato $ Strato.postChain chainInfo
   return chainId
 
-getChain :: ChainId -> Bloc ChainOutput
-getChain chainId = do
+getChainInfo :: ChainId -> Bloc ChainOutput
+getChainInfo chainId = do
   chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
   (ChainInfo cl ai _ mm) <- case chainIdChainInfo of
                                          [] -> throwError $ DBError "No chain matches the chainId"

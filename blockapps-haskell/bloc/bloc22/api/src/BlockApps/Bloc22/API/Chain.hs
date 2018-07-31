@@ -146,10 +146,10 @@ instance ToSchema ChainOutput where
 
 -- POST /chain
 
-type PostChain = "chain"
+type PostChainInfo = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
 
-type GetChain = "chain"
+type GetChainInfo = "chain"
   :> Capture "chainid" ChainId
   :> Get '[JSON] ChainOutput
