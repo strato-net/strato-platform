@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { fetchChains, changeChainFilter, resetChainId, fetchChainDetail } from './chains.actions';
+import { fetchChains, changeChainFilter, resetChainId } from './chains.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -157,8 +157,7 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchChains,
-      changeChainFilter,
       resetChainId,
-      fetchChainDetail
+      changeChainFilter
     }
   )(Chains));

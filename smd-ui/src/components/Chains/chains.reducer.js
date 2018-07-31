@@ -3,9 +3,7 @@ import {
   FETCH_CHAINS_SUCCESSFULL,
   FETCH_CHAINS_FAILED,
   CHANGE_CHAIN_FILTER,
-  RESET_CHAIN_ID,
-  FETCH_CHAIN_DETAIL_SUCCESS,
-  FETCH_CHAIN_DETAIL_FAILURE,
+  RESET_CHAIN_ID
 } from './chains.actions';
 
 const initialState = {
@@ -36,11 +34,18 @@ const reducer = function (state = initialState, action) {
         result[item] = {};
         return result;
       }, {});
+      const chains = {};
+      action.chainLabels.forEach(function(label, index){
+        let details = {};
+        let curId = action.chainIds[index];
+        details[curId] = action.chainInfos[index];
+        chains[label] = details;
+      });
       return {
         ...state,
         chainLabels: chainLabels,
         chainIds: chainIds,
-        chains: state.chains,
+        chains: chains,
         filter: state.filter,
         error: null
       };
@@ -62,23 +67,6 @@ const reducer = function (state = initialState, action) {
         chains: state.chains,
         error: state.error,
       }
-    case FETCH_CHAIN_DETAIL_SUCCESS:
-      return {
-        ...state,
-        chains: {
-          ...state.chainLabels,
-          [action.label]: {
-            ...state.chainLabels[action.label],
-            [action.id]: {
-              ...action.detail,
-              error: null
-            }
-          }
-        },
-        filter: state.filter,
-        error: state.error,
-        currentUserBalance: state.currentUserBalance
-      }
     case RESET_CHAIN_ID:
       return {
         ...state,
@@ -88,21 +76,6 @@ const reducer = function (state = initialState, action) {
         },
         filter: state.filter,
         error: state.error
-      }
-    case FETCH_CHAIN_DETAIL_FAILURE:
-      return {
-        ...state,
-        chains: {
-          ...state.chainLabels,
-          [action.label]: {
-            ...state.chainLabels[action.label],
-            [action.id]: {
-              error: action.error
-            }
-          }
-        },
-        filter: state.filter,
-        error: state.error,
       }
     default:
       return state;

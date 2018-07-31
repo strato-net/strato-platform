@@ -9,10 +9,7 @@ import {
   FETCH_CHAINS,
   FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
-  fetchChainsFailure,
-  fetchChainDetail,
-  fetchChainDetailSuccess,
-  fetchChainDetailFailure
+  fetchChainsFailure
 } from './chains.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -83,7 +80,11 @@ export function* getChains(action) {
     ];
     const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
     const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
-    yield put(fetchChainsSuccess(chainLabels, chainIds));
+    const chainInfos = [];
+    response.forEach(function(value, index){
+      chainInfos.push(value["info"]);
+    });
+    yield put(fetchChainsSuccess(chainLabels, chainIds, chainInfos));
   }
   catch (err) {
     yield put(fetchChainsFailure(err));
@@ -94,19 +95,8 @@ export function* getChains(action) {
   }
 }
 
-export function* getChainDetail(action) {
-  try{
-    const response = yield call(getChainDetailApi, action.id);
-    yield put(fetchChainDetailSuccess(action.label, action.id, response['0']));
-  }
-  catch (err) {
-    yield put(fetchChainDetailFailure(action.label, action.id, err));
-  }
-}
-
 export default function* watchFetchChains() {
   yield [
     takeLatest(FETCH_CHAINS, getChains),
-    takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail)
   ];
 }
