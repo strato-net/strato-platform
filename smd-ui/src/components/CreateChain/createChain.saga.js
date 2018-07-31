@@ -15,9 +15,9 @@ import {
 
 import { env } from '../../env';
 
-const url = env.STRATO_URL + "/chain"
+const url = env.BLOC_URL + "/chain"
 
-export function createChainApiCall(label, addRule, removeRule, members, acctBalance){
+export function createChainApiCall(label, members, balances, src, args){
   return fetch(
     url,
     {
@@ -27,11 +27,11 @@ export function createChainApiCall(label, addRule, removeRule, members, acctBala
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        "chainLabel": label,
-        "addRule": addRule,
-        "removeRule": removeRule,
-        "members": members,
-        "accountBalance": acctBalance
+        "src": src,
+        "label": label,
+        "balances": balances,
+        "args": args,
+        "members": members
       })
     }
   )
@@ -45,7 +45,7 @@ export function createChainApiCall(label, addRule, removeRule, members, acctBala
 
 export function* createChain(action) {
   try {
-    let response = yield call(createChainApiCall, action.label, action.addRule, action.removeRule, action.members, action.acctBalance);
+    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
     yield put(createChainSuccess(response));
     yield put(fetchChains(false));
   }

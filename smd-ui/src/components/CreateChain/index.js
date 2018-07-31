@@ -16,7 +16,7 @@ class CreateChain extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('create_chain_submit_click');
-    this.props.createChain(values.label, values.addRule, values.removeRule, values.members, values.acctBalance);
+    this.props.createChain(values.label, values.members, values.balances, values.src, values.args);
   }
 
   render() {
@@ -61,7 +61,7 @@ class CreateChain extends Component {
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
-                    Add Rule
+                    Chain Members
                   </label>
                   <div className="pt-form-content">
                     <Field
@@ -73,13 +73,13 @@ class CreateChain extends Component {
                       tabIndex="2"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.addRule}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
                   </div>
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-c">
-                    Remove Rule
+                    Balances
                   </label>
                   <div className="pt-form-content">
                     <Field
@@ -91,13 +91,13 @@ class CreateChain extends Component {
                       tabIndex="3"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.removeRule}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.balances}</div>
                   </div>
                 </div>
               
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-d">
-                    Members
+                    Governance Contract
                   </label>
                   <div className="pt-form-content">
                     <Field
@@ -109,13 +109,13 @@ class CreateChain extends Component {
                       tabIndex="4"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.src}</div>
                   </div>
                 </div>
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-e">
-                    Account Balance
+                    Arguments
                   </label>
                   <div className="pt-form-content">
                     <Field
@@ -127,7 +127,7 @@ class CreateChain extends Component {
                       tabIndex="5"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.acctBalance}</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.args}</div>
                   </div>
                 </div>
               </div>
