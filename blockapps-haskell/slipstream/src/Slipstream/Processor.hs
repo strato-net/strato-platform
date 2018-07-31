@@ -45,14 +45,23 @@ import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
 
-data Action = Action ActionType String String (Maybe [(String, String)])
+--data Action = Action ActionType String String (Maybe [(String, String)])
+data Action = Action ActionType String String (Maybe String) (Maybe [(String, String)])
               deriving (Show)
-
+{-
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
   (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
   ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
   ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  where
+    newValue (Diff _ x) = x
+-}
+stateDiffToChanges::StateDiff->[Action]
+stateDiffToChanges StateDiff{..} =
+  (map (\(x, y) -> Action Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> Action Delete x (codeHash y) chainId Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> Action Update x (codeHash y) chainId Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -106,16 +115,17 @@ storageToFunction s k =
    Just x -> x
 
 hasContract::Action->Bool
-hasContract (Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _) = False
+hasContract (Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ _) = False
 hasContract _ = True
 
 storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded (Action theType address codehash Nothing)= do
+--addStorageIfNeeded (Action theType address codehash Nothing)= do
+addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
-  return $ Action theType address codehash (Just $ map storageToList storage')
+  return $ Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
 
 first :: (a, b, c) -> a
@@ -180,10 +190,13 @@ processTheMessages messages = do
 
       --liftIO $ putStrLn $ "{{{FILLED IN CHANGE}}} : " ++ show filledInChange
 
-      let (address, codehash, storage) =
+      --let (address, codehash, storage) =
+      let (address, codehash, storage, chainId) =
             case filledInChange of
-             Action _ a c (Just s) -> (a, c, storageToFunction s)
-             Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+             --Action _ a c (Just s) -> (a, c, storageToFunction s)
+             --Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+             Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
+             Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
       --liftIO $ putStrLn $ "======address=====: " ++ show address
       --liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
@@ -206,7 +219,12 @@ processTheMessages messages = do
 
       let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
       --liftIO $ putStrLn $ "<>RET<>: " ++ show ret
+{-
       let chain = case Map.lookup "chainId" ret of
+                    Nothing -> ""
+                    Just(x) -> show x
+-}
+      let chain = case chainId of
                     Nothing -> ""
                     Just(x) -> show x
       --liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
