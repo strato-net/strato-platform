@@ -64,7 +64,7 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const chainId = yield rest.createChain(label, accountInfo, codeInfo, members);
+    const chainId = yield rest.createChain(chainLabel, accountInfo, codeInfo, members);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
@@ -74,11 +74,10 @@ describe("Create Chain", function() {
     const chainInfo = yield rest.getChainInfo([chainId]);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
-    assert.equal(label, chainInfo.label, "chain labels should be identical");
-    assert.equal(addRule, chainInfo.addRule, "chain addRules should be identical");
-    assert.equal(removeRule, chainInfo.removeRule, "chain removeRules should be identical");
+    assert.equal(chainLabel, chainInfo.chainLabel, "chain labels should be identical");
+    assert.deepEqual(accountInfo, chainInfo.accountInfo, "chain account infos should be identical");
+    assert.deepEqual(codeInfo, chainInfo.codeInfo, "chain code infos should be identical");
     assert.deepEqual(members, chainInfo.members, "chain members should be identical");
-    assert.deepEqual(bals, chainInfo.balances, "chain balances should be identical");
 
     for(var i=0; i < 10; i++) {
       const txResult = yield rest.send(alice, bob, 123456, chainId);
@@ -105,7 +104,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, [], codeInfo, members);
+      chainId = yield rest.createChain(chainLabel, [], codeInfo, members);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -130,7 +129,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, accountInfo, [], members);
+      chainId = yield rest.createChain(chainLabel, accountInfo, [], members);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -155,7 +154,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, accountInfo, codeInfo, []);
+      chainId = yield rest.createChain(chainLabel, accountInfo, codeInfo, []);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
