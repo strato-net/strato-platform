@@ -10,15 +10,17 @@ class Chain extends Component {
       id,
       chain
     } = this.props;
+    console.log("cur chain");
+    console.log(chain);
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
           <div className="col-sm-10">
-            <h4>
+            <h5>
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
-            </h4>
+            </h5>
           </div>
-          <div className="col-sm-4 text-right">
+         {/* <div className="col-sm-4 text-right">
             <button
               className="pt-button pt-intent-primary pt-small"
               onClick={(e) => {
@@ -37,7 +39,7 @@ class Chain extends Component {
               }}>
               Remove Member
               </button>
-          </div>
+          </div> */}
         </div>
 
         <table className="pt-table pt-str">
@@ -49,20 +51,12 @@ class Chain extends Component {
           </thead>
           <tbody>
             <tr>
-              <td><strong>Add Rule</strong></td>
-              <td>{chain.addRule}</td>
-            </tr>
-            <tr>
-              <td><strong>Remove Rule</strong></td>
-              <td>{chain.removeRule}</td>
+              <td><strong>Account Balances</strong></td>
+              <td>{chain.accountInfo[0]["balance"]}</td>
             </tr>
             <tr>
               <td><strong>Members</strong></td>
-              <td>{chain.members}</td>
-            </tr>
-            <tr>
-              <td><strong>Account Info</strong></td>
-              <td>{chain.balances[0]["Address"]}</td>
+              <td>{chain.members[0]}</td>
             </tr>
           </tbody>
         </table>
@@ -75,6 +69,8 @@ export function mapStateToProps(state, ownProps) {
   const label = ownProps.label;
   const id = ownProps.id;
   const chains = state.chains.chains;
+  console.log("All chains");
+  console.log(chains);
   return {
     chain: Object.getOwnPropertyNames(chains).indexOf(label) >= 0 ? state.chains.chains[label][id] : {},
   };
