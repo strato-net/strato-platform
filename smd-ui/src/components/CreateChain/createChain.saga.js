@@ -18,9 +18,8 @@ import { env } from '../../env';
 const url = env.BLOC_URL + "/chain"
 
 export function createChainApiCall(label, members, balances, src, args){
-  let bd = {
-  "args": [],
-  "balances": [
+  let a = [];
+  let b = [
     {
       "balance": 20000000,
       "address": "5815b9975001135697b5739956b9a6c87f1c575c"
@@ -29,8 +28,8 @@ export function createChainApiCall(label, members, balances, src, args){
       "balance": 999999,
       "address": "93fdd1d21502c4f87295771253f5b71d897d911c"
     }
-  ],
-  "members": [
+  ];
+  let m = [
     {
       "address": "5815b9975001135697b5739956b9a6c87f1c575c",
       "enode": "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
@@ -39,10 +38,9 @@ export function createChainApiCall(label, members, balances, src, args){
       "address": "93fdd1d21502c4f87295771253f5b71d897d911c",
       "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
     }
-  ],
-  "src": "contract Governance { }",
-  "label": "my chain"
-  };
+  ];
+  let s = "contract Governance { }";
+  let l = "my chain";
   return fetch(
     url,
     {
@@ -51,15 +49,13 @@ export function createChainApiCall(label, members, balances, src, args){
       headers: {
         'Content-Type': 'application/json'
       },
-      body: bd
-      // JSON.stringify({
-      //   "src": src,
-      //   "label": label,
-      //   "balances": [balances],
-      //   "args": [],
-      //   "members": [members]
-      // }
-      )
+      body: JSON.stringify({
+         "args": a,
+         "balances": b,
+         "members": m,
+         "src": s,
+         "label": l
+      })
     }
   )
     .then(function (response) {
@@ -73,7 +69,6 @@ export function createChainApiCall(label, members, balances, src, args){
 export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
-    console.log(response);
     yield put(createChainSuccess(response));
     yield put(fetchChains(false));
   }
