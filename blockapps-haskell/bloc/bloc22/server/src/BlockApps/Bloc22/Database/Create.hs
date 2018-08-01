@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS contracts_instance(
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
   address bytea NOT NULL,
   timestamp timestamptz NOT NULL DEFAULT now(),
-  chainId bytea NOT NULL,
+  chainid bytea NOT NULL,
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]

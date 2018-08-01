@@ -132,7 +132,7 @@ contractsInstanceTable = Table "contracts_instance" $ p5
   , required "contract_metadata_id"
   , required "address"
   , optional "timestamp"
-  , required "chainId"
+  , required "chainid"
   )
 
 contractsLookupTable :: Table

@@ -62,4 +62,4 @@ addMutabilityColumn = [sql|
 ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
 
 addChainIdColumn :: Query
-addChainIdColumn = [sql| ALTER TABLE contract_instance ADD COLUMN IF NOT EXISTS chainId bytea; |]
+addChainIdColumn = [sql| ALTER TABLE contracts_instance ADD COLUMN IF NOT EXISTS chainid bytea; |]
