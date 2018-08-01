@@ -40,7 +40,6 @@ export function createChainApiCall(label, members, balances, src, args){
     }
   ];
   let s = "contract Governance { }";
-  let l = "my chain";
   return fetch(
     url,
     {
@@ -54,7 +53,7 @@ export function createChainApiCall(label, members, balances, src, args){
          "balances": b,
          "members": m,
          "src": s,
-         "label": l
+         "label": label
       })
     }
   )
