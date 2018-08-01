@@ -12,21 +12,25 @@ const config = common.config;
 
 const password = '1234';
 
-const chainLabel = 'My chain label';
-const accountInfo = [
-        [ "0x5815b9975001135697b5739956b9a6c87f1c575c", 2000 ] ,
-        [ "0x93fdd1d21502c4f87295771253f5b71d897d911c", 4000000 ] ,
-        [ "0000000000000000000000000000000000deadbeef", 12345, "6b0d5d3309777e2e799976ea377ce6aeb4a485b1e7cae56f41a85ada9855fb99" ] ]
-const codeInfo = [
-       [ "/BEF", "me", "you" ] ,
-       [ "aNoThErByTeStRiNg", "you", "me" ] ]
-const members = [
-       { address  : "00000000000000000000000000000000deadbeef" ,
-         enodeURL :"enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
-       } ,
-       { address  :  "0000000000000000000000000000000012345678" ,
-         enodeURL : "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
-       }];
+const label = 'My chain label';
+const addRule = 'My add rule';
+const removeRule = 'My remove rule';
+const src = 'contract Governance { }';
+const args = [];
+const members = [{
+    address: "00000000000000000000000000000000deadbeef"
+  , enode: "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
+  }, {
+    address: "0000000000000000000000000000000012345678"
+  , enode: "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+  }];
+const balances = [
+           { address: "00000000000000000000000000000000deadbeef"
+           , balance: 1000000000000000000000
+           },
+           { address: "0000000000000000000000000000000012345678"
+           , balance: 0
+           }];
 
 describe("Create Chain", function() {
 
@@ -49,8 +53,10 @@ describe("Create Chain", function() {
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                  ,{ address: bob.address, balance: 0}
                  ];
-    const chainId = yield rest.createChain(chainLabel, accountInfo, codeInfo, members);
-
+    const mems = [{address: alice.address, enode: members[0].enode}
+                 ,{address: bob.address, enode: members[1].enode}
+		 ];
+    const chainId = yield rest.createChain(label, mems, bals, src, args);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
@@ -60,10 +66,10 @@ describe("Create Chain", function() {
     const chainInfo = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
-    assert.equal(chainLabel, chainInfo.chainLabel, "chain labels should be identical");
-    assert.deepEqual(accountInfo, chainInfo.accountInfo, "chain account infos should be identical");
-    assert.deepEqual(codeInfo, chainInfo.codeInfo, "chain code infos should be identical");
-    assert.deepEqual(members, chainInfo.members, "chain members should be identical");
+//    assert.equal(label, chainInfo.label, "chain labels should be identical");
+//    assert.deepEqual(mems, chainInfo.members, "chain members should be identical");
+//    assert.deepEqual(bals, chainInfo.balances, "chain balances should be identical");
+
     for(var i=0; i < 10; i++) {
       const txResult = yield rest.send(alice, bob, 123456, chainId);
       console.log('### TRANSACTION RESULT ###', txResult);
@@ -89,7 +95,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(chainLabel, [], codeInfo, members);
+      chainId = yield rest.createChain(label, '', removeRule, members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -114,7 +120,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(chainLabel, accountInfo, [], members);
+      chainId = yield rest.createChain(label, addRule, '', members, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -139,7 +145,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(chainLabel, accountInfo, codeInfo, []);
+      chainId = yield rest.createChain(label, addRule, removeRule, [], balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -161,7 +167,7 @@ describe("Create Chain", function() {
     assert.isDefined(bob, "should exist");
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
-/*
+
     const bals = [{ address: alice.address, balance: 0}
                  ,{ address: bob.address, balance: 0}
                  ];
@@ -171,8 +177,9 @@ describe("Create Chain", function() {
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
-    assert.isUndefined(chainId, "chainId not defined"); */
+    assert.isUndefined(chainId, "chainId not defined");
   });
+
 });
 
 function promiseTimeout(timeout) {
