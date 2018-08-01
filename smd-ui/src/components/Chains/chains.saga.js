@@ -7,14 +7,13 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_CHAINS,
-  FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
   fetchChainsFailure
 } from './chains.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 
-const chainUrl = env.STRATO_URL + "/chain"
+const chainUrl = env.BLOC_URL + "/chain"
 
 export function getChainsApi() {
   return fetch(
