@@ -46,7 +46,7 @@ import Slipstream.OutputData
 data ActionType = Create | Delete | Update deriving (Show)
 
 --data Action = Action ActionType String String (Maybe [(String, String)])
-data Action = Action ActionType String String (Maybe String) (Maybe [(String, String)])
+data Action = Action ActionType String String (Maybe ChainId) (Maybe [(String, String)])
               deriving (Show)
 {-
 stateDiffToChanges::StateDiff->[Action]
@@ -88,11 +88,11 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::String->String->Bloc (Either String Contract, String, String)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" = return $ (Left "Blank contract", "Blank ABI", "Blank")
-getContract address _ = do
+getContract::String->String->Maybe ChainId->Bloc (Either String Contract, String, String)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
+getContract address _ chainId = do
   qqqq <-
-    getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
+    getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
 
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
   liftIO $ putStrLn $ "ret1: " ++ show ret1
@@ -102,11 +102,11 @@ getContract address _ = do
   liftIO $ putStrLn $ "ret3" ++ show ret3
   return (ret1, ret2, ret3)
 
-fetchABI :: String -> Bloc String
-fetchABI address = do
-  conDet <- getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
-  let ret = show $ A.toJSON $ contractdetailsXabi conDet
-  return ret
+-- fetchABI :: String -> Bloc String
+-- fetchABI address = do
+--   conDet <- getContractDetailsByAddressOnly (Address $ fst $ head $ readHex address)
+--   let ret = show $ A.toJSON $ contractdetailsXabi conDet
+--   return ret
 
 storageToFunction::[(String, String)]->Storage
 storageToFunction s k =
@@ -205,7 +205,7 @@ processTheMessages messages = do
          Just c -> do
            return c
          Nothing -> do
-           (contractOrError, abi, name) <- getContract address codehash
+           (contractOrError, abi, name) <- getContract address codehash chainId
            case contractOrError of
             Left e -> error e
             Right c -> do

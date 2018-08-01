@@ -9,6 +9,7 @@
 
 module Slipstream.Events where
 
+import qualified BlockApps.Ethereum as Eth
 import Data.Aeson
 --import Data.Aeson.Types
 import Data.Map (Map)
@@ -36,7 +37,7 @@ data StateDiff =
     -- | The 'Eventual value is the pre-deletion state of the contract
     deletedAccounts :: Maybe (Map String AccountDiff),
     updatedAccounts :: Maybe (Map String AccountDiff),
-    chainId :: Maybe (String)
+    chainId :: Maybe Eth.ChainId
     }
     deriving (Show, Generic)
 
