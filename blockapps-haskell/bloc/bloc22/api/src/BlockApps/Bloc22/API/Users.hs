@@ -116,6 +116,7 @@ instance ToSample BlocTransactionData where
                                     , xabiModifiers = Map.empty
                                     , xabiEvents    = Map.empty
                                     }
+      , contractdetailsChainId    = Nothing
       }
     , Call [] -- probably make a better Call sample
     ]

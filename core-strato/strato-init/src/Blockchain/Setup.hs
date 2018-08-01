@@ -397,7 +397,9 @@ oneTimeSetup genesisBlockName = do
 
       {- CONFIG: create kafka topics -}
 
-      let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      --Replace this to re-enable unique topic names
+      --let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      let uniqueTopicMap = Map.fromList [(topic, topic) | topic <- topics]
       encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
       {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
@@ -418,7 +420,6 @@ oneTimeSetup genesisBlockName = do
          EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (block_id);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (number);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);" []

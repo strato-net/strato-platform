@@ -2,6 +2,7 @@
 
 module Blockchain.Mining.Normal (normalMiner) where
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Mining
 import           Control.Concurrent

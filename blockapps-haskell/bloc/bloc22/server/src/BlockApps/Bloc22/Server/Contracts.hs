@@ -28,7 +28,7 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Cirrus.Client
+--import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
@@ -45,13 +45,13 @@ getContracts = blocTransaction $ do
     -- current bloc returns milliseconds
     -- TODO: get those extra 3 significant figures of accuracy
     toMilliSec utc = truncate (utcTimeToPOSIXSeconds utc) * 1000
-    addressToVal addr utc = AddressCreatedAt (toMilliSec utc) (Unnamed addr)
+    addressToVal addr utc cid = AddressCreatedAt (toMilliSec utc) (Unnamed addr) cid
     addressesToMap = foldr'
-      (\ (key,addr,utc) -> Map.insertWith (++) key [addressToVal addr utc])
+      (\ (key,addr,utc,cid) -> Map.insertWith (++) key [addressToVal addr utc cid])
       Map.empty
-    nameToVal name utc = AddressCreatedAt (toMilliSec utc) (Named name)
+    nameToVal name utc cid = AddressCreatedAt (toMilliSec utc) (Named name) cid
     namesToMap = foldr'
-      (\ (key,name,utc) -> Map.insertWith (++) key [nameToVal name utc])
+      (\ (key,name,utc,cid) -> Map.insertWith (++) key [nameToVal name utc cid])
       Map.empty
   contractsAddresses <- blocQuery getContractsAddressesQuery
   contractsNamesAsAddresses <- blocQuery getContractsNamesAsAddressesQuery
@@ -62,12 +62,12 @@ getContracts = blocTransaction $ do
 
 getContractsData :: ContractName -> Bloc [MaybeNamed Address]
 getContractsData (ContractName contractName) = blocTransaction $ do
-  addresses <- blocQuery $ getContractsDataAddressesQuery contractName
+  (addresses :: [(Address, Maybe ChainId)]) <- blocQuery $ getContractsDataAddressesQuery contractName
   names <- blocQuery $ getContractsDataNamesQuery contractName
-  return $ map Unnamed addresses ++ map Named names
+  return $ map (Unnamed . fst) addresses ++ map Named names
 
-getContractsContract :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
-getContractsContract = getContractDetails
+getContractsContract :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
+getContractsContract name addr = getContractDetails name addr
 
 translateStorageMap :: [T.Storage] -> S.Storage
 translateStorageMap storage' =
@@ -86,7 +86,7 @@ getContractsState :: ContractName
 getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
-      $ xAbiToContract <$> getContractXabi contract contractId
+      $ xAbiToContract <$> getContractXabi contract contractId chainId
 
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
@@ -94,10 +94,10 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> do
-      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
       blocQuery1 $ proc () -> do
-        (_,cmId',addr,_) <-
-          (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+        (_,cmId',addr,_,_) <-
+          (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
             (queryTable contractsInstanceTable) -< ()
         restrict -< cmId' .== constant (metadataId::Int32)
         returnA -< addr
@@ -143,54 +143,55 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId 
+                           , qsChainId = chainId
                            }
- 
-getContractsDetails :: Address -> Bloc ContractDetails
-getContractsDetails contractAddress = do
+
+getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
+getContractsDetails contractAddress chainId = do
   toUserError
     (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-    (getContractDetailsByAddressOnly contractAddress >>= return . completeContractDetailXabi)
+    (getContractDetailsByAddressOnly contractAddress chainId >>= return . completeContractDetailXabi)
 
-getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
-getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
+getContractsFunctions (ContractName contractName) contractId chainId = blocTransaction $ do
+  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
   funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
   return $ map FunctionName funcs
 
-getContractsSymbols :: ContractName -> MaybeNamed Address -> Bloc [SymbolName]
-getContractsSymbols (ContractName contractName) contractId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
+getContractsSymbols (ContractName contractName) contractId chainId = blocTransaction $ do
+  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
   vars <- blocQuery $ getXabiVariableNamesQuery metadataId
   return $ map SymbolName vars
 
-getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Bloc [EnumValue]
-getContractsEnum (ContractName contractName) contractId (EnumName enumName) =
+getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> Bloc [EnumValue]
+getContractsEnum (ContractName contractName) contractId (EnumName enumName) chainId =
   blocTransaction $ do
     metadataId <- case contractId of
-      Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
-      Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+      Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+      Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
     map (EnumValue . fst) <$> getEnumValues metadataId enumName
 
 getContractsStateMapping :: ContractName
                          -> MaybeNamed Address
                          -> SymbolName
                          -> Text
+                         -> Maybe ChainId
                          -> Bloc GetContractsStateMappingResponse
                          -- state-translation
-getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName = do
-  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName chainId = do
+  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId chainId
 
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
 
   address <- case contractId of
               Unnamed addr -> return addr
               Named "Latest" -> blocQuery1 $ proc () -> do
-                (_,cmId,addr,_) <-
-                  (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+                (_,cmId,addr,_,_) <-
+                  (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
                     (queryTable contractsInstanceTable) -< ()
                 restrict -< cmId .== constant (metadataId::Int32)
                 returnA -< addr
@@ -227,9 +228,9 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right blockappsjsXabi ->
-            void . blocCirrusFireForget $ postContract details{contractdetailsXabi=blockappsjsXabi}
-        return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+          Right _ ->
+            return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+        --return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

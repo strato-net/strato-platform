@@ -278,6 +278,7 @@ data ContractDetails = ContractDetails
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
   , contractdetailsXabi       :: Xabi
+  , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic)
 
 instance ToJSON ContractDetails where
@@ -288,6 +289,7 @@ instance ToJSON ContractDetails where
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
     , "xabi" .= contractdetailsXabi
+    , "chainId" .= contractdetailsChainId
     ]
 
 instance FromJSON ContractDetails where
@@ -299,6 +301,7 @@ instance FromJSON ContractDetails where
       <*> obj .: "codeHash"
       <*> obj .: "name"
       <*> obj .: "xabi"
+      <*> obj .:? "chainId"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
 
@@ -319,6 +322,7 @@ instance ToSchema ContractDetails where
         , contractdetailsCodeHash = keccak256 "digest"
         , contractdetailsName = "DetailsName"
         , contractdetailsXabi = sampleXabi
+        , contractdetailsChainId = Nothing
         }
       sampleXabi :: Xabi
       sampleXabi = Xabi

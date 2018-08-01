@@ -1,0 +1,36 @@
+name:                strato-model
+version:             0.1.0.0
+author:              BlockApps
+maintainer:          blockapps
+build-type:          Simple
+license:             Apache-2.0
+
+library:
+  dependencies:
+    - aeson
+    - ansi-wl-pprint
+    - base
+    - base16-bytestring
+    - ethereum-rlp
+    - binary
+    - bytestring
+    - cryptonite
+    - lens
+    - path-pieces
+    - memory
+    - nibblestring
+    - blockapps-haskoin
+    - text
+    - time
+    - QuickCheck
+  source-dirs: src
+  default-extensions:
+    - MultiParamTypeClasses
+    - FlexibleContexts
+    - FlexibleInstances
+    - GeneralizedNewtypeDeriving
+    - GADTs
+    - LambdaCase
+    - RecordWildCards
+    - FunctionalDependencies
+  ghc-options: -Wall -Werror -fno-warn-warnings-deprecations

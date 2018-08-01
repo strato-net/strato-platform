@@ -139,9 +139,8 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           => ChainInfo
                           -> m StateRoot
 chainInfoToGenesisState ci = do
---    let accounts = (\(a,w) -> NonContract a (fromIntegral w)) <$> accountBalance ci
-    let accounts = acctInfo ci
-    initializeStateDB accounts
+    initializeCodeDB (codeInfo ci)
+    initializeStateDB (acctInfo ci)
     stateRoot <$> getStateDB
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]

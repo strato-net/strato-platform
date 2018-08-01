@@ -161,7 +161,7 @@ function getKafkaTopic() {
     } else {
       return rp(options)
         .then(function(r) {
-          scope.kafkaTopic = 'statediff_' + r.peerId;
+            scope.kafkaTopic = 'statediff';
           return scope;
         })
         .catch(function(err) {
