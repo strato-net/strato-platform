@@ -10,8 +10,6 @@ class Chain extends Component {
       id,
       chain
     } = this.props;
-    console.log("cur chain");
-    console.log(chain);
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
@@ -52,11 +50,11 @@ class Chain extends Component {
           <tbody>
             <tr>
               <td><strong>Account Balances</strong></td>
-              <td>{chain.accountInfo[0]["balance"]}</td>
+              <td>{chain.balances[0]["balance"]}</td>
             </tr>
             <tr>
               <td><strong>Members</strong></td>
-              <td>{chain.members[0]}</td>
+              <td>{}</td>
             </tr>
           </tbody>
         </table>
@@ -69,10 +67,9 @@ export function mapStateToProps(state, ownProps) {
   const label = ownProps.label;
   const id = ownProps.id;
   const chains = state.chains.chains;
-  console.log("All chains");
   console.log(chains);
   return {
-    chain: Object.getOwnPropertyNames(chains).indexOf(label) >= 0 ? state.chains.chains[label][id] : {},
+    chain: Object.getOwnPropertyNames(chains).indexOf(label) >= 0 ? chains[label][id] : {},
   };
 }
 
