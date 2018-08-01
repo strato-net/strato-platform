@@ -35,7 +35,8 @@ data StateDiff =
     createdAccounts :: Maybe (Map String AccountDiff),
     -- | The 'Eventual value is the pre-deletion state of the contract
     deletedAccounts :: Maybe (Map String AccountDiff),
-    updatedAccounts :: Maybe (Map String AccountDiff)
+    updatedAccounts :: Maybe (Map String AccountDiff),
+    chainId :: Maybe (String)
     }
     deriving (Show, Generic)
 
