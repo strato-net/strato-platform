@@ -18,6 +18,31 @@ import { env } from '../../env';
 const url = env.BLOC_URL + "/chain"
 
 export function createChainApiCall(label, members, balances, src, args){
+  let bd = {
+  "args": [],
+  "balances": [
+    {
+      "balance": 20000000,
+      "address": "5815b9975001135697b5739956b9a6c87f1c575c"
+    },
+    {
+      "balance": 999999,
+      "address": "93fdd1d21502c4f87295771253f5b71d897d911c"
+    }
+  ],
+  "members": [
+    {
+      "address": "5815b9975001135697b5739956b9a6c87f1c575c",
+      "enode": "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+    },
+    {
+      "address": "93fdd1d21502c4f87295771253f5b71d897d911c",
+      "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+    }
+  ],
+  "src": "contract Governance { }",
+  "label": "my chain"
+  };
   return fetch(
     url,
     {
@@ -26,13 +51,15 @@ export function createChainApiCall(label, members, balances, src, args){
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        "src": src,
-        "label": label,
-        "balances": [balances],
-        "args": [],
-        "members": [members]
-      })
+      body: bd
+      // JSON.stringify({
+      //   "src": src,
+      //   "label": label,
+      //   "balances": [balances],
+      //   "args": [],
+      //   "members": [members]
+      // }
+      )
     }
   )
     .then(function (response) {
