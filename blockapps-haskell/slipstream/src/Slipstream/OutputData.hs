@@ -110,7 +110,7 @@ convertRet address codehash abi name chain x = do
                 let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
                 createSt ++ delRow ++ ins
               else ""
-
+  putStrLn $ "INSERT STATEMENT: " ++ show ind
 
   --History flag
   let histFlag = True

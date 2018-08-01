@@ -142,11 +142,11 @@ processTheMessages messages = do
   --liftIO $ putStrLn "<>____Process_____<>"
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-{-
+
   if (length changes > 0)
     then liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
     else return ()
--}
+
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -181,14 +181,14 @@ processTheMessages messages = do
   cachedContractsIORef <- newIORef Map.empty
 
   _ <- enterBloc2 env $ do
-    --liftIO $ putStrLn "{{{}}}"
+    liftIO $ putStrLn "{{{}}}"
     forM (filter hasContract changes) $ \change -> do
 
-      --liftIO $ putStrLn $ "{{{CHANGE}}} : " ++ show change
+      liftIO $ putStrLn $ "{{{CHANGE}}} : " ++ show change
 
       filledInChange <- addStorageIfNeeded change
 
-      --liftIO $ putStrLn $ "{{{FILLED IN CHANGE}}} : " ++ show filledInChange
+      liftIO $ putStrLn $ "{{{FILLED IN CHANGE}}} : " ++ show filledInChange
 
       --let (address, codehash, storage) =
       let (address, codehash, storage, chainId) =
@@ -197,8 +197,8 @@ processTheMessages messages = do
              --Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
              Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
              Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-      --liftIO $ putStrLn $ "======address=====: " ++ show address
-      --liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
+      liftIO $ putStrLn $ "======address=====: " ++ show address
+      liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
@@ -218,7 +218,7 @@ processTheMessages messages = do
       --TODO: Add parsing of contract info to get flags (indexing, history)
 
       let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      --liftIO $ putStrLn $ "<>RET<>: " ++ show ret
+      liftIO $ putStrLn $ "<>RET<>: " ++ show ret
 {-
       let chain = case Map.lookup "chainId" ret of
                     Nothing -> ""
@@ -227,7 +227,7 @@ processTheMessages messages = do
       let chain = case chainId of
                     Nothing -> ""
                     Just(x) -> show x
-      --liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
+      liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
 
       liftIO $ convertRet address codehash strAbi name chain ret
 
