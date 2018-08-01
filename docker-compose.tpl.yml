@@ -100,6 +100,35 @@ services:
     build: .
     image: ${OAUTH_IMAGE:-<REPO_URL>oauth:<VERSION>}
     restart: always
+  vaultwrapper:
+    environment:
+    - APEX_URL=${APEX_URL}
+    - SMD_MODE=${SMD_MODE}
+    build: .
+    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
+    restart: always
+  cirrus:
+    depends_on:
+    - strato
+    - postgres
+    - postgrest
+    - kafka
+    - bloc
+    environment:
+    - blocHost=bloc:8000
+    - postgres_db=cirrus
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgrestHost=postgrest:3001
+    - SINGLE_NODE=${SINGLE_NODE}
+    - stateDiffTopic=${stateDiffTopic}
+    - stratoHost=strato:3000
+    - zookeeper_conn=zookeeper
+    build: .
+    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
+    restart: always
   strato:
     depends_on:
     - kafka
@@ -172,6 +201,7 @@ services:
     - strato
     - apex
     - oauth
+    - vaultwrapper
     environment:
     - authBasic=${authBasic}
     - azureAD=${azureAD}
