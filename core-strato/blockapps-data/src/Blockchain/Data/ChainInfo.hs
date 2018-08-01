@@ -25,12 +25,12 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
 
 import           Data.Aeson
-import qualified Data.Aeson.TH                        as AT
 import qualified Data.ByteString                      as B
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map                             as M      hiding (map, filter)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
+import qualified Data.Vector                          as V
 
 import qualified GHC.Generics                         as GHCG
 
@@ -41,7 +41,28 @@ data CodeInfo = CodeInfo
   , codeInfoName   :: String
   } deriving (Show, Read, Eq, GHCG.Generic)
 
-$(AT.deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
+instance FromJSON CodeInfo where
+  parseJSON (Array arr') = do 
+    let [a',b',c'] = V.toList arr'
+    a <- parseJSON a'
+    b <- parseJSON b'
+    c <- parseJSON c'
+    return (CodeInfo a b c)
+  
+  parseJSON (Object o) =
+    CodeInfo
+    <$> o .: "code"
+    <*> o .: "src"
+    <*> o .: "name"
+
+  parseJSON x = error $ "tried to parse JSON for " ++ show x ++ " as type CodeInfo"
+
+instance ToJSON CodeInfo where
+  toJSON (CodeInfo bs s1 s2) = object
+    [ "code" .= bs
+    , "src"  .= s1
+    , "name" .= s2
+    ]
 
 instance RLPSerializable CodeInfo where
   rlpEncode (CodeInfo a b c) = 
@@ -54,7 +75,54 @@ data AccountInfo = NonContract Address Integer
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic)
 
-$(AT.deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
+instance FromJSON AccountInfo where
+  parseJSON (Array arr') = do 
+    let (a':i':xs) = V.toList arr'
+    a <- parseJSON a'
+    i <- parseJSON i'
+    case xs of 
+      [] -> return $ NonContract a i
+      (c':s') -> do 
+        c <- parseJSON c'
+        case s' of
+          [] -> return $ ContractNoStorage a i c
+          [x] -> do 
+            s <- parseJSON x
+            return $ ContractWithStorage a i c s
+          _ -> error "parseJSON for AccountInfo as an Array failed"
+  
+  parseJSON (Object o) = do
+    a <- (o .: "address")
+    b <- (o .: "balance")
+    mc <- (o .:? "codeHash")
+    case mc of
+      Nothing -> return $ NonContract a b
+      Just c -> do
+        ms <- (o .:? "storage")
+        case ms of
+          Nothing -> return $ ContractNoStorage a b c
+          Just s -> do
+            return $ ContractWithStorage a b c s
+
+  parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
+
+  
+instance ToJSON AccountInfo where
+  toJSON (NonContract a b) = object
+    [ "address" .= a
+    , "balance" .= b
+    ]
+  toJSON (ContractNoStorage a b c) = object
+    [ "address" .= a
+    , "balance" .= b
+    , "codeHash" .= c
+    ]
+  toJSON (ContractWithStorage a b c s) = object
+    [ "address" .= a
+    , "balance" .= b
+    , "codeHash" .= c
+    , "storage" .= s
+    ]
 
 instance RLPSerializable AccountInfo where
   rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
