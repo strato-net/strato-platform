@@ -3,7 +3,34 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.VM.VMM where
+module Blockchain.VM.VMM (
+  VMM,
+  pop,
+  localState,
+  getStackItem,
+  push,
+  addDebugCallCreate,
+  addSuicideList,
+  getEnvVar,
+  addLog,
+  setPC,
+  incrementPC,
+  addToRefund,
+  getCallDepth,
+  getGasRemaining,
+  getReturnVal,
+  setDone,
+  setReturnVal,
+  setGasRemaining,
+  useGas,
+  addGas,
+  pay',
+  getStorageKeyVal,
+  putStorageKeyVal,
+  vmTrace,
+  getAllStorageKeyVals,
+  Word256Storable
+  ) where
 
 import           Control.Monad
 import           Control.Monad.Logger
@@ -20,6 +47,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -53,6 +81,24 @@ instance HasStateDB VMM where
     setStateDBStateRoot x = do
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
+
+instance HasChainDB VMM where
+  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
+  putBlockHashRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
+  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
+  putGenesisRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
+  getCurrentBlockHash = lift $ fmap (contextCurrentBlockHash . dbs) get
+  putCurrentBlockHash bh = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentBlockHash = bh}}
+  getCurrentChainId = lift $ fmap (contextCurrentChainId . dbs) get
+  putCurrentChainId cid = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentChainId = cid}}
 
 instance HasStorageDB VMM where
     getStorageDB = do
@@ -149,11 +195,6 @@ addLog newLog = do
   state' <- lift get
   lift $ put state'{logs=newLog:logs state'}
 
-clearLogs::VMM ()
-clearLogs = do
-  state' <- lift get
-  lift $ put state'{logs=[]}
-
 setPC::Word256->VMM ()
 setPC p = do
   state' <- lift get
@@ -212,11 +253,6 @@ addGas gas = do
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
   success <- pay reason from to val
-  unless success $ throwE InsufficientFunds
-
-addToBalance'::Address->Integer->VMM ()
-addToBalance' address' val = do
-  success <- addToBalance address' val
   unless success $ throwE InsufficientFunds
 
 getStorageKeyVal::Word256->VMM Word256

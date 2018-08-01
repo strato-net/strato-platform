@@ -40,6 +40,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
   <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
   <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
+  <> List.concat (List.map (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract))
   <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
   <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
   <> "\n}"
@@ -128,6 +129,16 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
   <> "\n    }"
+
+unparseEvent :: (Text, Event) -> String
+unparseEvent (name, Event{..}) = Text.unpack $
+     "event "
+  <> name
+  <> "(\n    "
+  <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
+  <> ")"
+  <> (if eventAnonymous then "anonymous" else "")
+  <> ";"
 
 unparseTypes :: (Text, Xabi.Def) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) =

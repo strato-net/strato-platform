@@ -17,3 +17,4 @@ cabal.sandbox.config
 *~
 .stack-work/
 Setup.hs
+strato-adit.cabal

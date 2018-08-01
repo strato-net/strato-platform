@@ -1,6 +1,6 @@
-
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA (
-  ExtendedSignature(..),
+  module Blockchain.ExtendedECDSA.Model.ExtendedSignature,
   extSignMsg,
   getPubKeyFromSignature
   ) where
@@ -9,6 +9,9 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
+
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
 
 import           Network.Haskoin.Constants
 import           Network.Haskoin.Crypto
@@ -43,8 +46,6 @@ genKeyPair = do
     return (d,q)
 
 -----------------------
-
-data ExtendedSignature = ExtendedSignature Signature Bool deriving (Show, Eq)
 
 unsafeExtSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe ExtendedSignature
 unsafeExtSignMsg _ 0 _ = Nothing
@@ -95,4 +96,3 @@ getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash = do
   p <- recoverPoint r yIsOdd
   w <- if r == 0 then Nothing else Just $ recip r
   return $ makePubKey $ shamirsTrick (s * w) p (-h * w) curveG
-

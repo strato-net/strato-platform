@@ -15,6 +15,7 @@ import           Database.Persist.Postgresql
 import           Numeric
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA
@@ -49,10 +50,11 @@ blockQueryParams = [ "txaddress",
                      "number",
                      "minnumber",
                      "maxnumber",
-                     "index" ]
+                     "index",
+                     "chainid"]
 
 -- todo: eliminate the Entity Block from this function
-getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction), expr (Entity Block))-> (Text, Text) -> expr (E.Value Bool)
+getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
 
 getBlkFilter  _                               ("page", _)    = E.val True
 getBlkFilter  _                               ("index", _)    = E.val True
@@ -60,37 +62,35 @@ getBlkFilter  _                               ("raw", _)    = E.val True
 getBlkFilter  _                               ("next", _)    = E.val True
 getBlkFilter  _                               ("prev", _)    = E.val True
 getBlkFilter  _                               ("appname", _) = E.val True
-getBlkFilter (bdRef, _, _, _)                 ("ntx", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("ntx", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("number", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("minnumber", v)    = bdRef E.^. BlockDataRefNumber E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxnumber", v)    = bdRef E.^. BlockDataRefNumber E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("number", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("minnumber", v)    = bdRef E.^. BlockDataRefNumber E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxnumber", v)    = bdRef E.^. BlockDataRefNumber E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v)
 
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("time", v)      = bdRef E.^. BlockDataRefTimestamp E.==. E.val (stringToDate v)
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("mintime", v)   = bdRef E.^. BlockDataRefTimestamp E.>=. E.val (stringToDate v)
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("maxtime", v)   = bdRef E.^. BlockDataRefTimestamp E.<=. E.val (stringToDate v)
 
-getBlkFilter (_, _, rawTX, _) ("txaddress", v) = (rawTX E.^. RawTransactionFromAddress E.==. E.val (toAddr v))
+getBlkFilter (_, _, rawTX) ("txaddress", v) = (rawTX E.^. RawTransactionFromAddress E.==. E.val (toAddr v))
                                                  E.||. (rawTX E.^. RawTransactionToAddress E.==. E.val (Just (toAddr v)))
 
-getBlkFilter (bdRef, _, _, blk) ("coinbase", v)  = bdRef E.^. BlockDataRefCoinbase E.==. E.val (toAddr v)
-                                                              E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-getBlkFilter (_, accStateRef, _, _) ("address", v)   = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-getBlkFilter (bdRef, _, _, blk) ("blockid", v)   = bdRef E.^. BlockDataRefBlockId E.==. E.val (toBlockId v)
-                                                              E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-getBlkFilter (bdRef, _, _, blk) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
+getBlkFilter (bdRef, _, _) ("coinbase", v)  = bdRef E.^. BlockDataRefCoinbase E.==. E.val (toAddr v)
+getBlkFilter (_, accStateRef, _) ("address", v)   = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+getBlkFilter (bdRef, _, _) ("blockid", v)   = bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)
+getBlkFilter (bdRef, _, _) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) )
 
 
 getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
@@ -108,7 +108,8 @@ accountQueryParams = [ "address",
                        "maxnumber",
                        "code",
                        "index",
-                       "codeHash"]
+                       "codeHash",
+                       "chainid"]
 
 
 getAccFilter :: (E.Esqueleto query expr backend) => (expr (Entity AddressStateRef))-> (Text, Text) -> expr (E.Value Bool)
@@ -131,6 +132,7 @@ getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefA
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
+getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
 
 getAccFilter _             _                 = P.undefined ("no match in getAccFilter"::String)
 
@@ -150,7 +152,8 @@ transactionQueryParams = [ "address",
                            "maxvalue",
                            "blocknumber",
                            "index",
-                           "rejected"]
+                           "rejected",
+                           "chainid"]
 
 getTransFilter :: (E.Esqueleto query expr backend) => (expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
 getTransFilter  _          ("rejected", _)     = E.val True
@@ -182,6 +185,7 @@ getTransFilter (rawTx)     ("minvalue", v)     = rawTx E.^. RawTransactionValue 
 getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue E.<=. E.val (toInteger' v)
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
+getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val (fromHexText v)))
 getTransFilter _           _                   = P.undefined ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
@@ -209,6 +213,9 @@ getStorageFilter (storage,_) ("addressid", v)
   = storage E.^. StorageAddressStateRefId E.==. E.val (toAddrId v)
 getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
   = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+getStorageFilter (_,addrStRef) ("chainid", v)
+  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
+
 getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
@@ -220,8 +227,8 @@ getLogFilter _           _  = P.undefined ("no match in getLogFilter"::String)
 toAddrId :: Text -> Key AddressStateRef
 toAddrId = toId
 
-toBlockId :: Text -> Key Block
-toBlockId = toId
+toBlockDataRefId :: Text -> Key BlockDataRef
+toBlockDataRefId = toId
 
 toId :: ToBackendKey SqlBackend record => Text -> Key record
 toId v = toSqlKey (fromIntegral $ (toInteger' v) )
@@ -292,11 +299,11 @@ getBlockNum :: Block -> Integer
 getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num
 
 getTxNum :: RawTransaction -> Int
-getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ bn _ _) = bn
+getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ _ bn _ _) = bn
 
 -- probably need to pad here
 getAccNum :: AddressStateRef -> String
-getAccNum (AddressStateRef (Address x) _ _ _ _ _ _ _ _) = (showHex x "")
+getAccNum (AddressStateRef (Address x) _ _ _ _ _ _ _ _ _) = (showHex x "")
 
 if' :: Bool -> a -> b -> Either a b
 if' x a b = if x == True then Left a else Right b

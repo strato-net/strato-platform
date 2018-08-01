@@ -28,7 +28,7 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Cirrus.Client
+--import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
@@ -77,12 +77,13 @@ translateStorageMap storage' =
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
+                  -> Maybe ChainId
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId mName mCount mOffset mLength = do
+getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -142,8 +143,8 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                           , qsChainId = chainId
                            }
-
 
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
@@ -226,9 +227,9 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right blockappsjsXabi ->
-            void . blocCirrusFireForget $ postContract details{contractdetailsXabi=blockappsjsXabi}
-        return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+          Right _ ->
+            return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+        --return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

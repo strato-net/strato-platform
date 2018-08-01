@@ -24,8 +24,8 @@ import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
-waitNewBlock :: ClientM ()
-waitNewBlock = do
+waitNewBlock :: Maybe ChainId -> ClientM ()
+waitNewBlock chainId = do
   blockNum <- lastBlockNum
   liftIO $ print blockNum
   untilM_
@@ -40,13 +40,13 @@ waitNewBlock = do
       = blockdataNumber
       . blockBlockData
       . withoutNext
-      . head <$> getBlocksLast 0
+      . head <$> getBlocksLast 0 chainId
 
-maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
-maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
+maybeTxResult :: Maybe ChainId -> Keccak256 -> Bloc (Maybe TransactionResult)
+maybeTxResult chainId hash = listToMaybe <$> blocStrato (getTxResult hash chainId)
 
-maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
-maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
+maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
+maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))
   where maybeHeads btxr =
           let list = map (flip Map.lookup $ unBatchTransactionResult btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
@@ -54,16 +54,16 @@ maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes
             Just trs -> listToMaybe trs
 
 
-maybeTx :: Keccak256 -> Bloc (Maybe Transaction)
-maybeTx hash = do
-  mtx <- blocStrato $ listToMaybe <$> getTxsFilter txsFilterParams{qtHash = Just hash}
+maybeTx :: Maybe ChainId -> Keccak256 -> Bloc (Maybe Transaction)
+maybeTx chainId hash = do
+  mtx <- blocStrato $ listToMaybe <$> getTxsFilter txsFilterParams{qtHash = Just hash, qtChainId = chainId}
   case mtx of
     Just tx -> return $ Just $ withoutNext tx
     Nothing -> return Nothing
 
-getBlocTxStatus :: Keccak256 -> Bloc (BlocTransactionStatus, Maybe TransactionResult)
-getBlocTxStatus hash = do
-  mtxr <- maybeTxResult hash
+getBlocTxStatus :: Maybe ChainId -> Keccak256 -> Bloc (BlocTransactionStatus, Maybe TransactionResult)
+getBlocTxStatus chainId hash = do
+  mtxr <- maybeTxResult chainId hash
   case mtxr of
     Nothing -> return (Pending,mtxr)
     Just txr -> do
@@ -71,9 +71,9 @@ getBlocTxStatus hash = do
         "Success!" -> return (Success,mtxr)
         _          -> return (Failure,mtxr)
 
-getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
-getBatchBlocTxStatus hashes = do
-  mtxrs <- maybeTxBatchResult hashes
+getBatchBlocTxStatus :: Maybe ChainId -> [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
+getBatchBlocTxStatus chainId hashes = do
+  mtxrs <- maybeTxBatchResult chainId hashes
   forM mtxrs $ \mtxr ->
     case mtxr of
       Nothing -> return (Pending, mtxr)

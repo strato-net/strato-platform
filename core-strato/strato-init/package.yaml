@@ -1,0 +1,96 @@
+name: strato-init
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+license-file: LICENSE
+maintainer: jamshidnh@gmail.com
+synopsis: A tool to setup the DBs for a Strato instance
+category: Data Structures
+license: Apache-2.0
+description: A tool to setup the DBs for a Strato instance
+github: blockapps/strato-platform/core-strato/strato-init
+
+ghc-options: -Wall -O2 -threaded
+
+dependencies:
+  - base >= 4 && < 5
+  - aeson
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-haskoin
+  - blockapps-milena
+  - blockapps-util
+  - bytestring
+  - containers
+  - cryptohash
+  - cryptonite
+  - crypto-api
+  - csv
+  - directory
+  - entropy
+  - ethereum-discovery
+  - ethereum-rlp
+  - file-embed
+  - filepath
+  - hedis
+  - hflags
+  - json-stream
+  - leveldb-haskell
+  - memory
+  - merkle-patricia-db
+  - monad-logger
+  - persistent-postgresql
+  - resourcet
+  - scientific
+  - split
+  - strato-conf
+  - strato-genesis
+  - strato-index
+  - strato-model
+  - strato-redis-blockdb
+  - strato-sequencer
+  - strato-statediff
+  - text
+  - time
+  - transformers
+  - unordered-containers
+  - utf8-string
+  - vector
+  - yaml
+
+library:
+  source-dirs: src/
+
+executables:
+  strato-setup:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - strato-init
+
+  strato-backup:
+    source-dirs: exec_src/
+    main: Backup.hs
+    dependencies:
+      - monad-control
+
+  strato-block-backup:
+    source-dirs: exec_src/
+    main: BlockBackup.hs
+
+  strato-ez-restore:
+    source-dirs: exec_src
+    main: RestoreTool.hs
+    dependencies:
+      - strato-init
+      - monad-control
+
+tests:
+  strato-init-test:
+    source-dirs: test/
+    main: Main.hs
+    dependencies:
+      - aeson-diff
+      - hspec
+      - strato-init

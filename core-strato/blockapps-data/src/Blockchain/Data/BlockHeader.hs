@@ -14,6 +14,7 @@ import           Numeric
 
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -59,11 +60,11 @@ instance Format BlockHeader where
          "gasUsed: " ++ show gu ++ "\n" ++
          "timestamp: " ++ show ts ++ "\n" ++
          "extraData: " ++ show ed ++ "\n" ++
-         "nonce: " ++ showHex nonce' "")
+         "nonce: " ++ showHex nonce' "" ++ "\n")
 
 instance RLPSerializable BlockHeader where
   rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-    RLPArray [
+    RLPArray $ [
       rlpEncode ph,
       rlpEncode oh,
       rlpEncode b,
@@ -116,6 +117,8 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderExtraData        = extraData
     blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
+
+    blockHeaderModifyExtra f h  = h{extraData = f (extraData h)}
 
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
                                               , parentHash       = blockHeaderParentHash b

@@ -16,7 +16,7 @@ module Network.Haskoin.Crypto.ECDSA
 import System.IO
 
 import Control.DeepSeq (NFData, rnf)
-import Control.Monad (liftM, guard, unless)
+import Control.Monad (liftM, liftM2, guard, unless)
 import Control.Monad.Trans (lift)
 import qualified Control.Monad.State as S
     ( StateT
@@ -35,6 +35,8 @@ import qualified Data.ByteString as BS
     , hGet
     , empty
     )
+
+import Test.QuickCheck (Arbitrary(..))
 
 import Network.Haskoin.Util
 import Network.Haskoin.Constants
@@ -114,6 +116,9 @@ data Signature =
 
 instance NFData Signature where
     rnf (Signature r s) = rnf r `seq` rnf s
+
+instance Arbitrary Signature where
+  arbitrary = liftM2 Signature arbitrary arbitrary
 
 -- Section 4.1.3 http://www.secg.org/download/aid-780/sec1-v2.pdf
 -- | Safely sign a message inside the 'SecretT' monad. The 'SecretT' monad will

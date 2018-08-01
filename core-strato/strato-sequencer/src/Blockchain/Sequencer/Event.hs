@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
@@ -8,11 +9,14 @@ import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
 
 import qualified Blockchain.Data.Address                   as A
+import           Blockchain.Data.Block                     (Block)
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
+import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
@@ -23,17 +27,38 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
-import           Blockchain.Sequencer.DB.SeenTransactionDB
+import qualified Blockchain.Blockstanbul                   as PBFT
+
+import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
-data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
+data IngestEvent = IETx Timestamp IngestTx
+                 | IEBlock IngestBlock
+                 | IEGenesis IngestGenesis
+                 | IEBlockstanbul PBFT.WireMessage
+                 deriving (Eq, Show, GHCG.Generic)
+
+data IngestEventType = IETTransaction
+                     | IETBlock
+                     | IETGenesis
+                     | IETBlockstanbul
+                     deriving (Eq, Ord, Show)
+
+iEventType :: IngestEvent -> IngestEventType
+iEventType = \case
+  IETx _ _    -> IETTransaction
+  IEBlock _   -> IETBlock
+  IEGenesis _ -> IETGenesis
+  IEBlockstanbul _ -> IETBlockstanbul
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
+  format (IEGenesis o) = show o
+  format (IEBlockstanbul o) = format o
 
 type Timestamp = Microtime
 
@@ -47,6 +72,9 @@ data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
                                , ibBlockUncles         :: [DD.BlockData]
                                } deriving (Eq, Read, Show, GHCG.Generic)
 
+data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
+                                   , igGenesisInfo     :: (Word256, ChainInfo)
+                                   } deriving (Eq, Read, Show, GHCG.Generic)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbHash                :: SHA
@@ -65,13 +93,20 @@ data JsonRpcCommand
 
 data OutputEvent = OETx Timestamp OutputTx
                  | OEBlock OutputBlock
+                 | OEGenesis OutputGenesis
                  | OEJsonRpcCommand JsonRpcCommand
-                 deriving (Eq, Read, Show, GHCG.Generic)
+                 | OEGetChain [Word256]
+                 | OEGetTx [SHA]
+                 | OEBlockstanbul PBFT.WireMessage
+                 deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx ts o) = show ts ++ " " ++ format o
-  format (OEBlock o) = format o
-  format x           = show x
+  format (OETx ts o)       = show ts ++ " " ++ format o
+  format (OEBlock o)       = format o
+  format (OEGenesis o)     = show o
+  format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format x                 = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -86,7 +121,14 @@ data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obBlockUncles         :: [DD.BlockData]
                                } deriving (Eq, Read, Show, GHCG.Generic)
 
-blockToIngestBlock :: TO.TXOrigin -> DD.Block -> IngestBlock
+data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
+                                   , ogGenesisInfo     :: (Word256, ChainInfo)
+                                   } deriving (Eq, Read, Show, GHCG.Generic)
+
+ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
+ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
+
+blockToIngestBlock :: TO.TXOrigin -> Block -> IngestBlock
 blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
     IngestBlock{ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
 
@@ -159,7 +201,7 @@ sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
 outputBlockHash :: OutputBlock -> SHA
 outputBlockHash = BDB.blockHeaderHash . obBlockData
 
-outputBlockToBlock :: OutputBlock -> DD.Block
+outputBlockToBlock :: OutputBlock -> Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
@@ -184,6 +226,9 @@ instance Witnessable IngestTx where
 instance Witnessable OutputTx where
     witnessableHash = otHash
 
+instance Witnessable SequencedBlock where
+    witnessableHash = blockHeaderHash . sbBlockData
+
 instance Eq SequencedBlock where
     a == b = sbHash a == sbHash b
 
@@ -192,20 +237,26 @@ instance Ord OutputTx where
 
 instance Binary IngestTx where
 instance Binary IngestBlock where
+instance Binary IngestGenesis where
 instance Binary SequencedBlock where
 instance Binary OutputTx where
 instance Binary OutputBlock where
+instance Binary OutputGenesis where
 
 instance Binary IngestEvent where
     -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
     put (IETx ts t) = putWord8 2 >> put ts >> put t
     put (IEBlock b) = putWord8 1 >> put b
+    put (IEGenesis g) = putWord8 3 >> put g
+    put (IEBlockstanbul m) = putWord8 4 >> put m
     get = do
         tag <- getWord8
         case tag of
             0 -> IETx 0 <$> get -- legacy IETx
             1 -> IEBlock  <$> get
             2 -> IETx <$> get <*> get
+            3 -> IEGenesis <$> get
+            4 -> IEBlockstanbul <$> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where
@@ -234,6 +285,10 @@ instance Binary OutputEvent where
     put (OETx ts t)          = putWord8 3 >> put ts >> put t
     put (OEBlock b)          = putWord8 1 >> put b
     put (OEJsonRpcCommand c) = putWord8 2 >> put c
+    put (OEGenesis g)        = putWord8 4 >> put g
+    put (OEGetChain cid)     = putWord8 5 >> put cid
+    put (OEGetTx tx)         = putWord8 6 >> put tx
+    put (OEBlockstanbul m)   = putWord8 7 >> put m
     get = do
         tag <- getWord8
         case tag of
@@ -241,6 +296,10 @@ instance Binary OutputEvent where
             1 -> OEBlock <$> get
             2 -> OEJsonRpcCommand <$> get
             3 -> OETx <$> get <*> get
+            4 -> OEGenesis <$> get
+            5 -> OEGetChain <$> get
+            6 -> OEGetTx <$> get
+            7 -> OEBlockstanbul <$> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where
@@ -309,6 +368,7 @@ instance TransactionLike OutputTx where
     txGasLimit    = txGasLimit . otBaseTx
     txCode        = txCode . otBaseTx
     txData        = txData . otBaseTx
+    txChainId     = txChainId . otBaseTx
 
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t
@@ -317,8 +377,8 @@ instance TransactionLike OutputTx where
                          }
 
 instance RLPSerializable OutputBlock where
-    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> DD.Block)
-    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> DD.Block)
+    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> Block)
+    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> Block)
 
 instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockHeader       = obBlockData

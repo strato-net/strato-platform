@@ -1,0 +1,118 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+module Blockchain.Blockstanbul.Authentication
+  ( module Blockchain.Blockstanbul.Authentication
+  , module Blockchain.Blockstanbul.Model.Authentication
+  ) where
+
+import Control.Monad (liftM2, liftM3)
+import Control.Monad.IO.Class
+import Control.Lens
+import qualified Data.ByteString as B
+import Data.List (sort)
+import MonadUtils (liftIO1)
+import Test.QuickCheck
+
+import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Model.Authentication
+import Blockchain.Data.Address
+import Blockchain.Data.Block
+import Blockchain.Data.BlockDB()
+import Blockchain.Data.ArbitraryInstances()
+import Blockchain.Data.DataDefs
+import Blockchain.Data.RLP
+import Blockchain.ExtendedECDSA
+import Blockchain.FastECRecover
+import Blockchain.SHA
+import Blockchain.Strato.Model.ExtendedWord
+import qualified Network.Haskoin.Crypto as HK
+
+instance Arbitrary IstanbulExtra where
+  arbitrary = liftM3 IstanbulExtra arbitrary arbitrary arbitrary
+
+instance Arbitrary ExtraData where
+  arbitrary = liftM2 ExtraData arbitrary arbitrary
+
+
+truncateExtra :: Block -> Block
+truncateExtra = over extraLens $ B.take 32
+
+addValidators :: [Address] -> Block -> Block
+addValidators vs = over extraLens $
+    uncookRawExtra
+  . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
+  . cookRawExtra
+
+addProposerSeal :: ExtendedSignature -> Block -> Block
+addProposerSeal sig = over extraLens $
+    uncookRawExtra
+  . set (istanbul . _Just . proposedSig) (Just sig)
+  . cookRawExtra
+
+addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
+addCommitmentSeals sigs = over extraLens $
+    uncookRawExtra
+  . set (istanbul . _Just . commitment) sigs
+  . cookRawExtra
+
+scrubAllSeals :: RawExtraData -> RawExtraData
+scrubAllSeals = uncookRawExtra
+              . set (istanbul . _Just . proposedSig) Nothing
+              . set (istanbul . _Just . commitment) []
+              . cookRawExtra
+
+
+proposalMessage :: Block -> HK.Word256
+-- TODO(tim): Clear everything out of extraData except vanity and validators
+proposalMessage = unSHA
+                . hash
+                . rlpSerialize
+                . rlpEncode
+                . over extraDataLens scrubAllSeals
+                . blockBlockData
+
+proposerSeal :: (MonadIO m) => Block -> HK.PrvKey -> m ExtendedSignature
+proposerSeal blk pk =
+  let msg = proposalMessage blk
+  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+
+
+verifyProposerSeal :: Block -> ExtendedSignature -> Maybe Address
+verifyProposerSeal blk sig =
+  let msg = proposalMessage blk
+  in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
+
+commitmentMessage :: SHA -> HK.Word256
+commitmentMessage (SHA dig) = unSHA . hash . B.pack . (++[2]) . word256ToBytes $ dig
+
+commitmentSeal :: (MonadIO m) => SHA -> HK.PrvKey -> m ExtendedSignature
+commitmentSeal sha pk =
+  let msg = commitmentMessage sha
+  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+
+verifyCommitmentSeal :: SHA -> ExtendedSignature -> Maybe Address
+verifyCommitmentSeal sha sig =
+  let msg = commitmentMessage sha
+  in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
+
+finalHash :: Block -> SHA
+finalHash = hash
+          . rlpSerialize
+          . rlpEncode
+          . over extraDataLens scrubCommitmentSeals
+          . blockBlockData
+
+signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
+signMessage pk tm = do
+  let msg = getHash tm
+      addr = prvKey2Address pk
+  sig <- HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+  return . OMsg (MsgAuth addr sig) $ tm
+
+authenticate :: InEvent -> Bool
+authenticate (IMsg (MsgAuth addr sig) tm) =
+  let msgHash = getHash tm
+      mKey = getPubKeyFromSignature sig msgHash
+      mAddress = pubKey2Address <$> mKey
+  in mAddress == Just addr
+authenticate _ = True -- Non-messages are trusted implicitly

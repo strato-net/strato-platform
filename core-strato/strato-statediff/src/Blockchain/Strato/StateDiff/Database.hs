@@ -33,23 +33,23 @@ import           Blockchain.Strato.StateDiff
 type SqlDbM m = SQL.SqlPersistT m
 
 sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m, MonadBaseControl IO m)=>
-           Integer -> SHA -> StateRoot -> StateRoot -> m ()
-sqlDiff blockNumber blockHash oldRoot newRoot = do
-  stateDiffs <- stateDiff blockNumber blockHash oldRoot newRoot
+           Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
+sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
+  stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs (const "") (const "")
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
                   StateDiff -> (SHA -> String) -> (SHA -> String) -> m ()
-commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
+commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    createAccount blockNumber codeSource codeContractName $ Map.toList createdAccounts
-    sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
-    sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
+    createAccount chainId blockNumber codeSource codeContractName $ Map.toList createdAccounts
+    sequence_ $ Map.mapWithKey (const . deleteAccount chainId) deletedAccounts
+    sequence_ $ Map.mapWithKey (updateAccount chainId blockNumber) updatedAccounts
 
 createAccount :: MonadIO m =>
-                 Integer -> (SHA -> String) -> (SHA -> String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
-createAccount blockNumber codeSource codeContractName addressDiffs = do
+                 Maybe Word256 -> Integer -> (SHA -> String) -> (SHA -> String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+createAccount chainId blockNumber codeSource codeContractName addressDiffs = do
   newAccounts <- forM addressDiffs $ \addressDiff -> do
     let (address, diff) = addressDiff
         src = codeSource $ codeHash diff
@@ -73,7 +73,8 @@ createAccount blockNumber codeSource codeContractName addressDiffs = do
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefSource = source,
-      addressStateRefContractName = name
+      addressStateRefContractName = name,
+      addressStateRefChainId = chainId
       }
     theError :: Address -> String -> a
     theError address name = error $
@@ -87,16 +88,16 @@ getField def field =
     Nothing        -> def
 
 deleteAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Address -> SQL.SqlPersistT m ()
-deleteAccount address = do
-  addrID <- getAddressStateSQL address "delete"
+                 Maybe Word256 -> Address -> SQL.SqlPersistT m ()
+deleteAccount chainId address = do
+  addrID <- getAddressStateSQL chainId address "delete"
   SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
   SQL.delete addrID
 
 updateAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
-updateAccount blockNumber address diff = do
-  addrID <- getAddressStateSQL address "update"
+                 Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
+updateAccount chainId blockNumber address diff = do
+  addrID <- getAddressStateSQL chainId address "update"
   SQL.update addrID $
     setField nonce AddressStateRefNonce $
     setField balance AddressStateRefBalance $
@@ -110,13 +111,15 @@ updateAccount blockNumber address diff = do
     takeIncremental Update{newValue} = newValue
 
 updateSource :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m) =>
-                Address -> String -> String -> m ()
-updateSource address name source = do
+                Maybe Word256 -> Address -> String -> String -> m ()
+updateSource chainId address name source = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    addrID <- getAddressStateSQL address "update"
-    SQL.update addrID [AddressStateRefSource =. source,
-                       AddressStateRefContractName =. name]
+    addrID <- getAddressStateSQL chainId address "update"
+    SQL.update addrID [ AddressStateRefSource =. source
+                      , AddressStateRefContractName =. name
+                      , AddressStateRefChainId =. chainId
+                      ]
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
@@ -133,14 +136,15 @@ commitStorage addrID key Update{newValue} = do
   SQL.update storageID [ StorageValue =. newValue ]
 
 getAddressStateSQL :: (HasStateDB m, HasHashDB m, MonadResource m)
-                   => Address
+                   => Maybe Word256
+                   -> Address
                    -> String
                    -> SqlDbM m (SQL.Key AddressStateRef)
-getAddressStateSQL addr' s = do
+getAddressStateSQL chainId addr' s = do
   addrIDs <- SQL.selectKeysList
-              [ AddressStateRefAddress SQL.==. addr' ] [ LimitTo 1 ]
+              [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. chainId ] [ LimitTo 1 ]
   if null addrIDs
-    then error $ s ++ ": Address not found in SQL db: " ++ formatAddressWithoutColor addr'
+    then error $ s ++ ": Address not found in SQL db: " ++ formatAddressWithoutColor addr' ++ " with chain Id " ++ show chainId
     else return $ head addrIDs
 
 getStorageKeySQL :: (HasStateDB m, HasHashDB m, MonadResource m)

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -10,18 +11,30 @@ module Blockchain.Data.AddressStateDB (
 
 import qualified Blockchain.Colors                  as CL
 
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
+import           Data.Maybe                         (maybeToList)
 
+import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
+data AddressState =
+  AddressState{
+    addressStateNonce::Integer,
+    addressStateBalance::Integer,
+    addressStateContractRoot::MP.StateRoot,
+    addressStateCodeHash::SHA,
+    addressStateChainId::Maybe Word256
+    } deriving (Eq, Generic, Read, Show)
+
+
 blankAddressState:: AddressState
-blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" }
+blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" , addressStateChainId = Nothing}
 
 
 instance Format AddressState where
@@ -30,23 +43,33 @@ instance Format AddressState where
     tab("\nnonce: " ++ showHex (addressStateNonce a) "" ++
         "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
         "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
-        "\ncodeHash: " ++ format (addressStateCodeHash a))
+        "\ncodeHash: " ++ format (addressStateCodeHash a) ++
+        "\nchainId: " ++ (show $ fmap (flip showHex "") (addressStateChainId a)))
 
 instance RLPSerializable AddressState where
   rlpEncode a | addressStateBalance a < 0 = error $ "Error in cal to rlpEncode for AddressState: AddressState has negative balance: " ++ format a
-  rlpEncode a = RLPArray [
+  rlpEncode a = RLPArray $ [
     rlpEncode $ toInteger $ addressStateNonce a,
     rlpEncode $ toInteger $ addressStateBalance a,
     rlpEncode $ addressStateContractRoot a,
     rlpEncode $ addressStateCodeHash a
-                ]
+    ] ++ (maybeToList . fmap rlpEncode $ addressStateChainId a)
 
+  rlpDecode (RLPArray [n, b, cr, ch, cid]) =
+    AddressState {
+      addressStateNonce=fromInteger $ rlpDecode n,
+      addressStateBalance=fromInteger $ rlpDecode b,
+      addressStateContractRoot=rlpDecode cr,
+      addressStateCodeHash=rlpDecode ch,
+      addressStateChainId = Just $ rlpDecode cid
+      }
   rlpDecode (RLPArray [n, b, cr, ch]) =
     AddressState {
       addressStateNonce=fromInteger $ rlpDecode n,
       addressStateBalance=fromInteger $ rlpDecode b,
       addressStateContractRoot=rlpDecode cr,
-      addressStateCodeHash=rlpDecode ch
+      addressStateCodeHash=rlpDecode ch,
+      addressStateChainId = Nothing
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
