@@ -92,7 +92,7 @@ instance ToJSON ChainInfo where
            ]
 
 instance KnownSymbol "address" where
-instance KnownSymbol "enodeURL" where
+instance KnownSymbol "enode" where
 
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
