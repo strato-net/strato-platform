@@ -29,9 +29,9 @@ export function createChainApiCall(label, members, balances, src, args){
       body: JSON.stringify({
         "src": src,
         "label": label,
-        "balances": balances,
-        "args": args,
-        "members": members
+        "balances": [balances],
+        "args": [],
+        "members": [members]
       })
     }
   )
@@ -46,6 +46,7 @@ export function createChainApiCall(label, members, balances, src, args){
 export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
+    console.log(response);
     yield put(createChainSuccess(response));
     yield put(fetchChains(false));
   }

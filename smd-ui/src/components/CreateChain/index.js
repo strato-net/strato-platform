@@ -16,7 +16,13 @@ class CreateChain extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('create_chain_submit_click');
-    this.props.createChain(values.label, values.members, values.balances, values.src, values.args);
+    let members = {};
+    members["address"] = values.memAddress;
+    members["enode"] = values.memEnode;
+    let balances = {};
+    balances["address"] = values.address;
+    balances["balance"] = values.balance;
+    this.props.createChain(values.label, members, balances, values.src, values.args);
   }
 
   render() {
@@ -65,12 +71,22 @@ class CreateChain extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="addRule"
+                      name="memAddress"
                       component="input"
                       type="text"
-                      placeholder="Add Rule"
+                      placeholder="Address"
                       className="pt-input form-width"
                       tabIndex="2"
+                      required
+                    />
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
+                    <Field
+                      name="memEnode"
+                      component="input"
+                      type="text"
+                      placeholder="Enode"
+                      className="pt-input form-width"
+                      tabIndex="3"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
@@ -79,16 +95,26 @@ class CreateChain extends Component {
 
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-c">
-                    Balances
+                    Account Balances
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="removeRule"
+                      name="address"
                       component="input"
                       type="text"
-                      placeholder="Remove Rule"
+                      placeholder="Address"
                       className="pt-input form-width"
-                      tabIndex="3"
+                      tabIndex="4"
+                      required
+                    />
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.balances}</div>
+                    <Field
+                      name="balance"
+                      component="input"
+                      type="text"
+                      placeholder="Balance"
+                      className="pt-input form-width"
+                      tabIndex="5"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.balances}</div>
@@ -101,12 +127,12 @@ class CreateChain extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="members"
+                      name="src"
                       component="input"
                       type="text"
-                      placeholder="Members"
+                      placeholder="Governance Contract"
                       className="pt-input form-width"
-                      tabIndex="4"
+                      tabIndex="6"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.src}</div>
@@ -119,12 +145,12 @@ class CreateChain extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="acctBalance"
+                      name="args"
                       component="input"
                       type="text"
-                      placeholder="Account Balance"
+                      placeholder="Variables"
                       className="pt-input form-width"
-                      tabIndex="5"
+                      tabIndex="7"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.args}</div>

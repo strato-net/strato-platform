@@ -75,7 +75,6 @@ export function mapStateToProps(state, ownProps) {
   const label = ownProps.label;
   const id = ownProps.id;
   const chains = state.chains.chains;
-  console.log(chains);
   return {
     chain: Object.getOwnPropertyNames(chains).indexOf(label) >= 0 ? state.chains.chains[label][id] : {},
   };
