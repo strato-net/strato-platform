@@ -97,9 +97,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$azureAD" = true ]; then
     mv /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
-    # fetch libraries from repo:
-    opm get zmartzone/lua-resty-openidc
-    opm get SkyLothar/lua-resty-jwt
   fi
 
   if [ "$ssl" = true ] ; then

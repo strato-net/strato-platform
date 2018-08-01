@@ -17,6 +17,12 @@ local opts = {
 -- call opendic for microsoft azure
 local res, err = require("resty.openidc").authenticate(opts)
 
+-- set request header to forward to APIs
+ngx.req.set_header("x-user", res.id_token.sub)
+
+-- set response header (if needed)
+-- ngx.header['MY-HEADER'] = "something"
+
 -- error handling needs to be polished
 if err then
   ngx.status = 500
