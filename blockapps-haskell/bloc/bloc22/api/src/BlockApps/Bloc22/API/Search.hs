@@ -23,4 +23,4 @@ import           BlockApps.Solidity.Xabi
 -- GET /search/:contractName
 type GetSearchContract = "search"
   :> Capture "contractName" ContractName
-  :> Get '[JSON] [MaybeNamed Address]
+  :> Get '[JSON] [(MaybeNamed Address, Maybe ChainId)]

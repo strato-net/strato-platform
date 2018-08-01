@@ -59,7 +59,7 @@ getContractsData :: ContractName -> ClientM [MaybeNamed Address]
 getContractsData = client (Proxy @ GetContractsData)
 
 getContractsContract
-  :: ContractName -> MaybeNamed Address -> ClientM ContractDetails
+  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM ContractDetails
 getContractsContract = client (Proxy @ GetContractsContract)
 
 getContractsState
@@ -74,26 +74,27 @@ getContractsState
 getContractsState = client (Proxy @ GetContractsState)
 
 getContractsDetails
-  :: Address -> ClientM ContractDetails
+  :: Address -> Maybe ChainId -> ClientM ContractDetails
 getContractsDetails = client (Proxy @ GetContractsDetails)
 
 getContractsFunctions
-  :: ContractName -> MaybeNamed Address -> ClientM [FunctionName]
+  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [FunctionName]
 getContractsFunctions = client (Proxy @ GetContractsFunctions)
 
 getContractsSymbols
-  :: ContractName -> MaybeNamed Address -> ClientM [SymbolName]
+  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [SymbolName]
 getContractsSymbols = client (Proxy @ GetContractsSymbols)
 
---getContractsEnum
---  :: ContractName -> MaybeNamed Address -> EnumName -> ClientM [EnumValue]
---getContractsEnum = client (Proxy @ GetContractsEnum)
+-- getContractsEnum
+--   :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> ClientM [EnumValue]
+-- getContractsEnum = client (Proxy @ GetContractsEnum)
 
 getContractsStateMapping
   :: ContractName
   -> MaybeNamed Address
   -> SymbolName
   -> Text
+  -> Maybe ChainId
   -> ClientM (Map Text (Map Text SolidityValue))
 getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
 
@@ -106,7 +107,7 @@ postContractsCompile = client (Proxy @ PostContractsCompile)
 postContractsXabi :: PostXabiRequest -> ClientM PostXabiResponse
 postContractsXabi = client (Proxy @ PostContractsXabi)
 
-getSearchContract :: ContractName -> ClientM [MaybeNamed Address]
+getSearchContract :: ContractName -> ClientM [(MaybeNamed Address, Maybe ChainId)]
 getSearchContract = client (Proxy @ GetSearchContract)
 
 getUsers :: ClientM [UserName]
