@@ -14,13 +14,12 @@ editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
                          bdata = (blockBlockData ppl) {blockDataCoinbase = bnf,
                                                        blockDataNonce = noncw
                                                      }
-                    
 
 extractBeneficiary :: Block -> Maybe(Address,Bool)
-extractBeneficiary ppl = case (BH.nonce $ BH.blockToBlockHeader ppl) of
-  0xffffffffffffffff -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl), True)
-  0x0000000000000000 -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl),False)
-  _ -> Nothing
+extractBeneficiary ppl = case (((BH.beneficiary $ BH.blockToBlockHeader ppl )> 0),(BH.nonce $ BH.blockToBlockHeader ppl)) of
+  (True, 0xffffffffffffffff) -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl), True)
+  (True, 0x0000000000000000) -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl),False)
+  (_, _) -> Nothing
  
 --output a new list of validater and beneficiary
 updatevalidator :: [Address] -> Map Address (Map Address Bool) -> ([Address],Map Address (Map Address Bool))
