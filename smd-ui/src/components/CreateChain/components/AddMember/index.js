@@ -231,7 +231,7 @@ class AddMember extends Component {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.props.handler(this.state.username, this.state.address, this.state.enode, this.state.balance);
+                    this.props.handler(this.state);
                     mixpanelWrapper.track('add_member_submit_click_successful');
                     this.closeModal();
                   }}                  

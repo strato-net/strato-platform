@@ -33,14 +33,14 @@ class CreateChain extends Component {
     this.props.createChain(values.label, members, balances, values.src, values.args);
   }
 
-  updateMembers(username, address, enode, balance) {
+  updateMembers(state) {
     const curMembers = this.state.members.slice(0);
     this.setState({
       members: curMembers.concat({
-        username: username,
-        address: address,
-        enode: enode,
-        balance: balance
+        username: state.username,
+        address: state.address,
+        enode: state.enode,
+        balance: state.balance
       })
     });
   }
