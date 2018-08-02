@@ -179,16 +179,13 @@ blockstanbulSend msgs = do
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        vmevs = mapMaybe rewriteBlock blocks
+        creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
+        vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
     $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
     mapM_ markForVM vmevs
     $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
     mapM_ markForP2P p2pevs
-
-    when (MakeBlockCommand `elem` resp) $ do
-      $logDebugS "seq/pbft/create" "Delaying a make block command"
-      markForVM OECreateBlockCommand
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
