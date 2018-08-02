@@ -4,11 +4,19 @@ import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-
+import AddMember from './components/AddMember';
 import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 class CreateChain extends Component {
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      members: [],
+    };
+    this.updateMembers = this.updateMembers.bind(this);
+  }
 
   componentDidMount() {
     mixpanelWrapper.track("create_chain_loaded");
@@ -25,6 +33,28 @@ class CreateChain extends Component {
     this.props.createChain(values.label, members, balances, values.src, values.args);
   }
 
+  updateMembers(member) {
+    const curMembers = this.state.members.slice(0);
+    this.setState({
+      members: curMembers.concat(member)
+    });
+  }
+
+  showMembers(members) {
+    if (members.length && members.length > 0){
+      const ret = [];
+      members.forEach(function(member, index){
+        ret.push(
+          <div>{member}</div>
+        )
+      })
+      return ret;
+    }
+    else {
+      return (<div> No Members </div>);
+    }
+  }
+
   render() {
     return (
       <div className="smd-pad-16">
@@ -35,7 +65,6 @@ class CreateChain extends Component {
         }} className="pt-intent-primary pt-icon-add"
           id="chains-create-chain-button"
           text="Create Chain" />
-
 
         <Dialog
           iconName="inbox"
@@ -62,62 +91,6 @@ class CreateChain extends Component {
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.label}</div>
-                  </div>
-                </div>
-
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Chain Members
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="memAddress"
-                      component="input"
-                      type="text"
-                      placeholder="Address"
-                      className="pt-input form-width"
-                      tabIndex="2"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
-                    <Field
-                      name="memEnode"
-                      component="input"
-                      type="text"
-                      placeholder="Enode"
-                      className="pt-input form-width"
-                      tabIndex="3"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.members}</div>
-                  </div>
-                </div>
-
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-c">
-                    Account Balances
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="address"
-                      component="input"
-                      type="text"
-                      placeholder="Address"
-                      className="pt-input form-width"
-                      tabIndex="4"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.balances}</div>
-                    <Field
-                      name="balance"
-                      component="input"
-                      type="text"
-                      placeholder="Balance"
-                      className="pt-input form-width"
-                      tabIndex="5"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.balances}</div>
                   </div>
                 </div>
               
@@ -155,6 +128,14 @@ class CreateChain extends Component {
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.args}</div>
                   </div>
+                </div>
+
+                <div className="pt-form-group pt-intent-danger">
+                  <label className="pt-label" htmlFor="input-b">
+                    Chain Members
+                  </label>
+                  {this.showMembers(this.state.members)}
+                  <AddMember handler={this.updateMembers}/>
                 </div>
               </div>
 
