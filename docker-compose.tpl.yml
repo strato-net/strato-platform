@@ -100,10 +100,7 @@ services:
     build: .
     image: ${OAUTH_IMAGE:-<REPO_URL>oauth:<VERSION>}
     restart: always
-  vaultwrapper:
-    environment:
-    - APEX_URL=${APEX_URL}
-    - SMD_MODE=${SMD_MODE}
+  vault-wrapper:
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
@@ -201,7 +198,7 @@ services:
     - strato
     - apex
     - oauth
-    - vaultwrapper
+    - vault-wrapper
     environment:
     - authBasic=${authBasic}
     - azureAD=${azureAD}

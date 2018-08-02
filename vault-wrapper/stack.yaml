@@ -23,8 +23,8 @@ extra-package-dbs: []
 extra-include-dirs: [/usr/local/include]
 extra-lib-dirs: [/usr/local/lib]
 
-# docker:
-#   enable: true
-#   image: "stack-vault-wrapper-buildbase:lts-12.4"
-#   set-user: true
-#   run-args: ["--ulimit=nofile=60000"]
+docker:
+  enable: true
+  image: "stack-vault-wrapper-buildbase:lts-12.4"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]
