@@ -4,12 +4,12 @@
 {-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..),
     AccountInfo (..),
     CodeInfo (..),
-    accountInfo,
     accountExtractor
   ) where
 
@@ -17,9 +17,9 @@ module Blockchain.Data.ChainInfo
 import           Control.Applicative               (many)
 
 import           Blockchain.ExtWord
-import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
+import           Blockchain.MiscJSON()
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
@@ -27,13 +27,12 @@ import           Blockchain.TypeLits
 import           Data.Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.JsonStream.Parser               as JS
-import qualified Data.Map                             as M
+import qualified Data.Map                             as M      hiding (map, filter)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
+import qualified Data.Vector                          as V
 
 import qualified GHC.Generics                         as GHCG
-
-import           Test.QuickCheck.Arbitrary
 
 
 data CodeInfo = CodeInfo
@@ -43,12 +42,20 @@ data CodeInfo = CodeInfo
   } deriving (Show, Read, Eq, GHCG.Generic)
 
 instance FromJSON CodeInfo where
+  parseJSON (Array arr') = do 
+    let [a',b',c'] = V.toList arr'
+    a <- parseJSON a'
+    b <- parseJSON b'
+    c <- parseJSON c'
+    return (CodeInfo a b c)
+  
   parseJSON (Object o) =
     CodeInfo
     <$> o .: "code"
     <*> o .: "src"
     <*> o .: "name"
-  parseJSON _ = error "parseJSON CodeInfo: expected Object"
+
+  parseJSON x = error $ "tried to parse JSON for " ++ show x ++ " as type CodeInfo"
 
 instance ToJSON CodeInfo where
   toJSON (CodeInfo bs s1 s2) = object
@@ -63,18 +70,27 @@ instance RLPSerializable CodeInfo where
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
 
-instance Arbitrary CodeInfo where
-  arbitrary = CodeInfo 
-      <$> arbitrary
-      <*> arbitrary
-      <*> arbitrary
-
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic)
 
 instance FromJSON AccountInfo where
+  parseJSON (Array arr') = do 
+    let (a':i':xs) = V.toList arr'
+    a <- parseJSON a'
+    i <- parseJSON i'
+    case xs of 
+      [] -> return $ NonContract a i
+      (c':s') -> do 
+        c <- parseJSON c'
+        case s' of
+          [] -> return $ ContractNoStorage a i c
+          [x] -> do 
+            s <- parseJSON x
+            return $ ContractWithStorage a i c s
+          _ -> error "parseJSON for AccountInfo as an Array failed"
+  
   parseJSON (Object o) = do
     a <- (o .: "address")
     b <- (o .: "balance")
@@ -87,8 +103,10 @@ instance FromJSON AccountInfo where
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
             return $ ContractWithStorage a b c s
-  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
 
+  parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
+
+  
 instance ToJSON AccountInfo where
   toJSON (NonContract a b) = object
     [ "address" .= a
@@ -111,29 +129,18 @@ instance RLPSerializable AccountInfo where
   rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
   rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ rlpEncode <$> d]
 
-  rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
-  rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)
+  rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
   rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
 
-instance Arbitrary AccountInfo where
-  arbitrary = NonContract
-      <$> arbitrary
-      <*> arbitrary
 
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
-    acctInfo        :: [AccountInfo],
+    accountInfo     :: [AccountInfo],
     codeInfo        :: [CodeInfo],
     members         :: M.Map Address Enode
 } deriving (Eq, Show, Read, GHCG.Generic)
-
-instance Arbitrary ChainInfo where
-  arbitrary = ChainInfo
-          <$> arbitrary
-          <*> arbitrary
-          <*> arbitrary
-          <*> arbitrary
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
@@ -152,10 +159,13 @@ instance ToJSON ChainInfo where
            , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            ]
 
+instance KnownSymbol "address" where
+instance KnownSymbol "enode" where
+
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
     [ rlpEncode . encodeUtf8 . T.pack $ chainLabel ci
-    , RLPArray . map rlpEncode $ acctInfo ci
+    , RLPArray . map rlpEncode $ accountInfo ci
     , RLPArray . map rlpEncode $ codeInfo ci
     , rlpEncode $ members ci
     ]
@@ -169,7 +179,7 @@ instance RLPSerializable ChainInfo where
 
 
 accountExtractor :: JS.Parser [AccountInfo]
-accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)
+accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 
-accountInfo :: JS.Parser AccountInfo
-accountInfo = JS.value
+acctInfo :: JS.Parser AccountInfo
+acctInfo = JS.value
