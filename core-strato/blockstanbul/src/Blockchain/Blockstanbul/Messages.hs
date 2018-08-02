@@ -75,6 +75,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
+              | MakeBlockCommand
               deriving (Eq, Show)
 
 getHash :: TrustedMessage -> Word256
