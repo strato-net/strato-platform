@@ -56,7 +56,7 @@ function newnode {
 
 
   echo "Starting ethereum-vm"
-  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
+  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel +RTS -N1 >> logs/ethereum-vm 2>&1
@@ -183,6 +183,7 @@ setEnv redisBDBNumber 0
 
 setEnv genesis gettingStarted
 setEnv miningAlgorithm Instant
+setEnv maxTxsPerBlock 500
 
 setEnv networkID 6
 setEnv genesisBlock ""
