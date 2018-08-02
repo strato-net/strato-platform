@@ -10,9 +10,10 @@ module Strato.Strato23.Client
 
 import           Servant.Client
 import           Data.Proxy
+import           Data.Text
 import           Strato.Strato23.API
 
-postSignature :: ClientM SignatureDetails
+postSignature :: Maybe Text -> ClientM SignatureDetails
 postSignature = client (Proxy @ PostSignature)
 
 getPing :: ClientM String
