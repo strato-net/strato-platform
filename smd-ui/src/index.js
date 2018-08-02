@@ -39,6 +39,7 @@ import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFil
 import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
 import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
 import downloadReducer from './components/ExternalStorage/Download/download.reducer';
+import signDataReducer from './components/Signature/signature.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -68,6 +69,7 @@ import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
+import watchSignData from './components/Signature/signature.saga';  
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -111,7 +113,8 @@ const rootReducer = combineReducers({
   externalStorage: externalStorageReducer,
   attest: attestReducer,
   verify: verifyReducer,
-  download: downloadReducer
+  download: downloadReducer,
+  signedData: signDataReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -140,7 +143,8 @@ const rootSaga = function* startForeman() {
     fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
-    fork(watchFetchUpload)
+    fork(watchFetchUpload),
+    fork(watchSignData),
   ])
 };
 

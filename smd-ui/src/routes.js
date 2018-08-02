@@ -18,6 +18,7 @@ import SideBar from './components/SideBar';
 import AccountDetail from './components/AccountDetail';
 import ExternalStorage from './components/ExternalStorage';
 import { isModePublic } from './lib/checkMode';
+import Signature from './components/Signature';
 
 const CommonRoute = (props) => {
   const CommonRoute = props.route === 'public' ? Route : ProtectedRoute;
@@ -32,6 +33,7 @@ const CommonRoute = (props) => {
     <CommonRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <CommonRoute exact path="/code_editor" component={CodeEditor} />
     <CommonRoute exact path="/launchpad" component={LaunchPad} />
+    <CommonRoute exact path="/signature" component={Signature} />
   </div>)
 };
 
