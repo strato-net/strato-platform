@@ -1,23 +1,18 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds  #-}
-{-# LANGUAGE DeriveGeneric  #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Strato.Strato23.API where
+module Strato.Strato23.API
+  ( StratoAPI
+  , module Strato.Strato23.API.Ping
+  , module Strato.Strato23.API.Signature
+  ) where
 
 import           Servant
-import           GHC.Generics
-import           Data.Aeson.Types
+import           Strato.Strato23.API.Ping
+import           Strato.Strato23.API.Signature
 
-type StratoAPI = "_ping" :> Get '[JSON] String
-  :<|> "strato" :> "v2.3" :> "signature" :> Post '[JSON] SignatureDetails
+type StratoAPI = GetPing
+  :<|> PostSignature
 
-data SignatureDetails = SignatureDetails {
-  r :: String
-  , s :: String
-  , v :: String
-} deriving (Eq, Show, Generic)
-
-instance ToJSON SignatureDetails
-instance FromJSON SignatureDetails

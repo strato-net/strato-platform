@@ -8,11 +8,12 @@ module Strato.Strato23.Client
     getPing
   ) where
 
-import           Servant.API
 import           Servant.Client
 import           Data.Proxy
 import           Strato.Strato23.API
 
 postSignature :: ClientM SignatureDetails
+postSignature = client (Proxy @ PostSignature)
+
 getPing :: ClientM String
-getPing :<|> postSignature = client (Proxy @ StratoAPI)
+getPing = client (Proxy @ GetPing)
