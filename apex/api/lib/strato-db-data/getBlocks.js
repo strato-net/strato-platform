@@ -2,7 +2,6 @@ const { BLOCKS_DIFFICULTY, TRANSACTIONS_COUNT, BLOCKS_PROPAGATION, LAST_BLOCK_NU
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
 const BlockDataRef = require('../../models/strato/eth/blockDataRef');
 const BlockTransaction = require('../../models/strato/eth/blockTransaction');
-const config = require('../../config/app.config');
 const db = require('../../models/strato/eth/connection');
 const moment = require('moment');
 const bigInt = require('big-integer');
@@ -21,7 +20,7 @@ function getBlocks() {
           'difficulty',
           'number',
           'timestamp',
-          'block_id'
+          'id'
         ],
         where: {
           pow_verified: true,
@@ -62,7 +61,7 @@ function getBlocks() {
             y: propagation
           })
 
-          blockIds.push(block.block_id)
+          blockIds.push(block.id)
           
         }
 
@@ -87,22 +86,22 @@ function getBlockTransactionCount(blockIds) {
   return BlockTransaction
     .findAll({
       attributes: [
-        'block_id',
+        'block_data_ref_id',
         [
           db.sequelize.fn('COUNT', db.sequelize.col('transaction')), 'txCount'
         ],
       ],
       where: {
-        block_id: {
+        block_data_ref_id: {
           [db.Sequelize.Op.in]: blockIds
         }
       },
-      group: ['block_id'],
-      order: [['block_id', 'ASC']] 
+      group: ['block_data_ref_id'],
+      order: [['block_data_ref_id', 'ASC']]
     })
     .then((counts) => {
       txCountMap = counts.reduce((map, count)=>{
-        map[count.block_id] = parseInt(count.get('txCount'));
+        map[count.block_data_ref_id] = parseInt(count.get('txCount'));
         return map;
       }, {})
       txCount = blockIds.map((blockId, i)=>{

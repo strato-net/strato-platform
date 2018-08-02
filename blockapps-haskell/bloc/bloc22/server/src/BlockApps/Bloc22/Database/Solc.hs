@@ -5,7 +5,8 @@
 module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
-import           Control.Arrow              (first)
+import           Control.Monad.IO.Class     (MonadIO(..))
+import           Control.Monad.Trans.Except
 import           Data.Aeson hiding (String)
 import Data.Monoid ((<>))
 import qualified Data.List                  as List
@@ -14,9 +15,6 @@ import qualified Data.Map                   as Map
 import           Data.Text
 import qualified Data.Text                  as Text
 import qualified Data.Traversable           as Trv
-import           Control.Monad.IO.Class     (MonadIO(..))
-
-import           Control.Monad.Trans.Either
 import           System.IO.Temp
 import           System.Directory
 import           System.Exit
@@ -31,6 +29,7 @@ import qualified Data.Text.Encoding         as Text
 
 import BlockApps.Bloc22.Monad
 import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Parse.UnParser
 
 
@@ -51,7 +50,7 @@ import BlockApps.Solidity.Parse.UnParser
 compileSolc :: Text -> Bloc Aeson.Value
 compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
     Left (err,_) -> blocError . AnError . Text.pack $ err
@@ -64,7 +63,7 @@ compileSolc mainSrc = do
 compileSolcIO :: Text -> IO (Either String Aeson.Value)
 compileSolcIO mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   return $ case eRes of
     Left (err, ExitFailure 1) -> Left err
     Left (err,_) -> Left err
@@ -74,12 +73,12 @@ compileSolcIO mainSrc = do
 runSolc :: Map String String
         -> Map String String
         -> Map String String
-        -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
+        -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
 runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
     solcCompileOpts = List.concat [
-      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--metadata-disable"]
+      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--evm-version=homestead"]
       ]
     solcLinkOpts = List.concat [solcLinkParam, solcLibsParam]
 
@@ -93,10 +92,10 @@ runSolc optsObj mainSrc importsSrc =
 
 
 execSolc :: [String] -> [String] -> Map String String -> Map String String
-            -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
+            -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
 execSolc compileOpts linkOpts mainSrc importsSrc =
-  doWithEitherT withTempDir $ \dir -> do
-    bimapEitherT (\x -> (x,ExitFailure 0)) id $ makeSrcFiles dir $ Map.union mainSrc importsSrc
+  doWithExceptT withTempDir $ \dir -> do
+    withExceptT (\e -> (e,ExitFailure 0)) $ makeSrcFiles dir $ Map.union mainSrc importsSrc
     compiledFiles <- Trv.sequence $ Map.mapWithKey (const . solcFile compileOpts linkOpts dir) mainSrc
     return $ Map.filter
       (\file -> case file of
@@ -104,34 +103,34 @@ execSolc compileOpts linkOpts mainSrc importsSrc =
           _          -> True)
       compiledFiles
 
-solcFile :: [String] -> [String] -> String -> String -> EitherT (String, ExitCode) IO Aeson.Value
+solcFile :: [String] -> [String] -> String -> String -> ExceptT (String, ExitCode) IO Aeson.Value
 solcFile compileOpts linkOpts dir fileName = do
   solcOutput <- callSolc compileOpts dir fileName
-  solcJSON0 <- hoistEither $ aesonDecodeUtf8 $ Text.pack solcOutput
+  solcJSON0 <- ExceptT . return  . aesonDecodeUtf8 . Text.pack $ solcOutput
   let solcJSON1 = Map.lookup ("contracts" :: String) solcJSON0
 
   let nullOutput n = liftM $ either (maybe (Right n) Left) Right
-  mapEitherT (nullOutput $ Aeson.Null) $ do
+  mapExceptT (nullOutput $ Aeson.Null) $ do
     solcJSON :: Map String (Map String Aeson.Value) <-
       case Aeson.fromJSON <$> solcJSON1 of
-        Just (Aeson.Error err) -> left $ Just (err, ExitFailure 0)
-        Just (Aeson.Success m) -> right m
-        Nothing                -> left Nothing
+        Just (Aeson.Error err) -> throwE $ Just (err, ExitFailure 0)
+        Just (Aeson.Success m) -> return m
+        Nothing                -> throwE Nothing
 
     let linkBin binabi bin tag =
           if (not . List.null $ linkOpts)
           then do
-            linkedBin <- bimapEitherT Just id $ callSolc linkOpts dir bin
+            linkedBin <- withExceptT Just $ callSolc linkOpts dir bin
             return $ Map.insert tag (Aeson.toJSON linkedBin) binabi
           else return binabi
 
     linkJSON <- Trv.forM solcJSON $ \binabi ->
-      bimapEitherT Just id $ mapEitherT (nullOutput Map.empty) $ do
+      withExceptT Just $ mapExceptT (nullOutput Map.empty) $ do
         let lookupTag tag = case Aeson.fromJSON <$> Map.lookup tag binabi of
-              Just (Aeson.Error err)  -> left $ Just (err, ExitFailure 0)
-              Just (Aeson.Success "") -> left Nothing
-              Just (Aeson.Success s)  -> right s
-              Nothing                 -> left Nothing
+              Just (Aeson.Error err)  -> throwE $ Just (err, ExitFailure 0)
+              Just (Aeson.Success "") -> throwE Nothing
+              Just (Aeson.Success s)  -> return s
+              Nothing                 -> throwE Nothing
         bin <- lookupTag "bin"
         binabiL <- linkBin binabi bin "bin"
         binr <- lookupTag "bin-runtime"
@@ -139,34 +138,34 @@ solcFile compileOpts linkOpts dir fileName = do
 
     return $ Aeson.toJSON $ Map.filter (not . Map.null) linkJSON
 
-callSolc :: [String] -> String -> String -> EitherT (String, ExitCode) IO String
+callSolc :: [String] -> String -> String -> ExceptT (String, ExitCode) IO String
 callSolc opts dir fileName =
   let solcCmd = (proc "solc" $ opts ++ [fileName]){ cwd = Just dir }
-  in execWithEitherT $ readCreateProcessWithExitCode solcCmd ""
+  in execWithExceptT $ readCreateProcessWithExitCode solcCmd ""
 
-makeSrcFiles :: String -> Map String String -> EitherT String IO ()
+makeSrcFiles :: String -> Map String String -> ExceptT String IO ()
 makeSrcFiles dir filesSrc = do
   let ensureRelative path =
         if isRelative path
-        then right path
-        else left $ "Refusing to handle absolute file path: " List.++ path
+        then return path
+        else throwE $ "Refusing to handle absolute file path: " List.++ path
   dirs <- mapM ensureRelative $ List.nub $ List.map takeDirectory $ Map.keys filesSrc
   liftIO $ do
     mapM_ (createDirectoryIfMissing True) $ List.map (dir </>) dirs
     Map.foldrWithKey (\k s x -> IO.writeFile (dir </> k) s >> x) (return ()) filesSrc
 
-doWithEitherT :: ((String -> IO (Either c d)) -> IO (Either c e)) -> ((String -> EitherT c IO d) -> EitherT c IO e)
-doWithEitherT runner cmd = do
-  let cmdIO = runEitherT . cmd
+doWithExceptT :: ((String -> IO (Either c d)) -> IO (Either c e)) -> ((String -> ExceptT c IO d) -> ExceptT c IO e)
+doWithExceptT runner cmd = do
+  let cmdIO = runExceptT . cmd
   resultE <- liftIO $ runner cmdIO
-  hoistEither resultE
+  ExceptT . return $ resultE
 
-execWithEitherT :: IO (ExitCode, String, String) -> EitherT (String,ExitCode) IO String
-execWithEitherT op = do
+execWithExceptT :: IO (ExitCode, String, String) -> ExceptT (String,ExitCode) IO String
+execWithExceptT op = do
   (exitCode, stdOut, stdErr) <- liftIO op
   case exitCode of
-    ExitSuccess -> right stdOut
-    _           -> left (stdErr,exitCode)
+    ExitSuccess -> return stdOut
+    _           -> throwE (stdErr,exitCode)
 
 withTempDir :: (String -> IO a) -> IO a
 withTempDir act = withSystemTempDirectory "solc" act
@@ -212,10 +211,12 @@ getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
-  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
+  File units <- parseXabiNoInheritanceMerge "" (unpack src)
   let src' = formatSrc src
-      modifiedContents = List.map (fmap (first (addF src'))) fileContents
-  return . pack . unparse $ modifiedContents
+      addGetSource (NamedXabi name (xabi, ts)) = NamedXabi name (addF src' xabi, ts)
+      addGetSource prag = prag
+      modifiedContents = List.map addGetSource units
+  return . pack . unparse . File $ modifiedContents
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
     formatSrc = replace "\"" "\\\""
@@ -225,10 +226,11 @@ addGetSourceFuncToSource src = do
 -- TODO: Merge with addGetSourceFunc if stable
 addGetNameFuncToSource :: Text -> Either String Text
 addGetNameFuncToSource src = do
-  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
-  let addGetName (name, (xabi, ts)) =
-       (name, (addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts))
-  return . pack . unparse . List.map addGetName $ fileContents
+  File units <- parseXabiNoInheritanceMerge "" (unpack src)
+  let addGetName (NamedXabi name (xabi, ts)) = NamedXabi name (
+          addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts)
+      addGetName prag = prag
+  return . pack . unparse . File . List.map addGetName $ units
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines

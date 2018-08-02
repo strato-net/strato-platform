@@ -1,9 +1,9 @@
 contract Util {
 
-    function __getContractName__() constant returns (string) {
+    function __getContractName__() view returns (string) {
         return "Util";
     }
-    function __getSource__() constant public returns (string) {
+    function __getSource__() view public returns (string) {
         return "/**\n * Util contract\n */\ncontract Util {\n  function stringToBytes32(string memory source) returns (bytes32 result) {\n    assembly {\n    result := mload(add(source, 32))\n        }\n  }\n\n  function b32(string memory source) returns (bytes32) {\n    return stringToBytes32(source);\n  }\n}\n";  
     
     }

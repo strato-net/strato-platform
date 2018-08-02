@@ -1,4 +1,6 @@
-resolver: nightly-2017-04-21
+resolver: lts-10.10 #also duplicated in docker section below
+compiler: ghc-8.0.2
+compiler-check: newer-minor
 packages:
 - bloc/bloc22/api
 - bloc/bloc22/client
@@ -8,6 +10,7 @@ packages:
 - cirrus/client
 - ethereum
 - ethereum-abi
+- slipstream
 - solidity
 - strato/api
 - strato/client
@@ -29,12 +32,17 @@ packages:
     commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
   extra-dep: true
 extra-deps:
-  - hflags-0.4.2
+  - hflags-0.4.3
   - ordered-containers-0.1.0
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
   - parsec3-numbers-0.1.0
+  - milena-0.5.2.1
 flags: {}
+
+ghc-options:
+  "$locals": -Wall -Werror
+
 extra-package-dbs: []
 
 extra-include-dirs:
@@ -42,3 +50,9 @@ extra-include-dirs:
 
 extra-lib-dirs:
 - /usr/local/lib
+
+docker:
+  enable: true
+  image: "stack-bloc-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]

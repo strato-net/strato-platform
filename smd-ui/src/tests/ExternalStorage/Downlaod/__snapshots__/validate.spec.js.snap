@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Downlaod: validate with empty values 1`] = `
+Object {
+  "contractAddress": "Can't be blank",
+}
+`;
+
+exports[`Downlaod: validate with values 1`] = `Object {}`;

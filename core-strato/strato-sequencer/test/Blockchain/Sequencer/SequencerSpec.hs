@@ -1,13 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.SequencerSpec where
 
+import           Data.Maybe                          (isNothing)
 import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
 import           Control.Exception                   (finally)
 import           Control.Monad.Logger
-import           Control.Monad.Stats
 
-import           Blockchain.EthConf                  (lookupConsumerGroup, runStatsTConfigured)
 import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -15,6 +15,7 @@ import           Blockchain.Sequencer.ChainHelpers
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
+import           Blockchain.Strato.Model.Class       (txChainId)
 
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
@@ -45,14 +46,16 @@ withTemporaryDepBlockDB genesisBlock m = do
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
+                               , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
                                , kafkaClientId         = kcid
-                               , kafkaConsumerGroup    = lookupConsumerGroup kcid
+                               , kafkaConsumerGroup    = KP.ConsumerGroup (KP.KString "fake")
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
-                               , bootstrapDoEmit       = True
+                               , bootstrapDoEmit       = False
+                               , statsConfig           = Nothing
                                }
 
-    runLoggingT (runStatsTConfigured (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m))) printLogMsg
+    runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -83,16 +86,22 @@ spec = do
         it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
-            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> inChain)
-            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            outBlocks <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IEBlock <$> inChain)
+              oes <- drainVM
+              return [block | OEBlock block <- oes ]
+            ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
 
         it "transformEvents should output blocks in partial order based on parent hash when input is out of order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
-            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> shuffled)
-            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            outBlocks <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IEBlock <$> shuffled)
+              oes <- drainVM
+              return [block | OEBlock block <- oes ]
+            ret <- validateOrder gb outBlocks
             assertBool (format ret) $ isValid ret
 
         it "should not deduplicate incoming transactions that are unique" $ do
@@ -100,23 +109,34 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (10, dedupWindow - 1)
             inTxs  <- generate $ vectorOf inTxSize arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx ts <$> inTxs)
+            outTxs <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IETx ts <$> inTxs)
+              oes <- drainVM
+              return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
-            let dedupedIn = feedBackOutputsToInput (snd outTxs)
-            dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents dedupedIn
-            assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
-                length dedupedIn == (length . snd $ dedupedOut)
+            let dedupedIn = feedBackOutputsToInput outTxs
+            dedupedOut <- withTemporaryDepBlockDB gb $ do
+              splitEvents dedupedIn
+              drainVM
+            assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
+                length dedupedIn == (length dedupedOut)
 
         it ("should allow duplicate incoming transactions that come in after a specified window (" ++ show dedupWindow ++ " txs)") $ do
             gb <- makeGenesisBlock
             ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
-            inTxs  <- generate $ vectorOf inTxSize arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx ts <$> inTxs)
+            inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
+            outTxs <- withTemporaryDepBlockDB gb $ do
+              splitEvents (IETx ts <$> inTxs)
+              oes <- drainVM
+              return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
-            let dedupedIn          = feedBackOutputsToInput (snd outTxs)
+            let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
-            dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents replicatedIn
-            assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
-                length replicatedIn == (length . snd $ dedupedOut)
+            dedupedOut <- withTemporaryDepBlockDB gb $ do
+              splitEvents replicatedIn
+              oes <- drainVM
+              return [o | o@(OETx _ _) <- oes]
+            assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
+                length replicatedIn == (length dedupedOut)

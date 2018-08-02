@@ -24,14 +24,15 @@ import           BlockApps.Solidity.Xabi.Type         (VarType(..))
 -- 'Parsec'.
 parseXabi :: FileName -> String -> Either String [(Text, Xabi)]
 parseXabi filename input = do
-  xabis <- showError $ runParser solidityFile "" filename input
+  File units <- showError $ runParser solidityFile "" filename input
+  let xabis = [(name, pair) | NamedXabi name pair <- units]
   let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
   xabis' <- traverse sequence inheritanceFullXabis
 
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
-parseXabiNoInheritanceMerge :: FileName -> String -> Either String [(Text, (Xabi, [Text]))]
+parseXabiNoInheritanceMerge :: FileName -> String -> Either String File
 parseXabiNoInheritanceMerge filename input = do
   showError $ runParser solidityFile "" filename input
 
@@ -54,11 +55,12 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
   Xabi{
-    xabiFuncs=xabiFuncs x `Map.union` xabiFuncs y,
-    xabiConstr=xabiConstr x,
+    xabiFuncs = xabiFuncs x `Map.union` xabiFuncs y,
+    xabiConstr = xabiConstr x,
     xabiVars= fmap (bumpAtBytes bumper) (xabiVars x) `Map.union` xabiVars y,
     xabiTypes=xabiTypes x `Map.union` xabiTypes y,
-    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
+    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y,
+    xabiEvents = xabiEvents x `Map.union` xabiEvents y
     }
   where
     bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32

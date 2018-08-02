@@ -8,9 +8,9 @@ module Blockchain.ExtMergeSources (
   mergeSourcesCloseForAny
   ) where
 
-
+import           ClassyPrelude                (atomically)
 import           Control.Concurrent
-import           Control.Concurrent.STM
+import           Control.Concurrent.STM       hiding (atomically)
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -22,15 +22,12 @@ import           Data.Conduit.TMChan          hiding (mergeSources)
 
 import           Data.Conduit
 
-liftSTM :: forall (m :: * -> *) a. MonadIO m => STM a -> m a
-liftSTM = liftIO . atomically
-
 chanSink
     :: MonadIO m
     => chan                     -- ^ The channel.
     -> (chan -> a -> STM ())    -- ^ The 'write' function.
     -> Sink a m ()
-chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
+chanSink ch writer = CL.mapM_ $ atomically . writer ch
 {-# INLINE chanSink #-}
 
 mergeSourcesCloseForAny :: (MonadLogger mi, MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
@@ -38,16 +35,16 @@ mergeSourcesCloseForAny :: (MonadLogger mi, MonadResource mi, MonadIO mo, MonadB
              -> Int -- ^ The bound of the intermediate channel.
              -> mi (Source mo a)
 mergeSourcesCloseForAny sx bound = do
-    c <- liftSTM $ newTBMChan bound
-    threadIdsVar <- liftSTM newEmptyTMVar
+    c <- atomically $ newTBMChan bound
+    threadIdsVar <- atomically newEmptyTMVar
     result <- mapM (runFork c threadIdsVar . transPipe lift) sx
-    liftSTM $ putTMVar threadIdsVar result
+    atomically $ putTMVar threadIdsVar result
     return $ sourceTBMChan c
 
     where runFork chan threadIdsVar s = runResourceT . resourceForkIO $ do
-            x <- try $ s $$ chanSink chan writeTBMChan
-            liftSTM $ closeTBMChan chan
-            threadIds <- liftSTM $ takeTMVar threadIdsVar
+            x <- try . runConduit $ s .| chanSink chan writeTBMChan
+            atomically $ closeTBMChan chan
+            threadIds <- atomically $ takeTMVar threadIdsVar
             myTh <- liftIO myThreadId
             _ <- liftIO $ forM (filter (/= myTh) threadIds) killThread
             case x of

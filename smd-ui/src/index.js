@@ -34,6 +34,11 @@ import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
+import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
+import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
+import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
+import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
+import downloadReducer from './components/ExternalStorage/Download/download.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -61,6 +66,8 @@ import watchFetchApplications from './components/Applications/applications.saga'
 import watchAppUpload from './components/LaunchPad/launchPad.saga';
 import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
+import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
+import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -99,7 +106,12 @@ const rootReducer = combineReducers({
   walkThrough: walkThroughReducer,
   tokenRequest: tokenRequestReducer,
   verifyAccount: verifyAccountReducer,
-  createBlocUser: createBlocUserReducer
+  createBlocUser: createBlocUserReducer,
+  uploadFile: uploadFileReducer,
+  externalStorage: externalStorageReducer,
+  attest: attestReducer,
+  verify: verifyReducer,
+  download: downloadReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -126,7 +138,9 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchVerifyAccount),
-    fork(watchCreateBlocUser)
+    fork(watchCreateBlocUser),
+    fork(watchUploadFile),
+    fork(watchFetchUpload)
   ])
 };
 

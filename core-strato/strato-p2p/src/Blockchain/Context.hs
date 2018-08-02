@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE Rank2Types           #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
@@ -24,21 +25,24 @@ module Blockchain.Context
     ) where
 
 
+import           Conduit
 import           Control.Monad.Logger
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           Data.Void
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Sequencer.Event            (IngestEvent (..))
+import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import qualified Database.Persist.Postgresql           as SQL
-import qualified Database.PostgreSQL.Simple            as PS
+import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
@@ -49,6 +53,8 @@ data Context =
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
+        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
+        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime
     }
@@ -66,6 +72,12 @@ instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
 
 instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
   getSQLDB = contextSQLDB <$> get
+
+instance (MonadState Context m, MonadIO m) => HasUnseqSink m where
+  getUnseqSink = gets unseqSink
+
+instance (MonadState Context m, MonadIO m, HasSQLDB m) => HasVMEventsSink m where
+  getVMEventsSink = gets vmEventsSink
 
 getDebugMsg :: MonadState Context m => m String
 getDebugMsg = concat . reverse . vmTrace <$> get
@@ -102,16 +114,13 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-instance Show PS.Connection where
-  show _ = "Postgres Simple Connection"
-
 runContextM :: (MonadBaseControl IO m )
             => s
             -> StateT s (ResourceT m) a
             -> m ()
 runContextM s f = void . runResourceT $ runStateT f s
 
-initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
             => m Context
 initContext = do
   dbs <- openDBs
@@ -121,8 +130,12 @@ initContext = do
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
+                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
+                 , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
                  }
+
+
 
 addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
         => PPeer

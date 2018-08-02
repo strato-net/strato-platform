@@ -2,12 +2,13 @@ module Blockchain.Strato.Model.Class where
 
 import qualified Data.ByteString                 as B
 import           Data.Time
--- import           Data.Time.Clock.POSIX
 import           Data.Word
 
+import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
@@ -41,19 +42,26 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderGasUsed          :: h -> Integer -- todo: ditto
     blockHeaderDifficulty       :: h -> Integer
     blockHeaderNonce            :: h -> Word64 -- todo: nonce newtype
-    blockHeaderExtraData        :: h -> Integer -- todo: extradata newtype
+    blockHeaderExtraData        :: h -> B.ByteString -- todo: extradata newtype
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
+
+    -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
+    -- derive it.
+    blockHeaderModifyExtra :: (B.ByteString -> B.ByteString) -> h -> h
 
     morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
     {-# MINIMAL blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
-                blockHeaderMixHash, morphBlockHeader #-}
+                blockHeaderMixHash, blockHeaderModifyExtra, morphBlockHeader #-}
 
     blockHeaderHash :: h -> SHA
-    blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+    blockHeaderHash = superProprietaryStratoSHAHash
+                    . rlpSerialize
+                    . rlpEncode
+                    . blockHeaderModifyExtra scrubCommitmentSeals
 
     blockHeaderPartialHash :: h -> SHA
     blockHeaderPartialHash h = superProprietaryStratoSHAHash . rlpSerialize $ RLPArray
@@ -71,7 +79,7 @@ class RLPSerializable h => BlockHeaderLike h where
       , rlpEncode $ blockHeaderExtraData        h
       ]
 
-data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
+data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Ord, Read, Show)
 
 -- todo: newtype all these vague Integers
 class (RLPSerializable t) => TransactionLike t where
@@ -87,10 +95,11 @@ class (RLPSerializable t) => TransactionLike t where
     txGasLimit    :: t -> Integer
     txCode        :: t -> Maybe Code
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
+    txChainId     :: t -> Maybe Word256
 
     morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
-                txCode, txData, morphTx #-}
+                txCode, txData, txChainId, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

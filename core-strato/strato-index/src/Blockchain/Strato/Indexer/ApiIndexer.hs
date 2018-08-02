@@ -20,6 +20,8 @@ import           Network.Kafka.Protocol
 import           System.Clock
 
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ChainInfoDB        (putChainInfo)
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
@@ -42,6 +44,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         putIndexerBestBlockInfo bbi
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+        let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
+        forM_ chainInfos $ uncurry putChainInfo
         let blocks = [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks
@@ -52,15 +56,14 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         then do
             insertStartTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-            results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
+            bids <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
-            let bids = fst <$> results
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime
             maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock
             num <- case maybeOldBestBlock of
                 Just x -> return x
-                Nothing -> blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
+                Nothing -> blockDataRefNumber <$> sqlQuery (getJust bestBid)
             --num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
             numTime <- liftIO $ getTime Realtime
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids

@@ -11,10 +11,10 @@ BlockData
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    extraData Integer
+    extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    deriving Eq Read Show
+    deriving Eq Read Show Generic
 
 BlockDataRef
     parentHash SHA
@@ -29,42 +29,20 @@ BlockDataRef
     gasLimit Integer sqltype=numeric(1000,0)
     gasUsed Integer sqltype=numeric(1000,0)
     timestamp UTCTime
-    extraData Integer
+    extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    blockId BlockId
     hash SHA
+    blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
     deriving Eq Read Show
 
-Block
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    deriving Eq Read Show
-
-NewBlk
-    hash SHA
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    Primary hash
-    TheHash hash
-    deriving Eq Read Show
-
 BlockTransaction
-    blockId BlockId
+    blockDataRefId BlockDataRefId
     transaction RawTransactionId
     deriving Eq Read Show
-
-AddressState
-    nonce Integer sqltype=numeric(1000,0)
-    balance Integer sqltype=numeric(1000,0)
-    contractRoot StateRoot
-    codeHash SHA
-    deriving Eq Generic Read Show
 
 AddressStateRef
     address Address
@@ -73,6 +51,7 @@ AddressStateRef
     contractRoot StateRoot
     code BS.ByteString
     codeHash SHA
+    chainId Word256 Maybe
     latestBlockDataRefNumber Integer
     source String
     contractName String
@@ -87,6 +66,7 @@ RawTransaction
     toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
     codeOrData BS.ByteString
+    chainId Word256 Maybe
     r Integer
     s Integer
     v Word8
@@ -118,6 +98,7 @@ TransactionResult json
     deletedStorage String
     status TransactionResultStatus Maybe
     miningStatus MiningStatus
+    chainId Word256 Maybe
     deriving Eq Read Show Generic
 
 UserN json
@@ -172,10 +153,35 @@ LogDB
     bloom Word512
     deriving Eq Read Show Generic
 
-BlockOffset
-    offset Integer
-    number Integer
-    hash SHA
-    Primary hash
-    UniqueH hash
-    deriving Eq Read Show
+ChainInfoRef
+    chainId Word256
+    chainLabel String
+    addRule String
+    removeRule String
+    deriving Eq Generic Read Show
+
+ChainMemberRef
+    chainInfoId ChainInfoRefId
+    name String
+    deriving Eq Generic Read Show
+
+ChainAccountBalanceRef
+    chainInfoId ChainInfoRefId
+    address Address
+    balance Integer
+    deriving Eq Generic Read Show
+
+AccountInfoRef
+    chainInfoId ChainInfoRefId
+    address Address
+    balance Int
+    codeHash SHA Maybe
+    map [MapPair] Maybe
+    deriving Eq Generic Read Show
+
+CodeInfoRef
+    chainInfoId ChainInfoRefId
+    evmByteCode BS.ByteString
+    contractCode String
+    contractName String
+    deriving Eq Generic Read Show

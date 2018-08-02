@@ -12,7 +12,7 @@ module Blockchain.EthConf (
       BlockConf(..),
       EthUniqueId(..),
       PrivKey(..),
-      StatsConf(..), runStatsTConfigured,
+      StatsConf(..), runStatsTConfigured, runStatsT,
       ethConf,
       connStr,
     ) where
@@ -180,7 +180,7 @@ lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` node
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = let r = redisBlockDBConfig ethConf in
-    Redis.ConnInfo {
+    Redis.defaultConnectInfo {
         Redis.connectHost           = redisHost r,
         Redis.connectPort           = Redis.PortNumber $ fromIntegral (redisPort r),
         Redis.connectAuth           = B8.pack <$> redisAuth r,
@@ -210,6 +210,9 @@ assertingStratoTags conf = toStatsTConfig modified
                          else ("hostname", ourHostName)
 
 runStatsTConfigured :: (MonadIO m) => StatsT.StatsT m a -> m a
-runStatsTConfigured m = case statsConfig ethConf of
-    Nothing -> StatsT.runNoStatsT m
-    Just x  -> StatsT.runStatsT m (assertingStratoTags x)
+runStatsTConfigured = runStatsT (statsConfig ethConf)
+
+runStatsT :: (MonadIO m) => Maybe StatsConf -> StatsT.StatsT m a -> m a
+runStatsT mc action = case mc of
+    Nothing -> StatsT.runNoStatsT action
+    Just c -> StatsT.runStatsT action (assertingStratoTags c)

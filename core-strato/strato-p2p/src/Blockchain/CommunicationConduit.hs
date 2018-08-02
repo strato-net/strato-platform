@@ -7,7 +7,6 @@
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
-    , awaitMsg
     , mkEthP2PEventSource
     , mkEthP2PEventConduit
     ) where
@@ -31,6 +30,7 @@ import           Blockchain.MilenaTools
 
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire
@@ -55,6 +55,9 @@ ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}
 
+blockstanbulVersion :: Int
+blockstanbulVersion = 1
+
 mkEthP2PEventSource :: ( Monad m
                        , MonadResource m
                        , MonadBaseControl IO m
@@ -67,18 +70,19 @@ mkEthP2PEventSource :: ( Monad m
                     -> m (Source m Event)
 mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
     [ appSource app
-        =$= ethDecrypt inCtx
-        =$= bytesToMessages
-        =$= tap (displayMessage False (show $ appSockAddr app))
-        =$= CL.map MsgEvt
-    , seqEventNotifictationSource =$= CL.map NewSeqEvent
+        .| ethDecrypt inCtx
+        .| bytesToMessages
+        .| tap (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.map MsgEvt
+    , seqEventNotificationSource
+        .| CL.map NewSeqEvent
     ] ++ extra) (2 + length extra)
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx = tap (displayMessage Outbound str) .| messageToBytes .| ethEncrypt outCtx
 
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
@@ -88,7 +92,9 @@ handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
                 , clientId = stratoVersionString
-                , capability = [ETH . fromIntegral $ ethVersion]
+                , capability = [ ETH . fromIntegral $ ethVersion
+                               , IST . fromIntegral $ blockstanbulVersion
+                               ]
                 , port = 0
                 , nodeId = myId
                 }

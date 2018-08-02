@@ -41,12 +41,12 @@ import qualified Data.ByteString.Char8                       as BC
 import qualified Data.ByteString.Lazy                        as BL
 import           Data.Maybe
 
-import           Control.Monad.State                         as ST
+import           Control.Monad                               (liftM)
 import           Control.Monad.Trans.Resource
 
 import qualified Data.NibbleString                           as N
 
-getAddressState::(HasStateDB m, HasHashDB m)=>Address->m AddressState
+getAddressState :: (HasStateDB m, HasHashDB m) => Address -> m AddressState
 getAddressState address = do
     db <- getStateDB
     states <- MP.getKeyVal db $ addressAsNibbleString address
@@ -60,12 +60,12 @@ getAddressState address = do
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
 
-getAllAddressStates::(HasHashDB m, HasStateDB m, MonadResource m)=>m [(Address, AddressState)]
+getAllAddressStates::(HasHashDB m, HasStateDB m, MonadResource m) => m [(Address, AddressState)]
 getAllAddressStates = do
   sdb <- getStateDB
   mapM convert =<<  MP.unsafeGetAllKeyVals sdb
   where
-    convert::(HasHashDB m, MonadResource m)=>(N.NibbleString, RLPObject)-> m (Address, AddressState)
+    convert :: (HasHashDB m, MonadResource m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
     convert (k, v) = do
       k' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k))) $ getAddressFromHash k
       return (k', rlpDecode . rlpDeserialize . rlpDecode $ v)
@@ -78,7 +78,7 @@ getStorageKeyFromHash::(HasHashDB m, MonadResource m)=>N.NibbleString -> m (Mayb
 getStorageKeyFromHash  =
   liftM (fmap (decode . BL.fromStrict . nibbleString2ByteString) ) . hashDBGet
 
-putAddressState::(HasStateDB m, HasHashDB m)=>Address->AddressState->m ()
+putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
 putAddressState address newState = do
   hashDBPut addrNibbles
   db <- getStateDB
@@ -86,13 +86,13 @@ putAddressState address newState = do
   setStateDBStateRoot (MP.stateRoot db')
   where addrNibbles = addressAsNibbleString address
 
-deleteAddressState::HasStateDB m=>Address->m ()
+deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do
   db <- getStateDB
   db' <- MP.deleteKey db (addressAsNibbleString address)
   setStateDBStateRoot $ MP.stateRoot db'
 
-addressStateExists::HasStateDB m=>Address->m Bool
+addressStateExists :: HasStateDB m => Address -> m Bool
 addressStateExists address = do
   db <- getStateDB
   MP.keyExists db (addressAsNibbleString address)

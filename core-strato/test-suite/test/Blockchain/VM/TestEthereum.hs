@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -14,9 +13,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
-import qualified Crypto.Hash.SHA3                            as SHA3
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
@@ -50,6 +48,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.SHA                 (keccak256)
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.VM
@@ -65,8 +64,8 @@ import           Blockchain.VM.TestFiles
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
 
-populateAndConvertAddressState::Address->AddressState'->ContextM AddressState
-populateAndConvertAddressState owner addressState' = do
+populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
+populateAndConvertAddressState cid owner addressState' = do
   addCode . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
@@ -80,6 +79,7 @@ populateAndConvertAddressState owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
+      (cid)
 
 showHexInt::Integer->String
 showHexInt x
@@ -149,13 +149,14 @@ txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
 runTest::Test->ContextM (Either String String)
 runTest test = do
+  let cid = chainId $ env test
 
   MP.initializeBlank =<< getStateDB
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $
     \(addr, s) -> do
-      state' <- populateAndConvertAddressState addr s
+      state' <- populateAndConvertAddressState cid addr s
       putAddressState addr state'
 
   beforeAddressStates <- addressStates
@@ -176,7 +177,7 @@ runTest test = do
              blockDataGasUsed = 0, --error "gasUsed not set",
              blockDataTimestamp = currentTimestamp . env $ test,
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
-             blockDataExtraData = 0, --error "extraData not set",
+             blockDataExtraData = "", --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
              blockDataMixHash=SHA 0 --error "mixHash not set"
              },
@@ -206,7 +207,7 @@ runTest test = do
 
         (result, vmState1) <- lift $
           flip runStateT vmState0{vmGasRemaining=getNumber $ gas' exec, debugCallCreates=Just []} $
-          runEitherT $ do
+          runExceptT $ do
             runCodeFromStart
 
             vmState2 <- lift get
@@ -247,7 +248,7 @@ runTest test = do
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
-          runEitherT $ addTransaction True (blockBlockData $ block) (currentGasLimit $ env test) signedTransaction
+          runExceptT $ addTransaction True (blockBlockData $ block) (currentGasLimit $ env test) signedTransaction
 
         flushMemStorageDB
         flushMemAddressStateDB
@@ -260,7 +261,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . (SHA3.hash 256) . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
+  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . keccak256 . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

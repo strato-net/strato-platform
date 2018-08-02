@@ -7,7 +7,6 @@ module Blockchain.Strato.Mining.Ethash.Cache (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3                          as SHA3
 import qualified Data.Array.IO                             as MA
 import qualified Data.Array.IO.Internals                   as MA
 import qualified Data.Array.Unboxed                        as A
@@ -16,13 +15,14 @@ import           Data.Word
 
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Model.SHA               (keccak512)
 
 type Cache = A.UArray (Word32, Word32) Word32
 
 mkCache :: Integer -> B.ByteString -> IO Cache
 mkCache cSize seed = do
   let n = cSize `div` hashBytes
-      v = initDataSet n $ SHA3.hash 512 seed
+      v = initDataSet n $ keccak512 seed
   mv <- MA.unsafeThawIOUArray v
   mix mv
   return v
@@ -31,7 +31,7 @@ mkCache cSize seed = do
 for _ in range(CACHE_ROUNDS):
         for i in range(n):
             v = o[i][0] % n
-            o[i] = sha3_512(map(xor, o[(i-1+n) % n], o[v]))
+            o[i] = keccak512(map(xor, o[(i-1+n) % n], o[v]))
 
 -}
 
@@ -60,10 +60,10 @@ mix mx = do
       m2 <- fmap repair $ sequence $ map (MA.readArray mx . ((i-1+n) `mod` n,)) [0..15]
       sequence $
         map (\(k, val) -> MA.writeArray mx (i,k) val) $
-        zip [0..15] $ shatter $ SHA3.hash 512 $ xorBS m1 m2
+        zip [0..15] $ shatter $ keccak512 $ xorBS m1 m2
 
 initDataSet::Integer->B.ByteString->Cache
 initDataSet n | n > toInteger (maxBound::Word32) =
   error "initDataSet called for value too large, you can no longer use Word32 for cache index"
-initDataSet n = A.listArray ((0,0), (fromIntegral n-1,15)) . concat . map shatter . iterate (SHA3.hash 512)
+initDataSet n = A.listArray ((0,0), (fromIntegral n-1,15)) . concat . map shatter . iterate keccak512
 

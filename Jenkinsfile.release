@@ -144,7 +144,7 @@ pipeline {
               git merge ${REFSPEC}
               echo ${RELEASE_VERSION} > VERSION
               git add VERSION
-              git commit VERSION -m "${RELEASE_VERSION}"
+              git commit VERSION -m "${RELEASE_VERSION}" --allow-empty
               git push
               git tag ${RELEASE_VERSION}
               git push --tags

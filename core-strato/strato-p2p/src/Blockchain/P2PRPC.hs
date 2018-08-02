@@ -77,7 +77,9 @@ clientCommPort = CommPort 14001
 runStratoP2PComm :: CommPort -> TVar (S.Set ConnectedPeer) -> IO ()
 runStratoP2PComm cp addresses =
   runTCPServer (serverSettings (unCommPort cp) "*") $ \app ->
-    appSource app =$= serve addresses $$ appSink app
+    runConduit $ appSource app
+              .| serve addresses
+              .|appSink app
 
 serve :: TVar (S.Set ConnectedPeer) -> Conduit BS.ByteString IO BS.ByteString
 serve addresses = do
@@ -89,7 +91,7 @@ serve addresses = do
 mkConn :: BS.ByteString -> CommPort -> Connection IO
 mkConn host (CommPort port) input = liftIO $ (fmap BL.fromStrict) <$> runTCPClient (clientSettings port host) c
   where runRPCInput = yield (BL.toStrict input) >> await
-        c app = appSource app $$ (runRPCInput `fuseUpstream` appSink app)
+        c app = runConduit $ appSource app .| (runRPCInput `fuseUpstream` appSink app)
 
 -- makeRPC :: (ToJSON t) => Signature ps t -> BS.ByteString -> CommPort -> IO (Either RpcError t)
 -- makeRPC sig host port = runExceptT $ toFunction (mkConn host port) sig

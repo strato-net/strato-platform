@@ -11,6 +11,8 @@ import           Control.Lens                 (mapped, (&), (?~), (.~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
+import           Data.Aeson.Types
+import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Proxy
@@ -34,6 +36,7 @@ data Xabi = Xabi
   , xabiVars      :: Map Text Xabi.VarType
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
+  , xabiEvents    :: Map Text Event
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -47,6 +50,7 @@ instance FromJSON Xabi where
          <*> v .:? "vars" .!= Map.empty
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
+         <*> v .:? "events" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -62,16 +66,14 @@ instance ToSchema Xabi where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcStateMutability  = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcStateMutability  = Just Pure
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
@@ -80,28 +82,92 @@ instance ToSchema Xabi where
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+        , xabiEvents = Map.empty
         }
 --------------------------------------------------------------------------------
+
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+
+tShow :: StateMutability -> Text
+tShow Pure = "pure"
+tShow Constant = "constant"
+tShow View = "view"
+tShow Payable = "payable"
+
+tRead :: Text -> Maybe StateMutability
+tRead "pure" = Just Pure
+tRead "constant" = Just Constant
+tRead "view" = Just View
+tRead "payable" = Just Payable
+tRead _ = Nothing
+
+instance ToJSON StateMutability where
+  toJSON = String . tShow
+
+instance FromJSON StateMutability where
+  parseJSON = withText "StateMutability" $ \t ->
+      case tRead t of
+          Just sm -> pure sm
+          Nothing -> fail $ "invalid StateMutability: " ++ show t
+
+
+instance Arbitrary StateMutability where
+  arbitrary = genericArbitrary uniform
+instance ToSchema StateMutability where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "State Mutability"
+    & mapped.schema.description ?~ "Reserved keywords for function state mutability"
+    & mapped.schema.example ?~ toJSON View
 
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
   , funcVals :: Map Text Xabi.IndexedType
+  , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
   , funcContents :: Maybe Text
-  , funcMutable :: Maybe Bool
-  , funcPayable :: Maybe Bool
   , funcVisibility :: Maybe Visibility
   , funcModifiers :: Maybe [String]
   } deriving (Eq,Show,Generic)
 
+funcPayable :: Func -> Bool
+funcPayable Func{funcStateMutability = Just Payable} = True
+funcPayable _ = False
+
+funcConstant :: Func -> Bool
+funcConstant Func{funcStateMutability = Nothing} = False
+funcConstant Func{funcStateMutability = Just Payable} = False
+funcConstant _ = True
+
 instance ToJSON Func where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON f = case genericToJSON (aesonPrefix camelCase) f of
+                 Object o -> Object
+                        . Hash.insert "payable" (Bool . funcPayable $ f)
+                        . Hash.insert "constant" (Bool . funcConstant $ f)
+                        $ o
+                 x -> x
+
+-- constant and payable are a deprecated way of specifying state mutability
+fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
+fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
+    let constant = Hash.lookup "constant" obj
+        payable = Hash.lookup "payable" obj
+    in case (constant, payable) of
+           (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
+           (Just (Bool True), _) -> pure . Just $ Constant
+           (_, Just (Bool True)) -> pure . Just $ Payable
+           _ -> pure Nothing
 
 instance FromJSON Func where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON val = do
+    func <- genericParseJSON (aesonPrefix camelCase) val
+    case funcStateMutability func of
+      Just _ -> return func
+      Nothing -> do
+          mut <- fallbackConstantPayable val
+          return func{funcStateMutability = mut}
 
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 
@@ -116,8 +182,7 @@ instance ToSchema Func where
         { funcArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcContents = Just "return userAddress;"
-        , funcMutable  = Nothing
-        , funcPayable  = Nothing
+        , funcStateMutability = Just View
         , funcVisibility = Nothing
         , funcModifiers = Nothing
         }
@@ -169,8 +234,39 @@ instance ToSchema Modifier where
         , modifierContents = Nothing
         }
 
-newtype Event = Event { eventLogs :: Map Text Xabi.IndexedType }
+data Event = Event { eventAnonymous :: Bool
+                   , eventLogs :: [(Text, Xabi.IndexedType)]
+                   }
               deriving (Eq,Show,Generic)
+
+instance ToJSON Event where
+  toJSON e = object [
+      "anonymous" .= eventAnonymous e
+    , "logs" .= eventLogs e
+    ]
+
+instance FromJSON Event where
+  parseJSON (Object o) = Event
+                     <$> (o .: "anonymous")
+                     <*> (o .: "logs")
+  parseJSON o = error $ "parseJSON Xabi.Event: Expected Object, got: " ++ show o
+
+instance Arbitrary Event where arbitrary = genericArbitrary uniform
+
+instance ToSchema Event where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Event schema"
+    & mapped.schema.description ?~ "Xabi Event"
+    & mapped.schema.example ?~ toJSON sampleEvent
+    where
+      sampleEvent :: Event
+      sampleEvent = Event
+        { eventAnonymous = True
+        , eventLogs =
+          [ ("_from", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Address})
+          , ("_to", Xabi.IndexedType {indexedTypeIndex = 1, indexedTypeType = Xabi.Address})
+          ]
+        }
 
 data Using = Using {} deriving (Eq,Show,Generic)
 
@@ -230,16 +326,14 @@ instance ToSchema ContractDetails where
           [ ("get", Func { funcArgs = Map.fromList []
                          , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcContents = Just "return x; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcStateMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
           , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
                          , funcVals = Map.fromList []
                          , funcContents = Just "return; "
-                         , funcMutable  = Nothing
-                         , funcPayable  = Nothing
+                         , funcStateMutability = Just View
                          , funcVisibility = Nothing
                          , funcModifiers = Nothing
                          })
@@ -248,6 +342,7 @@ instance ToSchema ContractDetails where
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+        , xabiEvents = Map.empty
         }
 
 --------------------------------------------------------------------------------

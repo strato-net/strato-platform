@@ -1,0 +1,13 @@
+*.swp
+*.hi
+*.o
+*.aux
+*.hp
+*.ps
+*.prof
+dist
+.cabal-sandbox
+cabal.sandbox.config
+cabal.config
+.stack-work
+blockapps-haskoin.cabal

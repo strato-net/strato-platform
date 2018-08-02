@@ -14,8 +14,9 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
+import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Xabi.Type
+import           BlockApps.Solidity.Xabi.Type
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
 
 
@@ -23,11 +24,12 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
-unparse :: [(Text, (Xabi, [Text]))] -> String
-unparse contracts = List.concat $ List.map unparseContract contracts
+unparse :: File -> String
+unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
-unparseContract :: (Text, (Xabi, [Text])) -> String
-unparseContract (name, (contract,inherited)) =
+unparseSourceUnit :: SourceUnit -> String
+unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
+unparseSourceUnit (NamedXabi name (contract,inherited)) =
      "contract "
   <> Text.unpack name
   <> (case inherited of
@@ -38,6 +40,7 @@ unparseContract (name, (contract,inherited)) =
   <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
   <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
   <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
+  <> List.concat (List.map (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract))
   <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
   <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
   <> "\n}"
@@ -76,9 +79,8 @@ unparseVarType (Bytes (Just True) _ ) = "bytes"
 unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (Label str) = str
 unparseVarType (Enum _ name _) = Text.unpack name
-unparseVarType (Array (Just True) _ t) = (unparseVarType t) <> "[]"
-unparseVarType (Array (Just False) (Just n) t) = (unparseVarType t) <> ("[" <> show n <> "]")
-unparseVarType (Array Nothing _ t) = (unparseVarType t) <> "[]"
+unparseVarType (Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
+unparseVarType (Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (Contract contractName) = Text.unpack contractName
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
@@ -91,12 +93,9 @@ unparseFunc (name, Func{..}) =
     <> "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
-    <> case funcMutable of
-        Just False -> "constant "
-        _ -> ""
-    <> case funcPayable of
-        Just True -> "payable "
-        _ -> ""
+    <> case funcStateMutability of
+        Just sm -> tShow sm <> " "
+        Nothing -> ""
     <> case funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
@@ -130,6 +129,16 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
   <> "\n    }"
+
+unparseEvent :: (Text, Event) -> String
+unparseEvent (name, Event{..}) = Text.unpack $
+     "event "
+  <> name
+  <> "(\n    "
+  <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
+  <> ")"
+  <> (if eventAnonymous then "anonymous" else "")
+  <> ";"
 
 unparseTypes :: (Text, Xabi.Def) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) =
@@ -174,8 +183,7 @@ addFunction (name, contents) c =
                                                              , indexedTypeIndex=0
                                                              }
                   , funcContents = Just $ Text.pack contents
-                  , funcMutable = Just False
-                  , funcPayable = Just False
+                  , funcStateMutability = Just View
                   , funcVisibility = Nothing
                   , funcModifiers = Nothing
                   }

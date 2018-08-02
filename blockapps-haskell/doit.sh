@@ -4,21 +4,35 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
-cirrusRoot=http://${cirrusHost}
+
+isPublic=false
+ if [ "${SMD_MODE}" == public ]; then
+   isPublic=true
+ fi
 
 echo "Environment variables:
-stratoHost=${stratoHost}
---cirrusurl=cirrusHost=${cirrusHost}
---stratourl=stratoRoot=${stratoRoot}
---pghost=postgres_host=${postgres_host}
---pgport=postgres_port=${postgres_port}
---pguser=postgres_user=${postgres_user}
---password=postgres_password=${postgres_password}
---loglevel=loglevel=${loglevel:-4}
+slipstream:
+--pghost=\$postgres_host="${postgres_host}"
+--pgport=\$postgres_port="${postgres_port}"
+--pguser=\$postgres_user="${postgres_user}"
+--password=\$postgres_password="${postgres_password}"
+--database=\$postgres_slipstream_db="${postgres_slipstream_db}"
+--stratourl=\$stratoRoot="${stratoRoot}"
+--kafkahost=\$kafkaHost"${kafkaHost}"
+--kafkaport=${kafkaPort}
+
+strato-server:
+no vars/flags set
+bloc:
+stratoHost="${stratoHost}"
+--stratourl=\$stratoRoot="${stratoRoot}"
+--pghost=\$postgres_host="${postgres_host}"
+--pgport=\$postgres_port="${postgres_port}"
+--pguser=\$postgres_user="${postgres_user}"
+--password=\$postgres_password="${postgres_password}"
+--loglevel=\$loglevel="${loglevel:-4}"
 "
 
-blocserver="/usr/bin/blockapps-bloc"
-stratoserver="/usr/bin/blockapps-strato-server"
 locale-gen "en_US.UTF-8"
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
@@ -38,7 +52,20 @@ while true; do
     sleep 0.5
 done
 
-$stratoserver &
+mkdir logs
 
-$blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" +RTS -N1 2>&1
+# TODO: refactor using the process monitoring from core-strato's doit.sh
+
+/usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
+
+until nc -z $kafkaHost $kafkaPort >&/dev/null
+do  echo "Waiting for Kafka to become available"
+    sleep 1
+done
+
+/usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+
+/usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1

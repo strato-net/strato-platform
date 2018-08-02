@@ -10,7 +10,6 @@ module Blockchain.Database.MerklePatricia.StateRoot (
   ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3       as C
 import           Data.Aeson
 import           Data.Binary
 import qualified Data.ByteString        as B
@@ -27,14 +26,14 @@ import           Blockchain.SHA
 
 import           GHC.Generics
 
--- | Internal nodes are indexed in the underlying database by their 256-bit SHA3 hash.
+-- | Internal nodes are indexed in the underlying database by their keccak256-bit hash.
 -- This types represents said hash.
 --
 -- The stateRoot is of this type,
 -- (ie- the pointer to the full set of key/value pairs at a particular time in history), and
 -- will be of interest if you need to refer to older or parallel version of the data.
 
-newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Read, Generic, IsString)
+newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, IsString)
 
 instance Format StateRoot where
   format x             | x == emptyTriePtr = CL.yellow "<empty>"
@@ -53,7 +52,7 @@ instance RLPSerializable StateRoot where
 
 -- | The stateRoot of the empty database.
 emptyTriePtr::StateRoot
-emptyTriePtr = StateRoot $ C.hash 256 $ rlpSerialize $ rlpEncode (0::Integer)
+emptyTriePtr = StateRoot $ keccak256 $ rlpSerialize $ rlpEncode (0::Integer)
 
 sha2StateRoot::SHA->StateRoot
 sha2StateRoot (SHA x) = StateRoot $ B.pack $ word256ToBytes x

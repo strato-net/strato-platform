@@ -17,6 +17,7 @@ import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
 import           GHC.Int
 
+import           BlockApps.Ethereum                (AccountInfo(..))
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Selector
 import           BlockApps.Solidity.Struct
@@ -26,6 +27,9 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
+
+transformXabi :: Xabi -> Map.Map Text Text -> AccountInfo
+transformXabi _ _ = error "transformXabi not implemented"
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
@@ -109,9 +113,9 @@ xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ sh
 
 
 xabiTypeToType::Xabi->Xabi.Type->Either String Type
-xabiTypeToType xabi Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
-  TypeArrayFixed len <$> xabiTypeToType xabi var
-xabiTypeToType xabi Xabi.Array { Xabi.entry=var } =
+xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=(Just l)} =
+  TypeArrayFixed l <$> xabiTypeToType xabi var
+xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=Nothing} =
   TypeArrayDynamic <$> xabiTypeToType xabi var
 xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
 xabiTypeToType xabi (Xabi.Label name) =
@@ -244,8 +248,7 @@ contractToXabi Contract{..} =
         [ ( name , Func { funcArgs = (Map.fromList $ zipWith (argToIndexedTypes typeDefs) [0..] args)
                         , funcVals = (Map.fromList $ zipWith (varToIndexedTypes typeDefs) [0..] rets)
                         , funcContents = Nothing
-                        , funcMutable = Nothing
-                        , funcPayable = Nothing
+                        , funcStateMutability = Nothing
                         , funcVisibility = Nothing
                         , funcModifiers = Nothing
                         }
@@ -264,7 +267,8 @@ contractToXabi Contract{..} =
       xabiConstr = Map.empty,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
-      xabiModifiers = Map.empty
+      xabiModifiers = Map.empty,
+      xabiEvents = Map.empty
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType
@@ -286,9 +290,12 @@ fieldToVarType typeDefs (Left text, theType) =
 -- Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
 typeToXabiType::TypeDefs->Type->Xabi.Type
 typeToXabiType _ (SimpleType x) = simpleTypeToXabiType x
-typeToXabiType typeDefs (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (typeToXabiType typeDefs theType)
-typeToXabiType typeDefs (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType typeDefs theType)
-typeToXabiType typeDefs (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType typeDefs to)
+typeToXabiType typeDefs (TypeArrayDynamic theType) =
+    Xabi.Array (typeToXabiType typeDefs theType) Nothing
+typeToXabiType typeDefs (TypeArrayFixed size theType) =
+    Xabi.Array (typeToXabiType typeDefs theType) (Just size)
+typeToXabiType typeDefs (TypeMapping from to) =
+    Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType typeDefs to)
 typeToXabiType _ (TypeStruct structName) = Xabi.Struct Nothing structName
 typeToXabiType typeDefs (TypeEnum enumName) =
   case Map.lookup enumName $ enumDefs typeDefs of

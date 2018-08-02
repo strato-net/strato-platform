@@ -10,8 +10,6 @@ module Blockchain.Strato.Model.Address
     ) where
 
 import           Control.Monad
-import qualified Crypto.Hash.SHA3                     as C
--- import           Data.Binary
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
 
@@ -19,6 +17,7 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Strato.Model.Colors       as CL
 import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import           Blockchain.Strato.Model.SHA          (keccak256)
 import           Blockchain.Strato.Model.Util
 
 import qualified Data.Aeson                           as AS
@@ -39,7 +38,6 @@ import           Web.PathPieces
 
 import           GHC.Generics
 
-
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
@@ -49,7 +47,7 @@ newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded,
 
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =
-  Address $ fromInteger $ byteString2Integer $ C.hash 256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromInteger $ byteString2Integer $ keccak256 $ BL.toStrict $ encode x `BL.append` encode y
   --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
   where
     point = pubKeyPoint $ derivePubKey prvKey
@@ -58,7 +56,7 @@ prvKey2Address prvKey =
 
 pubKey2Address :: PubKey -> Address
 pubKey2Address pubKey =
-  Address $ fromInteger $ byteString2Integer $ C.hash 256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromInteger $ byteString2Integer $ keccak256 $ BL.toStrict $ encode x `BL.append` encode y
   --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point

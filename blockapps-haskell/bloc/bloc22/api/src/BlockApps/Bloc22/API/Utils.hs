@@ -13,7 +13,6 @@ module BlockApps.Bloc22.API.Utils where
 import           Control.Lens                     (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
-import           Data.Aeson.Types
 import           Data.Proxy
 import           Data.String
 import           Data.Text                        (Text)
@@ -27,24 +26,6 @@ import           Test.QuickCheck.Instances        ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum
---------------------------------------------------------------------------------
-
-type GetHomepage = Get '[PlainText, JSON] Homepage
-whoWouldveThoughtThisIsActuallyTheHomepage :: Homepage
-whoWouldveThoughtThisIsActuallyTheHomepage = Homepage "home page!"
-newtype Homepage = Homepage { unHomepage :: Text }
-    deriving (Eq, Ord, Read, Show, Generic, MimeRender PlainText, MimeUnrender PlainText)
-instance ToSample Homepage where
-    toSamples _ = noSamples
-instance Arbitrary Homepage where -- seriously, lmfao
-    arbitrary = return whoWouldveThoughtThisIsActuallyTheHomepage
-instance ToSchema Homepage where
-    declareNamedSchema _ = declareNamedSchema $ Proxy @ Text
-instance ToJSON Homepage
-instance FromJSON Homepage
-
-
---------------------------------------------------------------------------------
 
 newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 

@@ -3,13 +3,40 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.VM.VMM where
+module Blockchain.VM.VMM (
+  VMM,
+  pop,
+  localState,
+  getStackItem,
+  push,
+  addDebugCallCreate,
+  addSuicideList,
+  getEnvVar,
+  addLog,
+  setPC,
+  incrementPC,
+  addToRefund,
+  getCallDepth,
+  getGasRemaining,
+  getReturnVal,
+  setDone,
+  setReturnVal,
+  setGasRemaining,
+  useGas,
+  addGas,
+  pay',
+  getStorageKeyVal,
+  putStorageKeyVal,
+  vmTrace,
+  getAllStorageKeyVals,
+  Word256Storable
+  ) where
 
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Stats
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
@@ -20,6 +47,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -34,16 +62,8 @@ import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
-type VMM = EitherT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
---type VMM2 = EitherT VMException (StateT VMState (ResourceT IO))
-
---TODO- Do I really need this?  Is it bad that it is undefined?
-instance MonadResource VMM where
-  liftResourceT = error "liftResourceT undefined for VMM"
-
--- todo: what the actual fuck
-instance MonadLogger VMM where
-    monadLoggerLog = monadLoggerLog
+type VMM = ExceptT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
+--type VMM2 = ExceptT VMException (StateT VMState (ResourceT IO))
 
 instance HasMemAddressStateDB VMM where
   getAddressStateDBMap = do
@@ -61,6 +81,24 @@ instance HasStateDB VMM where
     setStateDBStateRoot x = do
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
+
+instance HasChainDB VMM where
+  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
+  putBlockHashRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
+  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
+  putGenesisRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
+  getCurrentBlockHash = lift $ fmap (contextCurrentBlockHash . dbs) get
+  putCurrentBlockHash bh = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentBlockHash = bh}}
+  getCurrentChainId = lift $ fmap (contextCurrentChainId . dbs) get
+  putCurrentChainId cid = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextCurrentChainId = cid}}
 
 instance HasStorageDB VMM where
     getStorageDB = do
@@ -112,7 +150,7 @@ pop = do
     VMState{stack=val:rest} -> do
                 lift $ put state'{stack=rest}
                 return $ fromWord256 val
-    _ -> left StackTooSmallException
+    _ -> throwE StackTooSmallException
 
 localState :: (VMState -> VMState) -> VMM a -> VMM a
 localState f mv = do
@@ -127,12 +165,12 @@ getStackItem i = do
   state' <- lift get
   if length (stack state') > fromIntegral i
     then return $ fromWord256 (stack state' !! i)
-    else left StackTooSmallException
+    else throwE StackTooSmallException
 
 push::Word256Storable a=>a->VMM ()
 push val = do
   state' <- lift get
-  when (length (stack state') > 1023) $ left StackTooLarge
+  when (length (stack state') > 1023) $ throwE StackTooLarge
   lift $ put state'{stack = toWord256 val:stack state'}
 
 addDebugCallCreate::DebugCallCreate->VMM ()
@@ -156,11 +194,6 @@ addLog::Log->VMM ()
 addLog newLog = do
   state' <- lift get
   lift $ put state'{logs=newLog:logs state'}
-
-clearLogs::VMM ()
-clearLogs = do
-  state' <- lift get
-  lift $ put state'{logs=[]}
 
 setPC::Word256->VMM ()
 setPC p = do
@@ -207,25 +240,20 @@ useGas gas = do
   case vmGasRemaining state' - gas of
     x | x < 0 -> do
       lift $ put state'{vmGasRemaining=0}
-      left OutOfGasException
+      throwE OutOfGasException
     x -> lift $ put state'{vmGasRemaining=x}
 
 addGas::Integer->VMM ()
 addGas gas = do
   state' <- lift get
   case vmGasRemaining state' + gas of
-    x | x < 0 -> left OutOfGasException
+    x | x < 0 -> throwE OutOfGasException
     x -> lift $ put state'{vmGasRemaining=x}
 
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
   success <- pay reason from to val
-  unless success $ left InsufficientFunds
-
-addToBalance'::Address->Integer->VMM ()
-addToBalance' address' val = do
-  success <- addToBalance address' val
-  unless success $ left InsufficientFunds
+  unless success $ throwE InsufficientFunds
 
 getStorageKeyVal::Word256->VMM Word256
 getStorageKeyVal key = do

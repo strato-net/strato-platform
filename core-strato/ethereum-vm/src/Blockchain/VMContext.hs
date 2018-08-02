@@ -46,6 +46,7 @@ import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -69,6 +70,10 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextSQLDB               :: SQLDB
                        , contextAddressStateDBMap   :: M.Map Address AddressStateModification
                        , contextStorageMap          :: M.Map (Address, Word256) Word256
+                       , contextBlockHashRoot       :: MP.StateRoot
+                       , contextGenesisRoot         :: MP.StateRoot
+                       , contextCurrentBlockHash    :: SHA
+                       , contextCurrentChainId      :: Maybe Word256
                        , contextBaggerState         :: !BaggerState
                        , contextKafkaState          :: K.KafkaState
                        , contextBestBlockInfo       :: ContextBestBlockInfo
@@ -76,6 +81,7 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextInsertTxResultQueue :: [TransactionResult]
                        , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
                        , contextLogDBQueue          :: [LogDB]
+                       , contextHasBlockstanbul     :: Bool
                        }
 
 type ContextM = StateT Context (StatsT (ResourceT (LoggingT IO)))
@@ -136,6 +142,24 @@ instance HasStateDB ContextM where
   setStateDBStateRoot sr = do
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
+
+instance HasChainDB ContextM where
+  getBlockHashRoot = contextBlockHashRoot <$> get
+  putBlockHashRoot sr = do
+    cxt <- get
+    put cxt{contextBlockHashRoot = sr}
+  getGenesisRoot = contextGenesisRoot <$> get
+  putGenesisRoot sr = do
+    cxt <- get
+    put cxt{contextGenesisRoot = sr}
+  getCurrentBlockHash = contextCurrentBlockHash <$> get
+  putCurrentBlockHash bh = do
+    cxt <- get
+    put cxt{contextCurrentBlockHash = bh}
+  getCurrentChainId = contextCurrentChainId <$> get
+  putCurrentChainId cid = do
+    cxt <- get
+    put cxt{contextCurrentChainId = cid}
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
@@ -198,11 +222,16 @@ runContextM f = do
                         conn
                         M.empty
                         M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
                         defaultBaggerState
                         initialKafkaState
                         Unspecified
                         redisPool
-                        [] [] [])
+                        [] [] []
+                        flags_tmpblockstanbul)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a
@@ -227,7 +256,7 @@ getNewAddress address = do
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
   (_, storageMap) <- getStorageDB
-  putStorageMap $ M.filterWithKey (\key _ -> fst key /= address) storageMap
+  putStorageMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

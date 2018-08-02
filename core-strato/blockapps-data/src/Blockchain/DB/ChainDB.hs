@@ -1,0 +1,193 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
+module Blockchain.DB.ChainDB (
+    HasChainDB(..)
+  , bootstrapChainDB
+  , putBlockHeaderInChainDB
+  , getChainRoot
+  , getGenesisStateRoot
+  , putGenesisStateRoot
+  , withBlockchain
+  ) where
+
+import           Control.Monad.Trans.Resource
+
+import qualified Data.NibbleString                    as N
+import           Data.Word                            (Word8)
+
+import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.Data.RLP
+import           Blockchain.Format
+
+import           Blockchain.DB.StateDB
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+import           Blockchain.Strato.Model.SHA          (SHA(..))
+
+import qualified Database.LevelDB                     as DB
+
+{-
+|-------------------------------------------------------------------------------|
+|                          The Chain State Root DB                              |
+|-------------------------------------------------------------------------------|
+| When using Proof of Work as a consensus algorithm,                            |
+| we must be able to run blocks from arbitrary state roots,                     |
+| given that we have previously seen the state root.                            |
+| State roots for the main chain are given in the block header,                 |
+| but there is no such explication for private chains.                          |
+| To mitigate this problem, we must be able to recall the state root            |
+| for any chain id, for any block hash.                                         |
+| To solve this, we'll use a hierarchical approach,                             |
+| which leverages several MP tries to relate block hashes to state roots.       |
+| First, each chain will have a state root, just like the main chain:           |
+|                      state root                                               |
+|                          /\                                                   |
+|                         /  \                                                  |
+|                        /\  /\                                                 |
+|                    account states                                             |
+|                                                                               |
+| Next, the chains' state roots will be stored in a trie, keyed by chain id:    |
+|                      chain root                                               |
+|                          /\                                                   |
+|                         /  \                                                  |
+|                        /\  /\                                                 |
+|                 (chain id, state root)                                        |
+| Then, to keep track of chain roots across blocks, we'll store the chain roots |
+| in a trie, keyed by block hash:                                               |
+|                   block hash root                                             |
+|                          /\                                                   |
+|                         /  \                                                  |
+|                        /\  /\                                                 |
+|                (block hash, chain root)                                       |
+| Finally, all known chains that haven't been transacted upon will be stored    |
+| in a trie, keyed by chain id, with value being the chain's genesis state:     |
+|                     genesis root                                              |
+|                          /\                                                   |
+|                         /  \                                                  |
+|                        /\  /\                                                 |
+|             (chain id, genesis state root)                                    |
+| It's important to note that each block hash may have a unique chain root,     |
+| but the genesis root only gets updated when the VM receives a new             |
+| OEGenesis message.                                                            |
+|                                                                               |
+| When the VM receives a new block, it will insert it into the block hash       |
+| trie, with the same chain root as its parent.                                 |
+|                                                                               |
+| When the VM runs private transactions in a block, it will load the            |
+| chain's state root using the block's chain root. If the chain trie does       |
+| not include the chain id, the chain's genesis state root will be loaded       |
+| from the genesis trie, and be inserted into the chain trie. This will,        |
+| in effect, change the the chain root, and the block hash root.                |
+|-------------------------------------------------------------------------------|
+-}
+
+class Monad m => HasChainDB m where
+  getBlockHashRoot    :: m MP.StateRoot
+  putBlockHashRoot    :: MP.StateRoot -> m ()
+  getGenesisRoot      :: m MP.StateRoot
+  putGenesisRoot      :: MP.StateRoot -> m ()
+  getCurrentBlockHash :: m SHA
+  putCurrentBlockHash :: SHA -> m ()
+  getCurrentChainId   :: m (Maybe Word256)
+  putCurrentChainId   :: Maybe Word256 -> m ()
+
+forJust :: Applicative f => Maybe a -> b -> (a -> f b) -> f b
+forJust m b f =
+  case m of
+    Nothing -> pure b
+    Just a -> f a
+
+forNothing :: Applicative f => Maybe a -> (a -> b) -> f b -> f b
+forNothing m f b =
+  case m of
+    Nothing -> b
+    Just a -> pure (f a)
+
+getLDB :: HasStateDB m => m DB.DB
+getLDB = MP.ldb <$> getStateDB
+
+bytesToMPKey :: [Word8] -> N.NibbleString
+bytesToMPKey = N.pack . (N.byte2Nibbles =<<)
+
+word256ToMPKey :: Word256 -> N.NibbleString
+word256ToMPKey = bytesToMPKey . word256ToBytes
+
+getkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> m (Maybe a)
+getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
+
+putkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
+putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
+
+bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()
+bootstrapChainDB genesisHash = putChainRoot genesisHash MP.emptyTriePtr
+
+putBlockHeaderInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
+putBlockHeaderInChainDB b = do
+  let p = blockHeaderParentHash b
+      h = blockHeaderHash b
+  mChainRoot <- getChainRoot p
+  case mChainRoot of
+    Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
+    Just chainRoot -> putChainRoot h chainRoot
+
+getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
+getChainRoot (SHA h) = do
+  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
+  getkv bhdb (word256ToMPKey h)
+
+putChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> MP.StateRoot -> m ()
+putChainRoot (SHA h) sr = do
+  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
+  newBlockHashRoot <- putkv bhdb (word256ToMPKey h) sr
+  putBlockHashRoot newBlockHashRoot
+
+getGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe MP.StateRoot)
+getGenesisStateRoot cid = do
+  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
+  getkv gdb (word256ToMPKey cid)
+
+putGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> MP.StateRoot -> m ()
+putGenesisStateRoot cid sr = do
+  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
+  newGenesisRoot <- putkv gdb (word256ToMPKey cid) sr
+  putGenesisRoot newGenesisRoot
+
+getChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> m (Maybe MP.StateRoot)
+getChainStateRoot chainId bHash = do
+  mChainRoot <- getChainRoot bHash
+  (mStateRoot :: Maybe (Word256, MP.StateRoot))
+    <- forJust mChainRoot Nothing $ \chainRoot -> do
+      cdb <- flip MP.MPDB chainRoot <$> getLDB
+      getkv cdb (word256ToMPKey chainId)
+  forNothing mStateRoot (Just . snd) $ do
+    mGenStateRoot <- getGenesisStateRoot chainId
+    forJust mGenStateRoot Nothing $ \genStateRoot -> do
+      putChainStateRoot chainId bHash genStateRoot
+      return $ Just genStateRoot
+
+putChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
+putChainStateRoot chainId bHash stateRoot = do
+  mChainRoot <- getChainRoot bHash
+  case mChainRoot of
+    Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ format bHash ++ ", but it doesn't exist"
+    Just chainRoot -> do
+      cdb <- flip MP.MPDB chainRoot <$> getLDB
+      newChainRoot <- putkv cdb (word256ToMPKey chainId) (chainId, stateRoot)
+      putChainRoot bHash newChainRoot
+
+withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
+withBlockchain bh cid f = do
+  case cid of
+    Nothing -> f
+    Just chainId -> do
+      mStateRoot <- getChainStateRoot chainId bh
+      case mStateRoot of
+        Nothing -> error $ "withBlockchain: Couldn't find state root for chain " ++ format chainId
+        Just stateRoot -> do
+          existingStateRoot <- getStateRoot
+          setStateDBStateRoot stateRoot
+          a <- f
+          newStateRoot <- getStateRoot
+          putChainStateRoot chainId bh newStateRoot
+          setStateDBStateRoot existingStateRoot
+          return a

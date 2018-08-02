@@ -1,12 +1,14 @@
 import React from 'react';
 import SideBar from "../../components/SideBar";
 import * as checkMode from '../../lib/checkMode';
+import * as checkS3Credentials from '../../lib/checkS3Credentials';
 
 describe('SideBar: index', () => {
   let wrapper;
 
   test('render component for public mode', () => {
     checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    checkS3Credentials.isS3Available = jest.fn().mockReturnValue(false);
     wrapper = shallow(<SideBar />);
     expect(wrapper.debug()).toMatchSnapshot();
   });
@@ -15,6 +17,7 @@ describe('SideBar: index', () => {
 
     beforeEach(() => {
       checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkS3Credentials.isS3Available = jest.fn().mockReturnValue(false);
       wrapper = shallow(<SideBar />);
     });
 
@@ -57,6 +60,7 @@ describe('SideBar: index', () => {
 
   test('render component for enterprise mode', () => {
     checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    checkS3Credentials.isS3Available = jest.fn().mockReturnValue(true);
     wrapper = shallow(<SideBar />);
     expect(wrapper.debug()).toMatchSnapshot();
   });
@@ -65,6 +69,7 @@ describe('SideBar: index', () => {
 
     beforeEach(() => {
       checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkS3Credentials.isS3Available = jest.fn().mockReturnValue(true);
       wrapper = shallow(<SideBar />);
     });
 
@@ -97,11 +102,17 @@ describe('SideBar: index', () => {
       wrapper.find('NavLink').at(5).simulate('click');
       expect(wrapper.find('NavLink').get(5)).toMatchSnapshot();
     });
-
-    test('seventh position /apps', () => {
+    
+    test('seventh position /external-storage', () => {
       wrapper.find('NavLink').at(6).simulate('click');
       expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
     });
+
+    test('eight position /apps', () => {
+      wrapper.find('NavLink').at(7).simulate('click');
+      expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
+    });
+
 
   });
 

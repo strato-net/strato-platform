@@ -17,7 +17,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Stats
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
@@ -28,7 +28,6 @@ import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
-import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -110,7 +109,7 @@ logN n = do
 guardStorage :: VMM ()
 guardStorage = do
   w <- lift $ writable <$> get
-  when (not w) (left WriteProtection)
+  when (not w) (throwE WriteProtection)
 
 
 dupN::Int->VMM ()
@@ -118,7 +117,7 @@ dupN n = do
   stack' <- lift $ fmap stack get
   if length stack' < n
     then do
-    left StackTooSmallException
+    throwE StackTooSmallException
     else push $ stack' !! (n-1)
 
 
@@ -134,7 +133,7 @@ swapn n = do
   vmState <- lift get
   if length (stack vmState) < n
     then do
-      left StackTooSmallException
+      throwE StackTooSmallException
     else do
       let (middle, v2:rest2) = splitAt (n-1) $ stack vmState
       lift $ put vmState{stack = v2:(middle++(v1:rest2))}
@@ -167,7 +166,7 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack::Address->VMM ()
+accountCreationHack :: Address -> VMM ()
 accountCreationHack address' = do
   exists <- addressStateExists address'
   when (not exists) $ do
@@ -421,7 +420,7 @@ runOperation JUMP = do
 
   if p `elem` jumpDests
     then setPC $ fromIntegral p - 1 -- Subtracting 1 to compensate for the pc-increment that occurs every step.
-    else left InvalidJump
+    else throwE InvalidJump
 
 runOperation JUMPI = do
   p <- pop
@@ -431,7 +430,7 @@ runOperation JUMPI = do
   case (p `elem` jumpDests, (0::Word256) /= condition) of
     (_, False) -> return ()
     (True, _)  -> setPC $ fromIntegral p - 1
-    _          -> left InvalidJump
+    _          -> throwE InvalidJump
 
 runOperation PC = pushVMStateVar pc
 
@@ -695,7 +694,7 @@ runOperation DELEGATECALL = do
     else do
       let MalformedOpcode opcode = DELEGATECALL
       when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
-      left MalformedOpcodeException
+      throwE MalformedOpcodeException
 
 runOperation STATICCALL = do
   gas <- pop :: VMM Word256
@@ -712,15 +711,15 @@ runOperation REVERT = do
   retVal <- unsafeSliceByteString address' size
 
   setReturnVal $ Just retVal
-  left RevertException
+  throwE RevertException
 
-runOperation INVALID = left InvalidInstruction
+runOperation INVALID = throwE InvalidInstruction
 
 runOperation SUICIDE = do
   guardStorage
   address' <- pop
   owner <- getEnvVar envOwner
-  addressState <- getAddressState $ owner
+  addressState <- getAddressState owner
 
   let allFunds = addressStateBalance addressState
   pay' "transferring all funds upon suicide" owner address' allFunds
@@ -734,7 +733,7 @@ runOperation SUICIDE = do
 
 runOperation (MalformedOpcode opcode) = do
   when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
-  left MalformedOpcodeException
+  throwE MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
 
@@ -943,7 +942,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
                          callDepth=callDepth',
                          vmGasRemaining=availableGas,
                          suicideList=preExistingSuicideList} $
-      runEitherT f
+      runExceptT f
 
   case result of
       (Left e, vmState') -> do
@@ -958,19 +957,19 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> BlockData -> SHA -> ContextM String
+getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> BlockData -> SHA -> ContextM String
+getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
-getFromSelector :: BC.ByteString -> Bool -> BlockData -> SHA -> ContextM String
-getFromSelector sel isRunningTests' b codeHash = do
+getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
+getFromSelector sel isRunningTests' sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
   stateRoot <- getStateRoot
-  setStateDBStateRoot (blockDataStateRoot b)
-  let env = 
+  setStateDBStateRoot sr
+  let env =
         Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
           envGasPrice=1,
           envBlockHeader=BlockData{
@@ -986,7 +985,7 @@ getFromSelector sel isRunningTests' b codeHash = do
             blockDataGasLimit = 10000000000000000000,
             blockDataGasUsed = 0,
             blockDataTimestamp = posixSecondsToUTCTime 0,
-            blockDataExtraData = 0,
+            blockDataExtraData = "",
             blockDataNonce = 0,
             blockDataMixHash = SHA 0
             },
@@ -999,7 +998,7 @@ getFromSelector sel isRunningTests' b codeHash = do
           envJumpDests = getValidJUMPDESTs theCode
           }
   (eRes, _) <-
-    runVMM False True S.empty 0 env 1000000000000000000 $ call' True
+    runVMM isRunningTests' True S.empty 0 env 1000000000000000000 $ call' True
 
   setStateDBStateRoot stateRoot
   case eRes of

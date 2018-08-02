@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
 import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Parse.Declarations
 import BlockApps.Solidity.Parse.UnParser
@@ -21,84 +22,93 @@ spec = do
     it "should parse function as private" $ do
       let eRes = showError $ runParser functionModifiers "" "" "private returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Private
     it "should parse function as public" $ do
       let eRes = showError $ runParser functionModifiers "" "" "public returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Public
     it "should parse function as internal" $ do
       let eRes = showError $ runParser functionModifiers "" "" "internal returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Internal
     it "should parse function as external" $ do
       let eRes = showError $ runParser functionModifiers "" "" "external returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility, _, _) = eRes
       visibility `shouldBe` External
     it "should parse function as public by default" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (address) {}"
       printLeft eRes
-      let Right (_, visibility, _, _, _) = eRes
+      let Right (_, visibility,  _, _) = eRes
       visibility `shouldBe` Public
     it "should parse function as constant" $ do
       let eRes = showError $ runParser functionModifiers "" "" "constant returns (address) {}"
       printLeft eRes
-      let Right (_, _, mutable, _, _) = eRes
-      mutable `shouldBe` False
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Constant
     it "should parse function as a function mutates state" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (address) {}"
       printLeft eRes
-      let Right (_, _, mutable, _, _) = eRes
-      mutable `shouldBe` True
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Nothing
     it "should parse function with modifier onlyOwner" $ do
       let eRes = showError $ runParser functionModifiers "" "" "onlyOwner returns (address) {}"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["onlyOwner"]
     it "should parse function with multiple modifiers" $ do
       let eRes = showError $ runParser functionModifiers "" "" "one ring to mod them all returns (address) {}"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["one","ring","to","mod","them","all"]
     it "should parse function with correct modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "private onlyOwner constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, _, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
+      mutability `shouldBe` Just Constant
       modifiers `shouldBe` ["onlyOwner"]
     it "should parse function with correct base constructor" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(uint a) returns (address)"
       printLeft eRes
-      let Right (_, _, _, _, modifiers) = eRes
+      let Right (_, _, _, modifiers) = eRes
       modifiers `shouldBe` ["Base(uint a)"]
     it "should parse function with correct base constructor, modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(string a) private onlyOwner constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, _, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
+      mutability `shouldBe` Just Constant
       modifiers `shouldBe` ["Base(string a)", "onlyOwner"]
     it "should parse function with correct payable modifier" $ do
       let eRes = showError $ runParser functionModifiers "" "" "payable returns (address)"
       printLeft eRes
-      let Right (_, _, _, payable, _) = eRes
-      payable `shouldBe` True
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Payable
+    it "should parse function with view modifier" $ do
+      let eRes = showError $ runParser functionModifiers "" "" "view returns (uint)"
+      printLeft eRes
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just View
+    it "should parse function with pure modifier" $ do
+      let eRes = showError $ runParser functionModifiers "" "" "pure returns (string)"
+      printLeft eRes
+      let Right (_, _, mutability, _) = eRes
+      mutability `shouldBe` Just Pure
     it "should parse function with correct base constructor, payable, modifiers, mutability, and visibility" $ do
       let eRes = showError $ runParser functionModifiers "" "" "Base(string a) private onlyOwner payable constant returns (address)"
       printLeft eRes
-      let Right (_, visibility, mutable, payable, modifiers) = eRes
+      let Right (_, visibility, mutability, modifiers) = eRes
       visibility `shouldBe` Private
-      mutable `shouldBe` False
-      payable `shouldBe` True
+      mutability `shouldBe` Just Payable
       modifiers `shouldBe` ["Base(string a)", "onlyOwner"]
     it "should parse function that returns two values" $ do
       let eRes = showError $ runParser functionModifiers "" "" "returns (ErrorCodes, ProjectState) {}"
       printLeft eRes
-      let Right (rets, _, _, _, _) = eRes
+      let Right (rets, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
     it "should parse a function with nested comments" $ do
@@ -190,22 +200,24 @@ spec = do
       struct' `shouldBe` struct
 
   describe "Declarations - solidityContract" $ do
-    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty
+    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+    let nameOf (NamedXabi n _) = n
+        nameOf _ = error "unexpected pragma"
     it "should parse an empty contract" $ do
       let contractString = "contract a {}"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("a", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\
             \    function r() {}\
             \}"
           eRes = runParser solidityContract "" "" contractString
-      (fst <$> eRes) `shouldBe` Right "q"
+      (nameOf <$> eRes) `shouldBe` Right "q"
     it "should parse a commented contract" $ do
       let contractString = "contract b { // don't dead open inside \n}"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("b", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "b" (xempty, []))
     it "should parse nested a nested comments contract" $ do
       let contractString = "contract c { \
                            \  /* this is how \
@@ -213,7 +225,7 @@ spec = do
                            \  // bam! double comment \
                            \ */ }"
           eRes = runParser solidityContract "" "" contractString
-      eRes `shouldBe` Right ("c", (xempty, []))
+      eRes `shouldBe` Right (NamedXabi "c" (xempty, []))
     it "should parse unbalanced braces inside a string" $ do
       let contractString = "contract d { \
                            \  function x() constant returns (string) { \
@@ -221,7 +233,7 @@ spec = do
                            \  } \
                            \}"
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "d"
+      nameOf <$> eRes `shouldBe` Right "d"
 
     it "should parse unbalanced parens inside a string" $ do
       let contractString = "contract e { \
@@ -230,7 +242,7 @@ spec = do
                            \  } \
                            \}"
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "e"
+      nameOf <$> eRes `shouldBe` Right "e"
 
     it "should parse unbalanced strings inside a comment" $ do
       let contractString = unlines ["contract f { ",
@@ -239,7 +251,7 @@ spec = do
                                     "  } ",
                                     "}"]
           eRes = runParser solidityContract "" "" contractString
-      fst <$> eRes `shouldBe` Right "f"
+      nameOf<$> eRes `shouldBe` Right "f"
 
   let isLeft (Right _) = False
       isLeft (Left _) = True
@@ -286,6 +298,26 @@ spec = do
       let funcString = "constructor(){}"
           eRes = runParser functionDeclaration "Contract" "" funcString
       (fst <$> eRes) `shouldBe` Right "Contract"
+
+  describe "Declarations - events" $ do
+    it "should parse an event" $ do
+      let eventString = "event MemberAdded (address member);"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+    it "should parse an anonymous event" $ do
+      let eventString = "event MemberAdded (address member) anonymous;"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+      (snd <$> eRes) `shouldBe` Right (EventDeclaration (Event True [("member", (IndexedType 0 Address))]))
+    it "should parse an event with multiple fields" $ do
+      let eventString = "event MemberAdded (address indexed member, uint indexed count, string name);"
+          eRes = runParser eventDeclaration "" "" eventString
+      (fst <$> eRes) `shouldBe` Right "MemberAdded"
+      (snd <$> eRes) `shouldBe` Right (EventDeclaration (Event False
+                                                               [("member", (IndexedType 0 Address))
+                                                               ,("count", (IndexedType 1 (Int (Just False) Nothing)))
+                                                               ,("name", (IndexedType 2 (String (Just True))))
+                                                               ]))
 
   describe "Declarations - variableDeclaration" $ do
     let parseVarName = fmap fst . runParser variableDeclaration "" ""

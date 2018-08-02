@@ -99,12 +99,15 @@ instance MonadBaseControl IO Bloc where
   liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
   restoreM = Bloc . restoreM
 
+data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
+
 data BlocEnv = BlocEnv
   { urlStrato    :: BaseUrl
-  , urlCirrus    :: BaseUrl
+  --, urlCirrus    :: BaseUrl
   , httpManager  :: Manager
   , dbPool       :: Pool Connection
   , logLevel     :: Severity
+  , deployMode   :: DeployMode
   }
 
 data BlocError
@@ -115,20 +118,9 @@ data BlocError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
+  | AlreadyExists Text
   | RuntimeError SomeException
   deriving Show
-
-
-
-
-
-
-
-
-
-
-
-
 
 --------------------------------------------------------------------------------
 boxIt::String->String
@@ -171,20 +163,20 @@ enterBloc env x
     reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
-          StratoError (FailureResponse Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+          StratoError (FailureResponse url' Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
-                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "Response from server:",
                      boxIt $ Lazy.Char8.unpack responseBody'
                    ]}
-          StratoError (FailureResponse Status{statusCode=404} _ _) ->
+          StratoError (FailureResponse url' Status{statusCode=404} _ _) ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
-                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
@@ -218,6 +210,7 @@ enterBloc env x
                    ]}
           CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
           UserError err -> err400{errBody = fromString $ show err}
+          AlreadyExists err -> err409{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
             err500{errBody = fromString $ unlines
@@ -329,7 +322,7 @@ blocStrato client' = do
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
-
+{-
 blocCirrusFireForget :: HasCallStack => ClientM x -> Bloc Bool
 blocCirrusFireForget client' = do
   logWithCallStack callStack logNotice "Querying Cirrus"
@@ -337,7 +330,7 @@ blocCirrusFireForget client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   case resultEither of
-    Left err -> do 
+    Left err -> do
       logWith logError (Text.pack $ show err ++ "\n  Cirrus returned an error")
       return False
     Right _ -> return True
@@ -349,3 +342,4 @@ blocCirrus client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . CirrusError) return resultEither
+-}
