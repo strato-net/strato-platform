@@ -50,8 +50,8 @@ export function createChainApiCall(label, members, balances, src, args){
       },
       body: JSON.stringify({
          "args": a,
-         "balances": b,
-         "members": m,
+         "balances": balances,
+         "members": members,
          "src": s,
          "label": label
       })

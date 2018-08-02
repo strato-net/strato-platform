@@ -24,12 +24,18 @@ class CreateChain extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('create_chain_submit_click');
-    let members = {};
-    members["address"] = values.memAddress;
-    members["enode"] = values.memEnode;
-    let balances = {};
-    balances["address"] = values.address;
-    balances["balance"] = values.balance;
+    let members = [];
+    let balances = [];
+    this.state.members.forEach(function(member, index) {
+      members.push({
+        "address": member.address,
+        "enode": member.enode
+      });
+      balances.push({
+        "balance": member.balance,
+        "address": member.address
+      });
+    });
     this.props.createChain(values.label, members, balances, values.src, values.args);
   }
 
@@ -110,7 +116,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Governance Contract"
                       className="pt-input form-width"
-                      tabIndex="6"
+                      tabIndex="2"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.src}</div>
@@ -128,7 +134,7 @@ class CreateChain extends Component {
                       type="text"
                       placeholder="Variables"
                       className="pt-input form-width"
-                      tabIndex="7"
+                      tabIndex=""
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.args}</div>
@@ -160,10 +166,7 @@ class CreateChain extends Component {
                 }} />
                 <Button
                   intent={Intent.PRIMARY}
-                  onClick={(e) => {
-                    console.log(this.state.members);
-                    this.props.handleSubmit(this.submit)
-                  }}
+                  onClick={this.props.handleSubmit(this.submit)}
                   text="Create Chain"
                 />
               </div>
