@@ -75,7 +75,7 @@ ethereumVM = void . execContextM $ do
         forM_ newCommands runJsonRpcCommand
 
         let allTxs = [OETx ts t | OETx ts t <- seqEvents]
-        $logInfoS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+        $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)

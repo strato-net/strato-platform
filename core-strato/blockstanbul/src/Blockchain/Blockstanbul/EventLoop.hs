@@ -224,7 +224,7 @@ sendMessages wms = do
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   out <- sendMessages wms
-  $logInfoS "sendAllMessages" . T.pack . show $ out
+  $logDebugS "sendAllMessages" . T.pack . show $ out
   case catMaybes . map loopback $ out of
              [] -> return out
              wms' -> (out ++) <$> sendAllMessages wms'
