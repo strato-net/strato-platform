@@ -11,7 +11,7 @@ import           GHC.Generics
 import           Data.Aeson.Types
 
 type StratoAPI = "_ping" :> Get '[JSON] String
-  :<|> Header "X-User" String :> "strato" :> "v2.3" :> "signature" :> Post '[JSON] SignatureDetails
+  :<|> "strato" :> "v2.3" :> "signature" :> Post '[JSON] SignatureDetails
 
 data SignatureDetails = SignatureDetails {
   r :: String

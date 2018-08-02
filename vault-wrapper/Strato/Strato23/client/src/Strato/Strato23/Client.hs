@@ -13,6 +13,6 @@ import           Servant.Client
 import           Data.Proxy
 import           Strato.Strato23.API
 
-postSignature :: Maybe [Char] -> ClientM SignatureDetails
+postSignature :: ClientM SignatureDetails
 getPing :: ClientM String
 getPing :<|> postSignature = client (Proxy @ StratoAPI)

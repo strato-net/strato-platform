@@ -5,7 +5,7 @@ resolver: lts-12.4
 compiler-check: newer-minor # remove?
 
 packages:
-- Strato/Strato23/API
+- Strato/Strato23/api
 - Strato/Strato23/client
 - Strato/Strato23/server
 
