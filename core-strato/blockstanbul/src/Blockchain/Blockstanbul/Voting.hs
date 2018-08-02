@@ -1,11 +1,10 @@
 module Blockchain.Blockstanbul.Voting where
 
-import Data.Word
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader as BH
-import Data.Map
-import Data.List ((\\))
+import Data.Map as M
+import Data.List as L
 
 editBeneficiary :: Block -> Address -> Bool ->  Block   
 editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
@@ -17,39 +16,26 @@ editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
                                                      }
                     
 
-extractBeneficiary :: Block -> (Address,Word64)
-extractBeneficiary ppl = (benef, dir)
-  where benef = BH.beneficiary $ BH.blockToBlockHeader ppl
-        dir = BH.nonce $ BH.blockToBlockHeader ppl
-
+extractBeneficiary :: Block -> Maybe(Address,Bool)
+extractBeneficiary ppl = case (BH.nonce $ BH.blockToBlockHeader ppl) of
+  0xffffffffffffffff -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl), True)
+  0x0000000000000000 -> Just ((BH.beneficiary $ BH.blockToBlockHeader ppl),False)
+  _ -> Nothing
+ 
 --output a new list of validater and beneficiary
-updatevalidator :: [Address] -> Map Address (Map Address Word64) -> ([Address],Map Address (Map Address Word64))
+updatevalidator :: [Address] -> Map Address (Map Address Bool) -> ([Address],Map Address (Map Address Bool))
 updatevalidator val voted = (x,y)
                      where (todrop,toadd) = partitionWithKey (\ k _ -> k `elem` val) voted
-                           (addsuccess, _) = partition helperas toadd
-                           --(addfail, _) = partition helperaf addunknown
-                           (dropsuccess,_) = partition helperd todrop
-                           --(dropfail, _) = partition helperdf dropfail
+                           addsuccess = M.filter helperas toadd 
+                           dropsuccess = M.filter helperd todrop
                            x = combined val addsuccess dropsuccess
-                           y =  voted Data.Map.\\ addsuccess Data.Map.\\ dropsuccess
+                           y =  voted M.\\ addsuccess M.\\ dropsuccess
                            maxnum = (length val)*2 `div` 3 +1
-                           -- minnum = (length val)*1 `div` 3 +1
                            -- check if up and down votes exceed maxnum
-                           helperas valu = (numberofup (elems valu) > maxnum)
-                           --helperaf valu = (numberofdown (elems valu)>minnum)
-                           helperd valu = (numberofdown (elems valu) > maxnum)
-                           --helperdf valu =(numberofup (elems valu)>minnum)
+                           helperas valu = (length (L.filter (==True) (elems valu)) > maxnum)
+                           helperd valu =  (length (L.filter (==False) (elems valu)) > maxnum)
                                        
                            
-combined :: [Address] -> Map Address (Map Address Word64) -> Map Address (Map Address Word64) -> [Address]
-combined val adds drops = (val ++  (keys adds)) Data.List.\\ (keys drops)
+combined :: [Address] -> Map Address (Map Address Bool) -> Map Address (Map Address Bool) -> [Address]
+combined val adds drops = (val ++  (keys adds)) L.\\ (keys drops)
 
-
-numberofup :: [Word64] -> Int
-numberofup [] = 0
-numberofup (x:xs) = numberofup xs + (if (x == 0xffffffffffffffff) then 1 else 0)
-
-numberofdown :: [Word64] -> Int
-numberofdown [] = 0
-numberofdown (x:xs) = numberofup xs + (if (x == 0x0000000000000000) then 1 else 0)
-    
