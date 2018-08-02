@@ -21,7 +21,8 @@ import {
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 
-const chainUrl = env.STRATO_URL + "/chain"
+const chainUrl = env.STRATO_URL + "/chain";
+const chainUrl2 = env.BLOC_URL + "/chain/:chainid";
 
 export function getChainsApi() {
   return fetch(
@@ -43,7 +44,7 @@ export function getChainsApi() {
 
 export function getChainDetailApi(chainid) {
   return fetch(
-    chainUrl.concat("?chainid=", chainid),
+    chainUrl2.replace(':chainid', chainid),
     {
       method: 'GET',
       credentials: "include",
@@ -61,12 +62,12 @@ export function getChainDetailApi(chainid) {
 
 export function* getChains(action) {
   try {
-    // const response = yield call(getChainsApi);
-    // const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
-    // const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
+    const response = yield call(getChainsApi);
+    const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
+    const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
     // const chainInfos = response.map(chainIdChainInfo => chainIdChainInfo["info"]);
-    const chainLabels = ["c1","c2"];
-    const chainIds = ["5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac", "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f"];
+    //const chainLabels = ["c1","c2"];
+    //const chainIds = ["5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac", "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f"];
     yield put(fetchChainsSuccess(chainLabels, chainIds));
     if (action.loadChainId && chainLabels.length > 0) {
       yield put(fetchChainId(chainLabels[0], chainLabels, chainIds, action.loadChainId));
@@ -97,8 +98,8 @@ export function* getChainId(action) {
 
 export function* getChainDetail(action) {
   try {
-    // const response = yield call(getChainDetailApi, action.id);
-    const response = {
+    const response = yield call(getChainDetailApi, action.id);
+    {/*const response = {
       "balances": [
         {
           "balance": 0,
@@ -124,7 +125,7 @@ export function* getChainDetail(action) {
         }
       ],
       "label": "c1"
-    };
+    };*/}
     yield put(fetchChainDetailSuccess(action.label, action.id, response));
   }
   catch (err) {
