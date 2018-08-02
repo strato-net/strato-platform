@@ -23,7 +23,11 @@ class AddMember extends Component {
     this.state = {
       form: {
         userSelected: true
-      }
+      },
+      username: '',
+      address: '',
+      enode: '',
+      balance: 0
     }
   }
 
@@ -37,8 +41,28 @@ class AddMember extends Component {
     this.props.fetchAccounts(true, true);
   }
 
-  submit = (values) => {
-    console.log(values);
+  handleUsernameChange (event) {
+     this.setState({
+      username: event.target.value
+    });
+  }
+
+  handleAddressChange (event) {
+    this.setState({
+      address: event.target.value
+    });
+  }
+
+  handleEnodeChange (event) {
+    this.setState({
+      enode: event.target.value
+    });
+  }
+
+  handleBalanceChange (event) {
+    this.setState({
+      balance: event.target.value
+    });
   }
 
   userNameField = (users, isPublicMode) => {
@@ -47,8 +71,12 @@ class AddMember extends Component {
         className="pt-input"
         component="select"
         name="from"
+        value={this.state.username}
         onChange={
-          (e) => this.props.fetchUserAddresses(e.target.value, true)
+          (e) => {
+            this.props.fetchUserAddresses(e.target.value, true);
+            this.handleUsernameChange(e);
+          }
         }
         required
         disabled={isPublicMode}
@@ -76,6 +104,8 @@ class AddMember extends Component {
         className="pt-input"
         component="select"
         name="fromAddress"
+        value={this.state.address}
+        onChange={(e) => this.handleAddressChange(e)}
         required
         disabled={isPublicMode}
       >
@@ -158,7 +188,9 @@ class AddMember extends Component {
                       component="input"
                       type="text"
                       placeholder="Enode"
+                      value={this.state.enode}
                       className="pt-input form-width"
+                      onChange={(e) => this.handleEnodeChange(e)}
                       required
                     />
                   </div>
@@ -176,9 +208,11 @@ class AddMember extends Component {
                     <Field
                       name="value"
                       component="input"
-                      type="text"
+                      type="number"
                       placeholder="Balance"
+                      value={this.state.balance}
                       className="pt-input form-width"
+                      onChange={(e) => this.handleBalanceChange(e)}
                       required
                     />
                   </div>
@@ -197,7 +231,7 @@ class AddMember extends Component {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.props.handler("new member");
+                    this.props.handler(this.state.username, this.state.address, this.state.enode, this.state.balance);
                     mixpanelWrapper.track('add_member_submit_click_successful');
                     this.closeModal();
                   }}                  
