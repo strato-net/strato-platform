@@ -33,7 +33,6 @@ dependencies:
   - time
   - statsdi
   - stm
-  - stm-chans
   - conduit-combinators
   - blockstanbul
   - lens

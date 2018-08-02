@@ -121,7 +121,7 @@ sequencer = do
     vmEvs <- drainVM
     unless (null vmEvs) $ do
       when (OECreateBlockCommand `elem` vmEvs) $ do
-        $logOtherS "sequencer" "perfhunt" "sending OECreateBlockCommand"
+        $logDebugS "sequencer" "sleeping OECreateBlockCommand"
         -- TODO(tim): This delay is to ensure that the timestamp on the
         -- block is more than a block period away from the last. The
         -- threadDelay can instead sleep for max(blockperiod - (now - last_timestamp), 0)
