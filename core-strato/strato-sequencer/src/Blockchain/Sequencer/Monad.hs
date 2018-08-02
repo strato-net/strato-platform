@@ -18,8 +18,6 @@ module Blockchain.Sequencer.Monad (
   , addLdbBatchOps
   , drainP2P
   , drainVM
-  , vmEvents
-  , p2pEvents
 ) where
 
 import           ClassyPrelude                             (atomically, STM)
