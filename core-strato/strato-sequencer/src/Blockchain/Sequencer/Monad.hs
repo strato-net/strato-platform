@@ -20,8 +20,6 @@ module Blockchain.Sequencer.Monad (
   , drainVM
 ) where
 
-import           ClassyPrelude                             (atomically, STM)
-import           Control.Concurrent.STM.TMChan
 import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
@@ -29,6 +27,7 @@ import           Control.Monad.State
 import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
+import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 
@@ -67,8 +66,8 @@ data SequencerContext = SequencerContext
                       , _getChainsDB         :: S.Set Word256
                       , _getTransactionsDB   :: S.Set SHA
                       , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-                      , _vmEvents            :: TMChan OutputEvent
-                      , _p2pEvents           :: TMChan OutputEvent
+                      , _vmEvents            :: Q.Seq OutputEvent
+                      , _p2pEvents           :: Q.Seq OutputEvent
                       , _sequencerKafkaState :: K.KafkaState
                       , _blockstanbulContext :: Maybe BlockstanbulContext
                       }
@@ -132,8 +131,6 @@ runSequencerM c mbc m = do
         kClId    <- asks kafkaClientId
         mAddr    <- asks kafkaAddress
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
-        vm       <- atomically newTMChan
-        p2p      <- atomically newTMChan
         let kState = case mAddr of
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
@@ -146,8 +143,8 @@ runSequencerM c mbc m = do
             , _getChainsDB         = S.empty
             , _getTransactionsDB   = S.empty
             , _ldbBatchOps         = Q.empty
-            , _vmEvents            = vm
-            , _p2pEvents           = p2p
+            , _vmEvents            = Q.empty
+            , _p2pEvents           = Q.empty
             , _sequencerKafkaState = kState
             , _blockstanbulContext = mbc
             }
@@ -157,29 +154,16 @@ pairToOETx :: (Timestamp, OutputTx) -> OutputEvent
 pairToOETx = uncurry OETx
 
 markForVM :: OutputEvent -> SequencerM ()
-markForVM oe = do
-  ch <- use vmEvents
-  atomically $ writeTMChan ch oe
+markForVM oe = vmEvents %= (Q.|> oe)
 
 markForP2P :: OutputEvent -> SequencerM ()
-markForP2P oe = do
-  ch <- use p2pEvents
-  atomically $ writeTMChan ch oe
-
-drainEvents :: TMChan OutputEvent -> STM [OutputEvent]
-drainEvents ch = do
-  first <- tryReadTMChan ch
-  case first of
-    -- TODO(tim): Should we detect a closed channel?
-    Nothing -> return []
-    Just Nothing -> return []
-    Just (Just x) -> (x:) <$> drainEvents ch
+markForP2P oe = p2pEvents %= (Q.|> oe)
 
 drainP2P :: SequencerM [OutputEvent]
-drainP2P = join $ uses p2pEvents (atomically . drainEvents)
+drainP2P = fmap toList $ p2pEvents <<.= Q.empty
 
 drainVM :: SequencerM [OutputEvent]
-drainVM = join $ uses vmEvents (atomically . drainEvents)
+drainVM = fmap toList $ vmEvents <<.= Q.empty
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})

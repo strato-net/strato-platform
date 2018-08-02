@@ -13,7 +13,6 @@ import           ClassyPrelude                             (atomically)
 import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMVar
-import           Control.Lens           hiding (op)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
