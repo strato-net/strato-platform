@@ -11,6 +11,7 @@ import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Word
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 
@@ -18,6 +19,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
@@ -48,7 +50,8 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
-
+  , _voted :: M.Map Address (M.Map Address Word64)
+  , _pendingvotes :: [(Address, Bool)]
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
 }
@@ -71,6 +74,8 @@ newContext v as pk =
      , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
+     , _voted = M.empty
+     , _pendingvotes = []
      , _prvkey = pk
      }
 
@@ -123,6 +128,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
+    NewBeneficiary benf decision  -> do
+      -- voter <- selfAddr
+      pvotes <- use pendingvotes
+      pendingvotes .= (benf,decision) : pvotes
+      return ()
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
@@ -131,8 +141,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         pk <- use prvkey
         vs <- use validators
-        let blockWithVs = addValidators vs blk
-        pseal <- proposerSeal blockWithVs pk
+        --extract from pending list and vote
+        pvotes <- use pendingvotes
+        let (bnf, nonc) = head pvotes
+        let blkn = editBeneficiary blk bnf nonc
+        pendingvotes .= tail pvotes
+        
+        let blockWithVs = addValidators vs blkn
+        pseal <- proposerSeal blockWithVs pk 
         let sealedBlk = addProposerSeal pseal blockWithVs
         proposal .= Just sealedBlk
         yield =<< signMessage pk (Preprepare v sealedBlk)
@@ -143,6 +159,17 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           then do
             proposal .= Just pp
             pk <- use prvkey
+            let (bnef,vot) = extractBeneficiary pp
+            -- insert the vote into map
+            vmap <- use voted
+      
+            let val = M.lookup bnef vmap
+            let unwrapval = case val of
+                  Nothing -> M.empty
+                  Just vall -> vall
+            let nval = M.insert pr vot unwrapval
+           
+            _ <- voted <%= M.insert bnef nval
             yield =<< signMessage pk (Prepare v (blockHash pp))
           else roundChange
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
