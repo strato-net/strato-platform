@@ -13,8 +13,6 @@ const config = common.config;
 const password = '1234';
 
 const label = 'My chain label';
-const addRule = 'My add rule';
-const removeRule = 'My remove rule';
 const src = 'contract Governance { }';
 const args = [];
 const members = [{
@@ -77,7 +75,8 @@ describe("Create Chain", function() {
 
   });
 
-  it('should not create a new chain when addRule is empty', function* () {
+/*
+  it('should not create a new chain when members list is empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -95,14 +94,14 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, '', removeRule, members, balances);
+      chainId = yield rest.createChain(label, [], bals, src, args);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should not create a new chain when removeRule is empty', function* () {
+  it('should not create a new chain when balances are empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -120,14 +119,14 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, '', members, balances);
+      chainId = yield rest.createChain(label, mems, [], src, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should not create a new chain when member list is empty', function* () {
+  it('should not create a new chain when contract source is empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -145,7 +144,7 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, removeRule, [], balances);
+      chainId = yield rest.createChain(label, mems, bals, [], args);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
@@ -173,12 +172,14 @@ describe("Create Chain", function() {
                  ];
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, removeRule, members, bals);
+      chainId = yield rest.createChain(label, mems, bals, src, args);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
+
+*/
 
 });
 

@@ -27,14 +27,8 @@ import                  Network.Socket.Internal
 
 import                  Blockchain.Data.RLP
 
-import                  Test.QuickCheck.Arbitrary
-import                  Test.QuickCheck.Gen
-
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic)
-
-instance Arbitrary IPAddress where
-  arbitrary = IPv4 <$> arbitrary
 
 instance Binary IPAddress where
 
@@ -49,13 +43,6 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic)
         
-instance Arbitrary Enode where
-  arbitrary = Enode
-          <$> (B.pack <$> vectorOf 64 arbitrary)
-          <*> arbitrary
-          <*> arbitrary `suchThat` (>=0)
-          <*> (arbitrary `suchThat` maybe True (>=0))
-
 instance Binary Enode where
 
 instance RLPSerializable Enode where

@@ -8,6 +8,6 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi
 
-getSearchContract :: ContractName -> Bloc [MaybeNamed Address]
+getSearchContract :: ContractName -> Bloc [(MaybeNamed Address, Maybe ChainId)]
 getSearchContract (ContractName contractName) = blocTransaction $
-  map Unnamed <$> blocQuery (getSearchContractQuery contractName)
+  map (\(a,c) -> (Unnamed a, c)) <$> blocQuery (getSearchContractQuery contractName)

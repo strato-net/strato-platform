@@ -90,7 +90,7 @@ putChainInfo chainId ChainInfo{..} = do
   runResourceT . flip SQL.runSqlPool db $ do
     let chainInfoRef = ChainInfoRef chainId chainLabel
     cirId <- E.insert chainInfoRef
-    insertMany_ $ map (parseAInfo cirId) acctInfo
+    insertMany_ $ map (parseAInfo cirId) accountInfo
     insertMany_ $ map (parseCInfo cirId) codeInfo
     insertMany_ $ map (parseMember cirId) (M.toList members)
     return cirId

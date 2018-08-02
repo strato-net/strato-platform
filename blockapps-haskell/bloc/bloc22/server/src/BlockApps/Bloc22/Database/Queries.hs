@@ -23,6 +23,7 @@ import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.Foldable
 import           Data.Int                        (Int32, Int64)
@@ -49,6 +50,7 @@ import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
+import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -152,10 +154,11 @@ contractsJoinTable :: Query
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
 contractsJoinTable = joinF
-  (\ (_,_,a,ts) (cmId,n,b,br,ch,xch) -> (cmId,n,a,ts,b,br,ch,xch))
-  (\ (_,contractmetadataId,_,_) (cmId,_,_,_,_,_) -> cmId .== contractmetadataId)
+  (\ (_,_,a,ts, cid) (cmId,n,b,br,ch,xch) -> (cmId,n,a,ts,b,br,ch,xch,cid))
+  (\ (_,contractmetadataId,_,_,_) (cmId,_,_,_,_,_) -> cmId .== contractmetadataId)
   (queryTable contractsInstanceTable) $ joinF
     (\ (cmId,_,b,br,ch,xch) (_,n) -> (cmId,n,b,br,ch,xch))
     (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
@@ -165,6 +168,7 @@ contractsJoinTable = joinF
 contractByAddress
   :: Text
   -> Address
+  -> Maybe ChainId
   -> Query
     ( Column PGInt4
     , Column PGText
@@ -174,17 +178,20 @@ contractByAddress
     , Column PGBytea
     , Column PGBytea
     , Column PGBytea
+    , Column PGBytea
     )
-contractByAddress contractName contractAddress = proc () -> do
-  contract@(_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+contractByAddress contractName contractAddress chainId = proc () -> do
+  contract@(_,name,addr,_,_,_,_,_,cid) <- contractsJoinTable -< ()
   restrict -< name .== constant contractName
   restrict -< addr .== constant contractAddress
+  restrict -< cid .== constant chainId
   returnA -< contract
 
-contractNameFromAddress :: Address -> Query (Column PGText)
-contractNameFromAddress contractAddress = proc () -> do
-  (_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+contractNameFromAddress :: Address -> Maybe ChainId -> Query (Column PGText)
+contractNameFromAddress contractAddress chainId = proc () -> do
+  (_,name,addr,_,_,_,_,_,cid) <- contractsJoinTable -< ()
   restrict -< addr .== constant contractAddress
+  restrict -< cid .== constant chainId
   returnA -< name
 
 contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
@@ -223,13 +230,13 @@ SELECT CI.address FROM contracts_instance CI
  JOIN contracts C ON C.id = CM.contract_id
  WHERE C.name = $1 ORDER BY timestamp DESC;
 -}
-getSearchContractQuery :: Text -> Query (Column PGBytea)
+getSearchContractQuery :: Text -> Query (Column PGBytea, Column PGBytea)
 getSearchContractQuery contractName = proc () -> do
-  (_,name,addr,_,_,_,_,_) <-
-    orderBy (desc (\(_,_,_,timestamp,_,_,_,_) -> timestamp))
+  (_,name,addr,_,_,_,_,_,cid) <-
+    orderBy (desc (\(_,_,_,timestamp,_,_,_,_,_) -> timestamp))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< addr
+  returnA -< (addr,cid)
 
 {- |
 SELECT
@@ -246,10 +253,11 @@ getContractsAddressesQuery :: Query
   ( Column PGText
   , Column PGBytea
   , Column PGTimestamptz
+  , Column PGBytea
   )
 getContractsAddressesQuery = proc () -> do
-  (_,name,addr,timestamp,_,_,_,_) <- contractsJoinTable -< ()
-  returnA -< (name,addr,timestamp)
+  (_,name,addr,timestamp,_,_,_,_,cid) <- contractsJoinTable -< ()
+  returnA -< (name,addr,timestamp,cid)
 
 {- |
 SELECT
@@ -272,10 +280,11 @@ getContractsNamesAsAddressesQuery :: Query
   ( Column PGText
   , Column PGText
   , Column PGTimestamptz
+  , Column PGBytea
   )
 getContractsNamesAsAddressesQuery = joinF
-  (\ (_,_,_,timestamp) (_,_,_,_,name,name2,_) -> (name,name2,timestamp))
-  (\ (_,contractmetadataId,_,_) (_,_,_,_,_,_,cm2Id) -> contractmetadataId .== cm2Id)
+  (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_) -> (name,name2,timestamp,cid))
+  (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,cm2Id) -> contractmetadataId .== cm2Id)
   (queryTable contractsInstanceTable)
   linkedContractsJoinTable
 
@@ -289,11 +298,11 @@ JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM.id
 WHERE C.name=$1;
 -}
-getContractsDataAddressesQuery :: Text -> Query (Column PGBytea)
+getContractsDataAddressesQuery :: Text -> Query (Column PGBytea, Column PGBytea)
 getContractsDataAddressesQuery contractName = proc () -> do
-  (_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+  (_,name,addr,_,_,_,_,_,cid) <- contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< addr
+  returnA -< (addr,cid)
 
 {- |
 SELECT C.name
@@ -334,18 +343,18 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: Text -> MaybeNamed Address -> Query (Column PGInt4)
-getContractsMetaDataId contractName = \case
+getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Query (Column PGInt4)
+getContractsMetaDataId contractName mContractId chainId = case mContractId of
   Named "Latest" ->
     getContractsMetaDataIdByLatestQuery contractName
   Unnamed contractAddress ->
-    getContractsMetaDataIdByAddressQuery contractName contractAddress
+    getContractsMetaDataIdByAddressQuery contractName contractAddress chainId
   Named name -> if contractName == name
     then getContractsMetaDataIdBySameNameQuery contractName
     else getContractsMetaDataIdByNameQuery contractName name
 
-getContractsMetaDataIdExhaustive :: Text -> Address -> Bloc Int32
-getContractsMetaDataIdExhaustive contractName contractAddr = do
+getContractsMetaDataIdExhaustive :: Text -> Address -> Maybe ChainId -> Bloc Int32
+getContractsMetaDataIdExhaustive contractName contractAddr chainId = do
   -- cmIds <- catchError byAddress $ \ _ ->
   --   catchError byLatest $ \ _ ->
   --     bySameName
@@ -362,11 +371,11 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
         Just (cmId,_) -> return cmId
     cmId:_ -> return cmId
   where
-    byAddress = blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr
+    byAddress = blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr chainId
     byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
     bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
     addContractMetaDatafromStrato = do
-      mSrcHash <- getSourceFromStrato contractAddr
+      mSrcHash <- getSourceFromStrato contractAddr chainId
       case mSrcHash of
         Nothing -> do
           return Nothing
@@ -376,14 +385,14 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
           let valid cd = codeHash == contractdetailsCodeHash (snd cd) ||
                          contractName == contractdetailsName (snd cd)
           return . listToMaybe . filter valid . Map.elems $ cmIds
-    getSourceFromStrato addr = do
-      let afp = accountsFilterParams{qaAddress=Just addr}
+    getSourceFromStrato addr cid = do
+      let afp = accountsFilterParams{qaAddress=Just addr, qaChainId = cid}
       mAcc <- listToMaybe <$> blocStrato (getAccountsFilter afp)
       return ((arr accountSource &&& arr accountCodeHash) <$> mAcc)
 
-getContractDetailsByAddressOnly :: Address -> Bloc ContractDetails
-getContractDetailsByAddressOnly contractAddr = do
-  mName <- blocQuery $ contractNameFromAddress contractAddr
+getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetailsByAddressOnly contractAddr chainId = do
+  mName <- blocQuery $ contractNameFromAddress contractAddr chainId
   case mName of
     [] -> do
       mDetails <- addContractMetaDatafromStrato
@@ -391,7 +400,7 @@ getContractDetailsByAddressOnly contractAddr = do
         Nothing -> throwError $ UserError "getContractDetailsByAddressOnly: couldn't find contract metadata id"
         Just (cmId,details) -> do
           xs::[Int32] <- blocQuery $ proc () -> do
-            (cmId',_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr -< ()
+            (cmId',_,_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr chainId -< ()
             returnA -< cmId'
           when (isNothing $ listToMaybe xs) $ do
             void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable [
@@ -399,12 +408,13 @@ getContractDetailsByAddressOnly contractAddr = do
               , constant cmId
               , constant contractAddr
               , Nothing
+              , constant chainId
               )]
           return details{contractdetailsAddress = Just $ Unnamed contractAddr}
-    name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr)
+    name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
   where
     addContractMetaDatafromStrato = do
-      mSrcHash <- getSourceFromStrato contractAddr
+      mSrcHash <- getSourceFromStrato contractAddr chainId
       case mSrcHash of
         Nothing -> do
           return Nothing
@@ -414,8 +424,8 @@ getContractDetailsByAddressOnly contractAddr = do
           let valid cd = accountCodeHash acct == contractdetailsCodeHash (snd cd) ||
                          accountContractName acct == Just (contractdetailsName (snd cd))
           return . listToMaybe . filter valid . Map.elems $ cds
-    getSourceFromStrato addr = do
-      let afp = accountsFilterParams{qaAddress=Just addr}
+    getSourceFromStrato addr cid = do
+      let afp = accountsFilterParams{qaAddress=Just addr, qaChainId = cid}
       listToMaybe <$> blocStrato (getAccountsFilter afp)
 
 insertXabiFunctionArg
@@ -467,11 +477,12 @@ WHERE C.name=$1 AND CI.address=$2;
 getContractsMetaDataIdByAddressQuery
   :: Text
   -> Address
+  -> Maybe ChainId
   -> Query (Column PGInt4)
-getContractsMetaDataIdByAddressQuery contractName contractAddress =
+getContractsMetaDataIdByAddressQuery contractName contractAddress chainId =
   proc () -> do
-    (cmId,_,_,_,_,_,_,_) <-
-      contractByAddress contractName contractAddress -< ()
+    (cmId,_,_,_,_,_,_,_,_) <-
+      contractByAddress contractName contractAddress chainId -< ()
     returnA -< cmId
 
 {- |
@@ -493,8 +504,10 @@ LIMIT 1;
 getContractsContractByAddressQuery
   :: Text
   -> Address
+  -> Maybe ChainId
   -> Query
     ( Column PGBytea
+    , Column PGBytea
     , ( Column PGBytea
       , Column PGBytea
       , Column PGBytea
@@ -502,11 +515,11 @@ getContractsContractByAddressQuery
       , Column PGText
       , Column PGInt4
     ) )
-getContractsContractByAddressQuery contractName contractAddress =
+getContractsContractByAddressQuery contractName contractAddress chainId =
   limit 1 $ proc () -> do
-    (cmId,name,addr,_,bin,binRuntime,codeHash,xcodeHash) <-
-      contractByAddress contractName contractAddress -< ()
-    returnA -< (addr,(bin,binRuntime,codeHash,xcodeHash,name,cmId))
+    (cmId,name,addr,_,bin,binRuntime,codeHash,xcodeHash,cid) <-
+      contractByAddress contractName contractAddress chainId -< ()
+    returnA -< (addr,cid,(bin,binRuntime,codeHash,xcodeHash,name,cmId))
 
 {- |
 SELECT CM2.id
@@ -845,11 +858,11 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   returnA -< varName
 
 
-getContractDetails :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
-getContractDetails contract@(ContractName contractName) contractId = do
-    xabi <- getContractXabi contract contractId
+getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetails contract@(ContractName contractName) contractId chainId = do
+    xabi <- getContractXabi contract contractId chainId
     let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
+      detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr
@@ -857,25 +870,26 @@ getContractDetails contract@(ContractName contractName) contractId = do
           , contractdetailsCodeHash = codeHash
           , contractdetailsName = name
           , contractdetailsXabi = xabi
+          , contractdetailsChainId = cid
           }
     case contractId of
       Named "Latest" -> do
         tuple <- blocQuery1 $
           getContractsContractLatestQuery contractName
-        return $ detailsWith Nothing tuple
+        return $ detailsWith Nothing chainId tuple
       Unnamed addr -> do
-        (addr',tuple) <- blocQuery1 $
-          getContractsContractByAddressQuery contractName addr
-        return $ detailsWith (Just (Unnamed addr')) tuple
+        (addr',cid,tuple) <- blocQuery1 $
+          getContractsContractByAddressQuery contractName addr chainId
+        return $ detailsWith (Just (Unnamed addr')) cid tuple
       Named name -> if contractName == name
         then do
           tuple <- blocQuery1 $
             getContractsContractBySameNameQuery name
-          return $ detailsWith (Just (Named name)) tuple
+          return $ detailsWith (Just (Named name)) chainId tuple
         else do
           tuple <- blocQuery1 $
             getContractsContractByNameQuery contractName name
-          return $ detailsWith (Just (Named name)) tuple
+          return $ detailsWith (Just (Named name)) chainId tuple
 
 {- |
 WITH contract_id AS (
@@ -993,6 +1007,24 @@ instance Default Constant Keccak256 (Column PGBytea) where
       fromKecc :: Keccak256 -> ByteString
       fromKecc (Keccak256 digest) = ByteArray.convert digest
 
+instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
+  queryRunnerColumnDefault =
+    queryRunnerColumn id toChainId queryRunnerColumnDefault
+    where
+      toChainId :: ByteString -> Maybe ChainId
+      toChainId bs
+        = if BS.null bs
+            then Nothing
+            else Just
+               . ChainId
+               . byteStringToWord256
+               $ bs
+
+instance Default Constant (Maybe ChainId) (Column PGBytea) where
+  def = lmap fromChainId def
+        where fromChainId = \case
+                Nothing -> BS.empty
+                Just cid -> word256ToByteString $ unChainId cid
 
 insertXabiVariables
   :: Int32
@@ -1117,6 +1149,7 @@ compileContract source' = do
         , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsXabi = xabi
+        , contractdetailsChainId = Nothing
         }
 
   metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
@@ -1511,21 +1544,21 @@ getContractContractByMetadataId metadataId = getContractRetry 0
                     "getContractContractByMetadataId: invalid types in contract: " <> (Text.pack . show $ err)
 
 getContractXabi :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Bloc Xabi
-getContractXabi (ContractName contractName) contractId = do
+                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
+getContractXabi (ContractName contractName) contractId chainId = do
   -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   getContractXabiByMetadataId metadataId
 
 getContractXabiAndMetadataId :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Bloc (Int32, Xabi)
-getContractXabiAndMetadataId (ContractName contractName) contractId = do
+                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Int32, Xabi)
+getContractXabiAndMetadataId (ContractName contractName) contractId chainId = do
   -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
 
