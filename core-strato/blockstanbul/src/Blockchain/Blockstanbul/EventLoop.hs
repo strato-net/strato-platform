@@ -123,6 +123,13 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
+  --update validators list
+  val <- use validators
+  vot <- use voted
+  let finds = updatevalidator val vot
+  validators .= fst (finds)
+  voted .= snd (finds)
+
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
@@ -162,13 +169,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             let (bnef,vot) = extractBeneficiary pp
             -- insert the vote into map
             vmap <- use voted
-      
             let val = M.lookup bnef vmap
             let unwrapval = case val of
                   Nothing -> M.empty
                   Just vall -> vall
             let nval = M.insert pr vot unwrapval
-           
             _ <- voted <%= M.insert bnef nval
             yield =<< signMessage pk (Prepare v (blockHash pp))
           else roundChange
