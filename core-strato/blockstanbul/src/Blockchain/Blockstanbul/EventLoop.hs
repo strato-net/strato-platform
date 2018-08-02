@@ -22,7 +22,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
-type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m)
+type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m, MonadLogger m)
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 
@@ -108,7 +108,7 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- selfAddr
-  when (leader == self) $
+  when (leader == self) $ do
     yield MakeBlockCommand
   prepared .= M.empty
   committed .= M.empty
@@ -194,6 +194,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logWarnS "blockstanbul" err
       roundChange
     CommitResult (Right ()) -> do
+      $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
 

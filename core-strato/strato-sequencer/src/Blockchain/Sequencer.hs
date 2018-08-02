@@ -10,8 +10,8 @@ module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
 
+import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
-import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TMVar
 import           Control.Lens           hiding (op)
 import           Control.Monad.Logger
@@ -65,9 +65,10 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
+
 -- TODO(tim): Make these flag configurable
-blockPeriod :: NominalDiffTime
-blockPeriod = 1
+blockPeriodμs :: Int
+blockPeriodμs = 1000000
 
 roundTimeout :: NominalDiffTime
 roundTimeout = 10
@@ -85,20 +86,14 @@ createBlockstanbulRoundTimer = do
   setAlarm alarm next
   return var
 
-delayedCreation :: TMChan OutputEvent -> IO ()
-delayedCreation ch = do
-  let action = const . atomically . writeTMChan ch $ OECreateBlockCommand
-  alarm <- newAlarmClock action :: IO (AlarmClock UTCTime)
-  next <- addUTCTime blockPeriod <$> getCurrentTime
-  setAlarm alarm next
-
 sequencer :: SequencerM ()
 sequencer = do
   -- TODO(tim): Pipe time window in through a flag
   timer <- liftIO $ createBlockstanbulRoundTimer
   -- Bootstrap the block generation
-  join $ uses vmEvents (liftIO . delayedCreation)
+  writeSeqVmEvents' [OECreateBlockCommand]
   forever $ do
+    $logDebugS "seq/loop/start" ""
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
     timedOut <- atomically $ swapTMVar timer False
@@ -126,6 +121,12 @@ sequencer = do
       markForP2P . OEGetTx $ toList txHashes
     vmEvs <- drainVM
     unless (null vmEvs) $ do
+      when (OECreateBlockCommand `elem` vmEvs) $ do
+        $logOtherS "sequencer" "perfhunt" "sending OECreateBlockCommand"
+        -- TODO(tim): This delay is to ensure that the timestamp on the
+        -- block is more than a block period away from the last. The
+        -- threadDelay can instead sleep for max(blockperiod - (now - last_timestamp), 0)
+        liftIO $ threadDelay blockPeriodμs
       writeSeqVmEvents' vmEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
     p2pEvs <- drainP2P
@@ -187,7 +188,7 @@ blockstanbulSend msgs = do
 
     when (MakeBlockCommand `elem` resp) $ do
       $logDebugS "seq/pbft/create" "Delaying a make block command"
-      join $ uses vmEvents (liftIO . delayedCreation)
+      markForVM OECreateBlockCommand
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
