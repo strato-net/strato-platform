@@ -22,17 +22,17 @@ extractBeneficiary ppl = case (((BH.beneficiary $ BH.blockToBlockHeader ppl )> 0
   (_, _) -> Nothing
  
 --output a new list of validater and beneficiary
-updatevalidator :: [Address] -> Map Address (Map Address Bool) -> ([Address],Map Address (Map Address Bool))
-updatevalidator val voted = (x,y)
+updatevalidator :: [Address] -> Map Address (Map Address Bool) -> [Address]
+updatevalidator val voted = newVals
                      where (todrop,toadd) = partitionWithKey (\ k _ -> k `elem` val) voted
                            addsuccess = M.filter helperas toadd 
                            dropsuccess = M.filter helperd todrop
-                           x = combined val addsuccess dropsuccess
-                           y =  voted M.\\ addsuccess M.\\ dropsuccess
-                           maxnum = (length val)*2 `div` 3 +1
+                           newVals = combined val addsuccess dropsuccess
+                           -- y =  voted M.\\ addsuccess M.\\ dropsuccess
+                           threshold = (length val)*2 `div` 3 +1
                            -- check if up and down votes exceed maxnum
-                           helperas valu = (length (L.filter (==True) (elems valu)) > maxnum)
-                           helperd valu =  (length (L.filter (==False) (elems valu)) > maxnum)
+                           helperas valu = (length (L.filter (==True) (elems valu)) > threshold)
+                           helperd valu =  (length (L.filter (==False) (elems valu)) > threshold)
                                        
                            
 combined :: [Address] -> Map Address (Map Address Bool) -> Map Address (Map Address Bool) -> [Address]
