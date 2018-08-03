@@ -4,12 +4,34 @@ import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
 
 class Chain extends Component {
+
+  showMembers(balances) {
+    if (balances.length && balances.length > 0){
+      const ret = [];
+      balances.forEach(function(balance, index) {
+        if (balance.address && balance.address !== '0000000000000000000000000000000000000100'){
+          ret.push(
+            <tr>
+              <td>{balance.address}</td>
+              <td>{balance.balance}</td>
+            </tr>
+          );
+        }
+      });
+      return ret;
+    }
+    else {
+      return (<div> No Members </div>);
+    }
+  };
+
   render() {
     const {
       label,
       id,
       chain
     } = this.props;
+
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
@@ -43,19 +65,12 @@ class Chain extends Component {
         <table className="pt-table pt-str">
           <thead>
             <tr>
-              <th>Field</th>
-              <th>Value</th>
+              <th>Member Address</th>
+              <th>Member Balance</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><strong>Account Balances</strong></td>
-              <td>{chain.balances[0]["balance"]}</td>
-            </tr>
-            <tr>
-              <td><strong>Members</strong></td>
-              <td>{}</td>
-            </tr>
+            {this.showMembers(chain.balances)}
           </tbody>
         </table>
       </div>
