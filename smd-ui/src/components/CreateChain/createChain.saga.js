@@ -49,10 +49,10 @@ export function createChainApiCall(label, members, balances, src, args){
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-         "args": a,
+         "args": args,
          "balances": balances,
          "members": members,
-         "src": s,
+         "src": src,
          "label": label
       })
     }
