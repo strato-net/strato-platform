@@ -23,6 +23,7 @@ slipstream:
 
 strato-server:
 no vars/flags set
+
 bloc:
 stratoHost="${stratoHost}"
 --stratourl=\$stratoRoot="${stratoRoot}"
@@ -52,16 +53,26 @@ while true; do
     sleep 0.5
 done
 
+until nc -z $kafkaHost $kafkaPort >&/dev/null
+do  echo "Waiting for Kafka to become available"
+    sleep 1
+done
+
+
+PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+if PGPASSWORD=${postgres_password} psql ${PSQL_CONNECTION_PARAMS} -lqt | cut -d \| -f 1 | grep -qw ${postgres_slipstream_db}; then
+    # slipstream database exists - drop it to create the new one
+    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+fi
+# Create the database for slipstream
+PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+
+
 mkdir logs
 
 # TODO: refactor using the process monitoring from core-strato's doit.sh
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
-
-until nc -z $kafkaHost $kafkaPort >&/dev/null
-do  echo "Waiting for Kafka to become available"
-    sleep 1
-done
 
 /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
             --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
