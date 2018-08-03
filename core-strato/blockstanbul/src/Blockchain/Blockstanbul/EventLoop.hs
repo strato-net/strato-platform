@@ -50,7 +50,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
   , _voted :: M.Map Address (M.Map Address Bool)
-  , _pendingvotes :: [(Address, Bool)]
+  , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
 }
@@ -74,7 +74,7 @@ newContext v as pk =
      , _pendingRound = Nothing
      , _roundChanged = M.empty
      , _voted = M.empty
-     , _pendingvotes = []
+     , _pendingvotes = M.empty
      , _prvkey = pk
      }
 
@@ -137,7 +137,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary benf decision  -> do
       -- voter <- selfAddr
       pvotes <- use pendingvotes
-      pendingvotes .= (benf,decision) : pvotes
+      pendingvotes .= M.insert benf decision pvotes
       return ()
     NewBlock blk' -> do
       let blk = truncateExtra blk'
@@ -152,8 +152,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         editedBlk <- if null pending
               then return blk
               else do
-                 ((bnf,nonc):newPending) <- use pendingvotes
-                 pendingvotes .= newPending
+                 let (bnf,nonc) = M.findMin pending
+                 pendingvotes .= M.deleteMin pending
                  return $ editBeneficiary blk bnf nonc
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
