@@ -11,12 +11,13 @@ module Blockchain.Sequencer.Monad (
   , runSequencerM
   , getKafkaClientID
   , getKafkaConsumerGroup
-  , clearEvents
   , pairToOETx
   , markForVM
   , markForP2P
   , clearLdbBatchOps
   , addLdbBatchOps
+  , drainP2P
+  , drainVM
 ) where
 
 import           Control.Lens
@@ -26,6 +27,7 @@ import           Control.Monad.State
 import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
+import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 
@@ -148,9 +150,6 @@ runSequencerM c mbc m = do
             }
     return $ fst a
 
-clearEvents :: SequencerM ()
-clearEvents = (vmEvents .= Q.empty) >> (p2pEvents .= Q.empty)
-
 pairToOETx :: (Timestamp, OutputTx) -> OutputEvent
 pairToOETx = uncurry OETx
 
@@ -159,6 +158,12 @@ markForVM oe = vmEvents %= (Q.|> oe)
 
 markForP2P :: OutputEvent -> SequencerM ()
 markForP2P oe = p2pEvents %= (Q.|> oe)
+
+drainP2P :: SequencerM [OutputEvent]
+drainP2P = fmap toList $ p2pEvents <<.= Q.empty
+
+drainVM :: SequencerM [OutputEvent]
+drainVM = fmap toList $ vmEvents <<.= Q.empty
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
