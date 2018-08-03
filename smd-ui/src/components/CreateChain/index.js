@@ -36,7 +36,16 @@ class CreateChain extends Component {
         "address": member.address
       });
     });
-    this.props.createChain(values.label, members, balances, values.src, values.args);
+    let args = [
+    {
+      "value": values.val1,
+      "name": values.var1
+    },
+    {
+      "value": values.val2,
+      "name": values.var2
+    }];
+    this.props.createChain(values.label, members, balances, values.src, args);
   }
 
   updateMembers(state) {
@@ -129,15 +138,45 @@ class CreateChain extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="args"
+                      name="var1"
                       component="input"
                       type="text"
-                      placeholder="Variables"
+                      placeholder="Variable Name"
                       className="pt-input form-width"
-                      tabIndex=""
+                      tabIndex="3"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.args}</div>
+                  
+                    <Field
+                      name="val1"
+                      component="input"
+                      type="text"
+                      placeholder="Variable Value"
+                      className="pt-input form-width"
+                      tabIndex="4"
+                      required
+                    />
+                  </div>
+                  <div className="pt-form-content">
+                    <Field
+                      name="var2"
+                      component="input"
+                      type="text"
+                      placeholder="Variable Name"
+                      className="pt-input form-width"
+                      tabIndex="5"
+                      required
+                    />
+                  
+                    <Field
+                      name="val2"
+                      component="input"
+                      type="text"
+                      placeholder="Variable Value"
+                      className="pt-input form-width"
+                      tabIndex="6"
+                      required
+                    />
                   </div>
                 </div>
 
