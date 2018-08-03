@@ -46,6 +46,9 @@ class CreateChain extends Component {
       "name": values.var2
     }];
     this.props.createChain(values.label, members, balances, values.src, args);
+    this.setState({
+      members: [],
+    });
   }
 
   updateMembers(state) {
