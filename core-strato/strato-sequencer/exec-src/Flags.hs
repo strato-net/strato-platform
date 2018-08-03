@@ -2,7 +2,6 @@
 module Flags where
 
 import           Blockchain.Constants
-import           Blockchain.Data.Address
 import           Blockchain.Sequencer.Constants
 import           HFlags
 
@@ -22,4 +21,4 @@ defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaC
 
 defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to."
 
-defineEQFlag "validators" [| [] :: [Address] |] "ADDRESS_LIST" "Which validators initialize the consensus mechanism"
+defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"

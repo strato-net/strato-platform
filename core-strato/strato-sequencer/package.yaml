@@ -39,6 +39,7 @@ dependencies:
   - blockstanbul
   - lens
   - blockapps-haskoin
+  - aeson
 
 ghc-options: -Wall -O2 -threaded
 

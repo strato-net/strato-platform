@@ -3,6 +3,7 @@
 module Main where
 
 import           Control.Monad.Logger
+import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
 import           Data.Either.Extra
@@ -12,6 +13,7 @@ import           Safe
 import           System.Environment
 
 import           Blockchain.Blockstanbul
+import           Blockchain.Data.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -30,10 +32,11 @@ main = do
                           (_, "") -> Nothing
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
-  -- TODO(tim): Use proper initial values for the view
+      eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+      -- TODO(tim): Use proper initial values for the view
       ctx = newContext
                (View 0 0)
-               flags_validators
+               (fromEither (error "invalid validators") eValidators)
   mCtx <- if not flags_tmpblockstanbul
              then return Nothing
              else do
