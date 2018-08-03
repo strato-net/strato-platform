@@ -96,6 +96,9 @@ instance ToSchema ChainInput where
           ]
        }
 
+instance ToParam (QueryParams "chainid" ChainId) where
+  toParam _ = DocQueryParam "chainid" [] "chain ID to be looked up" Normal
+
 data ChainOutput = ChainOutput
   { chainoutputLabel    :: Text
   , chainoutputBalances :: NamedMap "address" Address "balance" Integer
@@ -151,5 +154,5 @@ type PostChainInfo = "chain"
   :> Post '[JSON] ChainId
 
 type GetChainInfo = "chain"
-  :> Capture "chainid" ChainId
-  :> Get '[JSON] ChainOutput
+  :> QueryParams "chainid" ChainId
+  :> Get '[JSON] [(ChainId, ChainOutput)]
