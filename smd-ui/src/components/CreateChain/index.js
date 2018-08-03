@@ -46,7 +46,7 @@ class CreateChain extends Component {
         username: state.username,
         address: state.address,
         enode: state.enode,
-        balance: state.balance
+        balance: parseInt(state.balance, 10)
       })
     });
   }
