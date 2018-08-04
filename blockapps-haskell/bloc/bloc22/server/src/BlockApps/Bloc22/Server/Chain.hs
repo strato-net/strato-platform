@@ -53,14 +53,14 @@ postChainInfo (ChainInput src lbl accountInfo _ members) = do
     ]
   return chainId
 
-getChainInfo :: [ChainId] -> Bloc [(ChainId, ChainOutput)]
+getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos::[ChainIdChainInfo] <- blocStrato $ Strato.getChain chainIds
   case chainIdChainInfos of 
     [] -> throwError $ DBError "No chains match any of the chainIds"
     _ -> return $ map convertChainInfo chainIdChainInfos
     where
-      convertChainInfo :: (ChainIdChainInfo) -> (ChainId, ChainOutput)
+      convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
         let chtup = (toTuple chp :: (ChainId, ChainInfo))
         let chinfo =  snd chtup
@@ -69,4 +69,4 @@ getChainInfo chainIds = do
                                     ContractNoStorage a b _ -> (a, b)
                                     ContractWithStorage a b _ _ -> (a, b)
         let acctInfo = map (fromTuple . getAddrBalance) $ accountInfo chinfo
-        (fst chtup, ChainOutput (chainLabel chinfo) acctInfo (members chinfo))
+        NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo (members chinfo)) :: ChainIdChainOutput
