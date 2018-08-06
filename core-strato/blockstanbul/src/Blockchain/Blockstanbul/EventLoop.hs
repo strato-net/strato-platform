@@ -53,6 +53,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
+  , _blockcount :: Int 
 }
 makeLenses ''BlockstanbulContext
 
@@ -76,6 +77,7 @@ newContext v as pk =
      , _voted = M.empty
      , _pendingvotes = M.empty
      , _prvkey = pk
+     , _blockcount = 0
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -103,6 +105,12 @@ nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
 nextRound nt = do
   -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
   -- rather than reset everything in the state.
+  epocheck <- use blockcount
+  if (epocheck `mod` 10000) == 0
+    then do
+      voted .= M.empty
+      blockcount .= 0
+    else return ()
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> view . round .= r
@@ -118,22 +126,20 @@ nextRound nt = do
 
   hasCommitted .= False
   hasPrepared .= False
-  pendingRound .= Nothing
+  pendingRound .= Nothing 
 
   --update validators list
   val <- use validators
   vot <- use voted
   let finds = updatevalidator val vot
   validators .= finds
-  --voted .= snd (finds)
-
+  
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
     NewBeneficiary benf decision  -> do
-      -- voter <- selfAddr
       pvotes <- use pendingvotes
       pendingvotes .= M.insert benf decision pvotes
       return ()
@@ -163,6 +169,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (sender auth == pr) $ do
         if v == v'
           then do
+            bc <- use blockcount
+            blockcount .= bc +1
             proposal .= Just pp
             pk <- use prvkey
             case extractBeneficiary pp of
