@@ -42,7 +42,6 @@ main = do
              then return Nothing
              else do
                 skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                putStrLn $ "skey: " ++ show skey
                 let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
