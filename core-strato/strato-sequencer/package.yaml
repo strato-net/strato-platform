@@ -46,13 +46,22 @@ ghc-options: -Wall -O2 -threaded
 library:
   source-dirs:     src
 
-executable:
-  source-dirs:      exec-src
-  main:             Main.hs
-  dependencies:
-    - hflags
-    - safe
-    - strato-sequencer
+executables:
+  strato-sequencer:
+    source-dirs:      exec-src
+    main:             Main.hs
+    dependencies:
+      - hflags
+      - safe
+      - strato-sequencer
+
+  keygen:
+    source-dirs: exec-src/
+    main: KeyGen.hs
+    dependencies:
+      - strato-sequencer
+      - entropy
+      - hflags
 
 tests:
   strato-sequencer-spec:
