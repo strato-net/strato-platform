@@ -13,7 +13,7 @@ import           Safe
 import           System.Environment
 
 import           Blockchain.Blockstanbul
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -26,7 +26,8 @@ import           Flags
 main :: IO ()
 main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
-  putStrLn $ "strato-sequencer with flags: " ++ unlines s
+  putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
+  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
                           (_, "") -> Nothing
@@ -41,8 +42,10 @@ main = do
              then return Nothing
              else do
                 skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                let bytes = fromEither (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+                putStrLn $ "skey: " ++ show skey
+                let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
                 return . Just . ctx $ pkey
 
   let cfg = SequencerConfig {
