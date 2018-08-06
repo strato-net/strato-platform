@@ -42,6 +42,10 @@ export const TRANSACTION_QUERY_TYPES = {
   last : {
     key: 'last',
     displayName : 'Last'
+  },
+  chainid: {
+    key: 'chainid',
+    displayName : 'Chain Id'
   }
 };
 
