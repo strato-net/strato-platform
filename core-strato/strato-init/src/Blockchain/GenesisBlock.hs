@@ -13,6 +13,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import           Data.Either                          (isLeft)
 import qualified Data.JsonStream.Parser               as JS
 
 import           Blockchain.BackupBlocks
@@ -172,8 +173,9 @@ bootstrapIndexer key obGB =
         runner = commit >>= \case
             Right (Right _) -> do
                 putStrLn "bootstrapIndex API checkpoint successful!"
-                void . runKafkaConfigured clientId $ -- todo handle the error :)
-                    IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
+                res <- runKafkaConfigured clientId $
+                      IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
+                when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
                 putStrLn "bootstrapIndex genesis seed successful!"
             Right (Left l) -> do
                 putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
