@@ -7,13 +7,13 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_CHAINS,
-  FETCH_CHAIN_ID_REQUEST,
+  FETCH_CHAIN_IDS_REQUEST,
   FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
   fetchChainsFailure,
-  fetchChainId,
-  fetchChainIdSuccess,
-  fetchChainIdFailure,
+  fetchChainIds,
+  fetchChainIdsSuccess,
+  fetchChainIdsFailure,
   fetchChainDetail,
   fetchChainDetailSuccess,
   fetchChainDetailFailure
@@ -62,15 +62,26 @@ export function getChainDetailApi(chainid) {
 
 export function* getChains(action) {
   try {
-    const response = yield call(getChainsApi);
-    const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
-    const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
+    // const response = yield call(getChainsApi);
+    // const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
+    // const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
     // const chainInfos = response.map(chainIdChainInfo => chainIdChainInfo["info"]);
-    //const chainLabels = ["c1","c2"];
-    //const chainIds = ["5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac", "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f"];
-    yield put(fetchChainsSuccess(chainLabels, chainIds));
-    if (action.loadChainId && chainLabels.length > 0) {
-      yield put(fetchChainId(chainLabels[0], chainLabels, chainIds, action.loadChainId));
+    const chainLabelIds = {
+      "c1" : 
+      {
+        "5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac": {}, 
+        "666": {}
+      },
+      "c2" :
+      {
+        "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f": {}
+      }
+    };
+    yield put(fetchChainsSuccess(chainLabelIds));
+
+    if (action.loadChainId && Object.getOwnPropertyNames(chainLabelIds).length > 0) {
+      const label = Object.getOwnPropertyNames(chainLabelIds)[0];
+      yield put(fetchChainIds(label, Object.getOwnPropertyNames(chainLabelIds[label]), action.loadChainId));
     }
   }
   catch (err) {
@@ -82,24 +93,24 @@ export function* getChains(action) {
   }
 }
 
-export function* getChainId(action) {
+export function* getChainIds(action) {
   try {
-    let labelIndex = action.labelList.indexOf(action.label);
-    let id = action.idList[labelIndex];
-    yield put(fetchChainIdSuccess(action.label, id));
+    let ids = action.chainIds;
+    yield put(fetchChainIdsSuccess(action.label, ids));
     if (action.loadDetails) {
-      yield put(fetchChainDetail(action.label, id));
+      yield ids.map(id => put(fetchChainDetail(action.label, id)));
+      // yield put(fetchChainDetail(action.label, ids));
     }
   }
   catch (err) {
-    yield put(fetchChainIdFailure(action.label, err));
+    yield put(fetchChainIdsFailure(action.label, err));
   }
 }
 
 export function* getChainDetail(action) {
   try {
-    const response = yield call(getChainDetailApi, action.id);
-    {/*const response = {
+    // const response = yield call(getChainDetailApi, action.id);
+    const response = {
       "balances": [
         {
           "balance": 0,
@@ -125,7 +136,7 @@ export function* getChainDetail(action) {
         }
       ],
       "label": "c1"
-    };*/}
+    };
     yield put(fetchChainDetailSuccess(action.label, action.id, response));
   }
   catch (err) {
@@ -136,7 +147,7 @@ export function* getChainDetail(action) {
 export default function* watchFetchChains() {
   yield [
     takeLatest(FETCH_CHAINS, getChains),
-    takeEvery(FETCH_CHAIN_ID_REQUEST, getChainId),
+    takeEvery(FETCH_CHAIN_IDS_REQUEST, getChainIds),
     takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail)
   ];
 }

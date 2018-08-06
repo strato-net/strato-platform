@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { fetchChains, fetchChainId, fetchChainDetail, changeChainFilter, resetChainId } from './chains.actions';
+import { fetchChains, fetchChainIds, fetchChainDetail, changeChainFilter, resetChainId } from './chains.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -35,26 +35,24 @@ constructor() {
     this.props.changeChainFilter(filter);
   };
 
-  onUserClick(label, chainid, chainlabels, chainids, index) {
-    if (chainid.length && index === this.state.selected) {
+  onUserClick(label, chainids, index) {
+    if (chainids.length && index === this.state.selected) {
       this.props.resetChainId(label);
       this.setState({ selected: null });
     } else {
-      this.props.fetchChainId(label, chainlabels, chainids, true);
       mixpanelWrapper.track('chains_row_click');
+      this.props.fetchChainIds(label, chainids, true);
     }
   }
 
   render() {
     console.log("RENDER~~~~~");
-    const chainLabels = this.props.chainLabels;
-    const chainIds = this.props.chainIds;
+    const labelIds = this.props.labelIds;
     const chains = this.props.chains;
     const filter = this.props.filter;
-    const labels = Object.getOwnPropertyNames(chainLabels);
-    const ids = Object.getOwnPropertyNames(chainIds);
+    const labels = Object.getOwnPropertyNames(chains);
     const rows = [];
-    const selectedChain = [];
+    const selectedChains = [];
 
     labels.filter(label => {
       if (!filter) {
@@ -65,13 +63,13 @@ constructor() {
         .indexOf(filter) > -1
     })
       .forEach(function (label, index) {
-        const chainid = Object.getOwnPropertyNames(chains[label]);
-        // const pos = labels.indexOf(label);
-        // const chainids = ids[pos];
+        const chainids = Object.getOwnPropertyNames(labelIds[label]);
         let labelClasseName = '';
-        if (this.state.selected === index && chainid.length > 0) {
+        if (this.state.selected === index && chainids.length > 0) {
           labelClasseName = ' selected';
-          selectedChain.push(<Chain label={label} id={chainid} />)
+          chainids.map(chainid =>
+            selectedChains.push(<Chain label={label} id={chainid} />)
+          );
         }
 
         rows.push(
@@ -79,7 +77,7 @@ constructor() {
             <div className="row">
               <div className={`pt-card pt-elevation-2 smd-pointer ${labelClasseName}`} key={index} onClick={(e) => {
                 this.setState({ selected: index });
-                this.onUserClick(label, chainid, labels, ids, index);
+                this.onUserClick(label, chainids, index);
               }}>
                 {label}
               </div>
@@ -137,7 +135,7 @@ constructor() {
             </div>
             <div className="col-sm-8 account-details">
               <div>
-                {selectedChain.length ? selectedChain : null}
+                {selectedChains.length ? selectedChains : null}
               </div>
             </div>
           </div>
@@ -150,9 +148,8 @@ constructor() {
 export function mapStateToProps(state) {
   return {
     filter: state.chains.filter,
-    chainLabels: state.chains.chainLabels,
-    chainIds: state.chains.chainIds,
-    chains: state.chains.chains
+    chains: state.chains.chains,
+    labelIds: state.chains.labelIds
   };
 }
 
@@ -160,7 +157,7 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchChains,
-      fetchChainId,
+      fetchChainIds,
       fetchChainDetail,
       resetChainId,
       changeChainFilter

@@ -3,17 +3,16 @@ import {
   FETCH_CHAINS_SUCCESSFULL,
   FETCH_CHAINS_FAILED,
   CHANGE_CHAIN_FILTER,
-  FETCH_CHAIN_ID_SUCCESSFUL,
-  FETCH_CHAIN_ID_FAILED,
+  FETCH_CHAIN_IDS_SUCCESSFUL,
+  FETCH_CHAIN_IDS_FAILED,
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
   RESET_CHAIN_ID
 } from './chains.actions';
 
 const initialState = {
-  chainLabels: {},
-  chainIds: {},
   chains: {},
+  labelIds: {},
   filter: '',
   error: null,
 };
@@ -23,68 +22,44 @@ const reducer = function (state = initialState, action) {
     case FETCH_CHAINS:
       return {
         ...state,
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
         chains: state.chains,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: null,
       };
     case FETCH_CHAINS_SUCCESSFULL:
-      const chainLabels = action.chainLabels.reduce(function (result, chainLabel) {
-        result[chainLabel] = {};
-        return result;
-      }, {});
-      const chainIds = action.chainIds.reduce(function (result, chainId) {
-        result[chainId] = {};
-        return result;
-      }, {});
-      const chains = {};
-      action.chainLabels.forEach(function(label, index){
-        chains[label] = action.chainIds[index];
-      });
       return {
         ...state,
-        chainLabels: chainLabels,
-        chainIds: chainIds,
-        chains: chains,
+        chains: action.chainLabelIds,
+        labelIds: action.chainLabelIds,
         filter: state.filter,
         error: null
       };
     case FETCH_CHAINS_FAILED:
       return {
         ...state,
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
         chains: state.chains,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: action.error
       };
     case CHANGE_CHAIN_FILTER:
       return {
         ...state,
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
         chains: state.chains,
+        labelIds: state.labelIds,
         filter: action.filter,
         error: state.error,
       }
-    case FETCH_CHAIN_ID_SUCCESSFUL:
-      const id = {};
-      id[action.id] = {
-        error: null
-      };
+    case FETCH_CHAIN_IDS_SUCCESSFUL:
       return {
         ...state,
-        chains: {
-          ...state.chains,
-          [action.label]: id
-        },
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
+        chains: state.chains,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
       }
-    case FETCH_CHAIN_ID_FAILED:
+    case FETCH_CHAIN_IDS_FAILED:
       return {
         ...state,
         chains: {
@@ -93,8 +68,7 @@ const reducer = function (state = initialState, action) {
             error: action.error
           }
         },
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
       }
@@ -111,8 +85,7 @@ const reducer = function (state = initialState, action) {
             }
           }
         },
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
       }
@@ -123,8 +96,7 @@ const reducer = function (state = initialState, action) {
           ...state.chains,
           [action.label]: {}
         },
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
       }
@@ -140,8 +112,7 @@ const reducer = function (state = initialState, action) {
             }
           }
         },
-        chainLabels: state.chainLabels,
-        chainIds: state.chainIds,
+        labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
       }

@@ -2,9 +2,9 @@ export const FETCH_CHAINS = 'FETCH_CHAINS';
 export const FETCH_CHAINS_SUCCESSFULL = 'FETCH_CHAINS_SUCCESSFULL';
 export const FETCH_CHAINS_FAILED = 'FETCH_CHAINS_FAILED';
 export const CHANGE_CHAIN_FILTER = 'CHANGE_CHAIN_FILTER';
-export const FETCH_CHAIN_ID_REQUEST = 'FETCH_CHAIN_ID_REQUEST';
-export const FETCH_CHAIN_ID_SUCCESSFUL = 'FETCH_CHAIN_ID_SUCCESS';
-export const FETCH_CHAIN_ID_FAILED = 'FETCH_CHAIN_ID_FAILURE';
+export const FETCH_CHAIN_IDS_REQUEST = 'FETCH_CHAIN_IDS_REQUEST';
+export const FETCH_CHAIN_IDS_SUCCESSFUL = 'FETCH_CHAIN_IDS_SUCCESS';
+export const FETCH_CHAIN_IDS_FAILED = 'FETCH_CHAIN_IDS_FAILURE';
 export const FETCH_CHAIN_DETAIL_REQUEST = 'FETCH_CHAIN_DETAIL_REQUEST';
 export const FETCH_CHAIN_DETAIL_SUCCESS = 'FETCH_CHAIN_DETAIL_SUCCESS';
 export const FETCH_CHAIN_DETAIL_FAILURE = 'FETCH_CHAIN_DETAIL_FAILURE';
@@ -18,11 +18,10 @@ export const fetchChains = function (loadLabels, loadChainId) {
   }
 };
 
-export const fetchChainsSuccess = function (chainLabels, chainIds) {
+export const fetchChainsSuccess = function (chainLabelIds) {
   return {
     type: FETCH_CHAINS_SUCCESSFULL,
-    chainLabels: chainLabels,
-    chainIds: chainIds
+    chainLabelIds: chainLabelIds,
   }
 };
 
@@ -40,12 +39,11 @@ export const changeChainFilter = function (filter) {
   }
 };
 
-export const fetchChainId = function (label, labelList, idList, loadDetails) {
+export const fetchChainIds = function (label, chainIds, loadDetails) {
   return {
-    type: FETCH_CHAIN_ID_REQUEST,
+    type: FETCH_CHAIN_IDS_REQUEST,
     label: label,
-    labelList: labelList,
-    idList: idList,
+    chainIds: chainIds,
     loadDetails: loadDetails
   }
 };
@@ -57,17 +55,17 @@ export const resetChainId = function (label) {
   }
 };
 
-export const fetchChainIdSuccess = function (label, id) {
+export const fetchChainIdsSuccess = function (label, ids) {
   return {
-    type: FETCH_CHAIN_ID_SUCCESSFUL,
+    type: FETCH_CHAIN_IDS_SUCCESSFUL,
     label: label,
-    id: id
+    ids: ids
   }
 };
 
-export const fetchChainIdFailure = function (label, error) {
+export const fetchChainIdsFailure = function (label, error) {
   return {
-    type: FETCH_CHAIN_ID_FAILED,
+    type: FETCH_CHAIN_IDS_FAILED,
     label: label,
     error: error
   }
