@@ -5,8 +5,9 @@ import HexText from '../HexText';
 
 class Chain extends Component {
 
-  showMembers(balances) {
-    if (balances.length && balances.length > 0){
+  showMembers(chain) {
+    if (chain && chain.balances && chain.balances.length > 0){
+      const balances = chain.balances;
       const ret = [];
       balances.forEach(function(balance, index) {
         if (balance.address && balance.address !== '0000000000000000000000000000000000000100'){
@@ -70,7 +71,7 @@ class Chain extends Component {
             </tr>
           </thead>
           <tbody>
-            {this.showMembers(chain.balances)}
+            {this.showMembers(chain)}
           </tbody>
         </table>
       </div>
