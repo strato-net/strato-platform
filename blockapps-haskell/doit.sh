@@ -58,17 +58,19 @@ do  echo "Waiting for Kafka to become available"
     sleep 1
 done
 
-
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
-if PGPASSWORD=${postgres_password} psql ${PSQL_CONNECTION_PARAMS} -lqt | cut -d \| -f 1 | grep -qw ${postgres_slipstream_db}; then
-    # slipstream database exists - drop it to create the new one
-    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+# Check if this container was initialized before
+if [ ! -f initialized ]; then
+    # drop slipstream db if already exists
+    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
+    # Create the database for slipstream
+    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+    # Create logs directory
+    mkdir logs
+    # Create the 'initialized' sentinel file
+    date '+%Y-%m-%d %H:%M:%S' > initialized
+
 fi
-# Create the database for slipstream
-PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
-
-
-mkdir logs
 
 # TODO: refactor using the process monitoring from core-strato's doit.sh
 
