@@ -327,7 +327,7 @@ addTransactions b blockGas (t:rest) = do
 
   printTransactionMessage t result deltaT
   time deltaT time_vm_tx_mined
-
+  --Write to slipstream
   outputTransactionResult b blockHeaderHash Mined $ TxRunResult t result deltaT beforeMap afterMap
 
   let remainingBlockGas =
@@ -491,6 +491,7 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
       txCost t' | isMessageTX t' = gTX
       txCost _  = if isHomestead then gCREATETX else gTX
 
+-- Slipstream Audit trail.
 --outputTransactionMessage::IO ()
 outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
@@ -510,14 +511,15 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
 
   when flags_createTransactionResults $ do
       let chainId = transactionChainId t
-          beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
+          beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ] --
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
-          afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
+          afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ] --
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
 
-      --mpdb <- getStateDB
-      --addrDiff <- addrDbDiff mpdb stateRootBefore stateRootAfter
+      mpdb <- getStateDB
+      addrDiff <- dbDiff mpdb stateRootBefore stateRootAfter
+      liftIO $ putStrLn $ "_____addrDiff_____: " ++ show addrDiff
 
       let (response, theTrace', theLogs) =
             case result of
@@ -692,6 +694,7 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
       when flags_diffPublish $
           let (deletionEvents, creationEvents, updateEvents) = destructStateDiff codeSourceHash' diff
           in withKafkaViolently $ do
+              --Where slipstream gets its info currently
               void $ writeStateDiffEvents deletionEvents
               void $ writeStateDiffEvents creationEvents
               void $ writeStateDiffEvents updateEvents
