@@ -295,7 +295,7 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
    Nothing -> Nothing
    Just (Right position, theType) ->
      Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
-   Just (Left text, theType) -> case (textToValue typeDefs' text theType) of
+   Just (Left text, theType) -> case (textToValue (Just typeDefs') text theType) of
       Left err -> error $ "decodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
       Right val -> Just val
 
@@ -592,7 +592,7 @@ encodeValue
   -> Maybe [(Word256,Word256)]
 encodeValue typeDefs' offset Struct{..} varName val = case OMap.lookup varName fields of
    Nothing -> Nothing
-   Just (Right position, theType) -> case (textToValue typeDefs' val theType) of
+   Just (Right position, theType) -> case (textToValue (Just typeDefs') val theType) of
      Left err -> error $ "encodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
      Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) v
    Just (Left _, _) -> error "decodeValue: cannot convert constant variable to storage"

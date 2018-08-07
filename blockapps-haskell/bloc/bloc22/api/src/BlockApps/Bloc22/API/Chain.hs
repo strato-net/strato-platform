@@ -19,6 +19,8 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import           Data.Map.Strict                    (Map)
+import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
 import           Generic.Random.Generic

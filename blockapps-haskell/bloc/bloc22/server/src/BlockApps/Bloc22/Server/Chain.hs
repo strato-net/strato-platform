@@ -40,7 +40,7 @@ postChainInfo (ChainInput src lbl accountInfo chaininputArgs members) = do
             [(_, x)] -> return x
             _ -> throwError $ UserError "Multiple governance contracts are not allowed"
   contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
-  let argsText = map (fmap argValueToText) $ map toTuple chaininputArgs
+  let argsText = map (fmap argValueToText) $ Map.toList chaininputArgs
       storage = encodeValues (typeDefs contract) (mainStruct contract) 0 argsText
       contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
       nonContractAcctInfo = map (uncurry NonContract) $ map toTuple accountInfo
