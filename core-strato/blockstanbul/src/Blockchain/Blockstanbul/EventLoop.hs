@@ -109,6 +109,11 @@ nextRound nt = do
   when (epocheck `mod` 10000 == 0) $ do
       voted .= M.empty
       blockcount .= 0
+
+   --update validators list
+  val <- use validators
+  vot <- use voted
+  validators .= updateValidator val vot
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> view . round .= r
@@ -124,23 +129,15 @@ nextRound nt = do
 
   hasCommitted .= False
   hasPrepared .= False
-  pendingRound .= Nothing 
+  pendingRound .= Nothing
 
-  --update validators list
-  val <- use validators
-  vot <- use voted
-  let finds = updatevalidator val vot
-  validators .= finds
-  
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
     NewBeneficiary benf decision  -> do
-      pvotes <- use pendingvotes
-      pendingvotes .= M.insert benf decision pvotes
-      return ()
+      pendingvotes %= M.insert benf decision
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
