@@ -2,6 +2,7 @@
 
 set -e
 set -x
+set -o pipefail
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
