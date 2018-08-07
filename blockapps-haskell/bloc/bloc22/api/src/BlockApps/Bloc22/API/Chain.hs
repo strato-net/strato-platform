@@ -29,6 +29,7 @@ import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 
 --------------------------------------------------------------------------------
@@ -38,7 +39,7 @@ data ChainInput  = ChainInput
   { chaininputSrc      :: Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
-  , chaininputArgs     :: NamedMap "name" Text "value" Text
+  , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
@@ -68,9 +69,9 @@ instance ToSample ChainInput where
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
-    , chaininputArgs = map fromTuple [
-         ("addRule" :: Text, "AUTO_APPROVE" :: Text)
-       , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
+    , chaininputArgs = Map.fromList [
+         ("addRule", ArgString "AUTO_APPROVE")
+       , ("removeRule", ArgString "AUTO_APPROVE")
        ]
     , chaininputMembers = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
@@ -91,9 +92,9 @@ instance ToSchema ChainInput where
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
           ]
-        , chaininputArgs = map fromTuple [
-            ("addRule" :: Text, "AUTO_APPROVE" :: Text)
-          , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
+        , chaininputArgs = Map.fromList [
+            ("addRule", ArgString "AUTO_APPROVE")
+          , ("removeRule", ArgString "AUTO_APPROVE")
           ]
         , chaininputMembers = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)

@@ -717,7 +717,7 @@ constructArgValues args argNamesTypes = do
               textToArgType "Int" False "" -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) (return . (ix,)) (textToValue valStr ty)
+          either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
     case args of
       Nothing ->
         if Map.null argNamesTypes
