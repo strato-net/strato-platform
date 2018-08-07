@@ -153,8 +153,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         editedBlk <- if null pending
               then return blk
               else do
-                 let (bnf,nonc) = M.findMin pending
-                 pendingvotes .= M.deleteMin pending
+                 let ((bnf,nonc),newPending) = M.deleteFindMin pending
+                 pendingvotes .= newPending
                  return $ editBeneficiary blk bnf nonc
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
