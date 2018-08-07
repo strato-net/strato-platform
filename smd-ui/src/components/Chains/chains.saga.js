@@ -22,7 +22,7 @@ import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 
 const chainUrl = env.STRATO_URL + "/chain";
-const chainUrl2 = env.BLOC_URL + "/chain/:chainid";
+const chainUrl2 = env.BLOC_URL + "/chain";
 
 export function getChainsApi() {
   return fetch(
@@ -44,7 +44,7 @@ export function getChainsApi() {
 
 export function getChainDetailApi(chainid) {
   return fetch(
-    chainUrl2.replace(':chainid', chainid),
+    chainUrl2.concat("?chainid=", chainid),
     {
       method: 'GET',
       credentials: "include",
