@@ -43,7 +43,7 @@ function newnode {
   fi
 
   echo "Starting strato-sequencer"
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} --validator=${validators:-:[]} >> logs/strato-sequencer 2>&1
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} --validators=${validators:-[]} >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
