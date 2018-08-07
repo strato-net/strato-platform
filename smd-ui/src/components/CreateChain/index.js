@@ -37,15 +37,10 @@ class CreateChain extends Component {
         "address": member.address
       });
     });
-    let args = [
-    {
-      "value": values.val1,
-      "name": values.var1
-    },
-    {
-      "value": values.val2,
-      "name": values.var2
-    }];
+    let args = {
+      [values.var1]: values.val1,
+      [values.var2]: values.val2
+    };
     this.props.createChain(values.label, members, balances, values.src, args);
     this.setState({
       members: [],
