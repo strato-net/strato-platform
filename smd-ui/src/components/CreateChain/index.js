@@ -16,6 +16,7 @@ class CreateChain extends Component {
       members: [],
     };
     this.updateMembers = this.updateMembers.bind(this);
+    this.removeMember = this.removeMember.bind(this);
   }
 
   componentDidMount() {
@@ -53,13 +54,28 @@ class CreateChain extends Component {
 
   updateMembers(state) {
     const curMembers = this.state.members.slice(0);
+    const usernames = [];
+    curMembers.forEach(function(member, index) {
+      usernames.push(member.username);
+    });
+    if (!usernames.includes(state.username)){
+      this.setState({
+        members: curMembers.concat({
+          username: state.username,
+          address: state.address,
+          enode: state.enode,
+          balance: parseInt(state.balance, 10)
+        })
+      });
+    } 
+  }
+
+  removeMember(member) {
+    const members = this.state.members.slice(0);
+    const index = members.indexOf(member);
+    members.splice(index, 1);
     this.setState({
-      members: curMembers.concat({
-        username: state.username,
-        address: state.address,
-        enode: state.enode,
-        balance: parseInt(state.balance, 10)
-      })
+      members: members
     });
   }
 
@@ -68,13 +84,25 @@ class CreateChain extends Component {
       const ret = [];
       members.forEach(function(member, index){
         ret.push(
-          <div>{member.username}</div>
-        )
-      })
+          <div className="pt-dialog-header">
+          <span className="pt-dialog-header-title">{member.username}</span>
+          <Button 
+            className="pt-button pt-icon-small-cross" 
+            onClick = {() => {
+              this.removeMember(member)
+            }}
+            text='Remove'/>
+          </div>
+        );
+      }.bind(this))
       return ret;
     }
     else {
-      return (<div> No Members </div>);
+      return (
+        <div className="pt-dialog-header">
+          <span className="pt-dialog-header-title">No Members</span> 
+        </div>
+      );
     }
   }
 
