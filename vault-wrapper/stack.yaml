@@ -11,6 +11,12 @@ packages:
 
 extra-deps:
   - transformers-0.5.5.0
+  - ethereum-rlp-0.1.0
+  - nibblestring-0.0.3
+  - conduit-1.2.13.1
+  - murmur3-1.0.3
+  - pbkdf-1.1.1.1
+  - resourcet-1.1.11
 
 flags: {}
 

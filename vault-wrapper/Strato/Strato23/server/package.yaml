@@ -30,7 +30,31 @@ dependencies:
 - wai
 - wai-extra
 - wai-middleware-static
-- monad-control
+- monad-control >=1.0 && <1.1
+- aeson
+- ansi-wl-pprint
+- base16-bytestring
+- ethereum-rlp
+- binary
+- bytestring
+# - cryptonite
+- lens
+- path-pieces
+- memory
+- nibblestring
+- time
+- QuickCheck
+- deepseq
+- byteable
+- conduit 
+- containers
+- cryptohash
+- mtl       
+- murmur3   
+- network   
+- pbkdf     
+- split     
+- transformers
 
 library:
   source-dirs: src
