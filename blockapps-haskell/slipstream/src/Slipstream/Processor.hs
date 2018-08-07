@@ -45,14 +45,23 @@ import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
 
-data Action = Action ActionType String String (Maybe [(String, String)])
+--data Action = Action ActionType String String (Maybe [(String, String)])
+data Action = Action ActionType String String (Maybe ChainId) (Maybe [(String, String)])
               deriving (Show)
-
+{-
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
   (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
   ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
   ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
+  where
+    newValue (Diff _ x) = x
+-}
+stateDiffToChanges::StateDiff->[Action]
+stateDiffToChanges StateDiff{..} =
+  (map (\(x, y) -> Action Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> Action Delete x (codeHash y) chainId Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> Action Update x (codeHash y) chainId Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -91,19 +100,21 @@ getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
 getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
 getContract address _ chainId = do
   qqqq <-
-    getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
+    getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
 
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
+  liftIO $ putStrLn $ "ret1: " ++ show ret1
   let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
+  liftIO $ putStrLn $ "ret2: " ++ show ret2
   let ret3 = show $ contractdetailsName qqqq
   liftIO $ putStrLn $ "ret3" ++ show ret3
   return ContractAndXabi { contract = ret1, xabi = ret2, name = ret3 }
 
-fetchABI :: String -> Bloc String
-fetchABI address = do
-  conDet <- getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
-  let ret = show $ A.toJSON $ contractdetailsXabi conDet
-  return ret
+-- fetchABI :: String -> Bloc String
+-- fetchABI address = do
+--   conDet <- getContractDetailsByAddressOnly (Address $ fst $ head $ readHex address)
+--   let ret = show $ A.toJSON $ contractdetailsXabi conDet
+--   return ret
 
 storageToFunction::[(String, String)]->Storage
 storageToFunction s k =
@@ -112,16 +123,17 @@ storageToFunction s k =
    Just x -> x
 
 hasContract::Action->Bool
-hasContract (Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _) = False
+hasContract (Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ _) = False
 hasContract _ = True
 
 storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded (Action theType address codehash Nothing)= do
+--addStorageIfNeeded (Action theType address codehash Nothing)= do
+addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
-  return $ Action theType address codehash (Just $ map storageToList storage')
+  return $ Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
 
 resolveContractName :: String -> Map.Map -> String
@@ -144,13 +156,14 @@ third (_, _, x) = x
 -}
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
+  --liftIO $ putStrLn "<>____Process_____<>"
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-{-
+
   if (length changes > 0)
     then liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
     else return ()
--}
+
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -173,12 +186,9 @@ processTheMessages messages = do
   --Set Flag on startup
   let deployFlag = BlockApps.Bloc22.Monad.Public
 
-  --cirrusUrl <- parseBaseUrl flags_cirrusurl
-
   let env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
-            --, urlCirrus= cirrusUrl
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
@@ -212,7 +222,7 @@ processTheMessages messages = do
          Just c -> do
            return c
          Nothing -> do
-           (contractOrError, abi, name) <- getContract address codehash
+           (contractOrError, abi, name) <- getContract address codehash chainId
            case contractOrError of
             Left e -> error e
             Right c -> do

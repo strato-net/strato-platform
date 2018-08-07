@@ -156,25 +156,18 @@ LogDB
 ChainInfoRef
     chainId Word256
     chainLabel String
-    addRule String
-    removeRule String
     deriving Eq Generic Read Show
 
 ChainMemberRef
     chainInfoId ChainInfoRefId
     name String
-    deriving Eq Generic Read Show
-
-ChainAccountBalanceRef
-    chainInfoId ChainInfoRefId
     address Address
-    balance Integer
     deriving Eq Generic Read Show
 
 AccountInfoRef
     chainInfoId ChainInfoRefId
     address Address
-    balance Int
+    balance Integer
     codeHash SHA Maybe
     map [MapPair] Maybe
     deriving Eq Generic Read Show

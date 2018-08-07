@@ -696,12 +696,11 @@ instance FromJSON CodeInfo where
   parseJSON _ = error "parseJSON CodeInfo: expected Object"
 
 instance ToJSON CodeInfo where
-  toEncoding (CodeInfo bs s1 s2) =
-    pairs (
-      "code" Aeson..= bs <>
-      "src"  Aeson..= s1 <>
-      "name" Aeson..= s2
-    )
+  toJSON (CodeInfo bs s1 s2) = object
+    [ "code" Aeson..= bs
+    , "src"  Aeson..= s1
+    , "name" Aeson..= s2
+    ]
 
 instance ToSchema CodeInfo where
   declareNamedSchema _ = return $

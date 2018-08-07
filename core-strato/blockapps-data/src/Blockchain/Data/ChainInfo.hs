@@ -6,16 +6,28 @@
 {-# LANGUAGE OverloadedStrings        #-}
 
 module Blockchain.Data.ChainInfo
-  ( ChainInfo (..)
+  ( ChainInfo (..),
+    AccountInfo (..),
+    CodeInfo (..),
+    accountInfo,
+    accountExtractor
   ) where
 
+
+import           Control.Applicative               (many)
+
+import           Blockchain.ExtWord
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
+import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
 
 import           Data.Aeson
+import qualified Data.ByteString                      as B
+import qualified Data.JsonStream.Parser               as JS
+import qualified Data.Map                             as M
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 
@@ -23,13 +35,98 @@ import qualified GHC.Generics                         as GHCG
 
 import           Test.QuickCheck.Arbitrary
 
+
+data CodeInfo = CodeInfo
+  { codeInfoCode   :: B.ByteString
+  , codeInfoSource :: String
+  , codeInfoName   :: String
+  } deriving (Show, Read, Eq, GHCG.Generic)
+
+instance FromJSON CodeInfo where
+  parseJSON (Object o) =
+    CodeInfo
+    <$> o .: "code"
+    <*> o .: "src"
+    <*> o .: "name"
+  parseJSON _ = error "parseJSON CodeInfo: expected Object"
+
+instance ToJSON CodeInfo where
+  toJSON (CodeInfo bs s1 s2) = object
+    [ "code" .= bs
+    , "src"  .= s1
+    , "name" .= s2
+    ]
+
+instance RLPSerializable CodeInfo where
+  rlpEncode (CodeInfo a b c) = 
+    RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
+
+instance Arbitrary CodeInfo where
+  arbitrary = CodeInfo 
+      <$> arbitrary
+      <*> arbitrary
+      <*> arbitrary
+
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer SHA
+                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
+   deriving (Show, Eq, Read, GHCG.Generic)
+
+instance FromJSON AccountInfo where
+  parseJSON (Object o) = do
+    a <- (o .: "address")
+    b <- (o .: "balance")
+    mc <- (o .:? "codeHash")
+    case mc of
+      Nothing -> return $ NonContract a b
+      Just c -> do
+        ms <- (o .:? "storage")
+        case ms of
+          Nothing -> return $ ContractNoStorage a b c
+          Just s -> do
+            return $ ContractWithStorage a b c s
+  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
+
+instance ToJSON AccountInfo where
+  toJSON (NonContract a b) = object
+    [ "address" .= a
+    , "balance" .= b
+    ]
+  toJSON (ContractNoStorage a b c) = object
+    [ "address" .= a
+    , "balance" .= b
+    , "codeHash" .= c
+    ]
+  toJSON (ContractWithStorage a b c s) = object
+    [ "address" .= a
+    , "balance" .= b
+    , "codeHash" .= c
+    , "storage" .= s
+    ]
+
+instance RLPSerializable AccountInfo where
+  rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
+  rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
+  rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ rlpEncode <$> d]
+
+  rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
+  rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)
+  rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
+
+instance Arbitrary AccountInfo where
+  arbitrary = NonContract
+      <$> arbitrary
+      <*> arbitrary
+
 data ChainInfo = ChainInfo {
     chainLabel      :: String,
-    addRule         :: String,
-    removeRule      :: String,
-    members         :: [Enode],
-    accountBalance  :: [(Address, Integer)]
-} deriving (Eq, Read, Show, GHCG.Generic)
+    acctInfo        :: [AccountInfo],
+    codeInfo        :: [CodeInfo],
+    members         :: M.Map Address Enode
+} deriving (Eq, Show, Read, GHCG.Generic)
 
 instance Arbitrary ChainInfo where
   arbitrary = ChainInfo
@@ -37,46 +134,42 @@ instance Arbitrary ChainInfo where
           <*> arbitrary
           <*> arbitrary
           <*> arbitrary
-          <*> (do
-                  array <- arbitrary
-                  return $ map (\(a,b) -> (a, abs b)) array
-              )
 
 instance FromJSON ChainInfo where
-  parseJSON (Object o) =
-    ChainInfo <$>
-    o .: "label" <*>
-    o .: "addRule" <*>
-    o .: "removeRule" <*>
-    o .: "members" <*>
-    (map toTuple <$> ((o .: "balances") :: NamedMapParser "address" Address "balance" Integer))
+  parseJSON (Object o) = do
+    l <- o .: "label"
+    as <- o .: "accountInfo"
+    cs <- o .: "codeInfo"
+    ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
+    return $ ChainInfo l as cs (M.fromList $ map toTuple ms)
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON (ChainInfo cl ar rr ms ab) =
+  toJSON (ChainInfo cl ai ci ms) =
     object [ "label" .= cl
-           , "addRule" .= ar
-           , "removeRule" .= rr
-           , "members" .= ms
-           , "balances" .= ((map fromTuple ab) :: NamedMap "address" Address "balance" Integer)
+           , "accountInfo" .= ai
+           , "codeInfo" .= ci
+           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            ]
-
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
 
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
     [ rlpEncode . encodeUtf8 . T.pack $ chainLabel ci
-    , rlpEncode . encodeUtf8 . T.pack $ addRule ci
-    , rlpEncode . encodeUtf8 . T.pack $ removeRule ci
-    , RLPArray . map rlpEncode $ members ci
-    , RLPArray . map rlpEncode $ accountBalance ci
+    , RLPArray . map rlpEncode $ acctInfo ci
+    , RLPArray . map rlpEncode $ codeInfo ci
+    , rlpEncode $ members ci
     ]
-  rlpDecode (RLPArray [cl, ar, rr, RLPArray ms, RLPArray ab]) =
+  rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms]) =
     ChainInfo
       (T.unpack . decodeUtf8 $ rlpDecode cl)
-      (T.unpack . decodeUtf8 $ rlpDecode ar)
-      (T.unpack . decodeUtf8 $ rlpDecode rr)
-      (rlpDecode <$> ms)
-      (rlpDecode <$> ab)
+      (rlpDecode <$> ai)
+      (rlpDecode <$> coi)
+      (rlpDecode ms)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
+
+
+accountExtractor :: JS.Parser [AccountInfo]
+accountExtractor = many ("accountInfo" JS..: JS.arrayOf accountInfo)
+
+accountInfo :: JS.Parser AccountInfo
+accountInfo = JS.value

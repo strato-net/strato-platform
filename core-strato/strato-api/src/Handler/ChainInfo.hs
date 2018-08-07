@@ -5,6 +5,7 @@
 module Handler.ChainInfo where
 
 import           Data.Aeson
+import qualified Data.Map                       as M
 import qualified Data.Text                      as T
 
 import           Blockchain.Data.TXOrigin
@@ -32,23 +33,22 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: Handler Text
+postChainR :: Handler Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ ar rr mb ab) -> do 
-      when (ar == "") $ invalidArgs ["add rule is empty"]
-      when (rr == "") $ invalidArgs ["remove rule is empty"]
-      when (length mb == 0) $ invalidArgs ["member list is empty"]
-      let balanceSum = Import.foldr (\cur acc -> acc + (snd cur)) 0 ab
-      when (balanceSum == 0) $ invalidArgs ["All balances are zero"]
+    Success gen@(ChainInfo _ acin cdin mb) -> do 
+    -- add more checks?
+      when (length acin == 0) $ invalidArgs ["account info is empty"]
+      when (length cdin == 0) $ invalidArgs ["code info is empty"]
+      when (M.size mb == 0) $ invalidArgs ["member list is empty"]
       liftIO $ putStrLn $ T.pack $ show gen 
       bytes <- liftIO $ getEntropy 32
       let cid = fromInteger $ byteString2Integer bytes
       emitKafkaTransactions [(cid, gen)]
-      return . T.pack $ showHex cid ""
+      return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 getChainR :: Handler Value
