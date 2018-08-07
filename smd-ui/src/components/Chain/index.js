@@ -71,7 +71,7 @@ class Chain extends Component {
             </tr>
           </thead>
           <tbody>
-            {this.showMembers(chain)}
+            {this.showMembers(chain[0]["info"])}
           </tbody>
         </table>
       </div>
