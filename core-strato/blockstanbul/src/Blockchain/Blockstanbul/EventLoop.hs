@@ -167,7 +167,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (sender auth == pr) $ do
         if v == v'
           then do
-            --bc <- use blockcount
             blockcount += 1
             proposal .= Just pp
             pk <- use prvkey
