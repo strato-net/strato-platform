@@ -28,7 +28,7 @@ updateValidator val voted = newVals
                            addSuccess = M.filter helperAs toAdd 
                            dropSuccess = M.filter helperDs toDrop
                            newVals = combined val addSuccess dropSuccess
-                           threshold = (length val)*2 `div` 3 +1
+                           threshold = (length val)*2 `div` 3
                            -- check if up and down votes exceed maxnum
                            helperAs valu = (length (L.filter (==True) (elems valu)) > threshold)
                            helperDs valu =  (length (L.filter (==False) (elems valu)) > threshold)
@@ -36,4 +36,3 @@ updateValidator val voted = newVals
                            
 combined :: [Address] -> Map Address (Map Address Bool) -> Map Address (Map Address Bool) -> [Address]
 combined val adds drops = (val ++  (keys adds)) L.\\ (keys drops)
-
