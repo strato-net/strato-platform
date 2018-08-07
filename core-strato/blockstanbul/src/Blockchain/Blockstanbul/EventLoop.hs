@@ -106,11 +106,9 @@ nextRound nt = do
   -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
   -- rather than reset everything in the state.
   epocheck <- use blockcount
-  if (epocheck `mod` 10000) == 0
-    then do
+  when (epocheck `mod` 10000 == 0) $ do
       voted .= M.empty
       blockcount .= 0
-    else return ()
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> view . round .= r
@@ -171,8 +169,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (sender auth == pr) $ do
         if v == v'
           then do
-            bc <- use blockcount
-            blockcount .= bc +1
+            --bc <- use blockcount
+            blockcount += 1
             proposal .= Just pp
             pk <- use prvkey
             case extractBeneficiary pp of
