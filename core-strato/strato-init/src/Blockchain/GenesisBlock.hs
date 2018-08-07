@@ -176,6 +176,7 @@ bootstrapIndexer key obGB =
                 res <- runKafkaConfigured clientId $
                       IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
                 when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
+                print res
                 putStrLn "bootstrapIndex genesis seed successful!"
             Right (Left l) -> do
                 putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
