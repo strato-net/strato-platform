@@ -114,8 +114,8 @@ export function postFaucet(address) {
 
 export function* getAccounts(action) {
   try {
-    // const response = yield call(getAccountsApi);
-    const response = ["sz1152", "sz2699"];
+    const response = yield call(getAccountsApi);
+    // const response = ["sz1152", "sz2699"];
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
     if (action.loadAddresses && response.length > 0) {
@@ -133,8 +133,8 @@ export function* getAccounts(action) {
 
 export function* getUserAddresses(action) {
   try {
-    // const response = yield call(getUserAddressesApi, action.name);
-    const response = ["999"];
+    const response = yield call(getUserAddressesApi, action.name);
+    // const response = ["999"];
     yield put(fetchUserAddressesSuccess(action.name, response));
     if (action.loadBalances) {
       yield response.map(address => put(fetchAccountDetail(action.name, address)));
