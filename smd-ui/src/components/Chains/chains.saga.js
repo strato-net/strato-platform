@@ -62,21 +62,31 @@ export function getChainDetailApi(chainid) {
 
 export function* getChains(action) {
   try {
-    // const response = yield call(getChainsApi);
-    // const chainLabels = response.map(chainIdChainInfo => chainIdChainInfo["info"]["label"]);
-    // const chainIds = response.map(chainIdChainInfo => chainIdChainInfo["id"]);
-    // const chainInfos = response.map(chainIdChainInfo => chainIdChainInfo["info"]);
-    const chainLabelIds = {
-      "c1" : 
-      {
-        "5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac": {}, 
-        "666": {}
-      },
-      "c2" :
-      {
-        "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f": {}
+    const response = yield call(getChainsApi);
+    const chainLabelIds = {};
+    response.forEach(function(chainIdChainInfo, index) {
+      const id = chainIdChainInfo["id"];
+      const label = chainIdChainInfo["info"]["label"];
+      if (!chainLabelIds[label]) {
+        chainLabelIds[label] = {};
+        chainLabelIds[label][id] = {};
+      } else {
+        chainLabelIds[label][id] = {};
       }
-    };
+    });
+    
+    // const chainLabelIds = {
+    //   "c1" : 
+    //   {
+    //     "5ee7e72b5ee72c93607998c15efe8d5fe1f00b1dfc9e051f3c6cad79a3b489ac": {}, 
+    //     "666": {}
+    //   },
+    //   "c2" :
+    //   {
+    //     "5874fceb96c31fdcab63bfb3b0026efef45c188d14762eee8ecfb36df849792f": {}
+    //   }
+    // };
+
     yield put(fetchChainsSuccess(chainLabelIds));
 
     if (action.loadChainId && Object.getOwnPropertyNames(chainLabelIds).length > 0) {
@@ -99,7 +109,6 @@ export function* getChainIds(action) {
     yield put(fetchChainIdsSuccess(action.label, ids));
     if (action.loadDetails) {
       yield ids.map(id => put(fetchChainDetail(action.label, id)));
-      // yield put(fetchChainDetail(action.label, ids));
     }
   }
   catch (err) {
@@ -109,34 +118,34 @@ export function* getChainIds(action) {
 
 export function* getChainDetail(action) {
   try {
-    // const response = yield call(getChainDetailApi, action.id);
-    const response = {
-      "balances": [
-        {
-          "balance": 0,
-          "address": "0000000000000000000000000000000000000100"
-        },
-        {
-          "balance": 20000000,
-          "address": "5815b9975001135697b5739956b9a6c87f1c575c"
-        },
-        {
-          "balance": 999999,
-          "address": "93fdd1d21502c4f87295771253f5b71d897d911c"
-        }
-      ],
-      "members": [
-        {
-          "address": "5815b9975001135697b5739956b9a6c87f1c575c",
-          "enode": "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
-        },
-        {
-          "address": "93fdd1d21502c4f87295771253f5b71d897d911c",
-          "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
-        }
-      ],
-      "label": "c1"
-    };
+    const response = yield call(getChainDetailApi, action.id);
+    // const response = {
+    //   "balances": [
+    //     {
+    //       "balance": 0,
+    //       "address": "0000000000000000000000000000000000000100"
+    //     },
+    //     {
+    //       "balance": 20000000,
+    //       "address": "5815b9975001135697b5739956b9a6c87f1c575c"
+    //     },
+    //     {
+    //       "balance": 999999,
+    //       "address": "93fdd1d21502c4f87295771253f5b71d897d911c"
+    //     }
+    //   ],
+    //   "members": [
+    //     {
+    //       "address": "5815b9975001135697b5739956b9a6c87f1c575c",
+    //       "enode": "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+    //     },
+    //     {
+    //       "address": "93fdd1d21502c4f87295771253f5b71d897d911c",
+    //       "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+    //     }
+    //   ],
+    //   "label": "c1"
+    // };
     yield put(fetchChainDetailSuccess(action.label, action.id, response));
   }
   catch (err) {
