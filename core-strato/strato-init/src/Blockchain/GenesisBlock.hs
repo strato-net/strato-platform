@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
@@ -9,6 +10,7 @@ module Blockchain.GenesisBlock (
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Logger
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8                as C8
@@ -101,11 +103,13 @@ initializeGenesisBlock :: ( MonadResource m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m
+                          , MonadLogger m
                           )
                        => BackupType
                        -> String
                        -> m ()
 initializeGenesisBlock backupType genesisBlockName = do
+    $logOtherS "initgen" "1mr" "Begin of initgen"
     (srcInfo, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
@@ -125,9 +129,12 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
+    $logOtherS "initgen" "1mr" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    $logOtherS "initgen" "1mr" "Genesis Block put"
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
+    $logOtherS "initgen" "1mr" "State diff has been generated"
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {
           StateDiff.chainId   = genesisChainId,
@@ -139,18 +146,22 @@ initializeGenesisBlock backupType genesisBlockName = do
           updatedAccounts     = Map.empty
         }
     commitSqlDiffs diff (const "") (const "")
+    $logOtherS "initgen" "1mr" "Diff committed to SQL"
     let writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
             ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
 
     forM_ srcInfo writeSource
+    $logOtherS "initgen" "1mr" "Source has been written"
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
+    $logOtherS "initgen" "1mr" "best block info inserted"
     liftIO (bootstrapIndexer genBId obGB)
+    $logOtherS "initgen" "1mr" "indexer has been bootstrapped"
     mErr <- liftIO . runKafkaConfigured "strato-init" $ do
       assertTopicCreation
       splitWriteStateDiffs [diff]
@@ -158,6 +169,7 @@ initializeGenesisBlock backupType genesisBlockName = do
        Right [] -> return ()
        Right errs -> error . show $ errs
        Left err -> error . show $ err
+    $logOtherS "initgen" "1mr" "End of initgen"
 
 bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =
