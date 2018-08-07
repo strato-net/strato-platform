@@ -34,10 +34,10 @@ main = do
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
       eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+      validators = fromRight (error "invalid validators") eValidators
       -- TODO(tim): Use proper initial values for the view
-      ctx = newContext
-               (View 0 0)
-               (fromEither (error "invalid validators") eValidators)
+      ctx = newContext (View 0 0) validators
+  putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_tmpblockstanbul
              then return Nothing
              else do
