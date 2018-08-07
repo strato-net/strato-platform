@@ -12,31 +12,37 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
+import qualified Data.Text                         as Text
 import           Opaleye                           hiding (not, null, index)
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
-import           BlockApps.Solidity.Contract()
+import           BlockApps.SolidityVarReader
+import           BlockApps.Solidity.ArgValue
+import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
+import           BlockApps.XAbiConverter           (xAbiToContract)
 
 governanceAddress :: Address
 governanceAddress = Address 0x100
 
 postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo (ChainInput src lbl accountInfo _ members) = do
+postChainInfo (ChainInput src lbl accountInfo chaininputArgs members) = do
   idsAndDetails <- compileContract src
   (cmId, ContractDetails{..}) <- case Map.toList idsAndDetails of
             [] -> throwError $ UserError "You need to supply at least one governance contract"
             [(_, x)] -> return x
             _ -> throwError $ UserError "Multiple governance contracts are not allowed"
-  let varMap = Map.empty -- Map.fromList $ transformXabi contractdetailsXabi (Map.fromList variableNames) -- TODO: this
-      contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash varMap
+  contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
+  let argsText = map (fmap argValueToText) $ Map.toList chaininputArgs
+      storage = encodeValues (typeDefs contract) (mainStruct contract) 0 argsText
+      contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
       nonContractAcctInfo = map (uncurry NonContract) $ map toTuple accountInfo
       acctInfo = [contractAcctInfo] ++ nonContractAcctInfo
       codeInfo = CodeInfo contractdetailsBinRuntime src contractdetailsName
@@ -53,15 +59,20 @@ postChainInfo (ChainInput src lbl accountInfo _ members) = do
     ]
   return chainId
 
-getChainInfo :: ChainId -> Bloc ChainOutput
-getChainInfo chainId = do
-  chainIdChainInfo <- blocStrato $ Strato.getChain [chainId]
-  (ChainInfo cl ai _ mm) <- case chainIdChainInfo of
-                                         [] -> throwError $ DBError "No chain matches the chainId"
-                                         (idInfo:_) -> return $ snd (toTuple idInfo :: (ChainId, ChainInfo))
-  let getAddrBalance acct = case acct of
-                              NonContract a b -> (a, b)
-                              ContractNoStorage a b _ -> (a, b)
-                              ContractWithStorage a b _ _ -> (a, b)
-  let acctInfo = map (fromTuple . getAddrBalance) ai
-  return $ ChainOutput cl acctInfo mm
+getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
+getChainInfo chainIds = do
+  chainIdChainInfos::[ChainIdChainInfo] <- blocStrato $ Strato.getChain chainIds
+  case chainIdChainInfos of 
+    [] -> throwError $ DBError "No chains match any of the chainIds"
+    _ -> return $ map convertChainInfo chainIdChainInfos
+    where
+      convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
+      convertChainInfo chp = do
+        let chtup = (toTuple chp :: (ChainId, ChainInfo))
+        let chinfo =  snd chtup
+        let getAddrBalance acct = case acct of
+                                    NonContract a b -> (a, b)
+                                    ContractNoStorage a b _ -> (a, b)
+                                    ContractWithStorage a b _ _ -> (a, b)
+        let acctInfo = map (fromTuple . getAddrBalance) $ accountInfo chinfo
+        NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo (members chinfo)) :: ChainIdChainOutput
