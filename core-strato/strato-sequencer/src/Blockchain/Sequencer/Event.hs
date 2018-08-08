@@ -98,6 +98,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEGetChain [Word256]
                  | OEGetTx [SHA]
                  | OEBlockstanbul PBFT.WireMessage
+                 | OECreateBlockCommand
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -289,6 +290,7 @@ instance Binary OutputEvent where
     put (OEGetChain cid)     = putWord8 5 >> put cid
     put (OEGetTx tx)         = putWord8 6 >> put tx
     put (OEBlockstanbul m)   = putWord8 7 >> put m
+    put (OECreateBlockCommand) = putWord8 8
     get = do
         tag <- getWord8
         case tag of
@@ -300,6 +302,7 @@ instance Binary OutputEvent where
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
             7 -> OEBlockstanbul <$> get
+            8 -> return OECreateBlockCommand
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where
