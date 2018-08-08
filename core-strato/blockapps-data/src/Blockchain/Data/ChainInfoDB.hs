@@ -8,8 +8,9 @@
 module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
+import           Control.Monad                      (when)
 import           Control.Monad.Trans.Resource
-import           Data.Map                           as M        hiding (map, filter)
+import           Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 
 import qualified Database.Esqueleto                 as E
@@ -22,6 +23,7 @@ import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Strato.Model.Address
 
 getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
@@ -104,6 +106,46 @@ putChainInfo chainId ChainInfo{..} = do
           CodeInfoRef ch bc cc cn
         parseMember chi (ad, en) = 
           ChainMemberRef chi (showEnode en) ad
+
+addMember :: (HasSQLDB m) => Word256 -> Address -> m ()
+addMember chainId address = do
+  db <- getSQLDB
+  runResourceT . flip SQL.runSqlPool db $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          members <- E.select . E.from $ \mRef -> do
+            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+            return mRef
+          when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
+            insertMany_ [ChainMemberRef chainInfoRefId "" address] -- TODO(dustin): Use correct enode
+
+removeMember :: (HasSQLDB m) => Word256 -> Address -> m ()
+removeMember chainId address = do
+  db <- getSQLDB
+  runResourceT . flip SQL.runSqlPool db $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          member <- E.select . E.from $ \mRef -> do
+            E.where_ ((mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+                      E.&&. (mRef E.^. ChainMemberRefAddress E.==. E.val address))
+            return mRef
+          when (not $ null member) $ do
+            delete . entityKey $ head member
+
+terminateChain :: (HasSQLDB m) => Word256 -> m ()
+terminateChain _ = return ()
 
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
