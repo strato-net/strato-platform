@@ -56,7 +56,22 @@ data BlockstanbulContext = BlockstanbulContext {
   , _prvkey :: HK.PrvKey
   , _blockcount :: Int
 }
+
 makeLenses ''BlockstanbulContext
+
+debugShowCtx :: StateMachineM m => m ()
+debugShowCtx = do
+  let debugLog :: (StateMachineM m2, Show a) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a-> m2 ()
+      debugLog loc lns = join . uses lns $ $logDebugS loc . T.pack . show
+  debugLog "showctx/view" view
+  debugLog "showctx/proposer" proposer
+  debugLog "showctx/validators" validators
+  debugLog "showctx/prepared" prepared
+  debugLog "showctx/committed" committed
+  debugLog "showctx/hasPrepared" hasPrepared
+  debugLog "showctx/roundChanged" roundChanged
+  mNumber <- uses proposal $ fmap (blockDataNumber . blockBlockData)
+  $logDebugS "showctx/mBlockNumber" . T.pack . show $ mNumber
 
 newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as pk =
@@ -65,7 +80,7 @@ newContext v as pk =
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _authenticator = const True
+     , _authenticator = const True -- TODO(tim): Authenticate
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -138,6 +153,7 @@ nextRound nt = do
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
+  debugShowCtx
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
