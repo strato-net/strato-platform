@@ -2,6 +2,7 @@
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 
@@ -9,6 +10,7 @@ module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import           Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
@@ -144,8 +146,8 @@ removeMember chainId address = do
           when (not $ null member) $ do
             delete . entityKey $ head member
 
-terminateChain :: (HasSQLDB m) => Word256 -> m ()
-terminateChain _ = return ()
+terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
+terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
 
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
