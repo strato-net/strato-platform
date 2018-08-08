@@ -129,6 +129,9 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
+    $logOtherS "initgen" "1mr" "Beginning major compaction"
+    sdb <- getStateDB
+    MP.compactEntireDB sdb
     $logOtherS "initgen" "1mr" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     $logOtherS "initgen" "1mr" "Genesis Block put"
