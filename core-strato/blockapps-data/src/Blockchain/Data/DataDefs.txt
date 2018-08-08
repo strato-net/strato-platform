@@ -144,6 +144,7 @@ Extra
 LogDB
     blockHash SHA
     transactionHash SHA
+    chainId Word256 Maybe
     address Address
     topic1 Word256 Maybe
     topic2 Word256 Maybe
