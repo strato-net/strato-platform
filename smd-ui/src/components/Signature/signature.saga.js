@@ -22,7 +22,7 @@ function signDataRequest(payload) {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ hash: payload.value })
+      body: JSON.stringify({ queryToSign: payload.value })
     })
     .then(function (response) {
       return response.json()
@@ -34,12 +34,16 @@ function signDataRequest(payload) {
 
 function* signData(action) {
   try {
-    console.log(action)
     const responseData = yield call(signDataRequest, action.payload);
-    console.log('lets check response:::', responseData)
-    yield put(signPayloadSuccess(responseData));
+    
+    if (responseData.error) {
+      yield put(signPayloadFailure(responseData.error.message))
+    } else {
+      yield put(signPayloadSuccess(responseData));
+    }
   } catch (err) {
     // Handle when you have error on logout
+    yield put(signPayloadFailure(err.message))
   }
 }
 

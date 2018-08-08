@@ -4,12 +4,21 @@ import { withRouter } from 'react-router-dom';
 import { Field, reduxForm, reset, Form } from 'redux-form';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { Button } from '@blueprintjs/core';
-import { signPayload } from './signature.action';
+import { signPayload, resetError } from './signature.action';
+import { toasts } from '../Toasts';
 
 class Signature extends Component {
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.signedDataError) {
+      toasts.show({ message: nextProps.signedDataError });
+      this.props.resetError();
+    }
+  }
+
   submit = (values) => {
     this.props.signPayload(values);
+    this.props.reset();
   };
 
   render() {
@@ -30,7 +39,7 @@ class Signature extends Component {
                     className="pt-input pt-fill"
                     component="input"
                     name="value"
-                    placeholder="Query Term"
+                    placeholder="Enter your text"
                     onKeyPress={
                       (e) => {
                         if (e.key === 'Enter') {
@@ -47,6 +56,16 @@ class Signature extends Component {
                   className="pt-intent-primary pt-icon-arrow-right" />
               </div>
             </Form>
+            <div>
+              {
+                this.props.signedPayload &&
+                <div>
+                  <h3> R: {this.props.signedPayload.r} </h3>
+                  <h3> S: {this.props.signedPayload.s} </h3>
+                  <h3> V: {this.props.signedPayload.v} </h3>
+                </div>
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -56,13 +75,15 @@ class Signature extends Component {
 
 export function mapStateToProps(state) {
   return {
-    uploadList: state.externalStorage.uploadList
+    signedPayload: state.signedData.signedPayload,
+    signedDataError: state.signedData.error,
   };
 }
 
 const formed = reduxForm({ form: 'signature' })(Signature);
 const connected = connect(mapStateToProps, {
   signPayload,
+  resetError
 })(formed)
 
 export default withRouter(connected);

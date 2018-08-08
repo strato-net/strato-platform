@@ -1,6 +1,7 @@
 import {
   SIGN_REQUEST_SUCCESS,
   SIGN_REQUEST_FAILURE,  
+  RESET_ERROR
 } from './signature.action';
 
 const initialState = {
@@ -13,13 +14,20 @@ const reducer = function (state = initialState, action) {
     case SIGN_REQUEST_SUCCESS:
       return {
         ...state,
-        signedPayload: action.signedPayload
+        signedPayload: action.signedPayload,
+        error: null
       };
     case SIGN_REQUEST_FAILURE:
       return {
         ...state,
         signedPayload: null,
         error: action.signedPayloadError,
+      };
+    case RESET_ERROR:
+      return {
+        ...state,
+        signedPayload: null,
+        error: null
       };
     default:
       return state;
