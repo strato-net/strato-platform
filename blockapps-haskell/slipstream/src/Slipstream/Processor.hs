@@ -90,25 +90,32 @@ emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
 data ContractAndXabi =
   ContractAndXabi {
-    contract :: Contract,
+    contract :: Either String Contract,
     xabi :: String,
     name :: String
   }
-  deriving(Show, Generic)
+  deriving(Show)
 
 getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
+--getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
 getContract address _ chainId = do
   qqqq <-
     getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
 
-  let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  liftIO $ putStrLn $ "ret1: " ++ show ret1
-  let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
-  liftIO $ putStrLn $ "ret2: " ++ show ret2
-  let ret3 = show $ contractdetailsName qqqq
-  liftIO $ putStrLn $ "ret3" ++ show ret3
-  return ContractAndXabi { contract = ret1, xabi = ret2, name = ret3 }
+  --let ret1 = xAbiToContract $ contractdetailsXabi qqqq
+  --liftIO $ putStrLn $ "ret1: " ++ show ret1
+  --let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
+  --liftIO $ putStrLn $ "ret2: " ++ show ret2
+  --let ret3 = show $ contractdetailsName qqqq
+  --liftIO $ putStrLn $ "ret3" ++ show ret3
+
+  let ret = ContractAndXabi {
+    contract = xAbiToContract $ contractdetailsXabi qqqq
+    , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
+    , name = show $ contractdetailsName qqqq
+  }
+  return $ (Right ret)
 
 -- fetchABI :: String -> Bloc String
 -- fetchABI address = do
@@ -130,40 +137,58 @@ storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
---addStorageIfNeeded (Action theType address codehash Nothing)= do
 addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
   return $ Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
 
-resolveContractName :: String -> Map.Map -> String
-resolveContractName name cache =
---Lookup Name
-  case () of
-    Nothing -> name
-    Just x -> name --Remove
---Lookup Name + codehash
---Increment Name
-{-
-first :: (a, b, c) -> a
-first (x, _, _) = x
 
-second :: (a, b, c) -> b
-second (_, x, _) = x
+resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)] -> IO String
+resolveContractName inc codehash contractName cache = do
+  liftIO $ putStrLn $ "...contractName... " ++ show contractName
+  liftIO $ putStrLn $ "...inc... " ++ show inc
+  --let lst = Map.toList cache
+  --liftIO $ putStrLn $ "...lst..." ++ show lst
+  let nameList = map(\(_, y) -> (name y)) cache
+  liftIO $ putStrLn $ ":::NAME LIST::: " ++ show nameList
+  let sameName = filter (\(_, y) -> findName y) cache
+  --liftIO $ putStrLn $ "___sameName___ " ++ show sameName
+  if (null sameName)
+    then
+      if (inc == 0)
+        then return contractName
+        else do
+          let newName = contractName ++ show inc
+          return newName
+    else do
+      case (lookup codehash sameName) of
+        Nothing -> do
+          resolveContractName (inc + 1) codehash contractName cache
+        Just _ -> do
+          liftIO $ putStrLn "_=^SAME CODEHASH^=_"
+          if (inc == 0)
+            then return contractName
+            else do
+              let newName = contractName ++ show inc
+              return newName
+  where findName :: ContractAndXabi -> Bool
+        findName cont = case inc of
+          0 -> if(contractName == name cont)
+            then True
+            else False
+          x -> if(contractName ++ show x == name cont)
+            then True
+            else False
 
-third :: (a, b, c) -> c
-third (_, _, x) = x
--}
-processTheMessages :: [B.ByteString] -> IO ()
-processTheMessages messages = do
-  --liftIO $ putStrLn "<>____Process_____<>"
+processTheMessages :: [B.ByteString] -> IORef (Map String ContractAndXabi) -> IO ()
+processTheMessages messages cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-
+{-
   if (length changes > 0)
     then liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
     else return ()
-
+-}
   let conHost = flags_pghost
   let conPort = read flags_pgport
   let conUser = flags_pguser
@@ -195,10 +220,10 @@ processTheMessages messages = do
             , deployMode= deployFlag   -- :: Severity
             }
 
-  cachedContractsIORef <- newIORef Map.empty
+  --cachedContractsIORef <- newIORef Map.empty
 
   _ <- enterBloc2 env $ do
-    --liftIO $ putStrLn "{{{}}}"
+    liftIO $ putStrLn "{{{}}}"
     forM (filter hasContract changes) $ \change -> do
 
       --liftIO $ putStrLn $ "{{{CHANGE}}} : " ++ show change
@@ -214,41 +239,41 @@ processTheMessages messages = do
              --Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
              Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
              Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-      --liftIO $ putStrLn $ "======address=====: " ++ show address
-      --liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
+      liftIO $ putStrLn $ "======address=====: " ++ show address
+      liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
          Just c -> do
            return c
          Nothing -> do
-           (contractOrError, abi, name) <- getContract address codehash chainId
+           --(contractOrError, abi, name) <- getContract address codehash chainId
+           contractOrError <- getContract address codehash chainId
            case contractOrError of
             Left e -> error e
             Right c -> do
+              --liftIO $ putStrLn $ "{{{c}}}"
               --Resolve Name Issues
-              let resolvedName = resolveContractName name cachedContracts
-              let newContractAndXabi = ContractAndXabi{contract = c, xabi = abi, name = resolvedName}
+              let contList = Map.toList cachedContracts
+              resolvedName <- liftIO $ resolveContractName 0 codehash (name c) contList
+              liftIO $ putStrLn $ "++++RESOLVEDNAME++++ " ++ show resolvedName
+              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = resolvedName}
               liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
-              return (c, abi, resolvedName)
+              return newContractAndXabi
 
       let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-      let name = replace "\"" "" $ name contractMetaData
+      let contName = replace "\"" "" $ name contractMetaData
 
       --TODO: Add parsing of contract info to get flags (indexing, history)
-
-      let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      --liftIO $ putStrLn $ "<>RET<>: " ++ show ret
-{-
-      let chain = case Map.lookup "chainId" ret of
-                    Nothing -> ""
-                    Just(x) -> show x
--}
+      let cont = case contract contractMetaData of
+                    Left s -> error s
+                    Right c -> c
+      let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) storage 0
       let chain = case chainId of
                     Nothing -> ""
                     Just(x) -> show x
       --liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
 
-      liftIO $ convertRet address codehash strAbi name chain ret
+      liftIO $ convertRet address codehash strAbi contName chain ret
 
   return()

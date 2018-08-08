@@ -15,6 +15,8 @@ import HFlags
 import Slipstream.MessageConsumer
 import Slipstream.OutputData
 import Slipstream.Options ()
+import qualified Data.Map as Map
+import Data.IORef
 
 main::IO ()
 main = do
@@ -27,7 +29,9 @@ main = do
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  msg <- runKafka state $ (getAndProcessMessages offset)
+  cachedContractsIORef <- newIORef Map.empty
+
+  msg <- runKafka state $ (getAndProcessMessages cachedContractsIORef offset)
 
   messages <- case msg of
         Left e -> error $ show e

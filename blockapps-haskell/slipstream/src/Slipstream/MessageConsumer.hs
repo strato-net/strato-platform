@@ -22,6 +22,7 @@ import Slipstream.Options
 import Data.List
 import Slipstream.Processor
 import Control.Concurrent
+import Data.IORef
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
@@ -74,11 +75,11 @@ getTheMessages offset = do
   let ret = (map tamPayload . fetchMessages) fetched
   return ret
 
-getAndProcessMessages :: Kafka a => K.Offset -> a ()
-getAndProcessMessages offset = do
+getAndProcessMessages :: Kafka a => IORef (M.Map String ContractAndXabi) -> K.Offset -> a ()
+getAndProcessMessages cache offset = do
   messages <- getTheMessages offset
-  liftIO $ processTheMessages messages
+  liftIO $ processTheMessages messages cache
   if (length messages == 0)
     then  liftIO $ threadDelay 1000000
     else return()
-  getAndProcessMessages $ (offset + fromIntegral (length messages))
+  getAndProcessMessages cache $ (offset + fromIntegral (length messages))
