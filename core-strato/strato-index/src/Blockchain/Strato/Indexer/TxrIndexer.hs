@@ -1,15 +1,19 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.TxrIndexer where
 
 import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Monad.IO.Class             (liftIO)
+import           Control.Exception                  (catch, SomeException)
 import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
+import qualified Data.Map.Strict                    as Map
 import           Data.Maybe                         (isJust)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -17,8 +21,10 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
 import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
+import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
 import           Blockchain.Data.MiningStatus
 import qualified Blockchain.Data.TransactionResult  as TxrDB
@@ -30,6 +36,7 @@ import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.SHA
+import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
 
 import           Numeric
@@ -61,13 +68,24 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                     Just x | SHA x == addTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
                           enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
-                          enode = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
-                      $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                      addMember chainId address enode
+                          enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
+                      mEnode <- liftIO $ (return . Just $ readEnode enode') `catch` (\(_ :: SomeException) -> return Nothing)
+                      when (isJust mEnode) $ do
+                        let Just enode = mEnode
+                        $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
+                        addMember chainId address enode' -- We only need the Text version for Postgres
+                        mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
+                        when (isJust mChainInfo) $ do
+                          let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
+                          void . RBDB.withRedisBlockDB $ RBDB.putChainInfo chainId cInfo{members = Map.insert address enode ms}
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                       removeMember chainId address
+                      mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
+                      when (isJust mChainInfo) $ do
+                        let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
+                        void . RBDB.withRedisBlockDB $ RBDB.putChainInfo chainId cInfo{members = Map.delete address ms}
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       terminateChain chainId
