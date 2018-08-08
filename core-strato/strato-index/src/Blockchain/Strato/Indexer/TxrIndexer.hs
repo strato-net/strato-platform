@@ -8,9 +8,11 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Data.Binary
 import qualified Data.ByteString                    as BS
+import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
 import           Data.Maybe                         (isJust)
 import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
@@ -23,21 +25,23 @@ import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Format
 
+import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.SHA
+import           Blockchain.Util                    (byteString2Integer)
 
 import           Numeric
 
 addTopic :: SHA
-addTopic = SHA 0xb251eb052afc73ffd02ffe85ad79990a8b3fed60d76dbc2fa2fdd7123dffd914
+addTopic = hash $ C8.pack "MemberAdded(address,string)"
 
 removeTopic :: SHA
-removeTopic = SHA 0x6e76fb4c77256006d9c38ec7d82b45a8c8f3c27b1d6766fffc42dfb8de684492
+removeTopic = hash $ C8.pack "MemberRemoved(address)"
 
 terminateTopic :: SHA
-terminateTopic = SHA 0xa216b6c57c66c6aca0a555ec262cc200b54bc3171354e33ff842740444e5e206
+terminateTopic = hash $ C8.pack "ChainTerminated()"
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -55,9 +59,11 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                   let Just chainId = mChainId
                   case topic1 of
                     Just x | SHA x == addTopic -> do
-                      let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
+                      let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
+                          enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
+                          enode = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                      addMember chainId address
+                      addMember chainId address enode
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""

@@ -97,18 +97,18 @@ putChainInfo chainId ChainInfo{..} = do
     insertMany_ $ map (parseMember cirId) (M.toList members)
     return cirId
       where
-        parseAInfo chid aInfo = 
+        parseAInfo chid aInfo =
           case aInfo of
             NonContract a i -> AccountInfoRef chid a i Nothing Nothing
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
-        parseCInfo ch (CodeInfo bc cc cn)  = 
+        parseCInfo ch (CodeInfo bc cc cn)  =
           CodeInfoRef ch bc cc cn
-        parseMember chi (ad, en) = 
+        parseMember chi (ad, en) =
           ChainMemberRef chi (showEnode en) ad
 
-addMember :: (HasSQLDB m) => Word256 -> Address -> m ()
-addMember chainId address = do
+addMember :: (HasSQLDB m) => Word256 -> Address -> String -> m ()
+addMember chainId address enode = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
@@ -123,7 +123,7 @@ addMember chainId address = do
             E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
             return mRef
           when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
-            insertMany_ [ChainMemberRef chainInfoRefId "" address] -- TODO(dustin): Use correct enode
+            insertMany_ [ChainMemberRef chainInfoRefId enode address]
 
 removeMember :: (HasSQLDB m) => Word256 -> Address -> m ()
 removeMember chainId address = do
