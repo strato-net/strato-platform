@@ -12,14 +12,20 @@ import           Data.Text
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type PostSignature = "strato" :> "v2.3" :> "signature" :> Header "X-USER-UNIQUE-NAME" Text :> Post '[JSON] SignatureDetails
+type PostSignature = "strato" :> "v2.3" :> "signature" :> Header "X-USER-UNIQUE-NAME" Text :> ReqBody '[JSON] UserData :> Post '[JSON] SignatureDetails
 
 data SignatureDetails = SignatureDetails {
-  r :: String
-  , s :: String
-  , v :: String
-  , k :: Maybe Text
+  r :: Integer
+  , s :: Integer
+  , v :: Integer
+} deriving (Eq, Show, Generic)
+
+data UserData = UserData {
+  queryToSign :: String
 } deriving (Eq, Show, Generic)
 
 instance ToJSON SignatureDetails
 instance FromJSON SignatureDetails
+
+instance ToJSON UserData
+instance FromJSON UserData

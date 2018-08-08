@@ -55,6 +55,7 @@ dependencies:
 - pbkdf     
 - split     
 - transformers
+- largeword
 
 library:
   source-dirs: src
