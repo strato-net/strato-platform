@@ -3,6 +3,7 @@ module Executable.EVMFlags where
 
 import           HFlags
 
+defineFlag "bootstrap" True "Whether this is a fresh start or a restart"
 defineFlag "maxTxsPerBlock" (500 :: Integer) "max number of transactions that may be put into a block"
 defineFlag "mempoolLivenessCutoff" (240 :: Integer) "max age of a transaction in seconds that is valid for the mempool"
 defineFlag "useTestnet" False "Change difficulty computation for ethdev testnet"

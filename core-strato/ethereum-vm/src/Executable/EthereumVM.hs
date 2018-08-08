@@ -16,6 +16,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
+import qualified Network.Kafka                         as Kafka
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
@@ -55,15 +56,16 @@ ethereumVM = void . execContextM $ do
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
-    putContextBestBlockInfo cpBBI
-    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
-    Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
-
-    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
+    when flags_bootstrap $ do
+      (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
+      putContextBestBlockInfo cpBBI
+      bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
+      Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
+      $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
     forever $ do
-        cpOffset <- getCheckpointNoMetadata
+      eCpOffset <- getCheckpointNoMetadata
+      withRight eCpOffset $ \cpOffset -> do
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
 
@@ -183,18 +185,18 @@ getCheckpoint = do
             $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
             return (ofs, md')
 
-getCheckpointNoMetadata :: ContextM KP.Offset
+getCheckpointNoMetadata :: ContextM (Either Kafka.KafkaClientError KP.Offset)
 getCheckpointNoMetadata = do
     let topic  = seqVmEventsTopicName
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
     K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
-        Left err -> error $ "getCheckpointNoMetadata: Connection to Kafka failed with: " ++ show err
+        Left err -> return $ Left err
         Right (Left KP.UnknownTopicOrPartition) -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (Right (ofs, _)) -> do
-            return ofs
+            return $ Right ofs
 
 
 setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()

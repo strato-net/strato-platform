@@ -133,10 +133,12 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Initing runKafka"
     $logInfoS "stratoAdit" "Will fetch offsets"
 
-    eOffset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
-    case eOffset of
-      Left err -> error $ "stratoAdit: Kafka connection failed with: " ++ show err
-      Right offset -> do
-        $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
+    offset <- getOffset
+    $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
-        doConsume (max (offset - 1) 0) c
+    doConsume (max (offset - 1) 0) c
+    where getOffset = do
+            eOffset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
+            case eOffset of
+              Right ofs -> return ofs
+              Left _ -> getOffset

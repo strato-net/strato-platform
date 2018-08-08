@@ -7,12 +7,12 @@ declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
-  initialize=false
+  bootstrap=false
 
   mkdir -p logs/rotation
 
   if [[ ! -d .ethereumH ]]
-  then initialize=true
+  then bootstrap=true
        cleanupDB
        doInit
   fi
@@ -58,7 +58,7 @@ function newnode {
   echo "Starting ethereum-vm"
   runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
+                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb --bootstrap=$bootstrap \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel \
                          --tmpblockstanbul=${tmpblockstanbul:-false} +RTS -N1 >> logs/ethereum-vm 2>&1
 
