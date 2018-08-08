@@ -480,9 +480,12 @@ readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
 readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    ret <- zip [(offset+1)..] <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
-    tickBy (length ret) ctr_sequencer_kafka_unseq_reads
-    return ret
+    eRet <- (fmap (zip [(offset+1)..])) <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
+    case eRet of
+      Left _ -> return [] --TODO: Should this error instead?
+      Right ret -> do
+        tickBy (length ret) ctr_sequencer_kafka_unseq_reads
+        return ret
 
 writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents' events = void $ do
@@ -498,10 +501,11 @@ getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
   ret <- K.withKafkaViolently (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
-    Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
+    Left err -> error $ "getNextIngestedOffset: Connection to Kafka failed with: " ++ show err
+    Right (Left KP.UnknownTopicOrPartition) -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
-    Right (ofs, _) -> return ofs
+    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
+    Right (Right (ofs, _)) -> return ofs
   tick ctr_sequencer_kafka_checkpoint_reads
   return ret
 
@@ -512,6 +516,7 @@ setNextIngestedOffset newOffset = do
     tick ctr_sequencer_kafka_checkpoint_writes
     op <- K.withKafkaViolently $ K.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
-        Left err ->
+        Left err -> error $ "setNextIngestedOffset: Connection to Kafka failed with: " ++ show err
+        Right (Left err) ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
-        Right () -> return ()
+        Right (Right ()) -> return ()

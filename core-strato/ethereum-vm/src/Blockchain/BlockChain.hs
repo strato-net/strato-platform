@@ -686,7 +686,7 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
       when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
       when flags_diffPublish $
           let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diff
-          in withKafkaViolently $ do
+          in void . withKafkaViolently $ do
               void $ writeStateDiffEvents deletionEvents
               void $ writeStateDiffEvents creationEvents
               void $ writeStateDiffEvents updateEvents
