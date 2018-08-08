@@ -93,7 +93,6 @@ enterBloc2 env x = do
 emptyHash :: Text
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-<<<<<<< 9d890455d3d94b9de942f6b71939dbdebf25877a
 getContract :: Text -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
 getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ =
   return $ (Left "noncontract accounts should have empty statediffs")
@@ -120,26 +119,6 @@ getContractCompileFullSource address _ chainId = do
   return $ (Right ret)
 
 storageToFunction :: Map Text Text -> Storage
-=======
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Contract,
-    xabi :: String,
-    name :: String
-  }
-  deriving(Show, Generic)
-
-getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
-getContract address _ chainId = do
-  qqqq <-
-    getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
-
-  let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
-  let ret3 = show $ contractdetailsName qqqq
-  liftIO $ putStrLn $ "ret3" ++ show ret3
-  return ContractAndXabi { contract = ret1, xabi = ret2, name = ret3 }
 
 fetchABI :: String -> Bloc String
 fetchABI address = do

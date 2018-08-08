@@ -517,9 +517,9 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
 
-      mpdb <- getStateDB
-      addrDiff <- dbDiff mpdb stateRootBefore stateRootAfter
-      liftIO $ putStrLn $ "_____addrDiff_____: " ++ show addrDiff
+      --mpdb <- getStateDB
+      --addrDiff <- dbDiff mpdb stateRootBefore stateRootAfter
+      --liftIO $ putStrLn $ "_____addrDiff_____: " ++ show addrDiff
 
       let (response, theTrace', theLogs) =
             case result of
