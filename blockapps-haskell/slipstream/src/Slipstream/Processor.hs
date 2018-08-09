@@ -210,7 +210,7 @@ processTheMessages messages conn g = do
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
-            , deployMode= deployFlag   -- :: Severity
+            , deployMode= deployFlag
             }
 
   _ <- enterBloc2 env $ do
