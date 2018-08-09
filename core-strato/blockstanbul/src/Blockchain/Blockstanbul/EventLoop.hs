@@ -182,7 +182,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 voted %= M.insert bnef nval
             yield =<< signMessage pk (Prepare v (blockHash pp))
           else do
-            $logDebugS "blockstanbul/roundchange" "view mismatch"
+            $logDebugS "blockstanbul/roundchange" . T.pack $ "view mismatch (us, sender)" ++ show (v, v')
             roundChange
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
