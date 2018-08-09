@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE BangPatterns      #-}
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
@@ -135,8 +136,8 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logOtherS "initgen" "1mr" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     $logOtherS "initgen" "1mr" "Genesis Block put"
-    genAddrStates <- getAllAddressStates
-    accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
+    !genAddrStates <- getAllAddressStates
+    !accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     $logOtherS "initgen" "1mr" "State diff has been generated"
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         diff = StateDiff {

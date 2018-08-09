@@ -111,13 +111,14 @@ function doInit {
   cp  /var/lib/mkCoinbase  /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
-  cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+  cmd="strato-setup +RTS -K10000000 -RTS --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
                     --statsEnable=$statsEnable --statsHost=$statsHost --statsPort=$statsPort \
-                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix'"
+                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix' \
+                    +RTS -K10000000 -RTS"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then

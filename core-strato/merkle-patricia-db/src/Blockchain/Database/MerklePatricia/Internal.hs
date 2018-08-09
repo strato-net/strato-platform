@@ -228,7 +228,8 @@ putNodeData db nd = do
   return $ StateRoot ptr
 
 compactEntireDB :: MonadResource m => MPDB -> m ()
-compactEntireDB db = DB.compactRange (ldb db) ("", "")
+compactEntireDB db = DB.compactRange (ldb db) ("", B.replicate 1000 0xff)
+-- compactEntireDB (DB db_ptr _ _) = DB.c_leveldb_Compact_range db_ptr nullPtr 0 nullPtr 0
 
 -----
 
