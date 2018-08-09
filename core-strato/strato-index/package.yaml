@@ -15,6 +15,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - clock
+  - containers
   - hedis
   - hflags
   - monad-logger

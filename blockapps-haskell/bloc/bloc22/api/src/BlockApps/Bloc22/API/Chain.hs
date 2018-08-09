@@ -19,6 +19,8 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import           Data.Map.Strict                    (Map)
+import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
 import           Generic.Random.Generic
@@ -29,6 +31,7 @@ import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 
 --------------------------------------------------------------------------------
@@ -38,7 +41,7 @@ data ChainInput  = ChainInput
   { chaininputSrc      :: Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
-  , chaininputArgs     :: NamedMap "name" Text "value" Text
+  , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
@@ -62,7 +65,7 @@ instance ToJSON ChainInput where
   toJSON = genericToJSON (aesonPrefix camelCase) 
 
 exampleSrc :: Text
-exampleSrc = "contract Governance { }" --enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
+exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
 
 exampleEnode1 :: Text
 exampleEnode1 = "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
@@ -78,9 +81,9 @@ instance ToSample ChainInput where
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
-    , chaininputArgs = map fromTuple [
-         ("addRule" :: Text, "AUTO_APPROVE" :: Text)
-       , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
+    , chaininputArgs = Map.fromList [
+         ("addRule", ArgString "AUTO_APPROVE")
+       , ("removeRule", ArgString "AUTO_APPROVE")
        ]
     , chaininputMembers = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
@@ -101,9 +104,9 @@ instance ToSchema ChainInput where
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
           , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
           ]
-        , chaininputArgs = map fromTuple [
-            ("addRule" :: Text, "AUTO_APPROVE" :: Text)
-          , ("removeRule" :: Text, "AUTO_APPROVE" :: Text)
+        , chaininputArgs = Map.fromList [
+            ("addRule", ArgString "AUTO_APPROVE")
+          , ("removeRule", ArgString "AUTO_APPROVE")
           ]
         , chaininputMembers = map fromTuple [
             (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
