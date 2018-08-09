@@ -50,7 +50,14 @@ instance KnownSymbol "balance" where
 instance KnownSymbol "enode" where
 
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "address and balance pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))) :: NamedTuple "address" Address "balance" Integer)
+
 instance ToSchema (NamedTuple "address" Address "enode" Text) where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "address and enode pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)) :: NamedTuple "address" Address "enode" Text)
 
 instance Arbitrary ChainInput where
   arbitrary = genericArbitrary uniform
@@ -142,31 +149,23 @@ instance ToSample ChainOutput where
        ]
     }
 
+exChainOutput :: ChainOutput
+exChainOutput = ChainOutput
+  { chainoutputLabel = "my chain"
+  , chainoutputBalances = map fromTuple [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer)), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
+  , chainoutputMembers = map fromTuple [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1), (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)]
+  }
+
 instance ToSchema ChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Chain Output Info"
     & mapped.schema.example ?~ toJSON exChainOutput
-    where
-
-exChainOutput :: ChainOutput
-exChainOutput = ChainOutput
-  { chainoutputLabel = "my chain"
-  , chainoutputBalances = map fromTuple [
-      (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-    , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
-    ]
-  , chainoutputMembers = map fromTuple [
-      (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
-    , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-    ]
- }
-
 
 type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
 
-exChainIdChainOutput :: ChainIdChainOutput
+exChainIdChainOutput :: ChainIdChainOutput 
 exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 instance ToSample ChainIdChainOutput where
@@ -175,7 +174,10 @@ instance ToSample ChainIdChainOutput where
 instance ToSchema ChainIdChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Chain Output Info"
-    & mapped.schema.example ?~ toJSON exChainIdChainOutput
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ChainIdChainOutput
+      ex = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 
 --------------------------------------------------------------------------------
@@ -185,6 +187,9 @@ instance ToSchema ChainIdChainOutput where
 type PostChainInfo = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
+
+
+-- GET /chain
 
 type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId
