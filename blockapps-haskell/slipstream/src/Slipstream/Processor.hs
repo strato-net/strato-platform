@@ -175,11 +175,11 @@ processTheMessages messages cachedContractsIORef = do
 
   let env = BlocEnv
             {
-              urlStrato=stratoUrl   -- :: BaseUrl
-            , httpManager=mgr -- :: Manager
-            , dbPool=pool     --  :: Pool Connection
+              urlStrato=stratoUrl
+            , httpManager=mgr
+            , dbPool=pool
             , logLevel=Error
-            , deployMode= deployFlag   -- :: Severity
+            , deployMode= deployFlag
             }
 
   _ <- enterBloc2 env $ do
