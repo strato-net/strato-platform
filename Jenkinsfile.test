@@ -10,7 +10,11 @@ pipeline {
       steps {
         wrap([$class: 'BuildUser']) {
           script {
-            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+            try {
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // anon"
+            }
           }
         }
         sh '''#!/bin/bash -le
