@@ -47,12 +47,9 @@ data ChainInput  = ChainInput
 
 instance KnownSymbol "address" where
 instance KnownSymbol "balance" where
-instance KnownSymbol "name" where
-instance KnownSymbol "value" where
 instance KnownSymbol "enode" where
 
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
-instance ToSchema (NamedTuple "name" Text "value" Text) where
 instance ToSchema (NamedTuple "address" Address "enode" Text) where
 
 instance Arbitrary ChainInput where
