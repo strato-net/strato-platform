@@ -166,22 +166,30 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (Preprepare v sealedBlk)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
-      when (sender auth == pr) $ do
-        if v == v'
-          then do
-            blockcount += 1
-            proposal .= Just pp
-            pk <- use prvkey
-            case extractBeneficiary pp of
-              Nothing -> return()
-              Just (bnef,vot) -> do
-            -- insert the vote into map
-                val <- uses voted $M.lookup bnef
-                let unwrapVal = fromMaybe M.empty val
-                let nval = M.insert pr vot unwrapVal
-                voted %= M.insert bnef nval
-            yield =<< signMessage pk (Prepare v (blockHash pp))
-          else roundChange
+      if (sender auth /= pr)
+        then $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+        else
+          if v /= v'
+            then do
+              $logDebugS "blockstanbul/roundchange" . T.pack $
+                 "view mismatch (us, sender): " ++ format (v, v')
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+              roundChange
+            else do
+               blockcount += 1
+               proposal .= Just pp
+               pk <- use prvkey
+               case extractBeneficiary pp of
+                 Nothing -> return()
+                 Just (bnef,vot) -> do
+                   -- insert the vote into map
+                   val <- uses voted $M.lookup bnef
+                   let unwrapVal = fromMaybe M.empty val
+                   let nval = M.insert pr vot unwrapVal
+                   voted %= M.insert bnef nval
+               yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -217,6 +225,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
+        $logDebugS "blockstanbul/roundchange" "agreed change"
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
@@ -231,10 +240,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           in $logDebugS "blockstanbul" . T.pack $ msg
         EQ -> do
           $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
+          $logDebugS "blockstanbul/roundchange" "timeout"
           roundChange
         GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
+      $logDebugS "blockstanbul/roundchange" "commit failure (how...)"
       roundChange
     CommitResult (Right ()) -> do
       $logDebugS "blockstanbul" "Successful block commit"
