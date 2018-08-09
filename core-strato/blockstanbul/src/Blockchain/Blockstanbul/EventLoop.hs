@@ -53,7 +53,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
-  , _blockcount :: Int 
+  , _blockcount :: Int
 }
 makeLenses ''BlockstanbulContext
 
@@ -132,6 +132,8 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+
+  yield ResetTimer
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do

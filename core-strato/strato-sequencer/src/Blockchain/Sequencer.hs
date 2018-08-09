@@ -72,18 +72,16 @@ blockPeriodμs = 1000000
 roundTimeout :: NominalDiffTime
 roundTimeout = 10
 
-createBlockstanbulRoundTimer :: IO (TMVar Bool)
-createBlockstanbulRoundTimer = do
+createNewTimer :: SequencerM ()
+createNewTimer = do
   var <- atomically $ newTMVar False
   let act :: AlarmClock UTCTime -> IO ()
-      act alarm' = do
-        _ <- atomically $ swapTMVar var True
-        next <- addUTCTime roundTimeout <$> getCurrentTime
-        setAlarm alarm' next
-  alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
-  next <- addUTCTime roundTimeout <$> getCurrentTime
+      act _ = atomically $ swapTMVar var True
+  alert <- liftIO $ newAlarmClock act
+  dt <- view blockstanbulRoundTimeout
+  next <- addUTCTime dt <$> liftIO getCurrentTime
   setAlarm alarm next
-  return var
+  blockstanbulTimeout .= var
 
 sequencer :: SequencerM ()
 sequencer = do
@@ -95,6 +93,7 @@ sequencer = do
     $logDebugS "seq/loop/start" ""
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
+    timer <- use blockstanbulTimeout
     timedOut <- atomically $ swapTMVar timer False
     when timedOut $ do
       blockstanbulSend [Timeout]
@@ -172,7 +171,7 @@ blockstanbulSend msgs = do
             -- TODO(tim): Block insertion can potentially fail, so there
             -- should be feedback here
             else sendAllMessages [CommitResult (Right ())]
-
+    when (ResetTimer `elem` resp) createNewTimer
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap OEBlock
                      . fmap (flip sequencedBlockToOutputBlock 1)

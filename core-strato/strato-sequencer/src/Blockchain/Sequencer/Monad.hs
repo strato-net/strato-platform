@@ -70,6 +70,7 @@ data SequencerContext = SequencerContext
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _sequencerKafkaState :: K.KafkaState
                       , _blockstanbulContext :: Maybe BlockstanbulContext
+                      , _blockstanbulTimeout :: TMVar Bool
                       }
 makeLenses ''SequencerContext
 
@@ -84,6 +85,8 @@ data SequencerConfig =
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
                      , statsConfig           :: Maybe StatsConf
+                     , blockstanbulBlockPeriodμs :: Int
+                     , blockstanbulRoundTimeout :: NominalDiffTime
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))

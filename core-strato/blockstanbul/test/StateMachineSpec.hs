@@ -80,7 +80,7 @@ spec = parallel $ do
         length xsp `shouldBe` 1
         xsp `shouldBe` [ToCommit blk]
         -- Pretend that in this interval, the block was committed
-        sendMessages [CommitResult (Right ())] `shouldReturn` []
+        sendMessages [CommitResult (Right ())] `shouldReturn` [ResetTimer]
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
@@ -106,8 +106,11 @@ spec = parallel $ do
         -- Lets abort this round
         next <- uses view (over round (+1))
         let aborts = map (\a -> IMsg a $ RoundChange next) as
-        omsgs5 <- sendMessages aborts
+        omsgs5' <- sendMessages aborts
+        let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
+            rest5 = omsgs5' \\ omsgs5
         map oMessage omsgs5 `shouldBe` [RoundChange next]
+        rest5 `shouldBe` [ResetTimer]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -295,7 +298,7 @@ spec = parallel $ do
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` []
+        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` [ResetTimer]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
