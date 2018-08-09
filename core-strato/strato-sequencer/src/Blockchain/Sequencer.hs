@@ -10,6 +10,7 @@ module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
 
+import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMVar
 import           Control.Monad.Logger
@@ -23,7 +24,6 @@ import           System.Clock
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
-import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 
@@ -64,35 +64,45 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-createBlockstanbulRoundTimer :: NominalDiffTime -> IO (TMVar Bool)
-createBlockstanbulRoundTimer dt = do
+
+-- TODO(tim): Make these flag configurable
+blockPeriodμs :: Int
+blockPeriodμs = 1000000
+
+roundTimeout :: NominalDiffTime
+roundTimeout = 10
+
+createBlockstanbulRoundTimer :: IO (TMVar Bool)
+createBlockstanbulRoundTimer = do
   var <- atomically $ newTMVar False
   let act :: AlarmClock UTCTime -> IO ()
       act alarm' = do
         _ <- atomically $ swapTMVar var True
-        next <- addUTCTime dt <$> getCurrentTime
+        next <- addUTCTime roundTimeout <$> getCurrentTime
         setAlarm alarm' next
   alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
-  next <- addUTCTime dt <$> getCurrentTime
+  next <- addUTCTime roundTimeout <$> getCurrentTime
   setAlarm alarm next
   return var
 
 sequencer :: SequencerM ()
 sequencer = do
   -- TODO(tim): Pipe time window in through a flag
-  timer <- liftIO $ createBlockstanbulRoundTimer 100
+  timer <- liftIO $ createBlockstanbulRoundTimer
+  -- Bootstrap the block generation
+  writeSeqVmEvents' [OECreateBlockCommand]
   forever $ do
+    $logDebugS "seq/loop/start" ""
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
-    roundTimeout <- atomically $ swapTMVar timer False
-    when roundTimeout $ do
+    timedOut <- atomically $ swapTMVar timer False
+    when timedOut $ do
       blockstanbulSend [Timeout]
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
     clearGetChainsDB
     clearGetTransactionsDB
-    clearEvents
     t0 <- liftIO $ getTime Realtime
     splitEvents $ map snd inEvents
     t1 <- liftIO $ getTime Realtime
@@ -108,14 +118,20 @@ sequencer = do
     txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
-    vmEvs <- gets _vmEvents
-    unless (Q.length vmEvs == 0) $ do
-      writeSeqVmEvents' $ toList vmEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- gets _p2pEvents
-    unless (Q.length p2pEvs == 0) $ do
-      writeSeqP2pEvents' $ toList p2pEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+    vmEvs <- drainVM
+    unless (null vmEvs) $ do
+      when (OECreateBlockCommand `elem` vmEvs) $ do
+        $logDebugS "sequencer" "sleeping OECreateBlockCommand"
+        -- TODO(tim): This delay is to ensure that the timestamp on the
+        -- block is more than a block period away from the last. The
+        -- threadDelay can instead sleep for max(blockperiod - (now - last_timestamp), 0)
+        liftIO $ threadDelay blockPeriodμs
+      writeSeqVmEvents' vmEvs
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+    p2pEvs <- drainP2P
+    unless (null p2pEvs) $ do
+      writeSeqP2pEvents' p2pEvs
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
     unless (null inEvents) $ do
       let ofs = maximum $ map fst inEvents
       setNextIngestedOffset ofs
@@ -148,22 +164,25 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
 
 blockstanbulSend :: [InEvent] -> SequencerM ()
 blockstanbulSend msgs = do
-    resp <- sendAllMessages msgs
-    $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
-    -- TODO(tim): Use the wiremessages in the response
-    let blocks = [b | ToCommit b <- resp]
-    unless (null blocks) $
-      -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
-      void $ sendAllMessages [CommitResult (Right ())]
+    resp' <- sendAllMessages msgs
+    let blocks = [b | ToCommit b <- resp']
+    resp <- (resp'++) <$>
+        if null blocks
+            then return []
+            -- TODO(tim): Block insertion can potentially fail, so there
+            -- should be feedback here
+            else sendAllMessages [CommitResult (Right ())]
+
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap OEBlock
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        vmevs = mapMaybe rewriteBlock blocks
+        creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
+        vmevs = creates ++ mapMaybe rewriteBlock blocks
+        p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
     $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
     mapM_ markForVM vmevs
-    let p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
     $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
     mapM_ markForP2P p2pevs
 
@@ -496,4 +515,3 @@ setNextIngestedOffset newOffset = do
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
         Right () -> return ()
-

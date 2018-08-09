@@ -73,12 +73,12 @@ showIP (IPv4 addy) =
 
 readIP :: String -> IPAddress
 readIP input =
-  let (b0,temp) = break (=='.') input
+  let (b3,temp) = break (=='.') input
       s0 = dropWhile (=='.') temp
-      (b1, temp2) = break (=='.') s0
+      (b2, temp2) = break (=='.') s0
       s1 = dropWhile (=='.') temp2
-      (b2, temp3) = break (=='.') s1
-      b3 = dropWhile (=='.') temp3
+      (b1, temp3) = break (=='.') s1
+      b0 = dropWhile (=='.') temp3
 
       addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) + 
         (((read b3) .&. 0xff) `shiftL` 24))

@@ -99,8 +99,6 @@ import           Blockchain.Strato.StateDiff.Kafka
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 
-import           Debug.Trace
-
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
     getBaggerState = contextBaggerState <$> State.get
@@ -309,11 +307,13 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
 addBlockTransactions :: Bool -> OutputBlock -> ContextM ()
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
-  let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ (trace ("addBlockTransactions: all transactions: " ++ show transactions) transactions)
+  $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
+  let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ transactions
       chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
   forM_ chains $ \(chainId, txs) -> do
-    withBlockchain (blockHeaderHash bd) (trace ("addBlockTransactions: Running chain " ++ show chainId ++ " with " ++ show txs) chainId) $ do
-      $logInfoS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
+    withBlockchain (blockHeaderHash bd) chainId $ do
+      $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
       flushMemStorageDB
       flushMemAddressStateDB
@@ -535,7 +535,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       let ranBlockHash = hashFunction b
-          mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+          mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
       enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash

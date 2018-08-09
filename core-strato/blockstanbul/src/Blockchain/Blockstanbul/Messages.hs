@@ -71,10 +71,12 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
+             | NewBeneficiary Address Bool
              deriving (Eq, Show)
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
+              | MakeBlockCommand
               deriving (Eq, Show)
 
 getHash :: TrustedMessage -> Word256
