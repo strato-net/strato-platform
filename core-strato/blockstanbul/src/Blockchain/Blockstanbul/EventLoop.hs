@@ -181,7 +181,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 let nval = M.insert pr vot unwrapVal
                 voted %= M.insert bnef nval
             yield =<< signMessage pk (Prepare v (blockHash pp))
-          else roundChange
+          else do
+            $logDebugS "blockstanbul/roundchange" "view mismatch"
+            roundChange
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -217,6 +219,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
+        $logDebugS "blockstanbul/roundchange" "agreed change"
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
@@ -231,10 +234,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           in $logDebugS "blockstanbul" . T.pack $ msg
         EQ -> do
           $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
+          $logDebugS "blockstanbul/roundchange" "timeout"
           roundChange
         GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
+      $logDebugS "blockstanbul/roundchange" "commit failure (how...)"
       roundChange
     CommitResult (Right ()) -> do
       $logDebugS "blockstanbul" "Successful block commit"
