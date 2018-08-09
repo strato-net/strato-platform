@@ -10,7 +10,7 @@ import {
 } from './signature.action';
 import { env } from '../../env';
 
-const signUrl = "http://localhost/strato/v2.3/signature/strato/v2.3/signature";
+const signUrl = "http://localhost/strato/v2.3/signature";
 
 function signDataRequest(payload) {
   return fetch(

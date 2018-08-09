@@ -12,7 +12,7 @@ import           Data.Text
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type PostSignature = "strato" :> "v2.3" :> "signature" :> Header "X-USER-UNIQUE-NAME" Text :> ReqBody '[JSON] UserData :> Post '[JSON] SignatureDetails
+type PostSignature = "signature" :> Header "X-USER-UNIQUE-NAME" Text :> ReqBody '[JSON] UserData :> Post '[JSON] SignatureDetails
 
 data SignatureDetails = SignatureDetails {
   r :: Integer
