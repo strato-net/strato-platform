@@ -91,4 +91,3 @@ data ProcessedContract = ProcessedContract {
   chain :: Text,
   contractData :: Map T.Text V.Value
 }
-
