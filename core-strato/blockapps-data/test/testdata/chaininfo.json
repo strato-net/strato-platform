@@ -8,14 +8,14 @@
        { "address"  : "0x93fdd1d21502c4f87295771253f5b71d897d911c",
          "balance"  : 4000000
        } ,
-       { "address"  : "0000000000000000000000000000000000deadbeef",
+       { "address"  : "0x00000000000000000000000000000000deadbeef",
          "balance"  : 12345,
          "codeHash" : "6b0d5d3309777e2e799976ea377ce6aeb4a485b1e7cae56f41a85ada9855fb99"
        }
      ]
   ,  "codeInfo" :
      [
-       { "code" : "/BEF",
+       { "code" : "some_code",
          "src"  : "me",
          "name" : "you"
        },

@@ -90,8 +90,6 @@ isFunction (_) = True
 
 convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
 convertRet address codehash abi name chain x = do
-  --Revisit to fix table name duplicates
-  --let contractName = take 63 codehash
 
   let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
   let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
@@ -116,21 +114,9 @@ convertRet address codehash abi name chain x = do
   let histFlag = True
   let hist = if (histFlag)
               --TODO: Add history insert statement (transaction, state)
-              then
-                ""
-                --let histCreate = "create table if not exists \"History\" (\"codeHash\" text, contract text, block_id text, state text)"
+              then ""
               else ""
 
-  --let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
-
-  --let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
-  --let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
-
-  --let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
-  --let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
-  --let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-
-  --let oneIns = "BEGIN;" ++ conIns ++ createSt ++ delRow ++ ind ++ hist ++ ins ++ "COMMIT;"
   let oneIns = "BEGIN;" ++ conIns ++ ind ++ hist ++ "COMMIT;"
 
   dbInsert oneIns
