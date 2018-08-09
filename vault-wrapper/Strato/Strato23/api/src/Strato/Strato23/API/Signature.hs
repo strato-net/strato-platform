@@ -15,9 +15,9 @@ import           Data.Text
 type PostSignature = "signature" :> Header "X-USER-UNIQUE-NAME" Text :> ReqBody '[JSON] UserData :> Post '[JSON] SignatureDetails
 
 data SignatureDetails = SignatureDetails {
-  r :: Integer
-  , s :: Integer
-  , v :: Integer
+  r :: String
+  , s :: String
+  , v :: String
 } deriving (Eq, Show, Generic)
 
 data UserData = UserData {

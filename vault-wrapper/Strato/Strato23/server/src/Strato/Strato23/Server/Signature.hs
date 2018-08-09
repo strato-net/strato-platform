@@ -27,7 +27,7 @@ data PrivateKey = PrivateKey {
 privateKeys :: [PrivateKey]
 privateKeys = 
   [ PrivateKey "tanuj500" "cb1a02b33d6fba1a226bdd8a45da4654e0f1ecd9" "5Kg1gnAjaLfKiwhhPpGS3QfRg2m6awQvaj98JCZBZQ5SuS2F15C"
-  , PrivateKey  "tanuj@blockapps.net" "84bcd6278fdde4e3147717123a4602faeeee83e4" "5Kg1gnAjaLfKiwhhPpGS3QfRg2m6awQvaj98JCZBZQ5SuS2F15C"
+  , PrivateKey  "tanuj@blockapps.net" "84bcd6278fdde4e3147717123a4602faeeee83e4" "5HvaLAxPMej789DdFwgbvr6TqDo17jixKQwCKY4zZxnUy5p2i9x"
   ]
 
 getHash256 :: String ->  Word256
@@ -46,11 +46,9 @@ signatureDetails userEmail userData = do
       -- prvKey = pk $ getPrivateKeyOfUser $ "tanuj@blockapps.net"
       dataToSign = queryToSign userData
       word256 = getHash256 dataToSign
-  liftIO $ print $ dataToSign
   ExtendedSignature signature' yIsOdd' <- liftIO $ HK.withSource HK.devURandom $ extSignMsg word256 $ getPk prvKey
-  let r' = BW.getBigWordInteger $ HK.sigR signature'
-      s' = BW.getBigWordInteger $ HK.sigS signature'
-      v' = if yIsOdd' then 0x1c else 0x1b
-  liftIO $ print $ BW.getBigWordInteger $ HK.sigR signature'
-  liftIO $ print $  BW.getBigWordInteger $ HK.sigS signature'
+  let r' = bsToHex $ integerToBS $ BW.getBigWordInteger $ HK.sigR signature'
+      s' = bsToHex $ integerToBS $ BW.getBigWordInteger $ HK.sigS signature'
+      v' = bsToHex $ integerToBS $ if yIsOdd' then 0x1c else 0x1b
+  liftIO $ print $ signature'
   return (SignatureDetails r' s' v')
