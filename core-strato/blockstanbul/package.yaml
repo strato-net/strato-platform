@@ -18,6 +18,8 @@ dependencies:
   - lens
   - mtl
   - QuickCheck
+  - servant
+  - servant-server
   - strato-model
   - text
   - transformers
