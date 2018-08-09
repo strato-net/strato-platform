@@ -322,6 +322,7 @@ showHexSimple t = showHex t ""
 
 instance ToJSON LogDB where
     toJSON (LogDB bh th
+                  chainId
                   (Address x)
                   maybeTopic1
                   maybeTopic2
@@ -329,7 +330,7 @@ instance ToJSON LogDB where
                   maybeTopic4
                   dataBS
                   bloomW512) =
-        object ["hash" .= th,
+        object $ ["hash" .= th,
                 "blockHash" .= bh,
                 "address" .= (showHex x ""),
                 "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
@@ -339,6 +340,7 @@ instance ToJSON LogDB where
 
                 "data" .= dataBS,
                 "bloom" .= showHexSimple bloomW512 ]
+                ++ (("chainid" .=) <$> maybeToList chainId)
 
 asrToAsrPrime :: (String, AddressStateRef) -> AddressStateRef'
 asrToAsrPrime (s, x) = AddressStateRef' x s

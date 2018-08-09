@@ -9,11 +9,9 @@
     , FlexibleContexts
 #-}
 
---import Control.Monad.Except
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
 import HFlags
---import Data.Time
 import Slipstream.MessageConsumer
 import Slipstream.OutputData
 import Slipstream.Options ()
@@ -21,10 +19,8 @@ import Slipstream.Options ()
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  --currentTime <- getCurrentTime
-  --liftIO $ putStrLn $ "Main -> " ++ show(currentTime)
 
-  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); COMMIT;"
+  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); alter table contract add column \"chainId\" text; COMMIT;"
   dbInsert conCreate
 
   let offset = 0 :: K.Offset

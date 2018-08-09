@@ -13,15 +13,20 @@ module BlockApps.Strato.TypeLits
   , NamedMapParser
   , IsTuple(..)
   , module GHC.TypeLits
+  , nmap
   ) where
 
 import           Control.Applicative (liftA2)
+import           Control.Lens        (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Types    (Parser)
+import           Data.Monoid         ((<>))
 import           Data.Proxy
+import           Data.Swagger
 import qualified Data.Text           as Text
 import           GHC.Generics
 import           GHC.TypeLits
+import           Test.QuickCheck     hiding (Success, Failure)
 
 data NamedTuple (k :: Symbol) a (v :: Symbol) b = NamedTuple (a,b)
   deriving (Eq, Ord, Show, Generic)
@@ -52,3 +57,17 @@ instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) 
                          (o .: (Text.pack $ symbolVal (Proxy :: Proxy k)))
                          (o .: (Text.pack $ symbolVal (Proxy :: Proxy v)))
   parseJSON o          = error $ "parseJSON NamedTuple: expected object, got " ++ show o
+
+instance forall k a v b. (KnownSymbol k, KnownSymbol v, ToSchema a, ToSchema b) => ToSchema (NamedTuple k a v b) where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & mapped.schema.description
+    ?~ Text.pack (symbolVal (Proxy :: Proxy k)
+    <> " and "
+    <> (symbolVal (Proxy :: Proxy v))
+    <> " pair")
+
+instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k a v b) where
+  arbitrary = fromTuple <$> (liftA2 (,) arbitrary arbitrary :: Gen (a,b))
+
+nmap :: ((a,b) -> (c,d)) -> NamedMap k a v b -> NamedMap k c v d
+nmap f = map (fromTuple . f . toTuple)
