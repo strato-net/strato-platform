@@ -45,18 +45,9 @@ import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
 
---data Action = Action ActionType String String (Maybe [(String, String)])
 data Action = Action ActionType String String (Maybe ChainId) (Maybe [(String, String)])
               deriving (Show)
-{-
-stateDiffToChanges::StateDiff->[Action]
-stateDiffToChanges StateDiff{..} =
-  (map (\(x, y) -> Action Create x (codeHash y) (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> Action Delete x (codeHash y) Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (codeHash y) Nothing) $ maybe [] Map.toList updatedAccounts)
-  where
-    newValue (Diff _ x) = x
--}
+
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
   (map (\(x, y) -> Action Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
@@ -68,9 +59,7 @@ stateDiffToChanges StateDiff{..} =
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
   case A.eitherDecode x of
-    --Slipstream shouldn't crash here?
    Left e -> error $ show e
-   --Right y -> traceShow(y) y
    Right y -> y
 
 enterBloc2 :: BlocEnv -> Bloc x -> IO x
@@ -81,7 +70,6 @@ enterBloc2 env x = do
     $ flip runReaderT env $ runBloc x
 
   case ret of
-    --Slipstream shouldn't crash here?
    Left e -> error $ show e
    Right v -> return v
 
@@ -95,18 +83,9 @@ getContract address _ chainId = do
     getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
 
   let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  liftIO $ putStrLn $ "ret1: " ++ show ret1
   let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
-  liftIO $ putStrLn $ "ret2: " ++ show ret2
   let ret3 = show $ contractdetailsName qqqq
-  liftIO $ putStrLn $ "ret3" ++ show ret3
   return (ret1, ret2, ret3)
-
--- fetchABI :: String -> Bloc String
--- fetchABI address = do
---   conDet <- getContractDetailsByAddressOnly (Address $ fst $ head $ readHex address)
---   let ret = show $ A.toJSON $ contractdetailsXabi conDet
---   return ret
 
 storageToFunction::[(String, String)]->Storage
 storageToFunction s k =
@@ -122,7 +101,6 @@ storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
---addStorageIfNeeded (Action theType address codehash Nothing)= do
 addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
   return $ Action theType address codehash chain (Just $ map storageToList storage')
@@ -139,13 +117,8 @@ third (_, _, x) = x
 
 processTheMessages :: [B.ByteString] -> IO ()
 processTheMessages messages = do
-  --liftIO $ putStrLn "<>____Process_____<>"
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-
-  if (length changes > 0)
-    then liftIO $ putStrLn $ "*****CHANGES*****: " ++ show changes
-    else return ()
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -181,24 +154,14 @@ processTheMessages messages = do
   cachedContractsIORef <- newIORef Map.empty
 
   _ <- enterBloc2 env $ do
-    liftIO $ putStrLn "{{{}}}"
     forM (filter hasContract changes) $ \change -> do
-
-      liftIO $ putStrLn $ "{{{CHANGE}}} : " ++ show change
 
       filledInChange <- addStorageIfNeeded change
 
-      liftIO $ putStrLn $ "{{{FILLED IN CHANGE}}} : " ++ show filledInChange
-
-      --let (address, codehash, storage) =
       let (address, codehash, storage, chainId) =
             case filledInChange of
-             --Action _ a c (Just s) -> (a, c, storageToFunction s)
-             --Action _ _ _ _ -> error "can't handle the case where we need to fetch the state"
              Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
              Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-      liftIO $ putStrLn $ "======address=====: " ++ show address
-      liftIO $ putStrLn $ "======codehash=====: " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
@@ -218,16 +181,9 @@ processTheMessages messages = do
       --TODO: Add parsing of contract info to get flags (indexing, history)
 
       let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      liftIO $ putStrLn $ "<>RET<>: " ++ show ret
-{-
-      let chain = case Map.lookup "chainId" ret of
-                    Nothing -> ""
-                    Just(x) -> show x
--}
       let chain = case chainId of
                     Nothing -> ""
                     Just(x) -> show x
-      liftIO $ putStrLn $ "CHAIN ID: " ++ show chain
 
       liftIO $ convertRet address codehash strAbi name chain ret
 
