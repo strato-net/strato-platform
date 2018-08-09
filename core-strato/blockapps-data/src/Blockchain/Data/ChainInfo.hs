@@ -26,6 +26,8 @@ import           Blockchain.TypeLits
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Base16               as B16
+import qualified Data.ByteString.Char8                as C8
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map                             as M      hiding (map, filter)
 import qualified Data.Text                            as T
@@ -37,21 +39,21 @@ import qualified GHC.Generics                         as GHCG
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
-  , codeInfoSource :: String
-  , codeInfoName   :: String
+  , codeInfoSource :: String --TODO(dustin): Text
+  , codeInfoName   :: String --TODO(dustin): Text
   } deriving (Show, Read, Eq, GHCG.Generic)
 
 instance FromJSON CodeInfo where
-  parseJSON (Array arr') = do 
-    let [a',b',c'] = V.toList arr'
+  parseJSON (Array v) = do
+    let [a',b',c'] = V.toList v
     a <- parseJSON a'
     b <- parseJSON b'
     c <- parseJSON c'
-    return (CodeInfo a b c)
-  
+    return (CodeInfo (fst . B16.decode $ C8.pack a) b c)
+
   parseJSON (Object o) =
     CodeInfo
-    <$> o .: "code"
+    <$> ((fst . B16.decode . C8.pack) <$> (o .: "code"))
     <*> o .: "src"
     <*> o .: "name"
 
@@ -59,16 +61,16 @@ instance FromJSON CodeInfo where
 
 instance ToJSON CodeInfo where
   toJSON (CodeInfo bs s1 s2) = object
-    [ "code" .= bs
+    [ "code" .= (C8.unpack $ B16.encode bs)
     , "src"  .= s1
     , "name" .= s2
     ]
 
 instance RLPSerializable CodeInfo where
-  rlpEncode (CodeInfo a b c) = 
-    RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (rlpDecode b) (rlpDecode c)
-  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject") 
+  rlpEncode (CodeInfo a b c) =
+    RLPArray [rlpEncode a, rlpEncode . encodeUtf8 $ T.pack b, rlpEncode . encodeUtf8 $ T.pack c]
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (T.unpack . decodeUtf8 $ rlpDecode b) (T.unpack . decodeUtf8 $ rlpDecode c)
+  rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
@@ -76,21 +78,21 @@ data AccountInfo = NonContract Address Integer
    deriving (Show, Eq, Read, GHCG.Generic)
 
 instance FromJSON AccountInfo where
-  parseJSON (Array arr') = do 
-    let (a':i':xs) = V.toList arr'
+  parseJSON (Array v) = do
+    let (a':i':xs) = V.toList v
     a <- parseJSON a'
     i <- parseJSON i'
-    case xs of 
+    case xs of
       [] -> return $ NonContract a i
-      (c':s') -> do 
+      (c':s') -> do
         c <- parseJSON c'
         case s' of
           [] -> return $ ContractNoStorage a i c
-          [x] -> do 
+          [x] -> do
             s <- parseJSON x
             return $ ContractWithStorage a i c s
           _ -> error "parseJSON for AccountInfo as an Array failed"
-  
+
   parseJSON (Object o) = do
     a <- (o .: "address")
     b <- (o .: "balance")
@@ -106,7 +108,7 @@ instance FromJSON AccountInfo where
 
   parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
 
-  
+
 instance ToJSON AccountInfo where
   toJSON (NonContract a b) = object
     [ "address" .= a
@@ -127,9 +129,9 @@ instance ToJSON AccountInfo where
 instance RLPSerializable AccountInfo where
   rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
   rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ rlpEncode <$> d]
+  rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ map rlpEncode d]
 
-  rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode <$> d)
+  rlpDecode (RLPArray [a,b,c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (map rlpDecode d)
   rlpDecode (RLPArray [a,b,c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
   rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
@@ -175,7 +177,7 @@ instance RLPSerializable ChainInfo where
       (rlpDecode <$> ai)
       (rlpDecode <$> coi)
       (rlpDecode ms)
-  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 5 element RLPArray, got " ++ show o
+  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 4 element RLPArray, got " ++ show o
 
 
 accountExtractor :: JS.Parser [AccountInfo]
