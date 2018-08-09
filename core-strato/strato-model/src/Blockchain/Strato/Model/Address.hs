@@ -76,6 +76,7 @@ instance PathPiece Address where
 
 formatAddress :: Address -> String
 formatAddress (Address x) = padZeros 40 $ showHex x ""
+
 {-
  make into a string rather than an object
 -}

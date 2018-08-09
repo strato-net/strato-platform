@@ -40,8 +40,9 @@ import           BlockApps.Solidity.Xabi
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 
 data AddressCreatedAt = AddressCreatedAt
-  { createdAt :: Int64
-  , address   :: MaybeNamed Address
+  { createdAt  :: Int64
+  , address    :: MaybeNamed Address
+  , acaChainId :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance ToJSON AddressCreatedAt
@@ -60,6 +61,7 @@ instance ToSchema AddressCreatedAt where
       ex = AddressCreatedAt
         { createdAt = 1494448021000
         , address = Unnamed $ Address 0xdeadbeef
+        , acaChainId = Nothing
         }
 
 newtype GetContractsResponse = GetContractsResponse
@@ -74,7 +76,7 @@ instance ToSchema GetContractsResponse where
     where
       ex :: GetContractsResponse
       ex = GetContractsResponse
-        { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Unnamed $ Address 0xdeadbeef)])]
+        { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Unnamed $ Address 0xdeadbeef) Nothing])]
         }
 
 instance ToJSON GetContractsResponse where
@@ -90,10 +92,12 @@ instance ToSample GetContractsResponse where
     [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
+      , acaChainId = Nothing
       }
     , AddressCreatedAt
       { address = Named "Addressed"
       , createdAt = 101
+      , acaChainId = Nothing
       }
     ]
 --------------------------------------------------------------------------------
@@ -106,6 +110,7 @@ type GetContractsData = "contracts"
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
+  :> QueryParam "chainid" ChainId
   :> Get '[JSON] ContractDetails
 --------------------------------------------------------------------------------
 type GetContractsState = "contracts"
@@ -140,6 +145,7 @@ type GetContractsDetails = "contracts"
   :> "contract"
   :> Capture "contractAddress" Address
   :> "details"
+  :> QueryParam "chainid" ChainId
   :> Get '[JSON] ContractDetails -- change to HTML
 
 --instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
@@ -156,6 +162,7 @@ type GetContractsDetails = "contracts"
 type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
+  :> QueryParam "chainid" ChainId
   :> "functions"
   :> Get '[JSON] [FunctionName]
 
@@ -184,6 +191,7 @@ instance ToSchema FunctionName where
 type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
+  :> QueryParam "chainid" ChainId
   :> "symbols"
   :> Get '[JSON] [SymbolName]
 --------------------------------------------------------------------------------
@@ -194,6 +202,7 @@ type GetContractsEnum = "contracts"
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "enum"
   :> Capture "enumName" EnumName
+  :> QueryParam "chainid" ChainId
   :> Get '[JSON] [EnumValue]
 
 newtype EnumName = EnumName {getEnumName :: Text} deriving (Eq,Show,Generic)
@@ -226,6 +235,7 @@ type GetContractsStateMapping = "contracts"
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
+  :> QueryParam "chainid" ChainId
   :> Get '[JSON] GetContractsStateMappingResponse
 
 instance ToCapture (Capture "key" Text) where

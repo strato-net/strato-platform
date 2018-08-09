@@ -118,6 +118,8 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
 
+    blockHeaderModifyExtra f h  = h{extraData = f (extraData h)}
+
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
                                               , parentHash       = blockHeaderParentHash b
                                               , ommersHash       = blockHeaderOmmersHash b

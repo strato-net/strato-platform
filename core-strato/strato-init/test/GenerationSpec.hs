@@ -8,6 +8,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import Test.Hspec
 
+import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation
 import Blockchain.Strato.Model.Address

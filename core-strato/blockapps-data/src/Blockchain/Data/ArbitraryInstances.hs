@@ -7,14 +7,18 @@ import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
 
 import           Data.ByteString.Arbitrary
+import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Internal           as IB
+import qualified Data.Map                           as M    hiding (map, filter)
 import           Data.Time
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
+import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia hiding (stateRoot)
@@ -73,7 +77,9 @@ instance Arbitrary BlockData where
         gasLimit         <- unboxPI <$> arbitrary
         gasUsed          <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit)
         timestamp        <- arbitrary
-        extraData        <- arbitrary
+        -- TODO(tim): Rather than making an artificial dependent type, guard Block against
+        -- rogue long bytestrings.
+        extraData        <- B.take 32 <$> arbitrary
         nonce            <- arbitrary
         mixHash          <- arbitrary
         return BlockData { blockDataParentHash       = parentHash
@@ -146,3 +152,31 @@ instance Arbitrary IB.ByteString where
 --     arbitrary = fastRandBs =<< choose (1024, 1024*1024) -- use this for (theoretical) correctness
     arbitrary = fastRandBs 1024 -- use this for speed
 
+instance Arbitrary IPAddress where
+  arbitrary = IPv4 <$> arbitrary
+
+instance Arbitrary Enode where
+  arbitrary = Enode
+          <$> (B.pack <$> vectorOf 64 arbitrary)
+          <*> arbitrary
+          <*> arbitrary `suchThat` (>=0)
+          <*> (arbitrary `suchThat` maybe True (>=0))
+
+instance Arbitrary CodeInfo where
+  arbitrary = CodeInfo 
+      <$> arbitrary
+      <*> arbitrary
+      <*> arbitrary
+
+instance Arbitrary AccountInfo where
+  arbitrary = NonContract
+      <$> arbitrary
+      <*> arbitrary `suchThat` (>=0)
+
+instance Arbitrary ChainInfo where
+  arbitrary = do 
+    cl <- arbitrary :: Gen String
+    ai <- arbitrary :: Gen [AccountInfo]
+    ci <- arbitrary :: Gen [CodeInfo]
+    mb <- arbitrary :: Gen (M.Map Address Enode) 
+    return (ChainInfo cl ai ci mb)

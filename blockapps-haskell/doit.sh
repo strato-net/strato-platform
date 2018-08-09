@@ -4,8 +4,6 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
-kafkaPort=9092
-kafkaHost="kafka"
 
 isPublic=false
  if [ "${SMD_MODE}" == public ]; then
@@ -25,6 +23,7 @@ slipstream:
 
 strato-server:
 no vars/flags set
+
 bloc:
 stratoHost="${stratoHost}"
 --stratourl=\$stratoRoot="${stratoRoot}"
@@ -54,21 +53,32 @@ while true; do
     sleep 0.5
 done
 
-mkdir logs
-
-# TODO: refactor bloc (and monstrato) dockerization using supervisord for more process control, log aggregation and health monitoring
-
-/usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
-
 until nc -z $kafkaHost $kafkaPort >&/dev/null
 do  echo "Waiting for Kafka to become available"
     sleep 1
 done
 
-# TODO: add kafka/zk connection flags to run slipstream (when slipstream supports them) and may be others (strato? bloc?..)
-/usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
-            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+# Check if this container was initialized before
+if [ ! -f initialized ]; then
+    # drop slipstream db if already exists
+    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
+    # Create the database for slipstream
+    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+    # Create logs directory
+    mkdir logs
+    # Create the 'initialized' sentinel file
+    date '+%Y-%m-%d %H:%M:%S' > initialized
 
-/usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
+fi
+
+# TODO: refactor using the process monitoring from core-strato's doit.sh
+
+/usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
+
+/usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+           --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+
+usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+           --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
