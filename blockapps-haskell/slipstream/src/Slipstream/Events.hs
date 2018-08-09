@@ -11,7 +11,6 @@ module Slipstream.Events where
 
 import qualified BlockApps.Ethereum as Eth
 import Data.Aeson
---import Data.Aeson.Types
 import Data.Map (Map)
 
 import GHC.Generics
