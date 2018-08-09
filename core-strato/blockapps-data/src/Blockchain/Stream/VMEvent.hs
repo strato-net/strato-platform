@@ -76,11 +76,14 @@ class HasVMEventsSink k where
 
 produceVMEventsM :: (HasSQLDB m, HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
-    Right x <- withKafkaViolently . produceMessages $
+    ex <- withKafkaViolently . produceMessages $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
 
-    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-    return offset
+    case ex of
+      Left err -> error $ "produceVMEventsM: Failed to connect to Kafka with: " ++ show err
+      Right x -> do
+        let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+        return offset
 
 -- todo: refactor this to consume produceVMEventsM
 produceVMEvents::(HasSQLDB m, MonadIO m)=>[VMEvent]->m Offset
