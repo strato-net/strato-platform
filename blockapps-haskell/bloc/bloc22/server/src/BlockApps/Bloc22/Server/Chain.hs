@@ -57,7 +57,7 @@ getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos::[ChainIdChainInfo] <- blocStrato $ Strato.getChain chainIds
   case chainIdChainInfos of 
-    [] -> throwError $ DBError "No chains match any of the chainIds"
+    [] -> return [] 
     _ -> return $ map convertChainInfo chainIdChainInfos
     where
       convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput

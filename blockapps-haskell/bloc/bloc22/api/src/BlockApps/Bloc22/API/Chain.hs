@@ -42,6 +42,16 @@ data ChainInput  = ChainInput
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
+instance KnownSymbol "address" where
+instance KnownSymbol "balance" where
+instance KnownSymbol "name" where
+instance KnownSymbol "value" where
+instance KnownSymbol "enode" where
+
+instance ToSchema (NamedTuple "address" Address "balance" Integer) where
+instance ToSchema (NamedTuple "name" Text "value" Text) where
+instance ToSchema (NamedTuple "address" Address "enode" Text) where
+
 instance Arbitrary ChainInput where
   arbitrary = genericArbitrary uniform
 
@@ -49,7 +59,7 @@ instance FromJSON ChainInput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToJSON ChainInput where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase) 
 
 exampleSrc :: Text
 exampleSrc = "contract Governance { }" --enum AddRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; enum RemoveRule = AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES; AddRule addRule; RemoveRule removeRule; event MemberAdded (address member); event MemberRemoved (address member); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; function voteToAdd(address m) { for (uint i = 0; i < addVotes.length; i++) { if (addVotes[i].member == m) { addVotes[i].votes++; } } } function voteToRemove(address m) { for (uint i = 0; i < removeVotes.length; i++) { if (removeVotes[i].member == m) { removeVotes[i].votes++; } } } }" 
@@ -156,9 +166,17 @@ type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
 
-instance ToSample (NamedTuple "id" ChainId "info" ChainOutput) where
-  toSamples _ = singleSample (NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput))
---toSamples (NamedTuple (a,b)) = singleSample (NamedTuple (toSample a, toSample b))
+exChainIdChainOutput :: ChainIdChainOutput
+exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
+
+instance ToSample ChainIdChainOutput where
+  toSamples _ = singleSample exChainIdChainOutput 
+
+instance ToSchema ChainIdChainOutput where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Chain Output Info"
+    & mapped.schema.example ?~ toJSON exChainIdChainOutput
+
 
 --------------------------------------------------------------------------------
 
