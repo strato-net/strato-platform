@@ -107,7 +107,7 @@ postContractsCompile = client (Proxy @ PostContractsCompile)
 postContractsXabi :: PostXabiRequest -> ClientM PostXabiResponse
 postContractsXabi = client (Proxy @ PostContractsXabi)
 
-getSearchContract :: ContractName -> ClientM [(MaybeNamed Address, Maybe ChainId)]
+getSearchContract :: ContractName -> ClientM [Greedy (MaybeNamed Address) ChainId]
 getSearchContract = client (Proxy @ GetSearchContract)
 
 getUsers :: ClientM [UserName]

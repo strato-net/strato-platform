@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import           Control.Arrow                   ((&&&))
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson                      as Ae
@@ -53,48 +52,54 @@ main = hspec $ do
 rlpRT :: (RLPSerializable a) => a -> a
 rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
 
+rlpCheck :: (Eq a, Show a, RLPSerializable a) => a -> Expectation
+rlpCheck x = rlpRT x `shouldBe` x
+
 jsonRT :: (ToJSON a, FromJSON a) => a -> a
-jsonRT =  either (error "Failed jsonRT") id . Ae.eitherDecode . Ae.encode
+jsonRT =  either (error . ("Failed jsonRT: " ++ )) id . Ae.eitherDecode . Ae.encode
+
+jsonCheck :: (Eq a, Show a, ToJSON a, FromJSON a) => a -> Expectation
+jsonCheck x = jsonRT x `shouldBe` x
 
 enodeRLP :: Spec
 enodeRLP = do
   it "should convert an Enode address to and from its RLP encoding" $ property $
-    uncurry (==) . (id &&& (rlpRT :: Enode -> Enode))
+    (\x -> rlpCheck (x :: Enode))
 
 enodeJSON :: Spec
 enodeJSON = do
   it "should convert an Enode address to and from its JSON encoding" $ property $
-    uncurry (==) . (id &&& (jsonRT :: Enode -> Enode))
+    (\x -> jsonCheck (x :: Enode))
 
 accountInfoRLP :: Spec
 accountInfoRLP = do
   it "should convert an AccountInfo to and from its RLP encoding" $ property $
-    uncurry (==) . (id &&& (rlpRT :: AccountInfo -> AccountInfo))
+    (\x -> rlpCheck (x :: AccountInfo))
 
 accountInfoJSON :: Spec
 accountInfoJSON = do
   it "should convert a AccountInfo to and from its JSON encoding" $ property $
-    uncurry (==) . (id &&& (jsonRT :: AccountInfo -> AccountInfo))
+    (\x -> jsonCheck (x :: AccountInfo))
 
 codeInfoRLP :: Spec
 codeInfoRLP = do
   it "should convert an CodeInfo to and from its RLP encoding" $ property $
-    uncurry (==) . (id &&& (rlpRT :: CodeInfo -> CodeInfo))
+    (\x -> rlpCheck (x :: CodeInfo))
 
 codeInfoJSON :: Spec
 codeInfoJSON = do
   it "should convert a CodeInfo to and from its JSON encoding" $ property $
-    uncurry (==) . (id &&& (jsonRT :: CodeInfo -> CodeInfo))
+    (\x -> jsonCheck (x :: CodeInfo))
 
 chainInfoRLP :: Spec
 chainInfoRLP = do
   it "should convert a ChainInfo to and from its RLP encoding" $ property $
-    uncurry (==) . (id &&& (rlpRT :: ChainInfo -> ChainInfo))
+    (\x -> rlpCheck (x :: ChainInfo))
 
 chainInfoJSON :: Spec
 chainInfoJSON = do
   it "should convert a ChainInfo to and from its JSON encoding" $ property $
-    uncurry (==) . (id &&& (jsonRT :: ChainInfo -> ChainInfo))
+    (\x -> jsonCheck (x :: ChainInfo))
 
 addressTesting :: Spec
 addressTesting = forM_ testAddresses $ \input -> do

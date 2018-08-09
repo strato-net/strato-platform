@@ -45,7 +45,6 @@ import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
 
---data Action = Action ActionType String String (Maybe [(String, String)])
 data Action = Action ActionType String String (Maybe ChainId) (Maybe [(String, String)])
               deriving (Show)
 

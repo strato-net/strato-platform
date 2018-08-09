@@ -20,7 +20,7 @@ main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
 
-  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text, \"chainId\" text); COMMIT;"
+  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); alter table contract add column \"chainId\" text; COMMIT;"
   dbInsert conCreate
 
   let offset = 0 :: K.Offset
