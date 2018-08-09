@@ -119,17 +119,20 @@ contractsInstanceTable :: Table
   , Column PGInt4
   , Column PGBytea
   , Maybe (Column PGTimestamptz)
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBytea
   , Column PGTimestamptz
+  , Column PGBytea
   )
-contractsInstanceTable = Table "contracts_instance" $ p4
+contractsInstanceTable = Table "contracts_instance" $ p5
   ( optional "id"
   , required "contract_metadata_id"
   , required "address"
   , optional "timestamp"
+  , required "chainid"
   )
 
 contractsLookupTable :: Table
