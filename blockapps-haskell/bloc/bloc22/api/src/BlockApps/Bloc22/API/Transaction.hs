@@ -29,9 +29,8 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Bloc22.API.Users         (BlocTransactionResult)
+import           BlockApps.Bloc22.API.Users 
 import           BlockApps.Bloc22.API.Utils
---import           BlockApps.Bloc22.Crypto
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 --import           BlockApps.Solidity.SolidityValue
@@ -60,30 +59,30 @@ instance ToSchema BlocTransactionType where
 
 --------------------------------------------------------------------------------
 
-type PostTransaction = "transaction"
+type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostTransactionRequest
+  :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] BlocTransactionResult
 
-data PostTransactionRequest = PostTransactionRequest
-  { posttransactionrequestTransactionType :: BlocTransactionType
-  , posttransactionrequestPayload         :: BlocTransactionPayload
-  , posttransactionrequestTxParams        :: Maybe TxParams
+data PostBlocTransactionRequest = PostBlocTransactionRequest
+  { postbloctransactionrequestTransactionType :: BlocTransactionType
+  , postbloctransactionrequestPayload         :: BlocTransactionPayload
+  , postbloctransactionrequestTxParams        :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 
---instance Arbitrary PostTransactionRequest where 
+--instance Arbitrary PostBlocTransactionRequest where 
   --arbitrary = genericArbitrary uniform
 
-instance ToJSON PostTransactionRequest where
+instance ToJSON PostBlocTransactionRequest where
 
-instance FromJSON PostTransactionRequest where
+instance FromJSON PostBlocTransactionRequest where
 
-instance ToSample PostTransactionRequest where
+instance ToSample PostBlocTransactionRequest where
   toSamples _ = noSamples
 
-instance ToSchema PostTransactionRequest where
+instance ToSchema PostBlocTransactionRequest where
 
 data BlocTransactionPayload = 
   ContractPayload {

@@ -71,7 +71,7 @@ type BlocAPI =
   :<|> PostChainInfo
   :<|> GetChainInfo
   -- /transaction endpoints
-  :<|> PostTransaction
+  :<|> PostBlocTransaction
 
 markdownBloc :: String
 markdownBloc = markdown $ docs blocApi
