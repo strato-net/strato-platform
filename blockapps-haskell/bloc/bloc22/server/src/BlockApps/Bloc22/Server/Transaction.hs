@@ -38,12 +38,15 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 
-postBlocTransaction :: Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc BlocTransactionResult
-postBlocTransaction userName chainId resolve (PostBlocTransactionRequest txType payload txParams) = do
-  case txType of
-      CONTRACT -> postContract userName chainId resolve txParams payload
-      TRANSFER -> postTransfer userName chainId resolve txParams payload
-      FUNCTION -> error "Unimplemented"
+postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc BlocTransactionResult
+postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txType payload txParams) = do
+  case mUserName of 
+    Nothing -> error "Did not find X-USER-UNIQUE-NAME in the header"
+    Just userName -> do  
+      case txType of
+        CONTRACT -> postContract userName chainId resolve txParams payload
+        TRANSFER -> postTransfer userName chainId resolve txParams payload
+        FUNCTION -> error "Unimplemented"
 
 postContract :: Text -> Maybe ChainId -> Bool -> Maybe TxParams -> BlocTransactionPayload -> Bloc BlocTransactionResult
 postContract userName chainId resolve mTxParams payload = blocTransaction $ do
