@@ -96,9 +96,11 @@ data BlocTransactionPayload =
   , transferpayloadValue     :: Strung Natural
   } |
   FunctionPayload {
-    functionpayloadMethod :: Text
-  , functionpayloadArgs   :: Map Text ArgValue
-  , functionpayloadValue  :: Maybe (Strung Natural) 
+    functionpayloadContractName    :: ContractName
+  , functionpayloadContractAddress :: Address
+  , functionpayloadMethod          :: Text
+  , functionpayloadArgs            :: Map Text ArgValue
+  , functionpayloadValue           :: Maybe (Strung Natural) 
   } deriving (Eq, Show, Generic)
 
 instance ToJSON BlocTransactionPayload where
