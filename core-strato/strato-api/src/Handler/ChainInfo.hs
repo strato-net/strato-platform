@@ -74,5 +74,5 @@ getChainR = do
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
-      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)--invalidArgs ["no chain found"]
+      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)
       cis -> returnJson cis
