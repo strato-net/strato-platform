@@ -21,6 +21,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB

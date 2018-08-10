@@ -53,7 +53,8 @@ bloc = (return gitInfo)
   :<|> getSearchContract
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
-  :<|> postChain
+  :<|> postChainInfo
+  :<|> getChainInfo
   :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI

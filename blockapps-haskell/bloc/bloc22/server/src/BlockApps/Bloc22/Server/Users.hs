@@ -405,7 +405,7 @@ postUsersContractMethod
   (PostUsersContractMethodRequest password funcName args value mTxParams) = do
     sk <- getAccountSecKey userName password userAddr
     txParams <- getAccountTxParams userAddr chainId mTxParams
-    cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
+    cmId <- getContractsMetaDataIdExhaustive contractName contractAddr chainId
 
     contract' <- getContractContractByMetadataId cmId
 
@@ -448,6 +448,7 @@ data ContractCreationData = ContractCreationData
        { metadataId :: Int32
        , transactionHash :: Keccak256
        , contractName :: ContractName
+       , contractChainId :: Maybe ChainId
        , transactionResult :: Maybe TransactionResult
        , batchIndex :: Integer
        }
@@ -543,17 +544,18 @@ evalAndReturn list = do
       , constant cmId
       , constant addr'
       , Nothing
+      , constant chainId
       )
-      | (addr', ContractCreationData cmId _ _ _ _) <- cl
+      | (addr', ContractCreationData cmId _ _ chainId _ _) <- cl
       ]
     forStateT state cl $
-      \(addr', ContractCreationData _ hash name mtxr index) -> do
+      \(addr', ContractCreationData _ hash name chainId mtxr index) -> do
         st <- get
         let cds = contractDetailsMap st
         (details, cds') <- case Map.lookup name cds of
           Just details' -> return (details'{contractdetailsAddress = Just (Unnamed addr')}, cds)
           Nothing -> do
-            details' <- lift $ getContractDetails name (Unnamed addr')
+            details' <- lift $ getContractDetails name (Unnamed addr') chainId
             return (details', Map.insert name details' cds)
         put st{contractDetailsMap = cds'}
         return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
@@ -569,6 +571,7 @@ contractResult :: Keccak256
 contractResult hash mtxr cmId name index = do
   let
     Just txResult = mtxr
+    chainId = transactionresultChainId txResult
     addressMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (transactionresultContractsCreated txResult)
@@ -584,13 +587,13 @@ contractResult hash mtxr cmId name index = do
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
       xs::[Int32] <- lift $ blocQuery $ proc () -> do
-        (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
+        (cmId',_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
         returnA -< cmId'
       if (isNothing $ listToMaybe xs)
         then do
           st <- get
           put st{contractsList =
-                  (contractsList st) ++ [(addr', ContractCreationData cmId hash (ContractName name) mtxr index)]
+                  (contractsList st) ++ [(addr', ContractCreationData cmId hash (ContractName name) chainId mtxr index)]
                 }
           return Nothing
         else do
@@ -600,7 +603,7 @@ contractResult hash mtxr cmId name index = do
           (details, cds') <- case Map.lookup cn cds of
             Just details' -> return (details'{contractdetailsAddress = Just (Unnamed addr')}, cds)
             Nothing -> do
-              details' <- lift $ getContractDetails cn (Unnamed addr')
+              details' <- lift $ getContractDetails cn (Unnamed addr') chainId
               return (details', Map.insert cn details' cds)
           put st{contractDetailsMap = cds'}
           return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
@@ -714,7 +717,7 @@ constructArgValues args argNamesTypes = do
               textToArgType "Int" False "" -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) (return . (ix,)) (textToValue valStr ty)
+          either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
     case args of
       Nothing ->
         if Map.null argNamesTypes
