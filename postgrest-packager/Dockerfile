@@ -25,6 +25,8 @@ RUN apt-get update && \
 
 COPY doit.sh postgrest.conf.tpl /
 
+COPY licenses /licenses
+
 EXPOSE 3001
 
 CMD ["sh", "/doit.sh"]

@@ -1,24 +1,25 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
 
-import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import           Blockchain.Strato.Model.Util
-import           Control.Monad                        (replicateM)
-import           Crypto.Hash                          (Digest, hash)
-import           Crypto.Hash.Algorithms               (Keccak_256, Keccak_512)
-import qualified Data.Aeson                           as Ae
-import qualified Data.Aeson.Encoding                  as Enc
-import           Data.Binary
-import           Data.ByteArray                       (convert)
-import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
-import qualified Data.ByteString.Char8                as S8
-import qualified Data.ByteString.Lazy                 as BL
-import qualified Data.Text                            as T
-import           GHC.Generics
-import           Numeric                              (readHex, showHex)
+import              Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+import              Blockchain.Strato.Model.Util
+import              Control.Monad                        (replicateM)
+import "cryptonite" Crypto.Hash                          (Digest, hash)
+import              Crypto.Hash.Algorithms               (Keccak_256, Keccak_512)
+import qualified    Data.Aeson                           as Ae
+import qualified    Data.Aeson.Encoding                  as Enc
+import              Data.Binary
+import              Data.ByteArray                       (convert)
+import qualified    Data.ByteString                      as B
+import qualified    Data.ByteString.Base16               as B16
+import qualified    Data.ByteString.Char8                as S8
+import qualified    Data.ByteString.Lazy                 as BL
+import qualified    Data.Text                            as T
+import              GHC.Generics
+import              Numeric                              (readHex, showHex)
 
-import           Blockchain.Data.RLP
+import              Blockchain.Data.RLP
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 

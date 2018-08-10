@@ -1,17 +1,22 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Blockchain.Blockstanbul.Authentication where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+module Blockchain.Blockstanbul.Authentication
+  ( module Blockchain.Blockstanbul.Authentication
+  , module Blockchain.Blockstanbul.Model.Authentication
+  ) where
 
 import Control.Monad (liftM2, liftM3)
 import Control.Monad.IO.Class
 import Control.Lens
 import qualified Data.ByteString as B
 import Data.List (sort)
-import Data.Monoid ((<>))
 import MonadUtils (liftIO1)
 import Test.QuickCheck
 
 import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB()
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
@@ -22,71 +27,30 @@ import Blockchain.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Crypto as HK
 
-type RawExtraData = B.ByteString
-
-data IstanbulExtra = IstanbulExtra {
-  _validatorList :: [Address],
-  _proposedSig :: Maybe ExtendedSignature,
-  _commitment :: [ExtendedSignature]
-} deriving (Eq, Show)
-makeLenses ''IstanbulExtra
-
-data ExtraData = ExtraData {
-  _vanity :: B.ByteString,
-  _istanbul :: Maybe IstanbulExtra
-} deriving (Eq, Show)
-makeLenses ''ExtraData
-
-
 instance Arbitrary IstanbulExtra where
   arbitrary = liftM3 IstanbulExtra arbitrary arbitrary arbitrary
 
 instance Arbitrary ExtraData where
   arbitrary = liftM2 ExtraData arbitrary arbitrary
 
-instance RLPSerializable IstanbulExtra where
-  rlpEncode (IstanbulExtra vls mp cs) =
-      RLPArray [RLPArray . map rlpEncode $ vls,
-                maybe (RLPScalar 0) rlpEncode mp,
-                RLPArray . map rlpEncode $ cs]
-  rlpDecode (RLPArray [RLPArray rvls, rp, RLPArray rcs]) =
-      IstanbulExtra (map rlpDecode rvls)
-                    (case rp of
-                        RLPScalar _ -> Nothing
-                        _ -> Just . rlpDecode $ rp)
-                    (map rlpDecode rcs)
-  rlpDecode x = error $ "invalid rlp for istanbul extra: " ++ show x
-
-uncookRawExtra :: ExtraData -> RawExtraData
-uncookRawExtra (ExtraData vn ist') =
-  case ist' of
-    Nothing -> B.take 32 vn
-    Just ist -> B.take 32 vn <> B.replicate (32 - B.length vn) 0 <> rlpSerialize (rlpEncode ist)
-
-cookRawExtra :: RawExtraData -> ExtraData
-cookRawExtra bs =
-  let (vn, rest) = B.splitAt 32 bs
-  in ExtraData vn $ if B.null rest
-                      then Nothing
-                      else Just . rlpDecode . rlpDeserialize $ rest
 
 truncateExtra :: Block -> Block
-truncateExtra = over (blockDataLens . extraDataLens) $ B.take 32
+truncateExtra = over extraLens $ B.take 32
 
 addValidators :: [Address] -> Block -> Block
-addValidators vs = over (blockDataLens . extraDataLens) $
+addValidators vs = over extraLens $
     uncookRawExtra
   . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
   . cookRawExtra
 
 addProposerSeal :: ExtendedSignature -> Block -> Block
-addProposerSeal sig = over (blockDataLens . extraDataLens) $
+addProposerSeal sig = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . proposedSig) (Just sig)
   . cookRawExtra
 
 addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
-addCommitmentSeals sigs = over (blockDataLens . extraDataLens) $
+addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . commitment) sigs
   . cookRawExtra
@@ -97,10 +61,6 @@ scrubAllSeals = uncookRawExtra
               . set (istanbul . _Just . commitment) []
               . cookRawExtra
 
-scrubCommitmentSeals :: RawExtraData -> RawExtraData
-scrubCommitmentSeals = uncookRawExtra
-                     . set (istanbul . _Just . commitment) []
-                     . cookRawExtra
 
 proposalMessage :: Block -> HK.Word256
 -- TODO(tim): Clear everything out of extraData except vanity and validators

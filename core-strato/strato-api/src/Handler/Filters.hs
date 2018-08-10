@@ -15,6 +15,7 @@ import           Database.Persist.Postgresql
 import           Numeric
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA
@@ -53,7 +54,7 @@ blockQueryParams = [ "txaddress",
                      "chainid"]
 
 -- todo: eliminate the Entity Block from this function
-getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction), expr (Entity Block))-> (Text, Text) -> expr (E.Value Bool)
+getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
 
 getBlkFilter  _                               ("page", _)    = E.val True
 getBlkFilter  _                               ("index", _)    = E.val True
@@ -61,37 +62,35 @@ getBlkFilter  _                               ("raw", _)    = E.val True
 getBlkFilter  _                               ("next", _)    = E.val True
 getBlkFilter  _                               ("prev", _)    = E.val True
 getBlkFilter  _                               ("appname", _) = E.val True
-getBlkFilter (bdRef, _, _, _)                 ("ntx", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("ntx", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("number", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("minnumber", v)    = bdRef E.^. BlockDataRefNumber E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxnumber", v)    = bdRef E.^. BlockDataRefNumber E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("number", v)    = bdRef E.^. BlockDataRefNumber E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("minnumber", v)    = bdRef E.^. BlockDataRefNumber E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxnumber", v)    = bdRef E.^. BlockDataRefNumber E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v)
-getBlkFilter (bdRef, _, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v)
 
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("time", v)      = bdRef E.^. BlockDataRefTimestamp E.==. E.val (stringToDate v)
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("mintime", v)   = bdRef E.^. BlockDataRefTimestamp E.>=. E.val (stringToDate v)
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("maxtime", v)   = bdRef E.^. BlockDataRefTimestamp E.<=. E.val (stringToDate v)
 
-getBlkFilter (_, _, rawTX, _) ("txaddress", v) = (rawTX E.^. RawTransactionFromAddress E.==. E.val (toAddr v))
+getBlkFilter (_, _, rawTX) ("txaddress", v) = (rawTX E.^. RawTransactionFromAddress E.==. E.val (toAddr v))
                                                  E.||. (rawTX E.^. RawTransactionToAddress E.==. E.val (Just (toAddr v)))
 
-getBlkFilter (bdRef, _, _, blk) ("coinbase", v)  = bdRef E.^. BlockDataRefCoinbase E.==. E.val (toAddr v)
-                                                              E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-getBlkFilter (_, accStateRef, _, _) ("address", v)   = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-getBlkFilter (bdRef, _, _, blk) ("blockid", v)   = bdRef E.^. BlockDataRefBlockId E.==. E.val (toBlockId v)
-                                                              E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-getBlkFilter (bdRef, _, _, blk) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
+getBlkFilter (bdRef, _, _) ("coinbase", v)  = bdRef E.^. BlockDataRefCoinbase E.==. E.val (toAddr v)
+getBlkFilter (_, accStateRef, _) ("address", v)   = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+getBlkFilter (bdRef, _, _) ("blockid", v)   = bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)
+getBlkFilter (bdRef, _, _) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) )
 
 
 getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
@@ -228,8 +227,8 @@ getLogFilter _           _  = P.undefined ("no match in getLogFilter"::String)
 toAddrId :: Text -> Key AddressStateRef
 toAddrId = toId
 
-toBlockId :: Text -> Key Block
-toBlockId = toId
+toBlockDataRefId :: Text -> Key BlockDataRef
+toBlockDataRefId = toId
 
 toId :: ToBackendKey SqlBackend record => Text -> Key record
 toId v = toSqlKey (fromIntegral $ (toInteger' v) )

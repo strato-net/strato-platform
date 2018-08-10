@@ -22,7 +22,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
-type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m)
+type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m, MonadLogger m)
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 
@@ -104,10 +104,12 @@ nextRound nt = do
     Round r -> view . round .= r
   vals <- use validators
   thisR <- use $ view . round
-  let nextP = vals !! (fromIntegral thisR `mod` length vals)
-  proposer .= nextP
+  let leader = vals !! (fromIntegral thisR `mod` length vals)
+  proposer .= leader
   proposal .= Nothing
-
+  self <- selfAddr
+  when (leader == self) $ do
+    yield MakeBlockCommand
   prepared .= M.empty
   committed .= M.empty
   roundChanged .= M.empty
@@ -192,6 +194,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logWarnS "blockstanbul" err
       roundChange
     CommitResult (Right ()) -> do
+      $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
@@ -224,7 +227,7 @@ sendMessages wms = do
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   out <- sendMessages wms
-  $logInfoS "sendAllMessages" . T.pack . show $ out
+  $logDebugS "sendAllMessages" . T.pack . show $ out
   case catMaybes . map loopback $ out of
              [] -> return out
              wms' -> (out ++) <$> sendAllMessages wms'

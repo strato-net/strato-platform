@@ -6,10 +6,9 @@ import qualified Blockchain.FastECRecover  as N
 import qualified Blockchain.SHA            as J
 import           Criterion.Main
 import qualified Data.ByteString           as M
+import           Data.Maybe                (fromJust)
 import qualified Network.Haskoin.Crypto    as A
 import qualified Network.Haskoin.Internals as G
-import           Prelude
-
 
 main =
   defaultMain $

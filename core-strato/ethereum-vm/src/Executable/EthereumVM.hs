@@ -10,6 +10,7 @@ module Executable.EthereumVM (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
@@ -75,7 +76,7 @@ ethereumVM = void . execContextM $ do
         forM_ newCommands runJsonRpcCommand
 
         let allTxs = [OETx ts t | OETx ts t <- seqEvents]
-        $logInfoS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+        $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
@@ -96,8 +97,12 @@ ethereumVM = void . execContextM $ do
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
+        pbft <- gets contextHasBlockstanbul
         let pending = B.pending state
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+        let shouldOutputBlocks = isCaughtUp && (
+              if pbft
+                then OECreateBlockCommand `elem` seqEvents
+                else not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do

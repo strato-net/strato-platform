@@ -1,0 +1,46 @@
+name: merkle-patricia-db
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A modified Merkle Patricia DB
+category:      Data Structures
+license: Apache-2.0
+description:
+    The modified Merkle Patricia DB described in the Ethereum Yellowpaper
+github: blockapps/strato-platform/strato-platform/merkle-patricia-db
+
+dependencies:
+  - base >= 4 && < 5
+  - aeson
+  - base16-bytestring
+  - binary
+  - bytestring
+  - cryptohash
+  - data-default
+  - ethereum-rlp
+  - blockapps-util
+  - leveldb-haskell
+  - nibblestring
+  - resourcet
+  - transformers
+  - ansi-wl-pprint
+  - containers
+  - mtl
+  - strato-model
+
+library:
+    source-dirs: src
+
+tests:
+  test-merkle-patricia-db:
+    source-dirs: test
+    main:        MerklePatriciaSpec.hs
+    dependencies:
+      - merkle-patricia-db
+      - test-framework
+      - test-framework-hunit
+      - HUnit
+      - hspec
+      - hspec-contrib
