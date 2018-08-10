@@ -12,11 +12,13 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
 import qualified Data.Aeson                        as Aeson
+import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.Int                          (Int32)
 import qualified Data.Map.Strict                   as Map
+import qualified Data.Map.Ordered                  as OMap
 import           Data.Monoid
 import           Data.RLP
 import           Data.Text                         (Text)
@@ -34,9 +36,13 @@ import           BlockApps.Bloc22.Server.Users
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
+import qualified BlockApps.Solidity.Contract       as C
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.XAbiConverter
 
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc BlocTransactionResult
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txType payload txParams) = do
@@ -115,6 +121,43 @@ postTransfer userName chainId resolve mTxParams payload = do
         )]
       getBlocTransactionResult' chainId hash resolve
     _ -> error "invalid payload for transfer"
+
+postFunctionCall :: Text -> Maybe ChainId -> Bool -> Maybe TxParams -> BlocTransactionPayload -> Bloc BlocTransactionResult
+postFunctionCall userName chainId resolve mTxParams payload = do
+  case payload of
+    FunctionPayload (ContractName contractName) contractAddr funcName args value  -> do
+      txParams <- getAccountTxParams (Address 0x00) chainId mTxParams
+      cmId <- getContractsMetaDataIdExhaustive contractName contractAddr chainId
+
+      contract' <- getContractContractByMetadataId cmId
+
+      let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
+      sel <-
+        case maybeFunc of
+         Just (_, TypeFunction selector _ _) -> return selector
+         _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+      functionId <- getFunctionId cmId funcName
+      argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
+      tx <- prepareTx' userName $
+        TransactionHeader
+          (Just contractAddr)
+          (Address 0x00)
+          txParams
+          (Wei (maybe 0 (fromIntegral . unStrung) value))
+          ((sel::ByteString) <> (argsBin::ByteString))
+          0
+          chainId
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
+      hash <- blocStrato $ postTx tx
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+        ( Nothing
+        , constant hash
+        , constant cmId
+        , constant (2 :: Int32)
+        , constant funcName
+        )]
+      getBlocTransactionResult' chainId hash resolve
+    _ -> error "invalid payload for function call"
 
 prepareTx' :: Text -> TransactionHeader -> Bloc PostTransaction
 prepareTx' userName txHeader = do
