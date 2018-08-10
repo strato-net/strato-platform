@@ -47,7 +47,7 @@ postChainR = do
       when (length acin == 0) $ invalidArgs ["account info is empty"]
       when (length cdin == 0) $ invalidArgs ["code info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
-      let accountCodeHashes = S.fromList . catMaybes . flip map acin $ \case
+      let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
             NonContract _ _ -> Nothing
             ContractNoStorage _ _ c -> Just c
             ContractWithStorage _ _ c _ -> Just c
