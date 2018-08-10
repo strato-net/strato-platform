@@ -528,23 +528,6 @@ instance ToJSON BatchTransactionResult where
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
 
-{-
-type AccountBalance = NamedTuple "address" Address "balance" Integer
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
-
-instance ToSchema AccountBalance where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "Account balances"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex = exampleAccountBalances
-
-exampleAccountBalances :: [AccountBalance]
-exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-                                       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
--}
-
 data ChainInfo = ChainInfo
   {  chainLabel    :: Text
   ,  accountInfo   :: [AccountInfo]
