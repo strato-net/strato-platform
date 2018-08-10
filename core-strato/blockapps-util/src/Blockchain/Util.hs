@@ -18,6 +18,10 @@ import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import qualified Data.Binary              as Binary
 
+withRight :: Monad m => Either a b -> (b -> m ()) -> m ()
+withRight (Left _) _ = return ()
+withRight (Right b) f = f b
+
 buildState :: s -> [a] -> (a -> State s ()) -> s
 buildState s [] _ = s
 buildState s (a:as) run =

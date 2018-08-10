@@ -121,17 +121,19 @@ kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer"
 
 getKafkaCheckpoint :: IContextM (Offset, IndexerBestBlockInfo)
 getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, Metadata (KString md'))  -> return (ofs, reIBBI . read $ S8.unpack md')
+    Left err -> error $ "getKafkaCheckpoint: Connection to Kafka failed with: " ++ show err
+    Right (Left UnknownTopicOrPartition) -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
+    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
+    Right (Right (ofs, Metadata (KString md'))) -> return (ofs, reIBBI . read $ S8.unpack md')
 
 setKafkaCheckpoint :: Offset -> IndexerBestBlockInfo -> IContextM ()
 setKafkaCheckpoint ofs md = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ show md
     op <- withKafkaViolently (setKafkaCheckpoint' ofs md)
     case op of
-        Left err -> error $ "Client error: " ++ show err
-        Right _  -> return ()
+        Left err -> error $ "setKafkaCheckpoint: Connection to Kafka failed with: " ++ show err
+        Right (Left err) -> error $ "Client error: " ++ show err
+        Right (Right _)  -> return ()
 
 setKafkaCheckpoint' :: (Kafka k) => Offset -> IndexerBestBlockInfo -> k (Either KafkaError ())
 setKafkaCheckpoint' ofs md =
@@ -143,5 +145,7 @@ setKafkaCheckpoint' ofs md =
 getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent], IndexerBestBlockInfo)
 getUnprocessedIndexEvents = do
     (ofs, md) <- getKafkaCheckpoint
-    evs       <- withKafkaViolently (readIndexEvents ofs)
-    return (ofs, evs, md)
+    eEvs       <- withKafkaViolently (readIndexEvents ofs)
+    case eEvs of
+      Left _ -> return (ofs, [], md) --TODO: should this error instead?
+      Right evs -> return (ofs, evs, md)

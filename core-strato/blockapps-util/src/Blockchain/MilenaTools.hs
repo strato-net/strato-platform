@@ -65,15 +65,15 @@ class HasKafkaState m where
     getKafkaState :: m KafkaState
     putKafkaState :: KafkaState -> m ()
 
-withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m (Either KafkaClientError a)
 withKafkaViolently k = do
     s <- getKafkaState
     r <- liftIO . runExceptT $ runStateT k s
     case r of
-        Left err -> error $ show err
+        Left err -> return $ Left err
         Right (a, newS) -> do
             putKafkaState newS
-            return a
+            return $ Right a
 
 
 

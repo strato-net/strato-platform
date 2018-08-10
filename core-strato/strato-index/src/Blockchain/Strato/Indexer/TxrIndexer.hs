@@ -107,19 +107,23 @@ kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer"
 
 getKafkaCheckpoint :: IContextM Offset
 getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, _)  -> return ofs
+    Left err -> error $ "getKafkaCheckpoint: Connection to Kafka failed with: " ++ show err
+    Right (Left UnknownTopicOrPartition) -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
+    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
+    Right (Right (ofs, _))  -> return ofs
 
 setKafkaCheckpoint :: Offset -> IContextM ()
 setKafkaCheckpoint ofs = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
     withKafkaViolently (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
-        Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
-        Right () -> return ()
+        Left err -> error $ "setKafkaCheckpoint: Connection to Kafka failed with: " ++ show err
+        Right (Left err) -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
+        Right (Right ()) -> return ()
 
 getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
     ofs <- getKafkaCheckpoint
-    evs <- withKafkaViolently (readIndexEvents ofs)
-    return (ofs, evs)
+    eEvs <- withKafkaViolently (readIndexEvents ofs)
+    case eEvs of
+      Left _ -> return (ofs, [])
+      Right evs -> return (ofs, evs)

@@ -70,9 +70,12 @@ doBlock minerNumber n newNonce = do
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
-    _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
-    $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
-    return ()
+    res <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
+    case res of
+      Left err -> $logErrorS "writeUnseqEventsEnd" . T.pack $ "Connection to Kafka failed with: " ++ show err
+      Right _ -> do
+        $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
+        return ()
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
 mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
@@ -94,7 +97,8 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
 doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
-    blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
+    eBlocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
+    let blocks = either (const []) id eBlocks
     numPeers <- liftIO $ getActivePeers >>= return . length
 
     case reverse blocks of
@@ -129,7 +133,12 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Initing runKafka"
     $logInfoS "stratoAdit" "Will fetch offsets"
 
-    offset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
+    offset <- getOffset
     $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
     doConsume (max (offset - 1) 0) c
+    where getOffset = do
+            eOffset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
+            case eOffset of
+              Right ofs -> return ofs
+              Left _ -> getOffset

@@ -16,6 +16,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
+import qualified Network.Kafka                         as Kafka
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
@@ -46,7 +47,7 @@ import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
-import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
+import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime, withRight)
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
@@ -55,15 +56,16 @@ ethereumVM = void . execContextM $ do
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
-    putContextBestBlockInfo cpBBI
-    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
-    Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
-
-    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
+    when flags_bootstrap $ do
+      (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
+      putContextBestBlockInfo cpBBI
+      bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
+      Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
+      $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
     forever $ do
-        cpOffset <- getCheckpointNoMetadata
+      eCpOffset <- getCheckpointNoMetadata
+      withRight eCpOffset $ \cpOffset -> do
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
 
@@ -109,7 +111,7 @@ ethereumVM = void . execContextM $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
-            K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+            void . K.withKafkaViolently $ produceUnminedBlocksM [outputBlockToBlock newBlock]
 
         -- todo: is this the best place to put this?
         flushLogEntries
@@ -175,24 +177,26 @@ getCheckpoint = do
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
     K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
-        Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
-        Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-        Right (ofs, md) -> do
+        Left err -> error $ "getCheckpoint: Connection to Kafka failed with: " ++ show err
+        Right (Left KP.UnknownTopicOrPartition) -> initializeCheckpointAndBlockSummary >> getCheckpoint
+        Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
+        Right (Right (ofs, md)) -> do
             let md' = fromKafkaMetadata md
             $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
             return (ofs, md')
 
-getCheckpointNoMetadata :: ContextM KP.Offset
+getCheckpointNoMetadata :: ContextM (Either Kafka.KafkaClientError KP.Offset)
 getCheckpointNoMetadata = do
     let topic  = seqVmEventsTopicName
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
     K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
-        Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
-        Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-        Right (ofs, _) -> do
-            return ofs
+        Left err -> return $ Left err
+        Right (Left KP.UnknownTopicOrPartition) -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
+        Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
+        Right (Right (ofs, _)) -> do
+            return $ Right ofs
 
 
 setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
@@ -200,21 +204,24 @@ setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
     ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
-    either (error . show) return ret
+    withRight ret $ either (error . show) return
 
 setCheckpointNoMetadata :: KP.Offset -> ContextM ()
 setCheckpointNoMetadata ofs = do
     $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
     let emptyMetadata = KP.Metadata $ KP.KString BS.empty
     ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
-    either (error . show) return ret
+    withRight ret $ either (error . show) return
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-    ret <- K.withKafkaViolently (readSeqVmEvents offset)
-    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
-    return ret
+    eRet <- K.withKafkaViolently (readSeqVmEvents offset)
+    case eRet of
+      Left _ -> return [] --TODO: Should this error instead?
+      Right ret -> do
+        $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
+        return ret
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =

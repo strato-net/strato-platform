@@ -26,10 +26,12 @@ seqEventNotificationSource :: ( MonadIO m
                               )
                            => Source m OutputEvent
 seqEventNotificationSource = do
-    ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
+    eOfs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
+    let ofs' = either (const 0) id eOfs'
     loop ofs'
     where loop nextOffset = do
-              events <- lift $ K.withKafkaViolently $ readSeqP2pEvents nextOffset
+              eEvents <- lift $ K.withKafkaViolently $ readSeqP2pEvents nextOffset
+              let events = either (const []) id eEvents
               unless (null events) $ do -- stop bloating the logs
                 $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
                 forM_ events $ \e -> do
