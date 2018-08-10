@@ -197,5 +197,7 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
+                                            , blockstanbulBlockPeriodμs = 0
+                                            , blockstanbulRoundPeriod = 0
                                             }
     runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg
