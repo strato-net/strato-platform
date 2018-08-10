@@ -17,7 +17,7 @@ import qualified Blockchain.Colors          as CL
 import           Blockchain.Format
 import           Blockchain.Util            (tab)
 
-class OrderValidateable t where
+class Show t => OrderValidateable t where
     getBlockHash   :: t -> SHA
     getParentHash  :: t -> SHA
     getBlockNumber :: t -> Integer
@@ -40,11 +40,11 @@ data OrderValidateable t => OrderValidatorState t =
     OrderValidatorState { seenBlocks   :: Map.Map SHA Integer
                         , unseenBlocks :: [t]
                         , runState     :: ValidationResult t
-                        }
+                        } deriving (Show)
 
 type OrderValidatorM t = StateT (OrderValidatorState t) IO
 
-instance (Show t, Format t, OrderValidateable t) => Format (OrderValidatorState t) where
+instance (Format t, OrderValidateable t) => Format (OrderValidatorState t) where
     format (OrderValidatorState sb usb rs) =
         if (isValid' rs) then CL.green body else CL.red body
             where body =    ("runState -> " ++ (show rs) ++ "\n")

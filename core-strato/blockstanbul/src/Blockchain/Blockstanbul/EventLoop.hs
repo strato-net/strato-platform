@@ -13,6 +13,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
+import Text.Printf
 
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
@@ -116,7 +117,9 @@ nextRound nt = do
   validators .= updateValidator val vot
   case nt of
     Sequence s -> view . sequence .= s
-    Round r -> view . round .= r
+    Round r -> do
+      view . round .= r
+      yield $ ResetTimer r
   vals <- use validators
   thisR <- use $ view . round
   let leader = vals !! (fromIntegral thisR `mod` length vals)
@@ -132,8 +135,6 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
-
-  yield ResetTimer
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
@@ -223,9 +224,15 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
       return ()
-    Timeout -> do
-      $logWarnS "blockstanbul" "Round timed out"
-      roundChange
+    Timeout r' -> do
+      case r' `compare` _round v of
+        LT ->
+          let msg = printf "Ignoring stale timeout for %v (now %v)" r' (_round v)
+          in $logDebugS "blockstanbul" . T.pack $ msg
+        EQ -> do
+          $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
+          roundChange
+        GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
       roundChange

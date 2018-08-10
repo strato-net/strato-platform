@@ -67,7 +67,7 @@ commitCode = 2
 roundchangeCode = 3
 
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
-             | Timeout
+             | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
@@ -77,7 +77,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
-              | ResetTimer
+              | ResetTimer RoundNumber
               deriving (Eq, Show)
 
 getHash :: TrustedMessage -> Word256

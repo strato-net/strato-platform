@@ -134,6 +134,9 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper
+    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
