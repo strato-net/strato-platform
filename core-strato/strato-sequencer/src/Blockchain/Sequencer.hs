@@ -65,7 +65,7 @@ sequencer = do
   forever $ do
     $logDebugS "seq/loop/start" ""
     v <- currentView
-    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
+    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
     blockstanbulSend . map Timeout =<< drainTimeouts
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"

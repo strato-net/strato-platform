@@ -11,6 +11,7 @@ import Data.DeriveTH
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
+import Text.Printf
 
 import Blockchain.Data.RLP
 import Blockchain.ExtWord
@@ -28,6 +29,9 @@ data View = View {
   _sequence :: SequenceNumber
 } deriving (Eq, Show, Ord, Generic)
 makeLenses ''View
+
+instance Format View where
+  format (View r s) = printf "View (round = %d, sequence = %d)" r s
 
 data MsgAuth = MsgAuth {
   sender :: Address,
