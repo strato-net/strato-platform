@@ -174,11 +174,8 @@ instance ToSample ChainIdChainOutput where
 instance ToSchema ChainIdChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Chain Output Info"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ChainIdChainOutput
-      ex = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
-
+--    TODO: Figure out why this line crashes the entire Bloc API doc? Works just fine for ChainIdChainInfo in Strato docs
+--    & mapped.schema.example ?~ toJSON exChainIdChainOutput
 
 --------------------------------------------------------------------------------
 
@@ -187,7 +184,6 @@ instance ToSchema ChainIdChainOutput where
 type PostChainInfo = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
-
 
 -- GET /chain
 
