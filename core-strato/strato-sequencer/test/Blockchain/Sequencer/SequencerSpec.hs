@@ -161,9 +161,10 @@ spec = do
         drainP2P `shouldReturn` evs2
         drainP2P `shouldReturn` []
 
-    it "queues timeouts" $ runTestM $ do
-      let input = [20, 45, 30]
-      local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $ do
-        mapM_ createNewTimer input
-      liftIO $ threadDelay 200 -- Who are you to judge?
-      drainTimeouts `shouldReturn` input
+      it "queues timeouts" $ runTestM $ do
+        let input = [20, 45, 30]
+        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $ do
+          mapM_ createNewTimer input
+        liftIO $ threadDelay 200 -- Who are you to judge?
+        out <- drainTimeouts
+        out `shouldMatchList` input
