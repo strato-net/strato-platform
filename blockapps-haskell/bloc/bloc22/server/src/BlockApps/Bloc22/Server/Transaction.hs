@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -11,19 +12,26 @@ module BlockApps.Bloc22.Server.Transaction where
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Data.Aeson                        hiding (Array, String)
 import qualified Data.Aeson                        as Aeson
+--import           Data.Aeson.Types
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.Int                          (Int32)
+import           Data.LargeWord
 import qualified Data.Map.Strict                   as Map
 import qualified Data.Map.Ordered                  as OMap
+import           Data.Maybe
 import           Data.Monoid
 import           Data.RLP
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
+import           Data.Word
+import           GHC.Generics
+import           Network.HTTP.Simple
 import           Opaleye                           hiding (not, null, index)
 
 import           BlockApps.Bloc22.API.Transaction
@@ -42,7 +50,6 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
-import           BlockApps.XAbiConverter
 
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc BlocTransactionResult
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txType payload txParams) = do
@@ -203,14 +210,41 @@ signTransaction' userName UnsignedTransaction{..} = Transaction
   , transactionGasLimit = unsignedTransactionGasLimit
   , transactionTo = unsignedTransactionTo
   , transactionValue = unsignedTransactionValue
-  , transactionV = v
-  , transactionR = r
-  , transactionS = s
+  , transactionV = v sig
+  , transactionR = r sig
+  , transactionS = s sig
   , transactionInitOrData = unsignedTransactionInitOrData
   , transactionChainId = unsignedTransactionChainId
   }
   where
+    msgHash = getMsg . rlpMsg . Array
+      $ [ rlpEncode unsignedTransactionNonce
+        , rlpEncode unsignedTransactionGasPrice
+        , rlpEncode unsignedTransactionGasLimit
+        , rlpEncode unsignedTransactionTo
+        , rlpEncode unsignedTransactionValue
+        , rlpEncode unsignedTransactionInitOrData
+        ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
     --TODO call /signature to get r, s, v values
-    r = 0xa90ee66c8faf6ce19a5e0496fc809cc1d6984d8636afc9c8a8b2ac381cabc014
-    s = 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
-    v = 0x1c
+    sig <- getRSV userName msgHash
+    --e = 0xa90ee66c8faf6ce19a5e0496fc809cc1d6984d8636afc9c8a8b2ac381cabc014
+    --s = 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+    --v = 0x1c
+
+getRSV :: Text -> ByteString -> Response SignatureDetails
+getRSV userName msgHash = do
+  let request = setRequestHeader "X-USER-UNIQUE-NAME" [Text.encodeUtf8 userName]
+              $ setRequestBodyJSON msgHash
+              $ "POST http://vault-wrapper:8000/strato/v2.3/signature"
+  response <- httpJSON request
+  getReponseBody response
+
+data SignatureDetails = SignatureDetails 
+  { r :: Word256
+  , s :: Word256
+  , v :: Word8
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON SignatureDetails
+instance FromJSON SignatureDetails
+
