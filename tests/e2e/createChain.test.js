@@ -13,10 +13,8 @@ const config = common.config;
 const password = '1234';
 
 const label = 'My chain label';
-const addRule = 'My add rule';
-const removeRule = 'My remove rule';
 const src = 'contract Governance { }';
-const args = [];
+const args = {};
 const members = [{
     address: "00000000000000000000000000000000deadbeef"
   , enode: "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303?discport=30303"
@@ -66,9 +64,7 @@ describe("Create Chain", function() {
     const chainInfo = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
-//    assert.equal(label, chainInfo.label, "chain labels should be identical");
-//    assert.deepEqual(mems, chainInfo.members, "chain members should be identical");
-//    assert.deepEqual(bals, chainInfo.balances, "chain balances should be identical");
+    assert.deepEqual(label, chainInfo.label, "chain labels should be identical");
 
     for(var i=0; i < 10; i++) {
       const txResult = yield rest.send(alice, bob, 123456, chainId);
@@ -77,7 +73,7 @@ describe("Create Chain", function() {
 
   });
 
-  it('should not create a new chain when addRule is empty', function* () {
+  it('should not create a new chain when members list is empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -86,6 +82,9 @@ describe("Create Chain", function() {
     const isAsync = true;
     const alice = yield rest.createUser(alicename, password, isAsync);
     const bob   = yield rest.createUser(bobname, password, isAsync);
+    const bals = [{ address: alice.address, balance: 1000000000000000000000}
+                  ,{ address: bob.address, balance: 0}
+                 ];
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -95,14 +94,14 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, '', removeRule, members, balances);
+      chainId = yield rest.createChain(label, [], bals, src, args);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should not create a new chain when removeRule is empty', function* () {
+  it('should not create a new chain when balances are empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -111,6 +110,9 @@ describe("Create Chain", function() {
     const isAsync = true;
     const alice = yield rest.createUser(alicename, password, isAsync);
     const bob   = yield rest.createUser(bobname, password, isAsync);
+    const mems = [{address: alice.address, enode: members[0].enode}
+                  ,{address: bob.address, enode: members[1].enode}
+		             ];
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -120,14 +122,14 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, '', members, balances);
+      chainId = yield rest.createChain(label, mems, [], src, balances);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should not create a new chain when member list is empty', function* () {
+  it('should create a new chain when contract source is empty', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const alicename = 'Alice' + uid;
@@ -136,6 +138,12 @@ describe("Create Chain", function() {
     const isAsync = true;
     const alice = yield rest.createUser(alicename, password, isAsync);
     const bob   = yield rest.createUser(bobname, password, isAsync);
+    const bals = [{ address: alice.address, balance: 1000000000000000000000}
+                  ,{ address: bob.address, balance: 0}
+                 ];
+    const mems = [{address: alice.address, enode: members[0].enode}
+                  ,{address: bob.address, enode: members[1].enode}
+		             ];
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -143,13 +151,9 @@ describe("Create Chain", function() {
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
 
-    let chainId;
-    try {
-      chainId = yield rest.createChain(label, addRule, removeRule, [], balances);
-    } catch(e) {
-      assert.equal(e.status,400, `fails with ${e.statusText}`);
-    }
-    assert.isUndefined(chainId, "chainId not defined");
+    const chainInfo = yield rest.getChainInfo(chainId);
+    console.log('###CHAININFO###',chainInfo);
+    assert.isDefined(chainInfo, "should exist");
   });
 
   it('should not create a new chain when all accounts have 0 balance', function* () {
@@ -168,12 +172,15 @@ describe("Create Chain", function() {
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
 
+    const mems = [{address: alice.address, enode: members[0].enode}
+                  ,{address: bob.address, enode: members[1].enode}
+		             ];
     const bals = [{ address: alice.address, balance: 0}
                  ,{ address: bob.address, balance: 0}
                  ];
     let chainId;
     try {
-      chainId = yield rest.createChain(label, addRule, removeRule, members, bals);
+      chainId = yield rest.createChain(label, mems, bals, src, args);
     } catch(e) {
       assert.equal(e.status,400, `fails with ${e.statusText}`);
     }

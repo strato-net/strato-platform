@@ -54,6 +54,7 @@ dependencies:
   - text
   - time
   - transformers
+  - vector
 
 ghc-options: -Wall -O2
 

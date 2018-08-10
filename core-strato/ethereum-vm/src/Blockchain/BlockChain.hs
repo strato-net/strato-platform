@@ -537,7 +537,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       let ranBlockHash = hashFunction b
-          mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+          mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
       enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash

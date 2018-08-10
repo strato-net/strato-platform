@@ -140,7 +140,7 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           -> m StateRoot
 chainInfoToGenesisState ci = do
     initializeCodeDB (codeInfo ci)
-    initializeStateDB (acctInfo ci)
+    initializeStateDB (accountInfo ci)
     stateRoot <$> getStateDB
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]

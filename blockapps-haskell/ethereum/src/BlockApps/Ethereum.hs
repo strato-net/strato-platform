@@ -729,7 +729,7 @@ instance ToJSON AccountInfo where
     [ "address" Aeson..= a
     , "balance" Aeson..= b
     , "codeHash" Aeson..= c
-    , "storage" Aeson..= (map (\(w1,w2) -> (Hex w1, Hex w2)) $ Map.toList s)
+    , "storage" Aeson..= (map (\(w1,w2) -> (show256 w1, show256 w2)) $ Map.toList s) -- TODO(dustin): This Hex newtype doesn't seem to work for tuples :/
     ]
 
 instance FromJSON AccountInfo where

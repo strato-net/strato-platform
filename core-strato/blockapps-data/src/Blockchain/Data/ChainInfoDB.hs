@@ -2,14 +2,17 @@
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
+import           Control.Monad                      (when)
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
-import           Data.Map                           as M        hiding (map, filter)
+import           Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 
 import qualified Database.Esqueleto                 as E
@@ -22,6 +25,7 @@ import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Strato.Model.Address
 
 getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
@@ -90,20 +94,60 @@ putChainInfo chainId ChainInfo{..} = do
   runResourceT . flip SQL.runSqlPool db $ do
     let chainInfoRef = ChainInfoRef chainId chainLabel
     cirId <- E.insert chainInfoRef
-    insertMany_ $ map (parseAInfo cirId) acctInfo
+    insertMany_ $ map (parseAInfo cirId) accountInfo
     insertMany_ $ map (parseCInfo cirId) codeInfo
     insertMany_ $ map (parseMember cirId) (M.toList members)
     return cirId
       where
-        parseAInfo chid aInfo = 
+        parseAInfo chid aInfo =
           case aInfo of
             NonContract a i -> AccountInfoRef chid a i Nothing Nothing
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
-        parseCInfo ch (CodeInfo bc cc cn)  = 
+        parseCInfo ch (CodeInfo bc cc cn)  =
           CodeInfoRef ch bc cc cn
-        parseMember chi (ad, en) = 
+        parseMember chi (ad, en) =
           ChainMemberRef chi (showEnode en) ad
+
+addMember :: (HasSQLDB m) => Word256 -> Address -> String -> m ()
+addMember chainId address enode = do
+  db <- getSQLDB
+  runResourceT . flip SQL.runSqlPool db $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          members <- E.select . E.from $ \mRef -> do
+            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+            return mRef
+          when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
+            insertMany_ [ChainMemberRef chainInfoRefId enode address]
+
+removeMember :: (HasSQLDB m) => Word256 -> Address -> m ()
+removeMember chainId address = do
+  db <- getSQLDB
+  runResourceT . flip SQL.runSqlPool db $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          member <- E.select . E.from $ \mRef -> do
+            E.where_ ((mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+                      E.&&. (mRef E.^. ChainMemberRefAddress E.==. E.val address))
+            return mRef
+          when (not $ null member) $ do
+            delete . entityKey $ head member
+
+terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
+terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
 
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where

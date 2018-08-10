@@ -43,7 +43,7 @@ function newnode {
   fi
 
   echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} >> logs/strato-sequencer 2>&1
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} --validators=${validators:-[]} >> logs/strato-sequencer 2>&1
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -128,7 +128,7 @@ function doInit {
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
   $cmd 2>&1 | tee logs/strato-setup
-  if [ $? -ne 0 ]; then
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
   fi
