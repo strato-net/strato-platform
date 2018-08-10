@@ -1,7 +1,7 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-
 
 module Handler.ChainInfo where
 
@@ -20,6 +20,7 @@ import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
+import           Blockchain.TypeLits
 import           System.Entropy
 import           Blockchain.Util
 import           Blockchain.ExtWord             (Word256)
@@ -73,5 +74,5 @@ getChainR = do
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
-      [] -> invalidArgs ["no chain found"]
+      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)
       cis -> returnJson cis
