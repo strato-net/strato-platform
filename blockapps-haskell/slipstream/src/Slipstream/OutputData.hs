@@ -108,7 +108,7 @@ convertRet address codehash abi name chain x = do
         let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
 
         --History
-        let histFlag = True
+        let histFlag = False
         let hist = if (histFlag)
             then do
               let createHist = "create table if not exists \"" ++ name ++ "_history\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
