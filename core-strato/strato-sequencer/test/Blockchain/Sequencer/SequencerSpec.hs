@@ -151,7 +151,9 @@ spec = do
             length dedupedOut `shouldBe` length dedupedOut
 
     describe "SequencerM" $ do
-      it "queues events" $ property $ \evs1 evs2 -> runTestM $ do
+      -- TODO: Benchmark more tightly.
+      -- This is amazingly slow for how little it appears to be doing.
+      it "queues events" $ withMaxSuccess 5 $ property $ \evs1 evs2 -> runTestM $ do
         drainVM `shouldReturn` []
         drainP2P `shouldReturn` []
         mapM_ markForVM evs1
