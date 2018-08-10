@@ -32,6 +32,7 @@ module BlockApps.Bloc22.Client
   , postUsersContractMethodList
   , getBlocTransactionResult
   , postBlocTransactionResults
+  , postBlocTransaction
   ) where
 
 import           Data.Map.Strict                  (Map)
@@ -41,6 +42,7 @@ import           Servant.Client
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.API.Chain
+import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
@@ -175,3 +177,11 @@ postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 
 postChain :: ChainInput -> ClientM ChainId
 postChain = client (Proxy @ PostChain)
+
+postBlocTransaction
+  :: Maybe Text
+  -> Maybe ChainId
+  -> Bool
+  -> PostBlocTransactionRequest
+  -> ClientM BlocTransactionResult
+postBlocTransaction = client (Proxy @ PostBlocTransaction)
