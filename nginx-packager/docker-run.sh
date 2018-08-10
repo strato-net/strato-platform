@@ -122,12 +122,12 @@ do
 done
 echo 'apex is available'
 
-echo 'Waiting for oauth to be available...'
-until curl --silent --output /dev/null --fail --location http://oauth:8000/_ping
+echo 'Waiting for vault-wrapper to be available...'
+until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/_ping
 do
   sleep 0.5
 done
-echo 'oauth is available'
+echo 'vault-wrapper is available'
 
 openresty
 tail -n0 -F /usr/local/openresty/nginx/logs/*.log

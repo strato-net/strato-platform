@@ -28,9 +28,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: bloc strato apex docs cirrus dappstore nginx postgrest smd oauth vault-wrapper
+build_all: bloc strato apex docs cirrus dappstore nginx postgrest smd vault-wrapper
 
-.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd oauth vault-wrapper
+.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -55,10 +55,6 @@ dappstore:
 nginx:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/
-
-oauth:
-	@echo Now building oauth...
-	BASIL_DOCKER_TAG=${REPO_URL}oauth:${VERSION} make --directory=oauth/
 
 postgrest:
 	@echo Now building postgrest...

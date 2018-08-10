@@ -93,13 +93,6 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
-  oauth:
-    environment:
-    - APEX_URL=${APEX_URL}
-    - SMD_MODE=${SMD_MODE}
-    build: .
-    image: ${OAUTH_IMAGE:-<REPO_URL>oauth:<VERSION>}
-    restart: always
   vault-wrapper:
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
@@ -179,7 +172,6 @@ services:
     - smd
     - strato
     - apex
-    - oauth
     - vault-wrapper
     environment:
     - authBasic=${authBasic}
