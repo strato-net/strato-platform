@@ -1,0 +1,36 @@
+[{
+     "label" : "myChain"
+  ,  "accountInfo" :
+     [
+       { "address"  : "0x5815b9975001135697b5739956b9a6c87f1c575c",
+         "balance"  : 2000
+       } ,
+       { "address"  : "0x93fdd1d21502c4f87295771253f5b71d897d911c",
+         "balance"  : 4000000
+       } ,
+       { "address"  : "0x00000000000000000000000000000000deadbeef",
+         "balance"  : 12345,
+         "codeHash" : "6b0d5d3309777e2e799976ea377ce6aeb4a485b1e7cae56f41a85ada9855fb99"
+       }
+     ]
+  ,  "codeInfo" :
+     [
+       { "code" : "some_code",
+         "src"  : "me",
+         "name" : "you"
+       },
+       { "code" : "aNoThErByTeStRiNg",
+         "src"  : "you",
+         "name" : "me"
+       }
+     ]
+  ,  "members" : 
+     [
+       { "address"  : "0x5815b9975001135697b5739956b9a6c87f1c575c", 
+         "enode" : "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+       } , 
+       { "address"  : "0x93fdd1d21502c4f87295771253f5b71d897d911c", 
+         "enode" : "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+       }
+     ]
+}]

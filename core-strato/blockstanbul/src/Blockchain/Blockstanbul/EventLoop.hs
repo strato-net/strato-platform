@@ -18,6 +18,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
@@ -48,9 +49,11 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
-
+  , _voted :: M.Map Address (M.Map Address Bool)
+  , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
+  , _blockcount :: Int 
 }
 makeLenses ''BlockstanbulContext
 
@@ -71,7 +74,10 @@ newContext v as pk =
      , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
+     , _voted = M.empty
+     , _pendingvotes = M.empty
      , _prvkey = pk
+     , _blockcount = 0
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -99,6 +105,15 @@ nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
 nextRound nt = do
   -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
   -- rather than reset everything in the state.
+  epocheck <- use blockcount
+  when (epocheck `mod` 10000 == 0) $ do
+      voted .= M.empty
+      blockcount .= 0
+
+   --update validators list
+  val <- use validators
+  vot <- use voted
+  validators .= updateValidator val vot
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> view . round .= r
@@ -123,6 +138,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
+    NewBeneficiary benf decision  -> do
+      pendingvotes %= M.insert benf decision
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
@@ -131,7 +148,15 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         pk <- use prvkey
         vs <- use validators
-        let blockWithVs = addValidators vs blk
+        --extract from pending list and vote
+        pending <- use pendingvotes
+        editedBlk <- if null pending
+              then return blk
+              else do
+                 let ((bnf,nonc),newPending) = M.deleteFindMin pending
+                 pendingvotes .= newPending
+                 return $ editBeneficiary blk bnf nonc
+        let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         proposal .= Just sealedBlk
@@ -141,8 +166,17 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (sender auth == pr) $ do
         if v == v'
           then do
+            blockcount += 1
             proposal .= Just pp
             pk <- use prvkey
+            case extractBeneficiary pp of
+              Nothing -> return()
+              Just (bnef,vot) -> do
+            -- insert the vote into map
+                val <- uses voted $M.lookup bnef
+                let unwrapVal = fromMaybe M.empty val
+                let nval = M.insert pr vot unwrapVal
+                voted %= M.insert bnef nval
             yield =<< signMessage pk (Prepare v (blockHash pp))
           else roundChange
     IMsg auth (Prepare v' di) -> when (v <= v') $ do

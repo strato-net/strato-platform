@@ -142,8 +142,10 @@ services:
     restart: always
   postgrest:
     depends_on:
+    - bloc
     - postgres
     environment:
+    - blocHost=bloc:8000
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
     - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
@@ -154,7 +156,6 @@ services:
     restart: always
   postgres:
     environment:
-    - POSTGRES_DB=cirrus
     - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
