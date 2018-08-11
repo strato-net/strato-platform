@@ -68,15 +68,18 @@ fromRight _ (Right b) = b
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
   let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
-  let parseAccounts :: String -> [AccountInfo]
-      parseAccounts line = case words line of
-                              [] -> []
-                              "s":_ -> []
-                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
-                              _ -> error $ "invalid AccountInfo line: " ++ line
-  return . concatMap parseAccounts . lines $ accountInfoString
+  if not (isFile accountInfoFilename)
+    then putStrLn "No AccountInfo file found" >> return ""
+    else do
+      accountInfoString <- readFile $ accountInfoFilename
+      let parseAccounts :: String -> [AccountInfo]
+          parseAccounts line = case words line of
+                                  [] -> []
+                                  "s":_ -> []
+                                  ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                                  _ -> error $ "invalid AccountInfo line: " ++ line
+      return . concatMap parseAccounts . lines $ accountInfoString
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
