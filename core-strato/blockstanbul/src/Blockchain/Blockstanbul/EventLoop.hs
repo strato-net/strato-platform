@@ -56,6 +56,8 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
   , _blockcount :: Int
+  -- Block locking: a safety mechanism to prevent partial commits
+  , _blockLock :: Maybe Block
 }
 
 makeLenses ''BlockstanbulContext
@@ -66,7 +68,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   debugLog "showctx/view" view format
   debugLog "showctx/proposer" proposer (printf "%x")
-  debugLog "showctx/validators" validators (show . map (printf "%x"))
+  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String))
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
@@ -94,6 +96,7 @@ newContext v as pk =
      , _pendingvotes = M.empty
      , _prvkey = pk
      , _blockcount = 0
+     , _blockLock = Nothing
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -142,7 +145,13 @@ nextRound nt = do
   proposal .= Nothing
   self <- selfAddr
   when (leader == self) $ do
-    yield MakeBlockCommand
+    lock <- use blockLock
+    case lock of
+      Nothing -> yield MakeBlockCommand
+      Just lb -> do
+        pk <- use prvkey
+        v <- use view
+        yield =<< signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
   roundChanged .= M.empty
@@ -178,34 +187,44 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
-        proposal .= Just sealedBlk
-        yield =<< signMessage pk (Preprepare v sealedBlk)
+        mLocked <- use blockLock
+        let realSealed = fromMaybe sealedBlk mLocked
+        proposal .= Just realSealed
+        yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       if (sender auth /= pr)
         then $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
-        else
-          if v /= v'
+        else do
+          mBlockLock <- use blockLock
+          if (isJust mBlockLock && Just pp /= mBlockLock)
             then do
-              $logDebugS "blockstanbul/roundchange" . T.pack $
-                 "view mismatch (us, sender): " ++ format (v, v')
               $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+                printf "Rejecting proposal: block does not match lock"
+              $logDebugS "blockstanbul/roundchange" "lock mismatch"
               roundChange
-            else do
-               blockcount += 1
-               proposal .= Just pp
-               pk <- use prvkey
-               case extractBeneficiary pp of
-                 Nothing -> return()
-                 Just (bnef,vot) -> do
-                   -- insert the vote into map
-                   val <- uses voted $M.lookup bnef
-                   let unwrapVal = fromMaybe M.empty val
-                   let nval = M.insert pr vot unwrapVal
-                   voted %= M.insert bnef nval
-               yield =<< signMessage pk (Prepare v (blockHash pp))
+            else
+              if v /= v'
+                then do
+                  $logDebugS "blockstanbul/roundchange" . T.pack $
+                     "view mismatch (us, sender): " ++ format (v, v')
+                  $logWarnS "blockstanbul/ppl" . T.pack $
+                    printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+                  roundChange
+                else do
+                   blockcount += 1
+                   proposal .= Just pp
+                   pk <- use prvkey
+                   case extractBeneficiary pp of
+                     Nothing -> return()
+                     Just (bnef,vot) -> do
+                       -- insert the vote into map
+                       val <- uses voted $M.lookup bnef
+                       let unwrapVal = fromMaybe M.empty val
+                       let nval = M.insert pr vot unwrapVal
+                       voted %= M.insert bnef nval
+                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -214,6 +233,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       hasSent <- use hasPrepared
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
+        (blockLock .=) =<< (use proposal)
         pk <- use prvkey
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
@@ -262,10 +282,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
       $logDebugS "blockstanbul/roundchange" "commit failure (how...)"
+      blockLock .= Nothing
       roundChange
     CommitResult (Right ()) -> do
       $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
+      blockLock .= Nothing
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where

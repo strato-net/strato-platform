@@ -336,3 +336,66 @@ spec = parallel $ do
         L.view commitment ist `shouldBe` []
         L.view proposedSig ist `shouldSatisfy`
           (== Just me) . (>>= verifyProposerSeal blk')
+
+  describe "Block locks" $ do
+    it "takes priority over NewBlocks" $ property $ \lock blk ->
+      runTest $ do
+        me <- selfAddr
+        validators .= [me]
+        proposer .= me
+        blockLock .= Just lock
+        omsgs <- sendMessages [NewBlock blk]
+        let [Preprepare v' blk'] = map oMessage omsgs
+        blk' `shouldBe` lock
+        v <- use view
+        v' `shouldBe` v
+
+    it "round changes a preprepare that doesn't match the lock" $ property $ \lock blk a ->
+      runTest $ do
+        validators .= [sender a]
+        proposer .= sender a
+        blockLock .= Just lock
+        v <- use view
+        omsgs <- sendMessages [IMsg a $ Preprepare v blk]
+        next <- uses view (over round (+1))
+        map oMessage omsgs `shouldBe` [RoundChange next]
+
+    it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
+      runTest $ do
+        me <- selfAddr
+        validators .= me:as
+        blockLock .= Just blk
+        _ <- sendMessages [CommitResult (Left "oops")]
+        use blockLock `shouldReturn` Nothing
+
+        blockLock .= Just blk
+        _ <- sendMessages [CommitResult (Right ())]
+        use blockLock `shouldReturn` Nothing
+
+    it "Sets a lock after prepare consensus is reached" $ property $ \auth blk ->
+      runTest $ do
+        (curView, di) <- setupRound blk [sender auth]
+        _ <- sendMessages [IMsg auth $ Prepare curView di]
+        use blockLock `shouldReturn` Just blk
+
+    let setBlock blk = do
+          me <- selfAddr
+          validators .= [me]
+          proposal .= Just blk
+          blockLock .= Just blk
+
+    it "requests a new block after success" $ property $ \blk ->
+      runTest $ do
+        setBlock blk
+        sendMessages [CommitResult (Right ())] `shouldReturn` [MakeBlockCommand]
+
+    it "re-issues the lock after round change" $ property $ \blk sig ->
+      runTest $ do
+        setBlock blk
+        me <- selfAddr
+        next <- uses view (over round (+1))
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        let omsgs = [o | o@(OMsg _ _) <- resp]
+            other = resp \\ omsgs
+        map oMessage omsgs `shouldBe` [RoundChange next, Preprepare next blk]
+        other `shouldBe` [ResetTimer $ _round next]

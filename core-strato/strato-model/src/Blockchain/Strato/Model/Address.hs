@@ -49,7 +49,6 @@ newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded,
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word
 
-
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =
   Address $ fromInteger $ byteString2Integer $ keccak256 $ BL.toStrict $ encode x `BL.append` encode y
