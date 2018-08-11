@@ -21,6 +21,7 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
+import Blockchain.Format
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
@@ -61,17 +62,16 @@ makeLenses ''BlockstanbulContext
 
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
-  let debugLog :: (StateMachineM m2, Show a) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a-> m2 ()
-      debugLog loc lns = join . uses lns $ $logDebugS loc . T.pack . show
-  debugLog "showctx/view" view
-  debugLog "showctx/proposer" proposer
-  debugLog "showctx/validators" validators
-  debugLog "showctx/prepared" prepared
-  debugLog "showctx/committed" committed
-  debugLog "showctx/hasPrepared" hasPrepared
-  debugLog "showctx/roundChanged" roundChanged
-  mNumber <- uses proposal $ fmap (blockDataNumber . blockBlockData)
-  $logDebugS "showctx/mBlockNumber" . T.pack . show $ mNumber
+  let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
+      debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
+  debugLog "showctx/view" view format
+  debugLog "showctx/proposer" proposer format
+  debugLog "showctx/validators" validators (show . map format)
+  debugLog "showctx/prepared" prepared show
+  debugLog "showctx/committed" committed show
+  debugLog "showctx/hasPrepared" hasPrepared show
+  debugLog "showctx/roundChanged" roundChanged show
+  debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as pk =
