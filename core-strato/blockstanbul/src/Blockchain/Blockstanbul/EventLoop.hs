@@ -65,8 +65,8 @@ debugShowCtx = do
   let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   debugLog "showctx/view" view format
-  debugLog "showctx/proposer" proposer format
-  debugLog "showctx/validators" validators (show . map format)
+  debugLog "showctx/proposer" proposer (printf "%x")
+  debugLog "showctx/validators" validators (show . map (printf "%x"))
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
