@@ -21,6 +21,7 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
+import Blockchain.Format
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
@@ -61,17 +62,16 @@ makeLenses ''BlockstanbulContext
 
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
-  let debugLog :: (StateMachineM m2, Show a) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a-> m2 ()
-      debugLog loc lns = join . uses lns $ $logDebugS loc . T.pack . show
-  debugLog "showctx/view" view
-  debugLog "showctx/proposer" proposer
-  debugLog "showctx/validators" validators
-  debugLog "showctx/prepared" prepared
-  debugLog "showctx/committed" committed
-  debugLog "showctx/hasPrepared" hasPrepared
-  debugLog "showctx/roundChanged" roundChanged
-  mNumber <- uses proposal $ fmap (blockDataNumber . blockBlockData)
-  $logDebugS "showctx/mBlockNumber" . T.pack . show $ mNumber
+  let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
+      debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
+  debugLog "showctx/view" view format
+  debugLog "showctx/proposer" proposer format
+  debugLog "showctx/validators" validators (show . map format)
+  debugLog "showctx/prepared" prepared show
+  debugLog "showctx/committed" committed show
+  debugLog "showctx/hasPrepared" hasPrepared show
+  debugLog "showctx/roundChanged" roundChanged show
+  debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as pk =
@@ -182,24 +182,30 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (Preprepare v sealedBlk)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
-      when (sender auth == pr) $ do
-        if v == v'
-          then do
-            blockcount += 1
-            proposal .= Just pp
-            pk <- use prvkey
-            case extractBeneficiary pp of
-              Nothing -> return()
-              Just (bnef,vot) -> do
-            -- insert the vote into map
-                val <- uses voted $M.lookup bnef
-                let unwrapVal = fromMaybe M.empty val
-                let nval = M.insert pr vot unwrapVal
-                voted %= M.insert bnef nval
-            yield =<< signMessage pk (Prepare v (blockHash pp))
-          else do
-            $logDebugS "blockstanbul/roundchange" . T.pack $ "view mismatch (us, sender)" ++ show (v, v')
-            roundChange
+      if (sender auth /= pr)
+        then $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+        else
+          if v /= v'
+            then do
+              $logDebugS "blockstanbul/roundchange" . T.pack $
+                 "view mismatch (us, sender): " ++ format (v, v')
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: view " ++ format v' ++ " is not " ++ format v
+              roundChange
+            else do
+               blockcount += 1
+               proposal .= Just pp
+               pk <- use prvkey
+               case extractBeneficiary pp of
+                 Nothing -> return()
+                 Just (bnef,vot) -> do
+                   -- insert the vote into map
+                   val <- uses voted $M.lookup bnef
+                   let unwrapVal = fromMaybe M.empty val
+                   let nval = M.insert pr vot unwrapVal
+                   voted %= M.insert bnef nval
+               yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
