@@ -14,6 +14,7 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.JsonStream.Parser               as JS
+import           System.Directory
 
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.BlockDB
@@ -68,7 +69,8 @@ fromRight _ (Right b) = b
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
   let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  if not (isFile accountInfoFilename)
+  exists <- isFile accountInfoFilename
+  if not exists
     then putStrLn "No AccountInfo file found" >> return ""
     else do
       accountInfoString <- readFile $ accountInfoFilename
