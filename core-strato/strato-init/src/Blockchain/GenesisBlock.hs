@@ -8,17 +8,17 @@ module Blockchain.GenesisBlock (
   BackupType(..)
 ) where
 
-import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Base16                        as B16
-import qualified Data.ByteString.Char8                        as C8
-import qualified Data.ByteString.Lazy.Char8                   as BLC
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import           Data.Either                          (isLeft)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
+import           System.Directory
 
 import           Blockchain.BackupBlocks
 import           Blockchain.Data.AddressStateDB
@@ -71,22 +71,22 @@ import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 
-fromRight :: b -> Either a b -> b
-fromRight b (Left _) = b
-fromRight _ (Right b) = b
-
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
   let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  accountInfoString <- fmap (fromRight "" :: Either SomeException String -> String) . try . readFile $ accountInfoFilename
-  let parseAccounts :: String -> [AccountInfo]
-      parseAccounts line = case words line of
-                              [] -> []
-                              "s":_ -> []
-                              ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                              ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
-                              _ -> error $ "invalid AccountInfo line: " ++ line
-  return . concatMap parseAccounts . lines $ accountInfoString
+  exists <- doesFileExist accountInfoFilename
+  if not exists
+    then putStrLn "No AccountInfo file found" >> return []
+    else do
+      accountInfoString <- readFile $ accountInfoFilename
+      let parseAccounts :: String -> [AccountInfo]
+          parseAccounts line = case words line of
+                                  [] -> []
+                                  "s":_ -> []
+                                  ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                                  _ -> error $ "invalid AccountInfo line: " ++ line
+      return . concatMap parseAccounts . lines $ accountInfoString
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
