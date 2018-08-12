@@ -7,7 +7,6 @@ module Blockchain.GenesisBlock (
   BackupType(..)
 ) where
 
-import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -61,10 +60,6 @@ import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
-
-fromRight :: b -> Either a b -> b
-fromRight b (Left _) = b
-fromRight _ (Right b) = b
 
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
