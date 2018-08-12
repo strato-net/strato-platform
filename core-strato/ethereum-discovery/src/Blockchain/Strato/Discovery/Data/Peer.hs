@@ -53,13 +53,14 @@ jamshidBirth = posixSecondsToUTCTime 0
 createPeer :: String -> Either String PPeer
 createPeer peerString = buildPeer <$> parseEnode peerString
 
+-- TODO(tim): Re-enable configurable ports for a peer
 buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (pubKeyMaybe, ip, port') =
+buildPeer (pubKeyMaybe, ip, _) =
     PPeer {
         pPeerPubkey = stringToPoint <$> pubKeyMaybe,
         pPeerIp = T.pack ip,
-        pPeerUdpPort = port', --TODO think about this....  Should the UDP port be the same as the TCP port by default?
-        pPeerTcpPort = port',
+        pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
+        pPeerTcpPort = 30303,
         pPeerNumSessions = 0,
         pPeerLastTotalDifficulty = 0,
         pPeerLastMsg  = T.pack "msg",
