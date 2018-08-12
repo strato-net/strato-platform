@@ -106,6 +106,7 @@ services:
     - bootnode=${bootnode}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
+    - seqDebugMode=${seqDebugMode}
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}

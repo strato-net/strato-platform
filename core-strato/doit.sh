@@ -37,9 +37,13 @@ function newnode {
        runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
-  minLogLevel=LevelInfo
+  evmMinLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
-      minLogLevel=LevelDebug
+     evmMinLogLevel=LevelDebug
+  fi
+  seqMinLogLevel=LevelInfo
+  if [ "${seqDebugMode}" = true ] ; then
+     seqMinLogLevel=LevelDebug
   fi
 
   echo "Starting strato-sequencer"
@@ -55,7 +59,7 @@ function newnode {
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" ${tbFlag} --minLogLevel=$minLogLevel &> logs/strato-sequencer
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" ${tbFlag} --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -71,7 +75,7 @@ function newnode {
   runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel \
+                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
                          --tmpblockstanbul=${tmpblockstanbul:-false} +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
