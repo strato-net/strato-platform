@@ -399,3 +399,14 @@ spec = parallel $ do
             other = resp \\ omsgs
         map oMessage omsgs `shouldBe` [RoundChange next, Preprepare next blk]
         other `shouldBe` [ResetTimer $ _round next]
+
+    it "clears the lock after a future round change" $ property $ \blk sig ->
+      runTest $ do
+        setBlock blk
+        me <- selfAddr
+        next <- uses view (over round (+1) . over sequence (+1))
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        let omsgs = [o | o@(OMsg _ _) <- resp]
+            other = resp \\ omsgs
+        map oMessage omsgs `shouldBe` [RoundChange next]
+        other `shouldMatchList` [ResetTimer $ _round next, MakeBlockCommand]
