@@ -69,7 +69,7 @@ fromRight _ (Right b) = b
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
   let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  exists <- isFile accountInfoFilename
+  exists <- doesFileExist accountInfoFilename
   if not exists
     then putStrLn "No AccountInfo file found" >> return []
     else do
