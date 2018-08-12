@@ -71,7 +71,7 @@ readSupplementaryAccounts genesisBlockName = do
   let accountInfoFilename = genesisBlockName ++ "AccountInfo"
   exists <- isFile accountInfoFilename
   if not exists
-    then putStrLn "No AccountInfo file found" >> return ""
+    then putStrLn "No AccountInfo file found" >> return []
     else do
       accountInfoString <- readFile $ accountInfoFilename
       let parseAccounts :: String -> [AccountInfo]
