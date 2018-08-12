@@ -118,6 +118,7 @@ roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
 roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
+  pendingRound .= Just (_round nextView)
   yield =<< signMessage pk (RoundChange nextView)
 
 nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent

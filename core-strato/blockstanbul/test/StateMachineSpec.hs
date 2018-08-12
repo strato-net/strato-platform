@@ -64,6 +64,11 @@ spec = parallel $ do
     it "ignores stale timeouts" $ do
       runTest $ do
         sendMessages [Timeout 10] `shouldReturn` []
+    it "sets the pending round after a timeout" $ property $ \a1 a2 ->
+      runTest $ do
+      validators .= [a1, a2]
+      _ <- sendMessages [Timeout 20]
+      use pendingRound `shouldReturn` Just 21
 
     it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
       not (null as) ==> runTest $ do
