@@ -117,7 +117,7 @@ initializeGenesisBlock :: ( MonadResource m
                        -> String
                        -> m ()
 initializeGenesisBlock backupType genesisBlockName = do
-    $logOtherS "initgen" "1mr" "Begin of initgen"
+    $logInfoS "initgen" "Begin of initgen"
     (srcInfo, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
@@ -137,30 +137,28 @@ initializeGenesisBlock backupType genesisBlockName = do
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
-    $logOtherS "initgen" "1mr" "Initial merkle patricia tries succussfully created"
+    $logInfoS "initgen" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
-    $logOtherS "initgen" "1mr" "Genesis Block put"
-    $logOtherS "initgen" "1mr" "State diff has been generated"
+    $logInfoS "initgen" "Genesis Block put"
+    $logInfoS "initgen" "State diff has been generated"
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
         writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
             ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
-
-    $logOtherS "initgen" "1mr" "Source has been written"
-    -- $logInfoS "Inserting genesis block into RedisDB"
+    $logInfoS "initgen" "Beginning to write to redis"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
-    $logOtherS "initgen" "1mr" "best block info inserted"
+    $logInfoS "initgen" "best block info inserted"
     liftIO (bootstrapIndexer genBId obGB)
-    $logOtherS "initgen" "1mr" "indexer has been bootstrapped"
+    $logInfoS "initgen" "indexer has been bootstrapped"
     populateStorageDBs genesisBlock genesisChainId
-    $logOtherS "initgen" "1mr" "populateStorageDBs is done"
+    $logInfoS "initgen" "populateStorageDBs is done"
     forM_ srcInfo writeSource
-    $logOtherS "initgen" "1mr" "End of initgen"
+    $logInfoS "initgen" "SourceInfo has been written; End of initgen"
 
 --------------------------------------
 populateStorageDBs::(HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
