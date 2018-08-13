@@ -1,23 +1,25 @@
-{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Strato.Strato23.Server.Signature where
 
-import           Control.Monad.IO.Class
 import           Crypto.Secp256k1
+import qualified Data.ByteArray                as ByteArray
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as C8
 import qualified Data.ByteString.Lazy.Char8    as Lazy.Char8
-import           Data.Maybe                    (fromJust, fromMaybe, isNothing)
 import           Data.List
-import           Data.Text
+import           Data.Maybe                    (fromJust, fromMaybe, isNothing)
+import qualified Data.Text                     as T
 import           GHC.Generics
 import           Servant
 import           Strato.Strato23.API.Signature
+import           Strato.Strato23.API.Types
 
 data PrivateKey = PrivateKey
   { username :: String
   , address  :: String
-  , secKey   :: SecKey
+  , sk       :: SecKey
   } deriving (Eq, Show, Generic)
 
 privateKeys :: [PrivateKey]
@@ -29,13 +31,10 @@ privateKeys =
 toSecKey :: String -> SecKey
 toSecKey = fromMaybe (error "toSecKey: could not decode") . secKey . fst . B16.decode . C8.pack
 
-getHash256 :: String ->  Word256
-getHash256 inputStr = hash256 $ stringToBS inputStr
-
 getPrivateKeyOfUser :: String -> PrivateKey
-getPrivateKeyOfUser = head . flip filter privateKeys . (== username)
+getPrivateKeyOfUser uname = head $ filter (\PrivateKey{..} -> uname == username) privateKeys
 
-signatureDetails :: Maybe Text -> UserData -> Handler SignatureDetails
+signatureDetails :: Maybe T.Text -> UserData -> Handler SignatureDetails
 signatureDetails userEmail (UserData queryToSig) = do
   if  (Data.List.null queryToSig)
     then throwError err400 { errBody = Lazy.Char8.pack "msgHash not found" }
@@ -43,12 +42,18 @@ signatureDetails userEmail (UserData queryToSig) = do
         then throwError err404 { errBody = Lazy.Char8.pack "No cookie provided" }
         else do
           let emailId = fromJust userEmail
-              prvKey = pk $ getPrivateKeyOfUser $ Data.Text.unpack emailId
+              prvKey = getPrivateKeyOfUser $ T.unpack emailId
               -- prvKey = pk $ getPrivateKeyOfUser $ "tanuj@blockapps.net"
               dataToSign = queryToSig
-              word256 = getHash256 dataToSign
-          case msg word256 of
-            Nothing -> throwError err500 "msgHash was not 32 bytes long"
+              msgHash = ByteArray.convert
+                      . digestKeccak256
+                      . keccak256
+                      $ C8.pack dataToSign
+          case msg msgHash of
+            Nothing -> throwError err500 { errBody = Lazy.Char8.pack "msgHash was not 32 bytes long" }
             Just msg' -> do
-              let CompactRecSig{..} = exportCompactRecSig . signRecMsg msg' $ secKey prvKey
-              return (SignatureDetails getCompactRecSigR getCompactRecSigS getCompactRecSigV)
+              let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
+              return $ SignatureDetails
+                         (Hex . fromIntegral $ getCompactRecSigR sig)
+                         (Hex . fromIntegral $ getCompactRecSigS sig)
+                         (Hex . fromIntegral $ getCompactRecSigV sig)
