@@ -57,5 +57,7 @@ main = do
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
     , statsConfig           = EC.statsConfig EC.ethConf
+    , blockstanbulBlockPeriodμs = 1000 * flags_blockstanbul_block_period_ms
+    , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
   }
   runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg

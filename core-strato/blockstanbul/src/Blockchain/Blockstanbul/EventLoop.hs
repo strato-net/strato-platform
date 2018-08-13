@@ -13,6 +13,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
+import Text.Printf
 
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
@@ -20,6 +21,7 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
+import Blockchain.Format
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
@@ -53,9 +55,26 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
-  , _blockcount :: Int 
+  , _blockcount :: Int
+  -- Block locking: a safety mechanism to prevent partial commits
+  , _blockLock :: Maybe Block
 }
+
 makeLenses ''BlockstanbulContext
+
+debugShowCtx :: StateMachineM m => m ()
+debugShowCtx = do
+  let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
+      debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
+  debugLog "showctx/view" view format
+  debugLog "showctx/proposer" proposer (printf "%x")
+  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String))
+  debugLog "showctx/prepared" prepared show
+  debugLog "showctx/committed" committed show
+  debugLog "showctx/hasPrepared" hasPrepared show
+  debugLog "showctx/roundChanged" roundChanged show
+  debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
+  debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as pk =
@@ -64,7 +83,7 @@ newContext v as pk =
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _authenticator = const True
+     , _authenticator = const True -- TODO(tim): Authenticate
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -78,6 +97,7 @@ newContext v as pk =
      , _pendingvotes = M.empty
      , _prvkey = pk
      , _blockcount = 0
+     , _blockLock = Nothing
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -99,6 +119,7 @@ roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
 roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
+  pendingRound .= Just (_round nextView)
   yield =<< signMessage pk (RoundChange nextView)
 
 nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
@@ -116,7 +137,9 @@ nextRound nt = do
   validators .= updateValidator val vot
   case nt of
     Sequence s -> view . sequence .= s
-    Round r -> view . round .= r
+    Round r -> do
+      view . round .= r
+      yield $ ResetTimer r
   vals <- use validators
   thisR <- use $ view . round
   let leader = vals !! (fromIntegral thisR `mod` length vals)
@@ -124,7 +147,13 @@ nextRound nt = do
   proposal .= Nothing
   self <- selfAddr
   when (leader == self) $ do
-    yield MakeBlockCommand
+    lock <- use blockLock
+    case lock of
+      Nothing -> yield MakeBlockCommand
+      Just lb -> do
+        pk <- use prvkey
+        v <- use view
+        yield =<< signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
   roundChanged .= M.empty
@@ -135,6 +164,7 @@ nextRound nt = do
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
+  debugShowCtx
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
@@ -159,26 +189,44 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
-        proposal .= Just sealedBlk
-        yield =<< signMessage pk (Preprepare v sealedBlk)
+        mLocked <- use blockLock
+        let realSealed = fromMaybe sealedBlk mLocked
+        proposal .= Just realSealed
+        yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
-      when (sender auth == pr) $ do
-        if v == v'
-          then do
-            blockcount += 1
-            proposal .= Just pp
-            pk <- use prvkey
-            case extractBeneficiary pp of
-              Nothing -> return()
-              Just (bnef,vot) -> do
-            -- insert the vote into map
-                val <- uses voted $M.lookup bnef
-                let unwrapVal = fromMaybe M.empty val
-                let nval = M.insert pr vot unwrapVal
-                voted %= M.insert bnef nval
-            yield =<< signMessage pk (Prepare v (blockHash pp))
-          else roundChange
+      if (sender auth /= pr)
+        then $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+        else do
+          mBlockLock <- use blockLock
+          if (isJust mBlockLock && Just pp /= mBlockLock)
+            then do
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: block does not match lock"
+              $logDebugS "blockstanbul/roundchange" "lock mismatch"
+              roundChange
+            else
+              if v /= v'
+                then do
+                  $logDebugS "blockstanbul/roundchange" . T.pack $
+                     "view mismatch (us, sender): " ++ format (v, v')
+                  $logWarnS "blockstanbul/ppl" . T.pack $
+                    printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+                  roundChange
+                else do
+                   blockcount += 1
+                   proposal .= Just pp
+                   pk <- use prvkey
+                   case extractBeneficiary pp of
+                     Nothing -> return()
+                     Just (bnef,vot) -> do
+                       -- insert the vote into map
+                       val <- uses voted $M.lookup bnef
+                       let unwrapVal = fromMaybe M.empty val
+                       let nval = M.insert pr vot unwrapVal
+                       voted %= M.insert bnef nval
+                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -187,6 +235,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       hasSent <- use hasPrepared
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
+        (blockLock .=) =<< (use proposal)
         pk <- use prvkey
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
@@ -214,22 +263,37 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
+        $logDebugS "blockstanbul/roundchange" "agreed change"
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
+        when (_sequence v < _sequence vn) $ do
+          -- Assume that we have missed the commit of the locked block, because
+          -- the rest of the nodes have moved on.
+          blockLock .= Nothing
         case next of
           Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
       return ()
-    Timeout -> do
-      $logWarnS "blockstanbul" "Round timed out"
-      roundChange
+    Timeout r' -> do
+      case r' `compare` _round v of
+        LT ->
+          let msg = printf "Ignoring stale timeout for %v (now %v)" r' (_round v)
+          in $logDebugS "blockstanbul" . T.pack $ msg
+        EQ -> do
+          $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
+          $logDebugS "blockstanbul/roundchange" "timeout"
+          roundChange
+        GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
+      $logDebugS "blockstanbul/roundchange" "commit failure (how...)"
+      blockLock .= Nothing
       roundChange
     CommitResult (Right ()) -> do
       $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
+      blockLock .= Nothing
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where
