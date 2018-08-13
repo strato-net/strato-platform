@@ -288,6 +288,15 @@ instance ToSchema PostSendParameters where
         , sendTxParams = Nothing
         }
 
+data TransferParameters = TransferParameters
+  { btpFromAddress :: Address
+  , btpToAddress   :: Address
+  , btpValue       :: Strung Natural
+  , btpTxParams    :: Maybe TxParams
+  , btpChainId     :: Maybe ChainId
+  , btpResolve     :: Bool
+  } deriving (Eq, Show, Generic)
+
 --------------------------------------------------------------------------------
 
 type PostUsersContract = "users"
@@ -364,6 +373,16 @@ instance ToSchema PostUsersContractRequest where
             }
       )
 
+data ContractParameters = ContractParameters
+  { bcpFromAddr :: Address
+  , bcpValue    :: Maybe (String Natural)
+  , bcpSrc      :: Text
+  , bcpContract :: Maybe Text
+  , bcpArgs     :: Maybe (Map Text ArgValue)
+  , bcpTxParams :: Maybe TxParams
+  , bcpChainId  :: Maybe ChainId
+  , bcpResolve  :: Bool
+  }
 --------------------------------------------------------------------------------
 
 type PostUsersUploadList = "users"
@@ -457,7 +476,12 @@ instance FromJSON PostUsersUploadListResponse where
 instance ToSample PostUsersUploadListResponse where
   toSamples _ = noSamples
 
-
+data ContractListParameters = ContractListParameters
+  { bclpFromAddr  :: Address
+  , bclpContracts :: [UploadListContract]
+  , bclpChainId   :: Maybe ChainId
+  , bclpResolve   :: Bool
+  } deriving (Eq,Show,Generic)
 
 --------------------------------------------------------------------------------
 
@@ -543,6 +567,17 @@ instance ToSchema PostUsersContractMethodResponse where
           ]
         }
 
+data FunctionParameters = FunctionParameters
+  { bfpFromAddr     :: Address
+  , bfpContractName :: ContractName
+  , bfpContractAddr :: Address
+  , bfpCuncName     :: Text
+  , bfpArgs         :: Map Text ArgValue
+  , bfpValue        :: Maybe (String Natural)
+  , bfpTxParams     :: Maybe TxParams
+  , bfpChainId      :: Maybe ChainId
+  , bfpResolve      :: Bool
+  }
 --------------------------------------------------------------------------------
 
 -- POST /users/:user/:userAddress/sendList
@@ -647,6 +682,13 @@ instance ToSchema SendTransaction where
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
+
+data TransferListParameters = TransferListParameters
+  { btlpFromAddr :: Address
+  , btlpTxs      :: [SendTransaction]
+  , btlpChainId  :: Maybe ChainId
+  , btlpResolve  :: Bool
+  }
 
 --------------------------------------------------------------------------------
 
@@ -830,3 +872,10 @@ instance ToSchema MethodCall where
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
         }
+
+data FunctionListParameters = FunctionListParameters
+  { bflpFromAddr :: Address
+  , bflpTxs      :: [MethodCall]
+  , bflpChainId  :: Maybe ChainId
+  , bflpResolve  :: Bool
+  }
