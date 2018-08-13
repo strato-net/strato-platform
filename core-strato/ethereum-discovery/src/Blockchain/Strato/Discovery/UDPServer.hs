@@ -54,13 +54,15 @@ runEthUDPServer :: ( MonadIO m
                 -> Int
                 -> Socket
                 -> m ()
-runEthUDPServer ctx myPriv portNum sock =
+runEthUDPServer ctx myPriv _ sock =
   void . runResourceT $ runStateT (udpHandshakeServer myPriv sock portNum) ctx
+     where portNum = 30303 -- TODO(tim): Reenable port selection
 
 connectMe :: (MonadIO m, MonadLogger m)
           => Int
           -> m Socket
-connectMe port' = do
+connectMe _ = do
+  let port' = 30303 :: Int -- TODO(tim): Reenable port selection
   (serveraddr:_) <- liftIO $ getAddrInfo
                                   (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                                   Nothing (Just (show port'))
@@ -95,10 +97,12 @@ attemptBond :: (MonadIO m, MonadLogger m)
             -> Socket
             -> Int
             -> m ()
-attemptBond prv sock portNum = do
+attemptBond prv sock _ = do
+  let portNum = 30303 :: Int
   unbondedPeers <- liftIO getUnbondedPeers
   when (length unbondedPeers /= 0) $
-    forM_ unbondedPeers $ \p -> do
+    forM_ unbondedPeers $ \p' -> do
+      let p = p'{pPeerUdpPort = 30303, pPeerTcpPort=30303} -- TODO(tim): Reenable port selection
       (peeraddr : _) <- liftIO $ getAddrInfo
                                    Nothing
                                    (Just $ T.unpack $ pPeerIp p)
@@ -131,7 +135,8 @@ udpHandshakeServer :: ( HasSQLDB m
                    -> Socket
                    -> Int
                    -> m ()
-udpHandshakeServer prv sock portNum = do
+udpHandshakeServer prv sock _ = do
+    let portNum = 30303 -- TODO(tim): Reenable port selection
     _ <- addPeersIfNeeded prv sock
     _ <- attemptBond prv sock portNum
     maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280
@@ -148,10 +153,11 @@ udpHandshakeServer prv sock portNum = do
         _ <- $logInfoS "udpHandshakeServer/handler" $ T.pack $ CL.cyan "receiving " ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
         handleValidPacket prv sock addr otherPort packet otherPubKey
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
-    argValidator msg addr = do
+    argValidator msg _ = do
       (packet, otherPubkey) <- dataToPacket msg
       validOtherPubKey <- hPubKeyToPubKey otherPubkey
-      otherPort <- getAddrPort addr
+      -- otherPort <- getAddrPort addr
+      let otherPort = 30303 -- TODO(tim): Reenable port selection
       return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: ( HasSQLDB m
@@ -168,7 +174,8 @@ handleValidPacket :: ( HasSQLDB m
                   -> NodeDiscoveryPacket
                   -> ECC.Point
                   -> m ()
-handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
+                                                       -- TODO(tim): Reenable port selection
+handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: Int in case packet of
     Ping{} -> do
         addPeer'
         time <- liftIO $ round `fmap` getPOSIXTime
@@ -186,18 +193,19 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
         peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
         let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
         sendPacket sock prv addr $ Neighbors theNeighbors nextTime
-
-          where mkEndpoint PPeer{..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (fromIntegral pPeerUdpPort) (fromIntegral pPeerTcpPort)
+                -- TODO(tim): Reenable port selection
+          where mkEndpoint PPeer{..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) 30303 30303
                 mkNodeId             = pointToNodeID . fromJust . pPeerPubkey
 
 
-    Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
+                                                          -- TODO(tim): Reenable port selection
+    Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' _ _) nodeID) -> do
         $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
         curTime <- liftIO getCurrentTime
         let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
                          , pPeerIp = T.pack $ format addr'
-                         , pPeerUdpPort = fromIntegral udpPort
-                         , pPeerTcpPort = fromIntegral tcpPort
+                         , pPeerUdpPort = 30303
+                         , pPeerTcpPort = 30303
                          , pPeerNumSessions = 0
                          , pPeerLastTotalDifficulty = 0
                          , pPeerLastMsg  = T.pack "msg"
@@ -213,9 +221,11 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
   where addPeer' = do
           curTime <- liftIO getCurrentTime
           let ip   = sockAddrToIP addr
+              portNum = 30303 :: Int
               peer = PPeer { pPeerPubkey = Just otherPubKey
                           , pPeerIp = T.pack ip
                           , pPeerUdpPort = fromIntegral portNum
+                          -- TODO(tim): This TODO may be the cause of the trouble
                           , pPeerTcpPort = fromIntegral portNum --TODO- put correct TCP port in here
                           ,  pPeerNumSessions = 0
                           ,  pPeerLastTotalDifficulty = 0
@@ -230,7 +240,8 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
                           }
           void $ addPeer peer
 
-getAddrPort :: SockAddr -> Either DiscoverException PortNumber
-getAddrPort (SockAddrInet portNumber _)      = Right portNumber
-getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
-getAddrPort s                                = Left . MissingPortException $ "No port number: " ++ show s
+-- TODO(tim): Reenable port selection
+-- getAddrPort :: SockAddr -> Either DiscoverException PortNumber
+-- getAddrPort (SockAddrInet portNumber _)      = Right portNumber
+-- getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
+-- getAddrPort s                                = Left . MissingPortException $ "No port number: " ++ show s

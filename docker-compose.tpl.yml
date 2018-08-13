@@ -106,6 +106,7 @@ services:
     - bootnode=${bootnode}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
+    - seqDebugMode=${seqDebugMode}
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
@@ -117,6 +118,7 @@ services:
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
     - networkID=${networkID}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -131,7 +133,11 @@ services:
     - statsPrefix=${statsPrefix}
     - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
+    - validators=${validators:-}
     - zkHost=zookeeper
+    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -140,8 +146,10 @@ services:
     restart: always
   postgrest:
     depends_on:
+    - bloc
     - postgres
     environment:
+    - blocHost=bloc:8000
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
     - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
@@ -152,7 +160,6 @@ services:
     restart: always
   postgres:
     environment:
-    - POSTGRES_DB=cirrus
     - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:

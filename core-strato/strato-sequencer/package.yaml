@@ -20,6 +20,7 @@ dependencies:
   - clock
   - containers
   - directory
+  - extra
   - mtl
   - resourcet
   - monad-logger
@@ -28,28 +29,40 @@ dependencies:
   - leveldb-haskell
   - blockapps-milena
   - binary
+  - base64-bytestring
   - bytestring
   - ethereum-rlp
   - time
   - statsdi
   - stm
+  - stm-chans
   - conduit-combinators
   - blockstanbul
   - lens
   - blockapps-haskoin
+  - aeson
 
 ghc-options: -Wall -O2 -threaded
 
 library:
   source-dirs:     src
 
-executable:
-  source-dirs:      exec-src
-  main:             Main.hs
-  dependencies:
-    - hflags
-    - safe
-    - strato-sequencer
+executables:
+  strato-sequencer:
+    source-dirs:      exec-src
+    main:             Main.hs
+    dependencies:
+      - hflags
+      - safe
+      - strato-sequencer
+
+  keygen:
+    source-dirs: exec-src/
+    main: KeyGen.hs
+    dependencies:
+      - strato-sequencer
+      - entropy
+      - hflags
 
 tests:
   strato-sequencer-spec:
@@ -61,5 +74,7 @@ tests:
       - derive
       - hflags
       - hspec
+      - hspec-core
       - hspec-contrib
       - strato-sequencer
+      - hspec-expectations-lifted

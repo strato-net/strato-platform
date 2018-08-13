@@ -21,6 +21,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
@@ -196,5 +197,7 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
+                                            , blockstanbulBlockPeriodμs = 0
+                                            , blockstanbulRoundPeriod = 0
                                             }
     runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg

@@ -68,6 +68,7 @@ import Data.Aeson
 import Data.Ratio (numerator, denominator)
 import qualified Data.ByteString as BS (head, length, reverse)
 import qualified Data.Text as T (pack, unpack)
+import Text.Printf
 
 import Network.Haskoin.Crypto.Curve
 import Network.Haskoin.Crypto.NumberTheory
@@ -108,6 +109,9 @@ newtype BigWord n = BigWord { getBigWordInteger :: Integer }
 
 instance NFData (BigWord n) where
     rnf (BigWord n) = rnf n
+
+instance PrintfArg (BigWord n) where
+  formatArg (BigWord n) = formatArg n
 
 inverseP :: FieldP -> FieldP
 inverseP (BigWord i) = fromInteger $ mulInverse i curveP
