@@ -33,7 +33,8 @@ extra-include-dirs: [/usr/local/include]
 extra-lib-dirs: [/usr/local/lib]
 
 docker:
-  enable: true
+  enable: false
   image: "stack-vault-wrapper-buildbase:lts-12.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+  mount: ["/var/tmp/strato-platform/core-strato:/mnt/core-strato"]
