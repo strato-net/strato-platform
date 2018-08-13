@@ -7,13 +7,19 @@ packages:
 - Strato/Strato23/server
 
 extra-deps:
-  - transformers-0.5.5.0
+  - ../core-strato/blockapps-haskoin
+  - ../core-strato/blockapps-milena
+  - ../core-strato/blockapps-util
+  - ../core-strato/ethereum-encryption
+  - ../core-strato/strato-model
+  - Crypto-4.2.5.1
   - ethereum-rlp-0.1.0
-  - nibblestring-0.0.3
-  - conduit-1.2.13.1
+  - global-lock-0.1
+  - hflags-0.4.3
   - murmur3-1.0.3
+  - nibblestring-0.0.3
   - pbkdf-1.1.1.1
-  - resourcet-1.1.11
+  - transformers-0.5.5.0
 
 flags: {}
 
@@ -27,7 +33,8 @@ extra-include-dirs: [/usr/local/include]
 extra-lib-dirs: [/usr/local/lib]
 
 docker:
-  enable: true
+  enable: false
   image: "stack-vault-wrapper-buildbase:lts-12.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+  mount: ["/var/tmp/strato-platform/core-strato:/mnt/core-strato"]

@@ -56,7 +56,7 @@ module Network.Haskoin.Crypto
   -- **Signatures
   -- | Elliptic curve cryptography standards are defined in
   -- <http://www.secg.org/download/aid-780/sec1-v2.pdf>
-, Signature
+, Signature(..)
 , signMsg
 , detSignMsg
 , verifySig

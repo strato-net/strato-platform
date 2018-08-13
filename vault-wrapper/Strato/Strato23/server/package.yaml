@@ -45,16 +45,18 @@ dependencies:
 - QuickCheck
 - deepseq
 - byteable
-- conduit 
+- conduit
 - containers
 - cryptohash
-- mtl       
-- murmur3   
-- network   
-- pbkdf     
-- split     
+- mtl
+- murmur3
+- network
+- pbkdf
+- split
 - transformers
 - largeword
+- ethereum-encryption
+- blockapps-haskoin
 
 library:
   source-dirs: src
