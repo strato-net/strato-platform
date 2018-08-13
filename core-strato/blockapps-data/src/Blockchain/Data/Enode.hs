@@ -27,23 +27,8 @@ import                  Network.Socket.Internal
 
 import                  Blockchain.Data.RLP
 
-import                  Test.QuickCheck.Arbitrary
-import                  Test.QuickCheck.Gen
 
--- Move to ethereum-rlp (generic serialization of Maybe)
-instance (RLPSerializable a) => RLPSerializable (Maybe a) where
-  rlpEncode Nothing = RLPString ""
-  rlpEncode (Just a) = RLPArray [rlpEncode a]
-
-  rlpDecode (RLPString "") = Nothing
-  rlpDecode (RLPArray [x]) = Just (rlpDecode x)
-  rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
-
-
-data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, GHCG.Generic)
-
-instance Arbitrary IPAddress where
-  arbitrary = IPv4 <$> arbitrary
+data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic)
 
 instance Binary IPAddress where
 
@@ -56,15 +41,8 @@ data Enode = Enode
   , ipAddress  :: IPAddress
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
-  } deriving (Show, Read, Eq, GHCG.Generic)
+  } deriving (Show, Read, Eq, Ord, GHCG.Generic)
         
-instance Arbitrary Enode where
-  arbitrary = Enode
-          <$> (B.pack <$> vectorOf 64 arbitrary)
-          <*> arbitrary
-          <*> arbitrary `suchThat` (>=0)
-          <*> (arbitrary `suchThat` maybe True (>=0))
-
 instance Binary Enode where
 
 instance RLPSerializable Enode where
@@ -95,12 +73,12 @@ showIP (IPv4 addy) =
 
 readIP :: String -> IPAddress
 readIP input =
-  let (b0,temp) = break (=='.') input
+  let (b3,temp) = break (=='.') input
       s0 = dropWhile (=='.') temp
-      (b1, temp2) = break (=='.') s0
+      (b2, temp2) = break (=='.') s0
       s1 = dropWhile (=='.') temp2
-      (b2, temp3) = break (=='.') s1
-      b3 = dropWhile (=='.') temp3
+      (b1, temp3) = break (=='.') s1
+      b0 = dropWhile (=='.') temp3
 
       addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) + 
         (((read b3) .&. 0xff) `shiftL` 24))

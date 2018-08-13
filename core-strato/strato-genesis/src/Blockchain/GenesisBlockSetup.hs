@@ -20,6 +20,7 @@ import           System.Entropy
 import           Network.Haskoin.Crypto      hiding (Address)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisInfo
 
 

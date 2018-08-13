@@ -75,7 +75,8 @@ import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
                                                keccak256lazy, stringAddress,
-                                               AccountInfo(..), CodeInfo(..))
+                                               AccountInfo(..), CodeInfo(..),
+                                               stringChainId)
 import           BlockApps.Strato.TypeLits
 
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
@@ -527,36 +528,33 @@ instance ToJSON BatchTransactionResult where
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
 
-type AccountBalance = NamedTuple "address" Address "balance" Integer
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
-
-instance ToSchema AccountBalance where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "Account balances"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex = exampleAccountBalances
-
-exampleAccountBalances :: [AccountBalance]
-exampleAccountBalances = map fromTuple [ (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-                                       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))]
-
 data ChainInfo = ChainInfo
-  {  chainLabel         :: Text
+  {  chainLabel    :: Text
   ,  accountInfo   :: [AccountInfo]
   ,  codeInfo      :: [CodeInfo]
-  ,  members       :: [(Address, Text)]
+  ,  members       :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
+
+
+instance KnownSymbol "address" where
+instance KnownSymbol "enode" where
+
+instance ToSchema (NamedTuple "address" Address "enode" Text) where 
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
+    & mapped.schema.description ?~ "address and enode pair" 
+    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)) :: NamedTuple "address" Address "enode" Text)
 
 exampleChainInfo :: ChainInfo
 exampleChainInfo = ChainInfo
   {
      chainLabel = "myChain"
-  ,  accountInfo = []
+  ,  accountInfo = [
+       (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (2000 :: Integer))
+     , (NonContract (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c) (400000 :: Integer))
+     ]
   ,  codeInfo = []
-  ,  members = [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303")
-               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303")]
+  ,  members = map fromTuple [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)
+               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303" :: Text)]
   }
 
 instance ToSchema ChainInfo where
@@ -565,18 +563,18 @@ instance ToSchema ChainInfo where
     & mapped.schema.example ?~ toJSON exampleChainInfo
 
 instance FromJSON ChainInfo where
-  parseJSON (Object o) =
-    ChainInfo <$>
-    o .: "chainLabel" <*>
-    o .: "accountInfo" <*>
-    o .: "codeInfo" <*>
-    o .: "members"
+  parseJSON (Object o) = do
+    l <- o .: "label"
+    as <- o .: "accountInfo"
+    cs <- o .: "codeInfo"
+    ms <- o .: "members"
+    return $ ChainInfo l as cs ms
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
   toJSON x =
     object [
-       "chainLabel" .= chainLabel x
+       "label" .= chainLabel x
     ,  "accountInfo" .= accountInfo x
     ,  "codeInfo" .= codeInfo x
     ,  "members" .= members x
@@ -586,10 +584,7 @@ type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
 
-instance ToSchema ChainIdChainInfo where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "ChainId and ChainInfo pair"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ChainIdChainInfo
-      ex = fromTuple (ChainId 0xec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781, exampleChainInfo)
+instance ToSchema ChainIdChainInfo where 
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
+    & mapped.schema.description ?~ "chainid and chaininfo pair" 
+    & mapped.schema.example ?~ toJSON ((NamedTuple (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781", exampleChainInfo)) :: ChainIdChainInfo) 

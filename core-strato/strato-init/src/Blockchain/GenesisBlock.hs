@@ -29,6 +29,7 @@ import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.RLP
+import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia           as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach   as MP
 import           Blockchain.DB.AddressStateDB
@@ -179,12 +180,12 @@ populateStorageDBs genesisBlock genesisChainId = do
       --since this contract has giant arrays that would choke strato
       --(yes, this temprary feature is hardcoded into the whole platform for one client)
       let realAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
-          addressState = 
+          addressState =
             if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
             then realAddressState
             else realAddressState{addressStateContractRoot=MP.blankStateRoot}
           genAddrStates = [(address, addressState)]
-          
+
       accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
 
       let diff = StateDiff {
@@ -250,5 +251,7 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             , statsConfig           = Nothing
+                                            , blockstanbulBlockPeriodμs = 0
+                                            , blockstanbulRoundPeriod = 0
                                             }
     runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg
