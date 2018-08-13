@@ -14,27 +14,35 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Char8                as C8
-import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.ByteString.Base16                        as B16
+import qualified Data.ByteString.Char8                        as C8
+import qualified Data.ByteString.Lazy.Char8                   as BLC
 import           Data.Either                          (isLeft)
-import qualified Data.JsonStream.Parser               as JS
+import           Data.Maybe
+import qualified Data.JsonStream.Parser                       as JS
 
 import           Blockchain.BackupBlocks
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
-import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia           as MP
+import qualified Blockchain.Database.MerklePatricia.ForEach   as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB      as Mem
+import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
+import           Blockchain.Util
+
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
@@ -48,7 +56,6 @@ import           Blockchain.Sequencer                 (bootstrap)
 import qualified Blockchain.Sequencer.Constants       as SeqConstants
 import           Blockchain.Sequencer.Event           (OutputBlock)
 import           Blockchain.Sequencer.Monad
-import           Control.Monad.Logger                 (runLoggingT)
 import qualified Network.Kafka                        as K
 import qualified Network.Kafka.Protocol               as KP
 
@@ -136,27 +143,14 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logOtherS "initgen" "1mr" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     $logOtherS "initgen" "1mr" "Genesis Block put"
-    !genAddrStates <- getAllAddressStates
-    !accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
     $logOtherS "initgen" "1mr" "State diff has been generated"
+
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
-        diff = StateDiff {
-          StateDiff.chainId   = genesisChainId,
-          blockNumber         = 0,
-          StateDiff.blockHash = blockHash genesisBlock,
-          StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
-          createdAccounts     = accountDiffs,
-          deletedAccounts     = Map.empty,
-          updatedAccounts     = Map.empty
-        }
-    commitSqlDiffs diff (const "") (const "")
-    $logOtherS "initgen" "1mr" "Diff committed to SQL"
-    let writeSource (account, CodeInfo _ name src) = case account of
+        writeSource (account, CodeInfo _ name src) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
             ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
 
-    forM_ srcInfo writeSource
     $logOtherS "initgen" "1mr" "Source has been written"
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
@@ -166,14 +160,55 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logOtherS "initgen" "1mr" "best block info inserted"
     liftIO (bootstrapIndexer genBId obGB)
     $logOtherS "initgen" "1mr" "indexer has been bootstrapped"
-    mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-      assertTopicCreation
-      splitWriteStateDiffs [diff]
-    case filterResponse <$> mErr of
+    populateStorageDBs genesisBlock genesisChainId
+    $logOtherS "initgen" "1mr" "populateStorageDBs is done"
+    forM_ srcInfo writeSource
+    $logOtherS "initgen" "1mr" "End of initgen"
+
+--------------------------------------
+populateStorageDBs::(HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
+                    Block->Maybe Word256->m ()
+populateStorageDBs genesisBlock genesisChainId = do
+
+    accountDB <- getStateDB
+    MP.forEach accountDB $ \keyHash value -> do
+      address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
+      liftIO $ putStrLn $ "################# addin dat: " ++ show address
+
+      --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
+      --since this contract has giant arrays that would choke strato
+      --(yes, this temprary feature is hardcoded into the whole platform for one client)
+      let realAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
+          addressState = 
+            if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
+            then realAddressState
+            else realAddressState{addressStateContractRoot=MP.blankStateRoot}
+          genAddrStates = [(address, addressState)]
+          
+      accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
+
+      let diff = StateDiff {
+            StateDiff.chainId   = genesisChainId,
+            blockNumber         = 0,
+            StateDiff.blockHash = blockHash genesisBlock,
+            StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
+            createdAccounts     = accountDiffs,
+            deletedAccounts     = Map.empty,
+            updatedAccounts     = Map.empty
+            }
+
+      commitSqlDiffs diff (const "") (const "")
+
+
+
+
+      mErr <- liftIO . runKafkaConfigured "strato-init" $ do
+        assertTopicCreation
+        splitWriteStateDiffs [diff]
+      case filterResponse <$> mErr of
        Right [] -> return ()
        Right errs -> error . show $ errs
        Left err -> error . show $ err
-    $logOtherS "initgen" "1mr" "End of initgen"
 
 bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =
