@@ -46,7 +46,7 @@ arrayContent :: SolidityValue -> String
 arrayContent (SolidityValueAsString x) = escapeQuotes $ T.unpack x
 arrayContent (SolidityBool x) = show x
 arrayContent (SolidityNum x ) = show x
-arrayContent (SolidityBytes x) = show x
+arrayContent (SolidityBytes x) = escapeQuotes $ show x
 arrayContent (SolidityArray x) = escapeQuotes $ show x
 arrayContent (SolidityObject x) = escapeQuotes $ show x
 
