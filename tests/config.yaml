@@ -1,6 +1,6 @@
 apiDebug: false
 password: '1234'
-timeout: 600000
+timeout: 9000000
 libPath: ./
 contractsPath: ./contracts/
 
