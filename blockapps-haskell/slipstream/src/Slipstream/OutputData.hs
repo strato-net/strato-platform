@@ -84,12 +84,26 @@ dbInsert insrt = do
   _ <- pgRunQuery conn qry
   pgDisconnect conn
 
+dbSelect :: String -> IO String
+dbSelect statement = do
+  conn <- pgConnect dbConnect
+  let qry = rawPGSimpleQuery $ BC.pack insert
+  ret <- pgRunQuery conn query
+  pgDisconnectconn
+  return ret
+
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name chain x = do
+--convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
+convertRet :: String -> String -> String -> ContractAndXabi -> Integer -> String -> Map.Map T.Text Value -> IO()
+convertRet address codehash abi contract inc chain x = do
+
+  let contName = name contract
+  let name = case resolvedName contract of
+    Nothing -> contName
+    Just x -> x
 
   let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
   let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
@@ -116,7 +130,23 @@ convertRet address codehash abi name chain x = do
               createHist ++ copyHist
             else ""
 
+
         let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+        let viewSt = if(name == contName ++ "1")
+          then
+            -- If Inc = 1 then Create view
+            "create view \"" ++ name ++ "select * from \"" ++ name ++ "\";"
+          else
+            let firstSchema = ???
+            let currentSchema = ???
+            if (firstSchema == currentSchema)
+              then
+                ""
+              else
+                ""
+        -- Check 1st table schema
+        -- if same schema, modify view to include this table "union"
+        -- else ignore
         let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
         let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
         createSt ++ hist ++ delRow ++ ins

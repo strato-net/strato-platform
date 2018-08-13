@@ -80,7 +80,8 @@ data ContractAndXabi =
   ContractAndXabi {
     contract :: Either String Contract,
     xabi :: String,
-    name :: String
+    name :: String,
+    resolvedName :: Maybe String
   }
   deriving(Show)
 
@@ -122,34 +123,23 @@ resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
   if (null sameName)
     then
-      if (inc == 0)
-        then return contractName
-        else do
-          let newName = contractName ++ show inc
-          return newName
+      let newName = contractName ++ show inc
+      return newName
     else do
       case (lookup codehash sameName) of
         Nothing -> do
           resolveContractName (inc + 1) codehash contractName cache
         Just _ -> do
-          if (inc == 0)
-            then return contractName
-            else do
-              let newName = contractName ++ show inc
-              return newName
+          let newName = contractName ++ show inc
+          return newName
   where findName :: ContractAndXabi -> Bool
-        findName cont = case inc of
-          0 -> if(contractName == name cont)
-            then True
-            else False
-          x -> if(contractName ++ show x == name cont)
-            then True
-            else False
+        findName cont = contractName ++ show inc == name cont
 
 processTheMessages :: [B.ByteString] -> IORef (Map String ContractAndXabi) -> IO ()
 processTheMessages messages cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
+  liftIO $ putStrLn "{}{}{}"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -191,6 +181,8 @@ processTheMessages messages cachedContractsIORef = do
             case filledInChange of
              Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
              Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+      --liftIO $ putStrLn $ "====address==== " ++ show address
+      --liftIO $ putStrLn $ "====codeHash==== " ++ show codehash
       cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
       contractMetaData <-
         case Map.lookup codehash cachedContracts of
@@ -203,8 +195,8 @@ processTheMessages messages cachedContractsIORef = do
             Right c -> do
               --Resolve Name Issues
               let contList = Map.toList cachedContracts
-              resolvedName <- liftIO $ resolveContractName 0 codehash (name c) contList
-              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = resolvedName}
+              resName <- liftIO $ resolveContractName 1 codehash (name c) contList
+              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = resName}
               liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
               return newContractAndXabi
 
@@ -220,6 +212,6 @@ processTheMessages messages cachedContractsIORef = do
                     Nothing -> ""
                     Just(x) -> show x
 
-      liftIO $ convertRet address codehash strAbi contName chain ret
+      liftIO $ convertRet address codehash strAbi contractMetaData chain ret
 
   return()
