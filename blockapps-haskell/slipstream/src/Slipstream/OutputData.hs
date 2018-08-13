@@ -32,12 +32,12 @@ listToKeyStatement _ [(x, _)] = "\"" ++ T.unpack x ++ "\""
 listToKeyStatement s ((x,_):es) = "\"" ++ T.unpack x ++ "\"" ++ s ++ (listToKeyStatement s es)
 
 valueToString :: String -> SolidityValue -> String
-valueToString s (SolidityValueAsString x) = s ++ T.unpack x ++ s
+valueToString s (SolidityValueAsString x) = s ++ (escapeQuotes $ T.unpack x) ++ s
 valueToString s (SolidityBool x) = s ++ show x ++ s
 valueToString s (SolidityNum x ) = s ++ show x ++ s
-valueToString s (SolidityBytes x) = s ++ show x ++ s
+valueToString s (SolidityBytes x) = s ++ (escapeQuotes $ show x) ++ s
 valueToString s (SolidityArray x) = s ++ "{" ++ arrayToString x ++ "}" ++ s
-valueToString s (SolidityObject x) = s ++ show x ++ s
+valueToString s (SolidityObject x) = s ++ (escapeQuotes $ show x) ++ s
 
 escapeQuotes :: String -> String
 escapeQuotes x = replace "\'" "\'\'" $ replace "\"" "\\\"" x
@@ -46,7 +46,7 @@ arrayContent :: SolidityValue -> String
 arrayContent (SolidityValueAsString x) = escapeQuotes $ T.unpack x
 arrayContent (SolidityBool x) = show x
 arrayContent (SolidityNum x ) = show x
-arrayContent (SolidityBytes x) = show x
+arrayContent (SolidityBytes x) = escapeQuotes $ show x
 arrayContent (SolidityArray x) = escapeQuotes $ show x
 arrayContent (SolidityObject x) = escapeQuotes $ show x
 
