@@ -62,7 +62,6 @@ ghc-options:
   strato-api: -Wall -Werror -fno-warn-orphans
   strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
-  strato-init: -Wall -Werror -rtsopts
   blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
 
 docker:

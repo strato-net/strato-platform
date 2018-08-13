@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE BangPatterns      #-}
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
