@@ -84,27 +84,42 @@ instance ToSample PostBlocTransactionRequest where
 
 instance ToSchema PostBlocTransactionRequest where
 
-data BlocTransactionPayload = 
-  ContractPayload {
-    contractpayloadSrc      :: Text
+data BlocTransactionPayload = BlocContract ContractPayload
+                            | BlocTransfer TransferPayload
+                            | BlocFunction FunctionPayload
+                            deriving (Eq, Show, Generic)
+
+data ContractPayload = ContractPayload
+  { contractpayloadSrc      :: Text
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
-  } |
-  TransferPayload {
-    transferpayloadToAddress :: Address
+  } deriving (Eq, Show, Generic)
+
+data TransferPayload = TransferPayload
+  { transferpayloadToAddress :: Address
   , transferpayloadValue     :: Strung Natural
-  } |
-  FunctionPayload {
-    functionpayloadContractName    :: ContractName
+  } deriving (Eq, Show, Generic)
+
+data FunctionPayload = FunctionPayload
+  { functionpayloadContractName    :: ContractName
   , functionpayloadContractAddress :: Address
   , functionpayloadMethod          :: Text
   , functionpayloadArgs            :: Map Text ArgValue
-  , functionpayloadValue           :: Maybe (Strung Natural) 
+  , functionpayloadValue           :: Maybe (Strung Natural)
   } deriving (Eq, Show, Generic)
 
 instance ToJSON BlocTransactionPayload where
+instance ToJSON ContractPayload where
+instance ToJSON TransferPayload where
+instance ToJSON FunctionPayload where
 
 instance FromJSON BlocTransactionPayload where
+instance FromJSON ContractPayload where
+instance FromJSON TransferPayload where
+instance FromJSON FunctionPayload where
 
 instance ToSchema BlocTransactionPayload where
+instance ToSchema ContractPayload where
+instance ToSchema TransferPayload where
+instance ToSchema FunctionPayload where
