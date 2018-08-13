@@ -188,5 +188,5 @@ postBlocTransaction
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest
-  -> ClientM BlocTransactionResult
+  -> ClientM [BlocTransactionResult]
 postBlocTransaction = client (Proxy @ PostBlocTransaction)

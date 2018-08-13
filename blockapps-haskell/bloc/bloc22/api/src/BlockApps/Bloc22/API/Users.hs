@@ -375,10 +375,10 @@ instance ToSchema PostUsersContractRequest where
 
 data ContractParameters = ContractParameters
   { bcpFromAddr :: Address
-  , bcpValue    :: Maybe (String Natural)
   , bcpSrc      :: Text
   , bcpContract :: Maybe Text
   , bcpArgs     :: Maybe (Map Text ArgValue)
+  , bcpValue    :: Maybe (Strung Natural)
   , bcpTxParams :: Maybe TxParams
   , bcpChainId  :: Maybe ChainId
   , bcpResolve  :: Bool
@@ -569,11 +569,11 @@ instance ToSchema PostUsersContractMethodResponse where
 
 data FunctionParameters = FunctionParameters
   { bfpFromAddr     :: Address
-  , bfpContractName :: ContractName
+  , bfpContractName :: Text
   , bfpContractAddr :: Address
-  , bfpCuncName     :: Text
+  , bfpFuncName     :: Text
   , bfpArgs         :: Map Text ArgValue
-  , bfpValue        :: Maybe (String Natural)
+  , bfpValue        :: Maybe (Strung Natural)
   , bfpTxParams     :: Maybe TxParams
   , bfpChainId      :: Maybe ChainId
   , bfpResolve      :: Bool

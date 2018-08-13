@@ -166,7 +166,7 @@ postUsersSend' TransferParameters{..} sign = do
     txParams <- getAccountTxParams btpFromAddress btpChainId btpTxParams
     tx <- sign $
       TransactionHeader
-        (Just btpToAddr)
+        (Just btpToAddress)
         btpFromAddress
         txParams
         (Wei (fromIntegral $ unStrung btpValue))
@@ -185,14 +185,14 @@ postUsersSend' TransferParameters{..} sign = do
 
 postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr chainId resolve
-  (PostUsersContractRequest src password maybeContract args mTxParams value) =
+  (PostUsersContractRequest src password maybeContract args mTxParams value) = do
   sk <- getAccountSecKey userName password addr
   let bcp = ContractParameters
               addr
-              value
               src
               maybeContract
               args
+              value
               mTxParams
               chainId
               resolve
@@ -200,7 +200,6 @@ postUsersContract userName addr chainId resolve
 
 postUsersContract' :: ContractParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc BlocTransactionResult
 postUsersContract' ContractParameters{..} sign = blocTransaction $ do
-  sk <- getAccountSecKey userName password addr
   txParams <- getAccountTxParams bcpFromAddr bcpChainId bcpTxParams
   --TODO: check what happens with mismatching args
   idsAndDetails <- compileContract bcpSrc
@@ -223,12 +222,12 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   tx <- sign $
     TransactionHeader
       Nothing
-      bcpToAddr
+      bcpFromAddr
       txParams
-      (Wei (fromIntegral (maybe 0 unStrung value)))
+      (Wei (fromIntegral (maybe 0 unStrung bcpValue)))
       (bin <> argsBin)
       0
-      chainId
+      bcpChainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -257,7 +256,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
     else do
       let UploadListContract _ _ mtp _ = head bclpContracts
       txParams <- getAccountTxParams bclpFromAddr bclpChainId mtp
-      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
+      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip bclpContracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           (names, cmIds, fIds) <- get
           (bin, cmId, names') <- case Map.lookup name names of
@@ -319,7 +318,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
 
 postUsersSendList' :: TransferListParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
-  if (null txs)
+  if (null btlpTxs)
     then return []
     else do
       let SendTransaction _ _ mtp = head btlpTxs
@@ -378,11 +377,11 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
 
 postUsersContractMethodList' :: FunctionListParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
-  if (null postmethodlistrequestTxs)
+  if (null bflpTxs)
     then return []
     else do
       let mc = head bflpTxs
-      txParams <- getAccountTxParams bflpFromAddr blfpChainId $ methodcallTxParams mc
+      txParams <- getAccountTxParams bflpFromAddr bflpChainId $ methodcallTxParams mc
       (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip bflpTxs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
           (names, cmIds, fIds) <- get
@@ -480,7 +479,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
     sel <-
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
-       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> bfpFuncName <> "'"
     functionId <- getFunctionId cmId bfpFuncName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText bfpArgs)) (Just functionId)
     tx <- sign $
