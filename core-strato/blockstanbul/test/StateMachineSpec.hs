@@ -58,8 +58,12 @@ spec = parallel $ do
   describe "The blockstanbul event loop" $ do
     it "requests a round changes round in response to a timeout or insertion failure" $
       runTest $ do
-        got <- sendMessages [Timeout, CommitResult (Left  "invalid hash")]
+        got <- sendMessages [Timeout 20, CommitResult (Left  "invalid hash")]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
+
+    it "ignores stale timeouts" $ do
+      runTest $ do
+        sendMessages [Timeout 10] `shouldReturn` []
 
     it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
       not (null as) ==> runTest $ do
@@ -106,8 +110,11 @@ spec = parallel $ do
         -- Lets abort this round
         next <- uses view (over round (+1))
         let aborts = map (\a -> IMsg a $ RoundChange next) as
-        omsgs5 <- sendMessages aborts
+        omsgs5' <- sendMessages aborts
+        let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
+            rest5 = omsgs5' \\ omsgs5
         map oMessage omsgs5 `shouldBe` [RoundChange next]
+        rest5 `shouldBe` [ResetTimer 21]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -295,7 +302,7 @@ spec = parallel $ do
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` []
+        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` [ResetTimer 24]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
