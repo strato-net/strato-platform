@@ -23,7 +23,7 @@ build_buildbase: prebuild
 
 build_haskell: build_buildbase
 	stack setup
-	stack install --local-bin-path=$(FAKEROOT)/usr/bin/vault-wrapper
+	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_docker: build_haskell
 	cp -f Dockerfile $(FAKEROOT)
