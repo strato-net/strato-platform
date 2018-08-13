@@ -2,4 +2,4 @@
 
 set -ex
 
-/usr/bin/server
+/usr/bin/vault-wrapper
