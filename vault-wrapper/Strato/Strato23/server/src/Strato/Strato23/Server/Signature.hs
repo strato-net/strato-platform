@@ -54,6 +54,6 @@ signatureDetails userEmail (UserData queryToSig) = do
             Just msg' -> do
               let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
               return $ SignatureDetails
-                         (Hex . fromIntegral $ getCompactRecSigR sig)
-                         (Hex . fromIntegral $ getCompactRecSigS sig)
-                         (Hex . fromIntegral $ getCompactRecSigV sig)
+                         (Hex $ getCompactRecSigR sig)
+                         (Hex $ getCompactRecSigS sig)
+                         (Hex $ getCompactRecSigV sig)
