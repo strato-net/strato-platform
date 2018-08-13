@@ -51,7 +51,8 @@ dependencies:
 - mtl       
 - murmur3   
 - network   
-- pbkdf     
+- pbkdf
+- secp256k1
 - split     
 - transformers
 - largeword
