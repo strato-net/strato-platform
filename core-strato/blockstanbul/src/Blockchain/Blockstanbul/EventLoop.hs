@@ -1,10 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
@@ -358,10 +356,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
 class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m (Maybe BlockstanbulContext)
   putBlockstanbulContext :: BlockstanbulContext -> m ()
-
-instance (Monad m, MonadState BlockstanbulContext m) => HasBlockstanbulContext m where
-  getBlockstanbulContext = gets Just
-  putBlockstanbulContext = put
 
 loopback :: OutEvent -> Maybe InEvent
 loopback (OMsg a m) = Just $ IMsg a m

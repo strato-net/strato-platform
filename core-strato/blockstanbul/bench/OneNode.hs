@@ -36,6 +36,10 @@ benchContext =
 runBench :: StateT BlockstanbulContext (NoLoggingT IO) a -> IO a
 runBench = runNoLoggingT . flip evalStateT benchContext
 
+instance HasBlockstanbulContext (StateT BlockstanbulContext (NoLoggingT IO)) where
+  getBlockstanbulContext = gets Just
+  putBlockstanbulContext = put
+
 fullRound :: StateMachineM m => Block -> m Block
 fullRound b' = do
   let b = truncateExtra b'
