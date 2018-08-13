@@ -108,6 +108,14 @@ dbInsert conn insrt = do
   _ <- pgQuery conn qry
   return ()
 
+dbSelect :: String -> IO String
+dbSelect statement = do
+  conn <- pgConnect dbConnect
+  let qry = rawPGSimpleQuery $ BC.pack insert
+  ret <- pgRunQuery conn query
+  pgDisconnectconn
+  return ret
+
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True

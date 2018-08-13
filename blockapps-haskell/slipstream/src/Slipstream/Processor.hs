@@ -165,6 +165,23 @@ smashIt (x:[]) tmp final =
     then (final ++ [[x]])
     else final ++ [tmp ++ [x]]
 
+resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)] -> IO String
+resolveContractName inc codehash contractName cache = do
+  let sameName = filter (\(_, y) -> findName y) cache
+  if (null sameName)
+    then
+      let newName = contractName ++ show inc
+      return newName
+    else do
+      case (lookup codehash sameName) of
+        Nothing -> do
+          resolveContractName (inc + 1) codehash contractName cache
+        Just _ -> do
+          let newName = contractName ++ show inc
+          return newName
+  where findName :: ContractAndXabi -> Bool
+        findName cont = contractName ++ show inc == name cont
+
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
