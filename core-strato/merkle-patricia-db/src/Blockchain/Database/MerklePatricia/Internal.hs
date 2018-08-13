@@ -19,8 +19,7 @@ module Blockchain.Database.MerklePatricia.Internal (
   keyToSafeKey,
   getCommonPrefix,
   replace,
-  prependToKey,
-  compactEntireDB
+  prependToKey
   ) where
 
 import           Control.Monad.Trans.Resource
@@ -226,10 +225,6 @@ putNodeData db nd = do
       ptr = keccak256 bytes
   DB.put (ldb db) def ptr bytes
   return $ StateRoot ptr
-
-compactEntireDB :: MonadResource m => MPDB -> m ()
-compactEntireDB db = DB.compactRange (ldb db) ("", B.replicate 1000 0xff)
--- compactEntireDB (DB db_ptr _ _) = DB.c_leveldb_Compact_range db_ptr nullPtr 0 nullPtr 0
 
 -----
 

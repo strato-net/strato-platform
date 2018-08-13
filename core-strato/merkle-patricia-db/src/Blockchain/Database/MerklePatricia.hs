@@ -22,8 +22,7 @@ module Blockchain.Database.MerklePatricia (
   Key, Val, MPDB(..), StateRoot(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
-  initializeBlank, blankStateRoot,
-  compactEntireDB
+  initializeBlank, blankStateRoot
   ) where
 
 import           Control.Monad.Trans.Resource
