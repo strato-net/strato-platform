@@ -74,6 +74,7 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
+  debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as pk =
