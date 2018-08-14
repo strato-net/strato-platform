@@ -5,6 +5,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Blockstanbul.Messages where
 
+import Control.DeepSeq
 import Control.Lens
 import Data.Binary
 import Data.DeriveTH
@@ -55,6 +56,11 @@ instance Binary View where
 instance Binary TrustedMessage where
 instance Binary WireMessage where
 
+instance NFData MsgAuth
+instance NFData View
+instance NFData TrustedMessage
+instance NFData WireMessage
+
 derive makeArbitrary ''MsgAuth
 derive makeArbitrary ''View
 derive makeArbitrary ''TrustedMessage
@@ -83,7 +89,9 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
-              deriving (Eq, Show)
+              deriving (Eq, Show, Generic)
+
+instance NFData OutEvent
 
 getHash :: TrustedMessage -> Word256
 -- This is wrong, because this means that the prepare and commits

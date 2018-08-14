@@ -13,6 +13,7 @@ dependencies:
   - conduit
   - conduit-combinators
   - crypto-api
+  - deepseq
   - derive
   - ethereum-encryption
   - ethereum-rlp

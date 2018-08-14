@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.State.Lazy
 
@@ -9,7 +12,6 @@ import qualified Network.Haskoin.Crypto as HK
 
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.Authentication
-import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Data.Block
 import Blockchain.Data.Json
 import Blockchain.Strato.Model.Address
@@ -40,13 +42,12 @@ instance HasBlockstanbulContext (StateT BlockstanbulContext (NoLoggingT IO)) whe
   getBlockstanbulContext = gets Just
   putBlockstanbulContext = put
 
-fullRound :: StateMachineM m => Block -> m Block
+fullRound :: (HasBlockstanbulContext m, MonadIO m, MonadLogger m)=> Block -> m [OutEvent]
 fullRound b' = do
   let b = truncateExtra b'
-  res <- sendAllMessages [NewBlock b]
-  return $ head [x | ToCommit x <- res]
+  sendAllMessages [NewBlock b]
 
-genesisBench :: IO Block
+genesisBench :: IO [OutEvent]
 genesisBench = runBench . fullRound $ genesisBlock
 
 main :: IO ()
