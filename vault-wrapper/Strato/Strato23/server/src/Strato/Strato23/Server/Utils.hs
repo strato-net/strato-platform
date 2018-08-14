@@ -1,12 +1,15 @@
 module Strato.Strato23.Server.Utils where
 
+import           Data.Binary.Get         (runGet, getWord64be)
+import           Data.ByteString         (ByteString)
+import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy    as BL
-import           Data.LargeWord          (LargeKey, Word256)
+import           Data.LargeWord          (LargeKey(..), Word256)
 
 word256ToByteString :: Word256 -> ByteString
 word256ToByteString (LargeKey w1 (LargeKey w2 (LargeKey w3 w4))) =
-  ByteString.concat $ map (BL.toStrict . BB.toLazyByteString . BB.word64BE) [w4,w3,w2,w1]
+  BS.concat $ map (BL.toStrict . BB.toLazyByteString . BB.word64BE) [w4,w3,w2,w1]
 
 byteStringToWord256 :: ByteString -> Word256
 byteStringToWord256 bs =
