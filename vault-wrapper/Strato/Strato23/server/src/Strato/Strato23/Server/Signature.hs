@@ -4,17 +4,16 @@
 module Strato.Strato23.Server.Signature where
 
 import           Crypto.Secp256k1
-import qualified Data.ByteArray                as ByteArray
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as C8
 import qualified Data.ByteString.Lazy.Char8    as Lazy.Char8
-import           Data.List
 import           Data.Maybe                    (fromJust, fromMaybe, isNothing)
 import qualified Data.Text                     as T
 import           GHC.Generics
 import           Servant
 import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
+import           Strato.Strato23.Server.Utils  (word256ToByteString)
 
 data PrivateKey = PrivateKey
   { username :: String
@@ -35,25 +34,17 @@ getPrivateKeyOfUser :: String -> PrivateKey
 getPrivateKeyOfUser uname = head $ filter (\PrivateKey{..} -> uname == username) privateKeys
 
 signatureDetails :: Maybe T.Text -> UserData -> Handler SignatureDetails
-signatureDetails userEmail (UserData queryToSig) = do
-  if  (Data.List.null queryToSig)
-    then throwError err400 { errBody = Lazy.Char8.pack "msgHash not found" }
-    else if (isNothing userEmail)
-        then throwError err404 { errBody = Lazy.Char8.pack "No cookie provided" }
-        else do
-          let emailId = fromJust userEmail
-              prvKey = getPrivateKeyOfUser $ T.unpack emailId
-              -- prvKey = pk $ getPrivateKeyOfUser $ "tanuj@blockapps.net"
-              dataToSign = queryToSig
-              msgHash = ByteArray.convert
-                      . digestKeccak256
-                      . keccak256
-                      $ C8.pack dataToSign
-          case msg msgHash of
-            Nothing -> throwError err500 { errBody = Lazy.Char8.pack "msgHash was not 32 bytes long" }
-            Just msg' -> do
-              let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
-              return $ SignatureDetails
-                         (Hex $ getCompactRecSigR sig)
-                         (Hex $ getCompactRecSigS sig)
-                         (Hex $ getCompactRecSigV sig)
+signatureDetails userEmail (UserData (Hex msgHash)) = do
+  if (isNothing userEmail)
+    then throwError err404 { errBody = Lazy.Char8.pack "No cookie provided" }
+    else do
+      let emailId = fromJust userEmail
+          prvKey = getPrivateKeyOfUser $ T.unpack emailId
+      case msg (word256ToByteString msgHash) of
+        Nothing -> throwError err500 { errBody = Lazy.Char8.pack "message was not 32 bytes long" }
+        Just msg' -> do
+          let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
+          return $ SignatureDetails
+                     (Hex $ getCompactRecSigR sig)
+                     (Hex $ getCompactRecSigS sig)
+                     (Hex $ getCompactRecSigV sig)

@@ -24,7 +24,7 @@ data SignatureDetails = SignatureDetails {
 } deriving (Eq, Show, Generic)
 
 data UserData = UserData {
-  queryToSign :: String
+  msgHash :: Hex Word256
 } deriving (Eq, Show, Generic)
 
 instance ToJSON SignatureDetails
