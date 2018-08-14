@@ -41,7 +41,7 @@ import           BlockApps.Strato.Types
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = CONTRACT | TRANSFER | FUNCTION deriving (Eq, Show, Generic)
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord, Show, Generic)
 
 instance Arbitrary BlocTransactionType where
   arbitrary = genericArbitrary uniform
@@ -64,12 +64,11 @@ type PostBlocTransaction = "transaction"
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
-  :> Post '[JSON] BlocTransactionResult
+  :> Post '[JSON] [BlocTransactionResult]
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
-  { postbloctransactionrequestTransactionType :: BlocTransactionType
-  , postbloctransactionrequestPayload         :: BlocTransactionPayload
-  , postbloctransactionrequestTxParams        :: Maybe TxParams
+  { postbloctransactionrequestTxs      :: [(BlocTransactionType, BlocTransactionPayload)]
+  , postbloctransactionrequestTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 
 --instance Arbitrary PostBlocTransactionRequest where 
