@@ -38,7 +38,7 @@ main = do
       -- TODO(tim): Use proper initial values for the view
       ctx = newContext (View 0 0) validators
   putStrLn $ "Interpreted validators: " ++ show validators
-  mCtx <- if not flags_tmpblockstanbul
+  mCtx <- if not flags_blockstanbul
              then return Nothing
              else do
                 skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
