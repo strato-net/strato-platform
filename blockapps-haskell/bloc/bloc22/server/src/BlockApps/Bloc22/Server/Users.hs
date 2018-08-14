@@ -74,7 +74,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderChainId  :: Maybe ChainId
   }
 
-type Signer = UnsignedTransaction -> Bloc PostTransaction
+type Signer = UnsignedTransaction -> Bloc Transaction
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
 forStateT s [] _ = return ([],s)
@@ -161,12 +161,12 @@ postUsersSend userName addr chainId resolve
                 mTxParams
                 chainId
                 resolve
-    postUsersSend' btp (prepareSignedTx sk addr)
+    postUsersSend' btp (return . signTransaction sk)
 
 postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
 postUsersSend' TransferParameters{..} sign = do
     params <- getAccountTxParams fromAddress chainId txParams
-    tx <- sign . prepareUnsignedTx $
+    tx <- signAndPrepare sign fromAddress $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -198,7 +198,7 @@ postUsersContract userName addr chainId resolve
               mTxParams
               chainId
               resolve
-  postUsersContract' bcp (prepareSignedTx sk addr)
+  postUsersContract' bcp (return . signTransaction sk)
 
 postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContract' ContractParameters{..} sign = blocTransaction $ do
@@ -221,7 +221,7 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   mFunctionId <- getConstructorId cmId
   argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
-  tx <- sign . prepareUnsignedTx $
+  tx <- signAndPrepare sign fromAddr $
     TransactionHeader
       Nothing
       fromAddr
@@ -249,7 +249,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                contracts
                chainId
                (resolve || _resolve)
-  postUsersUploadList' bclp (prepareSignedTx sk addr)
+  postUsersUploadList' bclp (return . signTransaction sk)
 
 postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadList' ContractListParameters{..} sign = do
@@ -283,7 +283,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          tx <- lift . sign . prepareUnsignedTx $
+          tx <- lift . signAndPrepare sign fromAddr $
               TransactionHeader
                 Nothing
                 fromAddr
@@ -316,7 +316,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
                txs
                chainId
                (resolve || resolve')
-  postUsersSendList' btlp (prepareSignedTx sk addr)
+  postUsersSendList' btlp (return . signTransaction sk)
 
 postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
@@ -336,7 +336,7 @@ postUsersSendList' TransferListParameters{..} sign = do
               i
               chainId
         ) txs [0..]
-      txs' <- mapM (sign . prepareUnsignedTx) txHeaders
+      txs' <- mapM (signAndPrepare sign fromAddr) txHeaders
       hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -375,7 +375,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                postmethodlistrequestTxs
                chainId
                (resolve || postmethodlistrequestResolve)
-  postUsersContractMethodList' bflp (prepareSignedTx sk userAddr)
+  postUsersContractMethodList' bflp (return . signTransaction sk)
 
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
@@ -413,7 +413,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               zxcv <- lift $ getXabiFunctionsArgsQuery functionId
               return (zxcv, Map.insert functionId zxcv fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
-          tx <- lift . sign . prepareUnsignedTx $
+          tx <- lift . signAndPrepare sign fromAddr $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -467,7 +467,7 @@ postUsersContractMethod
                 mTxParams
                 chainId
                 resolve
-    postUsersContractMethod' bfp (prepareSignedTx sk userAddr)
+    postUsersContractMethod' bfp (return . signTransaction sk)
 
 postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractMethod' FunctionParameters{..} sign = do
@@ -484,7 +484,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
     functionId <- getFunctionId cmId funcName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
-    tx <- sign . prepareUnsignedTx $
+    tx <- signAndPrepare sign fromAddr $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -852,18 +852,17 @@ prepareUnsignedTx TransactionHeader{..} =
   , unsignedTransactionChainId = transactionheaderChainId
   }
 
-prepareSignedTx
-  :: SecKey
-  -> Address
-  -> UnsignedTransaction
-  -> Bloc PostTransaction
-prepareSignedTx sk addr unsignedTx = return $ PostTransaction
+preparePostTx
+  :: Address
+  -> Transaction
+  -> PostTransaction
+preparePostTx from tx = PostTransaction
   { posttransactionHash = kecc
   , posttransactionGasLimit = fromIntegral gasLimit
   , posttransactionCodeOrData = code
   , posttransactionGasPrice = fromIntegral gasPrice
   , posttransactionTo = toAddr
-  , posttransactionFrom = addr
+  , posttransactionFrom = from
   , posttransactionValue = Strung $ fromIntegral value
   , posttransactionR = Hex $ fromIntegral r
   , posttransactionS = Hex $ fromIntegral s
@@ -872,7 +871,6 @@ prepareSignedTx sk addr unsignedTx = return $ PostTransaction
   , posttransactionChainId = chainId
   }
   where
-    tx = signTransaction sk unsignedTx
     kecc = keccak256 (rlpSerialize tx)
     r = transactionR tx
     s = transactionS tx
@@ -884,3 +882,6 @@ prepareSignedTx sk addr unsignedTx = return $ PostTransaction
     code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
     toAddr = transactionTo tx
     chainId = transactionChainId tx
+
+signAndPrepare :: Signer -> Address -> TransactionHeader -> Bloc PostTransaction
+signAndPrepare sign from = fmap (preparePostTx from) . sign . prepareUnsignedTx
