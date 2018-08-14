@@ -13,4 +13,4 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
 
 COPY ./ /
 
-ENTRYPOINT ["/usr/bin/doit.sh"]
+ENTRYPOINT ["/usr/bin/vault-wrapper/doit.sh"]
