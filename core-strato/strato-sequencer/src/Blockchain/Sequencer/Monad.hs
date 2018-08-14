@@ -80,7 +80,6 @@ data SequencerContext = SequencerContext
                       , _sequencerKafkaState :: K.KafkaState
                       , _blockstanbulContext :: Maybe BlockstanbulContext
                       , _blockstanbulTimeouts :: TMChan RoundNumber
-                      , _blockstanbulBeneficiary :: TMChan (Address, Bool)
                       }
 makeLenses ''SequencerContext
 
@@ -97,6 +96,7 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriodμs :: Int
                      , blockstanbulRoundPeriod :: NominalDiffTime
+                     , blockstanbulBeneficiary :: TMChan (Address, Bool)
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))

@@ -33,8 +33,8 @@ createWebServer = serve adminAPI admin
 
 webserver :: TMChan (Address,Bool) -> IO()
 webserver ch = do
-  chanIn ch
   run 8081 createWebServer
+  chanIn ch
 
 chanIn ::TMChan (Address,Bool) -> IO ()
 chanIn ch = forever $ do                 -- need tests. streaming api instead?

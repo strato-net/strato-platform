@@ -50,7 +50,7 @@ main = do
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
                 return . Just . ctx $ pkey
-
+  chv <- atomically $ newTMChan
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize
     , depBlockDBPath        = flags_depblockdbpath
@@ -63,6 +63,6 @@ main = do
     , statsConfig           = EC.statsConfig EC.ethConf
     , blockstanbulBlockPeriodμs = 1000 * flags_blockstanbul_block_period_ms
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
+    , blockstanbulBeneficiary = chv
   }
-  chv <- atomically $ newTMChan
   race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver chv)
