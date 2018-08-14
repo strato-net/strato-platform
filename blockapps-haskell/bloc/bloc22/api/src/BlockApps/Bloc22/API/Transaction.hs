@@ -67,7 +67,8 @@ type PostBlocTransaction = "transaction"
   :> Post '[JSON] [BlocTransactionResult]
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
-  { postbloctransactionrequestTxs      :: [(BlocTransactionType, BlocTransactionPayload)]
+  { postbloctransactionrequestAddress  :: Address
+  , postbloctransactionrequestTxs      :: [(BlocTransactionType, BlocTransactionPayload)]
   , postbloctransactionrequestTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 

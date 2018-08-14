@@ -37,7 +37,7 @@ import           BlockApps.Solidity.Contract()
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
-postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' txParams) = do
+postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest addr txs' txParams) = do
   case mUserName of
     Nothing -> error "Did not find X-USER-UNIQUE-NAME in the header"
     Just _ -> fmap join . forM (partitionWith fst txs') $ \(ttype, txs) -> case ttype of
@@ -46,7 +46,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         [x] -> do
           p <- fromTransfer $ snd x
           let btp = TransferParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       (transferpayloadToAddress p)
                       (transferpayloadValue p)
                       txParams
@@ -56,7 +56,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         xs -> do
           p <- mapM (fromTransfer . snd) xs
           let btlp = TransferListParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       (map (\(TransferPayload t v) -> SendTransaction t v txParams) p)
                       chainId
                       resolve
@@ -66,7 +66,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         [x] -> do
           p <- fromContract $ snd x
           let bcp = ContractParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       (contractpayloadSrc p)
                       (contractpayloadContract p)
                       (contractpayloadArgs p)
@@ -78,7 +78,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         xs -> do
           p <- mapM (fromContract . snd) xs
           let bclp = ContractListParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       (map (\(ContractPayload _ c a v) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v) p)
                       chainId
                       resolve
@@ -88,7 +88,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         [x] -> do
           p <- fromFunction $ snd x
           let bfp = FunctionParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       ((\(ContractName c) -> c) $ functionpayloadContractName p)
                       (functionpayloadContractAddress p)
                       (functionpayloadMethod p)
@@ -101,7 +101,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest txs' t
         xs -> do
           p <- mapM (fromFunction . snd) xs
           let bflp = FunctionListParameters
-                      (Address 0) -- TODO(dustin): Get real address
+                      addr
                       (map (\(FunctionPayload (ContractName n) a m r v) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams) p)
                       chainId
                       resolve
