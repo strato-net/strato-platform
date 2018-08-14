@@ -74,6 +74,8 @@ data TransactionHeader = TransactionHeader
   , transactionheaderChainId  :: Maybe ChainId
   }
 
+type Signer = TransactionHeader -> Bloc PostTransaction
+
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
 forStateT s [] _ = return ([],s)
 forStateT s (a:as) run = do
@@ -161,7 +163,7 @@ postUsersSend userName addr chainId resolve
                 resolve
     postUsersSend' btp (prepareTx sk)
 
-postUsersSend' :: TransferParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc BlocTransactionResult
+postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
 postUsersSend' TransferParameters{..} sign = do
     txParams <- getAccountTxParams btpFromAddress btpChainId btpTxParams
     tx <- sign $
@@ -198,7 +200,7 @@ postUsersContract userName addr chainId resolve
               resolve
   postUsersContract' bcp (prepareTx sk)
 
-postUsersContract' :: ContractParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc BlocTransactionResult
+postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   txParams <- getAccountTxParams bcpFromAddr bcpChainId bcpTxParams
   --TODO: check what happens with mismatching args
@@ -249,7 +251,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                (resolve || _resolve)
   postUsersUploadList' bclp (prepareTx sk)
 
-postUsersUploadList' :: ContractListParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc [BlocTransactionResult]
+postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadList' ContractListParameters{..} sign = do
   if (null bclpContracts)
     then return []
@@ -316,7 +318,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
                (resolve || resolve')
   postUsersSendList' btlp (prepareTx sk)
 
-postUsersSendList' :: TransferListParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc [BlocTransactionResult]
+postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
   if (null btlpTxs)
     then return []
@@ -375,7 +377,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                (resolve || postmethodlistrequestResolve)
   postUsersContractMethodList' bflp (prepareTx sk)
 
-postUsersContractMethodList' :: FunctionListParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc [BlocTransactionResult]
+postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
   if (null bflpTxs)
     then return []
@@ -467,7 +469,7 @@ postUsersContractMethod
                 resolve
     postUsersContractMethod' bfp (prepareTx sk)
 
-postUsersContractMethod' :: FunctionParameters -> (TransactionHeader -> Bloc PostTransaction) -> Bloc BlocTransactionResult
+postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractMethod' FunctionParameters{..} sign = do
     txParams <- getAccountTxParams bfpFromAddr bfpChainId bfpTxParams
     cmId <- getContractsMetaDataIdExhaustive bfpContractName bfpContractAddr bfpChainId
