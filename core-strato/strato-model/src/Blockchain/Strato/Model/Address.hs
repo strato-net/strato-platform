@@ -29,12 +29,16 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 
 import qualified Data.Text                            as T
+import           Data.Monoid
+import           Text.Read                            (readMaybe)
+
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
 -- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Web.PathPieces
+import           Web.HttpApiData
 
 import           GHC.Generics
 
@@ -109,3 +113,11 @@ instance Binary Address where
     bytes <- replicateM 20 get
     let byteString = B.pack bytes
     return (Address $ fromInteger $ byteString2Integer byteString)
+
+stringAddress :: String -> Maybe Address
+stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
+
+instance FromHttpApiData Address where
+  parseUrlPiece text = case stringAddress (T.unpack text) of
+    Nothing      -> Left $ "Could not decode Address: " <> text
+    Just address -> Right address

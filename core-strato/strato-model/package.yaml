@@ -23,6 +23,7 @@ library:
     - text
     - time
     - QuickCheck
+    - http-api-data
   source-dirs: src
   default-extensions:
     - MultiParamTypeClasses
