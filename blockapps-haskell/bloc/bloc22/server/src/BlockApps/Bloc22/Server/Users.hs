@@ -74,7 +74,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderChainId  :: Maybe ChainId
   }
 
-type Signer = TransactionHeader -> Bloc PostTransaction
+type Signer = UnsignedTransaction -> Bloc PostTransaction
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
 forStateT s [] _ = return ([],s)
@@ -161,12 +161,12 @@ postUsersSend userName addr chainId resolve
                 mTxParams
                 chainId
                 resolve
-    postUsersSend' btp (prepareTx sk)
+    postUsersSend' btp (prepareSignedTx sk addr)
 
 postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
 postUsersSend' TransferParameters{..} sign = do
     params <- getAccountTxParams fromAddress chainId txParams
-    tx <- sign $
+    tx <- sign . prepareUnsignedTx $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -198,7 +198,7 @@ postUsersContract userName addr chainId resolve
               mTxParams
               chainId
               resolve
-  postUsersContract' bcp (prepareTx sk)
+  postUsersContract' bcp (prepareSignedTx sk addr)
 
 postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContract' ContractParameters{..} sign = blocTransaction $ do
@@ -221,7 +221,7 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   mFunctionId <- getConstructorId cmId
   argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
-  tx <- sign $
+  tx <- sign . prepareUnsignedTx $
     TransactionHeader
       Nothing
       fromAddr
@@ -249,7 +249,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                contracts
                chainId
                (resolve || _resolve)
-  postUsersUploadList' bclp (prepareTx sk)
+  postUsersUploadList' bclp (prepareSignedTx sk addr)
 
 postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadList' ContractListParameters{..} sign = do
@@ -283,7 +283,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          tx <- lift . sign $
+          tx <- lift . sign . prepareUnsignedTx $
               TransactionHeader
                 Nothing
                 fromAddr
@@ -316,7 +316,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
                txs
                chainId
                (resolve || resolve')
-  postUsersSendList' btlp (prepareTx sk)
+  postUsersSendList' btlp (prepareSignedTx sk addr)
 
 postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
@@ -336,7 +336,7 @@ postUsersSendList' TransferListParameters{..} sign = do
               i
               chainId
         ) txs [0..]
-      txs' <- mapM sign txHeaders
+      txs' <- mapM (sign . prepareUnsignedTx) txHeaders
       hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -375,7 +375,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                postmethodlistrequestTxs
                chainId
                (resolve || postmethodlistrequestResolve)
-  postUsersContractMethodList' bflp (prepareTx sk)
+  postUsersContractMethodList' bflp (prepareSignedTx sk userAddr)
 
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
@@ -413,7 +413,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               zxcv <- lift $ getXabiFunctionsArgsQuery functionId
               return (zxcv, Map.insert functionId zxcv fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
-          tx <- lift . sign $
+          tx <- lift . sign . prepareUnsignedTx $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -467,7 +467,7 @@ postUsersContractMethod
                 mTxParams
                 chainId
                 resolve
-    postUsersContractMethod' bfp (prepareTx sk)
+    postUsersContractMethod' bfp (prepareSignedTx sk userAddr)
 
 postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractMethod' FunctionParameters{..} sign = do
@@ -484,7 +484,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
     functionId <- getFunctionId cmId funcName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
-    tx <- sign $
+    tx <- sign . prepareUnsignedTx $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -816,13 +816,6 @@ getAccountTxParams addr chainId = \case
         Nothing   -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
 
-prepareTx
-  :: SecKey
-  -> TransactionHeader
-  -> Bloc PostTransaction
-prepareTx sk txHeader = do
-  return . prepareSignedTx sk (transactionheaderFromAddr txHeader) $ prepareUnsignedTx txHeader
-
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
   uIds <- blocQuery . getUserIdQuery $ userName
@@ -863,8 +856,8 @@ prepareSignedTx
   :: SecKey
   -> Address
   -> UnsignedTransaction
-  -> PostTransaction
-prepareSignedTx sk addr unsignedTx = PostTransaction
+  -> Bloc PostTransaction
+prepareSignedTx sk addr unsignedTx = return $ PostTransaction
   { posttransactionHash = kecc
   , posttransactionGasLimit = fromIntegral gasLimit
   , posttransactionCodeOrData = code

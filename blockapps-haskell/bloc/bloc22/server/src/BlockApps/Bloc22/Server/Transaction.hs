@@ -179,10 +179,10 @@ signTransaction' userName UnsignedTransaction{..} = do
 
 getRSV :: Text -> ByteString -> Bloc SignatureDetails
 getRSV _ _ = return $ SignatureDetails (Hex 0) (Hex 0) 0 -- do -- TODO: Actually call signature route
-  -- let request = setRequestHeader "X-USER-UNIQUE-NAME" [Text.encodeUtf8 userName]
-  --             $ setRequestBodyJSON msgHash
-  --             $ "POST http://vault-wrapper:8000/strato/v2.3/signature"
-  -- getResponseBody <$> httpJSON request
+--  let request = setRequestHeader "X-USER-UNIQUE-NAME" [Text.encodeUtf8 userName]
+--              $ setRequestBodyJSON msgHash
+--              $ "POST http://vault-wrapper:8000/strato/v2.3/signature"
+--  getResponseBody <$> httpJSON request
 
 data SignatureDetails = SignatureDetails
   { r :: Hex Word256
