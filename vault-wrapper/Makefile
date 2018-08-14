@@ -2,7 +2,7 @@ BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
 FAKEROOT=$(BASILWORK)/fakeroot
-VAULTWRAPPERHOME=$(FAKEROOT)/usr/bin/vault-wrapper
+VAULTWRAPPERHOME=$(FAKEROOT)/usr/bin
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
