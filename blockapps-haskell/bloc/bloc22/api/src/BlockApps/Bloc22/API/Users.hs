@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -289,12 +290,12 @@ instance ToSchema PostSendParameters where
         }
 
 data TransferParameters = TransferParameters
-  { btpFromAddress :: Address
-  , btpToAddress   :: Address
-  , btpValue       :: Strung Natural
-  , btpTxParams    :: Maybe TxParams
-  , btpChainId     :: Maybe ChainId
-  , btpResolve     :: Bool
+  { fromAddress :: Address
+  , toAddress   :: Address
+  , value       :: Strung Natural
+  , txParams    :: Maybe TxParams
+  , chainId     :: Maybe ChainId
+  , resolve     :: Bool
   } deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
@@ -374,14 +375,14 @@ instance ToSchema PostUsersContractRequest where
       )
 
 data ContractParameters = ContractParameters
-  { bcpFromAddr :: Address
-  , bcpSrc      :: Text
-  , bcpContract :: Maybe Text
-  , bcpArgs     :: Maybe (Map Text ArgValue)
-  , bcpValue    :: Maybe (Strung Natural)
-  , bcpTxParams :: Maybe TxParams
-  , bcpChainId  :: Maybe ChainId
-  , bcpResolve  :: Bool
+  { fromAddr :: Address
+  , src      :: Text
+  , contract :: Maybe Text
+  , args     :: Maybe (Map Text ArgValue)
+  , value    :: Maybe (Strung Natural)
+  , txParams :: Maybe TxParams
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
   }
 --------------------------------------------------------------------------------
 
@@ -477,10 +478,10 @@ instance ToSample PostUsersUploadListResponse where
   toSamples _ = noSamples
 
 data ContractListParameters = ContractListParameters
-  { bclpFromAddr  :: Address
-  , bclpContracts :: [UploadListContract]
-  , bclpChainId   :: Maybe ChainId
-  , bclpResolve   :: Bool
+  { fromAddr  :: Address
+  , contracts :: [UploadListContract]
+  , chainId   :: Maybe ChainId
+  , resolve   :: Bool
   } deriving (Eq,Show,Generic)
 
 --------------------------------------------------------------------------------
@@ -568,15 +569,15 @@ instance ToSchema PostUsersContractMethodResponse where
         }
 
 data FunctionParameters = FunctionParameters
-  { bfpFromAddr     :: Address
-  , bfpContractName :: Text
-  , bfpContractAddr :: Address
-  , bfpFuncName     :: Text
-  , bfpArgs         :: Map Text ArgValue
-  , bfpValue        :: Maybe (Strung Natural)
-  , bfpTxParams     :: Maybe TxParams
-  , bfpChainId      :: Maybe ChainId
-  , bfpResolve      :: Bool
+  { fromAddr     :: Address
+  , contractName :: Text
+  , contractAddr :: Address
+  , funcName     :: Text
+  , args         :: Map Text ArgValue
+  , value        :: Maybe (Strung Natural)
+  , txParams     :: Maybe TxParams
+  , chainId      :: Maybe ChainId
+  , resolve      :: Bool
   }
 --------------------------------------------------------------------------------
 
@@ -684,10 +685,10 @@ instance ToSchema SendTransaction where
         }
 
 data TransferListParameters = TransferListParameters
-  { btlpFromAddr :: Address
-  , btlpTxs      :: [SendTransaction]
-  , btlpChainId  :: Maybe ChainId
-  , btlpResolve  :: Bool
+  { fromAddr :: Address
+  , txs      :: [SendTransaction]
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
   }
 
 --------------------------------------------------------------------------------
@@ -874,8 +875,8 @@ instance ToSchema MethodCall where
         }
 
 data FunctionListParameters = FunctionListParameters
-  { bflpFromAddr :: Address
-  , bflpTxs      :: [MethodCall]
-  , bflpChainId  :: Maybe ChainId
-  , bflpResolve  :: Bool
+  { fromAddr :: Address
+  , txs      :: [MethodCall]
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
   }
