@@ -8,14 +8,15 @@ import Data.Proxy
 import Servant
 
 import Blockchain.Data.Address
-import Blockchain.Blockstanbul.Messages (InEvent)
+--import Blockchain.Blockstanbul.Messages (InEvent)
 
 
-type AdminAPI = 
-  "vote"
+type AdminAPI = GetVote
+
+type GetVote = "vote"
     :> Capture "nominee" Address
     :> Capture "for_against" Bool
-    :> Get '[JSON] InEvent
+    :> Get '[JSON] (Address, Bool)
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
