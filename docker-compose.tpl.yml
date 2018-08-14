@@ -35,8 +35,7 @@ services:
     - postgres
     - postgrest
     - strato
-    environment:
-    - blocHost=bloc:8000
+    environment: - blocHost=bloc:8000
     - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
     - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
     - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}

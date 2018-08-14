@@ -4,10 +4,13 @@
 
 module Strato.Strato23.API.Signature where
 
-import           Servant.API
-import           GHC.Generics
 import           Data.Aeson.Types
+import           Data.LargeWord   (Word256)
 import           Data.Text
+import           Data.Word        (Word8)
+import           GHC.Generics
+import           Servant.API
+import           Strato.Strato23.API.Types
 
 --------------------------------------------------------------------------------
 -- Routes and Types
@@ -15,9 +18,9 @@ import           Data.Text
 type PostSignature = "signature" :> Header "X-USER-UNIQUE-NAME" Text :> ReqBody '[JSON] UserData :> Post '[JSON] SignatureDetails
 
 data SignatureDetails = SignatureDetails {
-  r :: String
-  , s :: String
-  , v :: String
+    r :: Hex Word256
+  , s :: Hex Word256
+  , v :: Hex Word8
 } deriving (Eq, Show, Generic)
 
 data UserData = UserData {

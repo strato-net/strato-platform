@@ -5,6 +5,10 @@ packages:
 - Strato/Strato23/api
 - Strato/Strato23/client
 - Strato/Strato23/server
+- location:
+    git: https://github.com/echatav/secp256k1-haskell/
+    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
+  extra-dep: true
 
 extra-deps:
   - transformers-0.5.5.0
