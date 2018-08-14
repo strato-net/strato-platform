@@ -21,8 +21,12 @@ function newnode {
 
   if $mineBlocks
   then echo "Starting strato-adit"
+      aMiner=$miningAlgorithm
+      if [ $tmpblockstanbul = true ]; then
+        aMiner=Instant
+      fi
       export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
+      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
   fi
 
   if $serveBlocks
