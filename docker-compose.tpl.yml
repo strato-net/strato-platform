@@ -94,6 +94,12 @@ services:
     image: redis:3.2
     restart: always
   vault-wrapper:
+    environment:
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_vault_wrapper_db=oauth
+    - postgres_user=postgres
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always

@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM vault-wrapper-deploybase:latest
 
 RUN apt-get -y update                                          && \
     apt-get install -y curl libgmp-dev                         && \
