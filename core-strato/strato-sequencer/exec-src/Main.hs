@@ -4,6 +4,8 @@ module Main where
 
 import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
@@ -62,4 +64,5 @@ main = do
     , blockstanbulBlockPeriodμs = 1000 * flags_blockstanbul_block_period_ms
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
   }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver)
+  chv <- atomically $ newTMChan
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver chv)

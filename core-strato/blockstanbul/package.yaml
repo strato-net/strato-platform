@@ -40,6 +40,7 @@ dependencies:
   - base64-bytestring
   - aeson
   - blockapps-milena
+  - http-conduit
 
 library:
   source-dirs: src/
