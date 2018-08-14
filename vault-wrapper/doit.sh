@@ -4,11 +4,11 @@ set -ex
 
 echo "Environment variables:
 vault-wrapper:
---pghost=\$postgres_host="${postgres_host}"
---pgport=\$postgres_port="${postgres_port}"
---pguser=\$postgres_user="${postgres_user}"
---password=\$postgres_password="${postgres_password}"
---database=\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
+\$postgres_host="${postgres_host}"
+\$postgres_port="${postgres_port}"
+\$postgres_user="${postgres_user}"
+\$postgres_password="${postgres_password}"
+\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 "
 
 echo 'Waiting for postgres to be available...'
@@ -27,11 +27,8 @@ if [ ! -f initialized ]; then
     PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_vault_wrapper_db}
     # Create the database for vault-wrapper
     PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_vault_wrapper_db}
-    # Create logs directory
-    mkdir logs
     # Create the 'initialized' sentinel file
     date '+%Y-%m-%d %H:%M:%S' > initialized
-
 fi
 
 /usr/bin/vault-wrapper

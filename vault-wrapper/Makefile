@@ -3,7 +3,6 @@ BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
 FAKEROOT=$(BASILWORK)/fakeroot
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
-DEPLOYBASE_NAME=vault-wrapper-deploybase
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
@@ -24,12 +23,7 @@ build_haskell: build_buildbase
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
-build_deploybase: prebuild
-	cp -f Dockerfile.deploybase /tmp/docker-dummy-vault-wrapper
-	docker build --tag=$(DEPLOYBASE_NAME):latest -f /tmp/docker-dummy-vault-wrapper/Dockerfile.deploybase /tmp/docker-dummy-vault-wrapper
-	rm -f /tmp/docker-dummy-vault-wrapper/Dockerfile.deploybase
-
-build_docker: build_deploybase build_haskell
+build_docker: build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(FAKEROOT)
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)

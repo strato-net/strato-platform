@@ -98,8 +98,8 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
-    - postgres_vault_wrapper_db=oauth
     - postgres_user=postgres
+    - postgres_vault_wrapper_db=oauth
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
