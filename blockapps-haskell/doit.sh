@@ -80,5 +80,5 @@ fi
            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
 
-usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+/usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
