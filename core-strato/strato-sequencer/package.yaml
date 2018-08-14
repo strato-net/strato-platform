@@ -37,9 +37,11 @@ dependencies:
   - stm
   - conduit-combinators
   - blockstanbul
+  - stm-chans
   - lens
   - blockapps-haskoin
   - aeson
+  - async
 
 ghc-options: -Wall -O2 -threaded
 

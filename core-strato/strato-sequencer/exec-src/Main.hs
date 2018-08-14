@@ -3,6 +3,7 @@
 module Main where
 
 import           Control.Monad.Logger
+import           Control.Concurrent.Async             as Async
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
@@ -13,6 +14,7 @@ import           Safe
 import           System.Environment
 
 import           Blockchain.Blockstanbul
+import           Server
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
@@ -58,4 +60,4 @@ main = do
     , bootstrapDoEmit       = True
     , statsConfig           = EC.statsConfig EC.ethConf
   }
-  runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver)
