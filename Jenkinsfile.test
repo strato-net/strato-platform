@@ -31,7 +31,6 @@ pipeline {
           set -x
           REPO=private make all
         '''
-        archive "docker-compose.yml"
       }
     }
 
@@ -63,9 +62,23 @@ pipeline {
       }
     }
 
-    stage('Test') {
+    stage('Test & Push images') {
       steps {
         parallel (
+
+          'Push images': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+            ]) {
+              archiveArtifacts artifacts: "docker-compose.yml"
+              sh '''#!/bin/bash -le
+              set -x
+              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+              docker-compose -f docker-compose.push.yml push
+            '''
+            }
+          },
+
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -116,20 +129,6 @@ pipeline {
             '''
           }
         )
-      }
-    }
-
-    stage('Release') {
-      steps {
-        withCredentials([
-          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            docker-compose -f docker-compose.push.yml push
-          '''
-        }
       }
     }
   }
