@@ -22,7 +22,7 @@ function newnode {
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
-      if [ $tmpblockstanbul = true ]; then
+      if [ $blockstanbul = true ]; then
         aMiner=Instant
       fi
       export miningThreads=${miningThreads:-1}

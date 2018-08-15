@@ -101,7 +101,7 @@ services:
     environment:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
-    - tmpblockstanbul=${tmpblockstanbul}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - debugFail=${debugFail}
