@@ -76,15 +76,6 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Either String Contract,
-    xabi :: String,
-    name :: String,
-    resolvedName :: Maybe String
-  }
-  deriving(Show)
-
 getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
 getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
 getContract address _ chainId = do
@@ -95,6 +86,7 @@ getContract address _ chainId = do
     contract = xAbiToContract $ contractdetailsXabi qqqq
     , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
     , name = show $ contractdetailsName qqqq
+    , resolvedName = Nothing
   }
   return $ (Right ret)
 
@@ -122,9 +114,7 @@ resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
   if (null sameName)
-    then
-      let newName = contractName ++ show inc
-      return newName
+    then return $ contractName ++ show inc
     else do
       case (lookup codehash sameName) of
         Nothing -> do
@@ -139,7 +129,6 @@ processTheMessages :: [B.ByteString] -> IORef (Map String ContractAndXabi) -> IO
 processTheMessages messages cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
-  liftIO $ putStrLn "{}{}{}"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -195,13 +184,13 @@ processTheMessages messages cachedContractsIORef = do
             Right c -> do
               --Resolve Name Issues
               let contList = Map.toList cachedContracts
-              resName <- liftIO $ resolveContractName 1 codehash (name c) contList
-              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = resName}
+              resName <- liftIO $ resolveContractName 1 codehash (replace "\"" "" $ name c) contList
+              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName}
               liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
               return newContractAndXabi
 
       let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-      let contName = replace "\"" "" $ name contractMetaData
+      --let contName = replace "\"" "" $ name contractMetaData
 
       --TODO: Add parsing of contract info to get flags (indexing, history)
       let cont = case contract contractMetaData of

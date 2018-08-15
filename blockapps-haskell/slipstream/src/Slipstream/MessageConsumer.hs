@@ -21,6 +21,7 @@ import Control.Lens
 import Slipstream.Options
 import Data.List
 import Slipstream.Processor
+import Slipstream.Events
 import Control.Concurrent
 import Data.IORef
 
