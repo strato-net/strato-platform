@@ -9,6 +9,8 @@
 module Blockchain.Sequencer where
 
 import           Control.Concurrent
+import           Control.Concurrent.STM.TMChan
+import           Control.Concurrent.STM
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -67,6 +69,14 @@ sequencer = do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
     blockstanbulSend . map Timeout =<< drainTimeouts
+    ch <- asks blockstanbulBeneficiary
+    x <- liftIO $ atomically $ tryReadTMChan ch
+    case x of 
+         Nothing -> error "Channel unexpectedly closed:"
+         Just (Nothing) -> return ()
+         Just (Just (addr,bool)) -> do
+            let ie = NewBeneficiary addr bool
+            blockstanbulSend [ie] 
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
