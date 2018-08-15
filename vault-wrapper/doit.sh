@@ -4,11 +4,11 @@ set -ex
 
 echo "Environment variables:
 vault-wrapper:
-\$postgres_host="${postgres_host}"
-\$postgres_port="${postgres_port}"
-\$postgres_user="${postgres_user}"
-\$postgres_password="${postgres_password}"
-\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
+--phsot=\$postgres_host="${postgres_host}"
+--pgport=\$postgres_port="${postgres_port}"
+--pguser=\$postgres_user="${postgres_user}"
+--password=\$postgres_password="${postgres_password}"
+--database=\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 "
 
 echo 'Waiting for postgres to be available...'
