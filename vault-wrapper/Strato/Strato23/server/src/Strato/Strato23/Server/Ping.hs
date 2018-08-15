@@ -1,7 +1,6 @@
 module Strato.Strato23.Server.Ping where
 
-  import           Servant
+  import           Strato.Strato23.Monad
 
-  getPing :: Handler String
+  getPing :: VaultM String
   getPing = return "pingDetail"
-  

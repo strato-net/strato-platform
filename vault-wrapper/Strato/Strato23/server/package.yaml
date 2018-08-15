@@ -20,42 +20,60 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/server#readme>
 
 dependencies:
-- base
-- API
-- text
-- servant
-- servant-server
-- servant-client
-- warp
-- wai
-- wai-extra
-- wai-middleware-static
-- monad-control >=1.0 && <1.1
 - aeson
 - ansi-wl-pprint
+- API
+- base
 - base16-bytestring
-- ethereum-rlp
 - binary
 - bytestring
-- lens
-- path-pieces
-- memory
-- nibblestring
-- time
-- QuickCheck
-- deepseq
 - byteable
 - conduit 
 - containers
 - cryptohash
+- cryptonite
+- deepseq
+- ethereum-rlp
+- hflags
+- http-client
+- largeword
+- lens
+- lifted-base
+- logging-effect
+- memory
+- monad-control >=1.0 && <1.1
 - mtl       
 - murmur3   
 - network   
+- nibblestring
+- opaleye
+- path-pieces
 - pbkdf
+- postgresql-simple
+- product-profunctors
+- profunctors
+- QuickCheck
+- resource-pool
+- saltine
 - secp256k1
+- servant
+- servant-client
+- servant-client-core
+- servant-options
+- servant-server
+- servant-swagger
 - split     
+- swagger2
+- text
+- time
 - transformers
-- largeword
+- transformers-base
+- unordered-containers
+- wai
+- wai-cors
+- wai-extra
+- wai-middleware-static
+- warp
 
 library:
   source-dirs: src

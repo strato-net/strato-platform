@@ -1,10 +1,21 @@
 FROM ubuntu:16.04
 
 RUN apt-get -y update                                          && \
-    apt-get install -y curl libgmp-dev                         && \
+    apt-get install -y \
+      curl \
+      libgmp-dev \
+#      libsodium-dev \
+      locales \
+      postgresql-client \
+                                                               && \
     apt-get autoremove                                         && \
     rm -rf /var/lib/apt/lists/*                                && \
-    apt-get clean
+    apt-get clean                                              && \
+    locale-gen en_US.UTF-8
+
+ENV LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    LC_ALL="en_US.UTF-8"
 
 EXPOSE 8000
 

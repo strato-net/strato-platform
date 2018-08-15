@@ -132,7 +132,7 @@ getRSV :: Text -> Word256 -> Bloc SignatureDetails
 getRSV userName msgHash' = do
   let request = setRequestHeader "X-USER-UNIQUE-NAME" [Text.encodeUtf8 userName]
               $ setRequestBodyJSON (UserData (Hex msgHash'))
-              $ "POST http://vault-wrapper:8000/signature" -- TODO(dustin): Establish a vault-wrapper API type and call this endpoint
+              $ "POST http://vault-wrapper:8000/strato/v2.3/signature" -- TODO(dustin): Establish a vault-wrapper API type and call this endpoint
   getResponseBody <$> httpJSON request
 
 data SignatureDetails = SignatureDetails

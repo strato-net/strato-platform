@@ -1,50 +1,42 @@
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Strato.Strato23.Server.Signature where
 
 import           Crypto.Secp256k1
-import qualified Data.ByteString.Base16        as B16
-import qualified Data.ByteString.Char8         as C8
-import qualified Data.ByteString.Lazy.Char8    as Lazy.Char8
-import           Data.Maybe                    (fromJust, fromMaybe, isNothing)
-import qualified Data.Text                     as T
-import           GHC.Generics
-import           Servant
+import           Data.Text                        (Text)
+import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
-import           Strato.Strato23.Server.Utils  (word256ToByteString)
+import           Strato.Strato23.Crypto
+import           Strato.Strato23.Database.Queries (getUserKeyQuery)
+import           Strato.Strato23.Server.Key       (postKey)
+import           Strato.Strato23.Server.Utils     (word256ToByteString)
 
-data PrivateKey = PrivateKey
-  { username :: String
-  , address  :: String
-  , sk       :: SecKey
-  } deriving (Eq, Show, Generic)
-
-privateKeys :: [PrivateKey]
-privateKeys =
-  [ PrivateKey "tanuj500" "cb1a02b33d6fba1a226bdd8a45da4654e0f1ecd9" (toSecKey "00000000000000000000000000000000000000000000000000000000deadbeef")
-  , PrivateKey  "tanuj@blockapps.net" "84bcd6278fdde4e3147717123a4602faeeee83e4" (toSecKey "0000000000000000000000000000000000000000000000000000000012345687")
-  ]
-
-toSecKey :: String -> SecKey
-toSecKey = fromMaybe (error "toSecKey: could not decode") . secKey . fst . B16.decode . C8.pack
-
-getPrivateKeyOfUser :: String -> PrivateKey
-getPrivateKeyOfUser uname = head $ filter (\PrivateKey{..} -> uname == username) privateKeys
-
-signatureDetails :: Maybe T.Text -> UserData -> Handler SignatureDetails
-signatureDetails userEmail (UserData (Hex msgHash)) = do
-  if (isNothing userEmail)
-    then throwError err404 { errBody = Lazy.Char8.pack "No cookie provided" }
-    else do
-      let emailId = fromJust userEmail
-          prvKey = getPrivateKeyOfUser $ T.unpack emailId
-      case msg (word256ToByteString msgHash) of
-        Nothing -> throwError err500 { errBody = Lazy.Char8.pack "message was not 32 bytes long" }
-        Just msg' -> do
-          let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
-          return $ SignatureDetails
-                     (Hex $ getCompactRecSigR sig)
-                     (Hex $ getCompactRecSigS sig)
-                     (Hex $ getCompactRecSigV sig)
+postSignature :: Maybe Text -> Maybe Text -> UserData -> VaultM SignatureDetails
+postSignature mUserUniqueName mUserId (UserData (Hex msgHash)) =
+  case (mUserUniqueName, mUserId) of
+    (Nothing, _) -> vaultWrapperError $ UserError "No user unique name provided"
+    (Just _, Nothing) -> vaultWrapperError $ UserError "No user ID provided"
+    (Just userName, Just userId) -> do
+      mpk <- vaultTransaction
+            . vaultQueryMaybe
+            $ getUserKeyQuery userName
+      (salt,nonce,pKey) <- case mpk of
+        Just pk -> return pk
+        Nothing -> do
+          _ <- postKey mUserUniqueName mUserId
+          vaultTransaction
+            . vaultQuery1
+            $ getUserKeyQuery userName
+      case decryptSecKey (textPassword userId) salt nonce pKey of
+        Nothing -> vaultWrapperError $ UserError "Incorrect password"
+        Just prvKey -> case msg (word256ToByteString msgHash) of
+          Nothing -> vaultWrapperError $ AnError "Message was not 32 bytes long"
+          Just msg' -> do
+            let sig = exportCompactRecSig $ signRecMsg prvKey msg'
+            return $ SignatureDetails
+                      (Hex $ getCompactRecSigR sig)
+                      (Hex $ getCompactRecSigS sig)
+                      (Hex $ getCompactRecSigV sig)
