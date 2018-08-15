@@ -12,7 +12,7 @@ schemaVersionTable :: Table
   )
 schemaVersionTable = Table "vault_wrapper_schema_version" $ p2
   ( optional "id"
-  , required "vault_wrapper_version"
+  , required "schema_version"
   )
 
 usersTable :: Table

@@ -34,10 +34,10 @@ migrations = [ (Throw, createTables)
              ]
 
 getSchemaVersion :: Query
-getSchemaVersion = [sql| SELECT schema_version FROM bloc_schema_version WHERE id=1; |]
+getSchemaVersion = [sql| SELECT schema_version FROM vault_wrapper_schema_version WHERE id=1; |]
 
 insertSchemaVersion :: Query
-insertSchemaVersion = [sql| INSERT INTO bloc_schema_version VALUES (1,1); |]
+insertSchemaVersion = [sql| INSERT INTO vault_wrapper_schema_version VALUES (1,1); |]
 
 updateSchemaVersion :: Query
-updateSchemaVersion = [sql| UPDATE bloc_schema_version SET schema_version=? WHERE id=1; |]
+updateSchemaVersion = [sql| UPDATE vault_wrapper_schema_version SET schema_version=? WHERE id=1; |]

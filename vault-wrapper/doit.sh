@@ -11,6 +11,10 @@ vault-wrapper:
 \$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 "
 
+locale-gen "en_US.UTF-8"
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
 echo 'Waiting for postgres to be available...'
 while true; do
     curl ${postgres_host}:${postgres_port} > /dev/null 2>&1 || EXIT_CODE=$? && true
@@ -31,4 +35,5 @@ if [ ! -f initialized ]; then
     date '+%Y-%m-%d %H:%M:%S' > initialized
 fi
 
-/usr/bin/vault-wrapper
+/usr/bin/vault-wrapper --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+                       --database="$postgres_vault_wrapper_db" --loglevel="${loglevel:-4}"
