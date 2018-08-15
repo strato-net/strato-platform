@@ -1,6 +1,7 @@
 {-# LANGUAGE
   OverloadedStrings
   , TemplateHaskell
+  , BangPatterns
 #-}
 
 module Slipstream.OutputData where
@@ -79,11 +80,9 @@ dbConnect =  PGDatabase
 
 dbInsert :: String -> PGConnection -> IO()
 dbInsert insrt conn = do
-  --conn <- pgConnect dbConnect
-  let qry = rawPGSimpleQuery $ BC.pack insrt
+  let qry = rawPGSimpleQuery $! BC.pack insrt
   _ <- pgRunQuery conn qry
   return ()
-  --pgDisconnect conn
 
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
@@ -97,7 +96,7 @@ convertRet address codehash abi name chain conn x = do
 
   --Indexing flag
   let indFlag = True
-  let ind = if (indFlag)
+  ind <- if (indFlag)
               then do
                 let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
                 let comma = if (length list == 0)
@@ -109,8 +108,8 @@ convertRet address codehash abi name chain conn x = do
                 let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
                 let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
                 let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-                createSt ++ delRow ++ ins
-              else ""
+                return $ createSt ++ delRow ++ ins
+              else return $ ""
 
   --History flag
   let histFlag = True
