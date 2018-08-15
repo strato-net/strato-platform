@@ -13,8 +13,8 @@ import           Strato.Strato23.API.Types
 import           Strato.Strato23.Database.Queries (getUserKeyQuery)
 import           Strato.Strato23.Server.Utils     (word256ToByteString)
 
-signatureDetails :: Maybe T.Text -> UserData -> VaultM SignatureDetails
-signatureDetails mUserId (UserData (Hex msgHash)) = case mUserId of
+postSignature :: Maybe T.Text -> UserData -> VaultM SignatureDetails
+postSignature mUserId (UserData (Hex msgHash)) = case mUserId of
   Nothing -> vaultWrapperError $ UserError "No user ID provided"
   Just userId -> do
     mPrvKey <- vaultTransaction

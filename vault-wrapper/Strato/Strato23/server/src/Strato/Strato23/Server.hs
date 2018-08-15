@@ -15,11 +15,14 @@ import           Servant.Swagger
 
 import           Strato.Strato23.API
 import           Strato.Strato23.Monad
+import           Strato.Strato23.Server.Key
 import           Strato.Strato23.Server.Ping
 import           Strato.Strato23.Server.Signature
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
-vaultWrapper = getPing :<|> signatureDetails
+vaultWrapper = getPing
+          :<|> postKey
+          :<|> postSignature
 
 serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper
