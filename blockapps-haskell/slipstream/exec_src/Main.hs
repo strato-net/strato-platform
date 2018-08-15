@@ -15,19 +15,22 @@ import HFlags
 import Slipstream.MessageConsumer
 import Slipstream.OutputData
 import Slipstream.Options ()
+import Database.PostgreSQL.Typed
 
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
 
+  conn <- pgConnect dbConnect
+
   let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); alter table contract add column \"chainId\" text; COMMIT;"
-  dbInsert conCreate
+  dbInsert conCreate conn
 
   let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  msg <- runKafka state $ (getAndProcessMessages offset)
+  msg <- runKafka state $ (getAndProcessMessages conn offset)
 
   messages <- case msg of
         Left e -> error $ show e
