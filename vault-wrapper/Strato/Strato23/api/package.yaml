@@ -22,10 +22,12 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base >= 4.7 && < 5
   - base16-bytestring
+  - binary
   - bytestring
   - cryptonite
   - http-media
   - largeword
+  - lens
   - memory
   - servant
   - servant-server
