@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Strato.Strato23.API
-  ( StratoAPI
+  ( VaultWrapperAPI
   , module Strato.Strato23.API.Ping
   , module Strato.Strato23.API.Signature
   ) where
@@ -10,6 +10,6 @@ import           Servant
 import           Strato.Strato23.API.Ping
 import           Strato.Strato23.API.Signature
 
-type StratoAPI = GetPing
+type VaultWrapperAPI = GetPing
   :<|> PostSignature
 

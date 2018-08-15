@@ -24,12 +24,13 @@ dependencies:
   - base16-bytestring
   - bytestring
   - cryptonite
+  - http-media
   - largeword
   - memory
   - servant
   - servant-server
+  - swagger2
   - text
-  - http-media
   - wai
   - wai-extra
   - wai-middleware-static

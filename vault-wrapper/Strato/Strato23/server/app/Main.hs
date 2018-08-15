@@ -1,26 +1,31 @@
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
+
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Log                  (Severity(..))
+import           Control.Monad.Log                      (Severity(..))
 import           Database.PostgreSQL.Simple
 import           Data.Pool
 import           HFlags
-import           Network.HTTP.Client hiding (Proxy)
+import           Network.HTTP.Client                    hiding (Proxy)
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
-import           Servant.Common.BaseUrl
-import           System.IO                          (BufferMode (..),
-                                                     hSetBuffering, stderr,
-                                                     stdout)
+import           System.IO                              (BufferMode (..),
+                                                        hSetBuffering, stderr,
+                                                        stdout)
 
-import qualified BlockApps.Bloc22.API as Bloc22
-import qualified BlockApps.Bloc22.Database.Create as Bloc22
-import qualified BlockApps.Bloc22.Database.Migration as Bloc22
-import qualified BlockApps.Bloc22.Monad as Bloc22
-import qualified BlockApps.Bloc22.Server as Bloc22
+import qualified Strato.Strato23.API                    as Strato23
+import qualified Strato.Strato23.Database.Migrations    as Strato23
+import qualified Strato.Strato23.Monad                  as Strato23
+import qualified Strato.Strato23.Server                 as Strato23
 
 import           Options
 
@@ -44,24 +49,24 @@ main = do
                                   }
 
   conn <- connect dbConnectInfo
-  void $ Bloc22.runMigrations conn
+  void $ Strato23.runMigrations conn
   close conn
 
   pool <- createPool (connect dbConnectInfo) close 5 3 5
   mgr <- newManager defaultManagerSettings
-  let env = VaultWrapperEnv mgr pool (toEnum flags_loglevel)
-  run flags_port (appVault env)
+  let env = Strato23.VaultWrapperEnv mgr pool (toEnum flags_loglevel)
+  run flags_port (appVaultWrapper env)
 
-appVaultWrapper :: VaultWrapperEnv -> Application
+appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
 appVaultWrapper env =
-  (if Bloc22.logLevel env >= Informational then logStdoutDev else logStdout)
+  (if Strato23.logLevel env >= Informational then logStdoutDev else logStdout)
   . cors (const $ Just policy)
-  . provideOptions (Proxy @ Bloc22.BlocAPI)
+  . provideOptions (Proxy @ Strato23.VaultWrapperAPI)
   . serve (Proxy @ (
-              "bloc" :> "v2.2" :> Bloc22.BlocAPI
-         :<|> "bloc" :> "v2.2" :> Bloc22.BlocDocsAPI
+              "strato" :> "v2.3" :> Strato23.VaultWrapperAPI
+         :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
               ))
-  $ Bloc22.serveBloc env
-     :<|> Bloc22.blocSwagger
+  $ Strato23.serveVaultWrapper env
+     :<|> return Strato23.vaultWrapperSwagger
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}

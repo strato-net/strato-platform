@@ -16,26 +16,17 @@ import           Control.Monad.Except
 import           Control.Monad.Log               hiding (Handler)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import qualified Data.Aeson                      as JSON
-import qualified Data.ByteString.Lazy.Char8      as Lazy.Char8
 import           Data.Foldable
-import qualified Data.HashMap.Lazy               as HashMap
-import           Data.Maybe                      (fromMaybe)
 import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import           Data.Time.Format
 import           Database.PostgreSQL.Simple      (Connection,
                                                   withTransaction)
 import           GHC.Stack
 import           Network.HTTP.Client
-import           Network.HTTP.Media
-import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
-import           Servant.Client
-import qualified Text.PrettyPrint.Leijen.Text    as Leijen
 
 newtype VaultM x = VaultM
   { runVaultM ::
@@ -56,10 +47,10 @@ newtype VaultM x = VaultM
 
 instance MonadError VaultWrapperError VaultM where
   throwError err@(RuntimeError _) = do
-    logWith logError (Text.pack $ formatError err ++ "\n  callstack missing for runtime errors")
+    logWith logError (Text.pack $ show err ++ "\n  callstack missing for runtime errors")
     VaultM $ throwError err
   throwError err = do
-    logWith logError (Text.pack (formatError err))
+    logWith logError (Text.pack (show err))
     VaultM $ throwError err
   catchError m handle = do
     VaultM $ catchError (runVaultM m) (runVaultM . handle)
@@ -121,16 +112,7 @@ boxIt string =
 filterPrintLog :: MonadIO m => Severity -> WithSeverity (WithCallStack (WithTimestamp Text)) -> m ()
 filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
 filterPrintLog _ x =
-  liftIO . print . render Leijen.stringStrict $ x
-  where
-    render::(a0 -> Leijen.Doc)
-            -> WithSeverity (WithCallStack (WithTimestamp a0))
-            -> Leijen.Doc
-    render
-      = renderWithSeverity
-      . renderLocation
-      . renderWithTimestamp
-          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+  liftIO . print $ x
 
 enterVaultWrapper :: VaultWrapperEnv -> VaultM x -> Handler x
 enterVaultWrapper env x
@@ -183,14 +165,9 @@ enterVaultWrapper env x
                      "(More information can be found in the Vault Wrapper logs.)"
                    ]}
 
-renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
-renderLocation k (WithCallStack stack msg) =
-  Leijen.fill 40 (Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
-
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
-
 
 logWithCallStack
   :: CallStack
@@ -225,7 +202,7 @@ vaultQuery1
   => Query x
   -> VaultM y
 vaultQuery1 q = vaultQuery q >>= \case
-    [] -> vaultError $ DBError "No result, expected one row"
+    [] -> vaultWrapperError $ DBError "No result, expected one row"
     [y] -> return y
     _:_:_ -> throwError $ DBError "vaultQuery1: Multiple results, expected one row"
 

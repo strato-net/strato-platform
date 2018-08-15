@@ -1,16 +1,16 @@
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Strato.Strato23.Server.Signature where
 
 import           Crypto.Secp256k1
 import qualified Data.ByteString.Base16        as B16
 import qualified Data.ByteString.Char8         as C8
-import qualified Data.ByteString.Lazy.Char8    as Lazy.Char8
 import           Data.Maybe                    (fromJust, fromMaybe, isNothing)
 import qualified Data.Text                     as T
 import           GHC.Generics
-import           Servant
+import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Server.Utils  (word256ToByteString)
@@ -33,15 +33,15 @@ toSecKey = fromMaybe (error "toSecKey: could not decode") . secKey . fst . B16.d
 getPrivateKeyOfUser :: String -> PrivateKey
 getPrivateKeyOfUser uname = head $ filter (\PrivateKey{..} -> uname == username) privateKeys
 
-signatureDetails :: Maybe T.Text -> UserData -> Handler SignatureDetails
+signatureDetails :: Maybe T.Text -> UserData -> VaultM SignatureDetails
 signatureDetails userEmail (UserData (Hex msgHash)) = do
   if (isNothing userEmail)
-    then throwError err404 { errBody = Lazy.Char8.pack "No cookie provided" }
+    then vaultWrapperError $ UserError "No cookie provided"
     else do
       let emailId = fromJust userEmail
           prvKey = getPrivateKeyOfUser $ T.unpack emailId
       case msg (word256ToByteString msgHash) of
-        Nothing -> throwError err500 { errBody = Lazy.Char8.pack "message was not 32 bytes long" }
+        Nothing -> vaultWrapperError $ AnError "message was not 32 bytes long"
         Just msg' -> do
           let sig = exportCompactRecSig $ signRecMsg (sk prvKey) msg'
           return $ SignatureDetails

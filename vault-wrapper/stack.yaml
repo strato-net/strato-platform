@@ -11,13 +11,16 @@ packages:
   extra-dep: true
 
 extra-deps:
-  - transformers-0.5.5.0
-  - ethereum-rlp-0.1.0
-  - nibblestring-0.0.3
   - conduit-1.2.13.1
+  - ethereum-rlp-0.1.0
+  - hflags-0.4.3
   - murmur3-1.0.3
+  - nibblestring-0.0.3
+  - opaleye-0.6.7001.0
   - pbkdf-1.1.1.1
   - resourcet-1.1.11
+  - servant-options-0.1.0.0
+  - transformers-0.5.5.0
 
 flags: {}
 

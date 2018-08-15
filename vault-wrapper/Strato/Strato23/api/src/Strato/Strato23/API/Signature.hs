@@ -1,13 +1,18 @@
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Strato.Strato23.API.Signature where
 
 import           Data.Aeson.Types
-import           Data.LargeWord   (Word256)
+import           Data.LargeWord               (Word256)
+import           Data.Swagger                 hiding (Header)
+import           Data.Swagger.Internal.Schema (named)
 import           Data.Text
-import           Data.Word        (Word8)
+import           Data.Word                    (Word8)
 import           GHC.Generics
 import           Servant.API
 import           Strato.Strato23.API.Types
@@ -30,5 +35,14 @@ data UserData = UserData {
 instance ToJSON SignatureDetails
 instance FromJSON SignatureDetails
 
+instance ToSchema SignatureDetails where
+
+instance ToSchema (Hex Word256) where
+  declareNamedSchema = const . pure $ named "hex word256" binarySchema
+
+instance ToSchema (Hex Word8) where
+  declareNamedSchema = const . pure $ named "hex word8" binarySchema
+
 instance ToJSON UserData
 instance FromJSON UserData
+instance ToSchema UserData where

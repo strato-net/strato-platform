@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Strato.Strato23.Database.Migration where
+module Strato.Strato23.Database.Migrations where
 
 import           Control.Exception                 (catch)
 import           Control.Monad                     (forM_)
@@ -38,3 +38,6 @@ getSchemaVersion = [sql| SELECT schema_version FROM bloc_schema_version WHERE id
 
 insertSchemaVersion :: Query
 insertSchemaVersion = [sql| INSERT INTO bloc_schema_version VALUES (1,1); |]
+
+updateSchemaVersion :: Query
+updateSchemaVersion = [sql| UPDATE bloc_schema_version SET schema_version=? WHERE id=1; |]

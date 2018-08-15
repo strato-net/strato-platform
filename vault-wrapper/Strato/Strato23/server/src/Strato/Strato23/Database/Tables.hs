@@ -1,6 +1,7 @@
 module Strato.Strato23.Database.Tables where
 
-import Opaleye
+import           Data.Profunctor.Product
+import           Opaleye
 
 schemaVersionTable :: Table
   ( Maybe (Column PGInt4)
