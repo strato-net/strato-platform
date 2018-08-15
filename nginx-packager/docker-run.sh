@@ -83,8 +83,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [ "$OAUTH_ENABLED" = true ] ; then
     cp /tmp/openid-auth.tpl.lua /tmp/openid-auth.lua
     sed -i 's*<OAUTH_OPENID_DISCOVERY_URL>*'"$OAUTH_OPENID_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
-    sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"$OAUTH_CLIENT_ID"'/g' /tmp/openid-auth.lua   
-    sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"$OAUTH_CLIENT_SECRET"'/g' /tmp/openid-auth.lua   
+    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-auth.lua
+    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
 
     if [ "$ssl" = true ] ; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth.lua   
