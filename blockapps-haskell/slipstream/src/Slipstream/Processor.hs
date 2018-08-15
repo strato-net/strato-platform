@@ -40,6 +40,7 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import HFlags
 import Slipstream.Options
+import Database.PostgreSQL.Typed
 
 import Slipstream.OutputData
 
@@ -115,8 +116,8 @@ second (_, x, _) = x
 third :: (a, b, c) -> c
 third (_, _, x) = x
 
-processTheMessages :: [B.ByteString] -> IO ()
-processTheMessages messages = do
+processTheMessages :: [B.ByteString] -> PGConnection -> IO ()
+processTheMessages messages conn = do
   _ <- $initHFlags "Setup Slipstream Variables"
   let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
 
@@ -185,6 +186,6 @@ processTheMessages messages = do
                     Nothing -> ""
                     Just(x) -> show x
 
-      liftIO $ convertRet address codehash strAbi name chain ret
+      liftIO $ convertRet address codehash strAbi name chain conn ret
 
   return()
