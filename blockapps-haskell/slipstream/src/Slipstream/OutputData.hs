@@ -81,7 +81,7 @@ dbConnect =  PGDatabase
 dbInsert :: String -> PGConnection -> IO()
 dbInsert insrt conn = do
   let qry = rawPGSimpleQuery $! BC.pack insrt
-  _ <- pgRunQuery conn qry
+  _ <- pgQuery conn qry
   return ()
 
 isFunction :: Value -> Bool
@@ -89,12 +89,13 @@ isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
 convertRet :: String -> String -> String -> String -> String -> PGConnection -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name chain conn x = do
+convertRet address codehash abi name chain conn metadata = do
 
   let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
   let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
-
-  --Indexing flag
+  dbInsert conIns conn
+  --TODO: Re-enable Indexing flag
+{-
   let indFlag = True
   ind <- if (indFlag)
               then do
@@ -110,14 +111,27 @@ convertRet address codehash abi name chain conn x = do
                 let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
                 return $ createSt ++ delRow ++ ins
               else return $ ""
+  -}
+  --TODO: Re-enable History flag
+  {-
+    --History flag
+    let histFlag = True
+    let hist = if (histFlag)
+                --TODO: Add history insert statement (transaction, state)
+                then ""
+                else ""
+  -}
+  let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction metadata
+  let comma = if (length list == 0)
+      then ""
+      else ", "
+  let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+  dbInsert createSt conn
 
-  --History flag
-  let histFlag = True
-  let hist = if (histFlag)
-              --TODO: Add history insert statement (transaction, state)
-              then ""
-              else ""
-
-  let oneIns = "BEGIN;" ++ conIns ++ ind ++ hist ++ "COMMIT;"
-
-  dbInsert oneIns conn
+  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
+  dbInsert delRow conn
+  let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+  let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
+  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
+  dbInsert ins conn
+  return ()

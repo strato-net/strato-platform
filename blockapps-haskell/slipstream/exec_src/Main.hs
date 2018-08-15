@@ -23,8 +23,10 @@ main = do
 
   conn <- pgConnect dbConnect
 
-  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); alter table contract add column \"chainId\" text; COMMIT;"
+  let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
   dbInsert conCreate conn
+  let conAlter =  "alter table contract add column \"chainId\" text;"
+  dbInsert conAlter conn
 
   let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
