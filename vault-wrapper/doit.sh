@@ -11,10 +11,6 @@ vault-wrapper:
 \$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 "
 
-locale-gen "en_US.UTF-8"
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-
 echo 'Waiting for postgres to be available...'
 while true; do
     curl ${postgres_host}:${postgres_port} > /dev/null 2>&1 || EXIT_CODE=$? && true
