@@ -51,8 +51,10 @@ dependencies:
 - pbkdf
 - postgresql-simple
 - product-profunctors
+- profunctors
 - QuickCheck
 - resource-pool
+- saltine
 - secp256k1
 - servant
 - servant-client
