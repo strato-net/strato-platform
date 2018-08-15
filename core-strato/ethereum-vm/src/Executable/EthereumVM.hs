@@ -103,10 +103,10 @@ ethereumVM = void . execContextM $ do
         reqd <- use contextBlockRequested
         let pending = B.pending state
             hasTxs = not (null poolableNewTxs) || not (M.null pending)
-            shouldOutputBlocks = isCaughtUp && hasTxs && (
+            shouldOutputBlocks = isCaughtUp && (
               if pbft
-                then reqd
-                else not makeLazyBlocks)
+                then reqd && hasTxs
+                else not makeLazyBlocks || hasTxs
         when (pbft && shouldOutputBlocks) $
           contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
