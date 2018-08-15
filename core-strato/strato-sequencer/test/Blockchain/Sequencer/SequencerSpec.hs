@@ -6,6 +6,8 @@ import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
 import           Control.Concurrent
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Monad.Logger
@@ -52,6 +54,7 @@ withTemporaryDepBlockDB genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
+    ch <- atomically $ newTMChan
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
@@ -64,6 +67,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , statsConfig           = Nothing
                                , blockstanbulBlockPeriodμs = 0
                                , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBeneficiary = ch
                                }
 
     runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg

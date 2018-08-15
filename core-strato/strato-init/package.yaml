@@ -51,6 +51,8 @@ dependencies:
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
+  - stm
+  - stm-chans
   - text
   - time
   - transformers
