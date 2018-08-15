@@ -20,14 +20,15 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 deriveAddress :: SecKey -> Address
 deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey
 
-postKey :: Maybe Text -> VaultM Address
-postKey mUserId = case mUserId of
-  Nothing -> vaultWrapperError $ UserError "No user ID provided"
-  Just userId -> do
+postKey :: Maybe Text -> Maybe Text -> VaultM Address
+postKey mUserUniqueName mUserId = case (mUserUniqueName, mUserId) of
+  (Nothing, _) -> vaultWrapperError $ UserError "No cookie provided"
+  (Just _, Nothing) -> vaultWrapperError $ UserError "No user ID provided"
+  (Just userName, Just _) -> do
     pKey <- liftIO newSecKey
     _ <- vaultTransaction
-       . toUserError ("User " <> userId <> " already exists")
+       . toUserError ("User " <> userName <> " already exists")
        . vaultModify
-       . postUserKeyQuery userId
+       . postUserKeyQuery userName
        $ getSecKey pKey
     return $ deriveAddress pKey

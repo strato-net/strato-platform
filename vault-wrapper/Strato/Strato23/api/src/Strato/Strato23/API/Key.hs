@@ -14,4 +14,7 @@ import           Strato.Strato23.API.Types
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type PostKey = "key" :> Header "X-USER-UNIQUE-NAME" Text :> Post '[JSON] Address
+type PostKey = "key"
+            :> Header "X-USER-UNIQUE-NAME" Text
+            :> Header "X-USER-ID" Text
+            :> Post '[JSON] Address
