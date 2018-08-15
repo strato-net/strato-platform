@@ -103,6 +103,7 @@ getContract name _ chainId = do
     contract = xAbiToContract xabi
     , xabi = T.pack . show $ JSON.toJSON xabi
     , name = name
+    , resolvedName = Nothing
     }
 
 getContractCompileFullSource :: Address -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
@@ -115,6 +116,7 @@ getContractCompileFullSource address _ chainId = do
     contract = xAbiToContract $ contractdetailsXabi contractDetails
     , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
     , name = contractdetailsName contractDetails
+    , resolvedName = Nothing
   }
   return $ (Right ret)
 
@@ -169,9 +171,7 @@ resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
   if (null sameName)
-    then
-      let newName = contractName ++ show inc
-      return newName
+    then return $ contractName ++ show inc
     else do
       case (lookup codehash sameName) of
         Nothing -> do

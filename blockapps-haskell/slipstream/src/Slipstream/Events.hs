@@ -91,3 +91,12 @@ data ProcessedContract = ProcessedContract {
   chain :: Text,
   contractData :: Map T.Text V.Value
 }
+
+data ContractAndXabi =
+  ContractAndXabi {
+    contract :: Either String Contract,
+    xabi :: String,
+    name :: String,
+    resolvedName :: Maybe String
+  }
+  deriving(Show)

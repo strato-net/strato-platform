@@ -108,13 +108,18 @@ dbInsert conn insrt = do
   _ <- pgQuery conn qry
   return ()
 
-dbSelect :: String -> IO String
+dbSelect :: String -> IO [String]
 dbSelect statement = do
   conn <- pgConnect dbConnect
-  let qry = rawPGSimpleQuery $ BC.pack insert
-  ret <- pgRunQuery conn query
-  pgDisconnectconn
-  return ret
+  let qry = rawPGSimpleQuery $ BC.pack statement
+  ret <- pgQuery conn qry
+  pgDisconnect conn
+  return $ map show ret
+
+compareSchema :: String -> String -> IO Bool
+compareSchema query schema = do
+  tOrF <- dbSelect query
+  return (concat tOrF == schema)
 
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
