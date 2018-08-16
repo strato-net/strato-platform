@@ -8,7 +8,7 @@ local opts = {
     token_endpoint_auth_method = "client_secret_post",
     ssl_verify                 = "<IS_SSL_PLACEHOLDER_YES_NO>",
     redirect_uri_scheme        = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-    session_contents           = {id_token=true},
+    session_contents           = {id_token=true, user=true}, -- for the cases when email is stored under user object
     logout_path                = "/auth/openidc/logout",
     -- TODO: handle the logout properly, unset the cookie for client
     --  redirect_after_logout_uri  = "https://login.microsoftonline.com/common/oauth2/logout", -- ?post_logout_redirect_uri=http://localhost/"
@@ -25,7 +25,8 @@ if err then
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local unique_name = res.id_token.email
+-- some oauth providers return email under `id_token` object, some - under `user`
+local unique_name = res.id_token.email or res.user.email
 local user_id = res.id_token.sub
 
 -- set request header to forward to APIs
@@ -33,4 +34,4 @@ ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 ngx.req.set_header("X-USER-ID", user_id)
 
 -- set response cookie header
---ngx.header['Set-Cookie'] = 'strato_user_name=' .. unique_name .. '; path=/'
+ngx.header['Set-Cookie'] = 'strato_user_name=' .. unique_name .. '; path=/'
