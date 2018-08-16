@@ -106,7 +106,7 @@ ethereumVM = void . execContextM $ do
             shouldOutputBlocks = isCaughtUp && (
               if pbft
                 then reqd && hasTxs
-                else not makeLazyBlocks || hasTxs
+                else not makeLazyBlocks || hasTxs)
         when (pbft && shouldOutputBlocks) $
           contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
