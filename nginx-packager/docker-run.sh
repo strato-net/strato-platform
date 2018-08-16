@@ -128,7 +128,7 @@ done
 echo 'apex is available'
 
 echo 'Waiting for vault-wrapper to be available...'
-until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/_ping
+until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/strato/v2.3/_ping
 do
   sleep 0.5
 done
