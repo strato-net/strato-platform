@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -e
 
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
@@ -9,26 +8,33 @@ authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
-azureAD=${azureAD:-false}
-azureADTenantID=${azureADTenantID:-NULL}
-azureADClientID=${azureADClientID:-NULL}
-azureADClientSecret=${azureADClientSecret:-NULL}
+OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+OAUTH_OPENID_DISCOVERY_URL=${OAUTH_OPENID_DISCOVERY_URL:-NULL}
+OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
+OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [ "$azureAD" = true ]; then
+  if [ "OAUTH_ENABLED" = true ]; then
     if [[ ${SMD_MODE,,} = public ]] ; then
-     echo 'Azure AD cannot be used with SMD_MODE=public'
+     echo 'OAuth cannot be used with SMD_MODE=public'
      exit 4
     fi
 
-    if [[ $azureADTenantID = NULL || $azureADClientID = NULL || $azureADClientSecret = NULL ]] ; then
-      echo 'AzureAD TenantID / ClientID / ClientSecret are required for azureAD'
-      exit 4
+    if [[ ${OAUTH_OPENID_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+      echo 'OAUTH_OPENID_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exiting'
+      exit 5
     fi
+
+    if ! curl --silent --output /dev/null --fail --location ${OAUTH_OPENID_DISCOVERY_URL}
+    then
+      echo "OpenID Connect Discovery URL is unreachable: ${OAUTH_OPENID_DISCOVERY_URL}. Exiting."
+      exit 6
+    fi
+
   fi
 
   ########
@@ -36,12 +42,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
-  # Remove Azure Active Directory configuration lines if deployment is not AAD-enabled
-  if [ "$azureAD" != true ]; then
-    sed -i '/#TEMPLATE_MARK_AZUREAD/d' /tmp/nginx.conf
+  # Remove OAuth configuration lines if deployment is not OAuth-enabled
+  if [ "$OAUTH_ENABLED" != true ]; then
+    sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
   else
-    sed -i '/#TEMPLATE_MARK_NO_AZUREAD/d' /tmp/nginx.conf
-    # Required with lua_code_cache off
+    sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
+    # Required with `lua_code_cache off` only, see https://github.com/bungle/lua-resty-session#notes-about-turning-lua-code-cache-off
     #sed -i 's/<SESSION_SECRET>/mySessionSecretKeyHash/g' /tmp/nginx.conf
   fi
 
@@ -72,21 +78,20 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   ########
-  ### Generate azure-authentication.lua from template according to configuration provided
+  ### Generate openid-auth.lua from template according to configuration provided
   ########
-  if [ "$azureAD" = true ] ; then
-    cp /tmp/azure-authentication.tpl.lua /tmp/azure-authentication.lua
-
-    sed -i 's/<TENANT_ID_PLACEHOLDER>/'"$azureADTenantID"'/g' /tmp/azure-authentication.lua
-    sed -i 's/<CLIENT_ID_PLACEHOLDER>/'"$azureADClientID"'/g' /tmp/azure-authentication.lua
-    sed -i 's/<CLIENT_SECRET_PLACEHOLDER>/'"$azureADClientSecret"'/g' /tmp/azure-authentication.lua
+  if [ "$OAUTH_ENABLED" = true ] ; then
+    cp /tmp/openid-auth.tpl.lua /tmp/openid-auth.lua
+    sed -i 's*<OAUTH_OPENID_DISCOVERY_URL>*'"$OAUTH_OPENID_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
+    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-auth.lua
+    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
 
     if [ "$ssl" = true ] ; then
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/azure-authentication.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/azure-authentication.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth.lua   
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-auth.lua   
     else
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/azure-authentication.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/azure-authentication.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth.lua   
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid-auth.lua
     fi
   fi
 
@@ -95,11 +100,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
-  if [ "$azureAD" = true ]; then
-    mv /tmp/azure-authentication.lua /usr/local/openresty/nginx/lua/azure-authentication.lua
-    # fetch libraries from repo:
-    opm get zmartzone/lua-resty-openidc
-    opm get SkyLothar/lua-resty-jwt
+  if [ "$OAUTH_ENABLED" = true ]; then
+    mv /tmp/openid-auth.lua /usr/local/openresty/nginx/lua/openid-auth.lua
   fi
 
   if [ "$ssl" = true ] ; then
@@ -125,5 +127,13 @@ do
 done
 echo 'apex is available'
 
+echo 'Waiting for vault-wrapper to be available...'
+until curl --silent --output /dev/null --fail --location http://vault-wrapper:8000/strato/v2.3/_ping
+do
+  sleep 0.5
+done
+echo 'vault-wrapper is available'
+
 openresty
+echo  'nginx is now running. See the logs below...'
 tail -n0 -F /usr/local/openresty/nginx/logs/*.log

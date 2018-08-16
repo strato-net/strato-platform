@@ -93,6 +93,16 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
+  vault-wrapper:
+    environment:
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgres_vault_wrapper_db=oauth
+    build: .
+    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
+    restart: always
   strato:
     depends_on:
     - kafka
@@ -172,12 +182,13 @@ services:
     - smd
     - strato
     - apex
+    - vault-wrapper
     environment:
     - authBasic=${authBasic}
-    - azureAD=${azureAD}
-    - azureADClientID=${azureADClientID}
-    - azureADClientSecret=${azureADClientSecret}
-    - azureADTenantID=${azureADTenantID}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_OPENID_DISCOVERY_URL}
     - blockTime=${blockTime}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}

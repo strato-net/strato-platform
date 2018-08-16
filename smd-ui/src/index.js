@@ -111,7 +111,7 @@ const rootReducer = combineReducers({
   externalStorage: externalStorageReducer,
   attest: attestReducer,
   verify: verifyReducer,
-  download: downloadReducer
+  download: downloadReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -140,7 +140,7 @@ const rootSaga = function* startForeman() {
     fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
-    fork(watchFetchUpload)
+    fork(watchFetchUpload),
   ])
 };
 
