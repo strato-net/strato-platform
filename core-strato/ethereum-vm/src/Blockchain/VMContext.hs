@@ -231,7 +231,7 @@ runContextM f = do
                         Unspecified
                         redisPool
                         [] [] []
-                        flags_tmpblockstanbul)
+                        flags_blockstanbul)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a

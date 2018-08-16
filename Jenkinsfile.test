@@ -31,7 +31,6 @@ pipeline {
           set -x
           REPO=private make all
         '''
-        archive "docker-compose.yml"
       }
     }
 
@@ -71,6 +70,7 @@ pipeline {
             withCredentials([
               usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
             ]) {
+              archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000

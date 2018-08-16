@@ -111,11 +111,12 @@ services:
     environment:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
-    - tmpblockstanbul=${tmpblockstanbul}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
+    - seqDebugMode=${seqDebugMode}
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
@@ -144,6 +145,9 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper
+    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
