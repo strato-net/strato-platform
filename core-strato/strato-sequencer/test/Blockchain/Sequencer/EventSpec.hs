@@ -14,44 +14,38 @@ import           Blockchain.Sequencer.Event
 main :: IO ()
 main = hspec spec
 
+binaryFidelity :: (Eq a, Show a, Binary a) => a -> Expectation
+binaryFidelity x = decode (encode x) `shouldBe` x
+
 spec :: Spec
 spec = parallel $ do
     describe "Transaction" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: TX.Transaction)
-
+        it "should be serializable and deserializable" $ property $
+            \x -> binaryFidelity (x :: TX.Transaction)
     describe "BlockData" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: DD.BlockData)
-
+        it "should be serializable and deserializable" $ property $
+            \x -> binaryFidelity (x :: DD.BlockData)
     describe "AccountInfo" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: CI.AccountInfo)
-
+        it "should be serializable and deserializable" $ property $
+            \x -> binaryFidelity (x :: CI.AccountInfo)
     describe "CodeInfo" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: CI.CodeInfo)
-
+        it "should be serializable and deserializable" $ property $
+            \x -> binaryFidelity (x :: CI.CodeInfo)
     describe "ChainInfo" $ do
-        it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: CI.ChainInfo)
-
+        it "should be serializable and deserializable" $ property $
+            \x -> binaryFidelity (x :: CI.ChainInfo)
     describe "IngestTx" $ do
         it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: IngestTx)
-
+            \x -> binaryFidelity (x :: IngestTx)
     describe "IngestBlock" $ do
         it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: IngestBlock)
-
+            \x -> binaryFidelity (x :: IngestBlock)
     describe "SequencedBlock" $ do
         it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: SequencedBlock)
-
+            \x -> binaryFidelity (x :: SequencedBlock)
     describe "OutputTx" $ do
         it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: OutputTx)
-
+            \x -> binaryFidelity (x :: OutputTx)
     describe "OutputBlock" $ do
         it "should be serializable and deserializable" $ property $ do
-            \x -> (decode . encode) x == (x :: OutputBlock)
+            \x -> binaryFidelity (x :: OutputBlock)

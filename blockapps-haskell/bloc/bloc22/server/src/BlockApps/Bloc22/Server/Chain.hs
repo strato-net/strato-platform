@@ -62,9 +62,7 @@ postChainInfo (ChainInput src lbl accountInfo chaininputArgs members) = do
 getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos::[ChainIdChainInfo] <- blocStrato $ Strato.getChain chainIds
-  case chainIdChainInfos of 
-    [] -> throwError $ DBError "No chains match any of the chainIds"
-    _ -> return $ map convertChainInfo chainIdChainInfos
+  return $ map convertChainInfo chainIdChainInfos
     where
       convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do

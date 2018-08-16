@@ -11,6 +11,7 @@ import Data.DeriveTH
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
+import Text.Printf
 
 import Blockchain.Data.RLP
 import Blockchain.ExtWord
@@ -28,6 +29,9 @@ data View = View {
   _sequence :: SequenceNumber
 } deriving (Eq, Show, Ord, Generic)
 makeLenses ''View
+
+instance Format View where
+  format (View r s) = printf "View (round = %d, sequence = %d)" r s
 
 data MsgAuth = MsgAuth {
   sender :: Address,
@@ -67,7 +71,7 @@ commitCode = 2
 roundchangeCode = 3
 
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
-             | Timeout
+             | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
@@ -77,6 +81,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
+              | ResetTimer RoundNumber
               deriving (Eq, Show)
 
 getHash :: TrustedMessage -> Word256

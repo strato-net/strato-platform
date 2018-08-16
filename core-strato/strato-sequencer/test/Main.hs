@@ -6,7 +6,10 @@ import   Test.Hspec.Runner
 
 import   qualified Spec
 
+predicate :: Path -> Bool
+predicate _ = True
+
 main :: IO ()
 main = do
   _ <- $initHFlags "Sequencer unit tests"
-  hspec Spec.spec
+  hspecWith (configAddFilter predicate defaultConfig) Spec.spec
