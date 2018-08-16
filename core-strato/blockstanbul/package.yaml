@@ -59,5 +59,3 @@ benchmarks:
     dependencies:
       - blockstanbul
       - criterion
-      - aeson
-      - hspec
