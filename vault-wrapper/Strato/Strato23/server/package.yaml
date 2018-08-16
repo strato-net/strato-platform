@@ -30,7 +30,6 @@ dependencies:
 - byteable
 - conduit 
 - containers
-- cryptohash
 - cryptonite
 - deepseq
 - ethereum-rlp
