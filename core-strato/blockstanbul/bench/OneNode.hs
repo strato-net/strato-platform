@@ -2,17 +2,20 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.State.Lazy
 
 import Data.Aeson
+import Data.Bits
+import qualified Data.ByteString as BS
 import Data.Maybe
 import qualified Network.Haskoin.Crypto as HK
 
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Data.Block
+import Blockchain.Data.Code
+import Blockchain.Data.TransactionDef
 import Blockchain.Data.Json
 import Blockchain.Strato.Model.Address
 
@@ -26,6 +29,18 @@ genesisBlock = case eitherGenesis of
   Left err -> error err
   Right [] -> error "no block"
   Right (b:_) -> b
+
+oneTX :: Int -> Transaction
+oneTX size = ContractCreationTX {
+  transactionNonce = 0,
+  transactionGasPrice = 0,
+  transactionGasLimit = 1,
+  transactionValue = 0,
+  transactionInit = Code {codeBytes = BS.replicate size 0xca },
+  transactionChainId = Nothing,
+  transactionR = 1 `shiftL` 200,
+  transactionS = 1 `shiftL` 133,
+  transactionV = 27}
 
 benchContext :: BlockstanbulContext
 benchContext =
@@ -42,15 +57,26 @@ instance HasBlockstanbulContext (StateT BlockstanbulContext (NoLoggingT IO)) whe
   getBlockstanbulContext = gets Just
   putBlockstanbulContext = put
 
-fullRound :: (HasBlockstanbulContext m, MonadIO m, MonadLogger m)=> Block -> m [OutEvent]
-fullRound b' = do
+fullRound :: Block -> IO [OutEvent]
+fullRound b' =
   let b = truncateExtra b'
-  sendAllMessages [NewBlock b]
+  in runBench . sendAllMessages $ [NewBlock b]
 
-genesisBench :: IO [OutEvent]
-genesisBench = runBench . fullRound $ genesisBlock
+genesisBench :: Int -> Int -> IO [OutEvent]
+genesisBench txcount txsize =
+  fullRound $ genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize)}
 
+pageTest :: Int -> Benchmark
+pageTest n = bench (show n ++ "x4KB") . nfIO . genesisBench n $ 4092
+
+slabTest :: Int -> Benchmark
+slabTest n = bench (show n ++ "x4MB") . nfIO . genesisBench n $ 4 * 1028 * 1028
+
+shebangTest :: Int -> Benchmark
+shebangTest n = bench (show n ++ "x1GB") . nfIO . genesisBench n $ 4 * 1028 * 1028 * 1028
 main :: IO ()
-main = defaultMain
-     [ bench "one validator loop" $ nfIO genesisBench
-     ]
+main = defaultMain $
+     [ bench "0x0" . nfIO . genesisBench 0 $ 0]
+    ++ map pageTest [10, 20, 40, 80, 160, 320, 640, 1280]
+    ++ map slabTest [10, 20, 40, 80, 160, 320, 640, 1280]
+    ++ map shebangTest [1, 2, 4, 8, 16, 32]

@@ -60,3 +60,4 @@ benchmarks:
       - blockstanbul
       - criterion
       - aeson
+      - hspec
