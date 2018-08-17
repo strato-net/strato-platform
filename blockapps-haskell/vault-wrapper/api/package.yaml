@@ -11,8 +11,10 @@ category: Web
 build-type: Simple
 
 dependencies:
-  - base
   - aeson
+  - base
+  - blockapps-ethereum
+  - largeword
   - QuickCheck
   - servant
   - servant-docs

@@ -27,6 +27,7 @@ library
   build-depends:
       aeson
     , base
+    , blockapps-ethereum
     , blockapps-vault-wrapper-api
     , containers
     , http-client

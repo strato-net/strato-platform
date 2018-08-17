@@ -3,14 +3,13 @@
 
 module BlockApps.VaultWrapper.API where
 
-import           Data.Aeson
 import           Data.Text                    (Text)
 import           Servant.API
 
 import           BlockApps.Ethereum           (Address(..))
 import           BlockApps.VaultWrapper.Types
 
-type API =  
+type API =
   "_ping"
     :> Get '[JSON] String
   :<|> "key"

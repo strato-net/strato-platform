@@ -6,12 +6,12 @@ module BlockApps.VaultWrapper.Client
   , postSignature
   ) where
 
-import           Data.Aeson
 import           Data.Proxy
 import           Data.Text                    (Text)
 import           Servant.API
 import           Servant.Client
 
+import           BlockApps.Ethereum           (Address(..))
 import           BlockApps.VaultWrapper.API
 import           BlockApps.VaultWrapper.Types
 

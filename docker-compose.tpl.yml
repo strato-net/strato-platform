@@ -71,6 +71,7 @@ services:
   bloc:
     depends_on:
     - strato
+    - vault-wrapper
     - postgres
     environment:
     - loglevel=${loglevel}
@@ -85,6 +86,7 @@ services:
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}

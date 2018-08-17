@@ -11,15 +11,9 @@ module BlockApps.Bloc22.Server.Transaction where
 
 import           Control.Monad
 import           Control.Monad.Except
-import           Data.Aeson                        hiding (Array, String)
-import           Data.LargeWord
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
-import qualified Data.Text.Encoding                as Text
-import           Data.Word
-import           GHC.Generics
-import           Network.HTTP.Simple
 
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
@@ -31,6 +25,8 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract()
 import           BlockApps.SolidityVarReader       (byteStringToWord256) -- TODO: Find a better module for this function
 import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.VaultWrapper.Client
+import           BlockApps.VaultWrapper.Types
 
 postBlocTransaction :: Maybe Text -> Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionRequest addr txs' txParams) = do
@@ -116,7 +112,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
 callSignature :: Text -> Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName userId unsigned@UnsignedTransaction{..} = do
   let msgHash = byteStringToWord256 $ rlpHash unsigned
-  SignatureDetails{..} <- getRSV userName userId msgHash
+  SignatureDetails{..} <- blocVaultWrapper $ postSignature (Just userName) (Just userId) (userData msgHash)
   return $ Transaction
     unsignedTransactionNonce
     unsignedTransactionGasPrice
@@ -128,30 +124,3 @@ callSignature userName userId unsigned@UnsignedTransaction{..} = do
     (unHex v)
     (unHex r)
     (unHex s)
-
-getRSV :: Text -> Text -> Word256 -> Bloc SignatureDetails
-getRSV userName userId msgHash' = do
-  let request = setRequestHeaders
-                  [("X-USER-UNIQUE-NAME", Text.encodeUtf8 userName)
-                  ,("X-USER-ID", Text.encodeUtf8 userId)
-                  ,("Content-Type", Text.encodeUtf8 "application/json")
-                  ]
-              . setRequestBodyJSON (UserData (Hex msgHash'))
-              $ "POST http://vault-wrapper:8000/strato/v2.3/signature" -- TODO(dustin): Establish a vault-wrapper API type and call this endpoint
-  getResponseBody <$> httpJSON request
-
-data SignatureDetails = SignatureDetails
-  { r :: Hex Word256
-  , s :: Hex Word256
-  , v :: Hex Word8
-  } deriving (Eq, Show, Generic)
-
-instance ToJSON SignatureDetails
-instance FromJSON SignatureDetails
-
-data UserData = UserData {
-  msgHash :: Hex Word256
-} deriving (Eq, Show, Generic)
-
-instance ToJSON UserData
-instance FromJSON UserData
