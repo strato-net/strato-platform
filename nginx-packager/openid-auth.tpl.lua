@@ -8,7 +8,9 @@ local opts = {
     token_endpoint_auth_method = "client_secret_post",
     ssl_verify                 = "<IS_SSL_PLACEHOLDER_YES_NO>",
     redirect_uri_scheme        = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-    session_contents           = {id_token=true, user=true}, -- for the cases when email is stored under user object
+  -- 'access_token' is required for refresh token, 'user' is for providers sending 'email' in user object instead openid
+  -- keeping commented to have everything stored in session
+    -- session_contents           = {id_token=true, user=true, access_token=true},
     logout_path                = "/auth/openidc/logout",
     -- TODO: handle the logout properly, unset the cookie for client
     --  redirect_after_logout_uri  = "https://login.microsoftonline.com/common/oauth2/logout", -- ?post_logout_redirect_uri=http://localhost/"
