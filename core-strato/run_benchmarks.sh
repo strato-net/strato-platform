@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 stack bench blockstanbul
+stack bench strato-sequencer
+stack bench ethereum-rlp
