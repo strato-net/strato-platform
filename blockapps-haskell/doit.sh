@@ -4,6 +4,7 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
+vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 isPublic=false
  if [ "${SMD_MODE}" == public ]; then
@@ -18,6 +19,7 @@ slipstream:
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
 --stratourl=\$stratoRoot="${stratoRoot}"
+--vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
 
@@ -26,7 +28,9 @@ no vars/flags set
 
 bloc:
 stratoHost="${stratoHost}"
+vaultWrapperHost="${vaultWrapperHost}"
 --stratourl=\$stratoRoot="${stratoRoot}"
+--vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --pghost=\$postgres_host="${postgres_host}"
 --pgport=\$postgres_port="${postgres_port}"
 --pguser=\$postgres_user="${postgres_user}"
@@ -43,6 +47,12 @@ until curl ${stratoRoot} >& /dev/null; do
     sleep 0.5
 done
 echo "STRATO is available"
+
+echo "Waiting for Vault Wrapper to be available..."
+until curl ${vaultWrapperRoot} >& /dev/null; do
+    sleep 0.5
+done
+echo "Vault Wrapper is available"
 
 echo 'Waiting for postgres to be available...'
 while true; do
@@ -77,7 +87,7 @@ function forkSlipstream() {
     sleep 1;
   done
   /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-             --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
+             --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
              --kafkahost="$kafkaHost" --kafkaport="$kafkaPort"
 }
 
@@ -89,4 +99,4 @@ function forkSlipstream() {
 forkSlipstream &>> logs/slipstream &
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1

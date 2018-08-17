@@ -16,12 +16,9 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
---import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
---import           Data.Proxy
 import           Data.Text                          (Text)
---import qualified Data.Text.Encoding                 as Text
 import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric.Natural
@@ -30,12 +27,10 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Bloc22.API.Users 
+import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
---import           BlockApps.Solidity.SolidityValue
---import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
 --------------------------------------------------------------------------------
@@ -62,6 +57,7 @@ instance ToSchema BlocTransactionType where
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> S.Header "X-USER-ID" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
