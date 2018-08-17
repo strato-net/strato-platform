@@ -71,6 +71,7 @@ tests:
       - test-framework-hunit == 0.3.*
       - HUnit == 1.*
       - hspec
+      - ethereum-rlp
 
 benchmarks:
   rlpserial:
