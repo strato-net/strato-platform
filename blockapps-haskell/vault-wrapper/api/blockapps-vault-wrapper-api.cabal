@@ -1,0 +1,41 @@
+-- This file has been generated from package.yaml by hpack version 0.20.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 4623eadf6dbe31f30aa997ba8aea2967b6ec1fd17ca1c00263ba04913366c7a8
+
+name:           blockapps-cirrus-api
+version:        0.1.0.0
+synopsis:       Cirrus microservice
+description:    Cirrus microservice API definitions
+category:       Web
+homepage:       https://github.com/blockapps/blockapps-haskell/cirrus/api#readme
+bug-reports:    https://github.com/blockapps/blockapps-haskell/cirrus/api/issues
+author:         Eitan Chatav
+maintainer:     eitan@blockapps.net
+copyright:      2016 BlockApps
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/cirrus/api
+
+library
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , blockapps-solidity
+    , servant
+    , servant-docs
+    , text
+  exposed-modules:
+      BlockApps.Cirrus.API
+  other-modules:
+      Paths_blockapps_cirrus_api
+  default-language: Haskell2010
