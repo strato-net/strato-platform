@@ -19,12 +19,10 @@ import           Data.Aeson.Casing
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Text                          (Text)
-import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API                        as S
 import           Servant.Docs
-import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
@@ -37,23 +35,12 @@ import           BlockApps.Strato.Types
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord, Show, Generic)
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord)
 
-instance Arbitrary BlocTransactionType where
-  arbitrary = genericArbitrary uniform
-
-instance FromJSON BlocTransactionType where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON BlocTransactionType where
-  toJSON = genericToJSON defaultOptions
-
-instance ToSchema BlocTransactionType where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Bloc Transaction Type"
-    & mapped.schema.example ?~ toJSON CONTRACT
-
---------------------------------------------------------------------------------
+transactionType :: BlocTransactionPayload -> BlocTransactionType
+transactionType (BlocTransfer _) = TRANSFER
+transactionType (BlocContract _) = CONTRACT
+transactionType (BlocFunction _) = FUNCTION
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
@@ -65,11 +52,11 @@ type PostBlocTransaction = "transaction"
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Address
-  , postbloctransactionrequestTxs      :: [(BlocTransactionType, BlocTransactionPayload)]
+  , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 
---instance Arbitrary PostBlocTransactionRequest where 
+--instance Arbitrary PostBlocTransactionRequest where
   --arbitrary = genericArbitrary uniform
 
 instance ToJSON PostBlocTransactionRequest where
@@ -82,12 +69,11 @@ instance ToSample PostBlocTransactionRequest where
   toSamples _ = singleSample $
     PostBlocTransactionRequest
       (Address 0xdeadbeef)
-      [(TRANSFER,
-        BlocTransfer $ TransferPayload
-          (Address 0x12345678)
-          (Strung 600)
-       )]
-      (Just (TxParams (Just $ Gas 1) (Just $ Wei 1) (Just $ Nonce 0)))
+      [BlocTransfer $ TransferPayload
+        (Address 0x12345678)
+        (Strung 600)
+      ]
+      (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
 
 instance ToSchema PostBlocTransactionRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -98,17 +84,31 @@ instance ToSchema PostBlocTransactionRequest where
       ex :: PostBlocTransactionRequest
       ex = PostBlocTransactionRequest
                  (Address 0xdeadbeef)
-                 [(TRANSFER,
-                   BlocTransfer $ TransferPayload
-                     (Address 0x12345678)
-                     (Strung 600)
-                 )]
-                 (Just (TxParams (Just $ Gas 1) (Just $ Wei 1) (Just $ Nonce 0)))
+                 [BlocTransfer $ TransferPayload
+                   (Address 0x12345678)
+                   (Strung 600)
+                 ]
+                 (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
 
-data BlocTransactionPayload = BlocContract ContractPayload
-                            | BlocTransfer TransferPayload
+data BlocTransactionPayload = BlocTransfer TransferPayload
+                            | BlocContract ContractPayload
                             | BlocFunction FunctionPayload
                             deriving (Eq, Show, Generic)
+
+instance ToJSON BlocTransactionPayload where
+  toJSON (BlocTransfer t) = object ["type" .= ("TRANSFER" :: Text), "payload" .= t]
+  toJSON (BlocContract c) = object ["type" .= ("CONTRACT" :: Text), "payload" .= c]
+  toJSON (BlocFunction f) = object ["type" .= ("FUNCTION" :: Text), "payload" .= f]
+
+instance FromJSON BlocTransactionPayload where
+  parseJSON (Object o) = do
+    (ttype :: Text) <- (o .: "type")
+    case ttype of
+      "TRANSFER" -> BlocTransfer <$> (o .: "payload")
+      "CONTRACT" -> BlocContract <$> (o .: "payload")
+      "FUNCTION" -> BlocFunction <$> (o .: "payload")
+      t -> error $ "fromJSON BlocTransactionPayload: Expected 'type' to be TRANSFER, CONTRACT, or FUNCTION, but got " ++ show t
+  parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
   { contractpayloadSrc      :: Text
@@ -118,8 +118,8 @@ data ContractPayload = ContractPayload
   } deriving (Eq, Show, Generic)
 
 data TransferPayload = TransferPayload
-  { transferpayloadTo    :: Address
-  , transferpayloadValue :: Strung Natural
+  { transferpayloadToAddress :: Address
+  , transferpayloadValue     :: Strung Natural
   } deriving (Eq, Show, Generic)
 
 data FunctionPayload = FunctionPayload
@@ -129,9 +129,6 @@ data FunctionPayload = FunctionPayload
   , functionpayloadArgs            :: Map Text ArgValue
   , functionpayloadValue           :: Maybe (Strung Natural)
   } deriving (Eq, Show, Generic)
-
-instance ToJSON BlocTransactionPayload where
-instance FromJSON BlocTransactionPayload where
 
 instance ToJSON ContractPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -183,7 +180,7 @@ instance ToSchema TransferPayload where
     where
       ex :: TransferPayload
       ex = TransferPayload
-        { transferpayloadTo    = Address (0xdeadbeef)
+        { transferpayloadToAddress = Address (0xdeadbeef)
         , transferpayloadValue = Strung 1000000
         }
 
