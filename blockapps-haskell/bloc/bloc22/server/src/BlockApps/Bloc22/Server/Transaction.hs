@@ -33,21 +33,21 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
   case (mUserName, mUserId) of
     (Nothing, _) -> error "Did not find X-USER-UNIQUE-NAME in the header"
     (Just _, Nothing) -> error "Did not find X-USER-ID in the header"
-    (Just userName, Just userId) -> fmap join . forM (partitionWith fst txs') $ \(ttype, txs) -> case ttype of
+    (Just userName, Just userId) -> fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
       TRANSFER -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromTransfer $ snd x
+          p <- fromTransfer x
           let btp = TransferParameters
                       addr
-                      (transferpayloadTo p)
+                      (transferpayloadToAddress p)
                       (transferpayloadValue p)
                       txParams
                       chainId
                       resolve
           fmap (:[]) $ postUsersSend' btp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromTransfer . snd) xs
+          p <- mapM fromTransfer xs
           let btlp = TransferListParameters
                       addr
                       (map (\(TransferPayload t v) -> SendTransaction t v txParams) p)
@@ -57,7 +57,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
       CONTRACT -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromContract $ snd x
+          p <- fromContract x
           let bcp = ContractParameters
                       addr
                       (contractpayloadSrc p)
@@ -69,7 +69,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                       resolve
           fmap (:[]) $ postUsersContract' bcp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromContract . snd) xs
+          p <- mapM fromContract xs
           let bclp = ContractListParameters
                       addr
                       (map (\(ContractPayload _ c a v) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v) p)
@@ -79,7 +79,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
       FUNCTION -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromFunction $ snd x
+          p <- fromFunction x
           let bfp = FunctionParameters
                       addr
                       ((\(ContractName c) -> c) $ functionpayloadContractName p)
@@ -92,7 +92,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                       resolve
           fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromFunction . snd) xs
+          p <- mapM fromFunction xs
           let bflp = FunctionListParameters
                       addr
                       (map (\(FunctionPayload (ContractName n) a m r v) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams) p)
