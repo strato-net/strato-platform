@@ -35,7 +35,10 @@ import           BlockApps.Strato.Types
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord)
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord, Show, Generic)
+
+instance ToJSON BlocTransactionType where
+instance FromJSON BlocTransactionType where
 
 transactionType :: BlocTransactionPayload -> BlocTransactionType
 transactionType (BlocTransfer _) = TRANSFER
@@ -96,18 +99,17 @@ data BlocTransactionPayload = BlocTransfer TransferPayload
                             deriving (Eq, Show, Generic)
 
 instance ToJSON BlocTransactionPayload where
-  toJSON (BlocTransfer t) = object ["type" .= ("TRANSFER" :: Text), "payload" .= t]
-  toJSON (BlocContract c) = object ["type" .= ("CONTRACT" :: Text), "payload" .= c]
-  toJSON (BlocFunction f) = object ["type" .= ("FUNCTION" :: Text), "payload" .= f]
+  toJSON (BlocTransfer t) = object ["type" .= TRANSFER, "payload" .= t]
+  toJSON (BlocContract c) = object ["type" .= CONTRACT, "payload" .= c]
+  toJSON (BlocFunction f) = object ["type" .= FUNCTION, "payload" .= f]
 
 instance FromJSON BlocTransactionPayload where
   parseJSON (Object o) = do
-    (ttype :: Text) <- (o .: "type")
+    ttype <- (o .: "type")
     case ttype of
-      "TRANSFER" -> BlocTransfer <$> (o .: "payload")
-      "CONTRACT" -> BlocContract <$> (o .: "payload")
-      "FUNCTION" -> BlocFunction <$> (o .: "payload")
-      t -> error $ "fromJSON BlocTransactionPayload: Expected 'type' to be TRANSFER, CONTRACT, or FUNCTION, but got " ++ show t
+      TRANSFER -> BlocTransfer <$> (o .: "payload")
+      CONTRACT -> BlocContract <$> (o .: "payload")
+      FUNCTION -> BlocFunction <$> (o .: "payload")
   parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
