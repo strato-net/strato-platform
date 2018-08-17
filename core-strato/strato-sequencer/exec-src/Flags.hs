@@ -26,3 +26,4 @@ defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
+defineFlag "blockstanbul_InEvent_port" (8081 :: Int) "The port to serve incoming InEvent Beneficiary messages"

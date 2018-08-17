@@ -27,11 +27,8 @@ createVote ch addr for_against = do
 createWebServer :: TMChan (Address,Bool) -> Application
 createWebServer ch = serve adminAPI (admin ch)
 
-webserver :: TMChan (Address,Bool) -> IO()
-webserver ch = run 8081 $ createWebServer ch
-
-  
-
+webserver :: Int -> TMChan (Address,Bool) -> IO()
+webserver prt ch = run prt $ createWebServer ch
 
  {- where ch = do
           x <- atomically $ newTMChan

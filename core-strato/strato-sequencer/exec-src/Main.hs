@@ -65,4 +65,4 @@ main = do
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
     , blockstanbulBeneficiary = chv
   }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver chv)
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver flags_blockstanbul_InEvent_port chv)
