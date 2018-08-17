@@ -17,6 +17,10 @@ import Slipstream.SolidityValue
 import qualified Data.Map as Map
 import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
+import Slipstream.Events
+import Control.Monad
+import qualified Data.List as L
+--import BlockApps.Bloc22.Monad
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
@@ -88,12 +92,9 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> String -> PGConnection -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name chain conn metadata = do
-
-  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
-  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
-  dbInsert conIns conn
+--convertRet :: String -> String -> String -> String -> String -> PGConnection -> Map.Map T.Text Value -> IO()
+convertRet :: [ProcessedContract] -> PGConnection -> IO()
+convertRet metadata conn = do
   --TODO: Re-enable Indexing flag
 {-
   let indFlag = True
@@ -121,17 +122,56 @@ convertRet address codehash abi name chain conn metadata = do
                 then ""
                 else ""
   -}
-  let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction metadata
-  let comma = if (length list == 0)
-      then ""
-      else ", "
-  let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
-  dbInsert createSt conn
+  if (length metadata > 1)
+    then do
+      --List of conVals
+      let conVals = forM metadata $ \row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+      --Split List with commas
+      let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
+      dbInsert conIns conn
 
-  let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
-  dbInsert delRow conn
-  let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
-  let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
-  let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-  dbInsert ins conn
+      --Keys list
+      let firstContract = contractData $ head metadata
+      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ firstContract
+      let comma = if (length list == 0)
+          then ""
+          else ", "
+      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+      dbInsert createSt conn
+
+      --List of delRow
+      _ <- forM_ metadata $ \row -> do
+            let delSt = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
+            dbInsert delSt conn
+
+      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+
+      --List of vals
+      --let valList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ metadata
+      vals <- forM metadata $ \row -> do
+            let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
+            return rowSt
+      --Split vals with commas
+      let inserts = L.intercalate ", " vals
+      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ ";"
+      dbInsert ins conn
+  else do
+    let row = head metadata
+    let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+    let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+    dbInsert conIns conn
+    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+    let comma = if (length list == 0)
+        then ""
+        else ", "
+    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+    dbInsert createSt conn
+
+    let delRow = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
+    dbInsert delRow conn
+    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
+    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
+    dbInsert ins conn
   return ()

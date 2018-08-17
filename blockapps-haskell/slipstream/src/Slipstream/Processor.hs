@@ -41,7 +41,6 @@ import qualified Data.ByteString as B
 import HFlags
 import Slipstream.Options
 import Database.PostgreSQL.Typed
-
 import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -115,11 +114,47 @@ second (_, x, _) = x
 
 third :: (a, b, c) -> c
 third (_, _, x) = x
+{-
+smashIt::[Maybe [StateDiff]]->[Maybe [StateDiff]]
+smashIt [] = []
+smashIt (Just [x]:rest) =
+  case smashIt rest of
+   (Just y:rest') -> Just (x:y):rest'
+   (Nothing:_) -> Just [x]:smashIt rest
+   [] -> []
+smashIt (Nothing:rest) = Nothing:smashIt rest
+smashIt (Just[]:rest) = Nothing:smashIt rest
+smashIt (Just (_:_:_):_) = [Nothing] --Needed?
+-}
+
+
+--Add more cases
+matchStateDiff :: StateDiff -> StateDiff -> Bool
+matchStateDiff (StateDiff (Just _) Nothing Nothing xchain) (StateDiff (Just _) Nothing Nothing ychain) = xchain == ychain
+matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
+
+smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]
+smashIt [] _ final = final
+smashIt (x:y:rest) tmp final = do
+  let newTmp = if (length tmp == 0)
+      then [x]
+      else tmp ++ [x]
+  case (matchStateDiff x y) of
+    True -> smashIt ([y] ++ rest) newTmp final
+    False -> smashIt ([y] ++ rest) [] (final ++ [newTmp])
+smashIt (x:[]) tmp final =
+  if (null tmp)
+    then (final ++ [[x]])
+    else final ++ [tmp ++ [x]]
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IO ()
 processTheMessages messages conn = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
+  --let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
+  let tempChanges = map (toStateDiff . BL.fromStrict) messages
+  let inter = smashIt tempChanges [] []
+  let changes = concat $ map (map stateDiffToChanges) inter
+
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -155,37 +190,37 @@ processTheMessages messages conn = do
   cachedContractsIORef <- newIORef Map.empty
 
   _ <- enterBloc2 env $ do
-    forM (filter hasContract changes) $ \change -> do
+    forM (map (filter hasContract) changes) $ \change -> do
+      processedList <- forM change $ \row -> do
+            filledInChange <- addStorageIfNeeded row
 
-      filledInChange <- addStorageIfNeeded change
+            let (address, codehash, storage, chainId) =
+                  case filledInChange of
+                   Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
+                   Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
+            contractMetaData <-
+              case Map.lookup codehash cachedContracts of
+               Just c -> do
+                 return c
+               Nothing -> do
+                 (contractOrError, abi, name) <- getContract address codehash chainId
+                 case contractOrError of
+                  Left e -> error e
+                  Right c -> do
+                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi, name) cachedContracts)
+                    return (c, abi, name)
 
-      let (address, codehash, storage, chainId) =
-            case filledInChange of
-             Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
-             Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-      cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
-      contractMetaData <-
-        case Map.lookup codehash cachedContracts of
-         Just c -> do
-           return c
-         Nothing -> do
-           (contractOrError, abi, name) <- getContract address codehash chainId
-           case contractOrError of
-            Left e -> error e
-            Right c -> do
-              liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi, name) cachedContracts)
-              return (c, abi, name)
+            let strAbi = replace "\'" "\'\'" $ second contractMetaData
+            let name = replace "\"" "" $ third contractMetaData
 
-      let strAbi = replace "\'" "\'\'" $ second contractMetaData
-      let name = replace "\"" "" $ third contractMetaData
+            --TODO: Add parsing of contract info to get flags (indexing, history)
 
-      --TODO: Add parsing of contract info to get flags (indexing, history)
-
-      let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
-      let chain = case chainId of
-                    Nothing -> ""
-                    Just(x) -> show x
-
-      liftIO $ convertRet address codehash strAbi name chain conn ret
+            let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
+            let chain = case chainId of
+                          Nothing -> ""
+                          Just(x) -> show x
+            return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = name, chain = chain, contractData = ret}
+      if (length processedList > 0) then liftIO $ convertRet processedList conn else return()
 
   return()
