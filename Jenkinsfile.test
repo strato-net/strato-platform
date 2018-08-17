@@ -157,7 +157,7 @@ pipeline {
           'Strato benchmarks': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running strato benchmarks'
+              echo 'Running strato benchmarks'
               cd core-strato
               ./run_benchmarks.sh
             '''
