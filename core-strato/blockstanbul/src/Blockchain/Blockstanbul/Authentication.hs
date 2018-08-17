@@ -37,11 +37,17 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens $ B.take 32
 
+takeExtra :: Block -> Block
+takeExtra = over extraLens $ B.drop 32
+
 addValidators :: [Address] -> Block -> Block
 addValidators vs = over extraLens $
     uncookRawExtra
   . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
   . cookRawExtra
+
+getValidatorList :: Block -> [Address]
+getValidatorList x = (cookRawExtra (rlpSerialize (rlpEncode x)))^. istanbul . _Just . validatorList
 
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
