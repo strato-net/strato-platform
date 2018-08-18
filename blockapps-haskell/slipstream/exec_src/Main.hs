@@ -16,6 +16,8 @@ import Slipstream.MessageConsumer
 import Slipstream.OutputData
 import Slipstream.Options ()
 import Database.PostgreSQL.Typed
+import qualified Data.Map as Map
+import Data.IORef
 
 main::IO ()
 main = do
@@ -32,7 +34,9 @@ main = do
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  msg <- runKafka state $ (getAndProcessMessages conn offset)
+  cachedContractsIORef <- newIORef Map.empty
+
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
 
   messages <- case msg of
         Left e -> error $ show e

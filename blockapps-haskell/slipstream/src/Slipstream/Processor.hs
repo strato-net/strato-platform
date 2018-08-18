@@ -76,16 +76,19 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::String->String->Maybe ChainId->Bloc (Either String Contract, String, String)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank contract", "Blank ABI", "Blank")
+getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
 getContract address _ chainId = do
   qqqq <-
     getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
 
-  let ret1 = xAbiToContract $ contractdetailsXabi qqqq
-  let ret2 = show $ A.toJSON $ contractdetailsXabi qqqq
-  let ret3 = show $ contractdetailsName qqqq
-  return (ret1, ret2, ret3)
+  let ret = ContractAndXabi {
+    contract = xAbiToContract $ contractdetailsXabi qqqq
+    , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
+    , name = show $ contractdetailsName qqqq
+    , contractStored = False
+  }
+  return $ (Right ret)
 
 storageToFunction::[(String, String)]->Storage
 storageToFunction s k =
@@ -105,7 +108,7 @@ addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
   return $ Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
-
+{-
 first :: (a, b, c) -> a
 first (x, _, _) = x
 
@@ -114,6 +117,7 @@ second (_, x, _) = x
 
 third :: (a, b, c) -> c
 third (_, _, x) = x
+-}
 {-
 smashIt::[Maybe [StateDiff]]->[Maybe [StateDiff]]
 smashIt [] = []
@@ -147,8 +151,8 @@ smashIt (x:[]) tmp final =
     then (final ++ [[x]])
     else final ++ [tmp ++ [x]]
 
-processTheMessages :: [B.ByteString] -> PGConnection -> IO ()
-processTheMessages messages conn = do
+processTheMessages :: [B.ByteString] -> PGConnection -> IORef (Map String ContractAndXabi) -> IO ()
+processTheMessages messages conn cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
   --let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
@@ -187,8 +191,6 @@ processTheMessages messages conn = do
             , deployMode= deployFlag   -- :: Severity
             }
 
-  cachedContractsIORef <- newIORef Map.empty
-
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
@@ -198,29 +200,32 @@ processTheMessages messages conn = do
                   case filledInChange of
                    Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
                    Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String (Contract, String, String))
+            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
             contractMetaData <-
               case Map.lookup codehash cachedContracts of
                Just c -> do
                  return c
                Nothing -> do
-                 (contractOrError, abi, name) <- getContract address codehash chainId
+                 contractOrError <- getContract address codehash chainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash (c, abi, name) cachedContracts)
-                    return (c, abi, name)
+                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
+                    return c
 
-            let strAbi = replace "\'" "\'\'" $ second contractMetaData
-            let name = replace "\"" "" $ third contractMetaData
+            let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
+            let strName = replace "\"" "" $ name contractMetaData
+            let cont = case contract contractMetaData of
+                    Left s -> error s
+                    Right c -> c
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-            let ret = Map.fromList $ decodeValues (typeDefs $ first contractMetaData) (mainStruct $ first contractMetaData) storage 0
+            let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) storage 0
             let chain = case chainId of
                           Nothing -> ""
                           Just(x) -> show x
-            return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = name, chain = chain, contractData = ret}
-      if (length processedList > 0) then liftIO $ convertRet processedList conn else return()
+            return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
+      if (length processedList > 0) then liftIO $ convertRet processedList conn cachedContractsIORef else return()
 
   return()

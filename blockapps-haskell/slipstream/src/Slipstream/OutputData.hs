@@ -19,7 +19,9 @@ import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
 import Slipstream.Events
 import Control.Monad
+import Control.Monad.IO.Class
 import qualified Data.List as L
+import Data.IORef
 --import BlockApps.Bloc22.Monad
 
 defaultMaxB :: Integer
@@ -93,8 +95,16 @@ isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
 --convertRet :: String -> String -> String -> String -> String -> PGConnection -> Map.Map T.Text Value -> IO()
-convertRet :: [ProcessedContract] -> PGConnection -> IO()
-convertRet metadata conn = do
+convertRet :: [ProcessedContract] -> PGConnection -> IORef (Map.Map String ContractAndXabi) -> IO()
+convertRet metadata conn cache = do
+  let firstContract = head metadata
+  let hashVal = codehash firstContract
+  --liftIO $ putStrLn $ "hashVal: " ++ show hashVal
+  contractCache <- readIORef cache
+  cachedContract <- case Map.lookup hashVal contractCache of
+    Just x -> return x
+    Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False}
+  --liftIO $ putStrLn $ "cachedContract: " ++ show cachedContract
   --TODO: Re-enable Indexing flag
 {-
   let indFlag = True
@@ -124,15 +134,24 @@ convertRet metadata conn = do
   -}
   if (length metadata > 1)
     then do
-      --List of conVals
-      let conVals = forM metadata $ \row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
-      --Split List with commas
-      let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
-      dbInsert conIns conn
+      if(contractStored cachedContract)
+        then do
+          --_ <- liftIO $ putStrLn $ "Smashed: " ++ show (name cachedContract)
+          return ()
+      else do
+          --_ <- liftIO $ putStrLn $ "Smashed First: " ++ show (name cachedContract)
+          --List of conVals
+          let conVals = forM metadata $ \row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+          --Split List with commas
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
+          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
+          --_ <- liftIO $ putStrLn $ "newState: " ++ show (newState hashVal)
+          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          dbInsert conIns conn
 
       --Keys list
-      let firstContract = contractData $ head metadata
-      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ firstContract
+      let fstContract = contractData $ head metadata
+      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
       let comma = if (length list == 0)
           then ""
           else ", "
@@ -158,9 +177,16 @@ convertRet metadata conn = do
       dbInsert ins conn
   else do
     let row = head metadata
-    let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
-    let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
-    dbInsert conIns conn
+
+    if(contractStored cachedContract)
+      then return ()
+    else do
+          let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
+          --_ <- liftIO $ putStrLn $ "newState: " ++ show (newState hashVal)
+          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          dbInsert conIns conn
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
     let comma = if (length list == 0)
         then ""
