@@ -99,12 +99,10 @@ convertRet :: [ProcessedContract] -> PGConnection -> IORef (Map.Map String Contr
 convertRet metadata conn cache = do
   let firstContract = head metadata
   let hashVal = codehash firstContract
-  --liftIO $ putStrLn $ "hashVal: " ++ show hashVal
   contractCache <- readIORef cache
   cachedContract <- case Map.lookup hashVal contractCache of
     Just x -> return x
     Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False}
-  --liftIO $ putStrLn $ "cachedContract: " ++ show cachedContract
   --TODO: Re-enable Indexing flag
 {-
   let indFlag = True
@@ -136,16 +134,13 @@ convertRet metadata conn cache = do
     then do
       if(contractStored cachedContract)
         then do
-          --_ <- liftIO $ putStrLn $ "Smashed: " ++ show (name cachedContract)
           return ()
       else do
-          --_ <- liftIO $ putStrLn $ "Smashed First: " ++ show (name cachedContract)
           --List of conVals
           let conVals = forM metadata $ \row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
           --Split List with commas
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
-          --_ <- liftIO $ putStrLn $ "newState: " ++ show (newState hashVal)
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
           dbInsert conIns conn
 

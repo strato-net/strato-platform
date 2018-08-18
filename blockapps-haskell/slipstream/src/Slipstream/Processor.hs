@@ -134,7 +134,7 @@ smashIt (Just (_:_:_):_) = [Nothing] --Needed?
 
 --Add more cases
 matchStateDiff :: StateDiff -> StateDiff -> Bool
-matchStateDiff (StateDiff (Just _) Nothing Nothing xchain) (StateDiff (Just _) Nothing Nothing ychain) = xchain == ychain
+matchStateDiff (StateDiff (Just _) Nothing Nothing Nothing) (StateDiff (Just _) Nothing Nothing Nothing) = True
 matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
 
 smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]
