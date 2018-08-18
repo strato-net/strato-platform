@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import           Data.Either                          (isLeft)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
+import qualified Data.Text                                    as T
 import           System.Directory
 
 import           Blockchain.BackupBlocks
@@ -39,6 +40,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
+import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
@@ -161,14 +163,22 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "SourceInfo has been written; End of initgen"
 
 --------------------------------------
-populateStorageDBs::(HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
+populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
                     Block->Maybe Word256->m ()
 populateStorageDBs genesisBlock genesisChainId = do
 
     accountDB <- getStateDB
+    res <- liftIO . runKafkaConfigured "strato-init" $ do
+      assertTopicCreation
+
+    case res of
+     Right () -> return ()
+     Left err -> error . show $ err
+
     MP.forEach accountDB $ \keyHash value -> do
       address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
-      liftIO $ putStrLn $ "################# addin dat: " ++ show address
+
+      $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
 
       --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
       --since this contract has giant arrays that would choke strato
@@ -198,7 +208,6 @@ populateStorageDBs genesisBlock genesisChainId = do
 
 
       mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-        assertTopicCreation
         splitWriteStateDiffs [diff]
       case filterResponse <$> mErr of
        Right [] -> return ()
