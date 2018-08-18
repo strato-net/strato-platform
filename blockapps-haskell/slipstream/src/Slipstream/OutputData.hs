@@ -165,6 +165,7 @@ convertRet metadata conn cache = do
             let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
             return rowSt
       --Split vals with commas
+      putStrLn $ "Inserting " ++ show (length vals) ++ " new contracts"
       let inserts = L.intercalate ", " vals
       let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ ";"
 
