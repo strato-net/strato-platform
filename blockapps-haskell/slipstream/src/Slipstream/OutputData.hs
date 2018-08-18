@@ -19,7 +19,7 @@ import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
 import Slipstream.Events
 import Control.Monad
-import Control.Monad.IO.Class
+--import Control.Monad.IO.Class
 import qualified Data.List as L
 import Data.IORef
 --import BlockApps.Bloc22.Monad
