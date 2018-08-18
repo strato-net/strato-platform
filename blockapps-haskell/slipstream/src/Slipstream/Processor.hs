@@ -157,7 +157,7 @@ processTheMessages messages conn cachedContractsIORef = do
   --let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
-  let changes = concat $ map (map stateDiffToChanges) inter
+  let changes = map (concat . map stateDiffToChanges) inter
 
 
   let conHost = flags_pghost
@@ -226,6 +226,7 @@ processTheMessages messages conn cachedContractsIORef = do
                           Nothing -> ""
                           Just(x) -> show x
             return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
+
       if (length processedList > 0) then liftIO $ convertRet processedList conn cachedContractsIORef else return()
 
   return()

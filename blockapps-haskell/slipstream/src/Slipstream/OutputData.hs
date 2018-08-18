@@ -130,14 +130,12 @@ convertRet metadata conn cache = do
                 then ""
                 else ""
   -}
+
   if (length metadata > 1)
     then do
-      if(contractStored cachedContract)
-        then do
-          return ()
-      else do
+      when (not $ contractStored cachedContract) $ do
           --List of conVals
-          let conVals = forM metadata $ \row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+          let conVals = map (\row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')") metadata
           --Split List with commas
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
@@ -169,6 +167,7 @@ convertRet metadata conn cache = do
       --Split vals with commas
       let inserts = L.intercalate ", " vals
       let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ ";"
+
       dbInsert ins conn
   else do
     let row = head metadata
@@ -187,6 +186,7 @@ convertRet metadata conn cache = do
         then ""
         else ", "
     let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+
     dbInsert createSt conn
 
     let delRow = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
