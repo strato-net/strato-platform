@@ -131,10 +131,10 @@ smashIt (Just[]:rest) = Nothing:smashIt rest
 smashIt (Just (_:_:_):_) = [Nothing] --Needed?
 -}
 
-
 --Add more cases
 matchStateDiff :: StateDiff -> StateDiff -> Bool
-matchStateDiff (StateDiff (Just _) Nothing Nothing Nothing) (StateDiff (Just _) Nothing Nothing Nothing) = True
+matchStateDiff (StateDiff (Just x) Nothing Nothing Nothing) (StateDiff (Just y) Nothing Nothing Nothing) = (codeHash $ head $ Map.elems x) == (codeHash $ head $ Map.elems y)
+--matchStateDiff (StateDiff (Just _) Nothing Nothing Nothing) (StateDiff (Just _) Nothing Nothing Nothing) = True
 matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
 
 smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]

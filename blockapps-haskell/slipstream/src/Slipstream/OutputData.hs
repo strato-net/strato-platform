@@ -134,10 +134,11 @@ convertRet metadata conn cache = do
   if (length metadata > 1)
     then do
       when (not $ contractStored cachedContract) $ do
-          --List of conVals
-          let conVals = map (\row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')") metadata
+          --All have the same codehash, so take the values of the first one only
+          --let conVals = map (\row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')") metadata
+          let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
           --Split List with commas
-          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ (L.intercalate ", " conVals) ++ " ON CONFLICT DO NOTHING;"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
           dbInsert conIns conn
