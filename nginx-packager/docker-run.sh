@@ -9,32 +9,52 @@ blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
 OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-OAUTH_OPENID_DISCOVERY_URL=${OAUTH_OPENID_DISCOVERY_URL:-NULL}
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
+OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false}
+OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [ "OAUTH_ENABLED" = true ]; then
+
+  if [ ${OAUTH_ENABLED} = true ]; then
     if [[ ${SMD_MODE,,} = public ]] ; then
-     echo 'OAuth cannot be used with SMD_MODE=public'
-     exit 4
+      echo 'OAuth cannot be used with SMD_MODE=public'
+      exit 4
     fi
 
-    if [[ ${OAUTH_OPENID_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
-      echo 'OAUTH_OPENID_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exiting'
+    if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+      echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exiting'
       exit 5
     fi
 
-    if ! curl --silent --output /dev/null --fail --location ${OAUTH_OPENID_DISCOVERY_URL}
+    if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
     then
-      echo "OpenID Connect Discovery URL is unreachable: ${OAUTH_OPENID_DISCOVERY_URL}. Exiting."
+      echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exiting."
       exit 6
     fi
+  fi
 
+  if [ ${OAUTH_JWT_VALIDATION_ENABLED} = true ]; then
+    if [[ ${SMD_MODE,,} = public ]] ; then
+      echo 'OAuth JWT Validation cannot be used with SMD_MODE=public'
+      exit 7
+    fi
+
+    if [[ ${OAUTH_JWT_VALIDATION_DISCOVERY_URL} = NULL ]] ; then
+      echo 'OAUTH_JWT_VALIDATION_DISCOVERY_URL is required for OAuth JWT Validation. Exiting'
+      exit 8
+    fi
+
+    if ! curl --silent --output /dev/null --fail --location ${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
+    then
+      echo "OAuth JWT Validation OpenID Connect Discovery URL is unreachable: ${OAUTH_JWT_VALIDATION_DISCOVERY_URL}. Exiting."
+      exit 9
+    fi
   fi
 
   ########
@@ -43,12 +63,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
   # Remove OAuth configuration lines if deployment is not OAuth-enabled
-  if [ "$OAUTH_ENABLED" != true ]; then
+  if [ "$OAUTH_ENABLED" != true ] && [ "$OAUTH_JWT_VALIDATION_ENABLED" != true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
   else
     sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
-    # Required with `lua_code_cache off` only, see https://github.com/bungle/lua-resty-session#notes-about-turning-lua-code-cache-off
-    #sed -i 's/<SESSION_SECRET>/mySessionSecretKeyHash/g' /tmp/nginx.conf
+  fi
+
+  if [ "$OAUTH_ENABLED" != true ]; then
+    sed -i '/#TEMPLATE_MARK_OAUTH_STRATO/d' /tmp/nginx.conf
+  fi
+
+  if [ "$OAUTH_JWT_VALIDATION_ENABLED" != true ]; then
+    sed -i '/#TEMPLATE_MARK_OAUTH_JWT/d' /tmp/nginx.conf
   fi
 
   # Remove SSL lines if deployment is not SSL-enabled
@@ -78,11 +104,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   ########
-  ### Generate openid-auth.lua from template according to configuration provided
+  ### Generate .lua scripts from templates according to configuration provided
   ########
   if [ "$OAUTH_ENABLED" = true ] ; then
     cp /tmp/openid-auth.tpl.lua /tmp/openid-auth.lua
-    sed -i 's*<OAUTH_OPENID_DISCOVERY_URL>*'"$OAUTH_OPENID_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
+    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
     sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-auth.lua
     sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
 
@@ -95,6 +121,17 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     fi
   fi
 
+  if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ] ; then
+    cp /tmp/openid-auth-jwt.tpl.lua /tmp/openid-auth-jwt.lua
+    sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-auth-jwt.lua
+
+    if [ "$ssl" = true ] ; then
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth-jwt.lua
+    else
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth-jwt.lua
+    fi
+  fi
+
   ########
   ### Move generated files to nginx dirs
   ########
@@ -102,6 +139,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$OAUTH_ENABLED" = true ]; then
     mv /tmp/openid-auth.lua /usr/local/openresty/nginx/lua/openid-auth.lua
+  fi
+
+  if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ]; then
+    mv /tmp/openid-auth-jwt.lua /usr/local/openresty/nginx/lua/openid-auth-jwt.lua
   fi
 
   if [ "$ssl" = true ] ; then
