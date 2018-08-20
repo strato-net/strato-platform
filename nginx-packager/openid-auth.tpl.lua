@@ -1,15 +1,16 @@
 -- configruation for openid connect
 local opts = {
+    -- see https://github.com/zmartzone/lua-resty-openidc for reference
     redirect_uri_path             = "/auth/openidc/return",
-    discovery                     = "<OAUTH_OPENID_DISCOVERY_URL>",
+    discovery                     = "<OAUTH_DISCOVERY_URL>",
     client_id                     = "<CLIENT_ID_PLACEHOLDER>",
     client_secret                 = "<CLIENT_SECRET_PLACEHOLDER>",
     scope                         = "openid email",
     token_endpoint_auth_method    = "client_secret_post",
-    ssl_verify                    =  "<IS_SSL_PLACEHOLDER_YES_NO>",
+    ssl_verify                    = "<IS_SSL_PLACEHOLDER_YES_NO>",
     redirect_uri_scheme           = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'access_token' is required for refresh token, 'user' is for providers sending 'email' in user object instead openid
-  -- keeping commented to have everything stored in session
+    -- 'access_token' is required for refresh token, 'user' is for providers sending 'email' in user object instead openid
+    -- keeping commented to have everything stored in session
     -- session_contents           = {id_token=true, user=true, access_token=true},
     renew_access_token_on_expiry  = true,
     access_token_expires_in       = 3600,
