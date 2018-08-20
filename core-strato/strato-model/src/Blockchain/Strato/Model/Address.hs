@@ -32,7 +32,6 @@ import qualified Data.Text                            as T
 import           Data.Monoid
 import           Text.Read                            (readMaybe)
 
-
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
 -- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
@@ -125,3 +124,6 @@ instance FromHttpApiData Address where
   parseUrlPiece text = case stringAddress (T.unpack text) of
     Nothing      -> Left $ "Could not decode Address: " <> text
     Just address -> Right address
+
+instance ToHttpApiData Address where
+  toUrlPiece = T.pack . formatAddress
