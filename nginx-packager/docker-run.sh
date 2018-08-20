@@ -6,6 +6,7 @@ MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
+NODE_HOST=${NODE_HOST}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
 OAUTH_ENABLED=${OAUTH_ENABLED:-false}
@@ -124,11 +125,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ] ; then
     cp /tmp/openid-auth-jwt.tpl.lua /tmp/openid-auth-jwt.lua
     sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-auth-jwt.lua
+    sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-auth-jwt.lua
 
     if [ "$ssl" = true ] ; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth-jwt.lua
+      sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-auth-jwt.lua
     else
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth-jwt.lua
+      sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-auth-jwt.lua
     fi
   fi
 
