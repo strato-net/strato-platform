@@ -24,6 +24,8 @@ dependencies:
   - blockapps-cirrus-client
   - blockapps-strato-api
   - blockapps-strato-client
+  - blockapps-vault-wrapper-api
+  - blockapps-vault-wrapper-client
   - clock
   - containers
   - contravariant
@@ -36,6 +38,7 @@ dependencies:
   - either
   - hflags
   - http-client
+  - http-conduit
   - http-media
   - http-types
   - insert-ordered-containers

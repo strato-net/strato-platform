@@ -175,7 +175,9 @@ processTheMessages messages conn cachedContractsIORef = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   let strato = flags_stratourl
+      vaultWrapper = flags_vaultwrapperurl
   stratoUrl <- parseBaseUrl strato
+  vaultwrapperUrl <- parseBaseUrl vaultWrapper
 
   mgr <- newManager defaultManagerSettings
 
@@ -185,6 +187,7 @@ processTheMessages messages conn cachedContractsIORef = do
   let env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
+            , urlVaultWrapper = vaultwrapperUrl
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error

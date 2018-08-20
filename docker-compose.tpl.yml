@@ -71,6 +71,7 @@ services:
   bloc:
     depends_on:
     - strato
+    - vault-wrapper
     - postgres
     environment:
     - loglevel=${loglevel}
@@ -85,6 +86,7 @@ services:
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
@@ -92,6 +94,16 @@ services:
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
+    restart: always
+  vault-wrapper:
+    environment:
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgres_vault_wrapper_db=oauth
+    build: .
+    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
   strato:
     depends_on:
@@ -101,7 +113,7 @@ services:
     environment:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
-    - tmpblockstanbul=${tmpblockstanbul}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - debugFail=${debugFail}
@@ -172,12 +184,13 @@ services:
     - smd
     - strato
     - apex
+    - vault-wrapper
     environment:
     - authBasic=${authBasic}
-    - azureAD=${azureAD}
-    - azureADClientID=${azureADClientID}
-    - azureADClientSecret=${azureADClientSecret}
-    - azureADTenantID=${azureADTenantID}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_OPENID_DISCOVERY_URL}
     - blockTime=${blockTime}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}

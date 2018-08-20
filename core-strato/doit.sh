@@ -21,8 +21,12 @@ function newnode {
 
   if $mineBlocks
   then echo "Starting strato-adit"
+      aMiner=$miningAlgorithm
+      if [ $blockstanbul = true ]; then
+        aMiner=Instant
+      fi
       export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
+      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
   fi
 
   if $serveBlocks
@@ -47,8 +51,8 @@ function newnode {
   fi
 
   echo "Starting strato-sequencer"
-  if [ -n "${tmpblockstanbul}" ]; then
-    tbFlag="--tmpblockstanbul=${tmpblockstanbul}"
+  if [ -n "${blockstanbul}" ]; then
+    tbFlag="--blockstanbul=${blockstanbul}"
   fi
   if [ -n "${blockstanbulBlockPeriodMs}" ]; then
     bpFlag="--blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs}"
@@ -59,7 +63,7 @@ function newnode {
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" ${tbFlag} --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -76,7 +80,7 @@ function newnode {
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         --tmpblockstanbul=${tmpblockstanbul:-false} +RTS -N1 >> logs/ethereum-vm 2>&1
+                         "${tbFlag}" +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
