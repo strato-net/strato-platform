@@ -153,9 +153,14 @@ convertRet metadata conn cache = do
       dbInsert createSt conn
 
       --List of delRow
-      _ <- forM_ metadata $ \row -> do
-            let delSt = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
-            dbInsert delSt conn
+      delList <- forM metadata $ \row -> do
+            let rowSt = "address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "'"
+            return rowSt
+            --let delSt = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
+            --dbInsert delSt conn
+      let deletes = L.intercalate " or " delList
+      let delSt = "delete from \"" ++ (contractName $ head metadata) ++ "\" where (" ++ deletes ++ ");"
+      dbInsert delSt conn
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
