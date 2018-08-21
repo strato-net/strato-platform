@@ -72,6 +72,12 @@ tableColumns [] = []
 tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y
 tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y ++ ", " ++ tableColumns es
 
+tableUpsert :: [(T.Text, SolidityValue)] -> String
+tableUpsert [] = []
+tableUpsert [(x, _)] = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
+tableUpsert ((x, _):es) = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\"" ++  ", " ++ tableUpsert es
+
+
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
   { pgDBHost = flags_pghost :: HostName
@@ -94,7 +100,6 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
---convertRet :: String -> String -> String -> String -> String -> PGConnection -> Map.Map T.Text Value -> IO()
 convertRet :: [ProcessedContract] -> PGConnection -> IORef (Map.Map String ContractAndXabi) -> IO()
 convertRet metadata conn cache = do
   let firstContract = head metadata
@@ -134,10 +139,7 @@ convertRet metadata conn cache = do
   if (length metadata > 1)
     then do
       when (not $ contractStored cachedContract) $ do
-          --All have the same codehash, so take the values of the first one only
-          --let conVals = map (\row -> "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')") metadata
           let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
-          --Split List with commas
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
@@ -149,23 +151,13 @@ convertRet metadata conn cache = do
       let comma = if (length list == 0)
           then ""
           else ", "
-      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
+      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
       dbInsert createSt conn
-
-      --List of delRow
-      delList <- forM metadata $ \row -> do
-            let rowSt = "address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "'"
-            return rowSt
-            --let delSt = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
-            --dbInsert delSt conn
-      let deletes = L.intercalate " or " delList
-      let delSt = "delete from \"" ++ (contractName $ head metadata) ++ "\" where (" ++ deletes ++ ");"
-      dbInsert delSt conn
+      let indexT = "create index if not exists \"" ++ (contractName $ head metadata) ++ "_index\" on \"" ++ (contractName $ head metadata) ++ "\" (address, \"chainId\");"
+      dbInsert indexT conn
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
-      --List of vals
-      --let valList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ metadata
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
             let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
@@ -173,7 +165,7 @@ convertRet metadata conn cache = do
       --Split vals with commas
       putStrLn $ "Inserting " ++ show (length vals) ++ " new contracts"
       let inserts = L.intercalate ", " vals
-      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ ";"
+      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
 
       dbInsert ins conn
   else do
@@ -185,21 +177,20 @@ convertRet metadata conn cache = do
           let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
-          --_ <- liftIO $ putStrLn $ "newState: " ++ show (newState hashVal)
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
           dbInsert conIns conn
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
     let comma = if (length list == 0)
         then ""
         else ", "
-    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
-
+    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
     dbInsert createSt conn
 
-    let delRow = "delete from \"" ++ contractName row ++ "\" where address='" ++ address row ++ "' and \"chainId\"='" ++ chain row ++ "';"
-    dbInsert delRow conn
+    let indexT = "create index if not exists \"" ++ (contractName $ row) ++ "_index\" on \"" ++ (contractName $ row) ++ "\" (address, \"chainId\");"
+    dbInsert indexT conn
+
     let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
     let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
-    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
+    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
     dbInsert ins conn
   return ()
