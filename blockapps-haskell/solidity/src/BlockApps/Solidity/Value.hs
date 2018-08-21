@@ -5,6 +5,7 @@ module BlockApps.Solidity.Value where
 
 
 import           Control.Monad           (sequence)
+import qualified Data.Bimap              as Bimap
 import           Data.Binary             (Binary)
 import qualified Data.Binary             as Binary
 import           Data.ByteString         (ByteString)
@@ -13,6 +14,7 @@ import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
 import           Data.List               (intersperse)
 import           Data.Monoid
+import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Encoding      as Text
@@ -22,6 +24,7 @@ import           Text.Read
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Int
 import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -465,21 +468,27 @@ simpleValueToText sv = Just $ case sv of
   ValueBytes b -> Text.pack $ show . Base16.encode $ b
   ValueString tx -> tx
 
-textToValue :: Text -> Type -> Either Text Value
-textToValue str = \case
+textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
+textToValue defs str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
   TypeArrayDynamic ty -> ValueArrayDynamic <$>
-    traverse (`textToValue` ty)
+    traverse (flip (textToValue defs) ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeArrayFixed len ty -> ValueArrayFixed len <$>
-    traverse (`textToValue` ty)
+    traverse (flip (textToValue defs) ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeMapping{}  -> Left "textToValue TODO: TypeMapping not yet implemented"
   TypeFunction{} -> Left "textToValue TODO: TypeFunction not yet implemented"
   TypeContract{} -> ValueContract <$> case stringAddress (Text.unpack str) of
     Nothing -> Left $ "textToValue: could not decode as contract address: " <> str
     Just x -> return x
-  TypeEnum{}     -> Left "textToValue TODO: TypeEnum not yet implemented"
+  TypeEnum name -> case defs of
+    Nothing -> Left $ "Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
+    Just tds -> case Map.lookup name (enumDefs tds) of
+      Nothing -> Left $ "Missing enum name in type definitions: " <> name
+      Just eSet -> case Bimap.lookupR str eSet of
+        Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
+        Just i -> Right $ ValueEnum name str $ fromIntegral i
   TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
 
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue

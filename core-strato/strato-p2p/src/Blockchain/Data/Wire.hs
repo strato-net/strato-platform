@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Blockchain.Data.Wire (
   Message(..),
@@ -17,6 +18,7 @@ import           Data.List
 import           Data.Word
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
+import qualified Blockchain.Blockstanbul      as PBFT
 import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
@@ -30,15 +32,21 @@ import           Blockchain.Util
 import           Blockchain.ExtWord
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
+                | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.
                 | UNKNOWNCAP String Integer -- | ¯\_(ツ)_/¯
                 deriving (Eq, Read, Show)
 
 name2Cap::Integer->String->Capability
 name2Cap ver "eth" = ETH ver
+-- TODO(tim): This deviates from the Am.is implementation, but they don't
+-- follow the devp2p spec. Change to "istanbul" or convince them to change to
+-- "ist" if we require interop.
+name2Cap ver "ist" = IST ver
 name2Cap ver name  = UNKNOWNCAP name ver
 
 instance RLPSerializable Capability where
     rlpEncode (ETH ver)             = RLPArray [rlpEncode ("eth"::B.ByteString), rlpEncode ver]
+    rlpEncode (IST ver)             = RLPArray [rlpEncode ("ist"::B.ByteString), rlpEncode ver]
     rlpEncode (UNKNOWNCAP name ver) = RLPArray [rlpEncode name, rlpEncode ver]
 
     rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
@@ -121,15 +129,15 @@ data TransactionRequest =
   } deriving (Eq, Show)
 
 instance RLPSerializable TransactionRequest where
-  rlpEncode (Explicit x) = 
+  rlpEncode (Explicit x) =
     RLPArray $ [(rlpEncode (0::Integer))] ++ (rlpEncode <$> x)
-  rlpEncode (Implicit a b c d) = 
-    RLPArray $ [(rlpEncode (1::Integer))] ++ 
+  rlpEncode (Implicit a b c d) =
+    RLPArray $ [(rlpEncode (1::Integer))] ++
       [rlpEncode a, rlpEncode $ toInteger b, rlpEncode $ toInteger c, rlpEncode d]
 
-  rlpDecode (RLPArray (x:xs)) 
+  rlpDecode (RLPArray (x:xs))
     | (rlpDecode x) == (0::Integer) = Explicit $ rlpDecode <$> xs
-    | (rlpDecode x) == (1::Integer) = 
+    | (rlpDecode x) == (1::Integer) =
       Implicit {
         trTransactionHash = rlpDecode a
       , trMaxTransactions = fromInteger $ rlpDecode b
@@ -157,11 +165,13 @@ data Message =
   GetBlockBodies [SHA] |
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
-  
+
+  Blockstanbul PBFT.WireMessage |
+
   -- private chains
   GetChainDetails [Word256] |
   ChainDetails [(Word256, ChainInfo)] |
-  GetTransactions [SHA] deriving (Eq,Show) 
+  GetTransactions [SHA] deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -205,22 +215,24 @@ instance Format Message where
       formatUncles []     = "No uncles"
       formatUncles uncles = "\nUncles:" ++ tab ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
-  
+
+  format (Blockstanbul msg) = CL.blue "Blockstanbul\n" ++ "  msg: " ++ format msg
+
   -- private chains
   format (GetChainDetails cids) = CL.blue "GetChainDetails\n" ++ "  for chainIDs: " ++ (intercalate "\n" (show <$> cids))
 
-  format (ChainDetails chPairs) = 
+  format (ChainDetails chPairs) =
     CL.blue "Chain Details\n" ++ formatPairs chPairs
-    where 
+    where
       formatPairs :: [(Word256, ChainInfo)] -> String
       formatPairs [] = ""
       formatPairs ((chID, chInfo):xs) =
         "\n  chainID: "  ++ show chID ++
         "\n  chainInfo: " ++ show chInfo ++ formatPairs xs
 
-  format (GetTransactions txHashes) = 
+  format (GetTransactions txHashes) =
     CL.blue "GetTransactions\n" ++ "requested transaction hashes: " ++ (intercalate "\n" (show <$> txHashes))
-    
+
   --format x = error $ "missing value in format for Wire Message: " ++ show x
 
 -- Convert RLPObject and message code into corresponding Message
@@ -260,8 +272,13 @@ obj2WireMessage 0x16 (RLPArray bodies) =
 obj2WireMessage 0x17 (RLPArray [b, td]) =
   NewBlock (rlpDecode b) (rlpDecode td)
 
+obj2WireMessage 0x18 a = Blockstanbul . rlpDecode $ a
+obj2WireMessage 0x19 a = Blockstanbul . rlpDecode $ a
+obj2WireMessage 0x1a a = Blockstanbul . rlpDecode $ a
+obj2WireMessage 0x1b a = Blockstanbul . rlpDecode $ a
+
 -- private chains
-obj2WireMessage 0x1c (RLPArray cids) = 
+obj2WireMessage 0x1c (RLPArray cids) =
   GetChainDetails (rlpDecode <$> cids)
 obj2WireMessage 0x1d (RLPArray chDetPairs) =
   ChainDetails $ rlpDecode <$> chDetPairs
@@ -308,14 +325,21 @@ wireMessage2Obj (BlockBodies bodies) =
 wireMessage2Obj (NewBlock b d) =
   (0x17, RLPArray [rlpEncode b, rlpEncode d])
 
+wireMessage2Obj (Blockstanbul wm@PBFT.WireMessage{PBFT._message=msg}) =
+  case msg of
+     PBFT.Preprepare _ _ -> (0x18, rlpEncode wm)
+     PBFT.Prepare _ _ -> (0x19, rlpEncode wm)
+     PBFT.Commit _ _ _ -> (0x1a, rlpEncode wm)
+     PBFT.RoundChange _ -> (0x1b, rlpEncode wm)
+
 -- private chains
-wireMessage2Obj (GetChainDetails cIds) = 
+wireMessage2Obj (GetChainDetails cIds) =
   (0x1c, RLPArray $ rlpEncode <$> cIds)
 
-wireMessage2Obj (ChainDetails chpairs) =  
+wireMessage2Obj (ChainDetails chpairs) =
   (0x1d, RLPArray $ rlpEncode <$> chpairs)
 
-wireMessage2Obj (GetTransactions trhashes) = 
+wireMessage2Obj (GetTransactions trhashes) =
   (0x1e, RLPArray $ rlpEncode <$> trhashes)
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x

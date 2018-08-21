@@ -1,0 +1,48 @@
+name:                strato-statediff
+version:             0.1.0.0
+author:              BlockApps
+maintainer:          blockapps
+build-type:          Simple
+license:             Apache-2.0
+
+library:
+  source-dirs: src/
+  dependencies:
+    - base
+    - binary
+    - bytestring
+    - nibblestring
+    - text
+    - containers
+    - unordered-containers
+    - resourcet
+    - aeson
+    - strato-model
+    - strato-conf
+    - blockapps-data
+    - blockapps-util
+    - ethereum-rlp
+    - merkle-patricia-db
+    - persistent
+    - persistent-postgresql
+    - blockapps-milena
+    - lens
+    - transformers
+    - time
+  default-extensions:
+    - MultiParamTypeClasses
+    - FlexibleContexts
+    - FlexibleInstances
+    - GeneralizedNewtypeDeriving
+    - GADTs
+    - LambdaCase
+    - RecordWildCards
+    - FunctionalDependencies
+    - DataKinds
+    - DeriveGeneric
+    - ExplicitForAll
+    - NamedFieldPuns
+    - OverloadedStrings
+    - TypeFamilies
+    - ViewPatterns
+  ghc-options: -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports

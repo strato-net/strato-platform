@@ -14,7 +14,6 @@ module Blockchain.Data.BlockDB (
   blockHeaderHash,
   blockHeaderPartialHash,
   getBlock,
-  getBlocks,
   putBlocks,
   nextDifficulty,
   homesteadNextDifficulty,
@@ -48,6 +47,7 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Database.MerklePatricia (StateRoot (..), unboxStateRoot)
 import           Blockchain.DB.SQLDB
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -57,6 +57,7 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
@@ -66,14 +67,15 @@ instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
 blk2BlkDataRef :: (HasSQLDB m) =>
-                  M.Map SHA Integer->(Block, SHA)->BlockId->Bool->m BlockDataRef
-blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
+                  M.Map SHA Integer->(Block, SHA)->Bool->m BlockDataRef
+blk2BlkDataRef dm (b, hash') makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
-  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
+  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
       bd = blockBlockData b
+      uncles = blockBlockUncles b
       pH = blockDataParentHash bd
       uH = blockDataUnclesHash bd
       cB = blockDataCoinbase bd
@@ -90,13 +92,8 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
 
-getBlocks :: HasSQLDB m => m [Block]
-getBlocks = do
-  db <- getSQLDB
-  liftM (map entityVal) . liftIO . SQL.runSqlPool (selectList [] []) $ db
-
 getBlock::(HasSQLDB m)=>
-          SHA->m (Maybe Block)
+          SHA->m (Maybe BlockDataRef)
 getBlock h = do
   db <- getSQLDB
   entBlkL <- runResourceT $
@@ -105,9 +102,9 @@ getBlock h = do
   case entBlkL of
     []  -> return Nothing
     lst -> return $ Just . entityVal . head $ lst
-  where actions = E.select $ E.from $ \(bdRef, block) -> do
-                                   E.where_ ( (bdRef E.^. BlockDataRefHash E.==. E.val h ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. block E.^. BlockId ))
-                                   return block
+  where actions = E.select $ E.from $ \bdRef -> do
+                                   E.where_ (bdRef E.^. BlockDataRefHash E.==. E.val h )
+                                   return bdRef
 
 -- if useDiffBomb is False then the expAdjustment is not added.
 nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
@@ -179,7 +176,7 @@ getDifficultyMap difficultyBase blocksAndHashes = do
          ) blocksAndHashes)
 
 
-putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [(Key Block, Key BlockDataRef)]
+putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [Key BlockDataRef]
 putBlocks difficultyBase blocks makeHashOne = do
   let blocksAndHashes = map (\b -> (b, blockHash b)) blocks
   dm <- getDifficultyMap difficultyBase blocksAndHashes
@@ -193,14 +190,13 @@ putBlocks difficultyBase blocks makeHashOne = do
 
       case existingBlockData of
            [] -> do
-             blkId <- SQL.insert b
-             toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') blkId makeHashOne
+             toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') makeHashOne
+             blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do
                txID <- updateBlockNumber b $ transactionHash tx
-               SQL.insert $ BlockTransaction blkId txID
-             blkDataRefId <- SQL.insert toInsert
-             return (blkId, blkDataRefId)
-           [bd] -> return (blockDataRefBlockId $ SQL.entityVal bd, SQL.entityKey bd)
+               SQL.insert $ BlockTransaction blkDataRefId txID
+             return blkDataRefId
+           [bd] -> return $ SQL.entityKey bd
            _ -> error "DB has multiple blocks with the same hash"
 
   where
@@ -316,6 +312,8 @@ instance BlockHeaderLike BlockData where
     blockHeaderExtraData        = blockDataExtraData
     blockHeaderTimestamp        = blockDataTimestamp
     blockHeaderMixHash          = blockDataMixHash
+
+    blockHeaderModifyExtra      = over extraDataLens
 
     morphBlockHeader h2 =
         BlockData { blockDataNumber           = blockHeaderBlockNumber h2

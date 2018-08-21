@@ -1,21 +1,26 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
-
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Handler.ChainInfo where
 
 import           Data.Aeson
+import qualified Data.Map                       as M
+import qualified Data.Set                       as S
 import qualified Data.Text                      as T
 
+import           Blockchain.SHA
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
-import           Import
+import           Import                         hiding (hash)
 import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
+import           Blockchain.TypeLits
 import           System.Entropy
 import           Blockchain.Util
 import           Blockchain.ExtWord             (Word256)
@@ -32,23 +37,29 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: Handler Text
+postChainR :: Handler Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ ar rr mb ab) -> do 
-      when (ar == "") $ invalidArgs ["add rule is empty"]
-      when (rr == "") $ invalidArgs ["remove rule is empty"]
-      when (length mb == 0) $ invalidArgs ["member list is empty"]
-      let balanceSum = Import.foldr (\cur acc -> acc + (snd cur)) 0 ab
-      when (balanceSum == 0) $ invalidArgs ["All balances are zero"]
-      liftIO $ putStrLn $ T.pack $ show gen 
-      bytes <- liftIO $ getEntropy 32
-      let cid = fromInteger $ byteString2Integer bytes
-      emitKafkaTransactions [(cid, gen)]
-      return . T.pack $ showHex cid ""
+    Success gen@(ChainInfo _ acin cdin mb) -> do
+    -- add more checks?
+      when (length acin == 0) $ invalidArgs ["account info is empty"]
+      when (M.size mb == 0) $ invalidArgs ["member list is empty"]
+      let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
+            NonContract _ _ -> Nothing
+            ContractNoStorage _ _ c -> Just c
+            ContractWithStorage _ _ c _ -> Just c
+          codeCodeHashes = S.fromList . flip map cdin $ \CodeInfo{..} -> hash codeInfoCode
+      case accountCodeHashes S.\\ codeCodeHashes of
+        s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]
+          | otherwise -> do
+            liftIO $ putStrLn $ T.pack $ show gen
+            bytes <- liftIO $ getEntropy 32
+            let cid = fromInteger $ byteString2Integer bytes
+            emitKafkaTransactions [(cid, gen)]
+            return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 getChainR :: Handler Value
@@ -62,5 +73,5 @@ getChainR = do
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
-      [] -> invalidArgs ["no chain found"]
+      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)
       cis -> returnJson cis

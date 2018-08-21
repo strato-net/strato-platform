@@ -2,6 +2,7 @@
 
 module Blockchain.Mining.Instant (instantMiner) where
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Mining
 

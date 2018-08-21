@@ -7,9 +7,11 @@ module Executable.EthereumVM (
   ethereumVM
 ) where
 
+import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
@@ -75,7 +77,7 @@ ethereumVM = void . execContextM $ do
         forM_ newCommands runJsonRpcCommand
 
         let allTxs = [OETx ts t | OETx ts t <- seqEvents]
-        $logInfoS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+        $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
@@ -92,12 +94,21 @@ ethereumVM = void . execContextM $ do
             writeBlockSummary b
         addBlocks blocks
 
+        contextBlockRequested ||= (OECreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
+        pbft <- gets contextHasBlockstanbul
+        reqd <- use contextBlockRequested
         let pending = B.pending state
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+            hasTxs = not (null poolableNewTxs) || not (M.null pending)
+            shouldOutputBlocks = isCaughtUp && (
+              if pbft
+                then reqd && hasTxs
+                else not makeLazyBlocks || hasTxs)
+        when (pbft && shouldOutputBlocks) $
+          contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do

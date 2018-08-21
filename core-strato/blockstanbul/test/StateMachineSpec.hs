@@ -23,8 +23,8 @@ import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
-import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
@@ -51,15 +51,24 @@ setupRound blk' as = do
   return (v, di)
 
 compareNoExtra :: (MonadIO m) => Block -> Block -> m ()
-compareNoExtra b1 b2 = set (blockDataLens . extraDataLens) "" b1 `shouldBe` set (blockDataLens . extraDataLens) "" b2
+compareNoExtra b1 b2 = set extraLens "" b1 `shouldBe` set extraLens "" b2
 
 spec :: Spec
 spec = parallel $ do
   describe "The blockstanbul event loop" $ do
     it "requests a round changes round in response to a timeout or insertion failure" $
       runTest $ do
-        got <- sendMessages [Timeout, CommitResult (Left  "invalid hash")]
+        got <- sendMessages [Timeout 20, CommitResult (Left  "invalid hash")]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
+
+    it "ignores stale timeouts" $ do
+      runTest $ do
+        sendMessages [Timeout 10] `shouldReturn` []
+    it "sets the pending round after a timeout" $ property $ \a1 a2 ->
+      runTest $ do
+      validators .= [a1, a2]
+      _ <- sendMessages [Timeout 20]
+      use pendingRound `shouldReturn` Just 21
 
     it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
       not (null as) ==> runTest $ do
@@ -106,8 +115,11 @@ spec = parallel $ do
         -- Lets abort this round
         next <- uses view (over round (+1))
         let aborts = map (\a -> IMsg a $ RoundChange next) as
-        omsgs5 <- sendMessages aborts
+        omsgs5' <- sendMessages aborts
+        let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
+            rest5 = omsgs5' \\ omsgs5
         map oMessage omsgs5 `shouldBe` [RoundChange next]
+        rest5 `shouldBe` [ResetTimer 21]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -123,8 +135,9 @@ spec = parallel $ do
         use proposal `shouldReturn` Nothing
 
   describe "A preprepare message" $ do
-    it "sets the current proposal in response a preprepare message" $ property $ \auth blk ->
+    it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
+        let blk = truncateExtra blk'
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
@@ -215,9 +228,9 @@ spec = parallel $ do
         omsgs <- sendMessages [IMsg auth $ Commit curView di seal]
         let [ToCommit b] = omsgs
         b `compareNoExtra` blk
-        let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
+        let got = cookRawExtra . L.view extraLens $ b
             want = ExtraData
-                      (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+                      (BS.take 32 . L.view extraLens $ blk)
                       (Just $ IstanbulExtra [sender auth] (Just seal) [seal])
         got `shouldBe` want
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
@@ -268,8 +281,8 @@ spec = parallel $ do
           omsgs <- sendMessages tippingPoint
           let [ToCommit b] = omsgs
           b `compareNoExtra` blk
-          let got = cookRawExtra . L.view (blockDataLens . extraDataLens) $ b
-          _vanity got `shouldBe` (BS.take 32 . L.view (blockDataLens . extraDataLens) $ blk)
+          let got = cookRawExtra . L.view extraLens $ b
+          _vanity got `shouldBe` (BS.take 32 . L.view extraLens $ blk)
           let Just ist = _istanbul got
           _validatorList ist `shouldBe` sort as
           _proposedSig ist `shouldBe` Just seal
@@ -294,7 +307,7 @@ spec = parallel $ do
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` []
+        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` [ResetTimer 24]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -310,7 +323,7 @@ spec = parallel $ do
   describe "A new block message" $ do
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over (blockDataLens . extraDataLens) (BS.take 32) blk''
+        let blk = over extraLens (BS.take 32) blk''
         me <- selfAddr
         validators .= [me]
         proposer .= me
@@ -318,13 +331,87 @@ spec = parallel $ do
         omsgs <- sendMessages [NewBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         v' `shouldBe` v
-        let initData = L.view (blockDataLens . extraDataLens) blk
-        set (blockDataLens . extraDataLens) initData blk' `shouldBe` blk
+        let initData = L.view extraLens blk
+        set extraLens initData blk' `shouldBe` blk
         blk' `shouldNotBe` blk
-        let parsedExtra = cookRawExtra . L.view (blockDataLens . extraDataLens) $ blk'
+        let parsedExtra = cookRawExtra . L.view extraLens $ blk'
         L.view vanity parsedExtra `shouldBe` initData
         let Just ist = _istanbul parsedExtra
         L.view validatorList ist `shouldBe` [me]
         L.view commitment ist `shouldBe` []
         L.view proposedSig ist `shouldSatisfy`
           (== Just me) . (>>= verifyProposerSeal blk')
+
+  describe "Block locks" $ do
+    it "takes priority over NewBlocks" $ property $ \lock blk ->
+      runTest $ do
+        me <- selfAddr
+        validators .= [me]
+        proposer .= me
+        blockLock .= Just lock
+        omsgs <- sendMessages [NewBlock blk]
+        let [Preprepare v' blk'] = map oMessage omsgs
+        blk' `shouldBe` lock
+        v <- use view
+        v' `shouldBe` v
+
+    it "round changes a preprepare that doesn't match the lock" $ property $ \lock blk a ->
+      runTest $ do
+        validators .= [sender a]
+        proposer .= sender a
+        blockLock .= Just lock
+        v <- use view
+        omsgs <- sendMessages [IMsg a $ Preprepare v blk]
+        next <- uses view (over round (+1))
+        map oMessage omsgs `shouldBe` [RoundChange next]
+
+    it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
+      runTest $ do
+        me <- selfAddr
+        validators .= me:as
+        blockLock .= Just blk
+        _ <- sendMessages [CommitResult (Left "oops")]
+        use blockLock `shouldReturn` Nothing
+
+        blockLock .= Just blk
+        _ <- sendMessages [CommitResult (Right ())]
+        use blockLock `shouldReturn` Nothing
+
+    it "Sets a lock after prepare consensus is reached" $ property $ \auth blk ->
+      runTest $ do
+        (curView, di) <- setupRound blk [sender auth]
+        _ <- sendMessages [IMsg auth $ Prepare curView di]
+        use blockLock `shouldReturn` Just blk
+
+    let setBlock blk = do
+          me <- selfAddr
+          validators .= [me]
+          proposal .= Just blk
+          blockLock .= Just blk
+
+    it "requests a new block after success" $ property $ \blk ->
+      runTest $ do
+        setBlock blk
+        sendMessages [CommitResult (Right ())] `shouldReturn` [MakeBlockCommand]
+
+    it "re-issues the lock after round change" $ property $ \blk sig ->
+      runTest $ do
+        setBlock blk
+        me <- selfAddr
+        next <- uses view (over round (+1))
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        let omsgs = [o | o@(OMsg _ _) <- resp]
+            other = resp \\ omsgs
+        map oMessage omsgs `shouldBe` [RoundChange next, Preprepare next blk]
+        other `shouldBe` [ResetTimer $ _round next]
+
+    it "clears the lock after a future round change" $ property $ \blk sig ->
+      runTest $ do
+        setBlock blk
+        me <- selfAddr
+        next <- uses view (over round (+1) . over sequence (+1))
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        let omsgs = [o | o@(OMsg _ _) <- resp]
+            other = resp \\ omsgs
+        map oMessage omsgs `shouldBe` [RoundChange next]
+        other `shouldMatchList` [ResetTimer $ _round next, MakeBlockCommand]

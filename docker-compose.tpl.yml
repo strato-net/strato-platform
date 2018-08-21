@@ -9,43 +9,43 @@ services:
     depends_on:
     - apex
     - bloc
-    - cirrus
+    - postgrest
     - strato
     environment:
     - APEX_URL=${APEX_URL}
     - BLOC_DOC_URL=${BLOC_DOC_URL}
     - BLOC_URL=${BLOC_URL}
     - CIRRUS_URL=${CIRRUS_URL}
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_NAME=${NODE_NAME}
     - SINGLE_NODE=${SINGLE_NODE}
+    - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - STRATO_DOC_URL=${STRATO_DOC_URL}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - STRATO_URL=${STRATO_URL}
-    - SMD_MODE=${SMD_MODE}
-    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
-    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
-    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
   apex:
     depends_on:
     - bloc
-    - cirrus
     - postgres
+    - postgrest
     - strato
     environment:
     - blocHost=bloc:8000
-    - cirrusHost=cirrus:3333
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
-    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
-    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+    - postgrestHost=postgrest:3001
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
@@ -59,7 +59,7 @@ services:
   dappstore:
     depends_on:
     - bloc
-    - cirrus
+    - postgrest
     - strato
     environment:
     - BLOC_URL=${BLOC_URL}
@@ -71,17 +71,23 @@ services:
   bloc:
     depends_on:
     - strato
+    - vault-wrapper
     - postgres
     environment:
-    - cirrusHost=cirrus:3333
     - loglevel=${loglevel}
+    - kafkaHost=kafka
+    - kafkaPort=9092
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
+    - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
+#    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
+    - zookeeper_conn=zookeeper
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
@@ -89,27 +95,15 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
-  cirrus:
-    depends_on:
-    - strato
-    - postgres
-    - postgrest
-    - kafka
-    - bloc
+  vault-wrapper:
     environment:
-    - blocHost=bloc:8000
-    - postgres_db=cirrus
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - postgrestHost=postgrest:3001
-    - SINGLE_NODE=${SINGLE_NODE}
-    - stateDiffTopic=${stateDiffTopic}
-    - stratoHost=strato:3000
-    - zookeeper_conn=zookeeper
+    - postgres_vault_wrapper_db=oauth
     build: .
-    image: ${CIRRUS_IMAGE:-<REPO_URL>cirrus:<VERSION>}
+    image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
   strato:
     depends_on:
@@ -119,21 +113,24 @@ services:
     environment:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
-    - tmpblockstanbul=${tmpblockstanbul}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
+    - seqDebugMode=${seqDebugMode}
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
     - networkID=${networkID}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -148,7 +145,11 @@ services:
     - statsPrefix=${statsPrefix}
     - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
+    - validators=${validators:-}
     - zkHost=zookeeper
+    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -157,8 +158,10 @@ services:
     restart: always
   postgrest:
     depends_on:
+    - bloc
     - postgres
     environment:
+    - blocHost=bloc:8000
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
     - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
@@ -169,7 +172,6 @@ services:
     restart: always
   postgres:
     environment:
-    - POSTGRES_DB=cirrus
     - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
@@ -178,18 +180,21 @@ services:
   nginx:
     depends_on:
     - bloc
-    - cirrus
     - postgrest
     - smd
     - strato
     - apex
+    - vault-wrapper
     environment:
     - authBasic=${authBasic}
-    - azureAD=${azureAD}
-    - azureADClientID=${azureADClientID}
-    - azureADClientSecret=${azureADClientSecret}
-    - azureADTenantID=${azureADTenantID}
     - blockTime=${blockTime}
+    - NODE_HOST=${NODE_HOST}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+    - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false}
+    - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}

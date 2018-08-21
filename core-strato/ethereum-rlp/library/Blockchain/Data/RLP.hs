@@ -14,16 +14,17 @@ module Blockchain.Data.RLP (
   rlpDeserialize
   ) where
 
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.ByteString.Internal
-import Data.Word
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-import Numeric
+import           Data.Bits
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
+import           Data.ByteString.Internal
+import qualified Data.Map                           as M
+import           Data.Word
+import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
+import           Numeric
 
-import Blockchain.Data.Util
+import           Blockchain.Data.Util
 
 -- | An internal representation of generic data, with no type information.
 --
@@ -203,3 +204,21 @@ instance
   rlpEncode (a,b,c,d,e,f) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d, rlpEncode e, rlpEncode f]
   rlpDecode (RLPArray [a,b,c,d,e,f]) = (rlpDecode a, rlpDecode b, rlpDecode c, rlpDecode d, rlpDecode e, rlpDecode f)
   rlpDecode x = error $ "rlpDecode for 6-tuples not defined for " ++ show x
+
+
+-- generic instance for Maybe
+instance (RLPSerializable a) => RLPSerializable (Maybe a) where
+  rlpEncode Nothing = RLPString ""
+  rlpEncode (Just a) = RLPArray [rlpEncode a]
+
+  rlpDecode (RLPString "") = Nothing
+  rlpDecode (RLPArray [x]) = Just (rlpDecode x)
+  rlpDecode _ = error "error in rlpDecode for Maybe: bad RLPObject"
+
+
+-- generic instance for Data.Map
+instance (RLPSerializable k, RLPSerializable v, Ord k, Ord v) 
+  => RLPSerializable (M.Map k v) where
+  rlpEncode mp = RLPArray $ map rlpEncode (M.toList mp)
+  rlpDecode (RLPArray rp) = M.fromList (map rlpDecode rp)
+  rlpDecode x = error $ "rlpDecode for Map not defined for " ++ show x 

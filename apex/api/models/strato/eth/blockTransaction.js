@@ -5,7 +5,7 @@ const Block = db.sequelize.define('block_transaction', {
     type: db.Sequelize.BIGINT,
     primaryKey: true
   },
-  block_id: {
+  block_data_ref_id: {
     type: db.Sequelize.BIGINT
   },
   transaction: {

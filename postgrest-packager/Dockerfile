@@ -15,7 +15,7 @@ ENV POSTGREST_SOURCE=http://github.com/begriffs/postgrest/releases/download \
     DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y tar xz-utils wget postgresql-client && \
+    apt-get install -y tar xz-utils wget postgresql-client curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     wget "$POSTGREST_SOURCE/$POSTGREST_VERSION/$POSTGREST_FILE" && \
@@ -24,6 +24,8 @@ RUN apt-get update && \
     rm $POSTGREST_FILE
 
 COPY doit.sh postgrest.conf.tpl /
+
+COPY licenses /licenses
 
 EXPOSE 3001
 

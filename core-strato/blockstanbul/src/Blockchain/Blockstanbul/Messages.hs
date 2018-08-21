@@ -2,48 +2,67 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.Lens
-import Control.Monad
+import Data.Binary
+import Data.DeriveTH
 import Data.Text
+import GHC.Generics
 import Test.QuickCheck
+import Text.Printf
 
 import Blockchain.Data.RLP
 import Blockchain.ExtWord
+import Blockchain.Format
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
-import Blockchain.SHA
 import Blockchain.ExtendedECDSA
+import Blockchain.SHA
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
 data View = View {
   _round :: RoundNumber,
   _sequence :: SequenceNumber
-} deriving (Eq, Show, Ord)
+} deriving (Eq, Show, Ord, Generic)
 makeLenses ''View
+
+instance Format View where
+  format (View r s) = printf "View (round = %d, sequence = %d)" r s
 
 data MsgAuth = MsgAuth {
   sender :: Address,
   signature :: ExtendedSignature
-} deriving (Eq, Show)
-
-instance Arbitrary MsgAuth where
-  arbitrary = liftM2 MsgAuth arbitrary arbitrary
+} deriving (Eq, Show, Generic)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
-                    deriving (Eq, Show)
+                    deriving (Eq, Show, Generic)
 
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
-} deriving (Eq, Show)
+} deriving (Eq, Show, Generic)
 makeLenses ''WireMessage
+
+instance Binary MsgAuth where
+instance Binary View where
+instance Binary TrustedMessage where
+instance Binary WireMessage where
+
+derive makeArbitrary ''MsgAuth
+derive makeArbitrary ''View
+derive makeArbitrary ''TrustedMessage
+derive makeArbitrary ''WireMessage
+
+instance Format WireMessage where
+  -- TODO(tim): Invest in better formatting.
+  format = show
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -52,14 +71,17 @@ commitCode = 2
 roundchangeCode = 3
 
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
-             | Timeout
+             | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
+             | NewBeneficiary Address Bool
              deriving (Eq, Show)
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
+              | MakeBlockCommand
+              | ResetTimer RoundNumber
               deriving (Eq, Show)
 
 getHash :: TrustedMessage -> Word256
@@ -71,9 +93,6 @@ getHash = \case
               (Prepare _ di) -> unSHA di
               (Commit _ di _) -> unSHA di
               (RoundChange _) -> unSHA $ hash "TODO(tim): this signature is predictable"
-
--- TODO(tim): JSON instances
-
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]

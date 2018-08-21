@@ -21,7 +21,7 @@ import           Data.Proxy
 import qualified Data.Text           as Text
 import           GHC.TypeLits
 
-data NamedTuple (k :: Symbol) a (v :: Symbol) b = NamedTuple (a,b)
+data NamedTuple (k :: Symbol) a (v :: Symbol) b = NamedTuple (a,b) deriving (Eq, Ord, Show)
 
 type NamedTupleParser k a v b = Parser (NamedTuple k a v b)
 

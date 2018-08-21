@@ -10,10 +10,13 @@ packages:
 - cirrus/client
 - ethereum
 - ethereum-abi
+- slipstream
 - solidity
 - strato/api
 - strato/client
 - strato/server
+- vault-wrapper/api
+- vault-wrapper/client
 - location:
     git: https://github.com/echatav/secp256k1-haskell/
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
@@ -36,8 +39,7 @@ extra-deps:
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
   - parsec3-numbers-0.1.0
-  - insert-ordered-containers-0.2.1.0
-
+  - milena-0.5.2.1
 flags: {}
 
 ghc-options:

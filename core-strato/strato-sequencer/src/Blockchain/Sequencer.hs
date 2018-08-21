@@ -8,24 +8,20 @@
 {-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
-import           ClassyPrelude                             (atomically)
-
-import           Control.Concurrent.AlarmClock
-import           Control.Concurrent.STM.TMVar
+import           Control.Concurrent
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
-import           Data.Time.Clock
 import           System.Clock
 
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
-import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
+import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
 
@@ -64,36 +60,19 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-createBlockstanbulRoundTimer :: NominalDiffTime -> IO (TMVar Bool)
-createBlockstanbulRoundTimer dt = do
-  var <- atomically $ newTMVar False
-  let act :: AlarmClock UTCTime -> IO ()
-      act alarm' = do
-        _ <- atomically $ swapTMVar var True
-        next <- addUTCTime dt <$> getCurrentTime
-        setAlarm alarm' next
-  alarm <- newAlarmClock act :: IO (AlarmClock UTCTime)
-  next <- addUTCTime dt <$> getCurrentTime
-  setAlarm alarm next
-  return var
-
 sequencer :: SequencerM ()
 sequencer = do
-  -- TODO(tim): Pipe time window in through a flag
-  timer <- liftIO $ createBlockstanbulRoundTimer 100
+  bootstrapBlockstanbul
   forever $ do
+    $logDebugS "seq/loop/start" ""
     v <- currentView
-    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ show v
-    roundTimeout <- atomically $ swapTMVar timer False
-    when roundTimeout $ do
-      oevs <- blockstanbulSend [Timeout]
-      void . writeSeqVmEvents' $ oevs
+    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
+    blockstanbulSend . map Timeout =<< drainTimeouts
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
     clearGetChainsDB
     clearGetTransactionsDB
-    clearEvents
     t0 <- liftIO $ getTime Realtime
     splitEvents $ map snd inEvents
     t1 <- liftIO $ getTime Realtime
@@ -109,14 +88,14 @@ sequencer = do
     txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
-    vmEvs <- gets _vmEvents
-    unless (Q.length vmEvs == 0) $ do
-      writeSeqVmEvents' $ toList vmEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- gets _p2pEvents
-    unless (Q.length p2pEvs == 0) $ do
-      writeSeqP2pEvents' $ toList p2pEvs
-      $logInfoS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+    vmEvs <- drainVM
+    unless (null vmEvs) $ do
+      writeSeqVmEvents' vmEvs
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+    p2pEvs <- drainP2P
+    unless (null p2pEvs) $ do
+      writeSeqP2pEvents' p2pEvs
+      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
     unless (null inEvents) $ do
       let ofs = maximum $ map fst inEvents
       setNextIngestedOffset ofs
@@ -147,23 +126,42 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                   writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
-blockstanbulSend :: [InEvent] -> SequencerM [OutputEvent]
+bootstrapBlockstanbul :: SequencerM ()
+bootstrapBlockstanbul = do
+  writeSeqVmEvents' [OECreateBlockCommand]
+  createFirstTimer
+
+blockstanbulSend :: [InEvent] -> SequencerM ()
 blockstanbulSend msgs = do
-    resp <- sendAllMessages msgs
-    $logDebugS "seq/tevs/blockstanbul" . T.pack $ "Response from blockstanbul: " ++ show resp
-    -- TODO(tim): Use the wiremessages in the response
-    let blocks = [b | ToCommit b <- resp]
-    unless (null blocks) $
-      -- TODO(tim): Block insertion can potentially fail, so there should be feedback here
-      void $ sendAllMessages [CommitResult (Right ())]
+    resp' <- sendAllMessages msgs
+    let blocks = [b | ToCommit b <- resp']
+    resp <- (resp'++) <$>
+        if null blocks
+            then return []
+            -- TODO(tim): Block insertion can potentially fail, so there
+            -- should be feedback here
+            else sendAllMessages [CommitResult (Right ())]
+    mapM_ createNewTimer [rn | ResetTimer rn <- resp]
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap OEBlock
                      . fmap (flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
-        evs = mapMaybe rewriteBlock blocks
-    $logDebugS "seq/pbft/send" . T.pack . show $ evs
-    return evs
+        creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
+        vmevs = creates ++ mapMaybe rewriteBlock blocks
+        p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+    unless (null blocks) $ do
+      let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
+      dt <- asks blockstanbulBlockPeriod
+      let tNext = addUTCTime dt tLast
+      now <- liftIO getCurrentTime
+      when (now < tNext) $
+       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+
+    $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
+    mapM_ markForVM vmevs
+    $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
+    mapM_ markForP2P p2pevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
@@ -320,9 +318,7 @@ transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks blocks = do
   hasPBFT <- blockstanbulRunning
   if hasPBFT
-    then do
-      outEvents <- blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
-      mapM_ markForVM outEvents
+    then blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
     else forM_ blocks $ \ib -> do
       let mSb = ingestBlockToSequencedBlock ib
       case mSb of
@@ -417,6 +413,9 @@ splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
     IETGenesis -> do
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETBlockstanbul -> do
+      $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
+      blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
@@ -493,4 +492,3 @@ setNextIngestedOffset newOffset = do
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
         Right () -> return ()
-

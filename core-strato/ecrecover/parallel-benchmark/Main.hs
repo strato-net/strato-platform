@@ -4,7 +4,6 @@ import qualified BlockApps.ECRecover.BytesFormat   as A
 import qualified BlockApps.ECRecover.IntegerFormat as C
 import qualified Control.Parallel.Strategies       as B
 import           Criterion.Main
-import           Prelude
 
 
 main =

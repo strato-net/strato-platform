@@ -1,0 +1,37 @@
+name:                miner-ethash
+version:             0.1.0.0
+license:             Apache-2.0
+license-file:        LICENSE
+category:            System
+build-type:          Simple
+
+ghc-options: -Wall -O2
+
+dependencies:
+  - base
+  - arithmoi
+  - array
+  - binary
+  - bytestring
+  - cryptohash
+  - strato-model
+  - time
+
+library:
+  source-dirs: src/
+  other-modules:
+    - Blockchain.Strato.Mining.Ethash.Util
+
+executables:
+  miner-ethash:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - miner-ethash
+      - mmap
+
+  mkDataset:
+    source-dirs: exec_src/
+    main: mkDataset.hs
+    dependencies:
+      - miner-ethash

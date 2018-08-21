@@ -1,0 +1,31 @@
+name:                strato-conf
+version:             0.1.0.0
+license:             Apache-2.0
+license-file:        LICENSE
+author:              Jamshid
+category:            Web
+build-type:          Simple
+github:              blockapps/strato-platform/core-strato/strato-conf
+
+library:
+  source-dirs:      src
+  dependencies:
+    - base >= 4.7 && < 5
+    - bytestring
+    - directory
+    - filepath
+    - hflags
+    - network
+    - hostname
+    - yaml
+    - postgresql-simple
+    - containers
+    - blockapps-milena
+    - ethereum-encryption
+    - file-embed
+    - crypto-random
+    - crypto-pubkey
+    - mtl
+    - transformers
+    - hedis
+    - statsdi

@@ -3,13 +3,17 @@
 module Main where
 
 import           Control.Monad.Logger
+import qualified Data.Aeson                 as Ae
+import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
+import           Data.Either.Extra
 import           Data.Maybe                 (fromMaybe)
 import           HFlags
 import           Safe
+import           System.Environment
 
 import           Blockchain.Blockstanbul
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -22,20 +26,26 @@ import           Flags
 main :: IO ()
 main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
-  putStrLn $ "strato-sequencer with flags: " ++ unlines s
+  putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
+  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
                           (_, "") -> Nothing
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
-  -- TODO(tim): Use proper values
-      ctx = newContext
-               (View 0 0)
-               [Address 0x80976e7d04c8ae9b3a1c08278a5c385e5b0ff446]
-               (fromMaybe (error "invalid argument")  $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
-      mCtx = if flags_tmpblockstanbul
-               then Just ctx
-               else Nothing
+      eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+      validators = fromRight (error "invalid validators") eValidators
+      -- TODO(tim): Use proper initial values for the view
+      ctx = newContext (View 0 0) validators
+  putStrLn $ "Interpreted validators: " ++ show validators
+  mCtx <- if not flags_blockstanbul
+             then return Nothing
+             else do
+                skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+                let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
+                return . Just . ctx $ pkey
 
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize
@@ -47,5 +57,7 @@ main = do
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
     , statsConfig           = EC.statsConfig EC.ethConf
+    , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
+    , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
   }
   runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg

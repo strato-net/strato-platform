@@ -96,9 +96,9 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
     accountInfoString <-
       liftIO $
       fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
-    let accountInfo = BLC.lines accountInfoString
+    let accountinfo = BLC.lines accountInfoString
 
-    let accountInfoBatches = chunksOf 10000 accountInfo
+    let accountInfoBatches = chunksOf 10000 accountinfo
 
     forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
       forM_ batch $ \theLine -> do
@@ -139,8 +139,8 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           => ChainInfo
                           -> m StateRoot
 chainInfoToGenesisState ci = do
-    let accounts = (\(a,w) -> NonContract a (fromIntegral w)) <$> accountBalance ci
-    initializeStateDB accounts
+    initializeCodeDB (codeInfo ci)
+    initializeStateDB (accountInfo ci)
     stateRoot <$> getStateDB
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]

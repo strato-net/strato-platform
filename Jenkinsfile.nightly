@@ -59,6 +59,21 @@ pipeline {
     stage('Test') {
       steps {
         parallel (
+
+          'Push images': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+            ]) {
+              archiveArtifacts artifacts: "strato-platform/docker-compose.yml"
+              sh '''#!/bin/bash -le
+                set -x
+                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                cd strato-platform
+                docker-compose -f docker-compose.push.yml push
+              '''
+            }
+          },
+
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -111,27 +126,10 @@ pipeline {
         )
       }
     }
-
-    stage('Release') {
-      steps {
-        withCredentials([
-          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
-        ]) {
-          sh '''#!/bin/bash -le
-            # Removing temporarily -- need to verify but this is probably not a needed step.
-            #set -x
-            #docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            #cd strato-platform
-            #docker-compose -f docker-compose.push.yml push
-          '''
-        }
-      }
-    }
   }
 
   post {
     success {
-      archive "strato-platform/docker-compose.yml"
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"

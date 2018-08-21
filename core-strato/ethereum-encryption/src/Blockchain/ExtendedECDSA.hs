@@ -1,6 +1,6 @@
-
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA (
-  ExtendedSignature(..),
+  module Blockchain.ExtendedECDSA.Model.ExtendedSignature,
   extSignMsg,
   getPubKeyFromSignature
   ) where
@@ -9,11 +9,9 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
-import qualified Data.ByteString           as B
-import           Test.QuickCheck
 
-import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
 
 import           Network.Haskoin.Constants
 import           Network.Haskoin.Crypto
@@ -48,8 +46,6 @@ genKeyPair = do
     return (d,q)
 
 -----------------------
-
-data ExtendedSignature = ExtendedSignature Signature Bool deriving (Show, Eq)
 
 unsafeExtSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe ExtendedSignature
 unsafeExtSignMsg _ 0 _ = Nothing
@@ -100,18 +96,3 @@ getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash = do
   p <- recoverPoint r yIsOdd
   w <- if r == 0 then Nothing else Just $ recip r
   return $ makePubKey $ shamirsTrick (s * w) p (-h * w) curveG
-
-instance Arbitrary ExtendedSignature where
-  arbitrary = liftM2 ExtendedSignature arbitrary arbitrary
-
-instance RLPSerializable ExtendedSignature where
-  rlpEncode (ExtendedSignature (Signature r s) yIsOdd) = RLPString . B.pack $ rstr ++ sstr ++ vstr
-      where rstr = word256ToBytes . fromIntegral $ r
-            sstr = word256ToBytes . fromIntegral $ s
-            vstr = [if yIsOdd then 1 else 0]
-
-  rlpDecode (RLPString bs) = ExtendedSignature (Signature r s) yIsOdd
-      where r = fromIntegral . bytesToWord256 . B.unpack . B.take 32 $ bs
-            s = fromIntegral . bytesToWord256 . B.unpack . B.take 32 . B.drop 32 $ bs
-            yIsOdd = (==1) . head . B.unpack . B.drop 64 $ bs
-  rlpDecode x = error $ "invalid rlp for extendedsignature: " ++ show x

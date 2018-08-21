@@ -1,26 +1,16 @@
 
 module Blockchain.Strato.Discovery.P2PUtil (
   hPubKeyToPubKey,
-  ecdsaSign,
-  intToBytes,
   sockAddrToIP,
-  add,
   DiscoverException(..)
   ) where
 
 import           Control.Error             (note)
 import           Control.Exception.Base    (Exception)
 
-import           Data.Bits                 (shiftR)
-import qualified Data.ByteString           as B
 import           Data.Typeable             (Typeable)
-import           Data.Word                 (Word8)
-
-import           Blockchain.ExtendedECDSA  (ExtendedSignature, extSignMsg)
-import           Blockchain.Strato.Model.SHA (keccak256)
 
 import           Crypto.Types.PubKey.ECC   (Point (..))
-import           Network.Haskoin.Crypto    (Word256)
 import qualified Network.Haskoin.Internals as H
 import qualified Network.Socket            as S
 
@@ -35,14 +25,6 @@ data DiscoverException = AffineException
 
 instance Exception DiscoverException
 
-add :: B.ByteString
-    -> B.ByteString
-    -> Either DiscoverException B.ByteString
-add acc val
-  | B.length acc == 32 && B.length val == 32 = Right $ keccak256 $ val `B.append` acc
-  | otherwise = Left $ ByteStringLengthException $ "Expected length 32 summands, got " ++
-      show (B.length acc, B.length val)
-
 --I need to use two definitions of PubKey (internally they represent the same thing)
 --The one in the Haskoin package allows me to recover signatures.
 --The one in the crypto packages let me do AES encryption.
@@ -54,12 +36,6 @@ hPubKeyToPubKey pubKey = do
   x <- note AffineException $ H.getX hPoint
   y <- note AffineException $ H.getY hPoint
   return $ Point (fromIntegral x) (fromIntegral y)
-
-ecdsaSign :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
-ecdsaSign = flip extSignMsg
-
-intToBytes :: Integer -> [Word8]
-intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
 sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host

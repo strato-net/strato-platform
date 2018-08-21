@@ -12,6 +12,8 @@ module BlockApps.SolidityVarReader (
   decodeValues,
   decodeValuesFromList,
   decodeMapValue,
+  encodeValues,
+  encodeValue,
   word256ToByteString,
   byteStringToWord256,
   valueToSolidityValue
@@ -30,12 +32,14 @@ import qualified Data.ByteString.Char8            as BC
 import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
 import           Data.List
-import qualified Data.Map                         as Map
+import           Data.Map.Strict                  (Map)
+import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
 import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
+import           Data.Word                        (Word8)
 import           Text.Printf
 import           Text.Read
 
@@ -291,7 +295,7 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
    Nothing -> Nothing
    Just (Right position, theType) ->
      Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
-   Just (Left text, theType) -> case (textToValue text theType) of
+   Just (Left text, theType) -> case (textToValue (Just typeDefs') text theType) of
       Left err -> error $ "decodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
       Right val -> Just val
 
@@ -562,6 +566,205 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
 
   return val
 
+encodeValues
+  :: TypeDefs
+  -> Struct
+  -> Word256
+  -> [(Text,Text)]
+  -> Map Word256 Word256
+encodeValues typeDefs' struct'@Struct{..} offset vars =
+  zipMapMaybe (uncurry $ encodeValue typeDefs' offset struct') vars Map.empty
+  where
+    zipMapMaybe _ [] m = m
+    zipMapMaybe f (a:as) m = case (f a) of
+      Nothing -> zipMapMaybe f as m
+      Just b -> zipMapMaybe f as $ foldl' (apply (.|.)) m b
+    apply f m (a,b) = case Map.lookup a m of
+      Nothing -> Map.insert a b m
+      Just c -> Map.insert a (f c b) m
+
+encodeValue
+  :: TypeDefs
+  -> Word256
+  -> Struct
+  -> Text
+  -> Text
+  -> Maybe [(Word256,Word256)]
+encodeValue typeDefs' offset Struct{..} varName val = case OMap.lookup varName fields of
+   Nothing -> Nothing
+   Just (Right position, theType) -> case (textToValue (Just typeDefs') val theType) of
+     Left err -> error $ "encodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
+     Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) v
+   Just (Left _, _) -> error "decodeValue: cannot convert constant variable to storage"
+
+encodeValue'
+  :: TypeDefs
+  -> Storage.Position
+  -> Value
+  -> [(Word256,Word256)]
+encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} = \case
+  SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
+  SimpleValue (ValueUInt v) -> encodeValue' typeDefs' position . SimpleValue $ ValueUInt256 v
+
+  SimpleValue (ValueInt8 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt16 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt24 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt32 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt40 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt48 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt56 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt64 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueInt72 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt80 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt88 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt96 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt104 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt112 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt120 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt128 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueInt136 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt144 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt152 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt160 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt168 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt176 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt184 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt192 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueInt200 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt208 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt216 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt224 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt232 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt240 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt248 v) -> encodeInt offset byte v
+  SimpleValue (ValueInt256 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueUInt8 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt16 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt24 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt32 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt40 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt48 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt56 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt64 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueUInt72 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt80 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt88 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt96 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt104 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt112 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt120 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt128 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueUInt136 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt144 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt152 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt160 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt168 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt176 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt184 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt192 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueUInt200 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt208 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt216 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt224 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt232 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt240 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt248 v) -> encodeInt offset byte v
+  SimpleValue (ValueUInt256 v) -> encodeInt offset byte v
+
+  SimpleValue (ValueInt v) -> encodeValue' typeDefs' position . SimpleValue $ ValueInt256 v
+
+  SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position . SimpleValue $ ValueUInt160 a
+  ValueContract (Address a) -> encodeValue' typeDefs' position . SimpleValue $ ValueUInt160 a
+
+{-
+  ValueFixed (Just (n,m)) ->
+    let
+      ValueInt x = EncodeValue' storage offset (ValueInt (Just 256))
+    in
+      ValueFixed $ fromIntegral x / 2 ** fromIntegral n
+  ValueFixed Nothing -> EncodeValue' storage offset (ValueFixed (Just (128,128)))
+-}
+  SimpleValue (ValueBytes1 v) -> [(offset, fromIntegral v)]
+  SimpleValue (ValueBytes2 v) -> encodeByteString offset byte 2 v
+  SimpleValue (ValueBytes3 v) -> encodeByteString offset byte 3 v
+  SimpleValue (ValueBytes4 v) -> encodeByteString offset byte 4 v
+  SimpleValue (ValueBytes5 v) -> encodeByteString offset byte 5 v
+  SimpleValue (ValueBytes6 v) -> encodeByteString offset byte 6 v
+  SimpleValue (ValueBytes7 v) -> encodeByteString offset byte 7 v
+  SimpleValue (ValueBytes8 v) -> encodeByteString offset byte 8 v
+  SimpleValue (ValueBytes9 v) -> encodeByteString offset byte 9 v
+  SimpleValue (ValueBytes10 v) -> encodeByteString offset byte 10 v
+  SimpleValue (ValueBytes11 v) -> encodeByteString offset byte 11 v
+  SimpleValue (ValueBytes12 v) -> encodeByteString offset byte 12 v
+  SimpleValue (ValueBytes13 v) -> encodeByteString offset byte 13 v
+  SimpleValue (ValueBytes14 v) -> encodeByteString offset byte 14 v
+  SimpleValue (ValueBytes15 v) -> encodeByteString offset byte 15 v
+  SimpleValue (ValueBytes16 v) -> encodeByteString offset byte 16 v
+  SimpleValue (ValueBytes17 v) -> encodeByteString offset byte 17 v
+  SimpleValue (ValueBytes18 v) -> encodeByteString offset byte 18 v
+  SimpleValue (ValueBytes19 v) -> encodeByteString offset byte 19 v
+  SimpleValue (ValueBytes20 v) -> encodeByteString offset byte 20 v
+  SimpleValue (ValueBytes21 v) -> encodeByteString offset byte 21 v
+  SimpleValue (ValueBytes22 v) -> encodeByteString offset byte 22 v
+  SimpleValue (ValueBytes23 v) -> encodeByteString offset byte 23 v
+  SimpleValue (ValueBytes24 v) -> encodeByteString offset byte 24 v
+  SimpleValue (ValueBytes25 v) -> encodeByteString offset byte 25 v
+  SimpleValue (ValueBytes26 v) -> encodeByteString offset byte 26 v
+  SimpleValue (ValueBytes27 v) -> encodeByteString offset byte 27 v
+  SimpleValue (ValueBytes28 v) -> encodeByteString offset byte 28 v
+  SimpleValue (ValueBytes29 v) -> encodeByteString offset byte 29 v
+  SimpleValue (ValueBytes30 v) -> encodeByteString offset byte 30 v
+  SimpleValue (ValueBytes31 v) -> encodeByteString offset byte 31 v
+  SimpleValue (ValueBytes32 v) -> encodeByteString offset byte 32 v
+
+  -- SimpleValue (ValueBytes _) -> error "Large strings not supported yet" --large string, 32+ bytes
+   --  let
+   --    len' = storage offset `div` 2
+   --    startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
+   --  in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+
+  SimpleValue (ValueBytes v) -> [(offset, byteStringToWord256 v)]
+
+  SimpleValue (ValueString v) -> encodeValue' typeDefs' position . SimpleValue . ValueBytes $ Text.encodeUtf8 v
+
+  ValueFunction _ _ _ -> error "Cannot convert function to storage"
+
+  ValueArrayFixed _ _ -> error "Arrays not supported yet" --if len
+    -- then SimpleValue $ ValueUInt $ fromIntegral size
+    -- else ValueArrayFixed size theList
+    -- where
+    --   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+    --   ofs' :: Word256 = fromIntegral . toInteger $ maybe 0 id ofs
+    --   cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') . fromIntegral $ maybe 100 id cnt
+    --   theList = map (flip (encodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
+
+  ValueArrayDynamic _ -> error "Arrays not supported yet" --if len
+    -- then SimpleValue $ ValueUInt (storage offset)
+    -- else ValueArrayDynamic theList
+    -- where
+    --   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+    --   --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
+    --   ofs' = maybe 0 id ofs
+    --   cnt' = max 0 . min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
+    --   theList = (flip (EncodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
+    --   startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
+
+  -- ValueMapping _ -> error "Mappings not supported yet" --SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleValue tyk ++ " => " ++ formatValue tyv ++ ")"
+
+  ValueEnum _ _ index -> encodeInt offset byte index
+
+  ValueStruct _ -> error "Structs not supported yet"
+    -- case Map.lookup name structDefs of
+    --  Nothing -> error ""
+    --  Just theStruct -> ValueStruct $ EncodeValues typeDefs' theStruct storage (Storage.alignedByte position)
+
 
 
 
@@ -570,8 +773,16 @@ orFail Nothing msg = Left msg
 orFail (Just x) _ = Right x
 
 
+encodeByteString :: Word256 -> Int -> Int -> ByteString -> [(Word256,Word256)]
+encodeByteString offset byte size bs =
+  let bss = ByteString.concat [ByteString.replicate (32 - byte - size) 0, bs, ByteString.replicate byte 0]
+   in [(offset, byteStringToWord256 bss)]
+
 decodeByteString::Storage->Word256->Int->Int->Value
 decodeByteString storage offset byte size = SimpleValue $ ValueBytes $ B16.encode $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+
+encodeInt :: (Num t, Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
+encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte*8))) (offset,val)
 
 decodeInt::Num t=>
            Storage->Word256->Int->(t->SimpleValue)->Value

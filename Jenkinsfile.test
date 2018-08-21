@@ -10,7 +10,11 @@ pipeline {
       steps {
         wrap([$class: 'BuildUser']) {
           script {
-            currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+            try {
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // anon"
+            }
           }
         }
         sh '''#!/bin/bash -le
@@ -58,9 +62,23 @@ pipeline {
       }
     }
 
-    stage('Test') {
+    stage('Test & Push images') {
       steps {
         parallel (
+
+          'Push images': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+            ]) {
+              archiveArtifacts artifacts: "docker-compose.yml"
+              sh '''#!/bin/bash -le
+              set -x
+              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+              docker-compose -f docker-compose.push.yml push
+            '''
+            }
+          },
+
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -78,9 +96,9 @@ pipeline {
               git clone https://github.com/blockapps/blockapps-ba.git -b master
               cd blockapps-ba
               npm i
-              SERVER=localhost npm run deploy
+              SERVER=localhost npm run deploy --timeout=6000000
               sleep 5
-              SERVER=localhost npm run test
+              SERVER=localhost npm run test --timeout=6000000
             '''
           },
 
@@ -113,25 +131,10 @@ pipeline {
         )
       }
     }
-
-    stage('Release') {
-      steps {
-        withCredentials([
-          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            docker-compose -f docker-compose.push.yml push
-          '''
-        }
-      }
-    }
   }
 
   post {
     success {
-      archive "docker-compose.yml"
       slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"

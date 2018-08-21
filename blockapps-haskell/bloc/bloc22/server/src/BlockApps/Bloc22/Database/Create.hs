@@ -79,8 +79,9 @@ contractsInstanceTable = [sql|
 CREATE TABLE IF NOT EXISTS contracts_instance(
   id serial PRIMARY KEY,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
-  address bytea NOT NULL UNIQUE,
+  address bytea NOT NULL,
   timestamp timestamptz NOT NULL DEFAULT now(),
+  chainid bytea NOT NULL,
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]

@@ -41,7 +41,7 @@ getGenesisBlockHash = do
     _   -> error "getGenesisBlockHash called, but there are multiple genesis blocks!  This is an error."
 
 getBestBlock::(MonadResource m, HasSQLDB m)=>
-              m Block
+              m BlockDataRef
 getBestBlock = do
   bestBlockHash <- getBestBlockHash
   bestBlock <- getBlock bestBlockHash

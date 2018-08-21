@@ -6,7 +6,6 @@ import           Data.DeriveTH
 import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances ()
-import           Blockchain.Data.GenesisInfo
 import           Blockchain.Sequencer.Event
 
 derive makeArbitrary ''IngestEvent
@@ -18,12 +17,6 @@ derive makeArbitrary ''OutputEvent
 derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''OutputGenesis
-
-instance Arbitrary CodeInfo where
-  arbitrary = CodeInfo <$> arbitrary <*> arbitrary <*> arbitrary
-
-instance Arbitrary AccountInfo where
-  arbitrary = NonContract <$> arbitrary <*> arbitrary
 
 -- just end me fam
 instance Arbitrary JsonRpcCommand where

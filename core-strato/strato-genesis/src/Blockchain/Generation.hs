@@ -35,6 +35,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Data.GenesisInfo
+import Blockchain.Data.ChainInfo
 
 data Type = Number Integer
           | Stryng T.Text

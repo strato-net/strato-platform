@@ -23,7 +23,6 @@ module Blockchain.Stream.VMEvent (
 ) where
 
 import           Conduit
-import           Control.Exception.Lifted
 
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
@@ -36,8 +35,6 @@ import           Network.Kafka.Protocol      hiding (Key)
 import           Blockchain.DB.SQLDB
 
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.BlockOffset
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.Format
@@ -83,9 +80,6 @@ produceVMEventsM vmEvents = do
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-        newBlocks = [b | ChainBlock b <- vmEvents]
-    (_::Either SomeException ()) <- try $
-        putBlockOffsets $ map (\(b, o) -> BlockOffset (fromIntegral o) (blockDataNumber $ blockBlockData b) (blockHash b)) $ zip newBlocks [offset..]
     return offset
 
 -- todo: refactor this to consume produceVMEventsM
@@ -98,8 +92,6 @@ produceVMEvents vmEvents = do
    Left e -> error $ show e
    Right x -> do
      let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-         newBlocks = [b | ChainBlock b <- vmEvents]
-     (_::Either SomeException ()) <- try $ putBlockOffsets $ map (\(b, o) -> BlockOffset (fromIntegral o) (blockDataNumber $ blockBlockData b) (blockHash b)) $ zip newBlocks [offset..]
      return offset
 
 -- | Reads VMEvents from `defaultVMEventsTopicName`

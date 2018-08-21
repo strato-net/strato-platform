@@ -4,10 +4,12 @@ NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
+LICENSE_DIR=$(FAKEROOT)/licenses
+LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
-all: build_docker
+all: build_docker clean
 
 prebuild:
 	mkdir -p $(BASILWORK)
@@ -16,11 +18,12 @@ prebuild:
 	mkdir -p $(FAKEROOT)/usr/lib
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(STRATOHOME)
-	mkdir -p /tmp/docker-dummy
+	mkdir -p $(LICENSE_SOURCE_DIR)
+	mkdir -p /tmp/docker-dummy-core
 
 build_buildbase: prebuild
-	cp -f Dockerfile.buildbase /tmp/docker-dummy
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-core-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+	cp -f Dockerfile.buildbase /tmp/docker-dummy-core
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-core-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy-core/Dockerfile.buildbase /tmp/docker-dummy-core
 
 build_haskell: prebuild build_buildbase
 	stack setup
@@ -31,9 +34,10 @@ build_haskell: prebuild build_buildbase
         # --profile --ghc-options="-fprof-auto -rtsopts"
 
 build_deploybase: prebuild
-	cp -f Dockerfile.deploybase /tmp/docker-dummy
-	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
-	rm -f /tmp/docker-dummy/Dockerfile.deploybase
+	cp -f Dockerfile.deploybase /tmp/docker-dummy-core
+	cp -fr licenses/* ${LICENSE_DIR}
+	docker build -t strato-deploybase:latest -f /tmp/docker-dummy-core/Dockerfile.deploybase /tmp/docker-dummy-core
+	rm -f /tmp/docker-dummy-core/Dockerfile.deploybase
 
 pull_blockapps_js: prebuild
 	( \
@@ -47,3 +51,7 @@ build_docker: build_deploybase build_haskell pull_blockapps_js
 	cp -f doit.sh mkCoinbase $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
+
+clean:
+	rm -rf $(BASILWORK)
+	rm -rf /tmp/docker-dummy-core

@@ -104,7 +104,7 @@ logN n = do
   topics' <- sequence $ replicate n pop
 
   theData <- mLoadByteString offset theSize
-  addLog Log{address=owner, bloom=0, logData=theData, topics=topics'}
+  addLog Log{address=owner, bloom=0, logData=theData, topics=topics'} -- TODO(dustin): Fix bloom filter
 
 guardStorage :: VMM ()
 guardStorage = do

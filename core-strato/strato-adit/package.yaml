@@ -1,0 +1,46 @@
+name:                strato-adit
+version:             0.1.0.0
+license:             Apache-2.0
+license-file:        LICENSE
+author:              Kristoffer Josefsson
+maintainer:          kristoffer@blockapps.net
+build-type:          Simple
+
+ghc-options: -Wall -O2
+
+dependencies:
+  - base
+  - bytestring
+  - monad-logger
+  - blockapps-data
+  - random
+  - stm
+  - normaldistribution
+  - ansi-wl-pprint
+  - cryptohash
+  - hflags
+  - blockapps-util
+  - blockapps-milena
+  - ethereum-rlp
+  - ethereum-discovery
+  - resourcet
+  - time
+  - lifted-base
+  - text
+  - strato-conf
+  - strato-sequencer
+  - mtl
+
+other-extensions: OverloadedStrings
+
+library:
+  source-dirs: src
+  other-modules:
+    - Executable.AditM
+
+executables:
+  strato-adit:
+    main:             Main.hs
+    source-dirs:      exec_src
+    dependencies:
+      - strato-adit
