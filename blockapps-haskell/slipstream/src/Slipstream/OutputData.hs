@@ -153,8 +153,8 @@ convertRet metadata conn cache = do
           else ", "
       let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
       dbInsert createSt conn
-      let indexT = "create index if not exists \"" ++ (contractName $ head metadata) ++ "_index\" on \"" ++ (contractName $ head metadata) ++ "\" (address, \"chainId\");"
-      dbInsert indexT conn
+      --let indexT = "create index if not exists \"" ++ (contractName $ head metadata) ++ "_index\" on \"" ++ (contractName $ head metadata) ++ "\" (address, \"chainId\");"
+      --dbInsert indexT conn
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
@@ -162,7 +162,7 @@ convertRet metadata conn cache = do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
             let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
             return rowSt
-      --Split vals with commas
+
       putStrLn $ "Inserting " ++ show (length vals) ++ " new contracts"
       let inserts = L.intercalate ", " vals
       let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
@@ -186,8 +186,8 @@ convertRet metadata conn cache = do
     let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
     dbInsert createSt conn
 
-    let indexT = "create index if not exists \"" ++ (contractName $ row) ++ "_index\" on \"" ++ (contractName $ row) ++ "\" (address, \"chainId\");"
-    dbInsert indexT conn
+    --let indexT = "create index if not exists \"" ++ (contractName $ row) ++ "_index\" on \"" ++ (contractName $ row) ++ "\" (address, \"chainId\");"
+    --dbInsert indexT conn
 
     let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
     let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
