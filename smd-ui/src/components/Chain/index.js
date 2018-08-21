@@ -12,7 +12,7 @@ class Chain extends Component {
       balances.forEach(function(balance, index) {
         if (balance.address && balance.address !== '0000000000000000000000000000000000000100'){
           ret.push(
-            <tr>
+            <tr key={index}>
               <td>{balance.address}</td>
               <td>{balance.balance}</td>
             </tr>
@@ -71,7 +71,7 @@ class Chain extends Component {
             </tr>
           </thead>
           <tbody>
-            {this.showMembers(chain[0]["info"])}
+            {chain[0] && this.showMembers(chain[0]["info"])}
           </tbody>
         </table>
       </div>
@@ -83,7 +83,6 @@ export function mapStateToProps(state, ownProps) {
   const label = ownProps.label;
   const id = ownProps.id;
   const chains = state.chains.chains;
-  console.log(chains);
   return {
     chain: Object.getOwnPropertyNames(chains).indexOf(label) >= 0 ? chains[label][id] : {},
   };

@@ -19,7 +19,7 @@ const tourSteps = [
 ];
 
 class Chains extends Component {
-constructor() {
+  constructor() {
     super()
     this.state = {
       selected: 0
@@ -46,7 +46,6 @@ constructor() {
   }
 
   render() {
-    console.log("RENDER~~~~~");
     const labelIds = this.props.labelIds;
     const chains = this.props.chains;
     const filter = this.props.filter;
@@ -68,7 +67,7 @@ constructor() {
         if (this.state.selected === index && chainids.length > 0) {
           labelClasseName = ' selected';
           chainids.map(chainid =>
-            selectedChains.push(<Chain label={label} id={chainid} />)
+            selectedChains.push(<Chain label={label} id={chainid} key={label} />)
           );
         }
 

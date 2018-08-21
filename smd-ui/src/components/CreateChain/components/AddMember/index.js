@@ -12,7 +12,6 @@ import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import ValueInput from '../../../ValueInput';
 import validate from '../../../Accounts/components/SendTokens/validate';
 import { isModePublic } from '../../../../lib/checkMode';
 
@@ -41,25 +40,25 @@ class AddMember extends Component {
     this.props.fetchAccounts(true, true);
   }
 
-  handleUsernameChange (event) {
-     this.setState({
+  handleUsernameChange(event) {
+    this.setState({
       username: event.target.value
     });
   }
 
-  handleAddressChange (event) {
+  handleAddressChange(event) {
     this.setState({
       address: event.target.value
     });
   }
 
-  handleEnodeChange (event) {
+  handleEnodeChange(event) {
     this.setState({
       enode: event.target.value
     });
   }
 
-  handleBalanceChange (event) {
+  handleBalanceChange(event) {
     this.setState({
       balance: event.target.value
     });
@@ -124,7 +123,6 @@ class AddMember extends Component {
   }
 
   render() {
-    const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
     const isPublicMode = isModePublic();
 
@@ -234,7 +232,7 @@ class AddMember extends Component {
                     this.props.handler(this.state);
                     mixpanelWrapper.track('add_member_submit_click_successful');
                     this.closeModal();
-                  }}                  
+                  }}
                   text="Add Member"
                 />
               </div>
