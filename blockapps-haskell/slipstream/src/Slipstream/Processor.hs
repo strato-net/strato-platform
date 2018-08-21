@@ -108,33 +108,9 @@ addStorageIfNeeded (Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
   return $ Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
-{-
-first :: (a, b, c) -> a
-first (x, _, _) = x
 
-second :: (a, b, c) -> b
-second (_, x, _) = x
-
-third :: (a, b, c) -> c
-third (_, _, x) = x
--}
-{-
-smashIt::[Maybe [StateDiff]]->[Maybe [StateDiff]]
-smashIt [] = []
-smashIt (Just [x]:rest) =
-  case smashIt rest of
-   (Just y:rest') -> Just (x:y):rest'
-   (Nothing:_) -> Just [x]:smashIt rest
-   [] -> []
-smashIt (Nothing:rest) = Nothing:smashIt rest
-smashIt (Just[]:rest) = Nothing:smashIt rest
-smashIt (Just (_:_:_):_) = [Nothing] --Needed?
--}
-
---Add more cases
 matchStateDiff :: StateDiff -> StateDiff -> Bool
 matchStateDiff (StateDiff (Just x) Nothing Nothing Nothing) (StateDiff (Just y) Nothing Nothing Nothing) = (codeHash $ head $ Map.elems x) == (codeHash $ head $ Map.elems y)
---matchStateDiff (StateDiff (Just _) Nothing Nothing Nothing) (StateDiff (Just _) Nothing Nothing Nothing) = True
 matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
 
 smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]
@@ -154,7 +130,6 @@ smashIt (x:[]) tmp final =
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef (Map String ContractAndXabi) -> IO ()
 processTheMessages messages conn cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  --let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter

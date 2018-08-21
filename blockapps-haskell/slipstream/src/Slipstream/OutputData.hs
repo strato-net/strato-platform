@@ -19,10 +19,8 @@ import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
 import Slipstream.Events
 import Control.Monad
---import Control.Monad.IO.Class
 import qualified Data.List as L
 import Data.IORef
---import BlockApps.Bloc22.Monad
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
@@ -108,33 +106,6 @@ convertRet metadata conn cache = do
   cachedContract <- case Map.lookup hashVal contractCache of
     Just x -> return x
     Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False}
-  --TODO: Re-enable Indexing flag
-{-
-  let indFlag = True
-  ind <- if (indFlag)
-              then do
-                let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
-                let comma = if (length list == 0)
-                    then ""
-                    else ", "
-                let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
-                let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
-
-                let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
-                let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
-                let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-                return $ createSt ++ delRow ++ ins
-              else return $ ""
-  -}
-  --TODO: Re-enable History flag
-  {-
-    --History flag
-    let histFlag = True
-    let hist = if (histFlag)
-                --TODO: Add history insert statement (transaction, state)
-                then ""
-                else ""
-  -}
 
   if (length metadata > 1)
     then do
@@ -145,7 +116,6 @@ convertRet metadata conn cache = do
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
           dbInsert conIns conn
 
-      --Keys list
       let fstContract = contractData $ head metadata
       let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
       let comma = if (length list == 0)
@@ -153,8 +123,6 @@ convertRet metadata conn cache = do
           else ", "
       let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       dbInsert createSt conn
-      --let indexT = "create index if not exists \"" ++ (contractName $ head metadata) ++ "_index\" on \"" ++ (contractName $ head metadata) ++ "\" (address, \"chainId\");"
-      --dbInsert indexT conn
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
@@ -163,7 +131,6 @@ convertRet metadata conn cache = do
             let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
             return rowSt
 
-      putStrLn $ "Inserting " ++ show (length vals) ++ " new contracts"
       let inserts = L.intercalate ", " vals
       let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
 
@@ -185,9 +152,6 @@ convertRet metadata conn cache = do
         else ", "
     let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
     dbInsert createSt conn
-
-    --let indexT = "create index if not exists \"" ++ (contractName $ row) ++ "_index\" on \"" ++ (contractName $ row) ++ "\" (address, \"chainId\");"
-    --dbInsert indexT conn
 
     let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
     let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
