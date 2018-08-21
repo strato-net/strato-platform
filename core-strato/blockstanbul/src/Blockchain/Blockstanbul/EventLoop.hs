@@ -195,9 +195,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         proposal .= Just realSealed
         yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
-      let ppextra = takeExtra pp
       vali <- use validators
-      if (vali /= (getValidatorList ppextra))
+      if (vali /= (getValidatorList pp))
         then do
           $logWarnS "blockstanbul/ppl" . T.pack $
             printf "Rejecting proposal: validator list does not match"
@@ -252,7 +251,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let committer = fromMaybe 0x0000000000000000 $ verifyCommitmentSeal di seal
       if (committer /= sender auth)
         then do $logWarnS "blockstanbul/" . T.pack $
-                   printf "Rejecting proposal: commit signer  %x is not %x" (sender auth) committer
+                   printf "Rejecting Commit Message: commit signer  %x is not %x" (sender auth) committer
         else do
           cs <- committed <%= M.insert (sender auth) (di, seal)
           total <- uses validators length
