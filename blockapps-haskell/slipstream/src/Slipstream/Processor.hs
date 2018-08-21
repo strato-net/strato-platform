@@ -40,7 +40,7 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import HFlags
 import Slipstream.Options
-
+import Database.PostgreSQL.Typed
 import Slipstream.OutputData
 
 data ActionType = Create | Delete | Update deriving (Show)
@@ -87,6 +87,7 @@ getContract address _ chainId = do
     , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
     , name = show $ contractdetailsName qqqq
     , resolvedName = Nothing
+    , contractStored = False
   }
   return $ (Right ret)
 
@@ -110,6 +111,24 @@ addStorageIfNeeded (Action theType address codehash chain Nothing)= do
 addStorageIfNeeded action = return action
 
 
+matchStateDiff :: StateDiff -> StateDiff -> Bool
+matchStateDiff (StateDiff (Just x) Nothing Nothing Nothing) (StateDiff (Just y) Nothing Nothing Nothing) = (codeHash $ head $ Map.elems x) == (codeHash $ head $ Map.elems y)
+matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
+
+smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]
+smashIt [] _ final = final
+smashIt (x:y:rest) tmp final = do
+  let newTmp = if (length tmp == 0)
+      then [x]
+      else tmp ++ [x]
+  case (matchStateDiff x y) of
+    True -> smashIt ([y] ++ rest) newTmp final
+    False -> smashIt ([y] ++ rest) [] (final ++ [newTmp])
+smashIt (x:[]) tmp final =
+  if (null tmp)
+    then (final ++ [[x]])
+    else final ++ [tmp ++ [x]]
+
 resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)] -> IO String
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
@@ -125,10 +144,13 @@ resolveContractName inc codehash contractName cache = do
   where findName :: ContractAndXabi -> Bool
         findName cont = contractName ++ show inc == name cont
 
-processTheMessages :: [B.ByteString] -> IORef (Map String ContractAndXabi) -> IO ()
-processTheMessages messages cachedContractsIORef = do
+processTheMessages :: [B.ByteString] -> PGConnection -> IORef (Map String ContractAndXabi) -> IO ()
+processTheMessages messages conn cachedContractsIORef = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  let changes = concat $ map (stateDiffToChanges . toStateDiff . BL.fromStrict) messages
+  let tempChanges = map (toStateDiff . BL.fromStrict) messages
+  let inter = smashIt tempChanges [] []
+  let changes = map (concat . map stateDiffToChanges) inter
+
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -145,7 +167,9 @@ processTheMessages messages cachedContractsIORef = do
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   let strato = flags_stratourl
+      vaultWrapper = flags_vaultwrapperurl
   stratoUrl <- parseBaseUrl strato
+  vaultwrapperUrl <- parseBaseUrl vaultWrapper
 
   mgr <- newManager defaultManagerSettings
 
@@ -154,53 +178,58 @@ processTheMessages messages cachedContractsIORef = do
 
   let env = BlocEnv
             {
-              urlStrato=stratoUrl
-            , httpManager=mgr
-            , dbPool=pool
+              urlStrato=stratoUrl   -- :: BaseUrl
+            , urlVaultWrapper = vaultwrapperUrl
+            , httpManager=mgr -- :: Manager
+            , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
             , deployMode= deployFlag
             }
 
   _ <- enterBloc2 env $ do
-    forM (filter hasContract changes) $ \change -> do
+    forM (map (filter hasContract) changes) $ \change -> do
+      processedList <- forM change $ \row -> do
+            filledInChange <- addStorageIfNeeded row
 
-      filledInChange <- addStorageIfNeeded change
+            let (address, codehash, storage, chainId) =
+                  case filledInChange of
+                   Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
+                   Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
+            contractMetaData <-
+              case Map.lookup codehash cachedContracts of
+               Just c -> do
+                 return c
+               Nothing -> do
+                 contractOrError <- getContract address codehash chainId
+                 case contractOrError of
+                  Left e -> error e
+                  Right c -> do
+                    {-
+                    --Resolve Name Issues
+                    let contList = Map.toList cachedContracts
+                    resName <- liftIO $ resolveContractName 1 codehash (replace "\"" "" $ name c) contList
+                    let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName}
+                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
+                    return newContractAndXabi
+                    -}
+                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
+                    return c
 
-      let (address, codehash, storage, chainId) =
-            case filledInChange of
-             Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
-             Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
-      --liftIO $ putStrLn $ "====address==== " ++ show address
-      --liftIO $ putStrLn $ "====codeHash==== " ++ show codehash
-      cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
-      contractMetaData <-
-        case Map.lookup codehash cachedContracts of
-         Just c -> do
-           return c
-         Nothing -> do
-           contractOrError <- getContract address codehash chainId
-           case contractOrError of
-            Left e -> error e
-            Right c -> do
-              --Resolve Name Issues
-              let contList = Map.toList cachedContracts
-              resName <- liftIO $ resolveContractName 1 codehash (replace "\"" "" $ name c) contList
-              let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName}
-              liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
-              return newContractAndXabi
-
-      let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-      --let contName = replace "\"" "" $ name contractMetaData
-
-      --TODO: Add parsing of contract info to get flags (indexing, history)
-      let cont = case contract contractMetaData of
+            let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
+            let strName = replace "\"" "" $ name contractMetaData
+            let cont = case contract contractMetaData of
                     Left s -> error s
                     Right c -> c
-      let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) storage 0
-      let chain = case chainId of
-                    Nothing -> ""
-                    Just(x) -> show x
 
-      liftIO $ convertRet address codehash strAbi contractMetaData chain ret
+            --TODO: Add parsing of contract info to get flags (indexing, history)
+
+            let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) storage 0
+            let chain = case chainId of
+                          Nothing -> ""
+                          Just(x) -> show x
+            return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
+
+      if (length processedList > 0) then liftIO $ convertRet processedList conn cachedContractsIORef else return()
 
   return()

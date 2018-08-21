@@ -15,6 +15,7 @@ import HFlags
 import Slipstream.MessageConsumer
 import Slipstream.OutputData
 import Slipstream.Options ()
+import Database.PostgreSQL.Typed
 import qualified Data.Map as Map
 import Data.IORef
 
@@ -22,8 +23,12 @@ main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
 
-  let conCreate = "BEGIN; create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text); alter table contract add column \"chainId\" text; COMMIT;"
-  dbInsert conCreate
+  conn <- pgConnect dbConnect
+
+  let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
+  dbInsert conCreate conn
+  let conAlter =  "alter table contract add column \"chainId\" text;"
+  dbInsert conAlter conn
 
   let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
@@ -31,7 +36,7 @@ main = do
 
   cachedContractsIORef <- newIORef Map.empty
 
-  msg <- runKafka state $ (getAndProcessMessages cachedContractsIORef offset)
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
 
   messages <- case msg of
         Left e -> error $ show e

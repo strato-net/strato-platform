@@ -7,6 +7,7 @@ module Executable.EthereumVM (
   ethereumVM
 ) where
 
+import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -93,16 +94,21 @@ ethereumVM = void . execContextM $ do
             writeBlockSummary b
         addBlocks blocks
 
+        contextBlockRequested ||= (OECreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
         pbft <- gets contextHasBlockstanbul
+        reqd <- use contextBlockRequested
         let pending = B.pending state
-        let shouldOutputBlocks = isCaughtUp && (
+            hasTxs = not (null poolableNewTxs) || not (M.null pending)
+            shouldOutputBlocks = isCaughtUp && (
               if pbft
-                then OECreateBlockCommand `elem` seqEvents
-                else not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+                then reqd && hasTxs
+                else not makeLazyBlocks || hasTxs)
+        when (pbft && shouldOutputBlocks) $
+          contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do

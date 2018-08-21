@@ -5,8 +5,11 @@ import           Data.Maybe                          (isNothing)
 import           Data.Time.Clock.POSIX
 import           Numeric                             (showHex)
 
+import           Control.Concurrent
 import           Control.Exception                   (finally)
+import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 
 import           Blockchain.Format
 import           Blockchain.Output
@@ -20,7 +23,8 @@ import           Blockchain.Strato.Model.Class       (txChainId)
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
 
-import           Test.Hspec
+import           Test.Hspec.Core.Spec
+import           Test.Hspec.Expectations.Lifted
 import           Test.Hspec.Contrib.HUnit            ()
 import           Test.HUnit
 import           Test.QuickCheck
@@ -33,6 +37,11 @@ stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [
 
 dedupWindow :: Int
 dedupWindow = 100
+
+runTestM :: SequencerM a -> IO ()
+runTestM m = do
+  gb <- makeGenesisBlock
+  void $ withTemporaryDepBlockDB gb m
 
 withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB genesisBlock m = do
@@ -53,6 +62,8 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , syncWrites            = False
                                , bootstrapDoEmit       = False
                                , statsConfig           = Nothing
+                               , blockstanbulBlockPeriod = 0
+                               , blockstanbulRoundPeriod = 10000000
                                }
 
     runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
@@ -91,7 +102,7 @@ spec = do
               oes <- drainVM
               return [block | OEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
-            assertBool (format ret) $ isValid ret
+            ret `shouldSatisfy` isValid
 
         it "transformEvents should output blocks in partial order based on parent hash when input is out of order" $ do
             gb <- makeGenesisBlock
@@ -102,7 +113,7 @@ spec = do
               oes <- drainVM
               return [block | OEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
-            assertBool (format ret) $ isValid ret
+            ret `shouldSatisfy` isValid
 
         it "should not deduplicate incoming transactions that are unique" $ do
             gb <- makeGenesisBlock
@@ -118,8 +129,7 @@ spec = do
             dedupedOut <- withTemporaryDepBlockDB gb $ do
               splitEvents dedupedIn
               drainVM
-            assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
-                length dedupedIn == (length dedupedOut)
+            length dedupedOut `shouldBe` length dedupedIn
 
         it ("should allow duplicate incoming transactions that come in after a specified window (" ++ show dedupWindow ++ " txs)") $ do
             gb <- makeGenesisBlock
@@ -138,5 +148,25 @@ spec = do
               splitEvents replicatedIn
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
-            assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length $ dedupedOut)) $
-                length replicatedIn == (length dedupedOut)
+            length dedupedOut `shouldBe` length dedupedOut
+
+    describe "SequencerM" $ do
+      -- TODO: Benchmark more tightly.
+      -- This is amazingly slow for how little it appears to be doing.
+      it "queues events" $ withMaxSuccess 5 $ property $ \evs1 evs2 -> runTestM $ do
+        drainVM `shouldReturn` []
+        drainP2P `shouldReturn` []
+        mapM_ markForVM evs1
+        mapM_ markForP2P evs2
+        drainVM `shouldReturn` evs1
+        drainVM `shouldReturn` []
+        drainP2P `shouldReturn` evs2
+        drainP2P `shouldReturn` []
+
+      it "queues timeouts" $ runTestM $ do
+        let input = [20, 45, 30]
+        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $ do
+          mapM_ createNewTimer input
+        liftIO $ threadDelay 200 -- Who are you to judge?
+        out <- drainTimeouts
+        out `shouldMatchList` input
