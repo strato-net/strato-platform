@@ -20,6 +20,7 @@ module Blockchain.Sequencer.Monad (
   , drainVM
   , createFirstTimer
   , createNewTimer
+  , drainTMChan
   , drainTimeouts
 ) where
 
@@ -96,7 +97,8 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriodμs :: Int
                      , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TMChan (Address, Bool)
+                     , blockstanbulBeneficiary :: TMChan (Address, Address, Bool)
+                     , blockstanbulAuthSenders :: [Address]
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))

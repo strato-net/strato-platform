@@ -115,9 +115,16 @@ checkForVotes = do
     case x of
          Nothing -> error "Channel unexpectedly closed"
          Just (Nothing) -> return ()
-         Just (Just (addr,bool)) -> do
-            let ie = NewBeneficiary addr bool
-            blockstanbulSend [ie]
+         Just (Just (sendr, addr,bool)) -> do
+            senderlist <- asks blockstanbulAuthSenders
+            if (elem sendr senderlist)
+              then do
+                -- add signature
+                let ie = NewBeneficiary (addr, bool)
+                blockstanbulSend [ie]
+              else return ()
+        {-      $logWarnS "blockstanbul/auth sender" . T.pack $
+                  print "Rejecting Beneficiary: sender not authorized"-}
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock
