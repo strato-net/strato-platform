@@ -11,7 +11,7 @@ RUN apt-get update && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
     opm get zmartzone/lua-resty-openidc
 
-COPY nginx.tpl.conf auth.htpasswd openid-auth.tpl.lua /tmp/
+COPY nginx.tpl.conf auth.htpasswd openid-auth.tpl.lua openid-auth-jwt.tpl.lua /tmp/
 
 COPY docker-run.sh /
 
