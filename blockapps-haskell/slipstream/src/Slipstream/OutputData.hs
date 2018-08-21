@@ -151,7 +151,7 @@ convertRet metadata conn cache = do
       let comma = if (length list == 0)
           then ""
           else ", "
-      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
+      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       dbInsert createSt conn
       --let indexT = "create index if not exists \"" ++ (contractName $ head metadata) ++ "_index\" on \"" ++ (contractName $ head metadata) ++ "\" (address, \"chainId\");"
       --dbInsert indexT conn
@@ -183,7 +183,7 @@ convertRet metadata conn cache = do
     let comma = if (length list == 0)
         then ""
         else ", "
-    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", UNIQUE (address, \"chainId\") );"
+    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
     dbInsert createSt conn
 
     --let indexT = "create index if not exists \"" ++ (contractName $ row) ++ "_index\" on \"" ++ (contractName $ row) ++ "\" (address, \"chainId\");"
