@@ -78,14 +78,14 @@ withKafkaViolently k = do
 withKafkaRetry :: (MonadIO m, HasKafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
   s <- getKafkaState
-  (a, newS) <- go s
+  let go = do
+        r <- liftIO . runExceptT $ runStateT k s
+        case r of
+          Right a -> return a
+          Left _ -> (liftIO $ threadDelay (1000*t)) >> go
+  (a, newS) <- go
   putKafkaState newS
   return a
-  where go s' = do
-          r <- liftIO . runExceptT $ runStateT k s'
-          case r of
-            Left _ -> (liftIO $ threadDelay (1000*t)) >> go s'
-            Right a -> return a
 
 withKafkaRetry1s :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry1s = withKafkaRetry 1000
