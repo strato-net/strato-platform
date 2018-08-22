@@ -21,6 +21,7 @@ import           Strato.Strato23.Server.Signature
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing
+          :<|> getKey
           :<|> postKey
           :<|> postSignature
 
