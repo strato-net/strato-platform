@@ -5,9 +5,11 @@
 
 module Strato.Strato23.API.Types where
 
-import           Control.Lens           ((&), (.~), (?~))
+import           Control.Lens           ((&), (.~), (?~), mapped)
 import           Crypto.Hash
-import           Data.Aeson.Types
+import           Data.Aeson.Casing
+import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Aeson.Types       hiding (fieldLabelModifier)
 import qualified Data.Binary            as B
 import qualified Data.ByteArray         as BA
 import           Data.ByteString        (ByteString)
@@ -15,6 +17,7 @@ import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as C8
 import qualified Data.ByteString.Lazy   as BL
+import           Data.Text              (Text)
 import           Data.LargeWord
 import           Data.Swagger
 import           Data.Word
@@ -22,6 +25,9 @@ import           GHC.Generics
 import           Numeric
 import           Text.Read
 import           Text.Read.Lex
+
+vaultWrapperSchemaOptions :: SchemaOptions
+vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 
@@ -90,49 +96,6 @@ instance FromJSON Address where
       Nothing      -> fail $ "Could not decode Address: " <> string
       Just address -> return address
 
--- instance ToHttpApiData Address where
---   toUrlPiece = Text.pack . addressString
--- 
--- instance FromHttpApiData Address where
---   parseUrlPiece text = case stringAddress (Text.unpack text) of
---     Nothing      -> Left $ "Could not decode Address: " <> text
---     Just address -> Right address
--- 
--- instance ToForm Address where
---   toForm address = [("address", toQueryParam address)]
--- 
--- instance FromForm Address where fromForm = parseUnique "address"
--- 
--- instance Arbitrary Address where
---   arbitrary = Address . fromInteger <$> arbitrary
--- 
--- instance ToSample Address where
---   toSamples _ = samples [Address 0xdeadbeef, Address 0x12345678]
--- 
--- instance ToCapture (Capture "address" Address) where
---   toCapture _ = DocCapture "address" "an Ethereum address"
--- 
--- instance ToCapture (Capture "contractAddress" Address) where
---   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
--- 
--- instance RLPEncodable Address where
---   rlpEncode addr = rlpEncode . fst . Base16.decode . Char8.pack $ addressString addr
---   rlpDecode obj = Address . fromInteger <$> rlpDecode obj
--- 
--- instance RLPEncodable (Maybe Address) where
---   rlpEncode = maybe rlp0 rlpEncode
---   rlpDecode x = if x == rlp0 then return Nothing else Just <$> rlpDecode x
--- 
--- instance ToCapture (Capture "userAddress" Address) where
---   toCapture _ = DocCapture "userAddress" "an Ethereum address"
--- 
--- instance ToParamSchema Address where
---   toParamSchema _ = mempty
---     & type_ .~ SwaggerString
---     & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
---     & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
---     & format ?~ "hex string"
-
 instance ToSchema Address where
   declareNamedSchema _ = return $
     NamedSchema (Just "Address")
@@ -140,6 +103,26 @@ instance ToSchema Address where
         & type_ .~ SwaggerString
         & example ?~ "00000000000000000000000000000000deadbeef"
         & description ?~ "Ethereum Address, 20 byte hex encoded string" )
+
+--------------------------------------------------------------------------
+
+newtype StatusAndAddress = StatusAndAddress { unStatusAndAddress :: Address } deriving (Show, Generic)
+
+instance ToJSON StatusAndAddress where
+  toJSON (StatusAndAddress a) = object
+                              [ "status" .= ("success" :: Text) -- hey, don't blame me, this is part of the spec
+                              , "address" .= a
+                              ]
+
+instance FromJSON StatusAndAddress where
+  parseJSON (Object o) = StatusAndAddress <$> (o .: "address")
+  parseJSON o = error $ "parseJSON StatusAndAddress: expected object, but got " ++ show o
+
+instance ToSchema StatusAndAddress where
+  declareNamedSchema proxy = genericDeclareNamedSchema vaultWrapperSchemaOptions proxy
+    & mapped.schema.description ?~ "Status and Address"
+    & mapped.schema.example ?~ toJSON ex
+    where ex = StatusAndAddress $ Address 0xdeadbeef
 
 --------------------------------------------------------------------------
 

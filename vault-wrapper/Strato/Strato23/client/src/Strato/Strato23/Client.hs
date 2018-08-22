@@ -14,7 +14,7 @@ import           Strato.Strato23.API
 getPing :: ClientM String
 getPing = client (Proxy @ GetPing)
 
-postKey :: Text -> Text -> ClientM Address
+postKey :: Text -> Text -> ClientM StatusAndAddress
 postKey = client (Proxy @ PostKey)
 
 postSignature :: Text -> Text -> UserData -> ClientM SignatureDetails
