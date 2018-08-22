@@ -106,7 +106,7 @@ kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
 
 getKafkaCheckpoint :: IContextM Offset
-getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
+getKafkaCheckpoint = withKafkaRetry 1000 (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
     Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, _)  -> return ofs
@@ -121,5 +121,5 @@ setKafkaCheckpoint ofs = do
 getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
     ofs <- getKafkaCheckpoint
-    evs <- withKafkaViolently (readIndexEvents ofs)
+    evs <- withKafkaRetry 1000 (readIndexEvents ofs)
     return (ofs, evs)

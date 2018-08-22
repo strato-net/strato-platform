@@ -34,5 +34,6 @@ library:
     - http-api-data
     - text
     - unix
+    - unliftio
     - time
     - strato-model

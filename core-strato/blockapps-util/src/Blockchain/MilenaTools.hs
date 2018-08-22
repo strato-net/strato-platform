@@ -75,6 +75,14 @@ withKafkaViolently k = do
             putKafkaState newS
             return a
 
-
-
-
+withKafkaRetry :: (MonadIO m, HasKafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry t k = do
+  s <- getKafkaState
+  (a, newS) <- go s
+  putKafkaState newS
+  return a
+  where go s' = do
+          r <- liftIO . runExceptT $ runStateT k s'
+          case r of
+            Left _ -> (liftIO $ threadDelay (1000*t)) >> go s'
+            Right a -> return a

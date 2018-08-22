@@ -120,7 +120,7 @@ kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
 
 getKafkaCheckpoint :: IContextM (Offset, IndexerBestBlockInfo)
-getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
+getKafkaCheckpoint = withKafkaRetry 1000 (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
     Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, Metadata (KString md'))  -> return (ofs, reIBBI . read $ S8.unpack md')
@@ -143,5 +143,5 @@ setKafkaCheckpoint' ofs md =
 getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent], IndexerBestBlockInfo)
 getUnprocessedIndexEvents = do
     (ofs, md) <- getKafkaCheckpoint
-    evs       <- withKafkaViolently (readIndexEvents ofs)
+    evs       <- withKafkaRetry 1000 (readIndexEvents ofs)
     return (ofs, evs, md)

@@ -180,7 +180,7 @@ getCheckpoint = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaRetry 1000 (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, md) -> do
