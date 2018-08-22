@@ -102,17 +102,18 @@ instance MonadBaseControl IO Bloc where
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato    :: BaseUrl
-  --, urlCirrus    :: BaseUrl
-  , httpManager  :: Manager
-  , dbPool       :: Pool Connection
-  , logLevel     :: Severity
-  , deployMode   :: DeployMode
+  { urlStrato       :: BaseUrl
+  , urlVaultWrapper :: BaseUrl
+  , httpManager     :: Manager
+  , dbPool          :: Pool Connection
+  , logLevel        :: Severity
+  , deployMode      :: DeployMode
   }
 
 data BlocError
   = StratoError ServantError
   | CirrusError ServantError
+  | VaultWrapperError ServantError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -192,6 +193,26 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           StratoError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc recieved a malformed response from Strato.",
+                     "This is probably a backend configuration problem.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          VaultWrapperError FailureResponse{..} | statusIsClientError responseStatus ->
+            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+          VaultWrapperError (ConnectionError _) ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc can not connect to Strato.",
+                     "This probably is a configuration error, but can also mean the Strato peer is down.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          VaultWrapperError _ ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
@@ -319,6 +340,14 @@ blocStrato client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (blocError . StratoError) return resultEither
+
+blocVaultWrapper :: HasCallStack => ClientM x -> Bloc x
+blocVaultWrapper client' = do
+  logWithCallStack callStack logNotice "Querying Vault Wrapper"
+  url <- asks urlVaultWrapper
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return

@@ -11,15 +11,9 @@ module BlockApps.Bloc22.Server.Transaction where
 
 import           Control.Monad
 import           Control.Monad.Except
-import           Data.Aeson                        hiding (Array, String)
-import           Data.LargeWord
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
-import qualified Data.Text.Encoding                as Text
-import           Data.Word
-import           GHC.Generics
-import           Network.HTTP.Simple
 
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
@@ -31,36 +25,39 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract()
 import           BlockApps.SolidityVarReader       (byteStringToWord256) -- TODO: Find a better module for this function
 import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.VaultWrapper.Client
+import           BlockApps.VaultWrapper.Types
 
-postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
-postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest addr txs' txParams) = do
-  case mUserName of
-    Nothing -> error "Did not find X-USER-UNIQUE-NAME in the header"
-    Just userName -> fmap join . forM (partitionWith fst txs') $ \(ttype, txs) -> case ttype of
+postBlocTransaction :: Maybe Text -> Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
+postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionRequest addr txs' txParams) = do
+  case (mUserName, mUserId) of
+    (Nothing, _) -> error "Did not find X-USER-UNIQUE-NAME in the header"
+    (Just _, Nothing) -> error "Did not find X-USER-ID in the header"
+    (Just userName, Just userId) -> fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
       TRANSFER -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromTransfer $ snd x
+          p <- fromTransfer x
           let btp = TransferParameters
                       addr
-                      (transferpayloadTo p)
+                      (transferpayloadToAddress p)
                       (transferpayloadValue p)
                       txParams
                       chainId
                       resolve
-          fmap (:[]) $ postUsersSend' btp (callSignature userName)
+          fmap (:[]) $ postUsersSend' btp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromTransfer . snd) xs
+          p <- mapM fromTransfer xs
           let btlp = TransferListParameters
                       addr
                       (map (\(TransferPayload t v) -> SendTransaction t v txParams) p)
                       chainId
                       resolve
-          postUsersSendList' btlp (callSignature userName)
+          postUsersSendList' btlp (callSignature userName userId)
       CONTRACT -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromContract $ snd x
+          p <- fromContract x
           let bcp = ContractParameters
                       addr
                       (contractpayloadSrc p)
@@ -70,19 +67,19 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest addr t
                       txParams
                       chainId
                       resolve
-          fmap (:[]) $ postUsersContract' bcp (callSignature userName)
+          fmap (:[]) $ postUsersContract' bcp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromContract . snd) xs
+          p <- mapM fromContract xs
           let bclp = ContractListParameters
                       addr
                       (map (\(ContractPayload _ c a v) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v) p)
                       chainId
                       resolve
-          postUsersUploadList' bclp (callSignature userName)
+          postUsersUploadList' bclp (callSignature userName userId)
       FUNCTION -> case txs of
         [] -> return []
         [x] -> do
-          p <- fromFunction $ snd x
+          p <- fromFunction x
           let bfp = FunctionParameters
                       addr
                       ((\(ContractName c) -> c) $ functionpayloadContractName p)
@@ -93,15 +90,15 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest addr t
                       txParams
                       chainId
                       resolve
-          fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName)
+          fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName userId)
         xs -> do
-          p <- mapM (fromFunction . snd) xs
+          p <- mapM fromFunction xs
           let bflp = FunctionListParameters
                       addr
                       (map (\(FunctionPayload (ContractName n) a m r v) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams) p)
                       chainId
                       resolve
-          postUsersContractMethodList' bflp (callSignature userName)
+          postUsersContractMethodList' bflp (callSignature userName userId)
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwError $ UserError "Could not decode transfer arguments from body"
@@ -112,10 +109,10 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest addr t
           BlocFunction f -> return f
           _ -> throwError $ UserError "Could not decode function arguments from body"
 
-callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
-callSignature userName unsigned@UnsignedTransaction{..} = do
+callSignature :: Text -> Text -> UnsignedTransaction -> Bloc Transaction
+callSignature userName userId unsigned@UnsignedTransaction{..} = do
   let msgHash = byteStringToWord256 $ rlpHash unsigned
-  SignatureDetails{..} <- getRSV userName msgHash
+  SignatureDetails{..} <- blocVaultWrapper $ postSignature (Just userName) (Just userId) (userData msgHash)
   return $ Transaction
     unsignedTransactionNonce
     unsignedTransactionGasPrice
@@ -127,26 +124,3 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
     (unHex v)
     (unHex r)
     (unHex s)
-
-getRSV :: Text -> Word256 -> Bloc SignatureDetails
-getRSV userName msgHash' = do
-  let request = setRequestHeader "X-USER-UNIQUE-NAME" [Text.encodeUtf8 userName]
-              $ setRequestBodyJSON (UserData (Hex msgHash'))
-              $ "POST http://vault-wrapper:8000/strato/v2.3/signature" -- TODO(dustin): Establish a vault-wrapper API type and call this endpoint
-  getResponseBody <$> httpJSON request
-
-data SignatureDetails = SignatureDetails
-  { r :: Hex Word256
-  , s :: Hex Word256
-  , v :: Hex Word8
-  } deriving (Eq, Show, Generic)
-
-instance ToJSON SignatureDetails
-instance FromJSON SignatureDetails
-
-data UserData = UserData {
-  msgHash :: Hex Word256
-} deriving (Eq, Show, Generic)
-
-instance ToJSON UserData
-instance FromJSON UserData

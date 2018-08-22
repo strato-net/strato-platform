@@ -185,6 +185,7 @@ getChainInfo = client (Proxy @ GetChainInfo)
 
 postBlocTransaction
   :: Maybe Text
+  -> Maybe Text
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest

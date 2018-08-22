@@ -8,8 +8,7 @@ const util = common.util;
 const BigNumber = common.BigNumber;
 const constants = common.constants;
 const assert = common.assert;
-const config = common.config;
-
+const config = common.config; 
 const password = '1234';
 
 const label = 'My chain label';
@@ -150,6 +149,11 @@ describe("Create Chain", function() {
     assert.isDefined(bob, "should exist");
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
+
+    const chainId = yield rest.createChain(label, mems, bals, "", args);
+    assert.isDefined(chainId, "should exist");
+
+    yield promiseTimeout(1000);
 
     const chainInfo = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo);

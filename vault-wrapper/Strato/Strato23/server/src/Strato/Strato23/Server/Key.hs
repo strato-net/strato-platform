@@ -14,17 +14,14 @@ import           Strato.Strato23.Database.Queries (postUserKeyQuery)
 deriveAddress :: SecKey -> Address
 deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey
 
-postKey :: Maybe Text -> Maybe Text -> VaultM Address
-postKey mUserUniqueName mUserId = case (mUserUniqueName, mUserId) of
-  (Nothing, _) -> vaultWrapperError $ UserError "No cookie provided"
-  (Just _, Nothing) -> vaultWrapperError $ UserError "No user ID provided"
-  (Just userName, Just userId) -> do
-    let pw = textPassword userId
-    keyStore@KeyStore{..} <- newKeyStore pw
-    _ <- vaultTransaction
-       . toUserError ("User " <> userName <> " already exists")
-       . vaultModify
-       $ postUserKeyQuery userName keyStore
-    case decryptSecKey pw keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey of
-      Nothing -> vaultWrapperError $ AnError "Error occurred while creating keystore"
-      Just pKey -> return $ deriveAddress pKey
+postKey :: Text -> Text -> VaultM StatusAndAddress
+postKey userName userId = do
+  let pw = textPassword userId
+  keyStore@KeyStore{..} <- newKeyStore pw
+  _ <- vaultTransaction
+     . toUserError ("User " <> userName <> " already exists")
+     . vaultModify
+     $ postUserKeyQuery userName keyStore
+  case decryptSecKey pw keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey of
+    Nothing -> vaultWrapperError $ AnError "Error occurred while creating keystore"
+    Just pKey -> return . StatusAndAddress $ deriveAddress pKey
