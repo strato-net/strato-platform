@@ -53,14 +53,13 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, newTxRanCallback, updateTxCallback, txsDroppedCallback #-}
 
-    getCheckpointableState :: m (SHA, DD.BlockData, [SHA])
+    getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
         state <- getBaggerState
         let miningCache = B.miningCache state
             bestSHA     = B.bestBlockSHA miningCache
             bestHeader  = B.bestBlockHeader miningCache
-            txShas      = B.bestBlockTxHashes miningCache
-        return (bestSHA, bestHeader, txShas)
+        return (bestSHA, bestHeader)
 
     updateBaggerState :: (B.BaggerState -> B.BaggerState) -> m ()
     updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
