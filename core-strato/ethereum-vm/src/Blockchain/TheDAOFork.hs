@@ -4,7 +4,7 @@ module Blockchain.TheDAOFork where
 import           Control.Monad
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.DataDefs
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB

@@ -4,6 +4,7 @@ import qualified Data.ByteString                 as B
 import           Data.Time
 import           Data.Word
 
+import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
@@ -45,15 +46,22 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
 
+    -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
+    -- derive it.
+    blockHeaderModifyExtra :: (B.ByteString -> B.ByteString) -> h -> h
+
     morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
     {-# MINIMAL blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
-                blockHeaderMixHash, morphBlockHeader #-}
+                blockHeaderMixHash, blockHeaderModifyExtra, morphBlockHeader #-}
 
     blockHeaderHash :: h -> SHA
-    blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+    blockHeaderHash = superProprietaryStratoSHAHash
+                    . rlpSerialize
+                    . rlpEncode
+                    . blockHeaderModifyExtra scrubCommitmentSeals
 
     blockHeaderPartialHash :: h -> SHA
     blockHeaderPartialHash h = superProprietaryStratoSHAHash . rlpSerialize $ RLPArray

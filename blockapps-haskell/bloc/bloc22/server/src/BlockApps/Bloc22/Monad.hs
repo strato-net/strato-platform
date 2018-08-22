@@ -103,7 +103,7 @@ data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
   { urlStrato    :: BaseUrl
-  , urlCirrus    :: BaseUrl
+  --, urlCirrus    :: BaseUrl
   , httpManager  :: Manager
   , dbPool       :: Pool Connection
   , logLevel     :: Severity
@@ -322,7 +322,7 @@ blocStrato client' = do
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
-
+{-
 blocCirrusFireForget :: HasCallStack => ClientM x -> Bloc Bool
 blocCirrusFireForget client' = do
   logWithCallStack callStack logNotice "Querying Cirrus"
@@ -342,3 +342,4 @@ blocCirrus client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . CirrusError) return resultEither
+-}

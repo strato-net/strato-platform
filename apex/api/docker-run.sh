@@ -2,7 +2,7 @@
 set -e
 set -x
 
-cirrusRoot=http://${cirrusHost}
+postgrestRoot=http://${postgrestHost}
 export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
@@ -10,7 +10,13 @@ export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
-sed -i -e 's|__searchUrl__|'"${cirrusRoot}"'|g' config-prod.yaml
+# IMPORTANT: blockapps-rest is not designed to be used internally between containers through docker network
+# We are putting `postgrest:3001` docker host here but blockapps-rest adds /search/ to this host in some cases
+# (mostly used in tests - search for "searchUrl" in blockapps-rest code) which will fail.
+# So far it works fine for Apex (these ba-rest features are not used) but we need to add the simplest proxy to postgrest
+# to proxy all requests coming to postgrest:3001/search/<something> -> to postgrest:3001/<something>
+#  to avoid blockapps-rest issues
+sed -i -e 's|__searchUrl__|'"${postgrestRoot}"'|g' config-prod.yaml
 
 # Set postgres configurations
 sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
@@ -44,8 +50,8 @@ do
 done
 echo 'strato is available'
 
-echo 'Waiting for cirrus to be available...'
-until curl --silent --output /dev/null --fail --location ${cirrusRoot}
+echo 'Waiting for postgrest to be available...'
+until curl --silent --output /dev/null --fail --location ${postgrestRoot}
 do
   echo "Check at $(date)"
   sleep 1

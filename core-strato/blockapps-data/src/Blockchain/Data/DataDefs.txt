@@ -14,7 +14,7 @@ BlockData
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    deriving Eq Read Show
+    deriving Eq Read Show Generic
 
 BlockDataRef
     parentHash SHA
@@ -32,40 +32,17 @@ BlockDataRef
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    blockId BlockId
     hash SHA
+    blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
     deriving Eq Read Show
 
-Block
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    deriving Eq Read Show
-
-NewBlk
-    hash SHA
-    blockData BlockData
-    receiptTransactions [Transaction]
-    blockUncles [BlockData]
-    Primary hash
-    TheHash hash
-    deriving Eq Read Show
-
 BlockTransaction
-    blockId BlockId
+    blockDataRefId BlockDataRefId
     transaction RawTransactionId
     deriving Eq Read Show
-
-AddressState
-    nonce Integer sqltype=numeric(1000,0)
-    balance Integer sqltype=numeric(1000,0)
-    contractRoot StateRoot
-    codeHash SHA
-    chainId Word256 Maybe
-    deriving Eq Generic Read Show
 
 AddressStateRef
     address Address
@@ -167,6 +144,7 @@ Extra
 LogDB
     blockHash SHA
     transactionHash SHA
+    chainId Word256 Maybe
     address Address
     topic1 Word256 Maybe
     topic2 Word256 Maybe
@@ -176,36 +154,21 @@ LogDB
     bloom Word512
     deriving Eq Read Show Generic
 
-BlockOffset
-    offset Integer
-    number Integer
-    hash SHA
-    Primary hash
-    UniqueH hash
-    deriving Eq Read Show
-
 ChainInfoRef
     chainId Word256
     chainLabel String
-    addRule String
-    removeRule String
     deriving Eq Generic Read Show
 
 ChainMemberRef
     chainInfoId ChainInfoRefId
     name String
-    deriving Eq Generic Read Show
-
-ChainAccountBalanceRef
-    chainInfoId ChainInfoRefId
     address Address
-    balance Integer
     deriving Eq Generic Read Show
 
 AccountInfoRef
     chainInfoId ChainInfoRefId
     address Address
-    balance Int
+    balance Integer
     codeHash SHA Maybe
     map [MapPair] Maybe
     deriving Eq Generic Read Show

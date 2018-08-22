@@ -16,7 +16,7 @@
     "aws-sdk": "2.254.1",
     "bcrypt": "1.0.3",
     "big-integer": "^1.6.26",
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#slipstream-updates",
     "body-parser": "1.18.2",
     "chai": "4.1.2",
     "chai-http": "3.0.0",

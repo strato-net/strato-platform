@@ -21,3 +21,6 @@ instance Format B.ByteString where
 instance Format N.NibbleString where
   format (N.EvenNibbleString bs)  = format bs
   format (N.OddNibbleString n bs) = showHex n "" ++ format bs
+
+instance (Format a, Format b) => Format (a, b) where
+  format (x, y) = "(" ++ format x ++ ", " ++ format y ++ ")"

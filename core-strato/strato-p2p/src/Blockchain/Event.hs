@@ -19,8 +19,8 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
+import           Data.Map                              (toList)
 import           Data.Maybe
---import qualified Data.Set as S
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
@@ -33,7 +33,6 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
-import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
@@ -109,7 +108,6 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
-        lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
         let sha         = blockHash block'
         let header      = blockHeader block'
         let num         = blockHeaderBlockNumber header
@@ -251,6 +249,9 @@ handleEvents mode peer = awaitForever $ \case
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
                 stampActionTimestamp
+    MsgEvt (Blockstanbul wm) -> do
+      stampActionTimestamp
+      SK.emitBlockstanbulMsg wm
 
     -- private chains
     MsgEvt (GetChainDetails cids) -> do
@@ -261,12 +262,12 @@ handleEvents mode peer = awaitForever $ \case
       let chPairs = fmap fromJust <$> filter (isJust . snd) unfilteredPairs -- remove pairs where ChainInfo is Nothing
       let finalPairs = filter ((checkPeerIsMember peer) . snd) chPairs -- remove pairs where peer is not a member
 
-      case finalPairs of 
+      case finalPairs of
         [] -> return ()
         _ -> do
           yield $ ChainDetails finalPairs
           stampActionTimestamp
-          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++ 
+          $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
             (intercalate "\n" $ show <$> finalPairs)
 
     MsgEvt (ChainDetails chpairs) -> do
@@ -277,16 +278,16 @@ handleEvents mode peer = awaitForever $ \case
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
       stampActionTimestamp
-      $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: " 
+      $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (show <$> trHashes))
       unfilteredTrs::[Maybe [Transaction]] <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
       let trs::[Transaction] = head <$> (fmap fromJust $ filter isJust unfilteredTrs) -- all non-Nothing TXs
-      
+
       -- yield all of the first list, do auth check for second list and send the ones that peer is allowed to see
       let splitTrs::([Transaction],[Transaction]) = partition ((== Nothing) . txChainId) trs
       unfilteredChInfos::[Maybe ChainInfo] <- (lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo (fromJust <$> (txChainId <$> (snd splitTrs))))
       let justChInfos::[ChainInfo] = fromJust <$> unfilteredChInfos
-      
+
       -- Make pairs of Transactions and their corresponding ChainInfos, do auth check, yield resultant TXs
       let txChInfoPairs::[(Transaction, ChainInfo)] = makePairs (snd splitTrs) justChInfos
       let validPairs::[(Transaction, ChainInfo)] = filter ((checkPeerIsMember peer) . snd) txChInfoPairs
@@ -336,14 +337,19 @@ handleEvents mode peer = awaitForever $ \case
           let match = find (==pIp) ipList
 
           case match of
-            Nothing -> do 
+            Nothing -> do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
-            Just _ -> do 
+            Just _ -> do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
               yield $ ChainDetails [(cId, cInfo)]
       OEGetChain chainIds -> yield $ GetChainDetails chainIds
       OEGetTx shas -> yield $ GetTransactions shas
-      _ -> return () -- shouldn't happen but our types don't prohibit us
+      OEBlockstanbul msg -> do
+        let outbound = Blockstanbul msg
+        $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
+        yield outbound
+      OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
+      OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
@@ -391,23 +397,19 @@ shouldSend peer tx = case tx of
         trace "NewTx of type Morphism came in. Should this even happen?" True
     Origin.Blockstanbul -> False
 
-
--- TODO: Instead of making this a boolean function, how about it takes [ChainInfo] and returns a [ChainInfo]
---       with all of the unauthorized chainInfos removed? or maybe thats too specific a case...
-
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
 checkPeerIsMember :: PPeer -> ChainInfo -> Bool
-checkPeerIsMember peer ci = 
+checkPeerIsMember peer ci =
   case match of
-    Nothing -> False 
+    Nothing -> False
     Just _ -> True
-  where 
+  where
     pIp = readIP $ T.unpack (pPeerIp peer)
-    ipList = ipAddress <$> (members ci)
+    ipList = ipAddress <$> (snd <$> (toList $ members ci))
     match = find (==pIp) ipList
 
 makePairs :: [a] -> [b] -> [(a,b)]
 makePairs [] _ = []
 makePairs _ [] = []
-makePairs (x:xs) (y:ys) = (x,y) : makePairs xs ys 
+makePairs (x:xs) (y:ys) = (x,y) : makePairs xs ys

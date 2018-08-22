@@ -146,7 +146,9 @@ instance RLPSerializable Neighbor where
   rlpDecode x = error $ "unsupported rlp in rlpDecode for Neighbor: " ++ show x
 
 peerToNeighbor :: PPeer -> Either DiscoverException Neighbor
-peerToNeighbor p = do
+peerToNeighbor p' = do
+  -- TODO(tim): Reenable port selection
+  let p = p'{pPeerUdpPort=30303, pPeerTcpPort=30303}
   pubKey <- note NoPublicKeyException (pPeerPubkey p)
   let endpoint = Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
                           (fromIntegral $ pPeerUdpPort p)
@@ -283,16 +285,20 @@ data UDPException = UDPTimeout deriving (Show)
 instance Exception UDPException where
 
 getSocket :: HostName -> PortNumber -> IO Socket
-getSocket domain port = do
+getSocket domain _ = do
+  -- TODO(tim): Reenable port selection
+  let port = 30303 :: Int
   (serveraddr:_) <- getAddrInfo Nothing (Just domain) (Just $ show port)
   s <- socket (addrFamily serveraddr) Datagram defaultProtocol
   _ <- connect s (addrAddress serveraddr)
   return s
 
 getServerPubKey :: H.PrvKey -> String -> PortNumber -> IO (Either SomeException Point)
-getServerPubKey myPriv domain port =
+getServerPubKey myPriv domain _ =
     withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
   where
+    -- TODO(tim): Reenable port selection
+    port = 30303
     talk :: H.PrvKey -> Socket -> IO (Either SomeException Point)
     talk prvKey' socket' = do
       timestamp <- fmap round getPOSIXTime
@@ -323,9 +329,11 @@ getServerPubKey myPriv domain port =
         Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
 
 findNeighbors::H.PrvKey -> String -> PortNumber -> IO ()
-findNeighbors myPriv domain port =
+findNeighbors myPriv domain _ =
     withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
   where
+    -- TODO(tim): Reenable port selection
+    port = 30303
     talk :: H.PrvKey -> Socket -> IO ()
     talk prvKey' socket' = do
       let (theType, theRLP) =

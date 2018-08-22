@@ -9,6 +9,7 @@ module Blockchain.Blockstanbul
   , View(..)
   , MsgAuth(..)
   , WireMessage(..)
+  , TrustedMessage(..)
   , InEvent(..)
   , OutEvent(..)
   , finalHash

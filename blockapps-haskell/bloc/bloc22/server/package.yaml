@@ -36,6 +36,7 @@ dependencies:
   - either
   - hflags
   - http-client
+  - http-conduit
   - http-media
   - http-types
   - insert-ordered-containers

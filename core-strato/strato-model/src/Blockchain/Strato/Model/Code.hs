@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Strato.Model.Code where
 
+import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
@@ -13,6 +14,8 @@ import           Blockchain.Data.RLP
 data Code = Code{codeBytes::B.ByteString}
           | PrecompiledCode Int
           deriving (Show, Eq, Read, Ord, Generic)
+
+instance Binary Code where
 
 instance RLPSerializable Code where
     rlpEncode (Code bytes) = rlpEncode bytes

@@ -1,0 +1,62 @@
+name: blockapps-tools
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:
+              Tool to query the ethereum databases
+
+executables:
+  queryStrato:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - base >= 4 && < 5
+      - ansi-wl-pprint
+      - base16-bytestring
+      - binary
+      - blockapps-data
+      - blockapps-util
+      - bytestring
+      - cmdargs
+      - data-default
+      - ethereum-rlp
+      - filepath
+      - blockapps-haskoin
+      - leveldb-haskell
+      - merkle-patricia-db
+      - blockapps-milena
+      - monad-logger
+      - monad-loops
+      - nibblestring
+      - persistent-postgresql
+      - resourcet
+      - time
+      - strato-conf
+      - strato-sequencer
+      - strato-index
+      - strato-redis-blockdb
+      - strato-model
+      - hedis
+
+  b16decode:
+    source-dirs: exec_src/
+    main: B16Decode.hs
+    dependencies:
+      - base >= 4 && < 5
+      - base16-bytestring
+      - bytestring
+
+  modifyDate:
+    source-dirs: exec_src/
+    main: ModifyDate.hs
+    dependencies:
+      - base >=4 && <5
+      - base16-bytestring
+      - bytestring
+      - hflags
+      - time

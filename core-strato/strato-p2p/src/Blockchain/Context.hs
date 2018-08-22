@@ -54,7 +54,7 @@ data Context =
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
-        vmEventsSink           :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
+        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime
     }

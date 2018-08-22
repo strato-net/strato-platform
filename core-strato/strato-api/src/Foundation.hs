@@ -146,7 +146,7 @@ instance Yesod App where
     -- in development, and warnings and errors in production.
 
     --maximumContentLength _ (Just (getAccountInfoR _)) = 2 * 1024 * 1024 -- 2 megabytes
-    maximumContentLength _ _ = Just (2 * 1024 * 1024 :: Word64) -- 2M
+    maximumContentLength _ _ = Just (4 * 1024 * 1024 :: Word64) -- 2M
 
     shouldLog app _source level =
         appShouldLogAll (appSettings app)

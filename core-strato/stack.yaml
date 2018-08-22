@@ -31,9 +31,9 @@ packages:
 extra-deps:
 - Crypto-4.2.5.1
 - bytestring-arbitrary-0.1.1
-- containers-0.5.11.0
+- containers-0.5.11.0 # temp re-added, will remove
 - dequeue-0.1.12
-- diagrams-html5-1.4
+- diagrams-html5-1.4.1
 - global-lock-0.1
 - hflags-0.4.3
 - json-rpc-client-0.2.5.0
@@ -44,16 +44,12 @@ extra-deps:
 - ordered-containers-0.1.0
 - pbkdf-1.1.1.1
 - yesod-raml-0.2.0
-- optparse-applicative-0.13.2.0
 - static-canvas-0.2.0.3
-- category-extras-1.0.2
-- monad-logger-0.3.28.1
-- ether-0.4.2.0
-- tasty-quickcheck-0.8.4
-- temporary-1.3
+- monad-logger-0.3.28.1 # temp re-added, will remove
+- ether-0.5.1.0 # temp re-added, will remove
 
 resolver: lts-10.10 #also duplicated in docker section below
-compiler: ghc-8.0.2
+compiler: ghc-8.0.2 # temp re-added, will remove - @see https://blockapps.atlassian.net/browse/STRATO-1086
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -64,7 +60,9 @@ extra-lib-dirs:
 ghc-options:
   "$locals": -Wall -Werror
   strato-api: -Wall -Werror -fno-warn-orphans
+  strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
+  blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
 
 docker:
   enable: true

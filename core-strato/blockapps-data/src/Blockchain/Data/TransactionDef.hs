@@ -8,13 +8,13 @@ module Blockchain.Data.TransactionDef (
   partialRLPDecode
   ) where
 
+import           Data.Binary
 import qualified Data.ByteString              as B
 import           Data.Maybe                   (maybeToList)
-import           Data.Word
 import           Database.Persist.TH
 import           GHC.Generics
 
-import           Text.PrettyPrint.ANSI.Leijen
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.Address
@@ -55,6 +55,10 @@ data Transaction =
     transactionTxHash    :: Word256,
     transactionChainHash :: Word256
     } deriving (Show, Read, Eq, Ord, Generic)
+
+instance Binary Transaction where
+  put = put . rlpSerialize . rlpEncode
+  get = (rlpDecode . rlpDeserialize) <$> get
 
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =

@@ -50,9 +50,9 @@ writeStateDiffs = KW.produceMessages . map mkTopicAndMessage
 splitWriteStateDiffs :: K.Kafka k => [StateDiff] -> k [KP.ProduceResponse]
 splitWriteStateDiffs = liftM concat . mapM writeStateDiffEvents . map (:[]) . concat . map breakup
   where breakup :: StateDiff -> [StateDiffEvent]
-        breakup StateDiff{..} = (Map.elems . Map.mapWithKey CreationEvent) createdAccounts
-                             ++ (Map.elems . Map.mapWithKey UpdateEvent) updatedAccounts
-                             ++ (Map.elems . Map.mapWithKey DeletionEvent) deletedAccounts
+        breakup StateDiff{..} = (Map.elems . Map.mapWithKey (CreationEvent chainId)) createdAccounts
+                             ++ (Map.elems . Map.mapWithKey (UpdateEvent chainId)) updatedAccounts
+                             ++ (Map.elems . Map.mapWithKey (DeletionEvent chainId)) deletedAccounts
 
 filterResponse :: [KP.ProduceResponse] -> [(KP.Partition, KP.KafkaError, KP.Offset)]
 filterResponse = concatMap onlyErrors

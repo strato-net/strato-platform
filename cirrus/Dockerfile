@@ -10,6 +10,8 @@ COPY *.js package.json /usr/lib/cirrus/
 
 COPY lib/* /usr/lib/cirrus/lib/
 
+COPY licenses /usr/lib/cirrus/licenses
+
 RUN cd /usr/lib/cirrus && \
     npm install
 

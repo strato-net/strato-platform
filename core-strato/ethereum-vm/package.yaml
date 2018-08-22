@@ -1,0 +1,101 @@
+name: ethereum-vm
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:
+    The client described in the Ethereum Yellowpaper
+github: blockapps/strato-platform/core-strato/ethereum-vm
+
+dependencies:
+  - base >= 4 && < 5
+  - ansi-wl-pprint
+  - array
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-haskoin
+  - blockapps-milena
+  - blockapps-util
+  - bytestring
+  - containers
+  - cryptohash
+  - directory
+  - either
+  - ethereum-encryption
+  - ethereum-rlp
+  - extra
+  - hedis
+  - hflags
+  - lens
+  - leveldb-haskell
+  - merkle-patricia-db
+  - monad-logger
+  - mtl
+  - ordered-containers
+  - persistent-postgresql
+  - postgresql-simple
+  - resourcet
+  - statsdi
+  - strato-adit
+  - strato-conf
+  - strato-genesis
+  - strato-index
+  - strato-model
+  - strato-p2p
+  - strato-redis-blockdb
+  - strato-sequencer
+  - strato-statediff
+  - text
+  - time
+  - transformers
+  - vector
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.BlockChain
+    - Blockchain.Bagger
+    - Blockchain.Bagger.BaggerState
+    - Blockchain.Bagger.Transactions
+    - Blockchain.Data.ExecResults
+    - Blockchain.TheDAOFork
+    - Blockchain.VMContext
+    - Blockchain.VMOptions
+    - Blockchain.Trigger
+    - Blockchain.Verifier
+    - Blockchain.VM
+    - Blockchain.VM.Code
+    - Blockchain.VM.Environment
+    - Blockchain.VM.Opcodes
+    - Blockchain.VM.VMException
+    - Blockchain.VM.VMState
+    - Blockchain.VMMetrics
+    - Executable.EthereumVM
+    - Executable.EVMFlags
+    - Executable.EVMCheckpoint
+  ghc-options: -Wall -O2
+
+
+executables:
+  ethereum-vm:
+    source-dirs: exec_src
+    main: Main.hs
+    dependencies:
+      - ethereum-vm
+    ghc-options: -Wall -O2 -threaded
+
+tests:
+  ethereum-vm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - aeson
+      - data-default
+      - ethereum-vm
+      - hspec
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

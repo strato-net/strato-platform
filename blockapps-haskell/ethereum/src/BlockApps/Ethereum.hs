@@ -35,6 +35,7 @@ module BlockApps.Ethereum
   , Transaction (..)
   , UnsignedTransaction (..)
   , rlpMsg
+  , rlpHash
   , signTransaction
   , verifyTransaction
   , recoverTransaction
@@ -493,7 +494,11 @@ rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
   = fromMaybe (error "rlpMsg failure")
   . msg
-  . ByteArray.convert
+  . rlpHash
+
+rlpHash :: RLPEncodable x => x -> ByteString
+rlpHash
+  = ByteArray.convert
   . digestKeccak256
   . keccak256
   . packRLP
@@ -696,12 +701,11 @@ instance FromJSON CodeInfo where
   parseJSON _ = error "parseJSON CodeInfo: expected Object"
 
 instance ToJSON CodeInfo where
-  toEncoding (CodeInfo bs s1 s2) =
-    pairs (
-      "code" Aeson..= bs <>
-      "src"  Aeson..= s1 <>
-      "name" Aeson..= s2
-    )
+  toJSON (CodeInfo bs s1 s2) = object
+    [ "code" Aeson..= bs
+    , "src"  Aeson..= s1
+    , "name" Aeson..= s2
+    ]
 
 instance ToSchema CodeInfo where
   declareNamedSchema _ = return $
@@ -730,7 +734,7 @@ instance ToJSON AccountInfo where
     [ "address" Aeson..= a
     , "balance" Aeson..= b
     , "codeHash" Aeson..= c
-    , "storage" Aeson..= (map (\(w1,w2) -> (Hex w1, Hex w2)) $ Map.toList s)
+    , "storage" Aeson..= (map (\(w1,w2) -> (show256 w1, show256 w2)) $ Map.toList s) -- TODO(dustin): This Hex newtype doesn't seem to work for tuples :/
     ]
 
 instance FromJSON AccountInfo where

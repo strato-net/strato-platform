@@ -8,11 +8,14 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
-    rm /usr/local/openresty/nginx/conf/nginx.conf
+    rm /usr/local/openresty/nginx/conf/nginx.conf && \
+    opm get zmartzone/lua-resty-openidc
 
-COPY nginx.tpl.conf auth.htpasswd azure-authentication.tpl.lua /tmp/
+COPY nginx.tpl.conf auth.htpasswd openid-auth.tpl.lua /tmp/
 
 COPY docker-run.sh /
+
+COPY licenses /licenses
 
 RUN chmod a+x /docker-run.sh
 

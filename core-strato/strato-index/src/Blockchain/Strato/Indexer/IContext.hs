@@ -25,7 +25,7 @@ import           Data.Int                        (Int64)
 import qualified Data.Text                       as T
 import qualified Database.Persist.Postgresql     as SQL
 
-import           Blockchain.Data.DataDefs        (Block, Key (BlockKey))
+import           Blockchain.Data.DataDefs        (BlockDataRef, Key (BlockDataRefKey))
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import qualified Blockchain.Strato.RedisBlockDB  as RBDB
@@ -46,7 +46,7 @@ data IContext = IContext {
 
 type IContextM = StateT IContext (ResourceT (LoggingT IO))
 
-newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key Block)
+newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
     deriving (Eq, Ord, Read, Show)
 
 instance HasSQLDB IContextM where
@@ -77,10 +77,10 @@ targetTopicName = indexEventsTopicName
 
 -- todo: Database.Persist.Postgresql.SqlBackendKey appears to be an Int64 under the hood. Need to verify.
 unIBBI :: IndexerBestBlockInfo -> Int64
-unIBBI (IndexerBestBlockInfo (BlockKey k)) = fromIntegral k
+unIBBI (IndexerBestBlockInfo (BlockDataRefKey k)) = fromIntegral k
 
 reIBBI :: Int64 -> IndexerBestBlockInfo
-reIBBI = IndexerBestBlockInfo . BlockKey . fromIntegral
+reIBBI = IndexerBestBlockInfo . BlockDataRefKey . fromIntegral
 
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do

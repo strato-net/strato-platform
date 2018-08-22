@@ -5,8 +5,8 @@
 
 module Main where
 
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Test.Hspec
 import           HFlags
 import           Control.Monad
@@ -86,7 +86,9 @@ runContextM' f = do
                         (error "Kafka not initialized") --initialKafkaState
                         Unspecified
                         (error "Redis not initialized") --redisPool
-                        [] [] [])
+                        [] [] []
+                        False False)
+
 
 
 spec :: Spec

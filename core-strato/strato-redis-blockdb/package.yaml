@@ -1,0 +1,62 @@
+name:                strato-redis-blockdb
+version:             0.1.0.0
+author:              BlockApps
+maintainer:          blockapps
+build-type:          Simple
+license:             Apache-2.0
+description:         Functions to operate against the Redis-backed BlockDB
+
+dependencies:
+  - base
+  - base16-bytestring
+  - blockapps-data
+  - blockapps-util
+  - bytestring
+  - containers
+  - ethereum-rlp
+  - hedis
+  - lens-family
+  - lens-family-th
+  - monad-logger
+  - mtl
+  - random
+  - strato-conf
+  - strato-model
+  - text
+
+library:
+  source-dirs:      src
+  ghc-options: -Wall -Werror
+
+executables:
+  strato-redis-viz:
+    main: Viz.hs
+    ghc-options: -Wall -O2
+    source-dirs:
+      - exec_src/
+      - test/
+    dependencies:
+      - QuickCheck
+      - diagrams-contrib
+      - diagrams-html5
+      - diagrams-lib
+      - optparse-applicative
+    ghc-options: -threaded -Wall -Werror
+
+
+tests:
+  strato-redis-blockdb-test:
+    source-dirs: test
+    main: Test.hs
+    dependencies:
+      - ansi-wl-pprint
+      - containers
+      - bytestring
+      - HUnit
+      - hspec-contrib
+      - hspec
+      - hspec-core
+      - QuickCheck
+      - strato-redis-blockdb
+    # We use -O0 here, since GHC takes *very* long to compile so many constants
+    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind

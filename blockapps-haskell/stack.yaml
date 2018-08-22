@@ -10,6 +10,7 @@ packages:
 - cirrus/client
 - ethereum
 - ethereum-abi
+- slipstream
 - solidity
 - strato/api
 - strato/client
@@ -36,8 +37,7 @@ extra-deps:
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
   - parsec3-numbers-0.1.0
-  - insert-ordered-containers-0.2.1.0
-
+  - milena-0.5.2.1
 flags: {}
 
 ghc-options:

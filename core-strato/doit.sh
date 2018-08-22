@@ -3,7 +3,7 @@
 set -e
 set -x
 
-MONITORED_PIDS=()
+declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
@@ -21,8 +21,12 @@ function newnode {
 
   if $mineBlocks
   then echo "Starting strato-adit"
+      aMiner=$miningAlgorithm
+      if [ $blockstanbul = true ]; then
+        aMiner=Instant
+      fi
       export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
+      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
   fi
 
   if $serveBlocks
@@ -37,13 +41,29 @@ function newnode {
        runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
-  minLogLevel=LevelInfo
+  evmMinLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
-      minLogLevel=LevelDebug
+     evmMinLogLevel=LevelDebug
+  fi
+  seqMinLogLevel=LevelInfo
+  if [ "${seqDebugMode}" = true ] ; then
+     seqMinLogLevel=LevelDebug
   fi
 
   echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer --minLogLevel=$minLogLevel --tmpblockstanbul=${tmpblockstanbul:-false} >> logs/strato-sequencer 2>&1
+  if [ -n "${blockstanbul}" ]; then
+    tbFlag="--blockstanbul=${blockstanbul}"
+  fi
+  if [ -n "${blockstanbulBlockPeriodMs}" ]; then
+    bpFlag="--blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs}"
+  fi
+  if [ -n "${blockstanbulRoundPeriodS}" ]; then
+    rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
+  fi
+  if [ -n "${validators}" ]; then
+    vsFlag="--validators=${validators}"
+  fi
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -56,10 +76,11 @@ function newnode {
 
 
   echo "Starting ethereum-vm"
-  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
+  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel +RTS -N1 >> logs/ethereum-vm 2>&1
+                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
+                         "${tbFlag}" +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
@@ -71,15 +92,15 @@ function newnode {
   echo "Monitoring the background processes..."
   while sleep ${MONITORING_TIMER}; do
     # check status for every monitored process
-    for monitored_pid in "${MONITORED_PIDS[@]}"; do
+    for monitored_pid in "${!MONITORED_PIDS[@]}"; do
       # if process with pid does not exist
       if ! (ps -p ${monitored_pid} > /dev/null); then
-        echo "Process with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+        echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
         # Kill all the rest of monitored processes
-        for pid_to_kill in "${MONITORED_PIDS[@]}"; do
-          if [ ${pid_to_kill} -ne ${monitored_pid} ]; then
-            echo "killing process ${pid_to_kill}..."
-            kill -9 ${pid_to_kill}
+        for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+          if ps -p ${pid_to_kill} > /dev/null; then
+            echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+            kill -9 ${pid_to_kill} || true
             echo "done"
           fi
         done
@@ -127,6 +148,10 @@ function doInit {
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
   $cmd 2>&1 | tee logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
+  fi
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
@@ -148,7 +173,7 @@ function cleanupLogs {
 function runBackgroundProcess {
   $@ &
   proc_pid=$!
-  MONITORED_PIDS+=(${proc_pid})
+  MONITORED_PIDS[${proc_pid}]=$@
   echo "process pid:: $proc_pid (command: $@)"
   disown %
 }
@@ -179,6 +204,7 @@ setEnv redisBDBNumber 0
 
 setEnv genesis gettingStarted
 setEnv miningAlgorithm Instant
+setEnv maxTxsPerBlock 500
 
 setEnv networkID 6
 setEnv genesisBlock ""

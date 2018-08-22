@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -116,6 +117,7 @@ instance ToSample BlocTransactionData where
                                     , xabiModifiers = Map.empty
                                     , xabiEvents    = Map.empty
                                     }
+      , contractdetailsChainId    = Nothing
       }
     , Call [] -- probably make a better Call sample
     ]
@@ -287,6 +289,15 @@ instance ToSchema PostSendParameters where
         , sendTxParams = Nothing
         }
 
+data TransferParameters = TransferParameters
+  { fromAddress :: Address
+  , toAddress   :: Address
+  , value       :: Strung Natural
+  , txParams    :: Maybe TxParams
+  , chainId     :: Maybe ChainId
+  , resolve     :: Bool
+  } deriving (Eq, Show, Generic)
+
 --------------------------------------------------------------------------------
 
 type PostUsersContract = "users"
@@ -363,6 +374,16 @@ instance ToSchema PostUsersContractRequest where
             }
       )
 
+data ContractParameters = ContractParameters
+  { fromAddr :: Address
+  , src      :: Text
+  , contract :: Maybe Text
+  , args     :: Maybe (Map Text ArgValue)
+  , value    :: Maybe (Strung Natural)
+  , txParams :: Maybe TxParams
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
+  }
 --------------------------------------------------------------------------------
 
 type PostUsersUploadList = "users"
@@ -456,7 +477,12 @@ instance FromJSON PostUsersUploadListResponse where
 instance ToSample PostUsersUploadListResponse where
   toSamples _ = noSamples
 
-
+data ContractListParameters = ContractListParameters
+  { fromAddr  :: Address
+  , contracts :: [UploadListContract]
+  , chainId   :: Maybe ChainId
+  , resolve   :: Bool
+  } deriving (Eq,Show,Generic)
 
 --------------------------------------------------------------------------------
 
@@ -542,6 +568,17 @@ instance ToSchema PostUsersContractMethodResponse where
           ]
         }
 
+data FunctionParameters = FunctionParameters
+  { fromAddr     :: Address
+  , contractName :: Text
+  , contractAddr :: Address
+  , funcName     :: Text
+  , args         :: Map Text ArgValue
+  , value        :: Maybe (Strung Natural)
+  , txParams     :: Maybe TxParams
+  , chainId      :: Maybe ChainId
+  , resolve      :: Bool
+  }
 --------------------------------------------------------------------------------
 
 -- POST /users/:user/:userAddress/sendList
@@ -646,6 +683,13 @@ instance ToSchema SendTransaction where
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
+
+data TransferListParameters = TransferListParameters
+  { fromAddr :: Address
+  , txs      :: [SendTransaction]
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
+  }
 
 --------------------------------------------------------------------------------
 
@@ -829,3 +873,10 @@ instance ToSchema MethodCall where
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
         }
+
+data FunctionListParameters = FunctionListParameters
+  { fromAddr :: Address
+  , txs      :: [MethodCall]
+  , chainId  :: Maybe ChainId
+  , resolve  :: Bool
+  }

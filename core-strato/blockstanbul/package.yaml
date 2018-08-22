@@ -3,6 +3,7 @@ ghc-options: -Wall -Werror
 
 dependencies:
   - base
+  - binary
   - blockapps-data
   - blockapps-haskoin
   - blockapps-util
@@ -11,6 +12,7 @@ dependencies:
   - conduit
   - conduit-combinators
   - crypto-api
+  - derive
   - ethereum-encryption
   - ethereum-rlp
   - ghc

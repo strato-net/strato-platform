@@ -98,7 +98,7 @@ data SetupDBs =
     localAddressState :: Map.Map Address AddressStateModification
     }
 
-type SetupDBM = StateT SetupDBs (ResourceT IO)
+type SetupDBM = StateT SetupDBs (LoggingT (ResourceT IO))
 instance HasStateDB SetupDBM where
   getStateDB = do
     cxt <- get
@@ -397,7 +397,9 @@ oneTimeSetup genesisBlockName = do
 
       {- CONFIG: create kafka topics -}
 
-      let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      --Replace this to re-enable unique topic names
+      --let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      let uniqueTopicMap = Map.fromList [(topic, topic) | topic <- topics]
       encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
       {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
@@ -418,7 +420,6 @@ oneTimeSetup genesisBlockName = do
          EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (block_id);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (number);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);" []
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);" []
@@ -455,7 +456,7 @@ oneTimeSetup genesisBlockName = do
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
+         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
