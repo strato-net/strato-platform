@@ -23,10 +23,13 @@ done
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 # Check if this container was initialized before
 if [ ! -f initialized ]; then
-    # drop vault-wrapper db if already exists
-    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_vault_wrapper_db}
-    # Create the database for vault-wrapper
-    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_vault_wrapper_db}
+    # Create the database for vault-wrapper if does not exist from previous STRATO deployments (e.g. STRATO upgrade flow)
+    if ! PGPASSWORD=${postgres_password} psql ${PSQL_CONNECTION_PARAMS} -lqt | cut -d \| -f 1 | grep -qw ${postgres_vault_wrapper_db}; then
+      echo "Creating the '${postgres_vault_wrapper_db}' database"
+      PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_vault_wrapper_db}
+    else
+      echo "Using the existing '${postgres_vault_wrapper_db}' database from previous STRATO deployment"
+    fi
     # Create the 'initialized' sentinel file
     date '+%Y-%m-%d %H:%M:%S' > initialized
 fi
