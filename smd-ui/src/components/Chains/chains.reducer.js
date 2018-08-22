@@ -3,8 +3,6 @@ import {
   FETCH_CHAINS_SUCCESSFULL,
   FETCH_CHAINS_FAILED,
   CHANGE_CHAIN_FILTER,
-  FETCH_CHAIN_IDS_SUCCESSFUL,
-  FETCH_CHAIN_IDS_FAILED,
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
   RESET_CHAIN_ID
@@ -28,10 +26,21 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case FETCH_CHAINS_SUCCESSFULL:
+      const chainLabelIds = {};
+      action.chainLabelIds.forEach(function (chainIdChainInfo, index) {
+        const id = chainIdChainInfo["id"];
+        const label = chainIdChainInfo["info"]["label"];
+        if (!chainLabelIds[label]) {
+          chainLabelIds[label] = {};
+          chainLabelIds[label][id] = {};
+        } else {
+          chainLabelIds[label][id] = {};
+        }
+      });
       return {
         ...state,
-        chains: action.chainLabelIds,
-        labelIds: action.chainLabelIds,
+        chains: chainLabelIds,
+        labelIds: chainLabelIds,
         filter: state.filter,
         error: null
       };
@@ -50,27 +59,6 @@ const reducer = function (state = initialState, action) {
         labelIds: state.labelIds,
         filter: action.filter,
         error: state.error,
-      }
-    case FETCH_CHAIN_IDS_SUCCESSFUL:
-      return {
-        ...state,
-        chains: state.chains,
-        labelIds: state.labelIds,
-        filter: state.filter,
-        error: state.error
-      }
-    case FETCH_CHAIN_IDS_FAILED:
-      return {
-        ...state,
-        chains: {
-          ...state.chains,
-          [action.label]: {
-            error: action.error
-          }
-        },
-        labelIds: state.labelIds,
-        filter: state.filter,
-        error: state.error
       }
     case FETCH_CHAIN_DETAIL_SUCCESS:
       return {

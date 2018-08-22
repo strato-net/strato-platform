@@ -3,8 +3,6 @@ export const FETCH_CHAINS_SUCCESSFULL = 'FETCH_CHAINS_SUCCESSFULL';
 export const FETCH_CHAINS_FAILED = 'FETCH_CHAINS_FAILED';
 export const CHANGE_CHAIN_FILTER = 'CHANGE_CHAIN_FILTER';
 export const FETCH_CHAIN_IDS_REQUEST = 'FETCH_CHAIN_IDS_REQUEST';
-export const FETCH_CHAIN_IDS_SUCCESSFUL = 'FETCH_CHAIN_IDS_SUCCESS';
-export const FETCH_CHAIN_IDS_FAILED = 'FETCH_CHAIN_IDS_FAILURE';
 export const FETCH_CHAIN_DETAIL_REQUEST = 'FETCH_CHAIN_DETAIL_REQUEST';
 export const FETCH_CHAIN_DETAIL_SUCCESS = 'FETCH_CHAIN_DETAIL_SUCCESS';
 export const FETCH_CHAIN_DETAIL_FAILURE = 'FETCH_CHAIN_DETAIL_FAILURE';
@@ -39,12 +37,11 @@ export const changeChainFilter = function (filter) {
   }
 };
 
-export const fetchChainIds = function (label, chainIds, loadDetails) {
+export const fetchChainIds = function (label, chainIds) {
   return {
     type: FETCH_CHAIN_IDS_REQUEST,
     label: label,
-    chainIds: chainIds,
-    loadDetails: loadDetails
+    chainIds: chainIds
   }
 };
 
@@ -52,22 +49,6 @@ export const resetChainId = function (label) {
   return {
     type: RESET_CHAIN_ID,
     label: label
-  }
-};
-
-export const fetchChainIdsSuccess = function (label, ids) {
-  return {
-    type: FETCH_CHAIN_IDS_SUCCESSFUL,
-    label: label,
-    ids: ids
-  }
-};
-
-export const fetchChainIdsFailure = function (label, error) {
-  return {
-    type: FETCH_CHAIN_IDS_FAILED,
-    label: label,
-    error: error
   }
 };
 

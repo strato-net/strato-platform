@@ -41,13 +41,13 @@ class Chains extends Component {
     this.props.changeChainFilter(filter);
   };
 
-  onUserClick(label, chainids, index) {
-    if (chainids.length && index === this.state.selected) {
+  onUserClick(label, chainid, index) {
+    if (chainid.length && index === this.state.selected) {
       this.props.resetChainId(label);
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('chains_row_click');
-      this.props.fetchChainIds(label, chainids, true);
+      this.props.fetchChainDetail(label, chainid);
     }
   }
 
@@ -82,7 +82,7 @@ class Chains extends Component {
             <div className="row">
               <div className={`pt-card pt-elevation-2 smd-pointer ${labelClasseName}`} key={index} onClick={(e) => {
                 this.setState({ selected: index });
-                this.onUserClick(label, chainids, index);
+                this.onUserClick(label, chainids[0], index);
               }}>
                 {label}
               </div>
