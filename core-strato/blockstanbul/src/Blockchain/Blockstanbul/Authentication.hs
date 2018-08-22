@@ -9,7 +9,9 @@ import Control.Monad (liftM2, liftM3)
 import Control.Monad.IO.Class
 import Control.Lens
 import qualified Data.ByteString as B
+import Data.ByteString.Lazy
 import Data.List (sort)
+import Data.Binary
 import MonadUtils (liftIO1)
 import Test.QuickCheck
 
@@ -104,6 +106,17 @@ finalHash = hash
           . rlpEncode
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
+
+signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool) -> m ExtendedSignature
+signBenfInfo pk bnf =
+  let msg = bytesToWord256 . B.unpack . toStrict $ encode (bnf)
+      --addr = prvKey2Address pk
+  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+
+verifyBenfInfo :: (Address, Bool) -> ExtendedSignature -> Maybe Address
+verifyBenfInfo bnf sign =
+  let msg = bytesToWord256 . B.unpack . toStrict $ encode (bnf)
+  in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
 signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
 signMessage pk tm = do
