@@ -80,3 +80,4 @@ benchmarks:
     dependencies:
       - ethereum-rlp
       - criterion
+      - random-bytestring
