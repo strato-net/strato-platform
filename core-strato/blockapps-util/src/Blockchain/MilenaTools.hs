@@ -86,3 +86,6 @@ withKafkaRetry t k = do
           case r of
             Left _ -> (liftIO $ threadDelay (1000*t)) >> go s'
             Right a -> return a
+
+withKafkaRetry1s :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry1s = withKafkaRetry 1000

@@ -457,24 +457,24 @@ readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
 readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    ret <- zip [(offset+1)..] <$> K.withKafkaRetry 1000 (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
+    ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
     tickBy (length ret) ctr_sequencer_kafka_unseq_reads
     return ret
 
 writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents' events = void $ do
-    void $ K.withKafkaRetry 1000 (writeSeqVmEvents events)
+    void $ K.withKafkaRetry1s (writeSeqVmEvents events)
     tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqP2pEvents' events = void $ do
-    void $ K.withKafkaRetry 1000 (writeSeqP2pEvents events)
+    void $ K.withKafkaRetry1s (writeSeqP2pEvents events)
     tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
-  ret <- K.withKafkaRetry 1000 (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
+  ret <- K.withKafkaRetry1s (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err

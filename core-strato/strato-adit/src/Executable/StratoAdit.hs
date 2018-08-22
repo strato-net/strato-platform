@@ -129,7 +129,7 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Initing runKafka"
     $logInfoS "stratoAdit" "Will fetch offsets"
 
-    offset <- withKafkaRetry 1000 $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
+    offset <- withKafkaRetry1s $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
     $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
     doConsume (max (offset - 1) 0) c
