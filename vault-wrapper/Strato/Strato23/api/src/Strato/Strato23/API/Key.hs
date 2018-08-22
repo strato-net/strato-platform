@@ -17,4 +17,4 @@ import           Strato.Strato23.API.Types
 type PostKey = "key"
             :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
             :> Header' '[Required, Strict] "X-USER-ID" Text
-            :> Post '[JSON] Address
+            :> Post '[JSON] StatusAndAddress
