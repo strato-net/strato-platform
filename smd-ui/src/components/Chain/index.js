@@ -6,11 +6,11 @@ import HexText from '../HexText';
 class Chain extends Component {
 
   showMembers(chain) {
-    if (chain && chain.balances && chain.balances.length > 0){
+    if (chain && chain.balances && chain.balances.length > 0) {
       const balances = chain.balances;
       const ret = [];
-      balances.forEach(function(balance, index) {
-        if (balance.address && balance.address !== '0000000000000000000000000000000000000100'){
+      balances.forEach(function (balance, index) {
+        if (balance.address && balance.address !== '0000000000000000000000000000000000000100') {
           ret.push(
             <tr key={index}>
               <td>{balance.address}</td>
@@ -41,29 +41,9 @@ class Chain extends Component {
               Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h5>
           </div>
-         {/* <div className="col-sm-4 text-right">
-            <button
-              className="pt-button pt-intent-primary pt-small"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}>
-              Add Member
-              </button>
-          </div>
-          <div className="col-sm-4 text-right">
-            <button
-              className="pt-button pt-intent-primary pt-small"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}>
-              Remove Member
-              </button>
-          </div> */}
         </div>
 
-        <table className="pt-table pt-str">
+        <table className="pt-table pt-str chain-detail">
           <thead>
             <tr>
               <th>Member Address</th>

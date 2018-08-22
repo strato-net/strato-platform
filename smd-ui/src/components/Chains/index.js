@@ -1,5 +1,11 @@
 import React, { Component } from 'react';
-import { fetchChains, fetchChainIds, fetchChainDetail, changeChainFilter, resetChainId } from './chains.actions';
+import {
+  fetchChains,
+  fetchChainIds,
+  fetchChainDetail,
+  changeChainFilter,
+  resetChainId
+} from './chains.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -12,7 +18,7 @@ const tourSteps = [
   {
     title: 'View Chains',
     text: 'Scroll through all chains that you belong to',
-    selector: '#contracts',
+    selector: '#chains',
     position: 'bottom',
     isFixed: true
   }
@@ -90,8 +96,8 @@ class Chains extends Component {
         <Tour
           name="chains"
           steps={tourSteps}
-          finalStepSelector='#contracts'
-          nextPage='contracts' />
+          finalStepSelector='#chains'
+          nextPage='transactions' />
 
         <div className="row">
           <div className="col-sm-4 text-left">

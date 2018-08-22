@@ -27,7 +27,7 @@ class CreateChain extends Component {
     mixpanelWrapper.track('create_chain_submit_click');
     let members = [];
     let balances = [];
-    this.state.members.forEach(function(member, index) {
+    this.state.members.forEach(function (member, index) {
       members.push({
         "address": member.address,
         "enode": member.enode
@@ -50,10 +50,10 @@ class CreateChain extends Component {
   updateMembers(state) {
     const curMembers = this.state.members.slice(0);
     const usernames = [];
-    curMembers.forEach(function(member, index) {
+    curMembers.forEach(function (member, index) {
       usernames.push(member.username);
     });
-    if (!usernames.includes(state.username)){
+    if (!usernames.includes(state.username)) {
       this.setState({
         members: curMembers.concat({
           username: state.username,
@@ -62,7 +62,7 @@ class CreateChain extends Component {
           balance: parseInt(state.balance, 10)
         })
       });
-    } 
+    }
   }
 
   removeMember(member) {
@@ -75,18 +75,18 @@ class CreateChain extends Component {
   }
 
   showMembers(members) {
-    if (members.length && members.length > 0){
+    if (members.length && members.length > 0) {
       const ret = [];
-      members.forEach(function(member, index){
+      members.forEach(function (member, index) {
         ret.push(
-          <div className="pt-dialog-header">
-          <span className="pt-dialog-header-title">{member.username}</span>
-          <Button 
-            className="pt-button pt-icon-small-cross" 
-            onClick = {() => {
-              this.removeMember(member)
-            }}
-            text='Remove'/>
+          <div className="pt-dialog-header" key={index}>
+            <span className="pt-dialog-header-title">{member.username}</span>
+            <Button
+              className="pt-button pt-icon-small-cross"
+              onClick={() => {
+                this.removeMember(member)
+              }}
+              text='Remove' />
           </div>
         );
       }.bind(this))
@@ -95,7 +95,7 @@ class CreateChain extends Component {
     else {
       return (
         <div className="pt-dialog-header">
-          <span className="pt-dialog-header-title">No Members</span> 
+          <span className="pt-dialog-header-title">No Members</span>
         </div>
       );
     }
@@ -139,7 +139,7 @@ class CreateChain extends Component {
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.label}</div>
                   </div>
                 </div>
-              
+
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-d">
                     Governance Contract
@@ -172,7 +172,7 @@ class CreateChain extends Component {
                       tabIndex="3"
                       required
                     />
-                  
+
                     <Field
                       name="val1"
                       component="input"
@@ -193,7 +193,7 @@ class CreateChain extends Component {
                       tabIndex="5"
                       required
                     />
-                  
+
                     <Field
                       name="val2"
                       component="input"
@@ -211,7 +211,7 @@ class CreateChain extends Component {
                     Chain Members
                   </label>
                   {this.showMembers(this.state.members)}
-                  <AddMember handler={this.updateMembers}/>
+                  <AddMember handler={this.updateMembers} />
                 </div>
               </div>
 
@@ -255,7 +255,7 @@ export function mapStateToProps(state) {
   };
 }
 
-export function validate(values) { 
+export function validate(values) {
   //TODO: add validations for chain creation
   const errors = {};
   return errors;
