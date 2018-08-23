@@ -53,8 +53,6 @@ describe('Throughput - upload', function () {
 	      countMatch = true;
 	      for(let node of nodes) {
       		const numContracts = yield getContractCount(users[node.id], node);
-          console.log('Here is numContracts', numContracts);
-          console.log('Here is (k+1)*batchSize', (k+1)*batchSize);
       		countMatch = countMatch && (numContracts == (k+1)*batchSize);
 	      }
 	      yield promiseTimeout(1000);
