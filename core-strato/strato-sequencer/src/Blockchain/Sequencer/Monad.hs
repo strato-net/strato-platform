@@ -97,7 +97,7 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriodμs :: Int
                      , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TMChan (Address, Address, Bool)
+                     , blockstanbulBeneficiary :: TMChan (Address, String, Address, Bool)
                      , blockstanbulAuthSenders :: [Address]
                      }
 

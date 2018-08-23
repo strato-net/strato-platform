@@ -110,7 +110,7 @@ finalHash = hash
 signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool) -> m ExtendedSignature
 signBenfInfo pk bnf =
   let msg = bytesToWord256 . B.unpack . toStrict $ encode (bnf)
-      --addr = prvKey2Address pk
+      -- addr = prvKey2Address pk
   in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool) -> ExtendedSignature -> Maybe Address

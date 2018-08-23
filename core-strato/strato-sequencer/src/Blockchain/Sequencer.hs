@@ -18,6 +18,7 @@ import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
+import           Data.ByteString.Char8                     (pack)
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
@@ -52,6 +53,7 @@ import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
+import qualified Blockchain.Data.RLP                       as RL
 
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
@@ -115,12 +117,13 @@ checkForVotes = do
     case x of
          Nothing -> error "Channel unexpectedly closed"
          Just (Nothing) -> return ()
-         Just (Just (sendr, addr,bool)) -> do
+         Just (Just (sendr, sign, addr, bool)) -> do
             senderlist <- asks blockstanbulAuthSenders
             if (elem sendr senderlist)
               then do
-                -- add signature
-                let ie = NewBeneficiary (addr, bool)
+                let extsign = RL.rlpDecode $ RL.rlpDeserialize (pack sign)
+                    bauth = MsgAuth { sender = sendr, signature = extsign}
+                let ie = NewBeneficiary bauth (addr, bool)
                 blockstanbulSend [ie]
               else return ()
         {-      $logWarnS "blockstanbul/auth sender" . T.pack $

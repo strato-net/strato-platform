@@ -15,9 +15,10 @@ type AdminAPI = GetVote
 
 type GetVote = "vote"
     :> Capture "sender" Address
+    :> Capture "signature" String
     :> Capture "nominee" Address
     :> Capture "for_against" Bool
-    :> Get '[JSON] (Address, Address, Bool)
+    :> Get '[JSON] (Address, String, Address, Bool)
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy

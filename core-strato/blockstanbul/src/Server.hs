@@ -18,30 +18,31 @@ import Blockchain.Data.Address
 
 import API
 
-admin :: TMChan (Address, Address, Bool) -> Server AdminAPI
+admin :: TMChan (Address, String, Address, Bool) -> Server AdminAPI
 admin = createVote
 
-createVote :: TMChan (Address, Address, Bool) -> Address -> Address -> Bool -> Handler (Address, Address, Bool)
-createVote ch sender addr for_against = do
-  liftIO $ atomically $ writeTMChan ch (sender, addr, for_against)
-  return (sender, addr,for_against)
+createVote :: TMChan (Address, String, Address, Bool) -> Address -> String -> Address -> Bool -> Handler (Address, String, Address, Bool)
+createVote ch sender sign addr for_against = do
+  liftIO $ atomically $ writeTMChan ch (sender, sign, addr, for_against)
+  return (sender, sign, addr,for_against)
 
-createWebServer :: TMChan (Address, Address,Bool) -> Application
+createWebServer :: TMChan (Address, String, Address,Bool) -> Application
 createWebServer ch = serve adminAPI (admin ch)
 
-webserver :: Int -> TMChan (Address, Address,Bool) -> IO()
+webserver :: Int -> TMChan (Address, String, Address,Bool) -> IO()
 webserver prt ch = run prt $ createWebServer ch
 
-getVote :: Address -> Address -> Bool -> ClientM (Address, Address,Bool)
+getVote :: Address -> String -> Address -> Bool -> ClientM (Address, String,Address,Bool)
 getVote = client (Proxy @ GetVote)
 
-uploadVote ::  Int -> (Address, Address, Bool) -> IO()
-uploadVote prt (sendr, addr, bool)= do
+uploadVote ::  Int -> (Address, String, Address, Bool) -> IO()
+uploadVote prt (sendr, sign, addr, bool)= do
   manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote sendr addr bool) (ClientEnv manager (BaseUrl Http "localhost" prt ""))
+  vot <- runClientM (getVote sendr sign addr bool) (ClientEnv manager (BaseUrl Http "localhost" prt ""))
   case vot of
     Left err -> putStrLn $ "Error: " ++ show err
-    Right (sdr, benf,nonce) -> do
+    Right (sdr, signature, benf,nonce) -> do
       print sdr
+      print signature
       print benf
       print nonce

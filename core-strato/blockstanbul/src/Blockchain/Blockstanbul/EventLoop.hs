@@ -169,8 +169,13 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary (benf,decision)  -> do
-      pendingvotes %= M.insert benf decision
+    NewBeneficiary bauth (benf,decision)  -> do
+      let senderverified = fromMaybe 0x0000000000000000 $ verifyBenfInfo (benf,decision) (signature bauth)
+      if (sender bauth /= senderverified)
+        then $logWarnS "blockstanbul/vote" . T.pack $
+               printf "Rejecting potential beneficiary: Address does not match"
+        else do
+          pendingvotes %= M.insert benf decision
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
@@ -207,34 +212,34 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             then $logWarnS "blockstanbul/ppl" . T.pack $
                    printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
             else do
-            mBlockLock <- use blockLock
-            if (isJust mBlockLock && Just pp /= mBlockLock)
-              then do
-                $logWarnS "blockstanbul/ppl" . T.pack $
-                  printf "Rejecting proposal: block does not match lock"
-                $logDebugS "blockstanbul/roundchange" "lock mismatch"
-                roundChange
-              else
-                if v /= v'
-                  then do
-                    $logDebugS "blockstanbul/roundchange" . T.pack $
-                       "view mismatch (us, sender): " ++ format (v, v')
-                    $logWarnS "blockstanbul/ppl" . T.pack $
-                      printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-                    roundChange
-                  else do
-                     blockcount += 1
-                     proposal .= Just pp
-                     pk <- use prvkey
-                     case extractBeneficiary pp of
-                       Nothing -> return()
-                       Just (bnef,vot) -> do
-                         -- insert the vote into map
-                         val <- uses voted $M.lookup bnef
-                         let unwrapVal = fromMaybe M.empty val
-                         let nval = M.insert pr vot unwrapVal
-                         voted %= M.insert bnef nval
-                     yield =<< signMessage pk (Prepare v (blockHash pp))
+              mBlockLock <- use blockLock
+              if (isJust mBlockLock && Just pp /= mBlockLock)
+                then do
+                  $logWarnS "blockstanbul/ppl" . T.pack $
+                    printf "Rejecting proposal: block does not match lock"
+                  $logDebugS "blockstanbul/roundchange" "lock mismatch"
+                  roundChange
+                else
+                  if v /= v'
+                    then do
+                      $logDebugS "blockstanbul/roundchange" . T.pack $
+                         "view mismatch (us, sender): " ++ format (v, v')
+                      $logWarnS "blockstanbul/ppl" . T.pack $
+                        printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+                      roundChange
+                    else do
+                      blockcount += 1
+                      proposal .= Just pp
+                      pk <- use prvkey
+                      case extractBeneficiary pp of
+                        Nothing -> return()
+                        Just (bnef,vot) -> do
+                          -- insert the vote into map
+                          val <- uses voted $M.lookup bnef
+                          let unwrapVal = fromMaybe M.empty val
+                          let nval = M.insert pr vot unwrapVal
+                          voted %= M.insert bnef nval
+                      yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
