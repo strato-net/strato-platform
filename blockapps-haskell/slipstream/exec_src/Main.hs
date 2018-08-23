@@ -27,7 +27,7 @@ main = do
 
   let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
   dbInsert conCreate conn
-  let conAlter =  "alter table contract add column \"chainId\" text;"
+  let conAlter =  "alter table contract add column if not exists \"chainId\" text;"
   dbInsert conAlter conn
 
   let offset = 0 :: K.Offset

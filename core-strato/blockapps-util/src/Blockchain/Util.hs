@@ -1,7 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Blockchain.Util where
 
-import           Control.Monad.State.Lazy           (State, execState, get, put)
+import           Control.Monad.State.Lazy (State, execState, get, put)
 import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
