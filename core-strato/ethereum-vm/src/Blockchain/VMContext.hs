@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
@@ -17,9 +18,11 @@ module Blockchain.VMContext
     , purgeStorageMap
     , getContextBestBlockInfo
     , putContextBestBlockInfo
+    , contextBlockRequested
     ) where
 
 
+import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
@@ -63,6 +66,9 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
+    deriving (Eq, Read, Show)
+
 data Context = Context { contextStateDB             :: MP.MPDB
                        , contextHashDB              :: HashDB
                        , contextCodeDB              :: CodeDB
@@ -82,7 +88,9 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
                        , contextLogDBQueue          :: [LogDB]
                        , contextHasBlockstanbul     :: Bool
+                       , _contextBlockRequested      :: Bool
                        }
+makeLenses ''Context
 
 type ContextM = StateT Context (StatsT (ResourceT (LoggingT IO)))
 
@@ -134,8 +142,6 @@ instance HasMemLogDB ContextM where
     _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
     put $ ctx { contextLogDBQueue = [] }
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
-    deriving (Eq, Read, Show)
 
 instance HasStateDB ContextM where
   getStateDB = contextStateDB <$> get
@@ -231,7 +237,8 @@ runContextM f = do
                         Unspecified
                         redisPool
                         [] [] []
-                        flags_tmpblockstanbul)
+                        flags_blockstanbul
+                        False)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a

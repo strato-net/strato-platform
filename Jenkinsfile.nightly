@@ -25,7 +25,6 @@ pipeline {
           cd strato-platform
           REPO=private make all
         '''
-        archive "strato-platform/docker-compose.yml"
       }
     }
 
@@ -40,19 +39,26 @@ pipeline {
           NODE_HOST=cd10.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
-          counter=0
           # Few quick tests
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
-          do
-            if [[ "$counter" -gt 120 ]]; then
-              echo "bloc took longer than 2 minutes to initialize! aborting."
-              exit 73
-            fi
-            echo "waiting for bloc to be available through nginx"
-            counter=$((counter+1))
-            sleep 1
-          done
-          echo "bloc is available through nginx - node is running"
+          check_bloc() {
+            counter=0
+            until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+            do
+              if [[ "$counter" -gt 120 ]]; then
+                echo "bloc took longer than 2 minutes to initialize! aborting."
+                exit 73
+              fi
+              echo "waiting for bloc to be available through nginx"
+              counter=$((counter+1))
+              sleep 1
+            done
+            echo "bloc is available through nginx - node is running"
+          }
+          check_bloc
+          echo "Restarting docker containers to simulate computer restart..."
+          docker-compose -p strato stop
+          docker-compose -p strato start
+          check_bloc
         '''
       }
     }
@@ -60,6 +66,21 @@ pipeline {
     stage('Test') {
       steps {
         parallel (
+
+          'Push images': {
+            withCredentials([
+              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+            ]) {
+              archiveArtifacts artifacts: "strato-platform/docker-compose.yml"
+              sh '''#!/bin/bash -le
+                set -x
+                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                cd strato-platform
+                docker-compose -f docker-compose.push.yml push
+              '''
+            }
+          },
+
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -110,21 +131,6 @@ pipeline {
             '''
           }
         )
-      }
-    }
-
-    stage('Release') {
-      steps {
-        withCredentials([
-          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            cd strato-platform
-            docker-compose -f docker-compose.push.yml push
-          '''
-        }
       }
     }
   }

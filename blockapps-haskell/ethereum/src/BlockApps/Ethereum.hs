@@ -35,6 +35,7 @@ module BlockApps.Ethereum
   , Transaction (..)
   , UnsignedTransaction (..)
   , rlpMsg
+  , rlpHash
   , signTransaction
   , verifyTransaction
   , recoverTransaction
@@ -493,7 +494,11 @@ rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
   = fromMaybe (error "rlpMsg failure")
   . msg
-  . ByteArray.convert
+  . rlpHash
+
+rlpHash :: RLPEncodable x => x -> ByteString
+rlpHash
+  = ByteArray.convert
   . digestKeccak256
   . keccak256
   . packRLP

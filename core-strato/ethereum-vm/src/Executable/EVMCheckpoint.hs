@@ -21,16 +21,15 @@ import           Control.Arrow            ((>>>))
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: SHA,
     checkpointHead   :: DD.BlockData,
-    checkpointTXs    :: [SHA],
     ctxBestBlockInfo :: ContextBestBlockInfo
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
-    rlpDecode (RLPArray [sha, header, RLPArray txShas, bbi]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas) (rlpDecode bbi)
+    rlpDecode (RLPArray [sha, header, bbi]) =
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi)
     rlpDecode _ = error "unexpected RLP object"
-    rlpEncode (EVMCheckpoint sha header txShas bbi) =
-        RLPArray [rlpEncode sha, rlpEncode header, RLPArray (rlpEncode <$> txShas), rlpEncode bbi]
+    rlpEncode (EVMCheckpoint sha header bbi) =
+        RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi]
 
 instance RLPSerializable ContextBestBlockInfo where
     rlpDecode (RLPArray [tag, body]) = case rlpDecode tag :: Integer of
@@ -58,10 +57,9 @@ instance RLPSerializable ContextBestBlockInfo where
 
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
-    format (EVMCheckpoint sha _ txhs _) =
-        "EVMCheckpoint " ++ CL.red (short sha) ++ (' ':count)
+    format (EVMCheckpoint sha _ _) =
+        "EVMCheckpoint " ++ CL.red (short sha)
             where short = take 16 . formatSHAWithoutColor
-                  count = CL.green $ show (length txhs)
 
 toKafkaMetadata :: EVMCheckpoint -> KP.Metadata
 toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEncode

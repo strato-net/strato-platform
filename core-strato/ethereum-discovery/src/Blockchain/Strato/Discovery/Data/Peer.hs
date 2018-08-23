@@ -53,13 +53,14 @@ jamshidBirth = posixSecondsToUTCTime 0
 createPeer :: String -> Either String PPeer
 createPeer peerString = buildPeer <$> parseEnode peerString
 
+-- TODO(tim): Reenable port selection
 buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (pubKeyMaybe, ip, port') =
+buildPeer (pubKeyMaybe, ip, _) =
     PPeer {
         pPeerPubkey = stringToPoint <$> pubKeyMaybe,
         pPeerIp = T.pack ip,
-        pPeerUdpPort = port', --TODO think about this....  Should the UDP port be the same as the TCP port by default?
-        pPeerTcpPort = port',
+        pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
+        pPeerTcpPort = 30303,
         pPeerNumSessions = 0,
         pPeerLastTotalDifficulty = 0,
         pPeerLastMsg  = T.pack "msg",
@@ -103,7 +104,9 @@ getAvailablePeers = withGlobalSQLPool $ \sqldb -> do
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 setPeerActiveState::T.Text->Int->Int->IO ()
-setPeerActiveState ip port' state = withGlobalSQLPool $ \sqldb -> do
+setPeerActiveState ip _ state = withGlobalSQLPool $ \sqldb -> do
+  -- TODO(tim): Reenable port selection
+  let port' = 30303
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port'] [PPeerActiveState SQL.=. state]
   return ()
@@ -115,7 +118,9 @@ getActivePeers = withGlobalSQLPool $ \sqldb -> do
     SQL.selectList [PPeerActiveState SQL.==. 1, PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO ()
-setPeerBondingState ip port' state = withGlobalSQLPool $ \sqldb -> do
+setPeerBondingState ip _ state = withGlobalSQLPool $ \sqldb -> do
+  -- TODO(tim): Reenable port selection
+  let port' = 30303
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
@@ -157,14 +162,18 @@ defaultPeer = PPeer{
   }
 
 disablePeerForSeconds::PPeer->Int->IO ()
-disablePeerForSeconds peer seconds = withGlobalSQLPool $ \sqldb -> do
+disablePeerForSeconds peer' seconds = withGlobalSQLPool $ \sqldb -> do
+  -- TODO(tim): Reenable port selection
+  let peer = peer'{pPeerTcpPort = 30303, pPeerUdpPort=30303}
   currentTime <- getCurrentTime
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
 
 disableUDPPeerForSeconds::PPeer->Int->IO ()
-disableUDPPeerForSeconds peer seconds = withGlobalSQLPool $ \sqldb -> do
+disableUDPPeerForSeconds peer' seconds = withGlobalSQLPool $ \sqldb -> do
+  -- TODO(tim): Reenable port selection
+  let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]

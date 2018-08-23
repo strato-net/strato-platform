@@ -1,18 +1,21 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Handler.ChainInfo where
 
 import           Data.Aeson
 import qualified Data.Map                       as M
+import qualified Data.Set                       as S
 import qualified Data.Text                      as T
 
+import           Blockchain.SHA
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
-import           Import
+import           Import                         hiding (hash)
 import           Numeric                        (showHex)
 
 import           Blockchain.Data.ChainInfo
@@ -40,16 +43,23 @@ postChainR = do
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ acin cdin mb) -> do 
+    Success gen@(ChainInfo _ acin cdin mb) -> do
     -- add more checks?
       when (length acin == 0) $ invalidArgs ["account info is empty"]
-      when (length cdin == 0) $ invalidArgs ["code info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
-      liftIO $ putStrLn $ T.pack $ show gen 
-      bytes <- liftIO $ getEntropy 32
-      let cid = fromInteger $ byteString2Integer bytes
-      emitKafkaTransactions [(cid, gen)]
-      return . String . T.pack $ showHex cid ""
+      let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
+            NonContract _ _ -> Nothing
+            ContractNoStorage _ _ c -> Just c
+            ContractWithStorage _ _ c _ -> Just c
+          codeCodeHashes = S.fromList . flip map cdin $ \CodeInfo{..} -> hash codeInfoCode
+      case accountCodeHashes S.\\ codeCodeHashes of
+        s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]
+          | otherwise -> do
+            liftIO $ putStrLn $ T.pack $ show gen
+            bytes <- liftIO $ getEntropy 32
+            let cid = fromInteger $ byteString2Integer bytes
+            emitKafkaTransactions [(cid, gen)]
+            return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
 getChainR :: Handler Value
@@ -63,5 +73,5 @@ getChainR = do
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
-      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)--invalidArgs ["no chain found"]
+      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)
       cis -> returnJson cis

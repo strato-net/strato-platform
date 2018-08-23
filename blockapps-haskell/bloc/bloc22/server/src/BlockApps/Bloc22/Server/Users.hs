@@ -74,6 +74,8 @@ data TransactionHeader = TransactionHeader
   , transactionheaderChainId  :: Maybe ChainId
   }
 
+type Signer = UnsignedTransaction -> Bloc Transaction
+
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
 forStateT s [] _ = return ([],s)
 forStateT s (a:as) run = do
@@ -152,12 +154,23 @@ postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParamet
 postUsersSend userName addr chainId resolve
   (PostSendParameters toAddr value password mTxParams) = do
     sk <- getAccountSecKey userName password addr
-    txParams <- getAccountTxParams addr chainId mTxParams
-    tx <- prepareTx sk $
+    let btp = TransferParameters
+                addr
+                toAddr
+                value
+                mTxParams
+                chainId
+                resolve
+    postUsersSend' btp (return . signTransaction sk)
+
+postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
+postUsersSend' TransferParameters{..} sign = do
+    params <- getAccountTxParams fromAddress chainId txParams
+    tx <- signAndPrepare sign fromAddress $
       TransactionHeader
-        (Just toAddr)
-        addr
-        txParams
+        (Just toAddress)
+        fromAddress
+        params
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
         0
@@ -174,55 +187,77 @@ postUsersSend userName addr chainId resolve
 
 postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr chainId resolve
-  (PostUsersContractRequest src password maybeContract args mTxParams value) = blocTransaction $ do
-    sk <- getAccountSecKey userName password addr
-    txParams <- getAccountTxParams addr chainId mTxParams
-    --TODO: check what happens with mismatching args
-    idsAndDetails <- compileContract src
-    logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-    (cmId,ContractDetails{..}) <-
-      case maybeContract of
-       Nothing ->
-         case Map.toList idsAndDetails of
-           [] -> throwError $ UserError "You need to supply at least one contract in the source"
-           [(_, x)] -> return x
-           _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-       Just contract ->
-         blocMaybe "Could not find global contract metadataId" $
-           Map.lookup contract idsAndDetails
-    let
-      (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-    mFunctionId <- getConstructorId cmId
-    argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
-    tx <- prepareTx sk $
-      TransactionHeader
-        Nothing
-        addr
-        txParams
-        (Wei (fromIntegral (maybe 0 unStrung value)))
-        (bin <> argsBin)
-        0
-        chainId
-    logWith logNotice ("tx is: " <> Text.pack (show tx))
-    hash <- blocStrato $ postTx tx
-    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-      ( Nothing
-      , constant hash
-      , constant cmId
-      , constant (1 :: Int32)
-      , constant contractdetailsName
-      )]
-    getBlocTransactionResult' chainId hash resolve
+  (PostUsersContractRequest src password maybeContract args mTxParams value) = do
+  sk <- getAccountSecKey userName password addr
+  let bcp = ContractParameters
+              addr
+              src
+              maybeContract
+              args
+              value
+              mTxParams
+              chainId
+              resolve
+  postUsersContract' bcp (return . signTransaction sk)
+
+postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContract' ContractParameters{..} sign = blocTransaction $ do
+  params <- getAccountTxParams fromAddr chainId txParams
+  --TODO: check what happens with mismatching args
+  idsAndDetails <- compileContract src
+  logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+  (cmId,ContractDetails{..}) <-
+    case contract of
+     Nothing ->
+       case Map.toList idsAndDetails of
+         [] -> throwError $ UserError "You need to supply at least one contract in the source"
+         [(_, x)] -> return x
+         _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+     Just contract' ->
+       blocMaybe "Could not find global contract metadataId" $
+         Map.lookup contract' idsAndDetails
+  let
+    (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
+  unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+  mFunctionId <- getConstructorId cmId
+  argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
+  tx <- signAndPrepare sign fromAddr $
+    TransactionHeader
+      Nothing
+      fromAddr
+      params
+      (Wei (fromIntegral (maybe 0 unStrung value)))
+      (bin <> argsBin)
+      0
+      chainId
+  logWith logNotice ("tx is: " <> Text.pack (show tx))
+  hash <- blocStrato $ postTx tx
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+    ( Nothing
+    , constant hash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant contractdetailsName
+    )]
+  getBlocTransactionResult' chainId hash resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts _resolve) = do
   sk <- getAccountSecKey userName pw addr
+  let bclp = ContractListParameters
+               addr
+               contracts
+               chainId
+               (resolve || _resolve)
+  postUsersUploadList' bclp (return . signTransaction sk)
+
+postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersUploadList' ContractListParameters{..} sign = do
   if (null contracts)
     then return []
     else do
       let UploadListContract _ _ mtp _ = head contracts
-      txParams <- getAccountTxParams addr chainId mtp
+      params <- getAccountTxParams fromAddr chainId mtp
       (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           (names, cmIds, fIds) <- get
@@ -248,11 +283,11 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          tx <- lift $ prepareTx sk $
+          tx <- lift . signAndPrepare sign fromAddr $
               TransactionHeader
                 Nothing
-                addr
-                txParams
+                fromAddr
+                params
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 (bin <> argsBin)
                 nonceIncr
@@ -271,28 +306,37 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
         )
         | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
         ]
-      getBatchBlocTransactionResult' chainId hashes (resolve || _resolve)
+      getBatchBlocTransactionResult' chainId hashes resolve
 
 postUsersSendList :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
 postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve' txs) = do
   sk <- getAccountSecKey userName pw addr
-  if (null txs)
+  let btlp = TransferListParameters
+               addr
+               txs
+               chainId
+               (resolve || resolve')
+  postUsersSendList' btlp (return . signTransaction sk)
+
+postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersSendList' TransferListParameters{..} sign = do
+  if null txs
     then return []
     else do
       let SendTransaction _ _ mtp = head txs
-      txParams <- getAccountTxParams addr chainId mtp
+      params <- getAccountTxParams fromAddr chainId mtp
       txHeaders <- zipWithM
         (\(SendTransaction toAddr (Strung value) _) i -> do
             return $ TransactionHeader
               (Just toAddr)
-              addr
-              txParams
+              fromAddr
+              params
               (Wei $ fromIntegral value)
               (ByteString.empty)
               i
               chainId
         ) txs [0..]
-      txs' <- mapM (prepareTx sk) txHeaders
+      txs' <- mapM (signAndPrepare sign fromAddr) txHeaders
       hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -303,7 +347,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
         )
         | (tx,hash) <- zip txs' hashes
         ]
-      getBatchBlocTransactionResult' chainId hashes (resolve || resolve')
+      getBatchBlocTransactionResult' chainId hashes resolve
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -326,12 +370,21 @@ postUsersContractMethodList
   -> Bloc [BlocTransactionResult]
 postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequest{..} = do
   sk <- getAccountSecKey userName postmethodlistrequestPassword userAddr
-  if (null postmethodlistrequestTxs)
+  let bflp = FunctionListParameters
+               userAddr
+               postmethodlistrequestTxs
+               chainId
+               (resolve || postmethodlistrequestResolve)
+  postUsersContractMethodList' bflp (return . signTransaction sk)
+
+postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersContractMethodList' FunctionListParameters{..} sign = do
+  if null txs
     then return []
     else do
-      let mc = head postmethodlistrequestTxs
-      txParams <- getAccountTxParams userAddr chainId $ methodcallTxParams mc
-      (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip postmethodlistrequestTxs [0..]) $
+      let mc = head txs
+      params <- getAccountTxParams fromAddr chainId $ methodcallTxParams mc
+      (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip txs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
           (names, cmIds, fIds) <- get
           (mapKey, names') <- case Map.lookup methodcallContractName names of
@@ -360,11 +413,11 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
               zxcv <- lift $ getXabiFunctionsArgsQuery functionId
               return (zxcv, Map.insert functionId zxcv fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
-          tx <- lift $ prepareTx sk $
+          tx <- lift . signAndPrepare sign fromAddr $
             TransactionHeader
               (Just methodcallContractAddress)
-              userAddr
-              txParams
+              fromAddr
+              params
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
               nonceIncr
@@ -372,9 +425,9 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
           put (names', cmIds', fIds')
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
-      let txs = [tx | (tx,_,_) <- txsCmIdsFuncNames]
-      mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs
-      hashes <- blocStrato $ postTxList txs
+      let txs' = [tx | (tx,_,_) <- txsCmIdsFuncNames]
+      mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs'
+      hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
         , constant hash
@@ -384,7 +437,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
         )
         | (hash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
         ]
-      getBatchBlocTransactionResult' chainId hashes (resolve || postmethodlistrequestResolve)
+      getBatchBlocTransactionResult' chainId hashes resolve
 
 postUsersContractMethod
   :: UserName
@@ -404,7 +457,21 @@ postUsersContractMethod
   resolve
   (PostUsersContractMethodRequest password funcName args value mTxParams) = do
     sk <- getAccountSecKey userName password userAddr
-    txParams <- getAccountTxParams userAddr chainId mTxParams
+    let bfp = FunctionParameters
+                userAddr
+                contractName
+                contractAddr
+                funcName
+                args
+                value
+                mTxParams
+                chainId
+                resolve
+    postUsersContractMethod' bfp (return . signTransaction sk)
+
+postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractMethod' FunctionParameters{..} sign = do
+    params <- getAccountTxParams fromAddr chainId txParams
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr chainId
 
     contract' <- getContractContractByMetadataId cmId
@@ -417,11 +484,11 @@ postUsersContractMethod
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
     functionId <- getFunctionId cmId funcName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
-    tx <- prepareTx sk $
+    tx <- signAndPrepare sign fromAddr $
       TransactionHeader
         (Just contractAddr)
-        userAddr
-        txParams
+        fromAddr
+        params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         ((sel::ByteString) <> (argsBin::ByteString))
         0
@@ -749,13 +816,6 @@ getAccountTxParams addr chainId = \case
         Nothing   -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
 
-prepareTx
-  :: SecKey
-  -> TransactionHeader
-  -> Bloc PostTransaction
-prepareTx sk txHeader = do
-  return . prepareSignedTx sk (transactionheaderFromAddr txHeader) $ prepareUnsignedTx txHeader
-
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
   uIds <- blocQuery . getUserIdQuery $ userName
@@ -792,18 +852,17 @@ prepareUnsignedTx TransactionHeader{..} =
   , unsignedTransactionChainId = transactionheaderChainId
   }
 
-prepareSignedTx
-  :: SecKey
-  -> Address
-  -> UnsignedTransaction
+preparePostTx
+  :: Address
+  -> Transaction
   -> PostTransaction
-prepareSignedTx sk addr unsignedTx = PostTransaction
+preparePostTx from tx = PostTransaction
   { posttransactionHash = kecc
   , posttransactionGasLimit = fromIntegral gasLimit
   , posttransactionCodeOrData = code
   , posttransactionGasPrice = fromIntegral gasPrice
   , posttransactionTo = toAddr
-  , posttransactionFrom = addr
+  , posttransactionFrom = from
   , posttransactionValue = Strung $ fromIntegral value
   , posttransactionR = Hex $ fromIntegral r
   , posttransactionS = Hex $ fromIntegral s
@@ -812,7 +871,6 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
   , posttransactionChainId = chainId
   }
   where
-    tx = signTransaction sk unsignedTx
     kecc = keccak256 (rlpSerialize tx)
     r = transactionR tx
     s = transactionS tx
@@ -824,3 +882,6 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
     code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
     toAddr = transactionTo tx
     chainId = transactionChainId tx
+
+signAndPrepare :: Signer -> Address -> TransactionHeader -> Bloc PostTransaction
+signAndPrepare sign from = fmap (preparePostTx from) . sign . prepareUnsignedTx
