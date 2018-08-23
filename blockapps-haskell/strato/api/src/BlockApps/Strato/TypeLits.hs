@@ -14,6 +14,10 @@ module BlockApps.Strato.TypeLits
   , IsTuple(..)
   , module GHC.TypeLits
   , nmap
+  , nmap1
+  , nmap2
+  , nmap1'
+  , nmap2'
   ) where
 
 import           Control.Applicative (liftA2)
@@ -58,5 +62,17 @@ instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k a v b) where
   arbitrary = fromTuple <$> (liftA2 (,) arbitrary arbitrary :: Gen (a,b))
 
-nmap :: ((a,b) -> (c,d)) -> NamedMap k a v b -> NamedMap k c v d
-nmap f = map (fromTuple . f . toTuple)
+nmap :: (a -> b -> c) -> NamedMap k a v b -> [c]
+nmap f = map (uncurry f . toTuple)
+
+nmap1 :: (a -> c) -> NamedMap k a v b -> [c]
+nmap1 f = map (f . fst . (toTuple :: NamedTuple k a v b -> (a,b)))
+
+nmap2 :: (b -> c) -> NamedMap k a v b -> [c]
+nmap2 f = map (f . snd . (toTuple :: NamedTuple k a v b -> (a,b)))
+
+nmap1' :: NamedMap k a v b -> [a]
+nmap1' = nmap1 id
+
+nmap2' :: NamedMap k a v b -> [b]
+nmap2' = nmap2 id

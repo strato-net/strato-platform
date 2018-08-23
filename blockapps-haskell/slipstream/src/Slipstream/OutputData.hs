@@ -1,6 +1,7 @@
 {-# LANGUAGE
   OverloadedStrings
   , TemplateHaskell
+  , BangPatterns
 #-}
 
 module Slipstream.OutputData where
@@ -16,6 +17,10 @@ import Slipstream.SolidityValue
 import qualified Data.Map as Map
 import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
+import Slipstream.Events
+import Control.Monad
+import qualified Data.List as L
+import Data.IORef
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
@@ -65,6 +70,12 @@ tableColumns [] = []
 tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y
 tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y ++ ", " ++ tableColumns es
 
+tableUpsert :: [(T.Text, SolidityValue)] -> String
+tableUpsert [] = []
+tableUpsert [(x, _)] = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
+tableUpsert ((x, _):es) = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\"" ++  ", " ++ tableUpsert es
+
+
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
   { pgDBHost = flags_pghost :: HostName
@@ -77,47 +88,73 @@ dbConnect =  PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: String -> IO()
-dbInsert insrt = do
-  conn <- pgConnect dbConnect
-  let qry = rawPGSimpleQuery $ BC.pack insrt
-  _ <- pgRunQuery conn qry
-  pgDisconnect conn
+dbInsert :: String -> PGConnection -> IO()
+dbInsert insrt conn = do
+  let qry = rawPGSimpleQuery $! BC.pack insrt
+  _ <- pgQuery conn qry
+  return ()
 
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name chain x = do
+convertRet :: [ProcessedContract] -> PGConnection -> IORef (Map.Map String ContractAndXabi) -> IO()
+convertRet metadata conn cache = do
+  let firstContract = head metadata
+  let hashVal = codehash firstContract
+  contractCache <- readIORef cache
+  cachedContract <- case Map.lookup hashVal contractCache of
+    Just x -> return x
+    Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False}
 
-  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
-  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+  if (length metadata > 1)
+    then do
+      when (not $ contractStored cachedContract) $ do
+          let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
+          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          dbInsert conIns conn
 
-  --Indexing flag
-  let indFlag = True
-  let ind = if (indFlag)
-              then do
-                let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
-                let comma = if (length list == 0)
-                    then ""
-                    else ", "
-                let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ");"
-                let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
+      let fstContract = contractData $ head metadata
+      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
+      let comma = if (length list == 0)
+          then ""
+          else ", "
+      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      dbInsert createSt conn
 
-                let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
-                let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
-                let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-                createSt ++ delRow ++ ins
-              else ""
+      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
-  --History flag
-  let histFlag = True
-  let hist = if (histFlag)
-              --TODO: Add history insert statement (transaction, state)
-              then ""
-              else ""
+      vals <- forM metadata $ \row -> do
+            let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
+            return rowSt
 
-  let oneIns = "BEGIN;" ++ conIns ++ ind ++ hist ++ "COMMIT;"
+      let inserts = L.intercalate ", " vals
+      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
 
-  dbInsert oneIns
+      dbInsert ins conn
+  else do
+    let row = head metadata
+
+    if(contractStored cachedContract)
+      then return ()
+    else do
+          let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
+          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          dbInsert conIns conn
+    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+    let comma = if (length list == 0)
+        then ""
+        else ", "
+    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
+    dbInsert createSt conn
+
+    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
+    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
+    dbInsert ins conn
+  return ()

@@ -96,6 +96,8 @@ services:
     image: redis:3.2
     restart: always
   vault-wrapper:
+    depends_on:
+    - postgres
     environment:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
@@ -149,7 +151,6 @@ services:
     - zkHost=zookeeper
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
-
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
