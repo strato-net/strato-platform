@@ -26,6 +26,7 @@ import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
+import           Text.Printf
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
@@ -99,13 +100,14 @@ setNewMaxSize newSize' = do
       liftIO $ writeIORef (mSize $ memory state) (fromInteger newSize)
     if newSize > oldLength
       then do
+        let breathingRoom = max 4096 . fromIntegral $ 2 * newSize :: Int
+            warn = when (newSize > 100000000) . liftIO . putStrLn . CL.red
         state' <- lift get
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red ("Warning, memory needs to grow to a huge value: " ++ show (fromIntegral newSize/(1000000::Double)) ++ "MB")
-        arr' <- liftIO $ V.grow (mVector $ memory state') $ fromIntegral $ (newSize+1000000)
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "clearing out memory"
-        --liftIO $ forM_ [oldLength..(newSize+1000000)-1] $ \p -> V.write arr' (fromIntegral p) 0
-        liftIO $ V.set (V.unsafeSlice (fromIntegral oldLength) (fromIntegral newSize+1000000) arr') 0
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "Finished growing memory"
+        warn . printf "Warning, memory needs to grow to a huge value: %dMB" $ breathingRoom `div` 1000000
+        arr' <- liftIO $ V.grow (mVector $ memory state') breathingRoom
+        warn "Zeroing new memory"
+        liftIO $ V.set (V.unsafeSlice (fromIntegral oldLength) breathingRoom arr') 0
+        warn "Finished growing memory"
         lift $ put $ state'{memory=(memory state'){mVector = arr'}}
       else return ()
 
