@@ -6,23 +6,26 @@ import HexText from '../HexText';
 class Chain extends Component {
 
   showMembers(chain) {
-    if (chain && chain.balances && chain.balances.length > 0) {
-      const balances = chain.balances;
-      const ret = [];
-      balances.forEach(function (balance, index) {
-        if (balance.address && balance.address !== '0000000000000000000000000000000000000100') {
-          ret.push(
+    if (chain && chain.info && chain.info.balances && chain.info.balances.length > 0) {
+      const balances = chain.info.balances;
+
+      return balances.filter((balance) => {
+        return balance.address !== '0000000000000000000000000000000000000100'
+      })
+        .map((balance, index) => {
+          return (
             <tr key={index}>
               <td>{balance.address}</td>
               <td>{balance.balance}</td>
             </tr>
-          );
-        }
-      });
-      return ret;
-    }
-    else {
-      return (<div> No Members </div>);
+          )
+        })
+    } else {
+      return (
+        <tr>
+          <td colSpan="2"> No Members</td>
+        </tr>
+      )
     }
   };
 
@@ -51,7 +54,7 @@ class Chain extends Component {
             </tr>
           </thead>
           <tbody>
-            {chain[0] && this.showMembers(chain[0]["info"])}
+            {this.showMembers(chain)}
           </tbody>
         </table>
       </div>

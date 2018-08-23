@@ -57,7 +57,7 @@ class Chains extends Component {
     const filter = this.props.filter;
     const labels = Object.getOwnPropertyNames(chains);
     const rows = [];
-    const selectedChains = [];
+    let selectedChain = null;
 
     labels.filter(label => {
       if (!filter) {
@@ -72,9 +72,7 @@ class Chains extends Component {
         let labelClasseName = '';
         if (this.state.selected === index && chainids.length > 0) {
           labelClasseName = ' selected';
-          chainids.map(chainid =>
-            selectedChains.push(<Chain label={label} id={chainid} key={label} />)
-          );
+          selectedChain = <Chain label={label} id={chainids[0]} key={label} />;
         }
 
         rows.push(
@@ -140,7 +138,7 @@ class Chains extends Component {
             </div>
             <div className="col-sm-8 account-details">
               <div>
-                {selectedChains.length ? selectedChains : null}
+                {selectedChain}
               </div>
             </div>
           </div>
