@@ -516,7 +516,7 @@ signTransaction sk u@UnsignedTransaction{..} = Transaction
   , transactionGasLimit = unsignedTransactionGasLimit
   , transactionTo = unsignedTransactionTo
   , transactionValue = unsignedTransactionValue
-  , transactionV = testV + 27
+  , transactionV = testV + 0x1b
   , transactionR = r
   , transactionS = s
   , transactionInitOrData = unsignedTransactionInitOrData
@@ -552,7 +552,7 @@ recoverTransaction :: Transaction -> Maybe PubKey
 recoverTransaction t@Transaction{transactionR = r, transactionS = s, transactionV = v} = do
   let
     message = rlpMsg $ unsignTransaction t
-    v' = v - 27
+    v' = v - 0x1b
     compactRecSig = CompactRecSig r s v'
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
