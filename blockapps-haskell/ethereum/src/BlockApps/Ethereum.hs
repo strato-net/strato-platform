@@ -463,6 +463,9 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionChainId    :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
+instance Arbitrary UnsignedTransaction where
+  arbitrary = genericArbitrary uniform
+
 instance RLPEncodable UnsignedTransaction where
   rlpEncode UnsignedTransaction{..} = Array $
     [ rlpEncode unsignedTransactionNonce
