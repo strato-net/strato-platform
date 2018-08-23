@@ -84,7 +84,7 @@ function newnode {
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" +RTS -N1 -hy -i4 -xt -xc -K2M >> logs/ethereum-vm 2>&1
+                         "${tbFlag}" +RTS -N1 -hy -i4 -xt -xc -K100K >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
