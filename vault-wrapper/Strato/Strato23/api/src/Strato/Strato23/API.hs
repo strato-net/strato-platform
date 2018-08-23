@@ -15,6 +15,7 @@ import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
 
 type VaultWrapperAPI = GetPing
+                  :<|> GetKey
                   :<|> PostKey
                   :<|> PostSignature
 
