@@ -464,31 +464,33 @@ data UnsignedTransaction = UnsignedTransaction
   } deriving (Eq,Show,Generic)
 
 instance RLPEncodable UnsignedTransaction where
-  rlpEncode UnsignedTransaction{..} = rlpEncode Transaction
-    { transactionNonce = unsignedTransactionNonce
-    , transactionGasPrice = unsignedTransactionGasPrice
-    , transactionGasLimit = unsignedTransactionGasLimit
-    , transactionTo = unsignedTransactionTo
-    , transactionValue = unsignedTransactionValue
-    , transactionInitOrData = unsignedTransactionInitOrData
-    , transactionChainId = unsignedTransactionChainId
-    , transactionV = 0
-    , transactionR = 0
-    , transactionS = 0
-    }
-  rlpDecode x = do
-    Transaction{..} <- rlpDecode x
-    if (transactionV,transactionR,transactionS) /= (0,0,0)
-      then Left "rlpDecode UnsignedTransaction: expected v,r,s = 0"
-      else return UnsignedTransaction
-        { unsignedTransactionNonce = transactionNonce
-        , unsignedTransactionGasPrice = transactionGasPrice
-        , unsignedTransactionGasLimit = transactionGasLimit
-        , unsignedTransactionTo = transactionTo
-        , unsignedTransactionValue = transactionValue
-        , unsignedTransactionInitOrData = transactionInitOrData
-        , unsignedTransactionChainId = transactionChainId
-        }
+  rlpEncode UnsignedTransaction{..} = Array $
+    [ rlpEncode unsignedTransactionNonce
+    , rlpEncode unsignedTransactionGasPrice
+    , rlpEncode unsignedTransactionGasLimit
+    , rlpEncode unsignedTransactionTo
+    , rlpEncode unsignedTransactionValue
+    , rlpEncode unsignedTransactionInitOrData
+    ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
+  rlpDecode (Array [n, gp, gl, to', va, iod, cid]) =
+    UnsignedTransaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> (Just <$> rlpDecode cid)
+  rlpDecode (Array [n, gp, gl, to', va, iod]) =
+    UnsignedTransaction
+      <$> rlpDecode n
+      <*> rlpDecode gp
+      <*> rlpDecode gl
+      <*> rlpDecode to'
+      <*> rlpDecode va
+      <*> rlpDecode iod
+      <*> pure Nothing
+  rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
 
 rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
@@ -505,7 +507,7 @@ rlpHash
   . rlpEncode
 
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
-signTransaction sk UnsignedTransaction{..} = Transaction
+signTransaction sk u@UnsignedTransaction{..} = Transaction
   { transactionNonce = unsignedTransactionNonce
   , transactionGasPrice = unsignedTransactionGasPrice
   , transactionGasLimit = unsignedTransactionGasLimit
@@ -521,45 +523,34 @@ signTransaction sk UnsignedTransaction{..} = Transaction
     CompactRecSig r s testV =
       exportCompactRecSig
       . signRecMsg sk
-      . rlpMsg
-      . Array
-      $ [ rlpEncode unsignedTransactionNonce
-        , rlpEncode unsignedTransactionGasPrice
-        , rlpEncode unsignedTransactionGasLimit
-        , rlpEncode unsignedTransactionTo
-        , rlpEncode unsignedTransactionValue
-        , rlpEncode unsignedTransactionInitOrData
-        ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
+      $ rlpMsg u
+
+unsignTransaction :: Transaction -> UnsignedTransaction
+unsignTransaction Transaction{..} = UnsignedTransaction
+  { unsignedTransactionNonce = transactionNonce
+  , unsignedTransactionGasPrice = transactionGasPrice
+  , unsignedTransactionGasLimit = transactionGasLimit
+  , unsignedTransactionTo = transactionTo
+  , unsignedTransactionValue = transactionValue
+  , unsignedTransactionInitOrData = transactionInitOrData
+  , unsignedTransactionChainId = transactionChainId
+  }
 
 verifyTransaction :: PubKey -> Transaction -> Bool
-verifyTransaction pk Transaction{..} =
+verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
   let
-    message = rlpMsg . Array $
-      [ rlpEncode transactionNonce
-      , rlpEncode transactionGasPrice
-      , rlpEncode transactionGasLimit
-      , rlpEncode transactionTo
-      , rlpEncode transactionValue
-      , rlpEncode transactionInitOrData
-      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
+    message = rlpMsg $ unsignTransaction t
   in
-    case importCompactSig (CompactSig transactionR transactionS) of
+    case importCompactSig (CompactSig r s) of
       Nothing  -> False
       Just sig -> verifySig pk sig message
 
 recoverTransaction :: Transaction -> Maybe PubKey
-recoverTransaction Transaction{..} = do
+recoverTransaction t@Transaction{transactionR = r, transactionS = s, transactionV = v} = do
   let
-    message = rlpMsg . Array $
-      [ rlpEncode transactionNonce
-      , rlpEncode transactionGasPrice
-      , rlpEncode transactionGasLimit
-      , rlpEncode transactionTo
-      , rlpEncode transactionValue
-      , rlpEncode transactionInitOrData
-      ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
-    testV = transactionV - 27
-    compactRecSig = CompactRecSig transactionR transactionS testV
+    message = rlpMsg $ unsignTransaction t
+    v' = v - 27
+    compactRecSig = CompactRecSig r s v'
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
 
