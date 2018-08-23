@@ -140,9 +140,6 @@ class AddMember extends Component {
             isOpen={this.props.isOpen}
             onClose={this.closeModal}
             title="Add Member"
-            style={{
-              width: "560px"
-            }}
             className="pt-dark"
           >
             <div className="pt-dialog-body">

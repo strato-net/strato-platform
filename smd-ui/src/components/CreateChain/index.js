@@ -14,6 +14,7 @@ class CreateChain extends Component {
     super(props);
     this.state = {
       members: [],
+      errors: null
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
@@ -24,27 +25,32 @@ class CreateChain extends Component {
   }
 
   submit = (values) => {
-    mixpanelWrapper.track('create_chain_submit_click');
-    let members = [];
-    let balances = [];
-    this.state.members.forEach(function (member, index) {
-      members.push({
-        "address": member.address,
-        "enode": member.enode
+    let errors = validate(values);
+    this.setState({ errors });
+
+    if (!Object.values(errors).length) {
+      mixpanelWrapper.track('create_chain_submit_click');
+      let members = [];
+      let balances = [];
+      this.state.members.forEach(function (member, index) {
+        members.push({
+          "address": member.address,
+          "enode": member.enode
+        });
+        balances.push({
+          "balance": member.balance,
+          "address": member.address
+        });
       });
-      balances.push({
-        "balance": member.balance,
-        "address": member.address
+      let args = {
+        addRule: values.addRule,
+        removeRule: values.removeRule
+      };
+      this.props.createChain(values.chainName, members, balances, values.governanceContract, args);
+      this.setState({
+        members: [],
       });
-    });
-    let args = {
-      [values.var1]: values.val1,
-      [values.var2]: values.val2
-    };
-    this.props.createChain(values.label, members, balances, values.src, args);
-    this.setState({
-      members: [],
-    });
+    }
   }
 
   updateMembers(state) {
@@ -101,6 +107,13 @@ class CreateChain extends Component {
     }
   }
 
+  errorMessageFor(fieldName) {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
+  }
+
   render() {
     return (
       <div className="smd-pad-16">
@@ -120,105 +133,100 @@ class CreateChain extends Component {
           className="pt-dark"
         >
           <form>
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Chain Label
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="label"
-                      component="input"
-                      type="text"
-                      placeholder="Chain Label"
-                      className="pt-input form-width"
-                      tabIndex="1"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.label}</div>
-                  </div>
-                </div>
+            <div className="pt-dialog-body create-chain-form">
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-d">
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Chain Name
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="chainName"
+                    component="input"
+                    type="text"
+                    placeholder="Chain Name"
+                    className="pt-input form-width"
+                    tabIndex="1"
+                    required
+                  />
+                  <span className="error-text">{this.errorMessageFor('chainName')}</span>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
                     Governance Contract
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="src"
-                      component="input"
-                      type="text"
-                      placeholder="Governance Contract"
-                      className="pt-input form-width"
-                      tabIndex="2"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.src}</div>
-                  </div>
                 </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="governanceContract"
+                    component="input"
+                    type="text"
+                    placeholder="Governance Contract"
+                    className="pt-input form-width"
+                    tabIndex="2"
+                    required
+                  />
+                  <span className="error-text">{this.errorMessageFor('governanceContract')}</span>
+                </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-e">
-                    Arguments
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Add Rule
                   </label>
-                  <div className="pt-form-content">
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
                     <Field
-                      name="var1"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Name"
-                      className="pt-input form-width"
-                      tabIndex="3"
-                      required
-                    />
-
-                    <Field
-                      name="val1"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Value"
-                      className="pt-input form-width"
-                      tabIndex="4"
-                      required
-                    />
-                  </div>
-                  <div className="pt-form-content">
-                    <Field
-                      name="var2"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Name"
-                      className="pt-input form-width"
-                      tabIndex="5"
-                      required
-                    />
-
-                    <Field
-                      name="val2"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Value"
-                      className="pt-input form-width"
-                      tabIndex="6"
-                      required
-                    />
+                      className="pt-input"
+                      component="select"
+                      name="addRule"
+                    >
+                      <option />
+                      <option value="MajorityRules">Majority Rules</option>
+                      <option value="AutoApprove">Auto Approve</option>
+                      <option value="TwoIn">Two In</option>
+                    </Field>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Remove Rule
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="removeRule"
+                    >
+                      <option />
+                      <option value="MajorityRules">Majority Rules</option>
+                      <option value="AutoApprove">Auto Approve</option>
+                      <option value="TwoIn">Two In</option>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="pt-form-group col-sm-12 pt-intent-danger smd-pad-4">
                   <label className="pt-label" htmlFor="input-b">
                     Chain Members
                   </label>
                   {this.showMembers(this.state.members)}
                   <AddMember handler={this.updateMembers} />
                 </div>
-              </div>
-
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
               </div>
             </div>
 
@@ -256,8 +264,16 @@ export function mapStateToProps(state) {
 }
 
 export function validate(values) {
-  //TODO: add validations for chain creation
   const errors = {};
+
+  if (!values.chainName) {
+    errors.chainName = 'required';
+  }
+
+  if (!values.governanceContract) {
+    errors.governanceContract = 'required';
+  }
+
   return errors;
 }
 
