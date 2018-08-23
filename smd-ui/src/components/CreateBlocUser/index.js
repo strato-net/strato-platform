@@ -39,7 +39,7 @@ class CreateBlocUser extends Component {
           className="pt-dark"
         >
           <form>
-            <div className="pt-dialog-body">
+            <div className="pt-dialog-body bloc-user-form">
               <div className="pt-form-group">
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
