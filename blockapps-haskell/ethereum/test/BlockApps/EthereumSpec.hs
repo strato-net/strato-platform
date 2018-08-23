@@ -64,7 +64,7 @@ spec = modifyMaxSuccess (const 10) $ do
       let t = signTransaction p u
           pub = derivePubKey p
       t `shouldSatisfy` verifyTransaction (derivePubKey p)
-      t `shouldSatisfy` (== Just pub) . recoverTransaction
+      recoverTransaction t `shouldBe` Just pub
     it "correctly signs transaction (1)" $ do
       let
         unsigned1' = UnsignedTransaction
