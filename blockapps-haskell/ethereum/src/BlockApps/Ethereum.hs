@@ -427,7 +427,7 @@ instance RLPEncodable Transaction where
     , rlpEncode transactionR
     , rlpEncode transactionS
     ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
-  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s', cid]) =
+  rlpDecode (Array (n:gp:gl:to':va:iod:v':r':s':rest)) =
     Transaction
       <$> rlpDecode n
       <*> rlpDecode gp
@@ -435,19 +435,10 @@ instance RLPEncodable Transaction where
       <*> rlpDecode to'
       <*> rlpDecode va
       <*> rlpDecode iod
-      <*> (Just <$> rlpDecode cid)
-      <*> rlpDecode v'
-      <*> rlpDecode r'
-      <*> rlpDecode s'
-  rlpDecode (Array [n, gp, gl, to', va, iod, v', r', s']) =
-    Transaction
-      <$> rlpDecode n
-      <*> rlpDecode gp
-      <*> rlpDecode gl
-      <*> rlpDecode to'
-      <*> rlpDecode va
-      <*> rlpDecode iod
-      <*> pure Nothing
+      <*> (case rest of
+             [] -> pure Nothing
+             [cid] -> Just <$> rlpDecode cid
+             x -> Left $ "rlpDecode Transaction: Too many entries, got: " ++ show x)
       <*> rlpDecode v'
       <*> rlpDecode r'
       <*> rlpDecode s'
@@ -475,7 +466,7 @@ instance RLPEncodable UnsignedTransaction where
     , rlpEncode unsignedTransactionValue
     , rlpEncode unsignedTransactionInitOrData
     ] ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
-  rlpDecode (Array [n, gp, gl, to', va, iod, cid]) =
+  rlpDecode (Array (n:gp:gl:to':va:iod:rest)) =
     UnsignedTransaction
       <$> rlpDecode n
       <*> rlpDecode gp
@@ -483,17 +474,11 @@ instance RLPEncodable UnsignedTransaction where
       <*> rlpDecode to'
       <*> rlpDecode va
       <*> rlpDecode iod
-      <*> (Just <$> rlpDecode cid)
-  rlpDecode (Array [n, gp, gl, to', va, iod]) =
-    UnsignedTransaction
-      <$> rlpDecode n
-      <*> rlpDecode gp
-      <*> rlpDecode gl
-      <*> rlpDecode to'
-      <*> rlpDecode va
-      <*> rlpDecode iod
-      <*> pure Nothing
-  rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
+      <*> (case rest of
+             [] -> pure Nothing
+             [cid] -> Just <$> rlpDecode cid
+             x -> Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x)
+  rlpDecode x = Left $ "rlpDecode UnsignedTransaction: Got " ++ show x
 
 rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
