@@ -10,7 +10,6 @@ import {
   FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
   fetchChainsFailure,
-  fetchChainDetail,
   fetchChainDetailSuccess,
   fetchChainDetailFailure
 } from './chains.actions';
@@ -60,12 +59,6 @@ export function* getChains(action) {
   try {
     const response = yield call(getChainsApi);
     yield put(fetchChainsSuccess(response));
-
-    if (Object.getOwnPropertyNames(response).length > 0) {
-      const label = response[0].info.label;
-      const address = response[0].id;
-      yield put(fetchChainDetail(label, address));
-    }
   }
   catch (err) {
     yield put(fetchChainsFailure(err));

@@ -5,13 +5,15 @@ import {
   CHANGE_CHAIN_FILTER,
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
-  RESET_CHAIN_ID
+  RESET_CHAIN_ID,
+  RESET_INITIAL_LABLE
 } from './chains.actions';
 
 const initialState = {
   chains: {},
   labelIds: {},
   filter: '',
+  initialLabel: null,
   error: null,
 };
 
@@ -43,6 +45,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         chains: chainLabelIds,
         labelIds: chainLabelIds,
+        initialLabel: action.chainLabelIds[0].info.label,
         filter: state.filter,
         error: null
       };
@@ -104,6 +107,11 @@ const reducer = function (state = initialState, action) {
         labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
+      }
+    case RESET_INITIAL_LABLE:
+      return {
+        ...state,
+        initialLabel: null
       }
     default:
       return state;
