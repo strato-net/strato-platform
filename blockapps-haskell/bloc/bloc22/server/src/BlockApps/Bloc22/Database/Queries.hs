@@ -14,6 +14,7 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Concurrent              (threadDelay)
+import           Control.Concurrent.Async.Lifted
 import           Control.Monad
 import           Control.Monad.Except
 import           Crypto.Hash
@@ -1151,8 +1152,12 @@ compileContract source' = do
         , contractdetailsXabi = xabi
         , contractdetailsChainId = Nothing
         }
+      details' = Map.toList details
 
-  metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
+  -- WARNING: forConcurrently will discard any BlocError that is created during
+  -- this block. The monadic state diverges for each thread, and rather than be
+  -- rejoined it is discarded.
+  metadataIds' <- forConcurrently details' $ \(contrName, detail@ContractDetails{..}) -> do
     let
       xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
     contrId <- createContractQuery contrName
@@ -1163,7 +1168,8 @@ compileContract source' = do
       contractdetailsCodeHash
       xcodeHash
     insertXabi metadataId contrName contractdetailsXabi
-    return (metadataId,detail)
+    return (contrName, (metadataId,detail))
+  let metadataIds = Map.fromList metadataIds'
 
   for_ metadataIds $ \ (leftmetadataId,_) ->
     for_ metadataIds $ \ (rightmetadataId,_) -> blocModify $
