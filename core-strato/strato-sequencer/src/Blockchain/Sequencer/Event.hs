@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
+import           Control.DeepSeq
 import           Data.Binary
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
@@ -114,6 +115,7 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otSigner :: A.Address
                          , otBaseTx :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic)
+instance NFData OutputTx
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
