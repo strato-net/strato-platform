@@ -21,6 +21,7 @@ import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
+import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
 
@@ -89,12 +90,6 @@ sequencer = do
       markForP2P . OEGetTx $ toList txHashes
     vmEvs <- drainVM
     unless (null vmEvs) $ do
-      when (OECreateBlockCommand `elem` vmEvs) $ do
-        $logDebugS "sequencer" "sleeping OECreateBlockCommand"
-        -- TODO(tim): This delay is to ensure that the timestamp on the
-        -- block is more than a block period away from the last. The
-        -- threadDelay can instead sleep for max(blockperiod - (now - last_timestamp), 0)
-        liftIO . threadDelay =<< asks blockstanbulBlockPeriodμs
       writeSeqVmEvents' vmEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
     p2pEvs <- drainP2P
@@ -155,6 +150,14 @@ blockstanbulSend msgs = do
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
         vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+    unless (null blocks) $ do
+      let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
+      dt <- asks blockstanbulBlockPeriod
+      let tNext = addUTCTime dt tLast
+      now <- liftIO getCurrentTime
+      when (now < tNext) $
+       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+
     $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
     mapM_ markForVM vmevs
     $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
@@ -454,24 +457,24 @@ readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
 readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    ret <- zip [(offset+1)..] <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
+    ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
     tickBy (length ret) ctr_sequencer_kafka_unseq_reads
     return ret
 
 writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents' events = void $ do
-    void $ K.withKafkaViolently (writeSeqVmEvents events)
+    void $ K.withKafkaRetry1s (writeSeqVmEvents events)
     tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqP2pEvents' events = void $ do
-    void $ K.withKafkaViolently (writeSeqP2pEvents events)
+    void $ K.withKafkaRetry1s (writeSeqP2pEvents events)
     tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
-  ret <- K.withKafkaViolently (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
+  ret <- K.withKafkaRetry1s (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err

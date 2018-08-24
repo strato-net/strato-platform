@@ -98,7 +98,7 @@ data SetupDBs =
     localAddressState :: Map.Map Address AddressStateModification
     }
 
-type SetupDBM = StateT SetupDBs (ResourceT IO)
+type SetupDBM = StateT SetupDBs (LoggingT (ResourceT IO))
 instance HasStateDB SetupDBM where
   getStateDB = do
     cxt <- get
@@ -456,7 +456,7 @@ oneTimeSetup genesisBlockName = do
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
+         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

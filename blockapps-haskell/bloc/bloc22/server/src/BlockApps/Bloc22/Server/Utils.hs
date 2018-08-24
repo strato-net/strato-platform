@@ -7,14 +7,15 @@
 module BlockApps.Bloc22.Server.Utils where
 
 import           Control.Concurrent
-import           Control.Monad          (forM)
+import           Control.Monad              (forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
-import qualified Data.ByteString.Base16 as BS16
-import qualified Data.Map.Strict        as Map
+import           Control.Monad.State.Lazy   (State, execState, get, put)
+import qualified Data.ByteString.Base16     as BS16
+import qualified Data.Map.Strict            as Map
 import           Data.Maybe
-import qualified Data.Text                as Text
-import qualified Data.Text.Encoding               as Text
+import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
 import           Servant.Client
 
 import           BlockApps.Bloc22.API.Users
@@ -87,3 +88,17 @@ emptyTxParams = TxParams Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
+
+buildState :: s -> [a] -> (a -> State s ()) -> s
+buildState s [] _ = s
+buildState s (a:as) run =
+  let s' = execState (run a) s
+   in buildState s' as run
+
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
+partitionWith f as = Map.toList . buildState Map.empty as $ \a -> do
+  s <- get
+  let k = f a
+  case Map.lookup k s of
+    Nothing -> put (Map.insert k [a] s)
+    Just _  -> put (Map.update (Just . (++ [a])) k s)

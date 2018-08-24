@@ -38,7 +38,7 @@ main = do
       -- TODO(tim): Use proper initial values for the view
       ctx = newContext (View 0 0) validators
   putStrLn $ "Interpreted validators: " ++ show validators
-  mCtx <- if not flags_tmpblockstanbul
+  mCtx <- if not flags_blockstanbul
              then return Nothing
              else do
                 skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
@@ -57,7 +57,7 @@ main = do
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
     , statsConfig           = EC.statsConfig EC.ethConf
-    , blockstanbulBlockPeriodμs = 1000 * flags_blockstanbul_block_period_ms
+    , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
   }
   runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg

@@ -39,7 +39,7 @@ import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
-import           Data.Word                        (Word8)
+import           Data.Word
 import           Text.Printf
 import           Text.Read
 
@@ -455,21 +455,19 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
 
 
-
-
-
-
-
-
   SimpleType TypeBytes | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
-      len' = storage offset `div` 2
+      len' = lastWord64 (storage offset) `div` 2
+      lastWord64::Word256->Word64
+      lastWord64 (LargeKey x _) = x
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
     in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType TypeBytes -> --small string, less than 32 bytes
     let
-      len' = storage offset .&. 0xfe `div` 2
+      len' = lastWord64 (storage offset) .&. 0xfe `div` 2
+      lastWord64::Word256->Word64
+      lastWord64 (LargeKey x _) = x
     in
       SimpleValue $ ValueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 

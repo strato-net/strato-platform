@@ -20,6 +20,7 @@ import           BlockApps.Bloc22.Server.Addresses
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Search
+import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
@@ -54,6 +55,7 @@ bloc = (return gitInfo)
   :<|> postBlocTransactionResults
   :<|> postChainInfo
   :<|> getChainInfo
+  :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
