@@ -1,19 +1,14 @@
 import React, { Component } from 'react';
-import {
-  sendTokensOpenModal,
-  sendTokensCloseModal,
-  sendTokens,
-  fromUsernameChange,
-  toUsernameChange
-} from '../../../Accounts/components/SendTokens/sendTokens.actions';
-import { fetchAccounts, fetchUserAddresses, fetchBalanceRequest } from '../../../Accounts/accounts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
-import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
+import { Button, Dialog, Intent } from '@blueprintjs/core';
+
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import validate from '../../../Accounts/components/SendTokens/validate';
+import { Field } from 'redux-form';
+import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
+import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
 import { isModePublic } from '../../../../lib/checkMode';
+import { validate } from './validate';
 
 class AddMember extends Component {
 
@@ -23,16 +18,16 @@ class AddMember extends Component {
       form: {
         userSelected: true
       },
-      username: '',
-      address: '',
-      enode: '',
-      balance: 0
+      username: null,
+      address: null,
+      enode: null,
+      balance: 0,
+      errors: null
     }
   }
 
   closeModal = () => {
-    this.props.sendTokensCloseModal();
-    !isModePublic() && this.props.fetchAccounts(true, true);
+    this.props.closeAddMemberModal();
   }
 
   componentDidMount() {
@@ -73,7 +68,7 @@ class AddMember extends Component {
         value={this.state.username}
         onChange={
           (e) => {
-            this.props.fetchUserAddresses(e.target.value, true);
+            this.props.fetchUserAddresses(e.target.value, false);
             this.handleUsernameChange(e);
           }
         }
@@ -94,8 +89,8 @@ class AddMember extends Component {
   }
 
   addressField = (isPublicMode) => {
-    const fromUserAddresses = Object.keys(this.props.accounts).length && this.props.fromUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
+    const fromUserAddresses = Object.keys(this.props.accounts).length && this.state.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.state.username])
       : [];
 
     return (
@@ -122,6 +117,28 @@ class AddMember extends Component {
     )
   }
 
+  errorMessageFor(fieldName) {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
+  }
+
+  submit = () => {
+    let username = this.state.username;
+    let address = this.state.address;
+    let enode = this.state.enode;
+
+    let errors = validate({ username, address, enode });
+    this.setState({ errors });
+
+    if (!Object.values(errors).length) {
+      mixpanelWrapper.track('add_member_submit_click_successful');
+      this.props.handler(this.state);
+      this.closeModal();
+    }
+  }
+
   render() {
     const users = Object.getOwnPropertyNames(this.props.accounts);
     const isPublicMode = isModePublic();
@@ -130,144 +147,130 @@ class AddMember extends Component {
       <div >
         <Button onClick={() => {
           mixpanelWrapper.track("add_member_open_click");
-          isModePublic() && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
-          this.props.sendTokensOpenModal()
+          this.props.openAddMemberModal()
         }} className="pt-intent-primary pt-icon-add"
+          style={{ marginTop: '8px' }}
           text="Add Member" />
-        <form>
-          <Dialog
-            iconName="inbox"
-            isOpen={this.props.isOpen}
-            onClose={this.closeModal}
-            title="Add Member"
-            className="pt-dark"
-          >
-            <div className="pt-dialog-body">
 
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Username
+        <Dialog
+          iconName="add"
+          isOpen={this.props.isOpen}
+          onClose={this.closeModal}
+          title="Add Member"
+          className="pt-dark"
+        >
+          <div className="pt-dialog-body">
+
+            <div className="row">
+              <div className="col-sm-3 text-right">
+                <label className="pt-label smd-pad-4">
+                  Username
                   </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select">
-                    {this.userNameField(users, isPublicMode)}
-                  </div>
+              </div>
+              <div className="col-sm-9 smd-pad-4">
+                <div className="pt-select">
+                  {this.userNameField(users, isPublicMode)}
+                  <br /><span className="error-text">{this.errorMessageFor('username')}</span>
                 </div>
               </div>
-
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Address
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select">
-                    {this.addressField(isPublicMode)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Enode
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="form-width">
-                    <Field
-                      name="enode"
-                      component="input"
-                      type="text"
-                      placeholder="Enode"
-                      value={this.state.enode}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleEnodeChange(e)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Balance
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="form-width">
-                    <Field
-                      name="value"
-                      component="input"
-                      type="number"
-                      placeholder="Balance"
-                      value={this.state.balance}
-                      className="pt-input form-width"
-                      onChange={(e) => this.handleBalanceChange(e)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
             </div>
 
-            <div className="pt-dialog-footer">
-              <div className="pt-dialog-footer-actions">
-                <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("add_member_cancel");
-                  this.closeModal();
-                }} />
-                <Button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.props.handler(this.state);
-                    mixpanelWrapper.track('add_member_submit_click_successful');
-                    this.closeModal();
-                  }}
-                  text="Add Member"
-                />
+            <div className="row">
+              <div className="col-sm-3 text-right">
+                <label className="pt-label smd-pad-4">
+                  Address
+                  </label>
+              </div>
+              <div className="col-sm-9 smd-pad-4">
+                <div className="pt-select">
+                  {this.addressField(isPublicMode)}
+                  <br /><span className="error-text">{this.errorMessageFor('address')}</span>
+                </div>
               </div>
             </div>
-          </Dialog>
-        </form>
+
+            <div className="row">
+              <div className="col-sm-3 text-right">
+                <label className="pt-label smd-pad-4">
+                  Enode
+                  </label>
+              </div>
+              <div className="col-sm-9 smd-pad-4">
+                <div className="form-width">
+                  <Field
+                    name="enode"
+                    component="input"
+                    type="text"
+                    placeholder="Enode"
+                    value={this.state.enode}
+                    className="pt-input form-width"
+                    onChange={(e) => this.handleEnodeChange(e)}
+                    required
+                  />
+                  <br /><span className="error-text">{this.errorMessageFor('enode')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-sm-3 text-right">
+                <label className="pt-label smd-pad-4">
+                  Balance
+                  </label>
+              </div>
+              <div className="col-sm-9 smd-pad-4">
+                <div className="form-width">
+                  <Field
+                    name="value"
+                    component="input"
+                    type="number"
+                    placeholder="Balance"
+                    value={this.state.balance}
+                    className="pt-input form-width"
+                    onChange={(e) => this.handleBalanceChange(e)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer-actions">
+              <Button text="Cancel" onClick={() => {
+                mixpanelWrapper.track("add_member_cancel");
+                this.closeModal();
+              }} />
+              <Button
+                intent={Intent.PRIMARY}
+                onClick={this.submit}
+                text="Add Member"
+              />
+            </div>
+          </div>
+        </Dialog>
       </div>
     );
   }
 }
 
-const selector = formValueSelector('send-tokens');
-
 export function mapStateToProps(state) {
   return {
-    isOpen: state.sendTokens.isOpen,
-    result: state.sendTokens.result,
+    isOpen: state.createChain.isAddMemberModalOpen,
     accounts: state.accounts.accounts,
-    fromUsername: selector(state, 'from'),
-    toUsername: selector(state, 'to'),
     initialValues: {
       from: state.user.currentUser.username,
       fromAddress: state.user.currentUser.accountAddress
-    },
-    balance: state.accounts.currentUserBalance
+    }
   };
 }
 
-const formed = reduxForm({ form: 'send-tokens', validate })(AddMember);
 const connected = connect(mapStateToProps, {
-  sendTokensOpenModal,
-  sendTokensCloseModal,
-  sendTokens,
   fetchAccounts,
   fetchUserAddresses,
-  fromUsernameChange,
-  toUsernameChange,
-  fetchBalanceRequest
-})(formed);
+  openAddMemberModal,
+  closeAddMemberModal
+})(AddMember);
 
 export default withRouter(connected);

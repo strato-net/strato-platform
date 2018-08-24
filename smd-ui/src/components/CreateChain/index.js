@@ -7,6 +7,7 @@ import { withRouter } from 'react-router-dom';
 import AddMember from './components/AddMember';
 import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { validate } from './validate';
 
 class CreateChain extends Component {
 
@@ -25,6 +26,7 @@ class CreateChain extends Component {
   }
 
   submit = (values) => {
+    values.members = this.state.members;
     let errors = validate(values);
     this.setState({ errors });
 
@@ -85,14 +87,19 @@ class CreateChain extends Component {
       const ret = [];
       members.forEach(function (member, index) {
         ret.push(
-          <div className="pt-dialog-header" key={index}>
-            <span className="pt-dialog-header-title">{member.username}</span>
-            <Button
-              className="pt-button pt-icon-small-cross"
-              onClick={() => {
-                this.removeMember(member)
-              }}
-              text='Remove' />
+          <div className="row smd-margin-8 member smd-vertical-center" key={index}>
+            <div className="col-sm-1"></div>
+            <div className="col-sm-9">
+              <span>{member.username}</span>
+            </div>
+            <div className="col-sm-2">
+              <Button
+                className="pt-button pt-icon-trash"
+                onClick={() => {
+                  this.removeMember(member)
+                }}
+              />
+            </div>
           </div>
         );
       }.bind(this))
@@ -126,7 +133,7 @@ class CreateChain extends Component {
           text="Create Chain" />
 
         <Dialog
-          iconName="inbox"
+          iconName="flows"
           isOpen={this.props.isOpen}
           onClose={this.props.closeCreateChainOverlay}
           title="Create New Chain"
@@ -220,11 +227,12 @@ class CreateChain extends Component {
               </div>
 
               <div className="row">
-                <div className="pt-form-group col-sm-12 pt-intent-danger smd-pad-4">
+                <div className="pt-form-group col-sm-12 pt-intent-danger smd-margin-8">
                   <label className="pt-label" htmlFor="input-b">
                     Chain Members
                   </label>
                   {this.showMembers(this.state.members)}
+                  <span className="error-text">{this.errorMessageFor('members')}</span>
                   <AddMember handler={this.updateMembers} />
                 </div>
               </div>
@@ -235,6 +243,9 @@ class CreateChain extends Component {
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track('create_chain_close_click');
                   this.props.reset();
+                  this.setState({
+                    members: [],
+                  });
                   this.props.closeCreateChainOverlay();
                 }} />
                 <Button
@@ -253,28 +264,9 @@ class CreateChain extends Component {
 }
 
 export function mapStateToProps(state) {
-  let errors = { errors: undefined };
-  if (state.form && state.form["create-chain"]) {
-    errors = { errors: state.form["create-chain"].syncErrors }
-  }
   return {
     isOpen: state.createChain.isOpen,
-    ...errors
   };
-}
-
-export function validate(values) {
-  const errors = {};
-
-  if (!values.chainName) {
-    errors.chainName = 'required';
-  }
-
-  if (!values.governanceContract) {
-    errors.governanceContract = 'required';
-  }
-
-  return errors;
 }
 
 const formed = reduxForm({ form: 'create-chain', validate })(CreateChain);

@@ -4,9 +4,12 @@ import {
   CREATE_CHAIN_REQUEST,
   CREATE_CHAIN_FAILURE,
   CREATE_CHAIN_SUCCESS,
+  OPEN_ADD_MEMBER_MODAL,
+  CLOSE_ADD_MEMBER_MODAL,
 } from './createChain.actions';
 
 const initialState = {
+  isAddMemberModalOpen: false,
   isOpen: false,
   spinning: false,
   key: null
@@ -21,6 +24,16 @@ const reducer = function (state = initialState, action) {
     case CLOSE_OVERLAY:
       return {
         isOpen: false
+      };
+    case OPEN_ADD_MEMBER_MODAL:
+      return {
+        ...state,
+        isAddMemberModalOpen: true,
+      };
+    case CLOSE_ADD_MEMBER_MODAL:
+      return {
+        ...state,
+        isAddMemberModalOpen: false
       };
     case CREATE_CHAIN_REQUEST:
       return {
