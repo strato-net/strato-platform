@@ -35,4 +35,4 @@ postSignature userName userId (UserData (Hex msgHash)) = do
         return $ SignatureDetails
                   (Hex $ getCompactRecSigR sig)
                   (Hex $ getCompactRecSigS sig)
-                  (Hex $ getCompactRecSigV sig)
+                  (Hex $ 0x1b + getCompactRecSigV sig)
