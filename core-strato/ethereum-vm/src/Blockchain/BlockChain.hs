@@ -670,11 +670,11 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
-        return (codeHash, codeSrc)
+        return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
 
     let codeSource' x =
           M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap
-
+ 
     codeNameMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeName <- codeContractName sr codeHash
@@ -683,9 +683,9 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     forM_ allDiffs $ \diff -> do
-      when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
+      when flags_sqlDiff $ commitSqlDiffs diff (fst . codeSource') codeContractName'
       when flags_diffPublish $
-          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diff
+          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff (snd . codeSource') diff
           in withKafkaViolently $ do
               void $ writeStateDiffEvents deletionEvents
               void $ writeStateDiffEvents creationEvents

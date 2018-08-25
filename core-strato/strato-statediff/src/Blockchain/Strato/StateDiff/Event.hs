@@ -13,6 +13,7 @@ import           Data.Maybe                      (maybeToList)
 import qualified Data.Text                       as T
 
 import           Blockchain.ExtWord              (Word256)
+import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.StateDiff
 
@@ -43,8 +44,8 @@ instance ToJSON StateDiffKafkaEvent where
     toJSON (Singleton de) = toJSON de
 
 -- order is (deleted, created, updated)
-destructStateDiff :: StateDiff -> ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent])
-destructStateDiff StateDiff{..} = (deletedAccounts', createdAccounts', updatedAccounts')
+destructStateDiff :: (SHA -> SHA) -> StateDiff -> ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent])
+destructStateDiff codeHashToSourceHash StateDiff{..} = (deletedAccounts', createdAccounts', updatedAccounts')
     where deletedAccounts' = transform (DeletionEvent chainId) deletedAccounts
           createdAccounts' = transform (CreationEvent chainId) createdAccounts
           updatedAccounts' = transform (UpdateEvent   chainId) updatedAccounts
@@ -52,7 +53,10 @@ destructStateDiff StateDiff{..} = (deletedAccounts', createdAccounts', updatedAc
           stripCode :: (Address, AccountDiff d) -> (Address, AccountDiff d)
           stripCode (addr, diff) = (addr, diff { code = Nothing })
 
+          addSourceHash :: AccountDiff d -> AccountDiff d
+          addSourceHash diff = diff{sourceCodeHash = Just $ codeHashToSourceHash (codeHash diff)}
+
           transform :: (Address -> AccountDiff d -> StateDiffEvent)
                     -> Map Address (AccountDiff d)
                     -> [StateDiffEvent]
-          transform f m = uncurry f . stripCode <$> Map.toList m
+          transform f m = uncurry f . stripCode . fmap addSourceHash <$> Map.toList m
