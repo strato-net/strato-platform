@@ -35,9 +35,6 @@ valueToTxt (_) = "text"
 listToKeyStatement :: [(T.Text, b)] -> String
 listToKeyStatement x = intercalate ", " $ map (quoteIt . T.unpack . fst) x
 
-tableColumns :: [(T.Text, SolidityValue)] -> String
-tableColumns = intercalate ", " . map tableColumn
-
 tableColumn :: (T.Text, SolidityValue) -> String
 tableColumn (x, y) = quoteIt (T.unpack x) ++ " " ++ valueToTxt y
 
@@ -123,7 +120,18 @@ convertRet metadata conn cache = do
       let comma = if (length list == 0)
           then ""
           else ", "
-      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      let createSt =
+           "create table if not exists \"" ++ (contractName $ head metadata)
+           ++ "\" ("
+           ++ intercalate ", "
+                   (
+                     ["address text", "\"chainId\" text"]
+                     ++ map tableColumn list
+                     ++ ["CONSTRAINT \""
+                         ++ contractName (head metadata)
+                         ++ "_pkey\" PRIMARY KEY (address, \"chainId\")"]
+                   )
+           ++ " );"
       dbInsert createSt conn
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
@@ -152,7 +160,20 @@ convertRet metadata conn cache = do
     let comma = if (length list == 0)
         then ""
         else ", "
-    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
+
+    let createSt =
+         "create table if not exists \"" ++ (contractName $ head metadata)
+         ++ "\" ("
+         ++ intercalate ", "
+                (
+                  ["address text", "\"chainId\" text"]
+                  ++ map tableColumn list
+                  ++ ["CONSTRAINT \""
+                      ++ contractName (head metadata)
+                      ++"_pkey\" PRIMARY KEY (address, \"chainId\")"]
+                )
+         ++ " );"
+
     dbInsert createSt conn
 
     let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
