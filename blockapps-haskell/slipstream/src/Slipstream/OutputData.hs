@@ -32,8 +32,6 @@ valueToTxt (SolidityBool _) = "bool"
 valueToTxt (SolidityArray _) = "text []"
 valueToTxt (_) = "text"
 
-listToKeyStatement :: [(T.Text, b)] -> String
-listToKeyStatement x = intercalate ", " $ map (quoteIt . T.unpack . fst) x
 
 tableColumn :: (T.Text, SolidityValue) -> String
 tableColumn (x, y) = quoteIt (T.unpack x) ++ " " ++ valueToTxt y
@@ -134,7 +132,10 @@ convertRet metadata conn cache = do
            ++ " );"
       dbInsert createSt conn
 
-      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
+      let keySt =
+            "("
+            ++ intercalate ", " ("address":"\"chainId\"":map (quoteIt . T.unpack . fst) list)
+            ++ ")"
 
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
@@ -176,7 +177,11 @@ convertRet metadata conn cache = do
 
     dbInsert createSt conn
 
-    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
+    let keySt =
+            "("
+            ++ intercalate ", " ("address":"\"chainId\"":map (quoteIt . T.unpack . fst) list)
+            ++ ")"
+
     let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement list ++ ")"
     let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
     dbInsert ins conn
