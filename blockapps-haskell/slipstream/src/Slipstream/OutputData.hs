@@ -16,6 +16,7 @@ import Slipstream.Options
 import Slipstream.SolidityValue
 import qualified Data.Map as Map
 import BlockApps.Solidity.Value
+import Data.List
 import Data.List.Utils (replace)
 import Slipstream.Events
 import Control.Monad
@@ -31,18 +32,32 @@ valueToTxt (SolidityBool _) = "bool"
 valueToTxt (SolidityArray _) = "text []"
 valueToTxt (_) = "text"
 
-listToKeyStatement :: String -> [(T.Text, b)] -> String
-listToKeyStatement _ [] = []
-listToKeyStatement _ [(x, _)] = "\"" ++ T.unpack x ++ "\""
-listToKeyStatement s ((x,_):es) = "\"" ++ T.unpack x ++ "\"" ++ s ++ (listToKeyStatement s es)
+listToKeyStatement :: [(T.Text, b)] -> String
+listToKeyStatement x = intercalate ", " $ map (quoteIt . T.unpack . fst) x
 
-valueToString :: String -> SolidityValue -> String
-valueToString s (SolidityValueAsString x) = s ++ (escapeQuotes $ T.unpack x) ++ s
-valueToString s (SolidityBool x) = s ++ show x ++ s
-valueToString s (SolidityNum x ) = s ++ show x ++ s
-valueToString s (SolidityBytes x) = s ++ (escapeQuotes $ show x) ++ s
-valueToString s (SolidityArray x) = s ++ "{" ++ arrayToString x ++ "}" ++ s
-valueToString s (SolidityObject x) = s ++ (escapeQuotes $ show x) ++ s
+tableColumns :: [(T.Text, SolidityValue)] -> String
+tableColumns = intercalate ", " . map tableColumn
+
+tableColumn :: (T.Text, SolidityValue) -> String
+tableColumn (x, y) = quoteIt (T.unpack x) ++ " " ++ valueToTxt y
+
+listToValueStatement :: [(a, SolidityValue)] -> String
+listToValueStatement x = intercalate ", " $ map (valueToString . snd) x
+
+quoteIt :: String -> String
+quoteIt x = "\"" ++ x ++ "\"" -- need some type of escaping here also
+
+singleQuoteIt :: String -> String
+singleQuoteIt x = "'" ++ escapeQuotes x ++ "'"
+
+valueToString :: SolidityValue -> String
+valueToString (SolidityValueAsString x) = singleQuoteIt $ T.unpack x
+valueToString (SolidityBool x) = singleQuoteIt $ show x
+valueToString (SolidityNum x ) = singleQuoteIt $ show x
+valueToString (SolidityBytes x) = singleQuoteIt $ show x
+valueToString (SolidityArray x) =
+  singleQuoteIt $  "{" ++ intercalate ", " (map arrayContent x) ++ "}"
+valueToString (SolidityObject x) = singleQuoteIt $ show x
 
 escapeQuotes :: String -> String
 escapeQuotes x = replace "\'" "\'\'" $ replace "\"" "\\\"" x
@@ -55,20 +70,7 @@ arrayContent (SolidityBytes x) = escapeQuotes $ show x
 arrayContent (SolidityArray x) = escapeQuotes $ show x
 arrayContent (SolidityObject x) = escapeQuotes $ show x
 
-arrayToString :: [SolidityValue] -> String
-arrayToString [] = []
-arrayToString [x] =  arrayContent x
-arrayToString (x:es) = arrayContent x ++ ", " ++ arrayToString es
 
-listToValueStatement :: String -> [(a, SolidityValue)] -> String
-listToValueStatement _ [] = []
-listToValueStatement _ [(_, y)] = valueToString "\'" y
-listToValueStatement s ((_, y):es) = valueToString "\'" y ++ s ++ (listToValueStatement s es)
-
-tableColumns :: [(T.Text, SolidityValue)] -> String
-tableColumns [] = []
-tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y
-tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y ++ ", " ++ tableColumns es
 
 tableUpsert :: [(T.Text, SolidityValue)] -> String
 tableUpsert [] = []
@@ -124,11 +126,11 @@ convertRet metadata conn cache = do
       let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       dbInsert createSt conn
 
-      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
 
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
+            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement rowList ++ ")"
             return rowSt
 
       let inserts = L.intercalate ", " vals
@@ -153,8 +155,8 @@ convertRet metadata conn cache = do
     let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
     dbInsert createSt conn
 
-    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
-    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
+    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement list ++ ")"
+    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement list ++ ")"
     let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
     dbInsert ins conn
   return ()
