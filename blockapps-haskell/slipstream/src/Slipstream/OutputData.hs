@@ -36,9 +36,6 @@ valueToTxt (_) = "text"
 tableColumn :: (T.Text, SolidityValue) -> String
 tableColumn (x, y) = quoteIt (T.unpack x) ++ " " ++ valueToTxt y
 
-listToValueStatement :: [(a, SolidityValue)] -> String
-listToValueStatement x = intercalate ", " $ map (valueToString . snd) x
-
 quoteIt :: String -> String
 quoteIt x = "\"" ++ x ++ "\"" -- need some type of escaping here also
 
@@ -68,9 +65,10 @@ arrayContent (SolidityObject x) = escapeQuotes $ show x
 
 
 tableUpsert :: [(T.Text, SolidityValue)] -> String
-tableUpsert [] = []
-tableUpsert [(x, _)] = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
-tableUpsert ((x, _):es) = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\"" ++  ", " ++ tableUpsert es
+tableUpsert x = intercalate ", " $ map (upsertCriteria . fst) x
+
+upsertCriteria :: T.Text -> String
+upsertCriteria x = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
 
 
 dbConnect :: PGDatabase
@@ -115,9 +113,7 @@ convertRet metadata conn cache = do
 
       let fstContract = contractData $ head metadata
       let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
-      let comma = if (length list == 0)
-          then ""
-          else ", "
+      
       let createSt =
            "create table if not exists \"" ++ (contractName $ head metadata)
            ++ "\" ("
@@ -139,11 +135,23 @@ convertRet metadata conn cache = do
 
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement rowList ++ ")"
+            let rowSt =
+                  "("
+                  ++ intercalate ", " (
+                             [singleQuoteIt (address row), singleQuoteIt (chain row)]
+                             ++ map (valueToString . snd) rowList
+                            )
+                  ++ ")"
             return rowSt
 
       let inserts = L.intercalate ", " vals
-      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
+
+          upsertList =
+              ["address = excluded.address", "\"chainId\" = excluded.\"chainId\""]
+              ++ map (upsertCriteria . fst) list
+
+
+      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set " ++ intercalate ", " upsertList ++ ";"
 
       dbInsert ins conn
   else do
@@ -158,9 +166,6 @@ convertRet metadata conn cache = do
           _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
           dbInsert conIns conn
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-    let comma = if (length list == 0)
-        then ""
-        else ", "
 
     let createSt =
          "create table if not exists \"" ++ (contractName $ head metadata)
@@ -182,7 +187,18 @@ convertRet metadata conn cache = do
             ++ intercalate ", " ("address":"\"chainId\"":map (quoteIt . T.unpack . fst) list)
             ++ ")"
 
-    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement list ++ ")"
-    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
+    let vals =
+         "("
+         ++ intercalate ", " (
+                 [singleQuoteIt (address row), singleQuoteIt (chain row)]
+                 ++ map (valueToString . snd) list
+               )
+         ++ ")"
+
+        upsertList =
+           ["address = excluded.address", "\"chainId\" = excluded.\"chainId\""]
+           ++ map (upsertCriteria . fst) list
+
+    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set " ++ intercalate ", " upsertList ++ ";"
     dbInsert ins conn
   return ()
