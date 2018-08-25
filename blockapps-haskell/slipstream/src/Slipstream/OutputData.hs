@@ -160,9 +160,7 @@ convertRet metadata conn cache = do
   else do
     let row = head metadata
 
-    if(contractStored cachedContract)
-      then return ()
-    else do
+    when (not $ contractStored cachedContract) $ do
           let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
