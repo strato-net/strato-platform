@@ -4,7 +4,11 @@
   , BangPatterns
 #-}
 
-module Slipstream.OutputData where
+module Slipstream.OutputData (
+  convertRet,
+  dbConnect,
+  dbInsert
+  ) where
 
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString as B
@@ -23,8 +27,8 @@ import Control.Monad
 import qualified Data.List as L
 import Data.IORef
 
-defaultMaxB :: Integer
-defaultMaxB = 32 * 1024 * 1024
+--defaultMaxB :: Integer
+--defaultMaxB = 32 * 1024 * 1024
 
 valueToTxt :: SolidityValue -> String
 valueToTxt (SolidityNum _) = "bigint"
@@ -64,12 +68,11 @@ arrayContent (SolidityObject x) = escapeQuotes $ show x
 
 
 
-tableUpsert :: [(T.Text, SolidityValue)] -> String
-tableUpsert x = intercalate ", " $ map (upsertCriteria . fst) x
+--tableUpsert :: [(T.Text, SolidityValue)] -> String
+--tableUpsert x = intercalate ", " $ map (upsertCriteria . fst) x
 
 upsertCriteria :: T.Text -> String
 upsertCriteria x = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
-
 
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
