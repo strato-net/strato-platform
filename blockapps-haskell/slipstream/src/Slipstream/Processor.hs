@@ -15,14 +15,22 @@ module Slipstream.Processor where
 import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
+import Data.List.Utils (replace)
 import qualified Data.Map as Map
 import Data.Pool
+import Data.Maybe
 import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
+
+
+
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
@@ -33,14 +41,10 @@ import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
-import Slipstream.Events hiding (Address)
-import Data.List.Utils (replace)
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import Database.PostgreSQL.Typed
 
 import Slipstream.Data.Action (Action)
 import qualified Slipstream.Data.Action as A
+import Slipstream.Events hiding (Address)
 import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.OutputData
@@ -137,12 +141,13 @@ smashIt (x:[]) tmp final =
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn globalsIORef = do
-  putStrLn $ show (length messages) ++ " messages have arrived"
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
   
-  putStrLn $ unlines $ map show changes
+  when (not $ null messages) $ do
+    putStrLn $ "\n" ++ show (length messages) ++ " messages have arrived"
+    putStrLn $ unlines $ map show changes
 
 
   let conHost = flags_pghost
@@ -182,31 +187,32 @@ processTheMessages messages conn globalsIORef = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-            filledInChange <- addStorageIfNeeded row
-
+            A.Action{..} <- addStorageIfNeeded row
+{-
             let (address, codehash, storage, chainId) =
                   case filledInChange of
                    A.Action {
                      A.address=a,
                      A.codeHash=c,
                      A.chainId=chId,
-                     A.storage=Just s
-                     } -> (a, c, storageToFunction s, chId)
-                   _ -> error "can't handle the case where we need to fetch the state"
+                     A.storage=s
+                     } -> (a, c, s, chId)
+-}
+
             globals <- liftIO $ readIORef globalsIORef
             contractMetaData <-
-              case Map.lookup codehash (contractCache globals) of
+              case Map.lookup codeHash (contractCache globals) of
                Just c -> do
                  return c
                Nothing -> do
-                 liftIO $ putStrLn $ "This is the first time we have seen contract " ++ show codehash ++ ", we will fetch and generate the metadata slowly"
-                 contractOrError <- getContract address codehash chainId
-                 liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codehash
+                 liftIO $ putStrLn $ "This is the first time we have seen contract " ++ show codeHash ++ ", we will fetch and generate the metadata slowly"
+                 contractOrError <- getContract address codeHash chainId
+                 liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     liftIO $ writeIORef globalsIORef
-                      globals{contractCache=Map.insert codehash c $ contractCache globals}
+                      globals{contractCache=Map.insert codeHash c $ contractCache globals}
                     return c
 
             let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
@@ -217,11 +223,11 @@ processTheMessages messages conn globalsIORef = do
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-            let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) storage 0
+            let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
             let chain = case chainId of
                           Nothing -> ""
                           Just(x) -> show x
-            return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
+            return ProcessedContract{address = address, codehash = codeHash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
 
       if (length processedList > 0) then liftIO $ convertRet processedList conn globalsIORef else return()
 
