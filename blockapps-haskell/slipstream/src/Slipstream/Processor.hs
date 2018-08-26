@@ -138,7 +138,6 @@ smashIt (x:[]) tmp final =
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn globalsIORef = do
   putStrLn $ show (length messages) ++ " messages have arrived"
-  putStrLn $ unlines $ map show messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
@@ -200,7 +199,9 @@ processTheMessages messages conn globalsIORef = do
                Just c -> do
                  return c
                Nothing -> do
+                 liftIO $ putStrLn $ "This is the first time we have seen contract " ++ show codehash ++ ", we will fetch and generate the metadata slowly"
                  contractOrError <- getContract address codehash chainId
+                 liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codehash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
