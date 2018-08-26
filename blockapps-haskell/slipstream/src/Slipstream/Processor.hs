@@ -188,16 +188,6 @@ processTheMessages messages conn globalsIORef = do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
             A.Action{..} <- addStorageIfNeeded row
-{-
-            let (address, codehash, storage, chainId) =
-                  case filledInChange of
-                   A.Action {
-                     A.address=a,
-                     A.codeHash=c,
-                     A.chainId=chId,
-                     A.storage=s
-                     } -> (a, c, s, chId)
--}
 
             globals <- liftIO $ readIORef globalsIORef
             contractMetaData <-
@@ -205,7 +195,7 @@ processTheMessages messages conn globalsIORef = do
                Just c -> do
                  return c
                Nothing -> do
-                 liftIO $ putStrLn $ "This is the first time we have seen contract " ++ show codeHash ++ ", we will fetch and generate the metadata slowly"
+                 liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourceCodeHash
                  contractOrError <- getContract address codeHash chainId
                  liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
