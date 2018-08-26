@@ -36,7 +36,7 @@ import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
 import Slipstream.Events hiding (Address)
 import Data.List.Utils (replace)
-import qualified Data.Aeson as A
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import Database.PostgreSQL.Typed
 
@@ -48,15 +48,25 @@ import Slipstream.OutputData
 
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
-  (map (\(x, y) -> A.Action A.Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> A.Action A.Delete x (codeHash y) chainId Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> A.Action A.Update x (codeHash y) chainId Nothing) $ maybe [] Map.toList updatedAccounts)
+  createAction A.Create createdAccounts
+  ++ createAction A.Delete deletedAccounts
+  ++ createAction A.Update updatedAccounts
   where
     newValue (Diff _ x) = x
+    createAction action' =
+      map (\(address', y) ->
+            A.Action {
+              actionType=action',
+              address=address',
+              codeHash=codeHash y,
+              chainId=chainId,
+              storage=Just $ map (fmap newValue) $ Map.toList $ storage y
+              }
+          ) . maybe [] Map.toList
 
 toStateDiff::BL.ByteString->StateDiff
 toStateDiff x =
-  case A.eitherDecode x of
+  case JSON.eitherDecode x of
    Left e -> error $ show e
    Right y -> y
 
@@ -82,7 +92,7 @@ getContract address _ chainId = do
 
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi qqqq
-    , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
+    , xabi = show $ JSON.toJSON $ contractdetailsXabi qqqq
     , name = show $ contractdetailsName qqqq
     , contractStored = False
   }
@@ -95,16 +105,16 @@ storageToFunction s k =
    Just x -> x
 
 hasContract::Action->Bool
-hasContract (A.Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ _) = False
+hasContract A.Action{A.codeHash="c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"} = False
 hasContract _ = True
 
 storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded (A.Action theType address codehash chain Nothing)= do
+addStorageIfNeeded action'@A.Action{..} | storage == Nothing= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
-  return $ A.Action theType address codehash chain (Just $ map storageToList storage')
+  return $ action'{A.storage = Just $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
 matchStateDiff :: StateDiff -> StateDiff -> Bool
@@ -177,8 +187,13 @@ processTheMessages messages conn cachedContractsIORef = do
 
             let (address, codehash, storage, chainId) =
                   case filledInChange of
-                   A.Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
-                   A.Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+                   A.Action {
+                     A.address=a,
+                     A.codeHash=c,
+                     A.chainId=chId,
+                     A.storage=Just s
+                     } -> (a, c, storageToFunction s, chId)
+                   _ -> error "can't handle the case where we need to fetch the state"
             cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
             contractMetaData <-
               case Map.lookup codehash cachedContracts of
