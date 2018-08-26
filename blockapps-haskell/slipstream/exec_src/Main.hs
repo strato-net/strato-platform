@@ -16,6 +16,7 @@ import qualified Data.Set as Set
 import HFlags
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
+import System.IO
 
 import Slipstream.Globals
 import Slipstream.MessageConsumer
@@ -26,6 +27,10 @@ import Slipstream.OutputData
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stdin LineBuffering
+
+  putStrLn "Welcome to Slipstream!!!!"
 
   conn <- pgConnect dbConnect
 
