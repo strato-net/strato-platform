@@ -44,7 +44,7 @@ instance ToJSON StateDiffKafkaEvent where
     toJSON (Singleton de) = toJSON de
 
 -- order is (deleted, created, updated)
-destructStateDiff :: (SHA -> Maybe SHA) -> StateDiff -> ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent])
+destructStateDiff :: (SHA -> Maybe (SHA, String)) -> StateDiff -> ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent])
 destructStateDiff codeHashToSourceHash StateDiff{..} = (deletedAccounts', createdAccounts', updatedAccounts')
     where deletedAccounts' = transform (DeletionEvent chainId) deletedAccounts
           createdAccounts' = transform (CreationEvent chainId) createdAccounts

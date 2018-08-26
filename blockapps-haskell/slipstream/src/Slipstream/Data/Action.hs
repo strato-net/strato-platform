@@ -21,7 +21,7 @@ data Action =
     actionType::ActionType,
     address::String,
     codeHash::String,
-    sourceCodeHash::Maybe String,
+    sourceCodeHash::Maybe (String, String),
     chainId::(Maybe ChainId),
     storage::(Maybe [(String, String)])
     } deriving (Show)

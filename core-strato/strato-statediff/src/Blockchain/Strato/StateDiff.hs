@@ -74,7 +74,7 @@ data AccountDiff (v :: Detail) =
     code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
     codeHash     :: SHA, -- Maybe
-    sourceCodeHash     :: Maybe SHA,
+    sourceCodeHash     :: Maybe (SHA, String),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),

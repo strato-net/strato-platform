@@ -671,19 +671,19 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
         return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
+        
+    codeNameMap <- fmap M.fromList $
+      forM allNewCodeHashes $ \(sr,codeHash) -> do
+        codeName <- codeContractName sr codeHash
+        return (codeHash, codeName)
 
     let
       codeSource' x = fst $
           M.findWithDefault (error $ "missing code hash in codeSource map: " ++ format x) x codeSourceMap
       codeSourceHash' x = 
-          case M.lookup x codeSourceMap of
-           Nothing -> Nothing
-           Just (_, sh) -> Just sh
-
-    codeNameMap <- fmap M.fromList $
-      forM allNewCodeHashes $ \(sr,codeHash) -> do
-        codeName <- codeContractName sr codeHash
-        return (codeHash, codeName)
+          case (M.lookup x codeSourceMap, M.lookup x codeNameMap) of
+           (Just (_, sh), Just name) -> Just (sh, name)
+           _ -> Nothing
 
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
