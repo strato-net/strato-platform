@@ -9,15 +9,19 @@
     , FlexibleContexts
 #-}
 
-import Network.Kafka
-import qualified Network.Kafka.Protocol as K hiding (Message)
-import HFlags
-import Slipstream.MessageConsumer
-import Slipstream.OutputData
-import Slipstream.Options ()
+import Data.IORef
 import Database.PostgreSQL.Typed
 import qualified Data.Map as Map
-import Data.IORef
+import qualified Data.Set as Set
+import HFlags
+import Network.Kafka
+import qualified Network.Kafka.Protocol as K hiding (Message)
+
+import Slipstream.Globals
+import Slipstream.MessageConsumer
+import Slipstream.Options ()
+import Slipstream.OutputData
+
 
 main::IO ()
 main = do
@@ -34,8 +38,8 @@ main = do
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  cachedContractsIORef <- newIORef Map.empty
-
+  cachedContractsIORef <- newIORef $ Globals Map.empty Set.empty
+    
   msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
 
   messages <- case msg of

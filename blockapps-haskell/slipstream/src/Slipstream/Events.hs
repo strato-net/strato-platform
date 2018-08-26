@@ -14,7 +14,6 @@ import Data.Aeson
 import Data.Map (Map)
 import qualified Data.Text as T
 import qualified BlockApps.Solidity.Value as V
-import BlockApps.Solidity.Contract
 
 import GHC.Generics
 
@@ -94,10 +93,3 @@ data ProcessedContract = ProcessedContract {
   contractData :: Map T.Text V.Value
 }
 
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Either String Contract,
-    xabi :: String,
-    name :: String,
-    contractStored :: Bool
-  } deriving(Show)

@@ -17,7 +17,6 @@ import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
-import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
 import Database.PostgreSQL.Simple
@@ -42,6 +41,7 @@ import Database.PostgreSQL.Typed
 
 import Slipstream.Data.Action (Action)
 import qualified Slipstream.Data.Action as A
+import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.OutputData
 
@@ -95,7 +95,6 @@ getContract address _ chainId = do
     contract = xAbiToContract $ contractdetailsXabi qqqq
     , xabi = show $ JSON.toJSON $ contractdetailsXabi qqqq
     , name = show $ contractdetailsName qqqq
-    , contractStored = False
   }
   return $ (Right ret)
 
@@ -136,8 +135,8 @@ smashIt (x:[]) tmp final =
     then (final ++ [[x]])
     else final ++ [tmp ++ [x]]
 
-processTheMessages :: [B.ByteString] -> PGConnection -> IORef (Map String ContractAndXabi) -> IO ()
-processTheMessages messages conn cachedContractsIORef = do
+processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
+processTheMessages messages conn globalsIORef = do
   putStrLn $ show (length messages) ++ " messages have arrived"
   putStrLn $ unlines $ map show messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
@@ -195,9 +194,9 @@ processTheMessages messages conn cachedContractsIORef = do
                      A.storage=Just s
                      } -> (a, c, storageToFunction s, chId)
                    _ -> error "can't handle the case where we need to fetch the state"
-            cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
+            globals <- liftIO $ readIORef globalsIORef
             contractMetaData <-
-              case Map.lookup codehash cachedContracts of
+              case Map.lookup codehash (contractCache globals) of
                Just c -> do
                  return c
                Nothing -> do
@@ -205,7 +204,8 @@ processTheMessages messages conn cachedContractsIORef = do
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash c cachedContracts)
+                    liftIO $ writeIORef globalsIORef
+                      globals{contractCache=Map.insert codehash c $ contractCache globals}
                     return c
 
             let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
@@ -222,6 +222,6 @@ processTheMessages messages conn cachedContractsIORef = do
                           Just(x) -> show x
             return ProcessedContract{address = address, codehash = codehash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
 
-      if (length processedList > 0) then liftIO $ convertRet processedList conn cachedContractsIORef else return()
+      if (length processedList > 0) then liftIO $ convertRet processedList conn globalsIORef else return()
 
   return()
