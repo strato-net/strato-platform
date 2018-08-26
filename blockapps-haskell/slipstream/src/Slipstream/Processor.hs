@@ -59,6 +59,7 @@ stateDiffToChanges StateDiff{..} =
               actionType=action',
               address=address',
               codeHash=codeHash y,
+              sourceCodeHash=sourceCodeHash y,
               chainId=chainId,
               storage=Just $ map (fmap newValue) $ Map.toList $ storage y
               }
