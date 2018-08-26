@@ -38,21 +38,19 @@ import Slipstream.Events hiding (Address)
 import Data.List.Utils (replace)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
-import HFlags
-import Slipstream.Options
 import Database.PostgreSQL.Typed
+
+import Slipstream.Data.Action (Action)
+import qualified Slipstream.Data.Action as A
+import Slipstream.Options
 import Slipstream.OutputData
 
-data ActionType = Create | Delete | Update deriving (Show)
-
-data Action = Action ActionType String String (Maybe ChainId) (Maybe [(String, String)])
-              deriving (Show)
 
 stateDiffToChanges::StateDiff->[Action]
 stateDiffToChanges StateDiff{..} =
-  (map (\(x, y) -> Action Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
-  ++ (map (\(x, y) -> Action Delete x (codeHash y) chainId Nothing) $ maybe [] Map.toList deletedAccounts)
-  ++ (map (\(x, y) -> Action Update x (codeHash y) chainId Nothing) $ maybe [] Map.toList updatedAccounts)
+  (map (\(x, y) -> A.Action A.Create x (codeHash y) chainId (Just $ map (fmap newValue) $ Map.toList $ storage y)) $ maybe [] Map.toList $ createdAccounts)
+  ++ (map (\(x, y) -> A.Action A.Delete x (codeHash y) chainId Nothing) $ maybe [] Map.toList deletedAccounts)
+  ++ (map (\(x, y) -> A.Action A.Update x (codeHash y) chainId Nothing) $ maybe [] Map.toList updatedAccounts)
   where
     newValue (Diff _ x) = x
 
@@ -97,16 +95,16 @@ storageToFunction s k =
    Just x -> x
 
 hasContract::Action->Bool
-hasContract (Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ _) = False
+hasContract (A.Action _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ _) = False
 hasContract _ = True
 
 storageToList::BA.Storage->(String, String)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
 
 addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded (Action theType address codehash chain Nothing)= do
+addStorageIfNeeded (A.Action theType address codehash chain Nothing)= do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
-  return $ Action theType address codehash chain (Just $ map storageToList storage')
+  return $ A.Action theType address codehash chain (Just $ map storageToList storage')
 addStorageIfNeeded action = return action
 
 matchStateDiff :: StateDiff -> StateDiff -> Bool
@@ -129,10 +127,13 @@ smashIt (x:[]) tmp final =
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef (Map String ContractAndXabi) -> IO ()
 processTheMessages messages conn cachedContractsIORef = do
-  _ <- $initHFlags "Setup Slipstream Variables"
+  putStrLn $ show (length messages) ++ " messages have arrived"
+  putStrLn $ unlines $ map show messages
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
+  
+  putStrLn $ unlines $ map show changes
 
 
   let conHost = flags_pghost
@@ -176,8 +177,8 @@ processTheMessages messages conn cachedContractsIORef = do
 
             let (address, codehash, storage, chainId) =
                   case filledInChange of
-                   Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
-                   Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
+                   A.Action _ a c chId (Just s) -> (a, c, storageToFunction s, chId)
+                   A.Action _ _ _ _ _ -> error "can't handle the case where we need to fetch the state"
             cachedContracts <- liftIO $ readIORef cachedContractsIORef::Bloc (Map String ContractAndXabi)
             contractMetaData <-
               case Map.lookup codehash cachedContracts of
