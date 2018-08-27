@@ -23,14 +23,14 @@ import Data.List.Utils (replace)
 import qualified Data.Map as Map
 import Data.Pool
 import Data.Maybe
+import qualified Data.Text as T
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
 
-
-
+import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
@@ -63,7 +63,7 @@ stateDiffToChanges StateDiff{..} =
               actionType=action',
               address=address',
               codeHash=codeHash y,
-              sourceCodeHash=sourceCodeHash y,
+              sourcePtr=sourceCodeHash y,
               chainId=chainId,
               storage=Just $ map (fmap newValue) $ Map.toList $ storage y
               }
@@ -91,14 +91,23 @@ emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
 getContract::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
 getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
-getContract address _ chainId = do
-  qqqq <-
-    getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
+getContract name _ chainId = do
+  xabi <- getContractXabi (ContractName $ T.pack name) (Named $ T.pack name) chainId
 
+  return $ Right ContractAndXabi {
+    contract = xAbiToContract xabi
+    , xabi = show $ JSON.toJSON xabi
+    }
+
+getContractCompileFullSource::String->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContractCompileFullSource address _ chainId = do
+  contractDetails <-
+    getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
+ 
   let ret = ContractAndXabi {
-    contract = xAbiToContract $ contractdetailsXabi qqqq
-    , xabi = show $ JSON.toJSON $ contractdetailsXabi qqqq
-    , name = show $ contractdetailsName qqqq
+    contract = xAbiToContract $ contractdetailsXabi contractDetails
+    , xabi = show $ JSON.toJSON $ contractdetailsXabi contractDetails
   }
   return $ (Right ret)
 
@@ -140,15 +149,15 @@ smashIt (x:[]) tmp final =
     else final ++ [tmp ++ [x]]
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
-processTheMessages messages conn globalsIORef = do
+processTheMessages messages conn g = do
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
   
-  when (not $ null messages) $ do
-    putStrLn $ "\n" ++ show (length messages) ++ " messages have arrived"
-    putStrLn $ unlines $ map show changes
-
+  case length messages of
+   0 -> return ()
+   1 -> putStrLn $ "1 message has arrived"
+   n -> putStrLn $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -187,38 +196,64 @@ processTheMessages messages conn globalsIORef = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-            A.Action{..} <- addStorageIfNeeded row
+        liftIO $ putStrLn $ "--------\n" ++ A.formatAction row
+        A.Action{..} <- addStorageIfNeeded row
 
-            globals <- liftIO $ readIORef globalsIORef
-            contractMetaData <-
-              case Map.lookup codeHash (contractCache globals) of
-               Just c -> do
-                 return c
-               Nothing -> do
-                 liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourceCodeHash
-                 contractOrError <- getContract address codeHash chainId
+        sourcePtr' <-
+          case sourcePtr of 
+           Just x -> do
+             storeCachedSourcePtr g codeHash x
+             return x
+           Nothing -> do
+             maybeName <- getCachedSourcePtr g codeHash
+             return $ fromMaybe (error "a contract without a sourcePtr has come to slipstream") maybeName
+
+        maybeCachedContract <- getCachedContract g codeHash
+        sourceIsCreated <- isSourceCreated g $ fst sourcePtr'
+            
+        contractMetaData <-
+              case (sourceIsCreated, maybeCachedContract) of
+               (True, _) -> do
+                 contractOrError <- getContractCompileFullSource address codeHash chainId
+                 setSourceCreated g $ fst sourcePtr'
+                 case contractOrError of
+                  Left e -> error e
+                  Right c -> do
+                    storeCachedContract g codeHash c
+                    return c
+                 
+               (_, Just cachedContract) -> return cachedContract
+               
+               (_, Nothing) -> do
+                 liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourcePtr'
+                 contractOrError <- getContract (snd sourcePtr') codeHash chainId
                  liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    liftIO $ writeIORef globalsIORef
-                      globals{contractCache=Map.insert codeHash c $ contractCache globals}
+                    storeCachedContract g codeHash c
                     return c
 
-            let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-            let strName = replace "\"" "" $ name contractMetaData
-            let cont = case contract contractMetaData of
+                    
+
+
+
+
+
+        let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
+            strName = replace "\"" "" $ snd sourcePtr'
+            cont = case contract contractMetaData of
                     Left s -> error s
                     Right c -> c
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-            let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
-            let chain = case chainId of
-                          Nothing -> ""
-                          Just(x) -> show x
-            return ProcessedContract{address = address, codehash = codeHash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
+        let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
+        let chain = case chainId of
+                     Nothing -> ""
+                     Just(x) -> show x
+        return ProcessedContract{address = address, codehash = codeHash, abi = strAbi, contractName = strName, chain = chain, contractData = ret}
 
-      if (length processedList > 0) then liftIO $ convertRet processedList conn globalsIORef else return()
+      if (length processedList > 0) then liftIO $ convertRet processedList conn g else return()
 
   return()
