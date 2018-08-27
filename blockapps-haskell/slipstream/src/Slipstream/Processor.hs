@@ -65,7 +65,7 @@ stateDiffToChanges StateDiff{..} =
               codeHash=codeHash y,
               sourcePtr=sourceCodeHash y,
               chainId=chainId,
-              storage=Just $ map (fmap newValue) $ Map.toList $ storage y
+              storage=Just $ map (fmap (fromMaybe "0" . newValue)) $ Map.toList $ storage y
               }
           ) . maybe [] Map.toList
 
@@ -153,6 +153,8 @@ processTheMessages messages conn g = do
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
+
+  putStrLn $ unlines $ map show messages
   
   case length messages of
    0 -> return ()
