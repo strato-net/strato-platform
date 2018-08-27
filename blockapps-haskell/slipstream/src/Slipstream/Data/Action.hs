@@ -14,7 +14,7 @@ module Slipstream.Data.Action where
 
 import BlockApps.Ethereum
 
-data ActionType = Create | Delete | Update deriving (Show)
+data ActionType = Create | Delete | Update deriving (Eq,Show)
 
 data Action =
   Action{
