@@ -88,15 +88,14 @@ function forkSlipstream() {
   done
   /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
              --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
-             --kafkahost="$kafkaHost" --kafkaport="$kafkaPort"
+             --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
 }
-
 
 # TODO: refactor using the process monitoring from core-strato's doit.sh
 
 /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
 
-forkSlipstream &>> logs/slipstream &
+forkSlipstream &
 
 /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1

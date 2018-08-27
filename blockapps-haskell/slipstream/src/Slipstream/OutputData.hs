@@ -12,15 +12,18 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import Network
-import Slipstream.Options
-import Slipstream.SolidityValue
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
-import Slipstream.Events
 import Control.Monad
 import qualified Data.List as L
 import Data.IORef
+
+import Slipstream.Events
+import Slipstream.Globals
+import Slipstream.Options
+import Slipstream.SolidityValue
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
@@ -98,22 +101,21 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: [ProcessedContract] -> PGConnection -> IORef (Map.Map String ContractAndXabi) -> IO()
-convertRet metadata conn cache = do
+convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
+convertRet metadata conn globalsIORef = do
   let firstContract = head metadata
   let hashVal = codehash firstContract
-  contractCache <- readIORef cache
-  cachedContract <- case Map.lookup hashVal contractCache of
-    Just x -> return x
-    Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False}
+  globals <- readIORef globalsIORef
+  let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
+  putStrLn $ "In convertRet, " ++ show hashVal ++ " contractAlreadyCreated = " ++ show contractAlreadyCreated
+  
   if (length metadata > 1)
     then do
-      when (not $ contractStored cachedContract) $ do
+      when (not $ contractAlreadyCreated) $ do
           let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
-          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
-          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
           dbInsert conIns conn
 
       let fstContract = contractData $ head metadata
@@ -138,13 +140,10 @@ convertRet metadata conn cache = do
   else do
     let row = head metadata
 
-    if(contractStored cachedContract)
-      then return ()
-    else do
+    when(not contractAlreadyCreated) $ do
           let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
-          let newState _ = ContractAndXabi{contract = contract cachedContract, xabi = xabi cachedContract, name = name cachedContract, contractStored = True}
-          _ <- writeIORef cache (Map.adjust newState hashVal contractCache)
+          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
           dbInsert conIns conn
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
     let comma = if (length list == 0)

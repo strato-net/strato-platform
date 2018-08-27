@@ -14,7 +14,6 @@ import Data.Aeson
 import Data.Map (Map)
 import qualified Data.Text as T
 import qualified BlockApps.Solidity.Value as V
-import BlockApps.Solidity.Contract
 
 import GHC.Generics
 
@@ -49,12 +48,12 @@ instance FromJSONKey Address
 instance FromJSON SHA
 instance FromJSON AccountDiff
 
-data Diff a = Diff (Maybe a) a deriving (Show, Generic)
+data Diff a = Diff (Maybe a) (Maybe a) deriving (Show, Generic)
 
 instance (FromJSON a) => FromJSON (Diff a) where
          parseJSON (Object x) = do
            old <- x .:? "oldValue"
-           new <- x .: "newValue"
+           new <- x .:? "newValue"
            return $ Diff old new
          --parseJSON x = typeMismatch "Not an object" x
          parseJSON x = do
@@ -73,6 +72,7 @@ data AccountDiff =
     -- | Since we want to always be able to identify account-type
     --codeHash :: SHA,
     codeHash     :: String,
+    sourceCodeHash     :: Maybe (String, String),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot),
@@ -93,10 +93,3 @@ data ProcessedContract = ProcessedContract {
   contractData :: Map T.Text V.Value
 }
 
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Either String Contract,
-    xabi :: String,
-    name :: String,
-    contractStored :: Bool
-  } deriving(Show)
