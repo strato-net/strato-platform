@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import {
   fetchChains,
-  fetchChainIds,
   fetchChainDetail,
   changeChainFilter,
   resetChainId,
@@ -169,7 +168,6 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchChains,
-      fetchChainIds,
       fetchChainDetail,
       resetChainId,
       changeChainFilter,

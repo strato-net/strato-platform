@@ -11,7 +11,10 @@ import {
   fetchChainsSuccess,
   fetchChainsFailure,
   fetchChainDetailSuccess,
-  fetchChainDetailFailure
+  fetchChainDetailFailure,
+  fetchChainIdsSuccess,
+  fetchChainIdsFailure,
+  FETCH_CHAIN_IDS_REQUEST
 } from './chains.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -69,6 +72,16 @@ export function* getChains(action) {
   }
 }
 
+export function* getChainsIds() {
+  try {
+    const response = yield call(getChainsApi);
+    yield put(fetchChainIdsSuccess(response));
+  }
+  catch (err) {
+    yield put(fetchChainIdsFailure(err));
+  }
+}
+
 export function* getChainDetail(action) {
   try {
     const response = yield call(getChainDetailApi, action.id);
@@ -82,6 +95,7 @@ export function* getChainDetail(action) {
 export default function* watchFetchChains() {
   yield [
     takeLatest(FETCH_CHAINS, getChains),
+    takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
     takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail)
   ];
 }

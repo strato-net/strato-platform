@@ -6,10 +6,13 @@ import {
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
   RESET_CHAIN_ID,
-  RESET_INITIAL_LABLE
+  RESET_INITIAL_LABLE,
+  FETCH_CHAINS_IDS_FAILED,
+  FETCH_CHAINS_IDS_SUCCESS
 } from './chains.actions';
 
 const initialState = {
+  chainIds: [],
   chains: {},
   labelIds: {},
   filter: '',
@@ -110,6 +113,17 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         initialLabel: null
+      }
+    case FETCH_CHAINS_IDS_SUCCESS:
+      return {
+        ...state,
+        chainIds: action.chain.map((chain) => chain.id)
+      }
+    case FETCH_CHAINS_IDS_FAILED:
+      return {
+        ...state,
+        chainIds: null,
+        error: action.error
       }
     default:
       return state;
