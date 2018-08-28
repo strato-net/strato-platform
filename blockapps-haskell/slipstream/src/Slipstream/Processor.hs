@@ -29,6 +29,7 @@ import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
+import System.Log.Logger
 
 import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
@@ -154,12 +155,14 @@ processTheMessages messages conn g = do
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
 
-  putStrLn $ unlines $ map show messages
-  
+  updateGlobalLogger "processTheMessages" (setLevel INFO)
+
+  debugM "processTheMessages" . unlines $ map show messages
+
   case length messages of
    0 -> return ()
-   1 -> putStrLn $ "1 message has arrived"
-   n -> putStrLn $ show n ++ " messages have arrived"
+   1 -> infoM "processTheMessages" $ "1 message has arrived"
+   n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -199,20 +202,20 @@ processTheMessages messages conn g = do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
         liftIO $ putStrLn $ "--------\n" ++ A.formatAction row
-        A.Action{..} <- addStorageIfNeeded row
+        a@A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
-          case sourcePtr of 
+          case sourcePtr of
            Just x -> do
              storeCachedSourcePtr g codeHash x
              return x
            Nothing -> do
              maybeName <- getCachedSourcePtr g codeHash
-             return $ fromMaybe (error "a contract without a sourcePtr has come to slipstream") maybeName
+             return $ fromMaybe (error $ "a contract without a sourcePtr has come to slipstream: " ++ show a) maybeName
 
         maybeCachedContract <- getCachedContract g codeHash
         sourceIsCreated <- isSourceCreated g $ fst sourcePtr'
-            
+
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (True, _) -> do
@@ -223,24 +226,18 @@ processTheMessages messages conn g = do
                   Right c -> do
                     storeCachedContract g codeHash c
                     return c
-                 
+
                (_, Just cachedContract) -> return cachedContract
-               
+
                (_, Nothing) -> do
-                 liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourcePtr'
+                 liftIO $ warningM "processTheMessages" $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourcePtr'
                  contractOrError <- getContract (snd sourcePtr') codeHash chainId
-                 liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
+                 liftIO $ infoM "processTheMessages" $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     storeCachedContract g codeHash c
                     return c
-
-                    
-
-
-
-
 
         let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
             strName = replace "\"" "" $ snd sourcePtr'

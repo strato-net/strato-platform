@@ -28,6 +28,7 @@ dependencies:
   - containers
   - data-default
   - hflags
+  - hslogger
   - http-client
   - lens
   - logging-effect
