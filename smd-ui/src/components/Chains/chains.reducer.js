@@ -22,7 +22,7 @@ const reducer = function (state = initialState, action) {
     case FETCH_CHAINS:
       return {
         ...state,
-        filter: state.filter,
+        filter: null,
         error: null,
       };
     case FETCH_CHAINS_SUCCESSFULL:

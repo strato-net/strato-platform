@@ -125,16 +125,19 @@ class AddMember extends Component {
   }
 
   submit = () => {
-    let username = this.state.username;
-    let address = this.state.address;
-    let enode = this.state.enode;
+    let data = {
+      username: isModePublic() ? this.props.initialValues.from : this.state.username,
+      address: isModePublic() ? this.props.initialValues.fromAddress : this.state.address,
+      enode: this.state.enode,
+      balance: this.state.balance
+    }
 
-    let errors = validate({ username, address, enode });
+    let errors = validate(data);
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
       mixpanelWrapper.track('add_member_submit_click_successful');
-      this.props.handler(this.state);
+      this.props.handler(data);
       this.closeModal();
     }
   }
