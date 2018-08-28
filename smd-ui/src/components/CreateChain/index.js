@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -8,6 +8,7 @@ import AddMember from './components/AddMember';
 import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
+import { toasts } from '../Toasts';
 
 class CreateChain extends Component {
 
@@ -23,6 +24,13 @@ class CreateChain extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("create_chain_loaded");
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.createErrorMessage) {
+      toasts.show({ message: nextProps.createErrorMessage });
+      this.props.resetError();
+    }
   }
 
   submit = (values) => {
@@ -266,6 +274,7 @@ class CreateChain extends Component {
 export function mapStateToProps(state) {
   return {
     isOpen: state.createChain.isOpen,
+    createErrorMessage: state.createChain.error,
   };
 }
 
@@ -276,6 +285,7 @@ const connected = connect(
     openCreateChainOverlay,
     closeCreateChainOverlay,
     createChain,
+    resetError
   }
 )(formed);
 

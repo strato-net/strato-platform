@@ -46,8 +46,13 @@ export function createChainApiCall(label, members, balances, src, args){
 export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
-    yield put(createChainSuccess(response));
-    yield put(fetchChains());
+    // TODO: Change when when we start getting actual error messages
+    if(response.status === 200) {
+      yield put(createChainSuccess(response));
+      yield put(fetchChains());
+    } else {
+      yield put(createChainFailure(response.statusText));
+    }
   }
   catch (err) {
     yield put(createChainFailure(err));

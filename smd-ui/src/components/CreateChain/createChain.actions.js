@@ -5,6 +5,7 @@ export const CLOSE_ADD_MEMBER_MODAL = "CLOSE_ADD_MEMBER_MODAL";
 export const CREATE_CHAIN_REQUEST = "CREATE_CHAIN_REQUEST";
 export const CREATE_CHAIN_SUCCESS = "CREATE_CHAIN_SUCCESS";
 export const CREATE_CHAIN_FAILURE = "CREATE_CHAIN_FAILURE";
+export const RESET_ERROR = "RESET_ERROR";
 
 export const openCreateChainOverlay = function () {
   return {
@@ -62,5 +63,11 @@ export const createChainFailure = function (error) {
     error: error,
     spinning: false,
     isOpen: false,
+  }
+}
+
+export const resetError = function () {
+  return {
+    type: RESET_ERROR
   }
 }

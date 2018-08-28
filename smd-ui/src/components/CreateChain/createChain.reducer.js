@@ -6,13 +6,15 @@ import {
   CREATE_CHAIN_SUCCESS,
   OPEN_ADD_MEMBER_MODAL,
   CLOSE_ADD_MEMBER_MODAL,
+  RESET_ERROR,
 } from './createChain.actions';
 
 const initialState = {
   isAddMemberModalOpen: false,
   isOpen: false,
   spinning: false,
-  key: null
+  key: null,
+  error: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -51,6 +53,11 @@ const reducer = function (state = initialState, action) {
         isOpen: false,
         spinning: false,
         key: action.key,
+      };
+    case RESET_ERROR:
+      return {
+        ...state,
+        error: null
       };
     default:
       return state;
