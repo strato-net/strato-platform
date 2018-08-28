@@ -1,6 +1,6 @@
 import {
-  FETCH_CHAINS,
-  FETCH_CHAINS_SUCCESSFULL,
+  FETCH_CHAINS_REQUEST,
+  FETCH_CHAINS_SUCCESS,
   FETCH_CHAINS_FAILED,
   CHANGE_CHAIN_FILTER,
   FETCH_CHAIN_DETAIL_SUCCESS,
@@ -22,13 +22,13 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_CHAINS:
+    case FETCH_CHAINS_REQUEST:
       return {
         ...state,
         filter: null,
         error: null,
       };
-    case FETCH_CHAINS_SUCCESSFULL:
+    case FETCH_CHAINS_SUCCESS:
       const chainLabelIds = {};
       const chains = action.chainLabelIds;
       // this will create an object of chain with label and their address

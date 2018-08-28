@@ -2,11 +2,10 @@ import {
   takeLatest,
   takeEvery,
   put,
-  call,
-  cancelled
+  call
 } from 'redux-saga/effects';
 import {
-  FETCH_CHAINS,
+  FETCH_CHAINS_REQUEST,
   FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
   fetchChainsFailure,
@@ -17,7 +16,6 @@ import {
   FETCH_CHAIN_IDS_REQUEST
 } from './chains.actions';
 import { env } from '../../env';
-import { hideLoading } from 'react-redux-loading-bar';
 
 const chainUrl = env.STRATO_URL + "/chain";
 const chainUrl2 = env.BLOC_URL + "/chain";
@@ -58,17 +56,13 @@ export function getChainDetailApi(chainid) {
     })
 }
 
-export function* getChains(action) {
+export function* getChains() {
   try {
     const response = yield call(getChainsApi);
     yield put(fetchChainsSuccess(response));
   }
   catch (err) {
     yield put(fetchChainsFailure(err));
-  } finally {
-    if (yield cancelled()) {
-      yield put(hideLoading());
-    }
   }
 }
 
@@ -94,7 +88,7 @@ export function* getChainDetail(action) {
 
 export default function* watchFetchChains() {
   yield [
-    takeLatest(FETCH_CHAINS, getChains),
+    takeLatest(FETCH_CHAINS_REQUEST, getChains),
     takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
     takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail)
   ];

@@ -1,5 +1,5 @@
-export const FETCH_CHAINS = 'FETCH_CHAINS';
-export const FETCH_CHAINS_SUCCESSFULL = 'FETCH_CHAINS_SUCCESSFULL';
+export const FETCH_CHAINS_REQUEST = 'FETCH_CHAINS_REQUEST';
+export const FETCH_CHAINS_SUCCESS = 'FETCH_CHAINS_SUCCESS';
 export const FETCH_CHAINS_FAILED = 'FETCH_CHAINS_FAILED';
 export const FETCH_CHAIN_IDS_REQUEST = 'FETCH_CHAIN_IDS_REQUEST';
 export const FETCH_CHAINS_IDS_SUCCESS = 'FETCH_CHAINS_IDS_SUCCESS';
@@ -13,13 +13,13 @@ export const RESET_INITIAL_LABLE = 'RESET_INITIAL_LABLE';
 
 export const fetchChains = function () {
   return {
-    type: FETCH_CHAINS
+    type: FETCH_CHAINS_REQUEST
   }
 };
 
 export const fetchChainsSuccess = function (chainLabelIds) {
   return {
-    type: FETCH_CHAINS_SUCCESSFULL,
+    type: FETCH_CHAINS_SUCCESS,
     chainLabelIds: chainLabelIds,
   }
 };
