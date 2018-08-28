@@ -47,7 +47,7 @@ export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
     yield put(createChainSuccess(response));
-    yield put(fetchChains(false));
+    yield put(fetchChains());
   }
   catch (err) {
     yield put(createChainFailure(err));

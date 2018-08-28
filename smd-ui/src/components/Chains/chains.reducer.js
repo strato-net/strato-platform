@@ -22,8 +22,6 @@ const reducer = function (state = initialState, action) {
     case FETCH_CHAINS:
       return {
         ...state,
-        chains: state.chains,
-        labelIds: state.labelIds,
         filter: state.filter,
         error: null,
       };
@@ -45,7 +43,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         chains: chainLabelIds,
         labelIds: chainLabelIds,
-        initialLabel: action.chainLabelIds[0].info.label,
+        initialLabel: chain.length && chain[0].info.label,
         filter: state.filter,
         error: null
       };

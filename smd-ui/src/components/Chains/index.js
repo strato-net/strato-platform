@@ -34,18 +34,8 @@ class Chains extends Component {
   }
 
   componentDidMount() {
-    this.props.fetchChains(true, true);
+    this.props.fetchChains();
     mixpanelWrapper.track('chains_page_load')
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.initialLabel) {
-      let defaultSelected = Object.getOwnPropertyNames(nextProps.chains[nextProps.initialLabel]);
-      defaultSelected.forEach((chainId) => {
-        this.props.fetchChainDetail(nextProps.initialLabel, chainId);
-      });
-      this.props.resetInitailLabel();
-    }
   }
 
   updateFilter(filter) {

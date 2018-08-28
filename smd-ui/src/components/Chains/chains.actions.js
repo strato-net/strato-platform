@@ -9,11 +9,9 @@ export const FETCH_CHAIN_DETAIL_FAILURE = 'FETCH_CHAIN_DETAIL_FAILURE';
 export const RESET_CHAIN_ID = 'RESET_CHAIN_ID';
 export const RESET_INITIAL_LABLE = 'RESET_INITIAL_LABLE';
 
-export const fetchChains = function (loadLabels, loadChainId) {
+export const fetchChains = function () {
   return {
-    type: FETCH_CHAINS,
-    loadLabels: loadLabels,
-    loadChainId: loadChainId
+    type: FETCH_CHAINS
   }
 };
 

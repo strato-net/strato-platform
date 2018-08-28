@@ -94,7 +94,7 @@ class CreateChain extends Component {
             </div>
             <div className="col-sm-2">
               <Button
-                className="pt-button pt-icon-trash"
+                className="pt-button pt-icon-trash member-remove"
                 onClick={() => {
                   this.removeMember(member)
                 }}
@@ -107,7 +107,7 @@ class CreateChain extends Component {
     }
     else {
       return (
-        <div className="pt-dialog-header">
+        <div className="pt-dialog-header no-member">
           <span className="pt-dialog-header-title">No Members</span>
         </div>
       );
@@ -227,7 +227,7 @@ class CreateChain extends Component {
               </div>
 
               <div className="row">
-                <div className="pt-form-group col-sm-12 pt-intent-danger smd-margin-8">
+                <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
                     Chain Members
                   </label>
@@ -269,7 +269,7 @@ export function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'create-chain', validate })(CreateChain);
+const formed = reduxForm({ form: 'create-chain' })(CreateChain);
 const connected = connect(
   mapStateToProps,
   {
