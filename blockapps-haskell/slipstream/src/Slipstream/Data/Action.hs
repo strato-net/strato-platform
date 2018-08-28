@@ -16,12 +16,14 @@ import BlockApps.Ethereum
 
 data ActionType = Create | Delete | Update deriving (Eq,Show)
 
+data SourcePtr = SourcePtr { sourceHash :: String, contractName :: String} deriving (Eq, Show)
+
 data Action =
   Action{
     actionType::ActionType,
     address::String,
     codeHash::String,
-    sourcePtr::Maybe (String, String),
+    sourcePtr::Maybe SourcePtr,
     chainId::Maybe ChainId,
     storage::(Maybe [(String, String)])
     } deriving (Show)
@@ -36,4 +38,4 @@ formatAction Action{..} =
   ++ " with " ++ show (length storage) ++ " items\n"
   ++ "    codeHash = " ++ show codeHash ++ "\n"
   ++ "    sourcePtr = " ++ show sourcePtr
-  
+

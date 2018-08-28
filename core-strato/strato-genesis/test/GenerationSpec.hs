@@ -83,7 +83,7 @@ spec = do
 
     it "should add emptyContract to the contractInfo" $
       let input = defaultGenesisInfo
-          want = [CodeInfo emptyContract "x" emptySource]
+          want = [CodeInfo emptyContract emptySource "x"]
           slots = replicate 10 []
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoCodeInfo got `shouldBe` want
