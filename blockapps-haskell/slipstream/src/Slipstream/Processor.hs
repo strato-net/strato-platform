@@ -89,10 +89,10 @@ enterBloc2 env x = do
 emptyHash :: String
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::Address -> String->String -> Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContract _ _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
-getContract address name _ chainId = do
-  xabi <- getContractXabi (ContractName $ T.pack name) (Unnamed address) chainId
+getContract::String->String -> Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContract name _ chainId = do
+  xabi <- getContractXabi (ContractName $ T.pack name) (Named . T.pack $ name) chainId
 
   return $ Right ContractAndXabi {
     contract = xAbiToContract xabi
@@ -215,20 +215,19 @@ processTheMessages messages conn g = do
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
-               (True, _) -> do
-                 contractOrError <- getContractCompileFullSource addr codeHash chainId
-                 setSourceCreated g $ A.sourceHash sourcePtr'
+               (_, Just cachedContract) -> return cachedContract
+               (True, Nothing) -> do
+                 contractOrError <- getContract (A.contractName sourcePtr') codeHash chainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     storeCachedContract g codeHash c
                     return c
-
-               (_, Just cachedContract) -> return cachedContract
-
-               (_, Nothing) -> do
-                 liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourcePtr'
-                 contractOrError <- getContract addr (A.contractName sourcePtr') codeHash chainId
+               (False, Nothing) -> do
+                 liftIO $ putStrLn $ "Need to call getContractCompileFullSource (this can be slow): ch:" ++
+                                     show codeHash ++ ", src:" ++ show sourcePtr'
+                 contractOrError <- getContractCompileFullSource addr codeHash chainId
+                 setSourceCreated g $ A.sourceHash sourcePtr'
                  liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
                   Left e -> error e
