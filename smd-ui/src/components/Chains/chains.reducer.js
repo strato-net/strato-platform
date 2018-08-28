@@ -27,11 +27,11 @@ const reducer = function (state = initialState, action) {
       };
     case FETCH_CHAINS_SUCCESSFULL:
       const chainLabelIds = {};
-      const chain = action.chainLabelIds;
+      const chains = action.chainLabelIds;
       // this will create an object of chain with label and their address
-      chain.forEach((chainIdChainInfo) => {
-        const id = chainIdChainInfo.id;
-        const label = chainIdChainInfo.info.label;
+      chains.forEach((chain) => {
+        const id = chain.id;
+        const label = chain.info.label;
         if (!chainLabelIds[label]) {
           chainLabelIds[label] = {};
           chainLabelIds[label][id] = {};
@@ -43,7 +43,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         chains: chainLabelIds,
         labelIds: chainLabelIds,
-        initialLabel: chain.length && chain[0].info.label,
+        initialLabel: chains.length && chains[0].info.label,
         filter: state.filter,
         error: null
       };

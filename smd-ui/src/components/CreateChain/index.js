@@ -258,6 +258,7 @@ class CreateChain extends Component {
                 }} />
                 <Button
                   intent={Intent.PRIMARY}
+                  disabled={this.props.isSpinning}
                   onClick={this.props.handleSubmit(this.submit)}
                   text="Create Chain"
                 />
@@ -274,6 +275,7 @@ class CreateChain extends Component {
 export function mapStateToProps(state) {
   return {
     isOpen: state.createChain.isOpen,
+    isSpinning: state.createChain.spinning,
     createErrorMessage: state.createChain.error,
   };
 }
