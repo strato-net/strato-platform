@@ -63,7 +63,7 @@ stateDiffToChanges StateDiff{..} =
               actionType=action',
               address=address',
               codeHash=codeHash y,
-              sourcePtr=sourceCodeHash y,
+              sourcePtr=(\(hsh, name) -> A.SourcePtr hsh name) <$> sourceCodeHash y,
               chainId=chainId,
               storage=Just $ map (fmap (fromMaybe "0" . newValue)) $ Map.toList $ storage y
               }
@@ -104,7 +104,7 @@ getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b
 getContractCompileFullSource address _ chainId = do
   contractDetails <-
     getContractDetailsByAddressOnly (Address . fst . head $ readHex address) chainId
- 
+
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi contractDetails
     , xabi = show $ JSON.toJSON $ contractdetailsXabi contractDetails
@@ -155,7 +155,7 @@ processTheMessages messages conn g = do
   let changes = map (concat . map stateDiffToChanges) inter
 
   putStrLn $ unlines $ map show messages
-  
+
   case length messages of
    0 -> return ()
    1 -> putStrLn $ "1 message has arrived"
@@ -202,7 +202,7 @@ processTheMessages messages conn g = do
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
-          case sourcePtr of 
+          case sourcePtr of
            Just x -> do
              storeCachedSourcePtr g codeHash x
              return x
@@ -211,24 +211,24 @@ processTheMessages messages conn g = do
              return $ fromMaybe (error "a contract without a sourcePtr has come to slipstream") maybeName
 
         maybeCachedContract <- getCachedContract g codeHash
-        sourceIsCreated <- isSourceCreated g $ fst sourcePtr'
-            
+        sourceIsCreated <- isSourceCreated g $ A.sourceHash sourcePtr'
+
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (True, _) -> do
                  contractOrError <- getContractCompileFullSource address codeHash chainId
-                 setSourceCreated g $ fst sourcePtr'
+                 setSourceCreated g $ A.sourceHash sourcePtr'
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     storeCachedContract g codeHash c
                     return c
-                 
+
                (_, Just cachedContract) -> return cachedContract
-               
+
                (_, Nothing) -> do
                  liftIO $ putStrLn $ "Need to call getContract (this can be slow): ch:" ++ show codeHash ++ ", src:" ++ show sourcePtr'
-                 contractOrError <- getContract (snd sourcePtr') codeHash chainId
+                 contractOrError <- getContract (A.contractName sourcePtr') codeHash chainId
                  liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
                  case contractOrError of
                   Left e -> error e
@@ -236,14 +236,9 @@ processTheMessages messages conn g = do
                     storeCachedContract g codeHash c
                     return c
 
-                    
-
-
-
-
 
         let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-            strName = replace "\"" "" $ snd sourcePtr'
+            strName = replace "\"" "" . A.contractName $ sourcePtr'
             cont = case contract contractMetaData of
                     Left s -> error s
                     Right c -> c

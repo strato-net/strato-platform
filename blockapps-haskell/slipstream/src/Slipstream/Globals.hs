@@ -11,6 +11,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import BlockApps.Solidity.Contract
+import qualified Slipstream.Data.Action as SS
+
 
 
 
@@ -18,12 +20,12 @@ data Globals =
   Globals {
     createdSources :: Set String, -- list of source codes that have been compiled and have had their xabis put in the bloc tables
     contractCache :: Map String ContractAndXabi, -- maps codehash to metadata
-    sourcePtrCache :: Map String (String, String), -- maps codehash to (source hash, contract name)
+    sourcePtrCache :: Map String SS.SourcePtr, -- maps codehash to (source hash, contract name)
     createdContracts :: Set String -- list of contracts that have had their tables made
     }
-  
+
 instance Default Globals where
-  def = 
+  def =
     Globals {
       createdSources = Set.empty,
       contractCache = Map.empty,
@@ -59,14 +61,14 @@ getCachedContract globalsIORef sourceCodeHash = do
   return $ Map.lookup sourceCodeHash $ contractCache globals
 
 storeCachedSourcePtr :: MonadIO m =>
-                        IORef Globals -> String -> (String, String) -> m ()
+                        IORef Globals -> String -> SS.SourcePtr -> m ()
 storeCachedSourcePtr globalsIORef codeHash c = do
   globals <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
     globals{sourcePtrCache=Map.insert codeHash c $ sourcePtrCache globals}
 
 getCachedSourcePtr :: MonadIO m =>
-                      IORef Globals -> String -> m (Maybe (String, String))
+                      IORef Globals -> String -> m (Maybe SS.SourcePtr)
 getCachedSourcePtr globalsIORef codeHash = do
   globals <- liftIO $ readIORef globalsIORef
   return $ Map.lookup codeHash $ sourcePtrCache globals
