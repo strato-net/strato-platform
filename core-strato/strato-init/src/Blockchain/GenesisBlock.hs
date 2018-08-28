@@ -146,7 +146,7 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "State diff has been generated"
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
-        writeSource (account, CodeInfo _ name src) = case account of
+        writeSource (account, CodeInfo _ src name) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
             ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
