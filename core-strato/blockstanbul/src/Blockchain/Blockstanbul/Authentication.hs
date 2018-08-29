@@ -48,6 +48,12 @@ addValidators vs = over extraLens $
 getValidatorList :: Block -> [Address]
 getValidatorList x = view (istanbul . _Just . validatorList) (cookRawExtra $ view extraLens x )
 
+getProposerSeal :: Block -> Maybe ExtendedSignature
+getProposerSeal x = do
+  ist <- view istanbul . cookRawExtra . view extraLens $ x
+  sig <- view proposedSig ist
+  return sig
+
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra

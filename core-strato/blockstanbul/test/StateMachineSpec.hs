@@ -75,8 +75,7 @@ spec = parallel $ do
 
     it "can handle several rounds in succession" $ property $ \blk' blk2' as' seal ->
       not (null as') ==> runTest $ do
-        -- let as = sortOn sender as'
-        let as = as'
+        let as = sortOn sender as'
         let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
@@ -156,6 +155,7 @@ spec = parallel $ do
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do
+        productionAuth .= True
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
@@ -263,6 +263,7 @@ spec = parallel $ do
         use view `shouldReturn` curView
     it "rejects a message from an unauthenticated peer" $ property $ \auth blk seal ->
       runTest $ do
+        productionAuth .= True
         (curView, di) <- setupRound blk [sender auth]
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
