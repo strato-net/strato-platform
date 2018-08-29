@@ -2,12 +2,14 @@
   OverloadedStrings
   , TemplateHaskell
   , BangPatterns
+  , FlexibleContexts
 #-}
 
 module Slipstream.OutputData where
 
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString as B
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
@@ -17,8 +19,12 @@ import qualified Data.Set as Set
 import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
 import Control.Monad
+import Control.Monad.Base
+import Control.Monad.IO.Class
 import qualified Data.List as L
-import Data.IORef
+import Data.IORef.Lifted
+
+import Conduit
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -31,7 +37,7 @@ defaultMaxB = 32 * 1024 * 1024
 valueToTxt :: SolidityValue -> String
 valueToTxt (SolidityNum _) = "bigint"
 valueToTxt (SolidityBool _) = "bool"
-valueToTxt (SolidityArray _) = "text []"
+valueToTxt (SolidityArray _) = "json"
 valueToTxt (_) = "text"
 
 listToKeyStatement :: String -> [(T.Text, b)] -> String
@@ -91,8 +97,8 @@ dbConnect =  PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: String -> PGConnection -> IO()
-dbInsert insrt conn = do
+dbInsert :: PGConnection -> String -> IO()
+dbInsert conn insrt = do
   let qry = rawPGSimpleQuery $! BC.pack insrt
   _ <- pgQuery conn qry
   return ()
@@ -102,21 +108,28 @@ isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
 convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
-convertRet metadata conn globalsIORef = do
+convertRet metadata conn globalsIORef = runConduit $
+     yield metadata
+  .| createInserts globalsIORef
+  .| mapM_C (dbInsert conn)
+
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m String
+createInserts globalsIORef = do
+  metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   let firstContract = head metadata
   let hashVal = codehash firstContract
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
-  putStrLn $ "In convertRet, " ++ show hashVal ++ " contractAlreadyCreated = " ++ show contractAlreadyCreated
-  
+  liftIO $ putStrLn $ "In convertRet, " ++ show hashVal ++ " contractAlreadyCreated = " ++ show contractAlreadyCreated
+
   if (length metadata > 1)
     then do
       when (not $ contractAlreadyCreated) $ do
           let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          dbInsert conIns conn
+          yield conIns
 
       let fstContract = contractData $ head metadata
       let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
@@ -124,7 +137,7 @@ convertRet metadata conn globalsIORef = do
           then ""
           else ", "
       let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
-      dbInsert createSt conn
+      yield createSt
 
       let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
@@ -136,7 +149,7 @@ convertRet metadata conn globalsIORef = do
       let inserts = L.intercalate ", " vals
       let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
 
-      dbInsert ins conn
+      yield ins
   else do
     let row = head metadata
 
@@ -144,16 +157,15 @@ convertRet metadata conn globalsIORef = do
           let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          dbInsert conIns conn
+          yield conIns
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
     let comma = if (length list == 0)
         then ""
         else ", "
     let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
-    dbInsert createSt conn
+    yield createSt
 
     let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
     let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
     let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
-    dbInsert ins conn
-  return ()
+    yield ins
