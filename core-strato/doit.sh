@@ -113,7 +113,7 @@ function newnode {
       done
     done
   else
-    echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /logs/ directory in the container for logs"
+    echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs"
     tail -f /dev/null
   fi
 }
