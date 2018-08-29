@@ -7,6 +7,7 @@ module Blockchain.Strato.StateDiff.Kafka
     , writeStateDiffEvents
     , writeStateDiffs
     , splitWriteStateDiffs
+    , splitWriteStateDiffEvents
     ) where
 
 import           Control.Lens.Getter               (view)
@@ -47,6 +48,10 @@ writeStateDiffs = KW.produceMessages . map mkTopicAndMessage
 
 -- splitWriteStateDiffs is useful if there is a statediff that is over 1MB on the wire,
 -- as the broker will reject it.
+--
+splitWriteStateDiffEvents :: K.Kafka k => ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent]) -> k [KP.ProduceResponse]
+splitWriteStateDiffEvents (ds, cs, us) = liftM concat . mapM writeStateDiffEvents . map (:[]) $ ds ++ cs ++ us
+
 splitWriteStateDiffs :: K.Kafka k => [StateDiff] -> k [KP.ProduceResponse]
 splitWriteStateDiffs = liftM concat . mapM writeStateDiffEvents . map (:[]) . concat . map breakup
   where breakup :: StateDiff -> [StateDiffEvent]
