@@ -80,5 +80,6 @@ benchmarks:
     dependencies:
       - blockapps-haskoin
       - criterion
+      - largeword
 
 
