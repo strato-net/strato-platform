@@ -118,7 +118,7 @@ instance Binary Address where
     return (Address $ fromInteger $ byteString2Integer byteString)
 
 stringAddress :: String -> Maybe Address
-stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
+stringAddress string = Address . fromInteger <$> readMaybe (string)
 
 instance FromHttpApiData Address where
   parseUrlPiece text = case stringAddress (T.unpack text) of
