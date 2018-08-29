@@ -35,11 +35,14 @@ testContext :: BlockstanbulContext
 testContext = newContext (View 20 18) [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
-runTest = runNoLoggingT . flip evalStateT testContext
+runTest = runNoLoggingT . flip evalStateT testContext . (disableAuth >>)
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
   getBlockstanbulContext = Just <$> get
+
+disableAuth :: StateMachineM m => m ()
+disableAuth = productionAuth .= False
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk' as = do
@@ -70,9 +73,10 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
-      not (null as) ==> runTest $ do
-        productionAuth .= True
+    it "can handle several rounds in succession" $ property $ \blk' blk2' as' seal ->
+      not (null as') ==> runTest $ do
+        -- let as = sortOn sender as'
+        let as = as'
         let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
@@ -138,7 +142,6 @@ spec = parallel $ do
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
-        productionAuth .= True
         let blk = truncateExtra blk'
         proposer .= sender auth
         validators .= [sender auth]
@@ -180,7 +183,6 @@ spec = parallel $ do
         proposer .= sender auth
         validators .= [sender auth]
         curView <- use view
-        productionAuth .= True
         got <- sendMessages [IMsg auth $ Preprepare curView{_round = 3} blk]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21]
 
@@ -225,7 +227,6 @@ spec = parallel $ do
   describe "A commit message" $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
-        productionAuth .= True
         let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
         validators .= [sender auth]
         proposal .= Just blk
@@ -243,14 +244,12 @@ spec = parallel $ do
         use view `shouldReturn` curView
     it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
       runTest $ do
-        productionAuth .= True
         (curView, _) <- setupRound blk [sender auth]
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
-        productionAuth .= True
         validators .= [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
@@ -271,7 +270,6 @@ spec = parallel $ do
 
     it "waits for 2/3s of commits" $ property $ \sig blk' as seal ->
       runTest $ do
-        productionAuth .= True
         let blk = addProposerSeal seal . addValidators as $ blk'
         validators .= as
         proposal .= Just blk
@@ -365,7 +363,6 @@ spec = parallel $ do
 
     it "round changes a preprepare that doesn't match the lock" $ property $ \lock blk a ->
       runTest $ do
-        productionAuth .= True
         validators .= [sender a]
         proposer .= sender a
         blockLock .= Just lock
