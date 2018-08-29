@@ -50,3 +50,13 @@ executables:
       - base >= 4 && < 5
       - base16-bytestring
       - bytestring
+
+  modifyDate:
+    source-dirs: exec_src/
+    main: ModifyDate.hs
+    dependencies:
+      - base >=4 && <5
+      - base16-bytestring
+      - bytestring
+      - hflags
+      - time

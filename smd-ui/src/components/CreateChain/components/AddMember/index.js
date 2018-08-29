@@ -1,20 +1,14 @@
 import React, { Component } from 'react';
-import {
-  sendTokensOpenModal,
-  sendTokensCloseModal,
-  sendTokens,
-  fromUsernameChange,
-  toUsernameChange
-} from '../../../Accounts/components/SendTokens/sendTokens.actions';
-import { fetchAccounts, fetchUserAddresses, fetchBalanceRequest } from '../../../Accounts/accounts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
-import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
+import { Button, Dialog, Intent } from '@blueprintjs/core';
+
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import ValueInput from '../../../ValueInput';
-import validate from '../../../Accounts/components/SendTokens/validate';
+import { Field, reduxForm } from 'redux-form';
+import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
+import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
 import { isModePublic } from '../../../../lib/checkMode';
+import { validate } from './validate';
 
 class AddMember extends Component {
 
@@ -24,16 +18,16 @@ class AddMember extends Component {
       form: {
         userSelected: true
       },
-      username: '',
-      address: '',
-      enode: '',
-      balance: 0
+      username: null,
+      address: null,
+      enode: null,
+      balance: 0,
+      errors: null
     }
   }
 
   closeModal = () => {
-    this.props.sendTokensCloseModal();
-    !isModePublic() && this.props.fetchAccounts(true, true);
+    this.props.closeAddMemberModal();
   }
 
   componentDidMount() {
@@ -41,25 +35,25 @@ class AddMember extends Component {
     this.props.fetchAccounts(true, true);
   }
 
-  handleUsernameChange (event) {
-     this.setState({
+  handleUsernameChange(event) {
+    this.setState({
       username: event.target.value
     });
   }
 
-  handleAddressChange (event) {
+  handleAddressChange(event) {
     this.setState({
       address: event.target.value
     });
   }
 
-  handleEnodeChange (event) {
+  handleEnodeChange(event) {
     this.setState({
       enode: event.target.value
     });
   }
 
-  handleBalanceChange (event) {
+  handleBalanceChange(event) {
     this.setState({
       balance: event.target.value
     });
@@ -74,7 +68,7 @@ class AddMember extends Component {
         value={this.state.username}
         onChange={
           (e) => {
-            this.props.fetchUserAddresses(e.target.value, true);
+            this.props.fetchUserAddresses(e.target.value, false);
             this.handleUsernameChange(e);
           }
         }
@@ -95,8 +89,8 @@ class AddMember extends Component {
   }
 
   addressField = (isPublicMode) => {
-    const fromUserAddresses = Object.keys(this.props.accounts).length && this.props.fromUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
+    const fromUserAddresses = Object.keys(this.props.accounts).length && this.state.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.state.username])
       : [];
 
     return (
@@ -123,8 +117,33 @@ class AddMember extends Component {
     )
   }
 
+  errorMessageFor(fieldName) {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
+  }
+
+  submit = () => {
+    let data = {
+      username: isModePublic() ? this.props.initialValues.from : this.state.username,
+      address: isModePublic() ? this.props.initialValues.fromAddress : this.state.address,
+      enode: this.state.enode,
+      balance: this.state.balance
+    }
+
+    let errors = validate(data);
+    this.setState({ errors });
+
+    if (!Object.values(errors).length) {
+      mixpanelWrapper.track('add_member_submit_click_successful');
+      this.props.handler(data);
+      this.props.reset();
+      this.closeModal();
+    }
+  }
+
   render() {
-    const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
     const isPublicMode = isModePublic();
 
@@ -132,56 +151,56 @@ class AddMember extends Component {
       <div >
         <Button onClick={() => {
           mixpanelWrapper.track("add_member_open_click");
-          isModePublic() && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
-          this.props.sendTokensOpenModal()
+          this.props.openAddMemberModal();
         }} className="pt-intent-primary pt-icon-add"
+          style={{ marginTop: '8px' }}
           text="Add Member" />
-        <form>
-          <Dialog
-            iconName="inbox"
-            isOpen={this.props.isOpen}
-            onClose={this.closeModal}
-            title="Add Member"
-            style={{
-              width: "560px"
-            }}
-            className="pt-dark"
-          >
+
+        <Dialog
+          iconName="add"
+          isOpen={this.props.isOpen}
+          onClose={this.closeModal}
+          title="Add Member"
+          className="pt-dark"
+        >
+          <form>
             <div className="pt-dialog-body">
 
               <div className="row">
-                <div className="col-sm-4 text-right">
+                <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Username
                   </label>
                 </div>
-                <div className="col-sm-8 smd-pad-4">
+                <div className="col-sm-9 smd-pad-4">
                   <div className="pt-select">
                     {this.userNameField(users, isPublicMode)}
+                    <br /><span className="error-text">{this.errorMessageFor('username')}</span>
                   </div>
                 </div>
               </div>
 
               <div className="row">
-                <div className="col-sm-4 text-right">
+                <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Address
                   </label>
                 </div>
-                <div className="col-sm-8 smd-pad-4">
+                <div className="col-sm-9 smd-pad-4">
                   <div className="pt-select">
                     {this.addressField(isPublicMode)}
+                    <br /><span className="error-text">{this.errorMessageFor('address')}</span>
                   </div>
                 </div>
               </div>
 
               <div className="row">
-                <div className="col-sm-4 text-right">
+                <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Enode
                   </label>
                 </div>
-                <div className="col-sm-8 smd-pad-4">
+                <div className="col-sm-9 smd-pad-4">
                   <div className="form-width">
                     <Field
                       name="enode"
@@ -193,17 +212,18 @@ class AddMember extends Component {
                       onChange={(e) => this.handleEnodeChange(e)}
                       required
                     />
+                    <br /><span className="error-text">{this.errorMessageFor('enode')}</span>
                   </div>
                 </div>
               </div>
 
               <div className="row">
-                <div className="col-sm-4 text-right">
+                <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Balance
                   </label>
                 </div>
-                <div className="col-sm-8 smd-pad-4">
+                <div className="col-sm-9 smd-pad-4">
                   <div className="form-width">
                     <Field
                       name="value"
@@ -225,54 +245,40 @@ class AddMember extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("add_member_cancel");
+                  this.props.reset();
                   this.closeModal();
                 }} />
                 <Button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.props.handler(this.state);
-                    mixpanelWrapper.track('add_member_submit_click_successful');
-                    this.closeModal();
-                  }}                  
+                  intent={Intent.PRIMARY}
+                  onClick={this.submit}
                   text="Add Member"
                 />
               </div>
             </div>
-          </Dialog>
-        </form>
+          </form>
+        </Dialog>
       </div>
     );
   }
 }
 
-const selector = formValueSelector('send-tokens');
-
 export function mapStateToProps(state) {
   return {
-    isOpen: state.sendTokens.isOpen,
-    result: state.sendTokens.result,
+    isOpen: state.createChain.isAddMemberModalOpen,
     accounts: state.accounts.accounts,
-    fromUsername: selector(state, 'from'),
-    toUsername: selector(state, 'to'),
     initialValues: {
       from: state.user.currentUser.username,
       fromAddress: state.user.currentUser.accountAddress
-    },
-    balance: state.accounts.currentUserBalance
+    }
   };
 }
 
-const formed = reduxForm({ form: 'send-tokens', validate })(AddMember);
+const formed = reduxForm({ form: 'add-member' })(AddMember);
 const connected = connect(mapStateToProps, {
-  sendTokensOpenModal,
-  sendTokensCloseModal,
-  sendTokens,
   fetchAccounts,
   fetchUserAddresses,
-  fromUsernameChange,
-  toUsernameChange,
-  fetchBalanceRequest
+  openAddMemberModal,
+  closeAddMemberModal
 })(formed);
 
 export default withRouter(connected);

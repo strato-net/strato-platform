@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -7,6 +7,8 @@ import { withRouter } from 'react-router-dom';
 import AddMember from './components/AddMember';
 import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { validate } from './validate';
+import { toasts } from '../Toasts';
 
 class CreateChain extends Component {
 
@@ -14,6 +16,7 @@ class CreateChain extends Component {
     super(props);
     this.state = {
       members: [],
+      errors: null
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
@@ -23,37 +26,50 @@ class CreateChain extends Component {
     mixpanelWrapper.track("create_chain_loaded");
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.createErrorMessage) {
+      toasts.show({ message: nextProps.createErrorMessage });
+      this.props.resetError();
+    }
+  }
+
   submit = (values) => {
-    mixpanelWrapper.track('create_chain_submit_click');
-    let members = [];
-    let balances = [];
-    this.state.members.forEach(function(member, index) {
-      members.push({
-        "address": member.address,
-        "enode": member.enode
+    values.members = this.state.members;
+    let errors = validate(values);
+    this.setState({ errors });
+
+    if (!Object.values(errors).length) {
+      mixpanelWrapper.track('create_chain_submit_click');
+      let members = [];
+      let balances = [];
+      this.state.members.forEach(function (member, index) {
+        members.push({
+          "address": member.address,
+          "enode": member.enode
+        });
+        balances.push({
+          "balance": member.balance,
+          "address": member.address
+        });
       });
-      balances.push({
-        "balance": member.balance,
-        "address": member.address
+      let args = {
+        addRule: values.addRule,
+        removeRule: values.removeRule
+      };
+      this.props.createChain(values.chainName, members, balances, values.governanceContract, args);
+      this.setState({
+        members: [],
       });
-    });
-    let args = {
-      [values.var1]: values.val1,
-      [values.var2]: values.val2
-    };
-    this.props.createChain(values.label, members, balances, values.src, args);
-    this.setState({
-      members: [],
-    });
+    }
   }
 
   updateMembers(state) {
     const curMembers = this.state.members.slice(0);
     const usernames = [];
-    curMembers.forEach(function(member, index) {
+    curMembers.forEach(function (member, index) {
       usernames.push(member.username);
     });
-    if (!usernames.includes(state.username)){
+    if (!usernames.includes(state.username)) {
       this.setState({
         members: curMembers.concat({
           username: state.username,
@@ -62,7 +78,7 @@ class CreateChain extends Component {
           balance: parseInt(state.balance, 10)
         })
       });
-    } 
+    }
   }
 
   removeMember(member) {
@@ -75,18 +91,23 @@ class CreateChain extends Component {
   }
 
   showMembers(members) {
-    if (members.length && members.length > 0){
+    if (members.length && members.length > 0) {
       const ret = [];
-      members.forEach(function(member, index){
+      members.forEach(function (member, index) {
         ret.push(
-          <div className="pt-dialog-header">
-          <span className="pt-dialog-header-title">{member.username}</span>
-          <Button 
-            className="pt-button pt-icon-small-cross" 
-            onClick = {() => {
-              this.removeMember(member)
-            }}
-            text='Remove'/>
+          <div className="row smd-margin-8 member smd-vertical-center" key={index}>
+            <div className="col-sm-1"></div>
+            <div className="col-sm-9">
+              <span>{member.username}</span>
+            </div>
+            <div className="col-sm-2">
+              <Button
+                className="pt-button pt-icon-trash member-remove"
+                onClick={() => {
+                  this.removeMember(member)
+                }}
+              />
+            </div>
           </div>
         );
       }.bind(this))
@@ -94,11 +115,18 @@ class CreateChain extends Component {
     }
     else {
       return (
-        <div className="pt-dialog-header">
-          <span className="pt-dialog-header-title">No Members</span> 
+        <div className="pt-dialog-header no-member">
+          <span className="pt-dialog-header-title">No Members</span>
         </div>
       );
     }
+  }
+
+  errorMessageFor(fieldName) {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
   }
 
   render() {
@@ -113,112 +141,108 @@ class CreateChain extends Component {
           text="Create Chain" />
 
         <Dialog
-          iconName="inbox"
+          iconName="flows"
           isOpen={this.props.isOpen}
           onClose={this.props.closeCreateChainOverlay}
           title="Create New Chain"
           className="pt-dark"
         >
           <form>
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Chain Label
+            <div className="pt-dialog-body create-chain-form">
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Chain Name
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="label"
-                      component="input"
-                      type="text"
-                      placeholder="Chain Label"
-                      className="pt-input form-width"
-                      tabIndex="1"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.label}</div>
-                  </div>
                 </div>
-              
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-d">
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="chainName"
+                    component="input"
+                    type="text"
+                    placeholder="Chain Name"
+                    className="pt-input form-width"
+                    tabIndex="1"
+                    required
+                  />
+                  <span className="error-text">{this.errorMessageFor('chainName')}</span>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
                     Governance Contract
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="src"
-                      component="input"
-                      type="text"
-                      placeholder="Governance Contract"
-                      className="pt-input form-width"
-                      tabIndex="2"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.src}</div>
-                  </div>
                 </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="governanceContract"
+                    component="input"
+                    type="text"
+                    placeholder="Governance Contract"
+                    className="pt-input form-width"
+                    tabIndex="2"
+                    required
+                  />
+                  <span className="error-text">{this.errorMessageFor('governanceContract')}</span>
+                </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-e">
-                    Arguments
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Add Rule
                   </label>
-                  <div className="pt-form-content">
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
                     <Field
-                      name="var1"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Name"
-                      className="pt-input form-width"
-                      tabIndex="3"
-                      required
-                    />
-                  
-                    <Field
-                      name="val1"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Value"
-                      className="pt-input form-width"
-                      tabIndex="4"
-                      required
-                    />
-                  </div>
-                  <div className="pt-form-content">
-                    <Field
-                      name="var2"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Name"
-                      className="pt-input form-width"
-                      tabIndex="5"
-                      required
-                    />
-                  
-                    <Field
-                      name="val2"
-                      component="input"
-                      type="text"
-                      placeholder="Variable Value"
-                      className="pt-input form-width"
-                      tabIndex="6"
-                      required
-                    />
+                      className="pt-input"
+                      component="select"
+                      name="addRule"
+                    >
+                      <option />
+                      <option value="MajorityRules">Majority Rules</option>
+                      <option value="AutoApprove">Auto Approve</option>
+                      <option value="TwoIn">Two In</option>
+                    </Field>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Remove Rule
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="removeRule"
+                    >
+                      <option />
+                      <option value="MajorityRules">Majority Rules</option>
+                      <option value="AutoApprove">Auto Approve</option>
+                      <option value="TwoIn">Two In</option>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
                     Chain Members
                   </label>
                   {this.showMembers(this.state.members)}
-                  <AddMember handler={this.updateMembers}/>
+                  <span className="error-text">{this.errorMessageFor('members')}</span>
+                  <AddMember handler={this.updateMembers} />
                 </div>
-              </div>
-
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
               </div>
             </div>
 
@@ -227,10 +251,14 @@ class CreateChain extends Component {
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track('create_chain_close_click');
                   this.props.reset();
+                  this.setState({
+                    members: [],
+                  });
                   this.props.closeCreateChainOverlay();
                 }} />
                 <Button
                   intent={Intent.PRIMARY}
+                  disabled={this.props.isSpinning}
                   onClick={this.props.handleSubmit(this.submit)}
                   text="Create Chain"
                 />
@@ -245,29 +273,21 @@ class CreateChain extends Component {
 }
 
 export function mapStateToProps(state) {
-  let errors = { errors: undefined };
-  if (state.form && state.form["create-chain"]) {
-    errors = { errors: state.form["create-chain"].syncErrors }
-  }
   return {
     isOpen: state.createChain.isOpen,
-    ...errors
+    isSpinning: state.createChain.spinning,
+    createErrorMessage: state.createChain.error,
   };
 }
 
-export function validate(values) { 
-  //TODO: add validations for chain creation
-  const errors = {};
-  return errors;
-}
-
-const formed = reduxForm({ form: 'create-chain', validate })(CreateChain);
+const formed = reduxForm({ form: 'create-chain' })(CreateChain);
 const connected = connect(
   mapStateToProps,
   {
     openCreateChainOverlay,
     closeCreateChainOverlay,
     createChain,
+    resetError
   }
 )(formed);
 

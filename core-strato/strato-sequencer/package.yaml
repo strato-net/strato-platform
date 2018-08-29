@@ -35,6 +35,7 @@ dependencies:
   - time
   - statsdi
   - stm
+  - stm-chans
   - conduit-combinators
   - blockstanbul
   - lens
@@ -73,5 +74,7 @@ tests:
       - derive
       - hflags
       - hspec
+      - hspec-core
       - hspec-contrib
       - strato-sequencer
+      - hspec-expectations-lifted

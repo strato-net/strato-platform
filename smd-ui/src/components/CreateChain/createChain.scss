@@ -4,6 +4,20 @@
   margin-left: 10%;
 }
 
-.form-width {
-  width: 50%;
+.create-chain-form .form-width {
+  width: 100%;
+}
+
+.no-member {
+  border-radius: 60px;
+}
+
+.member:hover {
+  cursor: pointer !important;
+  background: #30434D;
+  border-radius: 60px;
+}
+
+.member-remove:hover {
+  background-color: red !important;
 }

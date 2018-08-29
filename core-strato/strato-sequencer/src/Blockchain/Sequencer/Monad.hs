@@ -18,8 +18,15 @@ module Blockchain.Sequencer.Monad (
   , addLdbBatchOps
   , drainP2P
   , drainVM
+  , createFirstTimer
+  , createNewTimer
+  , drainTimeouts
 ) where
 
+import           ClassyPrelude                             (atomically, STM)
+import           Prelude                                   hiding (round)
+import           Control.Concurrent.AlarmClock
+import           Control.Concurrent.STM.TMChan
 import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
@@ -30,6 +37,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
+import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Constants
@@ -70,6 +78,7 @@ data SequencerContext = SequencerContext
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _sequencerKafkaState :: K.KafkaState
                       , _blockstanbulContext :: Maybe BlockstanbulContext
+                      , _blockstanbulTimeouts :: TMChan RoundNumber
                       }
 makeLenses ''SequencerContext
 
@@ -84,6 +93,8 @@ data SequencerConfig =
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
                      , statsConfig           :: Maybe StatsConf
+                     , blockstanbulBlockPeriod :: NominalDiffTime
+                     , blockstanbulRoundPeriod :: NominalDiffTime
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
@@ -134,6 +145,7 @@ runSequencerM c mbc m = do
         let kState = case mAddr of
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
+        ch <- atomically $ newTMChan
 
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
@@ -147,6 +159,7 @@ runSequencerM c mbc m = do
             , _p2pEvents           = Q.empty
             , _sequencerKafkaState = kState
             , _blockstanbulContext = mbc
+            , _blockstanbulTimeouts = ch
             }
     return $ fst a
 
@@ -164,6 +177,32 @@ drainP2P = fmap toList $ p2pEvents <<.= Q.empty
 
 drainVM :: SequencerM [OutputEvent]
 drainVM = fmap toList $ vmEvents <<.= Q.empty
+
+createFirstTimer :: SequencerM ()
+createFirstTimer = do
+  v <- currentView
+  createNewTimer . _round $ v
+
+createNewTimer :: RoundNumber -> SequencerM ()
+createNewTimer rn = do
+  ch <- use blockstanbulTimeouts
+  let act :: AlarmClock UTCTime -> IO ()
+      act _ = atomically $ writeTMChan ch rn
+  alarm <- liftIO $ newAlarmClock act
+  dt <- asks blockstanbulRoundPeriod
+  next <- addUTCTime dt <$> liftIO getCurrentTime
+  liftIO $ setAlarm alarm next
+
+drainTMChan :: TMChan a -> STM [a]
+drainTMChan ch = do
+  mmx <- tryReadTMChan ch
+  case mmx of
+    Nothing -> return []
+    Just Nothing -> return []
+    Just (Just x) -> (x:) <$> drainTMChan ch
+
+drainTimeouts :: SequencerM [RoundNumber]
+drainTimeouts = join $ uses blockstanbulTimeouts (atomically . drainTMChan)
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})

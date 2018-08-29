@@ -45,6 +45,20 @@ data ChainInput  = ChainInput
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
+instance KnownSymbol "address" where
+instance KnownSymbol "balance" where
+instance KnownSymbol "enode" where
+
+instance ToSchema (NamedTuple "address" Address "balance" Integer) where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "address and balance pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))) :: NamedTuple "address" Address "balance" Integer)
+
+instance ToSchema (NamedTuple "address" Address "enode" Text) where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "address and enode pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)) :: NamedTuple "address" Address "enode" Text)
+
 instance Arbitrary ChainInput where
   arbitrary = genericArbitrary uniform
 
@@ -52,7 +66,7 @@ instance FromJSON ChainInput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToJSON ChainInput where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase) 
 
 exampleSrc :: Text
 exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
@@ -63,8 +77,8 @@ exampleEnode1 = "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 exampleEnode2 :: Text
 exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
 
-instance ToSample ChainInput where
-  toSamples _ = singleSample ChainInput
+exChainInput :: ChainInput
+exChainInput = ChainInput
     { chaininputSrc = exampleSrc
     , chaininputLabel = "my chain"
     , chaininputBalances = map fromTuple [
@@ -81,31 +95,17 @@ instance ToSample ChainInput where
        ]
     }
 
+instance ToSample ChainInput where
+  toSamples _ = singleSample exChainInput
+
 instance ToSchema ChainInput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Chain Input Info"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ChainInput
-      ex = ChainInput
-        { chaininputSrc = exampleSrc
-        , chaininputLabel = "my chain"
-        , chaininputBalances = map fromTuple [
-            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
-          ]
-        , chaininputArgs = Map.fromList [
-            ("addRule", ArgString "AUTO_APPROVE")
-          , ("removeRule", ArgString "AUTO_APPROVE")
-          ]
-        , chaininputMembers = map fromTuple [
-            (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
-          , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-          ]
-       }
+    & mapped.schema.example ?~ toJSON exChainInput
 
 instance ToParam (QueryParams "chainid" ChainId) where
   toParam _ = DocQueryParam "chainid" [] "chain ID to be looked up" Normal
+
 
 data ChainOutput = ChainOutput
   { chainoutputLabel    :: Text
@@ -122,25 +122,6 @@ instance FromJSON ChainOutput where
 instance ToJSON ChainOutput where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
-instance ToSample ChainOutput where
-  toSamples _ = singleSample ChainOutput
-    { chainoutputLabel = "my chain"
-    , chainoutputBalances = map fromTuple [
-         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
-       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
-       ]
-    , chainoutputMembers = map fromTuple [
-         (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
-       , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
-       ]
-    }
-
-instance ToSchema ChainOutput where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Chain Output Info"
-    & mapped.schema.example ?~ toJSON exChainOutput
-    where
-
 exChainOutput :: ChainOutput
 exChainOutput = ChainOutput
   { chainoutputLabel = "my chain"
@@ -152,16 +133,32 @@ exChainOutput = ChainOutput
       (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
     , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
     ]
- }
+  }
+
+instance ToSample ChainOutput where
+  toSamples _ = singleSample exChainOutput
+
+instance ToSchema ChainOutput where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Chain Output Info"
+    & mapped.schema.example ?~ toJSON exChainOutput
 
 
 type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
 instance KnownSymbol "id" where
 instance KnownSymbol "info" where
 
-instance ToSample (NamedTuple "id" ChainId "info" ChainOutput) where
-  toSamples _ = singleSample (NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput))
---toSamples (NamedTuple (a,b)) = singleSample (NamedTuple (toSample a, toSample b))
+exChainIdChainOutput :: ChainIdChainOutput 
+exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
+
+instance ToSample ChainIdChainOutput where
+  toSamples _ = singleSample exChainIdChainOutput 
+
+instance ToSchema ChainIdChainOutput where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Chain Output Info"
+--    TODO: Figure out why this line crashes the entire Bloc API doc? Works just fine for ChainIdChainInfo in Strato docs
+--    & mapped.schema.example ?~ toJSON exChainIdChainOutput
 
 --------------------------------------------------------------------------------
 
@@ -170,6 +167,8 @@ instance ToSample (NamedTuple "id" ChainId "info" ChainOutput) where
 type PostChainInfo = "chain"
   :> ReqBody '[JSON] ChainInput
   :> Post '[JSON] ChainId
+
+-- GET /chain
 
 type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId

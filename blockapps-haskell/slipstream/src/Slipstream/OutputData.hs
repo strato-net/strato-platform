@@ -1,6 +1,7 @@
 {-# LANGUAGE
   OverloadedStrings
   , TemplateHaskell
+  , BangPatterns
 #-}
 
 module Slipstream.OutputData where
@@ -11,11 +12,18 @@ import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import Network
-import Slipstream.Options
-import Slipstream.SolidityValue
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import BlockApps.Solidity.Value
 import Data.List.Utils (replace)
+import Control.Monad
+import qualified Data.List as L
+import Data.IORef
+
+import Slipstream.Events
+import Slipstream.Globals
+import Slipstream.Options
+import Slipstream.SolidityValue
 
 defaultMaxB :: Integer
 defaultMaxB = 32 * 1024 * 1024
@@ -32,12 +40,12 @@ listToKeyStatement _ [(x, _)] = "\"" ++ T.unpack x ++ "\""
 listToKeyStatement s ((x,_):es) = "\"" ++ T.unpack x ++ "\"" ++ s ++ (listToKeyStatement s es)
 
 valueToString :: String -> SolidityValue -> String
-valueToString s (SolidityValueAsString x) = s ++ T.unpack x ++ s
+valueToString s (SolidityValueAsString x) = s ++ (escapeQuotes $ T.unpack x) ++ s
 valueToString s (SolidityBool x) = s ++ show x ++ s
 valueToString s (SolidityNum x ) = s ++ show x ++ s
-valueToString s (SolidityBytes x) = s ++ show x ++ s
+valueToString s (SolidityBytes x) = s ++ (escapeQuotes $ show x) ++ s
 valueToString s (SolidityArray x) = s ++ "{" ++ arrayToString x ++ "}" ++ s
-valueToString s (SolidityObject x) = s ++ show x ++ s
+valueToString s (SolidityObject x) = s ++ (escapeQuotes $ show x) ++ s
 
 escapeQuotes :: String -> String
 escapeQuotes x = replace "\'" "\'\'" $ replace "\"" "\\\"" x
@@ -46,7 +54,7 @@ arrayContent :: SolidityValue -> String
 arrayContent (SolidityValueAsString x) = escapeQuotes $ T.unpack x
 arrayContent (SolidityBool x) = show x
 arrayContent (SolidityNum x ) = show x
-arrayContent (SolidityBytes x) = show x
+arrayContent (SolidityBytes x) = escapeQuotes $ show x
 arrayContent (SolidityArray x) = escapeQuotes $ show x
 arrayContent (SolidityObject x) = escapeQuotes $ show x
 
@@ -65,6 +73,12 @@ tableColumns [] = []
 tableColumns [(x, y)] = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y
 tableColumns ((x, y):es) = "\"" ++ T.unpack x ++ "\"" ++ " " ++ valueToTxt y ++ ", " ++ tableColumns es
 
+tableUpsert :: [(T.Text, SolidityValue)] -> String
+tableUpsert [] = []
+tableUpsert [(x, _)] = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\""
+tableUpsert ((x, _):es) = "\"" ++ T.unpack x ++ "\"" ++ " = excluded." ++ "\"" ++ T.unpack x ++ "\"" ++  ", " ++ tableUpsert es
+
+
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
   { pgDBHost = flags_pghost :: HostName
@@ -77,45 +91,69 @@ dbConnect =  PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: String -> IO()
-dbInsert insrt = do
-  conn <- pgConnect dbConnect
-  let qry = rawPGSimpleQuery $ BC.pack insrt
-  _ <- pgRunQuery conn qry
-  pgDisconnect conn
+dbInsert :: String -> PGConnection -> IO()
+dbInsert insrt conn = do
+  let qry = rawPGSimpleQuery $! BC.pack insrt
+  _ <- pgQuery conn qry
+  return ()
 
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-convertRet :: String -> String -> String -> String -> String -> Map.Map T.Text Value -> IO()
-convertRet address codehash abi name chain x = do
+convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
+convertRet metadata conn globalsIORef = do
+  let firstContract = head metadata
+  let hashVal = codehash firstContract
+  globals <- readIORef globalsIORef
+  let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
-  let conVals = "('" ++ codehash ++ "', '" ++ name ++ "', '" ++ abi ++ "', '" ++ chain ++ "')"
-  let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+  putStrLn $ "In convertRet, " ++ show hashVal ++ " contractAlreadyCreated = " ++ show contractAlreadyCreated
+  
+  if (length metadata > 1)
+    then do
+      when (not $ contractAlreadyCreated) $ do
+          let conVals = "('" ++ (codehash $ head metadata) ++ "', '" ++ (contractName $ head metadata) ++ "', '" ++ (abi $ head metadata) ++ "', '" ++ (chain $ head metadata) ++ "')"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+          dbInsert conIns conn
 
-  --Indexing flag
-  let indFlag = True
-  let ind = if (indFlag)
-              then do
-                let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction x
+      let fstContract = contractData $ head metadata
+      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
+      let comma = if (length list == 0)
+          then ""
+          else ", "
+      let createSt = "create table if not exists \"" ++ (contractName $ head metadata) ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ (contractName $ head metadata) ++ "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      dbInsert createSt conn
 
-                let createSt = "create table if not exists \"" ++ name ++ "\" (address text, \"chainId\" text, " ++ tableColumns list ++ ");"
-                let delRow = "delete from \"" ++ name ++ "\" where address='" ++ address ++ "' and \"chainId\"='" ++ chain ++ "';"
+      let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
 
-                let keySt = "(" ++ "address, \"chainId\", " ++ listToKeyStatement ", " list ++ ")"
-                let vals = "(" ++ "'" ++ address ++ "', '" ++ chain ++ "', "  ++ listToValueStatement ", " list ++ ")"
-                let ins = "insert into \"" ++ name ++ "\" " ++ keySt ++ " values " ++ vals ++ ";"
-                createSt ++ delRow ++ ins
-              else ""
+      vals <- forM metadata $ \row -> do
+            let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+            let rowSt = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma ++ listToValueStatement ", " rowList ++ ")"
+            return rowSt
 
-  --History flag
-  let histFlag = True
-  let hist = if (histFlag)
-              --TODO: Add history insert statement (transaction, state)
-              then ""
-              else ""
+      let inserts = L.intercalate ", " vals
+      let ins = "insert into \"" ++ (contractName $ head metadata) ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
 
-  let oneIns = "BEGIN;" ++ conIns ++ ind ++ hist ++ "COMMIT;"
+      dbInsert ins conn
+  else do
+    let row = head metadata
 
-  dbInsert oneIns
+    when(not contractAlreadyCreated) $ do
+          let conVals = "('" ++ codehash row ++ "', '" ++ contractName row ++ "', '" ++ abi row ++ "', '" ++ chain row ++ "')"
+          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
+          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+          dbInsert conIns conn
+    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+    let comma = if (length list == 0)
+        then ""
+        else ", "
+    let createSt = "create table if not exists \"" ++ contractName row ++ "\" (address text, \"chainId\" text" ++ comma ++ tableColumns list ++ ", CONSTRAINT \"" ++ contractName row ++"_pkey\" PRIMARY KEY (address, \"chainId\") );"
+    dbInsert createSt conn
+
+    let keySt = "(" ++ "address, \"chainId\"" ++ comma ++ listToKeyStatement ", " list ++ ")"
+    let vals = "(" ++ "'" ++ address row ++ "', '" ++ chain row ++ "'" ++ comma  ++ listToValueStatement ", " list ++ ")"
+    let ins = "insert into \"" ++ contractName row ++ "\" " ++ keySt ++ " values " ++ vals ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
+    dbInsert ins conn
+  return ()

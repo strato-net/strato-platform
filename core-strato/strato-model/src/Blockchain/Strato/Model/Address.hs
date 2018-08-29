@@ -34,6 +34,7 @@ import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
 -- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
+import           Text.Printf
 import           Web.PathPieces
 
 import           GHC.Generics
@@ -44,6 +45,9 @@ instance RLPSerializable Address where
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
 newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+
+instance PrintfArg Address where
+  formatArg (Address word) = formatArg word
 
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =

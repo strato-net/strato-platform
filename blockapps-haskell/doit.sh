@@ -3,7 +3,11 @@
 set -e
 set -x
 
+declare -A MONITORED_PIDS
+MONITORING_TIMER=5;
+
 stratoRoot=http://${stratoHost}/eth/v1.2
+vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 isPublic=false
  if [ "${SMD_MODE}" == public ]; then
@@ -18,6 +22,7 @@ slipstream:
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_slipstream_db="${postgres_slipstream_db}"
 --stratourl=\$stratoRoot="${stratoRoot}"
+--vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
 
@@ -26,7 +31,9 @@ no vars/flags set
 
 bloc:
 stratoHost="${stratoHost}"
+vaultWrapperHost="${vaultWrapperHost}"
 --stratourl=\$stratoRoot="${stratoRoot}"
+--vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --pghost=\$postgres_host="${postgres_host}"
 --pgport=\$postgres_port="${postgres_port}"
 --pguser=\$postgres_user="${postgres_user}"
@@ -43,6 +50,12 @@ until curl ${stratoRoot} >& /dev/null; do
     sleep 0.5
 done
 echo "STRATO is available"
+
+echo "Waiting for Vault Wrapper to be available..."
+until curl ${vaultWrapperRoot} >& /dev/null; do
+    sleep 0.5
+done
+echo "Vault Wrapper is available"
 
 echo 'Waiting for postgres to be available...'
 while true; do
@@ -72,13 +85,48 @@ if [ ! -f initialized ]; then
 
 fi
 
-# TODO: refactor using the process monitoring from core-strato's doit.sh
+function runBackgroundProcess {
+  $@ &
+  proc_pid=$!
+  MONITORED_PIDS[${proc_pid}]=$@
+  echo "process pid:: $proc_pid (command: $@)"
+  disown %
+}
 
-/usr/bin/blockapps-strato-server >> logs/strato-server 2>&1 &
+runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
 
-/usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" \
-           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" >> logs/slipstream 2>&1 &
+runBackgroundProcess /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --loglevel="${loglevel:-4}" &>> logs/bloc
 
-usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" +RTS -N1 2>&1
+until curl localhost:8000 &> /dev/null; do
+  echo "Slipstream is waiting for bloc to come up..."
+  sleep 1;
+done
+echo "Bloc is up - running slipstream now..."
+
+runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+           --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
+           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
+
+set +x
+echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
+while sleep ${MONITORING_TIMER}; do
+  # check status for every monitored process
+  for monitored_pid in "${!MONITORED_PIDS[@]}"; do
+    # if process with pid does not exist
+    if ! (ps -p ${monitored_pid} > /dev/null); then
+      echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+      # Kill all the rest of monitored processes
+      for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+        if ps -p ${pid_to_kill} > /dev/null; then
+          echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+          kill -9 ${pid_to_kill} || true
+          echo "done"
+        fi
+      done
+      echo "CONTAINER IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /logs/ in the container"
+      # Keep container running idle
+      tail -f /dev/null
+    fi
+  done
+done

@@ -46,7 +46,6 @@ postChainR = do
     Success gen@(ChainInfo _ acin cdin mb) -> do
     -- add more checks?
       when (length acin == 0) $ invalidArgs ["account info is empty"]
-      when (length cdin == 0) $ invalidArgs ["code info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
       let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
             NonContract _ _ -> Nothing

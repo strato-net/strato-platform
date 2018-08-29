@@ -1,5 +1,11 @@
 import React, { Component } from 'react';
-import { fetchChains, fetchChainIds, fetchChainDetail, changeChainFilter, resetChainId } from './chains.actions';
+import {
+  fetchChains,
+  fetchChainDetail,
+  changeChainFilter,
+  resetChainId,
+  resetInitailLabel
+} from './chains.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -12,22 +18,22 @@ const tourSteps = [
   {
     title: 'View Chains',
     text: 'Scroll through all chains that you belong to',
-    selector: '#contracts',
+    selector: '#chains',
     position: 'bottom',
     isFixed: true
   }
 ];
 
 class Chains extends Component {
-constructor() {
+  constructor() {
     super()
     this.state = {
-      selected: 0
+      selected: null
     }
   }
 
   componentDidMount() {
-    this.props.fetchChains(true, true);
+    this.props.fetchChains();
     mixpanelWrapper.track('chains_page_load')
   }
 
@@ -35,24 +41,26 @@ constructor() {
     this.props.changeChainFilter(filter);
   };
 
-  onUserClick(label, chainids, index) {
-    if (chainids.length && index === this.state.selected) {
+  onUserClick(label, chainIds, index) {
+    let uniqueKey = `${label}-${index}`
+    if (chainIds.length && uniqueKey === this.state.selected) {
       this.props.resetChainId(label);
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('chains_row_click');
-      this.props.fetchChainIds(label, chainids, true);
+      chainIds.forEach((chainId) => {
+        this.props.fetchChainDetail(label, chainId);
+      })
     }
   }
 
   render() {
-    console.log("RENDER~~~~~");
     const labelIds = this.props.labelIds;
     const chains = this.props.chains;
     const filter = this.props.filter;
     const labels = Object.getOwnPropertyNames(chains);
     const rows = [];
-    const selectedChains = [];
+    let selectedChains = [];
 
     labels.filter(label => {
       if (!filter) {
@@ -63,12 +71,14 @@ constructor() {
         .indexOf(filter) > -1
     })
       .forEach(function (label, index) {
-        const chainids = Object.getOwnPropertyNames(labelIds[label]);
+        const chainIds = Object.getOwnPropertyNames(labelIds[label]);
+
         let labelClasseName = '';
-        if (this.state.selected === index && chainids.length > 0) {
+        let uniqueKey = `${label}-${index}`
+        if (this.state.selected === uniqueKey && chainIds.length > 0) {
           labelClasseName = ' selected';
-          chainids.map(chainid =>
-            selectedChains.push(<Chain label={label} id={chainid} />)
+          chainIds.map((chainid, key) =>
+            selectedChains.push(<Chain label={label} id={chainid} key={key} />)
           );
         }
 
@@ -76,8 +86,8 @@ constructor() {
           <div className="smd-margin-8" key={label}>
             <div className="row">
               <div className={`pt-card pt-elevation-2 smd-pointer ${labelClasseName}`} key={index} onClick={(e) => {
-                this.setState({ selected: index });
-                this.onUserClick(label, chainids, index);
+                this.setState({ selected: uniqueKey });
+                this.onUserClick(label, chainIds, index);
               }}>
                 {label}
               </div>
@@ -91,8 +101,8 @@ constructor() {
         <Tour
           name="chains"
           steps={tourSteps}
-          finalStepSelector='#contracts'
-          nextPage='contracts' />
+          finalStepSelector='#chains'
+          nextPage='transactions' />
 
         <div className="row">
           <div className="col-sm-4 text-left">
@@ -135,7 +145,7 @@ constructor() {
             </div>
             <div className="col-sm-8 account-details">
               <div>
-                {selectedChains.length ? selectedChains : null}
+                {selectedChains}
               </div>
             </div>
           </div>
@@ -149,7 +159,8 @@ export function mapStateToProps(state) {
   return {
     filter: state.chains.filter,
     chains: state.chains.chains,
-    labelIds: state.chains.labelIds
+    labelIds: state.chains.labelIds,
+    initialLabel: state.chains.initialLabel,
   };
 }
 
@@ -157,9 +168,9 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchChains,
-      fetchChainIds,
       fetchChainDetail,
       resetChainId,
-      changeChainFilter
+      changeChainFilter,
+      resetInitailLabel
     }
   )(Chains));

@@ -1,37 +1,54 @@
 import {
-  FETCH_CHAINS,
-  FETCH_CHAINS_SUCCESSFULL,
+  FETCH_CHAINS_REQUEST,
+  FETCH_CHAINS_SUCCESS,
   FETCH_CHAINS_FAILED,
   CHANGE_CHAIN_FILTER,
-  FETCH_CHAIN_IDS_SUCCESSFUL,
-  FETCH_CHAIN_IDS_FAILED,
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
-  RESET_CHAIN_ID
+  RESET_CHAIN_ID,
+  RESET_INITIAL_LABLE,
+  FETCH_CHAINS_IDS_FAILED,
+  FETCH_CHAINS_IDS_SUCCESS,
+  GET_LABEL_IDS
 } from './chains.actions';
 
 const initialState = {
   chains: {},
   labelIds: {},
   filter: '',
+  initialLabel: null,
   error: null,
+  listChain: {},
+  listLabelIds: {},
 };
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_CHAINS:
+    case FETCH_CHAINS_REQUEST:
       return {
         ...state,
-        chains: state.chains,
-        labelIds: state.labelIds,
-        filter: state.filter,
+        filter: null,
         error: null,
       };
-    case FETCH_CHAINS_SUCCESSFULL:
+    case FETCH_CHAINS_SUCCESS:
+      const chainLabelIds = {};
+      const chains = action.chainLabelIds;
+      // this will create an object of chain with label and their address
+      chains.forEach((chain) => {
+        const id = chain.id;
+        const label = chain.info.label;
+        if (!chainLabelIds[label]) {
+          chainLabelIds[label] = {};
+          chainLabelIds[label][id] = {};
+        } else {
+          chainLabelIds[label][id] = {};
+        }
+      });
       return {
         ...state,
-        chains: action.chainLabelIds,
-        labelIds: action.chainLabelIds,
+        chains: chainLabelIds,
+        labelIds: chainLabelIds,
+        initialLabel: chains.length && chains[0].info.label,
         filter: state.filter,
         error: null
       };
@@ -51,27 +68,6 @@ const reducer = function (state = initialState, action) {
         filter: action.filter,
         error: state.error,
       }
-    case FETCH_CHAIN_IDS_SUCCESSFUL:
-      return {
-        ...state,
-        chains: state.chains,
-        labelIds: state.labelIds,
-        filter: state.filter,
-        error: state.error
-      }
-    case FETCH_CHAIN_IDS_FAILED:
-      return {
-        ...state,
-        chains: {
-          ...state.chains,
-          [action.label]: {
-            error: action.error
-          }
-        },
-        labelIds: state.labelIds,
-        filter: state.filter,
-        error: state.error
-      }
     case FETCH_CHAIN_DETAIL_SUCCESS:
       return {
         ...state,
@@ -80,8 +76,7 @@ const reducer = function (state = initialState, action) {
           [action.label]: {
             ...state.chains[action.label],
             [action.id]: {
-              ...action.detail,
-              error: null
+              ...action.detail[0]
             }
           }
         },
@@ -115,6 +110,38 @@ const reducer = function (state = initialState, action) {
         labelIds: state.labelIds,
         filter: state.filter,
         error: state.error
+      }
+    case RESET_INITIAL_LABLE:
+      return {
+        ...state,
+        initialLabel: null
+      }
+    case FETCH_CHAINS_IDS_SUCCESS:
+      const newChain = {};
+      action.chain.forEach((chain) => {
+        const id = chain.id;
+        const label = chain.info.label;
+        if (!newChain[label]) {
+          newChain[label] = {};
+          newChain[label][id] = {};
+        } else {
+          newChain[label][id] = {};
+        }
+      });
+      return {
+        ...state,
+        listChain: newChain
+      }
+    case FETCH_CHAINS_IDS_FAILED:
+      return {
+        ...state,
+        listChain: [],
+        error: action.error
+      }
+    case GET_LABEL_IDS:
+      return {
+        ...state,
+        listLabelIds: state.listChain[action.label]
       }
     default:
       return state;
