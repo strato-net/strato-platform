@@ -10,6 +10,7 @@ export const FETCH_CHAIN_DETAIL_SUCCESS = 'FETCH_CHAIN_DETAIL_SUCCESS';
 export const FETCH_CHAIN_DETAIL_FAILURE = 'FETCH_CHAIN_DETAIL_FAILURE';
 export const RESET_CHAIN_ID = 'RESET_CHAIN_ID';
 export const RESET_INITIAL_LABLE = 'RESET_INITIAL_LABLE';
+export const GET_LABEL_IDS = 'GET_LABEL_IDS';
 
 export const fetchChains = function () {
   return {
@@ -94,5 +95,12 @@ export const fetchChainIdsFailure = function (error) {
   return {
     type: FETCH_CHAINS_IDS_FAILED,
     error
+  }
+};
+
+export const getLabelIds = function (label) {
+  return {
+    type: GET_LABEL_IDS,
+    label
   }
 };

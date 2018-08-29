@@ -15,7 +15,7 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
 import validate from './validate';
 import { isModePublic } from '../../../../lib/checkMode';
-import { fetchChainIds } from '../../../Chains/chains.actions';
+import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -289,23 +289,51 @@ class SendTokens extends Component {
               <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
-                    Chain ID
+                    Chain
                   </label>
                 </div>
                 <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select" style={{width: '100%'}}>
+                  <div className="pt-select">
                     <Field
                       className="pt-input"
                       component="select"
-                      name="chainId"
-                      style={{width: '100%'}}
+                      name="chainLabel"
+                      onChange={
+                        (e) => this.props.getLabelIds(e.target.value)
+                      }
                       required
                     >
                       <option />
                       {
-                        this.props.chainIds.map((chain, i) => {
+                        Object.getOwnPropertyNames(this.props.chainLabel).map((label, i) => {
                           return (
-                            <option key={chain + i} value={chain}>{chain}</option>
+                            <option key={label + i} value={label}>{label}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-4 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Chain IDs
+                  </label>
+                </div>
+                <div className="col-sm-8 smd-pad-4">
+                  <div className="pt-select smd-max-width">
+                    <Field
+                      className="pt-input smd-max-width"
+                      component="select"
+                      name="chainId"
+                      required
+                    >
+                      <option />
+                      {
+                        Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                          return (
+                            <option key={id + i} value={id}>{id}</option>
                           )
                         })
                       }
@@ -424,7 +452,8 @@ export function mapStateToProps(state) {
       fromAddress: state.user.currentUser.accountAddress
     },
     balance: state.accounts.currentUserBalance,
-    chainIds: state.chains.chainIds
+    chainLabel: state.chains.listChain,
+    chainLabelIds: state.chains.listLabelIds
   };
 }
 
@@ -438,7 +467,8 @@ const connected = connect(mapStateToProps, {
   fromUsernameChange,
   toUsernameChange,
   fetchBalanceRequest,
-  fetchChainIds
+  fetchChainIds,
+  getLabelIds
 })(formed);
 
 export default withRouter(connected);
