@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
@@ -32,7 +33,7 @@ data NextType = Round RoundNumber | Sequence SequenceNumber
 data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
     _view :: View
-  -- authenticator authenticates wire messages are coming from the right sender
+  -- Whether to really authenticate, or just to pretend to.
   , _productionAuth :: Bool
   -- The block proposed for this round
   , _proposal :: Maybe Block
@@ -83,7 +84,7 @@ newContext v as pk =
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _productionAuth = False -- True:Assume authenticated and not checking. False: Apply authenticator and check
+     , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -103,28 +104,29 @@ newContext v as pk =
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
+authorize :: (StateMachineM m) => InEvent -> m Bool
+authorize = \case
+  IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
+  _ -> return True
+
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
-  authn <- use productionAuth
-  if (authn)
-    then return True
-    else case iev of
-            IMsg (MsgAuth addr sign) (Preprepare _ pp) -> do
-              -- check validators in ExtraData
-              checkpass <- uses validators (addr `elem`)
-              vali <- use validators
-              let checkpass2 = checkpass && (vali == (getValidatorList pp))
-              let pplverified = fromMaybe 0x0000000000000000 $ verifyProposerSeal pp sign
-              pr <- use proposer
-              -- check proposer in ExtraData
-              let checkpass3 = checkpass2 && (pplverified == pr)
-              return checkpass3
-            IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-              checkpass <- uses validators (addr `elem`)
-              let committer = fromMaybe 0x0000000000000000 $ verifyCommitmentSeal di seal
-              return (checkpass && committer == addr)
-            IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
-            _ -> return True -- No sender for timeouts!
+  let authenticated = authenticate iev
+  authorized <- authorize iev
+  specificAuth <-
+    case iev of
+      IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
+        vali <- use validators
+        let validatorMatch = vali == (getValidatorList pp)
+            signatory = verifyProposerSeal pp =<< getProposerSeal pp
+        return $ validatorMatch && Just addr == signatory
+      IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+        return $ Just addr == verifyCommitmentSeal di seal
+      _ -> return True -- No specific auth for any other messages
+  doAuthn <- use productionAuth
+  return $ if doAuthn
+              then authorized && authenticated && specificAuth
+              else authorized
 
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
