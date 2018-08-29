@@ -33,7 +33,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
     _view :: View
   -- authenticator authenticates wire messages are coming from the right sender
-  , _authenticator :: Bool
+  , _productionAuth :: Bool
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
@@ -83,7 +83,7 @@ newContext v as pk =
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _authenticator = False -- True:Assume authenticated and not checking. False: Apply authenticator and check
+     , _productionAuth = False -- True:Assume authenticated and not checking. False: Apply authenticator and check
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -105,7 +105,7 @@ selfAddr = uses prvkey prvKey2Address
 
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
-  authn <- use authenticator
+  authn <- use productionAuth
   if (authn)
     then return True
     else case iev of
