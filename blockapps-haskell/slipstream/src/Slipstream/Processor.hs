@@ -85,7 +85,7 @@ getContract address _ chainId = do
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi qqqq
     , xabi = show $ A.toJSON $ contractdetailsXabi qqqq
-    , name = show $ contractdetailsName qqqq
+    , name = replace "\"" "" $ show $ contractdetailsName qqqq
     , resolvedName = Nothing
     , contractStored = False
     , contractSchema = Nothing
@@ -133,7 +133,6 @@ smashIt (x:[]) tmp final =
 resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)] -> IO String
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
-  liftIO $ putStrLn $ "sameName: " ++ show sameName
   if (null sameName)
     then return $ contractName ++ show inc
     else do
@@ -213,9 +212,7 @@ processTheMessages messages conn cachedContractsIORef = do
                   Right c -> do
                     --Resolve Name Issues
                     let contList = Map.toList cachedContracts
-                    liftIO $ putStrLn $ "Pre-resolution name: " ++ show (replace "\"" "" $ name c)
-                    resName <- liftIO $ resolveContractName 1 codehash (replace "\"" "" $ name c) contList
-                    liftIO $ putStrLn $ "Resolved Name: " ++ show resName
+                    resName <- liftIO $ resolveContractName 1 codehash (name c) contList
                     let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
                     liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
                     return newContractAndXabi

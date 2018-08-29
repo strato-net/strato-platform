@@ -15,7 +15,7 @@ import Data.Map (Map)
 import qualified Data.Text as T
 import qualified BlockApps.Solidity.Value as V
 import BlockApps.Solidity.Contract
-import Slipstream.SolidityValue
+--import Slipstream.SolidityValue
 
 import GHC.Generics
 
@@ -101,5 +101,5 @@ data ContractAndXabi =
     name :: String,
     resolvedName :: Maybe String,
     contractStored :: Bool,
-    contractSchema :: Maybe ([(T.Text, SolidityValue)])
+    contractSchema :: Maybe String
   } deriving(Show)
