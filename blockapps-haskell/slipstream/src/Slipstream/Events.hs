@@ -99,5 +99,5 @@ data ContractAndXabi =
     name :: String,
     resolvedName :: Maybe String,
     contractStored :: Bool,
-    contractSchema :: Maybe ([(T.Text, SolidityValue)])
+    contractSchema :: Maybe String
   } deriving(Show)
