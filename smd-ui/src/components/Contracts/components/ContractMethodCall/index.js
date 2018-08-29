@@ -15,12 +15,11 @@ import { required } from '../../../../lib/reduxFormsValidations'
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 import { isModePublic } from '../../../../lib/checkMode';
+import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 
 class ContractMethodCall extends Component {
 
-  handleOpenModal = (e) => {
-    e.stopPropagation();
-    e.preventDefault();
+  handleOpenModal = () => {
     mixpanelWrapper.track("method_call_button_click");
     this.props.methodCallOpenModal(this.props.lookup);
     const address = this.props.fromCirrus && this.props.fromBloc === undefined ? this.props.contractName : this.props.contractAddress
@@ -55,7 +54,8 @@ class ContractMethodCall extends Component {
         .reduce((args, arg) => {
           args[arg] = values[arg];
           return args;
-        }, {})
+        }, {}),
+      chainId: values.chainId
     }
     mixpanelWrapper.track("method_call_submit");
     this.props.methodCall(this.props.lookup, payload);
@@ -157,7 +157,12 @@ class ContractMethodCall extends Component {
       <div>
         <Button
           className="pt-minimal pt-small pt-intent-primary"
-          onClick={this.handleOpenModal}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.handleOpenModal();
+            this.props.fetchChainIds();
+          }}
         >
           Call Method
         </Button>
@@ -177,7 +182,64 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{ marginTop: '5px' }}>
+                  <label className="pt-label label-margin">
+                    Chain
+                  </label>
+                </div>
+                <div className="col-sm-9">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="chainLabel"
+                      onChange={
+                        (e) => this.props.getLabelIds(e.target.value)
+                      }
+                      validate={required}
+                      required
+                    >
+                      <option />
+                      {
+                        Object.getOwnPropertyNames(this.props.chainLabel).map((label, i) => {
+                          return (
+                            <option key={label + i} value={label}>{label}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label label-margin">
+                    Chain Ids
+                  </label>
+                </div>
+                <div className="col-sm-9">
+                  <div className="pt-select smd-max-width">
+                    <Field
+                      className="pt-input smd-max-width"
+                      component="select"
+                      name="chainId"
+                      validate={required}
+                      required
+                    >
+                      <option />
+                      {
+                        Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                          return (
+                            <option key={id + i} value={id}>{id}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label label-margin">
                     Username
                   </label>
                 </div>
@@ -187,7 +249,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{ marginTop: '9px' }}>
+                  <label className="pt-label label-margin">
                     Address
                   </label>
                 </div>
@@ -197,7 +259,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{ marginTop: '9px' }}>
+                  <label className="pt-label label-margin">
                     Password
                   </label>
                 </div>
@@ -215,7 +277,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{ marginTop: '9px' }}>
+                  <label className="pt-label label-margin">
                     Value
                   </label>
                 </div>
@@ -296,7 +358,9 @@ export function mapStateToProps(state, ownProps) {
       state.methodCall.modals[ownProps.lookup] : {},
     accounts: state.accounts.accounts,
     currentUser: state.user.currentUser,
-    modalUsername: selector(state, 'modalUsername')
+    modalUsername: selector(state, 'modalUsername'),
+    chainLabel: state.chains.listChain,
+    chainLabelIds: state.chains.listLabelIds
   };
 }
 
@@ -311,6 +375,8 @@ const connected = connect(
     fetchAccounts,
     fetchUserAddresses,
     methodCall,
+    fetchChainIds,
+    getLabelIds
   }
 )(formed);
 const routed = withRouter(connected);
