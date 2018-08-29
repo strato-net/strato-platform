@@ -14,12 +14,12 @@ import {CREATE_CONTRACT_FORM} from './'
 import {fetchCirrusInstances} from '../Contracts/components/ContractCard/contractCard.actions'
 import {env} from '../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/contract?resolve"
+const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&chainid=:chainId"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
-export function createContractApiCall(contract, src, username, address, password, args) {
-  return fetch(url.replace(":user", username).replace(":address", address), {
+export function createContractApiCall(contract, src, username, address, password, args, chainId) {
+  return fetch(url.replace(":user", username).replace(":address", address).replace(":chainId", chainId), {
     method: 'POST',
     credentials: "include",
     headers: {
@@ -85,7 +85,7 @@ export function compileContractApiCall(contractName, source, s) {
 
 export function * createContract(action) {
   try {
-    let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments);
+    let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId);
     yield put(createContractSuccess(response));
     yield put(updateToast());
     yield put(fetchContracts());
