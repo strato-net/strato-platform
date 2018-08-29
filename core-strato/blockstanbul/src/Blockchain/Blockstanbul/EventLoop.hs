@@ -33,7 +33,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
     _view :: View
   -- authenticator authenticates wire messages are coming from the right sender
-  , _authenticator :: InEvent -> Bool
+  , _authenticator :: Bool
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
@@ -83,7 +83,7 @@ newContext v as pk =
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _authenticator = const True -- TODO(tim): Authenticate
+     , _authenticator = False -- True:Assume authenticated and not checking. False: Apply authenticator and check
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -106,9 +106,23 @@ selfAddr = uses prvkey prvKey2Address
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
   authn <- use authenticator
-  if not (authn iev)
-    then return False
+  if (authn)
+    then return True
     else case iev of
+            IMsg (MsgAuth addr sign) (Preprepare _ pp) -> do
+              -- check validators in ExtraData
+              checkpass <- uses validators (addr `elem`)
+              vali <- use validators
+              let checkpass2 = checkpass && (vali == (getValidatorList pp))
+              let pplverified = fromMaybe 0x0000000000000000 $ verifyProposerSeal pp sign
+              pr <- use proposer
+              -- check proposer in ExtraData
+              let checkpass3 = checkpass2 && (pplverified == pr)
+              return checkpass3
+            IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+              checkpass <- uses validators (addr `elem`)
+              let committer = fromMaybe 0x0000000000000000 $ verifyCommitmentSeal di seal
+              return (checkpass && committer == addr)
             IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
             _ -> return True -- No sender for timeouts!
 
@@ -200,46 +214,39 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         proposal .= Just realSealed
         yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
-      vali <- use validators
-      if (vali /= (getValidatorList pp))
-        then do
-          $logWarnS "blockstanbul/ppl" . T.pack $
-            printf "Rejecting proposal: validator list does not match"
+      pr <- use proposer
+      if (sender auth /= pr)
+        then $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
         else do
-          let pplverified = fromMaybe 0x0000000000000000 $ verifyProposerSeal pp (signature auth)
-          pr <- use proposer
-          if (sender auth /= pr || pplverified /= pr)
-            then $logWarnS "blockstanbul/ppl" . T.pack $
-                   printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
-            else do
-              mBlockLock <- use blockLock
-              if (isJust mBlockLock && Just pp /= mBlockLock)
+          mBlockLock <- use blockLock
+          if (isJust mBlockLock && Just pp /= mBlockLock)
+            then do
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: block does not match lock"
+              $logDebugS "blockstanbul/roundchange" "lock mismatch"
+              roundChange
+            else
+              if v /= v'
                 then do
+                  $logDebugS "blockstanbul/roundchange" . T.pack $
+                     "view mismatch (us, sender): " ++ format (v, v')
                   $logWarnS "blockstanbul/ppl" . T.pack $
-                    printf "Rejecting proposal: block does not match lock"
-                  $logDebugS "blockstanbul/roundchange" "lock mismatch"
+                    printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
                   roundChange
-                else
-                  if v /= v'
-                    then do
-                      $logDebugS "blockstanbul/roundchange" . T.pack $
-                         "view mismatch (us, sender): " ++ format (v, v')
-                      $logWarnS "blockstanbul/ppl" . T.pack $
-                        printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-                      roundChange
-                    else do
-                      blockcount += 1
-                      proposal .= Just pp
-                      pk <- use prvkey
-                      case extractBeneficiary pp of
-                        Nothing -> return()
-                        Just (bnef,vot) -> do
-                          -- insert the vote into map
-                          val <- uses voted $M.lookup bnef
-                          let unwrapVal = fromMaybe M.empty val
-                          let nval = M.insert pr vot unwrapVal
-                          voted %= M.insert bnef nval
-                      yield =<< signMessage pk (Prepare v (blockHash pp))
+                else do
+                   blockcount += 1
+                   proposal .= Just pp
+                   pk <- use prvkey
+                   case extractBeneficiary pp of
+                     Nothing -> return()
+                     Just (bnef,vot) -> do
+                       -- insert the vote into map
+                       val <- uses voted $M.lookup bnef
+                       let unwrapVal = fromMaybe M.empty val
+                       let nval = M.insert pr vot unwrapVal
+                       voted %= M.insert bnef nval
+                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -253,25 +260,20 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
-      let committer = fromMaybe 0x0000000000000000 $ verifyCommitmentSeal di seal
-      if (committer /= sender auth)
-        then do $logWarnS "blockstanbul/" . T.pack $
-                   printf "Rejecting Commit Message: commit signer  %x is not %x" (sender auth) committer
-        else do
-          cs <- committed <%= M.insert (sender auth) (di, seal)
-          total <- uses validators length
-          let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
-          sameHash <- hasSameHash di
-          -- TODO(tim): Is it necessary to check that we have prepared?
-          hasSent <- use hasCommitted
-          when (3 * sameVoteCount > 2 * total && sameHash && not hasSent ) $ do
-            hasCommitted .= True
-            ppl <- use proposal
-            case ppl of
-              Nothing -> error "TODO(tim): Decide how to handle this"
-              Just blk -> do
-                let seals = map snd . M.elems $ cs
-                yield . ToCommit . addCommitmentSeals seals $ blk
+      cs <- committed <%= M.insert (sender auth) (di, seal)
+      total <- uses validators length
+      let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
+      sameHash <- hasSameHash di
+      -- TODO(tim): Is it necessary to check that we have prepared?
+      hasSent <- use hasCommitted
+      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent ) $ do
+        hasCommitted .= True
+        ppl <- use proposal
+        case ppl of
+          Nothing -> error "TODO(tim): Decide how to handle this"
+          Just blk -> do
+            let seals = map snd . M.elems $ cs
+            yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
