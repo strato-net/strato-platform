@@ -20,13 +20,31 @@ dependencies:
   - lens
   - mtl
   - QuickCheck
+  - servant
+  - servant-server
+  - servant-client
+  - stm
+  - stm-chans
   - strato-model
   - text
   - transformers
   - monad-logger
+  - wai
+  - warp
+  - http-client
+  - async
+  - hflags
+  - safe
+  - strato-conf
+  - extra
+  - base64-bytestring
+  - aeson
+  - blockapps-milena
+  - http-conduit
 
 library:
   source-dirs: src/
+   
 
 tests:
   blockstanbul-test:

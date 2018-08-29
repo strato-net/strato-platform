@@ -1,27 +1,40 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.SequencerSpec where
 
-import           Data.Maybe                          (isNothing)
+
+import qualified Data.Aeson                 as Ae
+import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
+import           Data.Map                            as M (lookup)
+import           Data.Either.Extra
 import           Numeric                             (showHex)
 
 import           Control.Concurrent
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 
+import           Blockchain.Blockstanbul
+import           Blockchain.Data.Address
 import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.ChainHelpers
 import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Flags
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class       (txChainId)
-
+import           Blockchain.Strato.Model.Address
+import           Server
+import           Blockchain.Blockstanbul.EventLoop
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
+import qualified Network.Haskoin.Crypto     as HK
 
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
@@ -43,6 +56,49 @@ runTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB gb m
 
+runTestM2 :: SequencerM a -> IO ()
+runTestM2 m = do
+  gb <- makeGenesisBlock
+  void $ withTemporaryDepBlockDBbs gb m
+
+withTemporaryDepBlockDBbs :: IngestBlock -> SequencerM a -> IO ()
+withTemporaryDepBlockDBbs genesisBlock m = do
+    cwd          <- getCurrentDirectory
+    randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
+    timestamp    <- round <$> getPOSIXTime  :: IO Integer
+    let fullPath ="./.ethereumH/dep_block_" ++ show timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
+        tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
+    setCurrentDirectory "../" -- for ethconf to be happy
+    createDirectoryIfMissing True fullPath
+    ch <- atomically $ newTMChan
+    let kcid = KP.KString (C8.pack tempKCID)
+        cfg  = SequencerConfig { depBlockDBCacheSize   = 0
+                               , depBlockDBPath        = fullPath
+                               , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
+                               , kafkaClientId         = kcid
+                               , kafkaConsumerGroup    = KP.ConsumerGroup (KP.KString "fake")
+                               , seenTransactionDBSize = dedupWindow
+                               , syncWrites            = False
+                               , bootstrapDoEmit       = False
+                               , statsConfig           = Nothing
+                               , blockstanbulBlockPeriodμs = 0
+                               , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBeneficiary = ch
+                               }
+    let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+        validatrs = fromRight (error "invalid validators") eValidators
+        ctx = newContext (View 0 0) validatrs
+    mCtx <- if not flags_blockstanbul
+             then return Nothing
+             else do
+                let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
+                return . Just . ctx $ pkey
+    race_ (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg) (webserver 8081 ch)
+        `finally`
+        (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
+
 withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB genesisBlock m = do
     cwd          <- getCurrentDirectory
@@ -52,6 +108,7 @@ withTemporaryDepBlockDB genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
+    ch <- atomically $ newTMChan
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
@@ -64,6 +121,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , statsConfig           = Nothing
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBeneficiary = ch
                                }
 
     runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
@@ -170,3 +228,20 @@ spec = do
         liftIO $ threadDelay 200 -- Who are you to judge?
         out <- drainTimeouts
         out `shouldMatchList` input
+
+      it "checks for votes" $ runTestM2 $ do
+        let vote = (testAddr,True)
+        liftIO $ uploadVote 8081 vote
+        checkForVotes
+        bc <- getBlockstanbulContext
+        case bc of
+          Nothing -> do
+            True `shouldBe` False
+          Just bct -> do
+            let pv = _pendingvotes bct
+            let val = M.lookup testAddr pv
+            let nonc = fromMaybe False val
+            nonc `shouldBe` True
+
+testAddr :: Address
+testAddr = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b

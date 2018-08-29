@@ -43,6 +43,9 @@ addValidators vs = over extraLens $
   . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
   . cookRawExtra
 
+getValidatorList :: Block -> [Address]
+getValidatorList x = view (istanbul . _Just . validatorList) (cookRawExtra $ view extraLens x )
+
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra

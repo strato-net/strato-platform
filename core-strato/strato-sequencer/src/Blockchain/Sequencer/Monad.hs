@@ -41,6 +41,7 @@ import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Constants
+import           Blockchain.Data.Address
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -95,6 +96,7 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
+                     , blockstanbulBeneficiary :: TMChan (Address, Bool)
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
@@ -146,7 +148,6 @@ runSequencerM c mbc m = do
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
         ch <- atomically $ newTMChan
-
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize

@@ -135,6 +135,7 @@ nextRound nt = do
   val <- use validators
   vot <- use voted
   validators .= updateValidator val vot
+
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
@@ -194,39 +195,46 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         proposal .= Just realSealed
         yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
-      pr <- use proposer
-      if (sender auth /= pr)
-        then $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+      vali <- use validators
+      if (vali /= (getValidatorList pp))
+        then do
+          $logWarnS "blockstanbul/ppl" . T.pack $
+            printf "Rejecting proposal: validator list does not match"
         else do
-          mBlockLock <- use blockLock
-          if (isJust mBlockLock && Just pp /= mBlockLock)
-            then do
-              $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: block does not match lock"
-              $logDebugS "blockstanbul/roundchange" "lock mismatch"
-              roundChange
-            else
-              if v /= v'
-                then do
-                  $logDebugS "blockstanbul/roundchange" . T.pack $
-                     "view mismatch (us, sender): " ++ format (v, v')
-                  $logWarnS "blockstanbul/ppl" . T.pack $
-                    printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-                  roundChange
-                else do
-                   blockcount += 1
-                   proposal .= Just pp
-                   pk <- use prvkey
-                   case extractBeneficiary pp of
-                     Nothing -> return()
-                     Just (bnef,vot) -> do
-                       -- insert the vote into map
-                       val <- uses voted $M.lookup bnef
-                       let unwrapVal = fromMaybe M.empty val
-                       let nval = M.insert pr vot unwrapVal
-                       voted %= M.insert bnef nval
-                   yield =<< signMessage pk (Prepare v (blockHash pp))
+          let pplverified = fromMaybe 0x0000000000000000 $ verifyProposerSeal pp (signature auth)
+          pr <- use proposer
+          if (sender auth /= pr || pplverified /= pr)
+            then $logWarnS "blockstanbul/ppl" . T.pack $
+                   printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
+            else do
+            mBlockLock <- use blockLock
+            if (isJust mBlockLock && Just pp /= mBlockLock)
+              then do
+                $logWarnS "blockstanbul/ppl" . T.pack $
+                  printf "Rejecting proposal: block does not match lock"
+                $logDebugS "blockstanbul/roundchange" "lock mismatch"
+                roundChange
+              else
+                if v /= v'
+                  then do
+                    $logDebugS "blockstanbul/roundchange" . T.pack $
+                       "view mismatch (us, sender): " ++ format (v, v')
+                    $logWarnS "blockstanbul/ppl" . T.pack $
+                      printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+                    roundChange
+                  else do
+                     blockcount += 1
+                     proposal .= Just pp
+                     pk <- use prvkey
+                     case extractBeneficiary pp of
+                       Nothing -> return()
+                       Just (bnef,vot) -> do
+                         -- insert the vote into map
+                         val <- uses voted $M.lookup bnef
+                         let unwrapVal = fromMaybe M.empty val
+                         let nval = M.insert pr vot unwrapVal
+                         voted %= M.insert bnef nval
+                     yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- uses validators length
@@ -240,20 +248,25 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
-      cs <- committed <%= M.insert (sender auth) (di, seal)
-      total <- uses validators length
-      let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
-      sameHash <- hasSameHash di
-      -- TODO(tim): Is it necessary to check that we have prepared?
-      hasSent <- use hasCommitted
-      when (3 * sameVoteCount > 2 * total && sameHash && not hasSent ) $ do
-        hasCommitted .= True
-        ppl <- use proposal
-        case ppl of
-          Nothing -> error "TODO(tim): Decide how to handle this"
-          Just blk -> do
-            let seals = map snd . M.elems $ cs
-            yield . ToCommit . addCommitmentSeals seals $ blk
+      let committer = fromMaybe 0x0000000000000000 $ verifyCommitmentSeal di seal
+      if (committer /= sender auth)
+        then do $logWarnS "blockstanbul/" . T.pack $
+                   printf "Rejecting Commit Message: commit signer  %x is not %x" (sender auth) committer
+        else do
+          cs <- committed <%= M.insert (sender auth) (di, seal)
+          total <- uses validators length
+          let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
+          sameHash <- hasSameHash di
+          -- TODO(tim): Is it necessary to check that we have prepared?
+          hasSent <- use hasCommitted
+          when (3 * sameVoteCount > 2 * total && sameHash && not hasSent ) $ do
+            hasCommitted .= True
+            ppl <- use proposal
+            case ppl of
+              Nothing -> error "TODO(tim): Decide how to handle this"
+              Just blk -> do
+                let seals = map snd . M.elems $ cs
+                yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
