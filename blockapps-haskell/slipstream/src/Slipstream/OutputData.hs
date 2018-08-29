@@ -135,13 +135,6 @@ convertRet metadata conn cache = do
 
   if (length metadata > 1)
     then do
-      --Cache list with ContractAndXabi
-      --let fstContract = contractData $ head metadata
-      --let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction firstContract
-      --let comma = if (length list == 0)
-        --  then ""
-        --  else ", "
-
       when (not $ contractStored cachedContract) $ do
           let conVals = "('" ++ (codehash firstContract) ++ "', '" ++ (contractName firstContract) ++ "', '" ++ (abi firstContract) ++ "', '" ++ (chain firstContract) ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
@@ -164,46 +157,7 @@ convertRet metadata conn cache = do
       let ins = "insert into \"" ++ tableName ++ "\" " ++ keySt ++ " values " ++ inserts ++ " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" ++ comma ++ (tableUpsert list) ++ ";"
       dbInsert ins conn
 
-{-
-      newCache <- readIORef cache
-      newCachedContract <-  case Map.lookup hashVal newCache of
-            Just x -> return x
-            Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False, resolvedName = Nothing, contractSchema = Nothing}
-      let newCacheList = Map.toList newCache
-      putStrLn $ "newCachedContract: " ++ show(newCachedContract)
-
---Set up view
-      viewSt <- if(show (resolvedName newCachedContract) == name newCachedContract ++ "1") --"Vehicle", "Vehicle1"
-        then do
-          --First time seeing this schema
-          return $ "create view if not exists \"" ++ name newCachedContract ++ "\" as select * from \"" ++ name newCachedContract ++ "1\";"
-        else do
-          --Find first time using schema with the contract name
-          let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (tableName ++ "1")) newCacheList
-          putStrLn $ "originalSchemaContract: " ++ show(originalSchemaContract)
-
-          let sameNameList = filter (\(_, y) -> name y == contractName firstContract) newCacheList
-          --putStrLn $ "sameNameList: " ++ show(sameNameList)
-
-          let tableList = if(not $ null originalSchemaContract)
-              then filter (\(_, y) -> (contractSchema y) == (contractSchema $ snd $ head originalSchemaContract)) sameNameList
-              else []
-          putStrLn $ "tableList: " ++ show(tableList)
-          let tableString = forM tableList $ \ table -> "UNION SELECT * FROM \"" ++ fromMaybe (name newCachedContract) (resolvedName $ snd table) ++ "\""
-          --putStrLn $ "tableString" ++ show tableString
-          -- Check if ContractAndXabi with same name and resolvedName == name + "1" has same schema
-          let ret = "create or replace view " ++ name newCachedContract ++ " as select * from \"" ++ (replace "\"" "" $ name newCachedContract) ++ "1\" " ++ (L.intercalate " " tableString) ++ ";"
-          putStrLn $ "View: " ++ ret
-          return ret
-      dbInsert viewSt conn
--}
-
     else do
-    --let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction firstContract
-    --let comma = if (length list == 0)
-      --  then ""
-      --  else ", "
-
       when (not $ contractStored cachedContract) $ do
           let conVals = "('" ++ codehash firstContract ++ "', '" ++ contractName firstContract ++ "', '" ++ abi firstContract ++ "', '" ++ chain firstContract ++ "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " ++ conVals ++ " ON CONFLICT DO NOTHING;"
