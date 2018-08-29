@@ -8,8 +8,6 @@ import Data.Proxy
 import Servant
 
 import Blockchain.Data.Address
---import Blockchain.Blockstanbul.Messages (InEvent)
-
 
 type AdminAPI = GetVote
 
@@ -22,8 +20,3 @@ type GetVote = "vote"
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
-
-
-
-
-
