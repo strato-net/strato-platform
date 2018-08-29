@@ -69,4 +69,4 @@ main = do
     , blockstanbulBeneficiary = chv
     , blockstanbulAuthSenders = authSenders
   }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver flags_blockstanbul_InEvent_port chv)
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver flags_blockstanbul_port chv)
