@@ -12,6 +12,7 @@ pipeline {
           docker ps
           docker rmi -f $(docker images -aq) || true
           docker images -a
+          rm -rf ~/.stack
           rm -rf strato-platform
           git clone https://github.com/blockapps/strato-platform -b develop
         '''
