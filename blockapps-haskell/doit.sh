@@ -110,7 +110,7 @@ runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$po
            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
 
 set +x
-if [ ${PROCESS_MONITORING} ]; then
+if [ "${PROCESS_MONITORING}" = true ] ; then
   echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
   while sleep ${MONITORING_TIMER}; do
     # check status for every monitored process
