@@ -119,6 +119,7 @@ Object {
     "arguments": Object {
       "_greeting": "abrrr",
     },
+    "chainId": "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86",
     "contract": "GreeterC",
     "fileText": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
     "greet": "",

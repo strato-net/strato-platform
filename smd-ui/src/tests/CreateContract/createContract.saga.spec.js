@@ -1,4 +1,4 @@
-import  watchCreateContract, {
+import watchCreateContract, {
   watchCompileContract,
   createContract,
   compileContract,
@@ -28,8 +28,8 @@ import {
 } from '../../components/Contracts/contracts.actions';
 import { fetchCirrusInstances } from '../../components/Contracts/components/ContractCard/contractCard.actions'
 import { expectSaga } from 'redux-saga-test-plan';
-import { payload, createContractResponse, payloadCompile,payloadCompileSearchable, compileResponse, compileError, responseError  } from './createContractMock';
-import {stopSubmit} from 'redux-form'
+import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileResponse, compileError, responseError } from './createContractMock';
+import { stopSubmit } from 'redux-form'
 var fs = require('fs');
 
 describe('CreateContract: saga', () => {
@@ -50,66 +50,66 @@ describe('CreateContract: saga', () => {
 
     test('inspection', () => {
       const gen = createContract({ type: CREATE_CONTRACT_REQUEST, payload });
-      expect(gen.next().value).toEqual(call(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments));
+      expect(gen.next().value).toEqual(call(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments, payload.chainId));
       expect(gen.next(createContractResponse).value).toEqual(put(createContractSuccess(createContractResponse)));
       expect(gen.next().value).toEqual(put(updateToast()));
       expect(gen.next().value).toEqual(put(fetchContracts()));
       expect(gen.next().value).toEqual(put(fetchCirrusInstances('GreeterC')));
-      expect(gen.throw().value).toEqual( put(createContractFailure()))
+      expect(gen.throw().value).toEqual(put(createContractFailure()))
       expect(gen.next().done).toBe(true);
     })
 
     test('inspection', () => {
-      const gen = compileContract({ type: COMPILE_CONTRACT_REQUEST, name:payloadCompile.name, contract: payloadCompile.contract,searchable: payloadCompile.searchable});
+      const gen = compileContract({ type: COMPILE_CONTRACT_REQUEST, name: payloadCompile.name, contract: payloadCompile.contract, searchable: payloadCompile.searchable });
       expect(gen.next().value).toEqual(call(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable));
       expect(gen.next(compileResponse).value).toEqual(put(compileContractSuccess(compileResponse)));
-      expect(gen.throw().value).toEqual( put(compileContractFailure()))
-      expect(gen.next().value).toEqual( put(stopSubmit('create-contract', {contract: 'undefined'})))
+      expect(gen.throw().value).toEqual(put(compileContractFailure()))
+      expect(gen.next().value).toEqual(put(stopSubmit('create-contract', { contract: 'undefined' })))
       expect(gen.next().done).toBe(true);
     })
 
-    describe('create Contract', ()=> {
+    describe('create Contract', () => {
 
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify(createContractResponse));
-        expectSaga(createContract, {payload: payload})
-          .call.fn(createContractApiCall,  payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_SUCCESS } })
+        expectSaga(createContract, { payload: payload })
+          .call.fn(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_SUCCESS } })
           .run().then((result) => { done() });
       });
-  
+
       test('failure', (done) => {
         fetch.mockReject(JSON.stringify('error'));
-        expectSaga(createContract, {payload: payload})
-        .call.fn(createContractApiCall,  payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_FAILURE } })
-        .run().then((result) => { done() });
+        expectSaga(createContract, { payload: payload })
+          .call.fn(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_FAILURE } })
+          .run().then((result) => { done() });
       });
 
     })
 
-    describe('compile Contract', ()=> {
-      
-            test('success', (done) => {
-              fetch.mockResponse(JSON.stringify(compileResponse));
-              expectSaga(compileContract, payloadCompile)
-                .call.fn(compileContractApiCall,  payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({ action: { type: COMPILE_CONTRACT_SUCCESS } })
-                .run().then((result) => { done() });
-            });
+    describe('compile Contract', () => {
 
-            test('compile searchable success', (done) => {
-              fetch.mockResponse(JSON.stringify(compileResponse));
-              expectSaga(compileContract, payloadCompileSearchable)
-                .call.fn(compileContractApiCall,  payloadCompileSearchable.name, payloadCompileSearchable.contract, payloadCompileSearchable.searchable).put.like({ action: { type: COMPILE_CONTRACT_SUCCESS } })
-                .run().then((result) => { done() });
-            });
-        
-            test('failure', (done) => {
-              fetch.mockReject(JSON.stringify(compileError));
-              expectSaga(compileContract, payloadCompile)
-              .call.fn(compileContractApiCall,  payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({ action: { type: COMPILE_CONTRACT_FAILURE } })
-              .run().then((result) => { done() });
-            });            
-      
-          })
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(compileResponse));
+        expectSaga(compileContract, payloadCompile)
+          .call.fn(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({ action: { type: COMPILE_CONTRACT_SUCCESS } })
+          .run().then((result) => { done() });
+      });
+
+      test('compile searchable success', (done) => {
+        fetch.mockResponse(JSON.stringify(compileResponse));
+        expectSaga(compileContract, payloadCompileSearchable)
+          .call.fn(compileContractApiCall, payloadCompileSearchable.name, payloadCompileSearchable.contract, payloadCompileSearchable.searchable).put.like({ action: { type: COMPILE_CONTRACT_SUCCESS } })
+          .run().then((result) => { done() });
+      });
+
+      test('failure', (done) => {
+        fetch.mockReject(JSON.stringify(compileError));
+        expectSaga(compileContract, payloadCompile)
+          .call.fn(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({ action: { type: COMPILE_CONTRACT_FAILURE } })
+          .run().then((result) => { done() });
+      });
+
+    })
 
   });
 
