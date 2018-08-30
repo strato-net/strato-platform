@@ -10,6 +10,7 @@ TESTS=(
   blockapps-strato-api
   blockapps-bloc22-server
   blockapps-bloc22-api
+  slipstream
 )
 
 for tst in ${TESTS[@]}; do

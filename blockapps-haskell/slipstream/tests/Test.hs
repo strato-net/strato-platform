@@ -8,9 +8,14 @@ import Test.Hspec
 import Slipstream.OutputData
 import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
-import Network
-import HFlags
 import qualified Data.ByteString.Char8 as BC
+import Conduit
+import Data.Default
+import Data.IORef
+import qualified Data.Map as M
+import qualified BlockApps.Solidity.Value as V
+
+import Slipstream.Events
 
 {-
 Test: Message conversion to statediff is successful and accurate
@@ -35,64 +40,23 @@ dbSelect insrt = do
 main :: IO ()
 main = hspec $ do
 
-  describe "" $ do
-    it "test1" $ do
-      let x = defaultMaxB
-      let y = defaultMaxB
-      x `shouldBe` y
+  describe "Array serialization" $ do
+    it "should create JSON entries" $ do
+      let input = [ProcessedContract {
+             address = "<ADDRESS>",
+             codehash = "<CODEHASH>",
+             abi = "<ABI>",
+             contractName = "<CONTRACT>",
+             chain = "<CHAIN>",
+             contractData = M.singleton "owners" $ V.ValueArrayDynamic [
+                V.ValueStruct [
+                  ("number", V.SimpleValue $ V.ValueUInt 18199984780605),
+                  ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
+            }]
 
-  describe "Message Conversion Test" $ do
-    it "Returns the correctly converted message to a statediff" $ do
-      pendingWith "TODO: (Carlo) Simulate successful message conversion"
-      let conversionExpected = ""
-      let conversionActual = ""
-      conversionExpected `shouldBe` conversionActual
-
-  describe "failed Kafka Message Test" $ do
-    it "Returns the appropriate response to a failed Kafka message" $ do
-      pendingWith "TODO: (Carlo) Simulate kafka message failure"
-      let failedKafkaExpected = ""
-      let failedKafkaActual = ""
-      failedKafkaExpected `shouldBe` failedKafkaActual
-
-  describe "Failed Conversion Test" $ do
-    it "Returns the correct message when message conversion fails" $ do
-      pendingWith "TODO: (Carlo) Simulate failing message conversion"
-      let failedConversionExpected = ""
-      let failedConversionActual = ""
-      failedConversionExpected `shouldBe` failedConversionActual
-
-  describe "Successful DB Writes Test" $ do
-    it "Confirms a successful db write" $ do
-      pendingWith "TODO: (Carlo) Simulate successful db writes"
-      _ <- $initHFlags "Setup Test Variables"
-      let address = "362fdc66a650bb11d61d9d046829d294cad82b70"
-      let codeHash = "0b49343ea28762c009cae266ebdb389601a28c9e814033fb9bf1b5ce89590388"
-      let abi = "TestABI"
-      let contract = "{\"__getContractName__\":\"function () returns (String)\",\"__getSource__\":\"function () returns (String)\",\"b32\":\"function (String) returns (Bytes32)\",\"s0\":\"s0_0_0\",\"s1\":\"s1_0_0\",\"s2\":\"s2_0_0\",\"s3\":\"s3_0_0\",\"set\":\"function (String,String,String,String) returns ()\",\"stringToBytes32\":\"function (String) returns (Bytes32)\",\"vin32\":\"function () returns (Bytes32)\"}"
-      let selectStatement = "select s1, s2, s3 from \"0b49343ea28762c009cae266ebdb389601a28c9e814033fb9bf1b5ce8959038\" where address=\'362fdc66a650bb11d61d9d046829d294cad82b70\';"
-      let dbWritesExpected = "why"
-      convertRet address codeHash abi contract
-
-      -- Call DB with address & codeHash (both tables)
-      dbWritesActual <- dbSelect selectStatement
-
-      -- Delete statement
-      let deleteStatement = "drop table \"0b49343ea28762c009cae266ebdb389601a28c9e814033fb9bf1b5ce8959038\";"
-      let res = dbInsert deleteStatement
-      dbWritesExpected `shouldBe` dbWritesActual
-
-  describe "DB Write Failure Test" $ do
-    pendingWith "TODO: (Carlo) Simulate failing db writes"
-    it "Returns correct message when " $ do
-      let dbFailureExpected = ""
-      let dbFailureActual = ""
-      dbFailureExpected `shouldBe` dbFailureActual
-
-
-  describe "Index Accuracy Test" $ do
-    pendingWith "TODO: (Carlo) Simulate accurate indexing"
-    it "" $ do
-      let x = ""
-      let y = ""
-      x `shouldBe` y
+      g <- newIORef def
+      runConduit (yield input .| createInserts g .| sinkList)
+        `shouldReturn` [
+          "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('<CODEHASH>', '<CONTRACT>', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
+          "create table if not exists \"<CONTRACT>\" (address text, \"chainId\" text, \"owners\" json, CONSTRAINT \"<CONTRACT>_pkey\" PRIMARY KEY (address, \"chainId\") );",
+          "insert into \"<CONTRACT>\" (address, \"chainId\", \"owners\") values ('<ADDRESS>', '<CHAIN>', '[{\"hash\":\"Owner_hash_181999847806006\",\"number\":\"18199984780605\"}]') on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", \"owners\" = excluded.\"owners\";"]
