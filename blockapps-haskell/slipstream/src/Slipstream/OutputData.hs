@@ -26,6 +26,7 @@ import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
+import           System.Log.Logger
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -97,7 +98,7 @@ dbConnect =  PGDatabase
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString
   , pgDBDebug = False
-  , pgDBLogMessage = print . PGError
+  , pgDBLogMessage = infoM "pglog" . show . PGError
   , pgDBParams = [("Timezone", "UTC")]
   }
 
@@ -128,7 +129,7 @@ createInserts globalsIORef = do
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
-  liftIO . print $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
+  liftIO . debugM "createInserts" . show $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
 
   if (length metadata > 1)
     then do

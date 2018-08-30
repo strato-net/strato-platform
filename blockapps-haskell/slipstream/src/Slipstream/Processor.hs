@@ -31,6 +31,7 @@ import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
+import System.Log.Logger
 
 import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
@@ -156,12 +157,13 @@ processTheMessages messages conn g = do
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
 
-  putStrLn $ unlines $ map show messages
+  unless (null messages) $
+    debugM "processTheMessages" . unlines . map show $ messages
 
   case length messages of
    0 -> return ()
-   1 -> putStrLn $ "1 message has arrived"
-   n -> putStrLn $ show n ++ " messages have arrived"
+   1 -> infoM "processTheMessages" "1 message has arrived"
+   n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -200,7 +202,7 @@ processTheMessages messages conn g = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-        liftIO . print $ "--------\n" <> A.formatAction row
+        liftIO . infoM "processTheMessages" . show $ "--------\n" <> A.formatAction row
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
@@ -227,11 +229,11 @@ processTheMessages messages conn g = do
                     storeCachedContract g codeHash c
                     return c
                (False, Nothing) -> do
-                 liftIO . print $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
+                 liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
                                      tshow codeHash <> ", src:" <> tshow sourcePtr'
                  contractOrError <- getContractCompileFullSource addr codeHash chainId
                  setSourceCreated g $ A.sourceHash sourcePtr'
-                 liftIO . print $ "Done fetching the metadata for " <> tshow codeHash
+                 liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do

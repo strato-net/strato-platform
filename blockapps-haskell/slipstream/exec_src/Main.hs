@@ -16,6 +16,7 @@ import HFlags
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
 import System.IO
+import System.Log.Logger
 
 import Slipstream.MessageConsumer
 import Slipstream.Options ()
@@ -25,6 +26,7 @@ import Slipstream.OutputData
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
+  updateGlobalLogger rootLoggerName (setLevel INFO)
   hSetBuffering stdout LineBuffering
   hSetBuffering stdin LineBuffering
 
