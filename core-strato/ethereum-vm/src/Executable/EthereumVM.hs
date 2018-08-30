@@ -56,10 +56,10 @@ ethereumVM = void . execContextM $ do
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
     bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
-    Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
+    Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -122,7 +122,9 @@ ethereumVM = void . execContextM $ do
         flushTransactionResults
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
-        setCheckpointNoMetadata newOffset
+        baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
+        checkpointData <- baggerData <$> getContextBestBlockInfo
+        setCheckpoint newOffset checkpointData
 
 insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
@@ -158,11 +160,10 @@ initializeCheckpointAndBlockSummary = do
         header = obBlockData block
         txs    = obReceiptTransactions block
         td     = obTotalDifficulty block
-        txHs   = otHash <$> txs
         txL    = length txs
         uncL   = length (obBlockUncles block)
         cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
-    setCheckpoint 1 (EVMCheckpoint sha header txHs cbbi)
+    setCheckpoint 1 (EVMCheckpoint sha header cbbi)
 
 
 writeBlockSummary :: OutputBlock -> ContextM ()
@@ -180,7 +181,7 @@ getCheckpoint = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaRetry1s (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, md) -> do

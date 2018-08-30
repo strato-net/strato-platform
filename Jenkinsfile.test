@@ -45,19 +45,26 @@ pipeline {
           NODE_HOST=cd10.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
-          counter=0
           # Few quick tests
-          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
-          do
-            if [[ "$counter" -gt 120 ]]; then
-              echo "bloc took longer than 2 minutes to initialize! aborting."
-              exit 73
-            fi
-            echo "waiting for bloc to be available through nginx"
-            counter=$((counter+1))
-            sleep 1
-          done
-          echo "bloc is available through nginx - node is running"
+          check_bloc() {
+            counter=0
+            until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+            do
+              if [[ "$counter" -gt 120 ]]; then
+                echo "bloc took longer than 2 minutes to initialize! aborting."
+                exit 73
+              fi
+              echo "waiting for bloc to be available through nginx"
+              counter=$((counter+1))
+              sleep 1
+            done
+            echo "bloc is available through nginx - node is running"
+          }
+          check_bloc
+          echo "Restarting docker containers to simulate computer restart..."
+          docker-compose -p strato stop
+          docker-compose -p strato start
+          check_bloc
         '''
       }
     }
