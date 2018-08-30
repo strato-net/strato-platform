@@ -87,5 +87,6 @@ isContractCreated globalsIORef codeHash = do
 data ContractAndXabi =
   ContractAndXabi {
     contract :: Either String Contract,
-    xabi :: Text
+    xabi :: Text,
+    name :: Text
   } deriving (Show)
