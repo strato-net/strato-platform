@@ -38,7 +38,7 @@ data SolidityValue
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
   toJSON (SolidityBool boolean) = toJSON boolean
-  toJSON (SolidityNum n) = toJSON n
+  toJSON (SolidityNum n) = toJSON . show $ n
   toJSON (SolidityArray array) = toJSON array
   toJSON (SolidityBytes bytes) = object
     [ "type" .= ("Buffer" :: Text)
