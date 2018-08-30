@@ -30,6 +30,7 @@ dependencies:
   - blockapps-milena
   - binary
   - base64-bytestring
+  - base16-bytestring
   - bytestring
   - ethereum-rlp
   - time
