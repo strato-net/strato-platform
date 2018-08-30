@@ -14,9 +14,10 @@ import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
-import           Data.IORef
+import           Data.IORef.Lifted
 import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
+import           Data.Maybe                      (fromMaybe)
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
@@ -99,8 +100,8 @@ dbConnect =  PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: Text -> PGConnection -> IO()
-dbInsert insrt conn = do
+dbInsert :: PGConnection -> Text -> IO ()
+dbInsert conn insrt = do
   let qry = rawPGSimpleQuery $! encodeUtf8 insrt
   _ <- pgQuery conn qry
   return ()
@@ -115,7 +116,7 @@ convertRet metadata conn globalsIORef = runConduit $
   .| createInserts globalsIORef
   .| mapM_C (dbInsert conn)
 
-createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m String
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   let firstContract = head metadata
@@ -165,7 +166,7 @@ createInserts globalsIORef = do
         then ""
         else ", "
     let createSt = "create table if not exists \"" <> contractName row <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> contractName row <>"_pkey\" PRIMARY KEY (address, \"chainId\") );"
-    dbInsert createSt conn
+    yield createSt
 
     let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
     let vals = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma  <> listToValueStatement ", " list <> ")"
