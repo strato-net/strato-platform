@@ -280,7 +280,6 @@ class CreateContract extends Component {
                       onChange={
                         (e) => this.props.getLabelIds(e.target.value)
                       }
-                      validate={required}
                     >
                       <option />
                       {
@@ -306,7 +305,6 @@ class CreateContract extends Component {
                       className="pt-input smd-max-width"
                       component="select"
                       name="chainId"
-                      validate={required}
                     >
                       <option />
                       {

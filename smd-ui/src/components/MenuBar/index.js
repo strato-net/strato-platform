@@ -15,9 +15,9 @@ import { isModePublic } from '../../lib/checkMode';
 
 class MenuBar extends Component {
 
-  componentDidMount(){
+  componentDidMount() {
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if(developerSignIn && isModePublic()) {
+    if (developerSignIn && isModePublic()) {
       this.props.openWalkThroughOverlay(false);
     }
   }
@@ -77,7 +77,7 @@ class MenuBar extends Component {
           {this.renderDeveloperButton()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
-          
+
           {this.afterLoggedIn()}
         </div>
         {isModePublic() && <div><Login />

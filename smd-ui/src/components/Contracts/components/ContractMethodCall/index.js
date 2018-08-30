@@ -195,7 +195,6 @@ class ContractMethodCall extends Component {
                       onChange={
                         (e) => this.props.getLabelIds(e.target.value)
                       }
-                      validate={required}
                       required
                     >
                       <option />
@@ -222,7 +221,6 @@ class ContractMethodCall extends Component {
                       className="pt-input smd-max-width"
                       component="select"
                       name="chainId"
-                      validate={required}
                       required
                     >
                       <option />

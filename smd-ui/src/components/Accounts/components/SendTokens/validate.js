@@ -3,14 +3,6 @@ import { isModePublic } from "../../../../lib/checkMode";
 export const validate = (values) => {
   const errors = {};
 
-  if (!values.chainLabel) {
-    errors.value = 'Please select a chain label';
-  }
-
-  if (!values.chainId) {
-    errors.value = 'Please select a chain ID';
-  }
-
   if (!values.from) {
     errors.value = 'Please select a user';
   }
