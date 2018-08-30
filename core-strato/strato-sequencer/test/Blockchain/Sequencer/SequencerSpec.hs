@@ -119,7 +119,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , syncWrites            = False
                                , bootstrapDoEmit       = False
                                , statsConfig           = Nothing
-                               , blockstanbulBlockPeriodμs = 0
+                               , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = ch
                                }

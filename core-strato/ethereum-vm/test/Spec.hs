@@ -87,7 +87,8 @@ runContextM' f = do
                         Unspecified
                         (error "Redis not initialized") --redisPool
                         [] [] []
-                        False)
+                        False False)
+
 
 
 spec :: Spec

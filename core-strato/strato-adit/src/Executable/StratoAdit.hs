@@ -13,8 +13,8 @@ module Executable.StratoAdit (
 import           Control.Concurrent.Lifted      hiding (yield, takeMVar, putMVar, newEmptyMVar)
 import           Control.Concurrent.STM
 import           Control.Monad
+import           Control.Monad.Except
 import           Control.Monad.Logger
-import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka
 import           Blockchain.MilenaTools
@@ -129,7 +129,7 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Initing runKafka"
     $logInfoS "stratoAdit" "Will fetch offsets"
 
-    offset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
+    offset <- withKafkaRetry1s $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
     $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
     doConsume (max (offset - 1) 0) c

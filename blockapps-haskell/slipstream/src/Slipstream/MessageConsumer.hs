@@ -18,10 +18,14 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
-import Slipstream.Options
 import Data.List
-import Slipstream.Processor
 import Control.Concurrent
+import Database.PostgreSQL.Typed
+import Data.IORef
+
+import Slipstream.Globals
+import Slipstream.Options
+import Slipstream.Processor
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
@@ -74,11 +78,11 @@ getTheMessages offset = do
   let ret = (map tamPayload . fetchMessages) fetched
   return ret
 
-getAndProcessMessages :: Kafka a => K.Offset -> a ()
-getAndProcessMessages offset = do
+getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals ->  K.Offset -> a ()
+getAndProcessMessages conn cache offset = do
   messages <- getTheMessages offset
-  liftIO $ processTheMessages messages
+  liftIO $ processTheMessages messages conn cache
   if (length messages == 0)
     then  liftIO $ threadDelay 1000000
     else return()
-  getAndProcessMessages $ (offset + fromIntegral (length messages))
+  getAndProcessMessages conn cache $ (offset + fromIntegral (length messages))

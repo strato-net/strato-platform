@@ -22,7 +22,7 @@ function newnode {
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
-      if [ $tmpblockstanbul = true ]; then
+      if [ $blockstanbul = true ]; then
         aMiner=Instant
       fi
       export miningThreads=${miningThreads:-1}
@@ -89,7 +89,7 @@ function newnode {
   runBackgroundProcess cleanupLogs
 
   set +x
-  echo "Monitoring the background processes..."
+  echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
   while sleep ${MONITORING_TIMER}; do
     # check status for every monitored process
     for monitored_pid in "${!MONITORED_PIDS[@]}"; do
@@ -104,12 +104,11 @@ function newnode {
             echo "done"
           fi
         done
-        echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/"
+        echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
         # Keep container running idle
         tail -f /dev/null
       fi
     done
-    echo "All background processes are up, waiting ${MONITORING_TIMER} sec for the next check..."
   done
 }
 

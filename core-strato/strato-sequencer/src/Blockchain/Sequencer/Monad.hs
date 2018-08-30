@@ -95,7 +95,7 @@ data SequencerConfig =
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
                      , statsConfig           :: Maybe StatsConf
-                     , blockstanbulBlockPeriodμs :: Int
+                     , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan (Address, String, Address, Bool)
                      , blockstanbulAuthSenders :: [Address]
