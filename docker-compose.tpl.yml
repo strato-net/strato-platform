@@ -188,6 +188,7 @@ services:
     - vault-wrapper
     environment:
     - authBasic=${authBasic}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - NODE_HOST=${NODE_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
