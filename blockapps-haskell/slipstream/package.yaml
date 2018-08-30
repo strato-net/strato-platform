@@ -17,7 +17,7 @@ dependencies:
   - base
   - aeson
   - base16-bytestring
-  - base
+  - lifted-base
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-ethereum
@@ -25,6 +25,8 @@ dependencies:
   - blockapps-strato-client
   - blockapps-strato-api
   - bytestring
+  - conduit
+  - conduit-combinators
   - containers
   - data-default
   - hflags
@@ -65,7 +67,7 @@ executables:
 
 tests:
   slipstream-test:
-    main: Spec.hs
+    main: Test.hs
     source-dirs: tests/
     dependencies:
       - base >=4 && < 5

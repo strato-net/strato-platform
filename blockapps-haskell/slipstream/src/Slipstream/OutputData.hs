@@ -2,11 +2,13 @@
   OverloadedStrings
   , TemplateHaskell
   , BangPatterns
+  , FlexibleContexts
 #-}
 
 module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
+import           Conduit
 import           Control.Monad
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
@@ -108,13 +110,20 @@ isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
 convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
-convertRet metadata conn globalsIORef = do
+convertRet metadata conn globalsIORef = runConduit $
+     yield metadata
+  .| createInserts globalsIORef
+  .| mapM_C (dbInsert conn)
+
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m String
+createInserts globalsIORef = do
+  metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   let firstContract = head metadata
   let hashVal = codehash firstContract
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
-  print $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
+  liftIO . print $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
 
   if (length metadata > 1)
     then do
@@ -122,7 +131,7 @@ convertRet metadata conn globalsIORef = do
           let conVals = "('" <> (codehash $ head metadata) <> "', '" <> (contractName $ head metadata) <> "', '" <> (abi $ head metadata) <> "', '" <> (chain $ head metadata) <> "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          dbInsert conIns conn
+          yield conIns
 
       let fstContract = contractData $ head metadata
       let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
@@ -130,7 +139,7 @@ convertRet metadata conn globalsIORef = do
           then ""
           else ", "
       let createSt = "create table if not exists \"" <> (contractName $ head metadata) <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> (contractName $ head metadata) <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
-      dbInsert createSt conn
+      yield createSt
 
       let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
 
@@ -142,7 +151,7 @@ convertRet metadata conn globalsIORef = do
       let inserts = T.intercalate ", " vals
       let ins = "insert into \"" <> (contractName $ head metadata) <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
 
-      dbInsert ins conn
+      yield ins
   else do
     let row = head metadata
 
@@ -150,7 +159,7 @@ convertRet metadata conn globalsIORef = do
           let conVals = "('" <> codehash row <> "', '" <> contractName row <> "', '" <> abi row <> "', '" <> chain row <> "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          dbInsert conIns conn
+          yield conIns
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
     let comma = if (length list == 0)
         then ""
@@ -161,5 +170,4 @@ convertRet metadata conn globalsIORef = do
     let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
     let vals = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma  <> listToValueStatement ", " list <> ")"
     let ins = "insert into \"" <> contractName row <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
-    dbInsert ins conn
-  return ()
+    yield ins
