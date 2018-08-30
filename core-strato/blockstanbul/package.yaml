@@ -41,6 +41,7 @@ dependencies:
   - aeson
   - blockapps-milena
   - http-conduit
+  - wai-extra
 
 library:
   source-dirs: src/

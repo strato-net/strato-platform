@@ -12,6 +12,7 @@ import Servant.Client
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad.IO.Class
+import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Handler.Warp
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Blockchain.Data.Address
@@ -30,7 +31,7 @@ createWebServer :: TMChan (Address, String, Address,Bool) -> Application
 createWebServer ch = serve adminAPI (admin ch)
 
 webserver :: Int -> TMChan (Address, String, Address,Bool) -> IO()
-webserver prt ch = run prt $ createWebServer ch
+webserver prt ch = run prt $ logStdoutDev (createWebServer ch)
 
 getVote :: Address -> String -> Address -> Bool -> ClientM (Address, String,Address,Bool)
 getVote = client (Proxy @ GetVote)
