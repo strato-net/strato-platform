@@ -9,6 +9,7 @@ module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
 import           Conduit
+import           Control.Exception
 import           Control.Monad
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
@@ -110,11 +111,14 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
+handlePostgresError :: (MonadIO m) => SomeException -> m ()
+handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
+
 convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
 convertRet metadata conn globalsIORef = runConduit $
      yield metadata
   .| createInserts globalsIORef
-  .| mapM_C (dbInsert conn)
+  .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
 createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
 createInserts globalsIORef = do
