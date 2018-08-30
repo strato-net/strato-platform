@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Blockchain.Sequencer.SequencerSpec where
 
 
@@ -7,6 +9,7 @@ import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (lookup)
 import           Data.Either.Extra
+import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
 import           Control.Concurrent
@@ -20,6 +23,7 @@ import           Control.Monad.Reader
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -32,6 +36,7 @@ import           Blockchain.Strato.Model.Class       (txChainId)
 import           Blockchain.Strato.Model.Address
 import           Server
 import           Blockchain.Blockstanbul.EventLoop
+import           Blockchain.Blockstanbul.Authentication
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
 import qualified Network.Haskoin.Crypto     as HK
@@ -56,6 +61,9 @@ runTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB gb m
 
+testWebserverPort :: Int
+testWebserverPort = 8050
+
 runTestM2 :: SequencerM a -> IO ()
 runTestM2 m = do
   gb <- makeGenesisBlock
@@ -70,6 +78,8 @@ withTemporaryDepBlockDBbs genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
+    let eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_authorized_addresses) :: Either String [Address]
+    let authSenders = fromRight (error "invalid sender addresses") eAuthSenders
     ch <- atomically $ newTMChan
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
@@ -81,9 +91,10 @@ withTemporaryDepBlockDBbs genesisBlock m = do
                                , syncWrites            = False
                                , bootstrapDoEmit       = False
                                , statsConfig           = Nothing
-                               , blockstanbulBlockPeriodμs = 0
+                               , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = ch
+                               , blockstanbulAuthSenders = authSenders
                                }
     let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
         validatrs = fromRight (error "invalid validators") eValidators
@@ -95,7 +106,7 @@ withTemporaryDepBlockDBbs genesisBlock m = do
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
                 return . Just . ctx $ pkey
-    race_ (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg) (webserver 8081 ch)
+    race_ (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg) (webserver testWebserverPort ch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -122,6 +133,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = ch
+                               , blockstanbulAuthSenders = []
                                }
 
     runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
@@ -230,18 +242,25 @@ spec = do
         out `shouldMatchList` input
 
       it "checks for votes" $ runTestM2 $ do
-        let vote = (testAddr,True)
-        liftIO $ uploadVote 8081 vote
         checkForVotes
         bc <- getBlockstanbulContext
         case bc of
           Nothing -> do
-            True `shouldBe` False
+            expectationFailure "BlockstanbulContext required"
           Just bct -> do
+            let pvk = _prvkey bct
+                addr = prvKey2Address pvk
+                (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
+            --create the extendedsignature for (beneficiary, nonce)
+            esign <- signBenfInfo pvk (testAddr, True)
+            --rlp seilize and hex and string the signature
+            let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
+                vote = (addr, esignStr, testAddr,True)
+            liftIO $ uploadVote testWebserverPort vote
+            local (\cfg -> cfg{blockstanbulAuthSenders = [addr]}) $ do
+              checkForVotes
             let pv = _pendingvotes bct
-            let val = M.lookup testAddr pv
+                val = M.lookup testAddr pv
             let nonc = fromMaybe False val
             nonc `shouldBe` True
-
-testAddr :: Address
-testAddr = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
+            --pv `shouldBe` (M.singleton testAddr True)

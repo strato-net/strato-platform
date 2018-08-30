@@ -19,6 +19,7 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
 import           Data.ByteString.Char8                     (pack)
+import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
@@ -116,7 +117,10 @@ checkForVotes = do
             senderlist <- asks blockstanbulAuthSenders
             if (elem sendr senderlist)
               then do
-                let extsign = RL.rlpDecode $ RL.rlpDeserialize (pack sign)
+                let extsign = RL.rlpDecode
+                            . RL.rlpDeserialize
+                            . fst
+                            . B16.decode $ pack sign
                     bauth = MsgAuth { sender = sendr, signature = extsign}
                 let ie = NewBeneficiary bauth (addr, bool)
                 blockstanbulSend [ie]
