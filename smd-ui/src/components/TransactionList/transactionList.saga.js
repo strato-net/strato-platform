@@ -10,10 +10,13 @@ import {
 } from './transactionList.actions';
 import { env } from '../../env';
 
-const url = env.STRATO_URL + "/transaction/last/";
+let url = env.STRATO_URL + "/transaction/last/";
 
-export function getTx(last) {
+export function getTx(last, chainId) {
   if (last === undefined) last = 15;
+  if (chainId) {
+    url =+ `?chainId=${chainId}`
+  }
   return fetch(
     url + last.toString(),
     {
@@ -36,7 +39,7 @@ export function getTx(last) {
 
 export function* fetchTx(action) {
   try {
-    let response = yield call(getTx, action.last);
+    let response = yield call(getTx, action.last, action.chainId);
     yield put(fetchTxSuccess(response));
   }
   catch (err) {

@@ -11,6 +11,7 @@ export const FETCH_CHAIN_DETAIL_FAILURE = 'FETCH_CHAIN_DETAIL_FAILURE';
 export const RESET_CHAIN_ID = 'RESET_CHAIN_ID';
 export const RESET_INITIAL_LABLE = 'RESET_INITIAL_LABLE';
 export const GET_LABEL_IDS = 'GET_LABEL_IDS';
+export const SELECT_CHAIN = 'SELECT_CHAIN';
 
 export const fetchChains = function () {
   return {
@@ -102,5 +103,12 @@ export const getLabelIds = function (label) {
   return {
     type: GET_LABEL_IDS,
     label
+  }
+};
+
+export const selectChain = function (chainId) {
+  return {
+    type: SELECT_CHAIN,
+    chainId
   }
 };

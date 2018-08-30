@@ -9,7 +9,8 @@ import {
   RESET_INITIAL_LABLE,
   FETCH_CHAINS_IDS_FAILED,
   FETCH_CHAINS_IDS_SUCCESS,
-  GET_LABEL_IDS
+  GET_LABEL_IDS,
+  SELECT_CHAIN
 } from './chains.actions';
 
 const initialState = {
@@ -20,6 +21,8 @@ const initialState = {
   error: null,
   listChain: {},
   listLabelIds: {},
+  chainIds: [],
+  selectedChain: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -130,7 +133,8 @@ const reducer = function (state = initialState, action) {
       });
       return {
         ...state,
-        listChain: newChain
+        listChain: newChain,
+        chainIds: action.chain.map((chain) => chain.id)
       }
     case FETCH_CHAINS_IDS_FAILED:
       return {
@@ -142,6 +146,11 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         listLabelIds: state.listChain[action.label]
+      }
+    case SELECT_CHAIN:
+      return {
+        ...state,
+        selectedChain: action.chainId
       }
     default:
       return state;
