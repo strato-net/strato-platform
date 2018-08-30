@@ -8,15 +8,17 @@ module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
 import           Control.Monad
+import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Lazy            as BL
 import           Data.IORef
 import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
-import           Data.Text.Encoding              (encodeUtf8)
+import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
@@ -33,10 +35,10 @@ tshow :: Show a => a -> Text
 tshow = T.pack . show
 
 typeText :: SolidityValue -> Text
+typeText (SolidityValueAsString _) = "text"
 typeText (SolidityNum _) = "bigint"
 typeText (SolidityBool _) = "bool"
-typeText (SolidityArray _) = "text []"
-typeText (_) = "text"
+typeText (_) = "json"
 
 listToKeyStatement :: Text -> [(Text, b)] -> Text
 listToKeyStatement _ [] = ""
@@ -48,8 +50,8 @@ solidityValueToText s (SolidityValueAsString x) = s <> (escapeQuotes x) <> s
 solidityValueToText s (SolidityBool x) = s <> tshow x <> s
 solidityValueToText s (SolidityNum x ) = s <> tshow x <> s
 solidityValueToText s (SolidityBytes x) = s <> (escapeQuotes $ tshow x) <> s
-solidityValueToText s (SolidityArray x) = s <> "{" <> arrayToString x <> "}" <> s
-solidityValueToText s (SolidityObject x) = s <> (escapeQuotes $ tshow x) <> s
+solidityValueToText s (SolidityArray x) = s <> (decodeUtf8 . BL.toStrict $ encode x) <> s
+solidityValueToText s (SolidityObject x) = s <> (decodeUtf8 . BL.toStrict $ encode x) <> s
 
 escapeQuotes :: Text -> Text
 escapeQuotes = T.replace "\'" "\'\'" . T.replace "\"" "\\\""

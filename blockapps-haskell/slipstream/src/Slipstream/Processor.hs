@@ -113,11 +113,11 @@ getContractCompileFullSource address _ chainId = do
   return $ (Right ret)
 
 storageToFunction :: Map Text Text -> Storage
-storageToFunction s = fromMaybe 0
-                    . fmap (fst . head . readHex . T.unpack)
-                    . flip Map.lookup s
-                    . T.pack
-                    . flip showHex ""
+storageToFunction s k =
+  case Map.lookup k (Map.mapKeys read256 $ Map.map read256 s) of
+   Nothing -> 0
+   Just x -> x
+  where read256 = fromInteger . fst . head . readHex . T.unpack
 
 hasContract::Action->Bool
 hasContract A.Action{A.codeHash="c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"} = False
