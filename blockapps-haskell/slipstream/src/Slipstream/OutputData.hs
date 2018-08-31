@@ -141,28 +141,27 @@ createInserts globalsIORef = do
   let hashVal = codehash firstContract
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
-
   cachedContract <- getCachedContract globalsIORef hashVal
 
   let tableName = case cachedContract of
         Just c -> fromMaybe (contractName firstContract)(resolvedName c)
         Nothing -> contractName firstContract
 
+  let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
+  let comma = if (length list == 0)
+      then ""
+      else ", "
+
   liftIO . debugM "createInserts" . show $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
 
   if (length metadata > 1)
     then do
       when (not $ contractAlreadyCreated) $ do
-          let conVals = "('" <> (codehash $ head metadata) <> "', '" <> (contractName $ head metadata) <> "', '" <> (abi $ head metadata) <> "', '" <> (chain $ head metadata) <> "')"
+          let conVals = "('" <> (codehash firstContract) <> "', '" <> (contractName firstContract) <> "', '" <> (abi firstContract) <> "', '" <> (chain firstContract) <> "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
           yield conIns
 
-      let fstContract = contractData $ head metadata
-      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
-      let comma = if (length list == 0)
-          then ""
-          else ", "
       let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       yield createSt
 
@@ -183,10 +182,7 @@ createInserts globalsIORef = do
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
           yield conIns
-    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
-    let comma = if (length list == 0)
-        then ""
-        else ", "
+
     let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <>"_pkey\" PRIMARY KEY (address, \"chainId\") );"
     yield createSt
 
