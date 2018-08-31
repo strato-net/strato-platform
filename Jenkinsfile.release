@@ -113,6 +113,15 @@ pipeline {
               cd strato-platform/blockapps-haskell
               ./run_unit_tests.sh
             '''
+          },
+          "Integration tests" : {
+            sh '''#!/bin/bash -le
+              set -x
+              echo 'Running local integration tests'
+              cd tests
+              npm ci
+              npm run test:truchainz
+            '''
           }
         )
       }
