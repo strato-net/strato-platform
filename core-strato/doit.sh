@@ -230,9 +230,9 @@ setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
 
-setEnv statsEnable false
-setEnv statsHost telegraf
-setEnv statsPort 8125
+setEnv statsEnable true
+setEnv statsHost localhost
+setEnv statsPort 13240
 setEnv statsFlush 1000
 setEnv statsPrefix ""
 setEnv statsSuffix ""
