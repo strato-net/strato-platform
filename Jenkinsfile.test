@@ -140,7 +140,7 @@ pipeline {
               set -x
               echo 'Running local integration tests'
               cd tests
-              npm ci
+              npm install
               npm run test:truchainz
             '''
           }
