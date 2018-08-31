@@ -37,7 +37,7 @@ class Accounts extends Component {
   }
 
   componentDidMount() {
-    this.props.fetchAccounts(true, true);
+    this.props.fetchAccounts(true, true, this.props.selectedChain);
     mixpanelWrapper.track('accounts_page_load')
   }
 

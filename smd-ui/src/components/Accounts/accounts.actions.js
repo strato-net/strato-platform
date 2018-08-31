@@ -19,11 +19,12 @@ export const FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST = 'FETCH_CURRENT_ACCOUNT_DETAI
 export const FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS = 'FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS';
 export const FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE = 'FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE';
 
-export const fetchAccounts = function (loadAddresses, loadBalances) {
+export const fetchAccounts = function (loadAddresses, loadBalances, chainId) {
   return {
     type: FETCH_ACCOUNTS,
     loadAddresses: loadAddresses,
-    loadBalances: loadBalances
+    loadBalances: loadBalances,
+    chainId: chainId
   }
 };
 

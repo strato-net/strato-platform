@@ -120,7 +120,7 @@ export function* getAccounts(action) {
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
     if (action.loadAddresses && response.length > 0) {
-      yield put(fetchUserAddresses(response[0], action.loadBalances));
+      yield put(fetchUserAddresses(response[0], action.loadBalances, action.chainId));
     }
   }
   catch (err) {
