@@ -28,7 +28,6 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 
-import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.SolidityValue
@@ -43,7 +42,7 @@ typeText :: SolidityValue -> Text
 typeText (SolidityValueAsString _) = "text"
 typeText (SolidityNum _) = "bigint"
 typeText (SolidityBool _) = "bool"
-typeText (_) = "json"
+typeText (_) = "jsonb"
 
 listToKeyStatement :: Text -> [(Text, b)] -> Text
 listToKeyStatement _ [] = ""
@@ -139,10 +138,15 @@ createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   let firstContract = head metadata
   let officialName = contractName firstContract
-  putStrLn $ "firstContract name: " ++ show (contractName firstContract)
   let hashVal = codehash firstContract
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
+
+  cachedContract <- getCachedContract globalsIORef hashVal
+
+  let tableName = case cachedContract of
+        Just c -> fromMaybe (contractName firstContract)(resolvedName c)
+        Nothing -> contractName firstContract
 
   liftIO . debugM "createInserts" . show $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
 
@@ -159,7 +163,7 @@ createInserts globalsIORef = do
       let comma = if (length list == 0)
           then ""
           else ", "
-      let createSt = "create table if not exists \"" <> (contractName $ head metadata) <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> (contractName $ head metadata) <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       yield createSt
 
       let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
@@ -170,51 +174,50 @@ createInserts globalsIORef = do
             return rowSt
 
       let inserts = T.intercalate ", " vals
-      let ins = "insert into \"" <> (contractName $ head metadata) <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+      let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
 
       yield ins
   else do
-    let row = head metadata
-
     when(not contractAlreadyCreated) $ do
-          let conVals = "('" <> codehash row <> "', '" <> contractName row <> "', '" <> abi row <> "', '" <> chain row <> "')"
+          let conVals = "('" <> codehash firstContract <> "', '" <> contractName firstContract <> "', '" <> abi firstContract <> "', '" <> chain firstContract <> "')"
           let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
           _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
           yield conIns
-    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
     let comma = if (length list == 0)
         then ""
         else ", "
-    let createSt = "create table if not exists \"" <> contractName row <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> contractName row <>"_pkey\" PRIMARY KEY (address, \"chainId\") );"
+    let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <>"_pkey\" PRIMARY KEY (address, \"chainId\") );"
     yield createSt
 
     let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
-    let vals = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma  <> listToValueStatement ", " list <> ")"
-    let ins = "insert into \"" <> contractName row <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+    let vals = "(" <> "'" <> address firstContract <> "', '" <> chain firstContract <> "'" <> comma  <> listToValueStatement ", " list <> ")"
+    let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
     yield ins
 
-    newCache <- readIORef cache
-    newCachedContract <-  case Map.lookup hashVal newCache of
-          Just x -> return x
-          Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False, resolvedName = Nothing, contractSchema = Nothing}
-    let newCacheList = Map.toList newCache
+  newCache <- readIORef globalsIORef
+  newCachedContract <-  case Map.lookup hashVal $ contractCache newCache of
+        Just x -> return x
+        Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False, resolvedName = Nothing, contractSchema = Nothing}
+  let newCacheList = Map.toList $ contractCache newCache
 
-    --If ContractAndXabi resolvedName == name ++ "1" , then create view
-  viewSt <- if(show (resolvedName newCachedContract) == name newCachedContract ++ "1")
-    then do
-      return $ "create view if not exists \"" ++ name newCachedContract ++ "\" as select * from \"" ++ name newCachedContract ++ "1\";"
-    else do
-      --Get the first contract that uses the name
-      let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (officialName ++ "1")) newCacheList
-      --Get the list of contracts that use the same name
-      let sameNameList = filter (\(_, y) -> (name y) == (contractName firstContract)) newCacheList
-      --Check how many have the same schema as the original contract
-      let tableList = if (not $ null originalSchemaContract)
-          then filter (\(_, y) -> (contractSchema y) == (contractSchema $ snd $ head originalSchemaContract)) sameNameList
-          else []
-      --Create a UNION statement for every table that matches the schema of the original contract
-      let tableString = map (\table -> "UNION SELECT * FROM \"" ++ fromMaybe (name newCachedContract) (resolvedName $ snd table) ++ "\"") tableList
+  --If ContractAndXabi resolvedName == name ++ "1" , then create view
+  viewSt <- if(resolvedName newCachedContract == Just (name newCachedContract <> "1"))
+      then do
+        return $ "create or replace view \"" <> name newCachedContract <> "\" as select * from \"" <> name newCachedContract <> "1\";"
+      else do
+        --Get the first contract that uses the name
+        let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (officialName <> "1")) newCacheList
+        --Get the list of contracts that use the same name
+        let sameNameList = filter (\(_, y) -> (name y) == (contractName firstContract)) newCacheList
+        --Check how many have the same schema as the original contract
+        let tableList = if (not $ null originalSchemaContract)
+            then filter (\(_, y) -> (contractSchema y) == (contractSchema $ snd $ head originalSchemaContract)) sameNameList
+            else []
+        --Create a UNION statement for every table that matches the schema of the original contract
+        let tableString = map (\table -> "UNION SELECT * FROM \"" <> fromMaybe (name newCachedContract) (resolvedName $ snd table) <> "\"") tableList
 
-      return $ "create or replace view \"" ++ (name newCachedContract) ++ "\" as select * from \"" ++ (name newCachedContract) ++ "1\" " ++ (L.intercalate " " tableString) ++ ";"
+        return $ "create or replace view \"" <> (name newCachedContract) <> "\" as select * from \"" <> (name newCachedContract) <> "1\" " <> (T.intercalate " " tableString) <> ";"
 
-  dbInsert viewSt conn
+  yield viewSt
+  --return ()

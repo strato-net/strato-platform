@@ -13,6 +13,7 @@ import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Slipstream.Data.Action      as SS
+import qualified BlockApps.Solidity.Value as V
 
 data Globals =
   Globals {
@@ -30,6 +31,12 @@ instance Default Globals where
       sourcePtrCache = Map.empty,
       createdContracts = Set.empty
       }
+
+getAllContracts :: MonadIO m =>
+                   IORef Globals -> m (Map Text ContractAndXabi)
+getAllContracts globalsIORef = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return contractCache
 
 storeCachedContract :: MonadIO m =>
                        IORef Globals -> Text -> ContractAndXabi -> m ()
@@ -88,5 +95,17 @@ data ContractAndXabi =
   ContractAndXabi {
     contract :: Either String Contract,
     xabi :: Text,
-    name :: Text
+    name :: Text,
+    resolvedName :: Maybe Text,
+    contractStored :: Bool,
+    contractSchema :: Maybe Text
   } deriving (Show)
+
+data ProcessedContract = ProcessedContract {
+  address :: Text,
+  codehash :: Text,
+  abi :: Text,
+  contractName :: Text,
+  chain :: Text,
+  contractData :: Map Text V.Value
+}

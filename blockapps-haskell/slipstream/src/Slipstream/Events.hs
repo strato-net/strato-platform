@@ -9,11 +9,9 @@
 module Slipstream.Events where
 
 import qualified BlockApps.Ethereum       as Eth
-import qualified BlockApps.Solidity.Value as V
 import           Data.Aeson
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
-import qualified Data.Text                as T
 import           GHC.Generics
 
 type Word256 = Integer
@@ -82,22 +80,3 @@ data AccountDiff =
     deriving (Generic, Show)
 
 -- data family Diff a (v :: Detail)
-
-data ProcessedContract = ProcessedContract {
-  address :: Text,
-  codehash :: Text,
-  abi :: Text,
-  contractName :: Text,
-  chain :: Text,
-  contractData :: Map T.Text V.Value
-}
-
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Either String Contract,
-    xabi :: String,
-    name :: String,
-    resolvedName :: Maybe String,
-    contractStored :: Bool,
-    contractSchema :: Maybe String
-  } deriving(Show)

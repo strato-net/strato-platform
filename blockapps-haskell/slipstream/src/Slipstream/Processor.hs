@@ -104,6 +104,8 @@ getContract name _ chainId = do
     , xabi = T.pack . show $ JSON.toJSON xabi
     , name = name
     , resolvedName = Nothing
+    , contractStored = False
+    , contractSchema = Nothing
     }
 
 getContractCompileFullSource :: Address -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
@@ -115,7 +117,7 @@ getContractCompileFullSource address _ chainId = do
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi contractDetails
     , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
-    , name = replace "\"" "" $ show $ contractdetailsName contractDetails
+    , name = T.replace "\"" "" $ contractdetailsName contractDetails
     , resolvedName = Nothing
     , contractStored = False
     , contractSchema = Nothing
@@ -123,15 +125,6 @@ getContractCompileFullSource address _ chainId = do
   return $ (Right ret)
 
 storageToFunction :: Map Text Text -> Storage
-
-fetchABI :: String -> Bloc String
-fetchABI address = do
-  conDet <- getContractDetailsByAddressOnly $ Address $ fst $ head $ readHex address
-  let ret = show $ A.toJSON $ contractdetailsXabi conDet
-  return ret
-
-storageToFunction::[(String, String)]->Storage
->>>>>>> Resolve Names
 storageToFunction s k =
   case Map.lookup k (Map.mapKeys read256 $ Map.map read256 s) of
    Nothing -> 0
@@ -169,23 +162,22 @@ smashIt (x:[]) tmp final =
     then (final ++ [[x]])
     else final ++ [tmp ++ [x]]
 
-resolveContractName :: Integer -> String -> String -> [(String, ContractAndXabi)] -> IO String
+resolveContractName :: Integer -> Text -> Text -> [(Text, ContractAndXabi)] -> IO Text
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
   if (null sameName)
-    then return $ contractName ++ show inc
+    then return $ contractName <> (T.pack $ show inc)
     else do
       case (lookup codehash sameName) of
         Nothing -> do
           resolveContractName (inc + 1) codehash contractName cache
         Just _ -> do
-          let newName = contractName ++ show inc
+          let newName = contractName <> (T.pack $ show inc)
           return newName
   where findName :: ContractAndXabi -> Bool
         findName cont = do
           case resolvedName cont of
-            Just x -> contractName ++ show inc == x
-            --
+            Just x -> contractName <> (T.pack $ show inc) == x
             Nothing -> True
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
@@ -258,28 +250,32 @@ processTheMessages messages conn g = do
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
-                 let name = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
-                 contractOrError <- getContract name codeHash chainId
-                 case contractOrError of
-                  Left e -> error e
-                  Right c -> do
-                    storeCachedContract g codeHash c
-                    return c
-               (False, Nothing) -> do
-                 liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
-                                     tshow codeHash <> ", addr:" <> tshow addr
-                 contractOrError <- getContractCompileFullSource addr codeHash chainId
-                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                 liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
+                 let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
+                 contractOrError <- getContract contName codeHash chainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     --Resolve Name Issues
-                    let contList = Map.toList cachedContracts
-                    resName <- liftIO $ resolveContractName 1 codehash (name c) contList
+                    allContracts <- getAllContracts g
+                    resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
                     let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
-                    liftIO $ writeIORef cachedContractsIORef (Map.insert codehash newContractAndXabi cachedContracts)
+                    storeCachedContract g codeHash newContractAndXabi
                     return newContractAndXabi
+               (False, Nothing) -> do
+                  liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
+                                    tshow codeHash <> ", addr:" <> tshow addr
+                  contractOrError <- getContractCompileFullSource addr codeHash chainId
+                  traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
+                  liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
+                  case contractOrError of
+                      Left e -> error e
+                      Right c -> do
+                        allContracts <- getAllContracts g
+                        resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
+                        let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
+
+                        storeCachedContract g codeHash newContractAndXabi
+                        return newContractAndXabi
 
 
         let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
