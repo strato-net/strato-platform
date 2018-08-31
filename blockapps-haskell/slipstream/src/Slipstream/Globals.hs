@@ -1,27 +1,25 @@
+{-# LANGUAGE RecordWildCards #-}
 
 module Slipstream.Globals where
 
 
-import Control.Monad.IO.Class
-import Data.Default
-import Data.IORef
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-
-import BlockApps.Solidity.Contract
-import qualified Slipstream.Data.Action as SS
-
-
-
+import           BlockApps.Solidity.Contract
+import           Control.Monad.IO.Class
+import           Data.Default
+import           Data.IORef
+import           Data.Map                    (Map)
+import qualified Data.Map                    as Map
+import           Data.Set                    (Set)
+import qualified Data.Set                    as Set
+import           Data.Text                   (Text)
+import qualified Slipstream.Data.Action      as SS
 
 data Globals =
   Globals {
-    createdSources :: Set String, -- list of source codes that have been compiled and have had their xabis put in the bloc tables
-    contractCache :: Map String ContractAndXabi, -- maps codehash to metadata
-    sourcePtrCache :: Map String SS.SourcePtr, -- maps codehash to (source hash, contract name)
-    createdContracts :: Set String -- list of contracts that have had their tables made
+    createdSources :: Set Text, -- list of source codes that have been compiled and have had their xabis put in the bloc tables
+    contractCache :: Map Text ContractAndXabi, -- maps codehash to metadata
+    sourcePtrCache :: Map Text SS.SourcePtr, -- maps codehash to (source hash, contract name)
+    createdContracts :: Set Text -- list of contracts that have had their tables made
     }
 
 instance Default Globals where
@@ -33,61 +31,71 @@ instance Default Globals where
       createdContracts = Set.empty
       }
 
+getAllContracts :: MonadIO m =>
+                   IORef Globals -> m (Map Text ContractAndXabi)
+getAllContracts globalsIORef = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return contractCache
+
 storeCachedContract :: MonadIO m =>
-                       IORef Globals -> String -> ContractAndXabi -> m ()
+                       IORef Globals -> Text -> ContractAndXabi -> m ()
 storeCachedContract globalsIORef sourceCodeHash c = do
-  globals <- liftIO $ readIORef globalsIORef
+  globals@Globals{..} <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
-    globals{contractCache=Map.insert sourceCodeHash c $ contractCache globals}
+    globals{contractCache=Map.insert sourceCodeHash c contractCache}
 
 
 setSourceCreated :: MonadIO m =>
-                    IORef Globals -> String -> m ()
+                    IORef Globals -> Text -> m ()
 setSourceCreated globalsIORef sourceCodeHash = do
-  globals <- liftIO $ readIORef globalsIORef
+  globals@Globals{..} <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
-    globals{createdSources=Set.insert sourceCodeHash $ createdSources globals}
+    globals{createdSources=Set.insert sourceCodeHash createdSources}
 
 isSourceCreated :: MonadIO m =>
-                   IORef Globals -> String -> m Bool
+                   IORef Globals -> Text -> m Bool
 isSourceCreated globalsIORef sourceCodeHash = do
-  globals <- liftIO $ readIORef globalsIORef
-  return $ sourceCodeHash `Set.member` createdSources globals
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ sourceCodeHash `Set.member` createdSources
 
 getCachedContract :: MonadIO m =>
-                     IORef Globals -> String -> m (Maybe ContractAndXabi)
+                     IORef Globals -> Text -> m (Maybe ContractAndXabi)
 getCachedContract globalsIORef sourceCodeHash = do
-  globals <- liftIO $ readIORef globalsIORef
-  return $ Map.lookup sourceCodeHash $ contractCache globals
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ Map.lookup sourceCodeHash contractCache
 
 storeCachedSourcePtr :: MonadIO m =>
-                        IORef Globals -> String -> SS.SourcePtr -> m ()
+                        IORef Globals -> Text -> SS.SourcePtr -> m ()
 storeCachedSourcePtr globalsIORef codeHash c = do
-  globals <- liftIO $ readIORef globalsIORef
+  globals@Globals{..} <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
-    globals{sourcePtrCache=Map.insert codeHash c $ sourcePtrCache globals}
+    globals{sourcePtrCache=Map.insert codeHash c sourcePtrCache}
 
 getCachedSourcePtr :: MonadIO m =>
-                      IORef Globals -> String -> m (Maybe SS.SourcePtr)
+                      IORef Globals -> Text -> m (Maybe SS.SourcePtr)
 getCachedSourcePtr globalsIORef codeHash = do
-  globals <- liftIO $ readIORef globalsIORef
-  return $ Map.lookup codeHash $ sourcePtrCache globals
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ Map.lookup codeHash sourcePtrCache
 
 setContractCreated :: MonadIO m =>
-                      IORef Globals -> String -> m ()
+                      IORef Globals -> Text -> m ()
 setContractCreated globalsIORef codeHash = do
-  globals <- liftIO $ readIORef globalsIORef
+  globals@Globals{..} <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
-    globals{createdContracts=Set.insert codeHash $ createdContracts globals}
+    globals{createdContracts=Set.insert codeHash createdContracts}
 
 isContractCreated :: MonadIO m =>
-                     IORef Globals -> String -> m Bool
+                     IORef Globals -> Text -> m Bool
 isContractCreated globalsIORef codeHash = do
-  globals <- liftIO $ readIORef globalsIORef
-  return $ codeHash `Set.member` createdContracts globals
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ codeHash `Set.member` createdContracts
 
 data ContractAndXabi =
   ContractAndXabi {
     contract :: Either String Contract,
-    xabi :: String
-  } deriving(Show)
+    xabi :: Text,
+    name :: Text,
+    resolvedName :: Maybe Text,
+    contractStored :: Bool,
+    contractSchema :: Maybe Text
+  } deriving (Show)
