@@ -19,4 +19,4 @@ install:
 	install $(GOPATH)/bin/* $(BINDIR)
 
 run: all
-	$(GOPATH)/bin/contrails
+	$(GOPATH)/bin/contrails -logtostderr
