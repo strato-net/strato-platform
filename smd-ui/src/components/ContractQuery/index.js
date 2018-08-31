@@ -76,7 +76,7 @@ class ContractQuery extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track('contract_query_load');
-    this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString);
+    this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString, this.props.selectedChain);
   }
 
   componentWillMount() {
@@ -86,7 +86,10 @@ class ContractQuery extends Component {
 
   componentWillReceiveProps(nextProps) {
     if(this.props.contractQuery.queryString !== nextProps.contractQuery.queryString) {
-      this.props.queryCirrus(nextProps.match.params.name, nextProps.contractQuery.queryString);
+      this.props.queryCirrus(nextProps.match.params.name, nextProps.contractQuery.queryString, nextProps.selectedChain);
+    }
+    if(this.props.selectedChain !== nextProps.selectedChain) {
+      this.props.queryCirrus(nextProps.match.params.name, nextProps.contractQuery.queryString, nextProps.selectedChain);
     }
   }
 
@@ -243,7 +246,7 @@ class ContractQuery extends Component {
         <div className="row">
           <div className="col-sm-12 smd-pad-8">
             <code>
-              Query URL: { env.CIRRUS_URL + '/' + name + '?' + this.props.contractQuery.queryString }
+              Query URL: { env.CIRRUS_URL + '/' + name + '?' + this.props.contractQuery.queryString + '&chainId=' + this.props.selectedChain }
             </code>
           </div>
         </div>
@@ -263,9 +266,10 @@ class ContractQuery extends Component {
   }
 }
 
-export function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state) {
   return {
-    contractQuery: state.contractQuery
+    contractQuery: state.contractQuery,
+    selectedChain: state.chains.selectedChain
   };
 }
 
