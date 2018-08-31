@@ -20,9 +20,13 @@ const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/s
 const cirrusUrl = env.CIRRUS_URL + '/:contractName'
 const accountUrl = env.STRATO_URL + '/account?address=:address'
 
-export function getState(contractName, contractAddress) {
+export function getState(contractName, contractAddress, chainId) {
+  let localUrl = contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress);
+  if (chainId) {
+    localUrl += `?chainId=${chainId}`
+  }
   return fetch(
-    contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
+    localUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -78,7 +82,7 @@ export function getAccount(address) {
 
 export function* fetchState(action) {
   try {
-    let response = yield call(getState, action.name, action.address);
+    let response = yield call(getState, action.name, action.address, action.chainId);
     yield put(fetchStateSuccess(action.name, action.address, response));
   }
   catch (err) {
