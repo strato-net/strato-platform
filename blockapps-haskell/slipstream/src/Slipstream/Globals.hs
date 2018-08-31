@@ -13,7 +13,6 @@ import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Slipstream.Data.Action      as SS
-import qualified BlockApps.Solidity.Value as V
 
 data Globals =
   Globals {
@@ -100,12 +99,3 @@ data ContractAndXabi =
     contractStored :: Bool,
     contractSchema :: Maybe Text
   } deriving (Show)
-
-data ProcessedContract = ProcessedContract {
-  address :: Text,
-  codehash :: Text,
-  abi :: Text,
-  contractName :: Text,
-  chain :: Text,
-  contractData :: Map Text V.Value
-}

@@ -28,6 +28,7 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 
+import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.SolidityValue
@@ -106,19 +107,6 @@ dbInsert conn insrt = do
   let qry = rawPGSimpleQuery $! encodeUtf8 insrt
   _ <- pgQuery conn qry
   return ()
-
-dbSelect :: String -> IO [String]
-dbSelect statement = do
-  conn <- pgConnect dbConnect
-  let qry = rawPGSimpleQuery $ BC.pack statement
-  ret <- pgQuery conn qry
-  pgDisconnect conn
-  return $ map show ret
-
-compareSchema :: String -> String -> IO Bool
-compareSchema query schema = do
-  tOrF <- dbSelect query
-  return (concat tOrF == schema)
 
 isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
