@@ -19,6 +19,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
+import Data.Foldable
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
@@ -93,23 +94,27 @@ emptyHash :: Text
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
 getContract :: Text -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ =
+  return $ (Left "noncontract accounts should have empty statediffs")
 getContract name _ chainId = do
   xabi <- getContractXabi (ContractName name) (Named name) chainId
 
   return $ Right ContractAndXabi {
     contract = xAbiToContract xabi
     , xabi = T.pack . show $ JSON.toJSON xabi
+    , name = name
     }
 
 getContractCompileFullSource :: Address -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ =
+  return $ (Left "noncontract accounts should have empty statediffs")
 getContractCompileFullSource address _ chainId = do
   contractDetails <- getContractDetailsByAddressOnly address chainId
 
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi contractDetails
     , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
+    , name = contractdetailsName contractDetails
   }
   return $ (Right ret)
 
@@ -207,22 +212,22 @@ processTheMessages messages conn g = do
 
         sourcePtr' <-
           case sourcePtr of
-           Just x -> do
-             storeCachedSourcePtr g codeHash x
-             return x
-           Nothing -> do
-             maybeName <- getCachedSourcePtr g codeHash
-             return $ fromMaybe (error "a contract without a sourcePtr has come to slipstream") maybeName
+            Just x -> do
+              storeCachedSourcePtr g codeHash x
+              return sourcePtr
+            Nothing -> do
+              getCachedSourcePtr g codeHash
 
         maybeCachedContract <- getCachedContract g codeHash
-        sourceIsCreated <- isSourceCreated g $ A.sourceHash sourcePtr'
+        sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
         let addr = Address . fst . head . readHex . T.unpack $ address
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
-                 contractOrError <- getContract (A.contractName sourcePtr') codeHash chainId
+                 let name = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
+                 contractOrError <- getContract name codeHash chainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
@@ -230,9 +235,9 @@ processTheMessages messages conn g = do
                     return c
                (False, Nothing) -> do
                  liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
-                                     tshow codeHash <> ", src:" <> tshow sourcePtr'
+                                     tshow codeHash <> ", addr:" <> tshow addr
                  contractOrError <- getContractCompileFullSource addr codeHash chainId
-                 setSourceCreated g $ A.sourceHash sourcePtr'
+                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
                  liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
                  case contractOrError of
                   Left e -> error e
@@ -241,8 +246,8 @@ processTheMessages messages conn g = do
                     return c
 
 
-        let strAbi = T.replace "\'" "\'\'" $ xabi contractMetaData
-            strName = T.replace "\"" "" . A.contractName $ sourcePtr'
+        let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
+            strName = T.replace "\"" "" . name $ contractMetaData
             cont = case contract contractMetaData of
                     Left s -> error s
                     Right c -> c
