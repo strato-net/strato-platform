@@ -10,15 +10,12 @@ import {
 } from './transactionList.actions';
 import { env } from '../../env';
 
-let url = env.STRATO_URL + "/transaction/last/";
+const url = env.STRATO_URL + "/transaction/last/15";
 
-export function getTx(last, chainId) {
-  if (last === undefined) last = 15;
-  if (chainId) {
-    url =+ `?chainId=${chainId}`
-  }
+export function getTx(chainId) {
+  const localUrl = chainId ? url + `?chainid=${chainId}` : url;
   return fetch(
-    url + last.toString(),
+    localUrl,
     {
       method: 'GET',
       credentials: "include",

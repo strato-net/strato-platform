@@ -13,7 +13,7 @@ import HexText from '../../../HexText';
 class TransactionTable extends Component {
 
   componentDidMount() {
-    this.props.fetchTx(null, this.props.selectedChain);
+    this.props.fetchTx(this.props.selectedChain);
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   }
 
@@ -23,10 +23,10 @@ class TransactionTable extends Component {
 
   componentWillReceiveProps(newProps) {
     if (newProps.query !== this.props.query) {
-      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, this.props.selectedChain);
+      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
     }
     if (newProps.selectedChain !== this.props.selectedChain) {
-      newProps.fetchTx(null, newProps.selectedChain);
+      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
     }
   }
 
