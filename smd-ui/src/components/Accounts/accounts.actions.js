@@ -48,11 +48,12 @@ export const changeAccountFilter = function (filter) {
   }
 };
 
-export const fetchUserAddresses = function (name, loadBalances) {
+export const fetchUserAddresses = function (name, loadBalances, chainId) {
   return {
     type: FETCH_ACCOUNT_ADDRESS_REQUEST,
     name: name,
-    loadBalances: loadBalances
+    loadBalances: loadBalances,
+    chainId: chainId
   }
 };
 
@@ -79,11 +80,12 @@ export const fetchUserAddressesFailure = function (name, error) {
   }
 };
 
-export const fetchAccountDetail = function (name, address) {
+export const fetchAccountDetail = function (name, address, chainId) {
   return {
     type: FETCH_ACCOUNT_DETAIL_REQUEST,
     name: name,
-    address: address
+    address: address,
+    chainId: chainId
   }
 };
 

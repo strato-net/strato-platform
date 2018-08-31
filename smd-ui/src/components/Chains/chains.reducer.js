@@ -134,7 +134,7 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         listChain: newChain,
-        chainIds: action.chain.map((chain) => chain.id)
+        chainIds: action.chain.map((chain) => {return {id: chain.id, label: chain.info.label}} )
       }
     case FETCH_CHAINS_IDS_FAILED:
       return {

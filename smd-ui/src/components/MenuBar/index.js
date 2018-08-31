@@ -87,18 +87,17 @@ class MenuBar extends Component {
                 name="chainLabel"
                 onChange={
                   (e) => {
-                    const data = e.target.value === 'Chain ID' ? null : e.target.value;
+                    const data = e.target.value === 'Chain Label' ? null : e.target.value;
                     this.props.selectChain(data);
                   }
                 }
-                style={{ maxWidth: '100px' }}
                 required
               >
-                <option> Chain ID </option>
+                <option> Chain Label </option>
                 {
                   this.props.chainIds.map((label, i) => {
                     return (
-                      <option key={label + i} value={label}>{label}</option>
+                      <option key={label.id} value={label.id}>{label.label}</option>
                     )
                   })
                 }
