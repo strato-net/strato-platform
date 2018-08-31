@@ -58,26 +58,10 @@ class MenuBar extends Component {
     }
   }
 
-  render() {
-    return (
-      <nav className="pt-navbar pt-dark smd-menu-bar" >
-        <div className="pt-navbar-group pt-align-left">
-          <div>
-            <Link to="/home">
-              <img
-                src={logo}
-                alt="Blockapps Logo"
-                height="32"
-                className="smd-menu-logo"
-              />
-            </Link>
-          </div>
-        </div>
-        <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
-        </div>
-        <div className="pt-navbar-group pt-align-right">
-          {this.renderDeveloperButton()}
+  renderChainDropDown() {
+    if (this.props.isLoggedIn || !isModePublic()) {
+      return (
+        <span>
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">
             <div className="pt-select">
@@ -104,6 +88,32 @@ class MenuBar extends Component {
               </Field>
             </div>
           </small>
+        </span>
+      );
+    }
+  }
+
+  render() {
+    return (
+      <nav className="pt-navbar pt-dark smd-menu-bar" >
+        <div className="pt-navbar-group pt-align-left">
+          <div>
+            <Link to="/home">
+              <img
+                src={logo}
+                alt="Blockapps Logo"
+                height="32"
+                className="smd-menu-logo"
+              />
+            </Link>
+          </div>
+        </div>
+        <div className="pt-navbar-group pt-align-left">
+          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
+        </div>
+        <div className="pt-navbar-group pt-align-right">
+          {this.renderDeveloperButton()}
+          {this.renderChainDropDown()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
           {this.afterLoggedIn()}
