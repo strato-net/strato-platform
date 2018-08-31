@@ -936,12 +936,12 @@ runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM 
 runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas f = do
   dbs' <- get
   vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
-
+  statsCfg EC.statsConfig EC.ethConf
   result <- lift . lift $
-      runNoStatsT $ flip runStateT vmState{
-                         callDepth=callDepth',
-                         vmGasRemaining=availableGas,
-                         suicideList=preExistingSuicideList} $
+      runStatsTConfigured $ flip runStateT vmState{
+                               callDepth=callDepth',
+                               vmGasRemaining=availableGas,
+                               suicideList=preExistingSuicideList} $
       runExceptT f
 
   case result of

@@ -6,7 +6,6 @@ endif
 
 GOPATH=$(PWD)/.go-work
 all: | $(GOPATH)
-	GOPATH=$(GOPATH) GO111MODULE=on go get ./...
 	GOPATH=$(GOPATH) GO111MODULE=on go install .
 
 $(GOPATH):
