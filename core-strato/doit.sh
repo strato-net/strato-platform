@@ -11,6 +11,9 @@ function newnode {
 
   mkdir -p logs/rotation
 
+  # Note: intentionally not monitored yet, as its still experimental
+  contrails &> logs/contrails &
+
   if [[ ! -d .ethereumH ]]
   then initialize=true
        cleanupDB
