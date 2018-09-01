@@ -1,7 +1,7 @@
 module BlockApps.Solidity.Int
   ( module Data.Int
   , module Data.LargeInt
-  , module Data.LargeWord
+  , module Network.Haskoin.Crypto
   , module Data.Word
   , Word24
   , Word40
@@ -51,7 +51,7 @@ module BlockApps.Solidity.Int
 
 import           Data.Int
 import           Data.LargeInt
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.Word
 
 type Word24 = LargeKey Word8 Word16

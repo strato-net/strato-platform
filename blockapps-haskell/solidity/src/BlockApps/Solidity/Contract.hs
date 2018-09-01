@@ -3,7 +3,7 @@ module BlockApps.Solidity.Contract where
 
 import qualified Data.Bimap                  as Bimap
 import           Data.Bits
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import qualified Data.Map                    as Map
 import qualified Data.Text                   as T
 

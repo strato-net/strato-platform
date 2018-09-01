@@ -13,7 +13,7 @@ module BlockApps.Ethereum.Abi.Value
 import           Data.Bool                   (bool)
 import           Data.ByteString             (ByteString)
 import           Data.LargeInt
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                   (Text)

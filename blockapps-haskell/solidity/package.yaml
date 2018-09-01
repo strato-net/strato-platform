@@ -26,8 +26,6 @@ dependencies:
   - cryptonite
   - generic-random
   - http-api-data
-  - largeint
-  - largeword
   - lens
   - logging-effect
   - memory

@@ -1,7 +1,7 @@
 
 module BlockApps.Solidity.Struct where
 
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.Map.Ordered        (OMap)
 import           Data.Text               (Text)
 
