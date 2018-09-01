@@ -12,7 +12,7 @@ import           Control.Monad.Except
 import           Control.Monad.Log
 import           Data.Foldable
 import           Data.Int
-import           Data.LargeWord                  (Word256)
+import           Network.Haskoin.Crypto                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Monoid

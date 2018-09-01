@@ -58,7 +58,6 @@ import           Control.Lens.Operators
 import           Control.DeepSeq (NFData, rnf)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
-import           Crypto.Secp256k1
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import qualified Data.Aeson.Encoding    as AesonEnc
@@ -66,10 +65,10 @@ import qualified Data.Binary            as Binary
 import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
+import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
-import           Data.LargeWord
 import qualified Data.Map.Strict        as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -90,12 +89,8 @@ import           Test.QuickCheck.Instances    ()
 import           Text.Read              hiding (String)
 import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
-
-instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = LargeKey <$> arbitrary <*> arbitrary
-
-instance (NFData a, NFData b) => NFData (LargeKey a b) where
-  rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
+-- TODO(tim): Drop Crypto.Secp256k1
+import           Network.Haskoin.Crypto hiding (Address)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 
@@ -138,22 +133,11 @@ padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
 show256 :: Word256 -> String
-show256 (LargeKey w64 w192) = (show192 w192) ++ (show64 w64)
+show256 = error "TODO(tim): implement"
 
-show192 :: Word192 -> String
-show192 (LargeKey w64 w128) = (show128 w128) ++ (show64 w64)
 
 show160 :: Word160 -> String
-show160 (LargeKey w32 w128) = (show128 w128) ++ (show32 w32)
-
-show128 :: Word128 -> String
-show128 (LargeKey w1 w2) = (show64 w2) ++ (show64 w1)
-
-show64 :: Word64 -> String
-show64 w64 = padZeros 16 (showHex w64 "")
-
-show32 :: Word32 -> String
-show32 w32 = padZeros 8 (showHex w32 "")
+show160 = error "TODO(tim): implement"
 
 addressString :: Address -> String
 addressString (Address address) = show160 address
@@ -297,10 +281,8 @@ instance ToSchema ChainId where
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Private chain id, 32 byte hex encoded string" )
 
-newSecKey :: IO SecKey
-newSecKey = fromMaybe err . secKey <$> getEntropy 32
-  where
-    err = error "could not generate secret key"
+newSecKey :: IO PrvKey
+newSecKey = withSource getEntropy genPrvKey
 --------------------------------------------------------------------------------
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
@@ -659,11 +641,7 @@ instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode n
   rlpDecode obj = Gas <$> rlpDecode obj
 
-newtype BloomFilter = BloomFilter
-  ( LargeKey
-    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
-    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
-  ) deriving (Eq,Show,Generic)
+newtype BloomFilter = BloomFilter BS.ByteString deriving (Eq, Show, Generic)
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: Text.Text

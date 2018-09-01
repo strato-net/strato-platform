@@ -48,7 +48,7 @@ import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
 import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import           Data.Maybe

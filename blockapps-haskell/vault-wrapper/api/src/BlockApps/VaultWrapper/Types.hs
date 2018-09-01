@@ -3,7 +3,7 @@
 module BlockApps.VaultWrapper.Types where
 
 import           Data.Aeson
-import           Data.LargeWord          (Word256)
+import           Network.Haskoin.Crypto          (Word256)
 import           Data.Word               (Word8)
 import           GHC.Generics
 

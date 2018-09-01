@@ -30,7 +30,7 @@ import qualified Data.ByteString.Base16           as B16
 import qualified Data.ByteString.Builder          as BB
 import qualified Data.ByteString.Char8            as BC
 import qualified Data.ByteString.Lazy             as BL
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map

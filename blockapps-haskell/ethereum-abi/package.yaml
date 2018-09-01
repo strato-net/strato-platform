@@ -18,8 +18,6 @@ dependencies:
   - blockapps-ethereum
   - binary
   - bytestring
-  - largeint
-  - largeword
   - text
 
 library:

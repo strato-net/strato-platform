@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module BlockApps.Storage where
 
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 
 type Storage = Word256 -> Word256
 

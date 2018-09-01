@@ -6,7 +6,7 @@
 module BlockApps.XAbiConverter where
 
 import qualified Data.Bimap                        as Bimap
-import           Data.LargeWord
+import           Network.Haskoin.Crypto
 import           Data.List
 import qualified Data.Map                          as Map
 import qualified Data.Map.Ordered                  as OMap
