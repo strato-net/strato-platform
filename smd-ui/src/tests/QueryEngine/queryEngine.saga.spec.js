@@ -30,13 +30,14 @@ describe('QueryEngine: saga', () => {
     const action = {
       query: { last: 15 },
       resourceType: "/transaction",
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
       type: EXECUTE_QUERY_REQUEST
     }
 
     test('inspection', () => {
       const gen = executeQuery(action);
 
-      expect(gen.next().value).toEqual(call(query, action.query, action.resourceType));
+      expect(gen.next().value).toEqual(call(query, action.query, action.resourceType, action.chainId));
       expect(gen.next(transactionsMock).value).toEqual(put(executeQuerySuccess(transactionsMock)));
       expect(gen.throw(error).value).toEqual(put(executeQueryFailure(error)));
       expect(gen.next().done).toBe(true);
@@ -65,13 +66,14 @@ describe('QueryEngine: saga', () => {
     const action = {
       query: { gaslim: 10, last: 15, number: 203976 },
       resourceType: "/block",
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
       type: EXECUTE_QUERY_REQUEST
     }
 
     test('inspection', () => {
       const gen = executeQuery(action);
 
-      expect(gen.next().value).toEqual(call(query, action.query, action.resourceType));
+      expect(gen.next().value).toEqual(call(query, action.query, action.resourceType, action.chainId));
       expect(gen.next(blocksMock).value).toEqual(put(executeQuerySuccess(blocksMock)));
       expect(gen.throw(error).value).toEqual(put(executeQueryFailure(error)));
       expect(gen.next().done).toBe(true);
