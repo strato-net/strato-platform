@@ -118,7 +118,7 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} validate={[Function: required]} required={true}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
                 <option />
                 <option value=\\"airline cartel 9\\">
                   airline cartel 9
@@ -195,7 +195,7 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select smd-max-width\\">
-              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" validate={[Function: required]} required={true}>
+              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
                 <option />
                 <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
                   75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
@@ -429,7 +429,7 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} validate={[Function: required]} required={true}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
                 <option />
                 <option value=\\"airline cartel 9\\">
                   airline cartel 9
@@ -506,7 +506,7 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select smd-max-width\\">
-              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" validate={[Function: required]} required={true}>
+              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
                 <option />
                 <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
                   75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
