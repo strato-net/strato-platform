@@ -69,6 +69,7 @@ Object {
 exports[`ContractCard: action fetch state request 1`] = `
 Object {
   "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
   "name": "Greeter",
   "type": "FETCH_STATE_REQUEST",
 }

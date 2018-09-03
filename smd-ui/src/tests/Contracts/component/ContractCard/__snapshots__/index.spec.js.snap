@@ -1,6 +1,10 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`ContractCard: index mapStateToProps with default values 1`] = `Object {}`;
+exports[`ContractCard: index mapStateToProps with default values 1`] = `
+Object {
+  "selectedChain": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+}
+`;
 
 exports[`ContractCard: index render ContractCard attribute fromBlock and fromCirrus have false value 1`] = `
 ShallowWrapper {
