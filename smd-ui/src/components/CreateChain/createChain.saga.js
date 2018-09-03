@@ -11,14 +11,15 @@ import {
 } from './createChain.actions';
 
 import {
-  fetchChains
+  fetchChains,
+  fetchChainIds
 } from '../Chains/chains.actions';
 
 import { env } from '../../env';
 
 const url = env.BLOC_URL + "/chain"
 
-export function createChainApiCall(label, members, balances, src, args){
+export function createChainApiCall(label, members, balances, src, args) {
   return fetch(
     url,
     {
@@ -28,11 +29,11 @@ export function createChainApiCall(label, members, balances, src, args){
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-         "args": args,
-         "balances": balances,
-         "members": members,
-         "src": src,
-         "label": label
+        "args": args,
+        "balances": balances,
+        "members": members,
+        "src": src,
+        "label": label
       })
     }
   )
@@ -48,10 +49,11 @@ export function* createChain(action) {
   try {
     let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
     // TODO: Change when when we start getting actual error messages
-    if(response.status === 200) {
+    if (response.status === 200) {
       yield put(createChainSuccess(response));
       yield call(delay, 2000);
       yield put(fetchChains());
+      yield put(fetchChainIds())
     } else {
       yield put(createChainFailure(response.statusText));
     }
