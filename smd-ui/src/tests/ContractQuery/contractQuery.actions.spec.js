@@ -36,7 +36,7 @@ describe('ContractQuery: action', () => {
   describe('fetch queryCirrus', () => {
 
     test('request', () => {
-      expect(queryCirrus('Bid', undefined)).toMatchSnapshot();
+      expect(queryCirrus('Bid', undefined, "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9")).toMatchSnapshot();
     });
 
     test('success', () => {
