@@ -19,16 +19,20 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
-import Data.List.Utils (replace)
+import Data.Foldable
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
 import Data.Maybe
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
+import System.Log.Logger
 
 import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
@@ -63,9 +67,9 @@ stateDiffToChanges StateDiff{..} =
               actionType=action',
               address=address',
               codeHash=codeHash y,
-              sourcePtr=(\(hsh, name) -> A.SourcePtr hsh name) <$> sourceCodeHash y,
+              sourcePtr = uncurry A.SourcePtr <$> sourceCodeHash y,
               chainId=chainId,
-              storage=Just $ map (fmap (fromMaybe "0" . newValue)) $ Map.toList $ storage y
+              storage = Just . Map.map (fromMaybe "0" . newValue) $ storage y
               }
           ) . maybe [] Map.toList
 
@@ -86,47 +90,52 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
-emptyHash :: String
+emptyHash :: Text
 emptyHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
 
-getContract::String->String -> Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContract :: Text -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContract _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ =
+  return $ (Left "noncontract accounts should have empty statediffs")
 getContract name _ chainId = do
-  xabi <- getContractXabi (ContractName $ T.pack name) (Named . T.pack $ name) chainId
+  xabi <- getContractXabi (ContractName name) (Named name) chainId
 
   return $ Right ContractAndXabi {
     contract = xAbiToContract xabi
-    , xabi = show $ JSON.toJSON xabi
+    , xabi = T.pack . show $ JSON.toJSON xabi
+    , name = name
     }
 
-getContractCompileFullSource::Address->String->Maybe ChainId->Bloc (Either String ContractAndXabi)
-getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ = return $ (Left "Blank")
+getContractCompileFullSource :: Address -> Text -> Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContractCompileFullSource _ "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470" _ =
+  return $ (Left "noncontract accounts should have empty statediffs")
 getContractCompileFullSource address _ chainId = do
   contractDetails <- getContractDetailsByAddressOnly address chainId
 
   let ret = ContractAndXabi {
     contract = xAbiToContract $ contractdetailsXabi contractDetails
-    , xabi = show $ JSON.toJSON $ contractdetailsXabi contractDetails
+    , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
+    , name = contractdetailsName contractDetails
   }
   return $ (Right ret)
 
-storageToFunction::[(String, String)]->Storage
+storageToFunction :: Map Text Text -> Storage
 storageToFunction s k =
-  case Map.lookup k (Map.fromList $ map (\(x, y) -> (fromInteger $ fst $ head $ readHex x, fromInteger $ fst $ head $ readHex y)) s) of
+  case Map.lookup k (Map.mapKeys read256 $ Map.map read256 s) of
    Nothing -> 0
    Just x -> x
+  where read256 = fromInteger . fst . head . readHex . T.unpack
 
 hasContract::Action->Bool
 hasContract A.Action{A.codeHash="c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"} = False
 hasContract _ = True
 
-storageToList::BA.Storage->(String, String)
-storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (show k, show v)
+storageToList :: BA.Storage -> (Text, Text)
+storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (T.pack $ show k, T.pack $ show v)
 
 addStorageIfNeeded::Action->Bloc Action
 addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
-  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just $ Address $ fst $ head $ readHex address }
-  return $ action'{A.storage = Just $ map storageToList storage'}
+  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ T.unpack address }
+  return $ action'{A.storage = Just . Map.fromList $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
 matchStateDiff :: StateDiff -> StateDiff -> Bool
@@ -153,12 +162,13 @@ processTheMessages messages conn g = do
   let inter = smashIt tempChanges [] []
   let changes = map (concat . map stateDiffToChanges) inter
 
-  putStrLn $ unlines $ map show messages
+  unless (null messages) $
+    debugM "processTheMessages" . unlines . map show $ messages
 
   case length messages of
    0 -> return ()
-   1 -> putStrLn $ "1 message has arrived"
-   n -> putStrLn $ show n ++ " messages have arrived"
+   1 -> infoM "processTheMessages" "1 message has arrived"
+   n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
   let conPort = read flags_pgport
@@ -197,38 +207,38 @@ processTheMessages messages conn g = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-        liftIO $ putStrLn $ "--------\n" ++ A.formatAction row
+        liftIO . infoM "processTheMessages" . show $ "--------\n" <> A.formatAction row
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
           case sourcePtr of
-           Just x -> do
-             storeCachedSourcePtr g codeHash x
-             return x
-           Nothing -> do
-             maybeName <- getCachedSourcePtr g codeHash
-             return $ fromMaybe (error "a contract without a sourcePtr has come to slipstream") maybeName
+            Just x -> do
+              storeCachedSourcePtr g codeHash x
+              return sourcePtr
+            Nothing -> do
+              getCachedSourcePtr g codeHash
 
         maybeCachedContract <- getCachedContract g codeHash
-        sourceIsCreated <- isSourceCreated g $ A.sourceHash sourcePtr'
-        let addr = Address . fst . head $ readHex address
+        sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
+        let addr = Address . fst . head . readHex . T.unpack $ address
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
-                 contractOrError <- getContract (A.contractName sourcePtr') codeHash chainId
+                 let name = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
+                 contractOrError <- getContract name codeHash chainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
                     storeCachedContract g codeHash c
                     return c
                (False, Nothing) -> do
-                 liftIO $ putStrLn $ "Need to call getContractCompileFullSource (this can be slow): ch:" ++
-                                     show codeHash ++ ", src:" ++ show sourcePtr'
+                 liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
+                                     tshow codeHash <> ", addr:" <> tshow addr
                  contractOrError <- getContractCompileFullSource addr codeHash chainId
-                 setSourceCreated g $ A.sourceHash sourcePtr'
-                 liftIO $ putStrLn $ "Done fetching the metadata for " ++ show codeHash
+                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
+                 liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
@@ -236,8 +246,8 @@ processTheMessages messages conn g = do
                     return c
 
 
-        let strAbi = replace "\'" "\'\'" $ xabi contractMetaData
-            strName = replace "\"" "" . A.contractName $ sourcePtr'
+        let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
+            strName = T.replace "\"" "" . name $ contractMetaData
             cont = case contract contractMetaData of
                     Left s -> error s
                     Right c -> c
@@ -247,7 +257,7 @@ processTheMessages messages conn g = do
         let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
         let chain = case chainId of
                      Nothing -> ""
-                     Just(x) -> show x
+                     Just (ChainId x) -> T.pack $ showHex x ""
         return ProcessedContract{address = address,
                                  codehash = codeHash,
                                  abi = strAbi,

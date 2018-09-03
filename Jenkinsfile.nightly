@@ -130,6 +130,15 @@ pipeline {
               cd strato-platform/smd-ui
               docker build -f Dockerfile.test .
             '''
+          },
+          'Integration tests' : {
+            sh '''#!/bin/bash -le
+              set -x
+              echo 'Running local integration tests'
+              cd tests
+              npm install
+              npm run test:truchainz
+            '''
           }
         )
       }

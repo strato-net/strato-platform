@@ -12,30 +12,37 @@
 
 module Slipstream.Data.Action where
 
-import BlockApps.Ethereum
+import           BlockApps.Ethereum
+import           Data.Map.Strict    (Map)
+import qualified Data.Map.Strict    as M
+import           Data.Monoid        ((<>))
+import           Data.Text          (Text)
+import qualified Data.Text          as T
 
 data ActionType = Create | Delete | Update deriving (Eq,Show)
 
-data SourcePtr = SourcePtr { sourceHash :: String, contractName :: String} deriving (Eq, Show)
+data SourcePtr = SourcePtr { sourceHash :: Text, contractName :: Text} deriving (Eq, Show)
 
 data Action =
   Action{
-    actionType::ActionType,
-    address::String,
-    codeHash::String,
-    sourcePtr::Maybe SourcePtr,
-    chainId::Maybe ChainId,
-    storage::(Maybe [(String, String)])
+    actionType :: ActionType,
+    address :: Text,
+    codeHash :: Text,
+    sourcePtr :: Maybe SourcePtr,
+    chainId :: Maybe ChainId,
+    storage :: Maybe (Map Text Text)
     } deriving (Show)
 
 
-formatAction :: Action -> String
+formatAction :: Action -> Text
 formatAction Action{..} =
-  show actionType ++ " " ++ address
-  ++ (case chainId of
+  tshow actionType <> " " <> address
+  <> (case chainId of
        Nothing -> ""
-       Just c -> "in chain" ++ show c)
-  ++ " with " ++ show (length storage) ++ " items\n"
-  ++ "    codeHash = " ++ show codeHash ++ "\n"
-  ++ "    sourcePtr = " ++ show sourcePtr
+       Just c -> "in chain" <> tshow c)
+  <> " with " <> tshow (maybe 0 M.size storage) <> " items\n"
+  <> "    codeHash = " <> codeHash <> "\n"
+  <> "    sourcePtr = " <> tshow sourcePtr
+  where tshow :: Show a => a -> Text
+        tshow = T.pack . show
 
