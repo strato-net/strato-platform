@@ -95,14 +95,13 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = ch
-                               , blockstanbulAuthSenders = authSenders
                                }
         bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
         pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
         myAddr = prvKey2Address pkey
         vals = [myAddr]
-        authSenders = [myAddr]
-        ctx = newContext (View 0 0) vals pkey
+        auSenders = [myAddr]
+        ctx = newContext (View 0 0) vals auSenders pkey
         mCtx = if pbft then Just ctx else Nothing
     fromLeft (error "webserver completed") <$>
       race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
@@ -217,7 +216,8 @@ spec = do
           Nothing -> do
             expectationFailure "BlockstanbulContext required"
           Just bct -> do
-            let pvk = _prvkey bct
+            let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+                pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
             --create the extendedsignature for (beneficiary, nonce)
@@ -229,12 +229,11 @@ spec = do
                                        , recipient=testAddr
                                        , toInclude=True}
             liftIO $ uploadVote testWebserverPort vote
-            local (\cfg -> cfg{blockstanbulAuthSenders = [addr]}) $ do
-              checkForVotes
-              bct' <- getBlockstanbulContext
-              let unwrapbct = fromMaybe bct bct'
-              let pv = _pendingvotes unwrapbct
-                  val = M.lookup testAddr pv
-                  nonc = fromMaybe False val
-              nonc `shouldBe` True
-              pv `shouldBe` (M.singleton testAddr True)
+            checkForVotes
+            bct' <- getBlockstanbulContext
+            let unwrapbct = fromMaybe bct bct'
+            let pv = _pendingvotes unwrapbct
+                val = M.lookup testAddr pv
+                nonc = fromMaybe False val
+            nonc `shouldBe` True
+            pv `shouldBe` (M.singleton testAddr True)

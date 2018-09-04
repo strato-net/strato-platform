@@ -27,10 +27,4 @@ adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
 
 instance FromJSON CandidateReceived
-instance ToJSON CandidateReceived {-where
-  toJSON (CandidateReceived sendr sign recp toInc) = object
-   [ "sender" .= sendr
-   , "signature" .= sign
-   , "recipient" .= recp
-   , "toInclude" .= toInc
-   ] -}
+instance ToJSON CandidateReceived

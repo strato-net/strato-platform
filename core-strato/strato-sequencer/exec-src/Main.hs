@@ -43,7 +43,7 @@ main = do
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_authorized_addresses) :: Either String [Address]
       authSenders = fromRight (error "invalid validators") eAuthSenders
       -- TODO(tim): Use proper initial values for the view
-      ctx = newContext (View 0 0) validators
+      ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
              then return Nothing
@@ -67,6 +67,5 @@ main = do
     , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
     , blockstanbulBeneficiary = chv
-    , blockstanbulAuthSenders = authSenders
   }
   race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver flags_blockstanbul_port chv)

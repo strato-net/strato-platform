@@ -114,9 +114,6 @@ checkForVotes = do
          Nothing -> error "Channel unexpectedly closed"
          Just (Nothing) -> error "Where is the vote?"
          Just (Just br) -> do
-            senderlist <- asks blockstanbulAuthSenders
-            if (elem (API.sender br) senderlist)
-              then do
                 let extsign = RL.rlpDecode
                             . RL.rlpDeserialize
                             . fst
@@ -124,9 +121,6 @@ checkForVotes = do
                     bauth = MsgAuth { sender = (API.sender br), signature = extsign}
                 let ie = NewBeneficiary bauth ((API.recipient br), (API.toInclude br))
                 blockstanbulSend [ie]
-              else error "Sender address is not in the list"
-        {-      $logWarnS "blockstanbul/auth sender" . T.pack $
-                  print "Rejecting Beneficiary: sender not authorized"-}
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock

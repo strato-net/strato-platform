@@ -59,6 +59,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
+  , _authSenders :: [Address]
 }
 
 makeLenses ''BlockstanbulContext
@@ -77,8 +78,8 @@ debugShowCtx = do
   debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
-newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
-newContext v as pk =
+newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
+newContext v as senderlist pk =
   let prop = case as of
                  [] -> 0x0 -- TODO(tim): C? In my Haskell? It's more likely than you think.
                  (a:_) -> a
@@ -99,6 +100,7 @@ newContext v as pk =
      , _prvkey = pk
      , _blockcount = 0
      , _blockLock = Nothing
+     , _authSenders = senderlist
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -116,8 +118,9 @@ isAuthorized iev = do
   specificAuth <-
     case iev of
       NewBeneficiary (MsgAuth addr sign) (benf, dir) -> do
+        slist <- use authSenders
         let senderverified = verifyBenfInfo (benf,dir) sign
-        return $ Just addr == senderverified
+        return $ elem addr slist && Just addr == senderverified
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
         let validatorMatch = vali == (getValidatorList pp)

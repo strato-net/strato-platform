@@ -42,7 +42,6 @@ import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Constants
-import           Blockchain.Data.Address
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -98,7 +97,6 @@ data SequencerConfig =
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan CandidateReceived
-                     , blockstanbulAuthSenders :: [Address]
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
