@@ -172,7 +172,7 @@ function* testSendList(test) {
   assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
 
   // send List
-  const resolve = true;
+  const resolve = false;
   const txs = createBatchTxWithNonce(batchValue, bob, test.nonces);
   const receipts = yield rest.sendList(alice, txs, resolve);
   const results = yield Promise.all(checkResults(receipts));
