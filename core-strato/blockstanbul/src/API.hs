@@ -11,12 +11,11 @@ import Blockchain.Data.Address
 
 type AdminAPI = GetVote
 
-type GetVote = "vote"
-    :> Capture "sender" Address
-    :> Capture "signature" String
-    :> Capture "nominee" Address
-    :> Capture "for_against" Bool
-    :> Get '[JSON] (Address, String, Address, Bool)
+--(Sender address, sender signature, beneficiary address, voting up or down)
+type CandidateReceived = (Address, String, Address, Bool)
+
+type GetVote = "vote" :> ReqBody '[JSON] CandidateReceived :> Post '[JSON] (Address, String, Address, Bool)
+
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy

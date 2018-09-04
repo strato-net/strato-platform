@@ -112,7 +112,7 @@ checkForVotes = do
     x <- liftIO $ atomically $ tryReadTMChan ch
     case x of
          Nothing -> error "Channel unexpectedly closed"
-         Just (Nothing) -> return ()
+         Just (Nothing) -> error "Where is the vote?"
          Just (Just (sendr, sign, addr, bool)) -> do
             senderlist <- asks blockstanbulAuthSenders
             if (elem sendr senderlist)
@@ -124,7 +124,7 @@ checkForVotes = do
                     bauth = MsgAuth { sender = sendr, signature = extsign}
                 let ie = NewBeneficiary bauth (addr, bool)
                 blockstanbulSend [ie]
-              else return ()
+              else error "Sender address is not in the list"
         {-      $logWarnS "blockstanbul/auth sender" . T.pack $
                   print "Rejecting Beneficiary: sender not authorized"-}
 

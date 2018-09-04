@@ -7,7 +7,7 @@ module Blockchain.Sequencer.SequencerSpec where
 import qualified Data.Aeson                 as Ae
 import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
-import           Data.Map                            as M (lookup)
+import           Data.Map                            as M (singleton,lookup)
 import           Data.Either.Extra
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
@@ -242,7 +242,6 @@ spec = do
         out `shouldMatchList` input
 
       it "checks for votes" $ runTestM2 $ do
-        checkForVotes
         bc <- getBlockstanbulContext
         case bc of
           Nothing -> do
@@ -259,8 +258,10 @@ spec = do
             liftIO $ uploadVote testWebserverPort vote
             local (\cfg -> cfg{blockstanbulAuthSenders = [addr]}) $ do
               checkForVotes
-            let pv = _pendingvotes bct
-                val = M.lookup testAddr pv
-            let nonc = fromMaybe False val
-            nonc `shouldBe` True
-            --pv `shouldBe` (M.singleton testAddr True)
+              bct' <- getBlockstanbulContext
+              let unwrapbct = fromMaybe bct bct'
+              let pv = _pendingvotes unwrapbct
+                  val = M.lookup testAddr pv
+                  nonc = fromMaybe False val
+              nonc `shouldBe` True
+              pv `shouldBe` (M.singleton testAddr True)

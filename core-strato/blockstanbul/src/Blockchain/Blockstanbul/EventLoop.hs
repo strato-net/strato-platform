@@ -115,6 +115,9 @@ isAuthorized iev = do
   authorized <- authorize iev
   specificAuth <-
     case iev of
+      NewBeneficiary (MsgAuth addr sign) (benf, dir) -> do
+        let senderverified = verifyBenfInfo (benf,dir) sign
+        return $ Just addr == senderverified
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
         let validatorMatch = vali == (getValidatorList pp)
@@ -185,13 +188,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary bauth (benf,decision)  -> do
-      let senderverified = fromMaybe 0x0000000000000000 $ verifyBenfInfo (benf,decision) (signature bauth)
-      if (sender bauth /= senderverified)
-        then $logWarnS "blockstanbul/vote" . T.pack $
-               printf "Rejecting potential beneficiary: Address does not match"
-        else do
-          pendingvotes %= M.insert benf decision
+    NewBeneficiary _ (benf,decision)  -> do
+      pendingvotes %= M.insert benf decision
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
