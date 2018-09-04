@@ -100,7 +100,7 @@ instance (NFData a, NFData b) => NFData (LargeKey a b) where
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 
 instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex n ""
+  show (Hex n) = showHex (toInteger n) ""
 
 instance (Eq n, Num n) => Read (Hex n) where
   readPrec = Hex <$> readP_to_Prec (const readHexP)
