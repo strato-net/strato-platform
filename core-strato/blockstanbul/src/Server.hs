@@ -15,9 +15,7 @@ import Control.Monad.IO.Class
 import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Handler.Warp
 import Network.HTTP.Client (newManager, defaultManagerSettings)
-
 import API
-
 
 admin :: TMChan CandidateReceived -> Server AdminAPI
 admin = createVote

@@ -16,6 +16,5 @@ type CandidateReceived = (Address, String, Address, Bool)
 
 type GetVote = "vote" :> ReqBody '[JSON] CandidateReceived :> Post '[JSON] (Address, String, Address, Bool)
 
-
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
