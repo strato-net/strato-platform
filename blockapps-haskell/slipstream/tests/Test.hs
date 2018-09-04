@@ -14,7 +14,6 @@ import Data.Default
 import Data.IORef
 import qualified Data.Map as M
 import qualified BlockApps.Solidity.Value as V
-import qualified Data.Set as Set
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -57,7 +56,6 @@ main = hspec $ do
             }]
       let c = ContractAndXabi{contract = Left "test", xabi = "test", name = "<CONTRACT>", contractStored = False, resolvedName = Just "<CONTRACT>1", contractSchema = Nothing}
       g <- newIORef def
-      globals <- readIORef g
       storeCachedContract g "<CODEHASH>" c
       runConduit (yield input .| createInserts g .| sinkList)
         `shouldReturn` [
