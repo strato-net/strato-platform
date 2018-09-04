@@ -19,6 +19,7 @@ import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 
+import           API
 import           Blockchain.Blockstanbul
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
@@ -223,7 +224,10 @@ spec = do
             esign <- signBenfInfo pvk (testAddr, True)
             --rlp seilize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
-                vote = (addr, esignStr, testAddr,True)
+                vote = CandidateReceived{API.sender=addr
+                                       , API.signature=esignStr
+                                       , recipient=testAddr
+                                       , toInclude=True}
             liftIO $ uploadVote testWebserverPort vote
             local (\cfg -> cfg{blockstanbulAuthSenders = [addr]}) $ do
               checkForVotes

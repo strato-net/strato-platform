@@ -54,7 +54,7 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.StatsConf
-
+import           API
 import           System.Directory                          (createDirectoryIfMissing)
 
 import qualified Database.LevelDB                          as LDB
@@ -97,7 +97,7 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TMChan (Address, String, Address, Bool)
+                     , blockstanbulBeneficiary :: TMChan CandidateReceived
                      , blockstanbulAuthSenders :: [Address]
                      }
 

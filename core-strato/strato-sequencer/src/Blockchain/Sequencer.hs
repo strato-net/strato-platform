@@ -28,7 +28,7 @@ import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
-
+import           API
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -113,16 +113,16 @@ checkForVotes = do
     case x of
          Nothing -> error "Channel unexpectedly closed"
          Just (Nothing) -> error "Where is the vote?"
-         Just (Just (sendr, sign, addr, bool)) -> do
+         Just (Just br) -> do
             senderlist <- asks blockstanbulAuthSenders
-            if (elem sendr senderlist)
+            if (elem (API.sender br) senderlist)
               then do
                 let extsign = RL.rlpDecode
                             . RL.rlpDeserialize
                             . fst
-                            . B16.decode $ pack sign
-                    bauth = MsgAuth { sender = sendr, signature = extsign}
-                let ie = NewBeneficiary bauth (addr, bool)
+                            . B16.decode $ pack (API.signature br)
+                    bauth = MsgAuth { sender = (API.sender br), signature = extsign}
+                let ie = NewBeneficiary bauth ((API.recipient br), (API.toInclude br))
                 blockstanbulSend [ie]
               else error "Sender address is not in the list"
         {-      $logWarnS "blockstanbul/auth sender" . T.pack $
