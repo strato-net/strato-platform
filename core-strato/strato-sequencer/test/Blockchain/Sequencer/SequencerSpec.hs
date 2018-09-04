@@ -4,11 +4,9 @@
 module Blockchain.Sequencer.SequencerSpec where
 
 
-import qualified Data.Aeson                 as Ae
 import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (singleton,lookup)
-import           Data.Either.Extra
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
@@ -29,11 +27,9 @@ import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.ChainHelpers
 import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Flags
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class       (txChainId)
-import           Blockchain.Strato.Model.Address
 import           Server
 import           Blockchain.Blockstanbul.EventLoop
 import           Blockchain.Blockstanbul.Authentication
@@ -50,6 +46,11 @@ import           Test.QuickCheck
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
 
+
+fromLeft :: a -> Either a b -> a
+fromLeft _ (Left a) = a
+fromLeft a _ = a
+
 stripTransactionsAndUncles :: IngestBlock -> IngestBlock
 stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [] }
 
@@ -59,18 +60,18 @@ dedupWindow = 100
 runTestM :: SequencerM a -> IO ()
 runTestM m = do
   gb <- makeGenesisBlock
-  void $ withTemporaryDepBlockDB gb m
+  void $ withTemporaryDepBlockDB False gb m
 
 testWebserverPort :: Int
 testWebserverPort = 8050
 
-runTestM2 :: SequencerM a -> IO ()
-runTestM2 m = do
+runPBFTTestM :: SequencerM a -> IO ()
+runPBFTTestM m = do
   gb <- makeGenesisBlock
-  void $ withTemporaryDepBlockDBbs gb m
+  void $ withTemporaryDepBlockDB True gb m
 
-withTemporaryDepBlockDBbs :: IngestBlock -> SequencerM a -> IO ()
-withTemporaryDepBlockDBbs genesisBlock m = do
+withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
+withTemporaryDepBlockDB pbft genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
     timestamp    <- round <$> getPOSIXTime  :: IO Integer
@@ -78,10 +79,9 @@ withTemporaryDepBlockDBbs genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
-    let eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_authorized_addresses) :: Either String [Address]
-    let authSenders = fromRight (error "invalid sender addresses") eAuthSenders
     ch <- atomically $ newTMChan
-    let kcid = KP.KString (C8.pack tempKCID)
+    let
+        kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
                                , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
@@ -96,47 +96,16 @@ withTemporaryDepBlockDBbs genesisBlock m = do
                                , blockstanbulBeneficiary = ch
                                , blockstanbulAuthSenders = authSenders
                                }
-    let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-        validatrs = fromRight (error "invalid validators") eValidators
-        ctx = newContext (View 0 0) validatrs
-    mCtx <- if not flags_blockstanbul
-             then return Nothing
-             else do
-                let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
-                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-                putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
-                return . Just . ctx $ pkey
-    race_ (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg) (webserver testWebserverPort ch)
-        `finally`
-        (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
-
-withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
-withTemporaryDepBlockDB genesisBlock m = do
-    cwd          <- getCurrentDirectory
-    randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
-    timestamp    <- round <$> getPOSIXTime  :: IO Integer
-    let fullPath ="./.ethereumH/dep_block_" ++ show timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
-        tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
-    setCurrentDirectory "../" -- for ethconf to be happy
-    createDirectoryIfMissing True fullPath
-    ch <- atomically $ newTMChan
-    let kcid = KP.KString (C8.pack tempKCID)
-        cfg  = SequencerConfig { depBlockDBCacheSize   = 0
-                               , depBlockDBPath        = fullPath
-                               , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
-                               , kafkaClientId         = kcid
-                               , kafkaConsumerGroup    = KP.ConsumerGroup (KP.KString "fake")
-                               , seenTransactionDBSize = dedupWindow
-                               , syncWrites            = False
-                               , bootstrapDoEmit       = False
-                               , statsConfig           = Nothing
-                               , blockstanbulBlockPeriod = 0
-                               , blockstanbulRoundPeriod = 10000000
-                               , blockstanbulBeneficiary = ch
-                               , blockstanbulAuthSenders = []
-                               }
-
-    runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
+        bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+        pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+        myAddr = prvKey2Address pkey
+        vals = [myAddr]
+        authSenders = [myAddr]
+        ctx = newContext (View 0 0) vals pkey
+        mCtx = if pbft then Just ctx else Nothing
+    fromLeft (error "webserver completed") <$>
+      race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
+           (webserver testWebserverPort ch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -167,7 +136,7 @@ spec = do
         it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
-            outBlocks <- withTemporaryDepBlockDB gb $ do
+            outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> inChain)
               oes <- drainVM
               return [block | OEBlock block <- oes ]
@@ -178,7 +147,7 @@ spec = do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
-            outBlocks <- withTemporaryDepBlockDB gb $ do
+            outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> shuffled)
               oes <- drainVM
               return [block | OEBlock block <- oes ]
@@ -190,13 +159,13 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (10, dedupWindow - 1)
             inTxs  <- generate $ vectorOf inTxSize arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ do
+            outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
-            dedupedOut <- withTemporaryDepBlockDB gb $ do
+            dedupedOut <- withTemporaryDepBlockDB False gb $ do
               splitEvents dedupedIn
               drainVM
             length dedupedOut `shouldBe` length dedupedIn
@@ -206,7 +175,7 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
             inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
-            outTxs <- withTemporaryDepBlockDB gb $ do
+            outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
@@ -214,7 +183,7 @@ spec = do
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
-            dedupedOut <- withTemporaryDepBlockDB gb $ do
+            dedupedOut <- withTemporaryDepBlockDB False gb $ do
               splitEvents replicatedIn
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
@@ -241,7 +210,7 @@ spec = do
         out <- drainTimeouts
         out `shouldMatchList` input
 
-      it "checks for votes" $ runTestM2 $ do
+      it "checks for votes" $ runPBFTTestM $ do
         bc <- getBlockstanbulContext
         case bc of
           Nothing -> do
