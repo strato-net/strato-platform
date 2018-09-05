@@ -130,6 +130,7 @@ Object {
     },
   },
   "filter": "Search accounts",
+  "selectedChain": "airline cartel 1",
 }
 `;
 
