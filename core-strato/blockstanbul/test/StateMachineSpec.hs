@@ -32,7 +32,7 @@ import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
-testContext = newContext (View 20 18) [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
+testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
 runTest = runNoLoggingT . flip evalStateT testContext . (disableAuth >>)

@@ -59,7 +59,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
-  , _authSenders :: [Address]
+  , _authSenders :: M.Map Address Int
 }
 
 makeLenses ''BlockstanbulContext
@@ -100,7 +100,7 @@ newContext v as senderlist pk =
      , _prvkey = pk
      , _blockcount = 0
      , _blockLock = Nothing
-     , _authSenders = senderlist
+     , _authSenders = generateAuthMap senderlist M.empty
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -117,10 +117,15 @@ isAuthorized iev = do
   authorized <- authorize iev
   specificAuth <-
     case iev of
-      NewBeneficiary (MsgAuth addr sign) (benf, dir) -> do
+      NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
+        ---to check nonce for replay attack
         slist <- use authSenders
+        nonceAuth <-
+          if (M.member addr slist)
+            then return $ (Just nonc) > (M.lookup addr slist)
+          else return False
         let senderverified = verifyBenfInfo (benf,dir) sign
-        return $ elem addr slist && Just addr == senderverified
+        return $ nonceAuth && Just addr == senderverified
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
         let validatorMatch = vali == (getValidatorList pp)
@@ -133,6 +138,10 @@ isAuthorized iev = do
   return $ if doAuthn
               then authorized && authenticated && specificAuth
               else authorized
+
+generateAuthMap :: [Address] -> M.Map Address Int-> M.Map Address Int
+generateAuthMap (x:xs) y = generateAuthMap xs (M.insert x 0 y)
+generateAuthMap [] y = y
 
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
@@ -191,7 +200,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary _ (benf,decision)  -> do
+    NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
     NewBlock blk' -> do
       let blk = truncateExtra blk'

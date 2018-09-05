@@ -263,6 +263,5 @@ bootstrapSequencer gb = do
                                             , blockstanbulBlockPeriod = 0
                                             , blockstanbulRoundPeriod = 0
                                             , blockstanbulBeneficiary = ch
-                                            , blockstanbulAuthSenders = []
                                             }
     runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg

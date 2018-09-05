@@ -227,7 +227,8 @@ spec = do
                 vote = CandidateReceived{API.sender=addr
                                        , API.signature=esignStr
                                        , recipient=testAddr
-                                       , toInclude=True}
+                                       , votingdir=True
+                                       , nonce = 1}
             liftIO $ uploadVote testWebserverPort vote
             checkForVotes
             bct' <- getBlockstanbulContext

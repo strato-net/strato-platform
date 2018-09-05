@@ -119,7 +119,7 @@ checkForVotes = do
                             . fst
                             . B16.decode $ pack (API.signature br)
                     bauth = MsgAuth { sender = (API.sender br), signature = extsign}
-                let ie = NewBeneficiary bauth ((API.recipient br), (API.toInclude br))
+                let ie = NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
                 blockstanbulSend [ie]
 
 -- bootstrap genesis block into leveldb if needed

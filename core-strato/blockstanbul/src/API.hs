@@ -16,7 +16,8 @@ import Blockchain.Data.Address
 data CandidateReceived = CandidateReceived { sender :: Address
                                            , signature :: String
                                            , recipient :: Address
-                                           , toInclude :: Bool
+                                           , votingdir :: Bool
+                                           , nonce :: Int
                                            } deriving (Show,GHCG.Generic)
 
 type AdminAPI = GetVote
