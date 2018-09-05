@@ -235,6 +235,21 @@ spec = do
             let unwrapbct = fromMaybe bct bct'
             let pv = _pendingvotes unwrapbct
                 val = M.lookup testAddr pv
-                nonc = fromMaybe False val
-            nonc `shouldBe` True
+            val `shouldBe` Just(True)
             pv `shouldBe` (M.singleton testAddr True)
+            esign' <- signBenfInfo pvk (testAddr, False)
+            let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
+                vote' = CandidateReceived{API.sender=addr
+                                       , API.signature=esignStr'
+                                       , recipient=testAddr
+                                       , votingdir=False
+                                       , nonce = 1}
+            liftIO $ uploadVote testWebserverPort vote'
+            checkForVotes
+            bctn <- getBlockstanbulContext
+            let unwrapbct' = fromMaybe bct bctn
+            let pv' = _pendingvotes unwrapbct'
+                val' = M.lookup testAddr pv'
+            val' `shouldBe` Just(True)
+            pv' `shouldBe` (M.singleton testAddr True)
+            _authSenders unwrapbct' `shouldBe` (M.singleton addr 1)

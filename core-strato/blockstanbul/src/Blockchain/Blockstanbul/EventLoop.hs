@@ -100,7 +100,7 @@ newContext v as senderlist pk =
      , _prvkey = pk
      , _blockcount = 0
      , _blockLock = Nothing
-     , _authSenders = generateAuthMap senderlist M.empty
+     , _authSenders = generateNonceMap senderlist
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -125,7 +125,12 @@ isAuthorized iev = do
             then return $ (Just nonc) > (M.lookup addr slist)
           else return False
         let senderverified = verifyBenfInfo (benf,dir) sign
-        return $ nonceAuth && Just addr == senderverified
+        if (nonceAuth && Just addr == senderverified)
+          then do
+            authSenders %= M.insert addr nonc
+            return True
+          else
+            return False
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
         let validatorMatch = vali == (getValidatorList pp)
@@ -139,9 +144,8 @@ isAuthorized iev = do
               then authorized && authenticated && specificAuth
               else authorized
 
-generateAuthMap :: [Address] -> M.Map Address Int-> M.Map Address Int
-generateAuthMap (x:xs) y = generateAuthMap xs (M.insert x 0 y)
-generateAuthMap [] y = y
+generateNonceMap :: [Address] -> M.Map Address Int
+generateNonceMap = M.fromList . flip zip (repeat 0)
 
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
