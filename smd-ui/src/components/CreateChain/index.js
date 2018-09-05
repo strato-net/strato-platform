@@ -9,6 +9,7 @@ import './createChain.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
 import { toasts } from '../Toasts';
+import Dropzone from 'react-dropzone';
 
 class CreateChain extends Component {
 
@@ -16,7 +17,8 @@ class CreateChain extends Component {
     super(props);
     this.state = {
       members: [],
-      errors: null
+      errors: null,
+      governanceContract: null
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
@@ -35,6 +37,7 @@ class CreateChain extends Component {
 
   submit = (values) => {
     values.members = this.state.members;
+    values.governanceContract = this.state.governanceContract;
     let errors = validate(values);
     this.setState({ errors });
 
@@ -129,6 +132,50 @@ class CreateChain extends Component {
     return null;
   }
 
+  isValidFileType = (files) => {
+    if (!files || !files[0])
+      return 'Please add contract source file'
+    const contractSource = files[0];
+    if (!contractSource.name.includes('.sol'))
+      return 'It should be an .sol extention file';
+  };
+
+  renderDropzoneInput = (field) => {
+    const touchedAndHasErrors = field.meta.touched && field.meta.error
+    return (
+      <div className="dropzoneContainer text-center">
+        <Dropzone
+          className="dropzone"
+          name={field.name}
+          onDrop={(filesToUpload, e) => this.handleFileDrop(filesToUpload, field)}
+        >
+          {({ isDragActive, isDragReject, acceptedFiles }) => {
+            if (isDragActive) {
+              return (<p className="pt-intent-success">Drop to Upload!</p>);
+            }
+            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+          }}
+        </Dropzone>
+        {touchedAndHasErrors && <span className="error-text">{field.meta.error}</span>}
+      </div>
+    );
+  };
+
+  handleFileDrop = (files, dropZoneField) => {
+    this.props.touch('contract');
+    dropZoneField.input.onChange(files);
+    const contract = files[0];
+
+    let reader = new FileReader();
+    const self = this;
+    reader.onload = function (event) {
+      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
+      mixpanelWrapper.track("create_contract_file_upload");
+      self.setState({ governanceContract: fileContents })
+    };
+    reader.readAsText(contract);
+  };
+
   render() {
     return (
       <div className="smd-pad-16">
@@ -172,18 +219,19 @@ class CreateChain extends Component {
 
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Governance Contract
-                  </label>
+                  <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
+                    Contract
+                    </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <Field
-                    name="governanceContract"
-                    component="input"
-                    type="text"
-                    placeholder="Governance Contract"
-                    className="pt-input form-width"
-                    tabIndex="2"
+                    id="input-b"
+                    className="form-width pt-input"
+                    name="contract"
+                    component={this.renderDropzoneInput}
+                    dir="auto"
+                    title="Contract Source"
+                    validate={this.isValidFileType}
                     required
                   />
                   <span className="error-text">{this.errorMessageFor('governanceContract')}</span>
