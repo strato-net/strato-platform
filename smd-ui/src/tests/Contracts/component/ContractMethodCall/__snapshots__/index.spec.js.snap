@@ -110,115 +110,117 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
             </h5>
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Chain
-            </label>
-          </div>
-          <div className=\\"col-sm-9\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"airline cartel 9\\">
-                  airline cartel 9
-                </option>
-                <option value=\\"airline cartel 1\\">
-                  airline cartel 1
-                </option>
-                <option value=\\"airline cartel 2\\">
-                  airline cartel 2
-                </option>
-                <option value=\\"airline cartel 3\\">
-                  airline cartel 3
-                </option>
-                <option value=\\"airline cartel 4\\">
-                  airline cartel 4
-                </option>
-                <option value=\\"airline cartel 5\\">
-                  airline cartel 5
-                </option>
-                <option value=\\"airline cartel 6\\">
-                  airline cartel 6
-                </option>
-                <option value=\\"airline cartel 7\\">
-                  airline cartel 7
-                </option>
-                <option value=\\"airline cartel 10\\">
-                  airline cartel 10
-                </option>
-                <option value=\\"airline cartel 11\\">
-                  airline cartel 11
-                </option>
-                <option value=\\"airline cartel 12\\">
-                  airline cartel 12
-                </option>
-                <option value=\\"airline cartel 13\\">
-                  airline cartel 13
-                </option>
-                <option value=\\"airline cartel 14\\">
-                  airline cartel 14
-                </option>
-                <option value=\\"airline cartel 89\\">
-                  airline cartel 89
-                </option>
-                <option value=\\"airline cartel 200\\">
-                  airline cartel 200
-                </option>
-                <option value=\\"airline cartel 822\\">
-                  airline cartel 822
-                </option>
-                <option value=\\"airline cartel 52\\">
-                  airline cartel 52
-                </option>
-                <option value=\\"airline cartel 900\\">
-                  airline cartel 900
-                </option>
-                <option value=\\"airline cartel 1000\\">
-                  airline cartel 1000
-                </option>
-                <option value=\\"airline cartel 9000\\">
-                  airline cartel 9000
-                </option>
-                <option value=\\"airline cartel 2000\\">
-                  airline cartel 2000
-                </option>
-              </Field>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label label-margin\\">
+                Chain
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"airline cartel 9\\">
+                    airline cartel 9
+                  </option>
+                  <option value=\\"airline cartel 1\\">
+                    airline cartel 1
+                  </option>
+                  <option value=\\"airline cartel 2\\">
+                    airline cartel 2
+                  </option>
+                  <option value=\\"airline cartel 3\\">
+                    airline cartel 3
+                  </option>
+                  <option value=\\"airline cartel 4\\">
+                    airline cartel 4
+                  </option>
+                  <option value=\\"airline cartel 5\\">
+                    airline cartel 5
+                  </option>
+                  <option value=\\"airline cartel 6\\">
+                    airline cartel 6
+                  </option>
+                  <option value=\\"airline cartel 7\\">
+                    airline cartel 7
+                  </option>
+                  <option value=\\"airline cartel 10\\">
+                    airline cartel 10
+                  </option>
+                  <option value=\\"airline cartel 11\\">
+                    airline cartel 11
+                  </option>
+                  <option value=\\"airline cartel 12\\">
+                    airline cartel 12
+                  </option>
+                  <option value=\\"airline cartel 13\\">
+                    airline cartel 13
+                  </option>
+                  <option value=\\"airline cartel 14\\">
+                    airline cartel 14
+                  </option>
+                  <option value=\\"airline cartel 89\\">
+                    airline cartel 89
+                  </option>
+                  <option value=\\"airline cartel 200\\">
+                    airline cartel 200
+                  </option>
+                  <option value=\\"airline cartel 822\\">
+                    airline cartel 822
+                  </option>
+                  <option value=\\"airline cartel 52\\">
+                    airline cartel 52
+                  </option>
+                  <option value=\\"airline cartel 900\\">
+                    airline cartel 900
+                  </option>
+                  <option value=\\"airline cartel 1000\\">
+                    airline cartel 1000
+                  </option>
+                  <option value=\\"airline cartel 9000\\">
+                    airline cartel 9000
+                  </option>
+                  <option value=\\"airline cartel 2000\\">
+                    airline cartel 2000
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Chain Ids
-            </label>
-          </div>
-          <div className=\\"col-sm-9\\">
-            <div className=\\"pt-select smd-max-width\\">
-              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
-                <option />
-                <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
-                  75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
-                </option>
-                <option value=\\"8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60\\">
-                  8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60
-                </option>
-                <option value=\\"86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6\\">
-                  86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6
-                </option>
-                <option value=\\"8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5\\">
-                  8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5
-                </option>
-                <option value=\\"90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b\\">
-                  90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b
-                </option>
-                <option value=\\"ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1\\">
-                  ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1
-                </option>
-                <option value=\\"936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9\\">
-                  936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9
-                </option>
-              </Field>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label label-margin\\">
+                Chain Ids
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <div className=\\"pt-select smd-max-width\\">
+                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
+                  <option />
+                  <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
+                    75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
+                  </option>
+                  <option value=\\"8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60\\">
+                    8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60
+                  </option>
+                  <option value=\\"86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6\\">
+                    86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6
+                  </option>
+                  <option value=\\"8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5\\">
+                    8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5
+                  </option>
+                  <option value=\\"90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b\\">
+                    90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b
+                  </option>
+                  <option value=\\"ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1\\">
+                    ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1
+                  </option>
+                  <option value=\\"936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9\\">
+                    936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>
         </div>
@@ -421,115 +423,117 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
             </h5>
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Chain
-            </label>
-          </div>
-          <div className=\\"col-sm-9\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-                <option />
-                <option value=\\"airline cartel 9\\">
-                  airline cartel 9
-                </option>
-                <option value=\\"airline cartel 1\\">
-                  airline cartel 1
-                </option>
-                <option value=\\"airline cartel 2\\">
-                  airline cartel 2
-                </option>
-                <option value=\\"airline cartel 3\\">
-                  airline cartel 3
-                </option>
-                <option value=\\"airline cartel 4\\">
-                  airline cartel 4
-                </option>
-                <option value=\\"airline cartel 5\\">
-                  airline cartel 5
-                </option>
-                <option value=\\"airline cartel 6\\">
-                  airline cartel 6
-                </option>
-                <option value=\\"airline cartel 7\\">
-                  airline cartel 7
-                </option>
-                <option value=\\"airline cartel 10\\">
-                  airline cartel 10
-                </option>
-                <option value=\\"airline cartel 11\\">
-                  airline cartel 11
-                </option>
-                <option value=\\"airline cartel 12\\">
-                  airline cartel 12
-                </option>
-                <option value=\\"airline cartel 13\\">
-                  airline cartel 13
-                </option>
-                <option value=\\"airline cartel 14\\">
-                  airline cartel 14
-                </option>
-                <option value=\\"airline cartel 89\\">
-                  airline cartel 89
-                </option>
-                <option value=\\"airline cartel 200\\">
-                  airline cartel 200
-                </option>
-                <option value=\\"airline cartel 822\\">
-                  airline cartel 822
-                </option>
-                <option value=\\"airline cartel 52\\">
-                  airline cartel 52
-                </option>
-                <option value=\\"airline cartel 900\\">
-                  airline cartel 900
-                </option>
-                <option value=\\"airline cartel 1000\\">
-                  airline cartel 1000
-                </option>
-                <option value=\\"airline cartel 9000\\">
-                  airline cartel 9000
-                </option>
-                <option value=\\"airline cartel 2000\\">
-                  airline cartel 2000
-                </option>
-              </Field>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label label-margin\\">
+                Chain
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"airline cartel 9\\">
+                    airline cartel 9
+                  </option>
+                  <option value=\\"airline cartel 1\\">
+                    airline cartel 1
+                  </option>
+                  <option value=\\"airline cartel 2\\">
+                    airline cartel 2
+                  </option>
+                  <option value=\\"airline cartel 3\\">
+                    airline cartel 3
+                  </option>
+                  <option value=\\"airline cartel 4\\">
+                    airline cartel 4
+                  </option>
+                  <option value=\\"airline cartel 5\\">
+                    airline cartel 5
+                  </option>
+                  <option value=\\"airline cartel 6\\">
+                    airline cartel 6
+                  </option>
+                  <option value=\\"airline cartel 7\\">
+                    airline cartel 7
+                  </option>
+                  <option value=\\"airline cartel 10\\">
+                    airline cartel 10
+                  </option>
+                  <option value=\\"airline cartel 11\\">
+                    airline cartel 11
+                  </option>
+                  <option value=\\"airline cartel 12\\">
+                    airline cartel 12
+                  </option>
+                  <option value=\\"airline cartel 13\\">
+                    airline cartel 13
+                  </option>
+                  <option value=\\"airline cartel 14\\">
+                    airline cartel 14
+                  </option>
+                  <option value=\\"airline cartel 89\\">
+                    airline cartel 89
+                  </option>
+                  <option value=\\"airline cartel 200\\">
+                    airline cartel 200
+                  </option>
+                  <option value=\\"airline cartel 822\\">
+                    airline cartel 822
+                  </option>
+                  <option value=\\"airline cartel 52\\">
+                    airline cartel 52
+                  </option>
+                  <option value=\\"airline cartel 900\\">
+                    airline cartel 900
+                  </option>
+                  <option value=\\"airline cartel 1000\\">
+                    airline cartel 1000
+                  </option>
+                  <option value=\\"airline cartel 9000\\">
+                    airline cartel 9000
+                  </option>
+                  <option value=\\"airline cartel 2000\\">
+                    airline cartel 2000
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Chain Ids
-            </label>
-          </div>
-          <div className=\\"col-sm-9\\">
-            <div className=\\"pt-select smd-max-width\\">
-              <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
-                <option />
-                <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
-                  75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
-                </option>
-                <option value=\\"8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60\\">
-                  8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60
-                </option>
-                <option value=\\"86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6\\">
-                  86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6
-                </option>
-                <option value=\\"8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5\\">
-                  8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5
-                </option>
-                <option value=\\"90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b\\">
-                  90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b
-                </option>
-                <option value=\\"ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1\\">
-                  ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1
-                </option>
-                <option value=\\"936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9\\">
-                  936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9
-                </option>
-              </Field>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label label-margin\\">
+                Chain Ids
+              </label>
+            </div>
+            <div className=\\"col-sm-9\\">
+              <div className=\\"pt-select smd-max-width\\">
+                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
+                  <option />
+                  <option value=\\"75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86\\">
+                    75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86
+                  </option>
+                  <option value=\\"8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60\\">
+                    8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60
+                  </option>
+                  <option value=\\"86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6\\">
+                    86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6
+                  </option>
+                  <option value=\\"8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5\\">
+                    8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5
+                  </option>
+                  <option value=\\"90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b\\">
+                    90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b
+                  </option>
+                  <option value=\\"ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1\\">
+                    ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1
+                  </option>
+                  <option value=\\"936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9\\">
+                    936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9
+                  </option>
+                </Field>
+              </div>
             </div>
           </div>
         </div>

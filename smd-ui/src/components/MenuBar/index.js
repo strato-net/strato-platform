@@ -59,7 +59,7 @@ class MenuBar extends Component {
   }
 
   renderChainDropDown() {
-    if (this.props.isLoggedIn || !isModePublic()) {
+    if ( this.props.chainIds.length && (this.props.isLoggedIn || !isModePublic())) {
       return (
         <span>
           <span className="pt-navbar-divider" />

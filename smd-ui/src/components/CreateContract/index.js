@@ -240,10 +240,76 @@ class CreateContract extends Component {
     }
   }
 
+  renderChainFields() {
+    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+
+    if (chainLabel.length) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain
+          </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => this.props.getLabelIds(e.target.value)
+                  }
+                >
+                  <option />
+                  {
+                    chainLabel.map((label, i) => {
+                      return (
+                        <option key={label + i} value={label}>{label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain IDs
+          </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select smd-max-width">
+                <Field
+                  className="pt-input smd-max-width"
+                  component="select"
+                  name="chainId"
+                >
+                  <option />
+                  {
+                    Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                      return (
+                        <option key={id + i} value={id}>{id}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  }
+
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const isPublicMode = isModePublic();
+
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
@@ -265,59 +331,7 @@ class CreateContract extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Chain
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="chainLabel"
-                      onChange={
-                        (e) => this.props.getLabelIds(e.target.value)
-                      }
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabel).map((label, i) => {
-                          return (
-                            <option key={label + i} value={label}>{label}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Chain IDs
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select smd-max-width">
-                    <Field
-                      className="pt-input smd-max-width"
-                      component="select"
-                      name="chainId"
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                          return (
-                            <option key={id + i} value={id}>{id}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
+              {this.renderChainFields()}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
