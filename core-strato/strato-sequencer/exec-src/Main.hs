@@ -42,7 +42,6 @@ main = do
       validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_authorized_addresses) :: Either String [Address]
       authSenders = fromRight (error "invalid validators") eAuthSenders
-
       -- TODO(tim): Use proper initial values for the view
       ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
