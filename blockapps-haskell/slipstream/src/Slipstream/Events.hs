@@ -36,6 +36,8 @@ data StateDiff =
     -- | The 'Eventual value is the pre-deletion state of the contract
     deletedAccounts :: Maybe (Map Text AccountDiff),
     updatedAccounts :: Maybe (Map Text AccountDiff),
+    indexFlag :: Maybe Bool,
+    historyFlag :: Maybe Bool,
     chainId :: Maybe Eth.ChainId
     }
     deriving (Show, Generic)
@@ -88,5 +90,7 @@ data ProcessedContract = ProcessedContract {
   abi :: Text,
   contractName :: Text,
   chain :: Text,
+  index :: Bool,
+  history :: Bool,
   contractData :: Map Text V.Value
 }

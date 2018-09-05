@@ -29,6 +29,8 @@ data Action =
     address :: Text,
     codeHash :: Text,
     sourcePtr :: Maybe SourcePtr,
+    indexFlag :: Maybe Bool,
+    historyFlag :: Maybe Bool,
     chainId :: Maybe ChainId,
     storage :: Maybe (Map Text Text)
     } deriving (Show)
@@ -45,4 +47,3 @@ formatAction Action{..} =
   <> "    sourcePtr = " <> tshow sourcePtr
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
-

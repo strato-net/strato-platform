@@ -68,6 +68,8 @@ stateDiffToChanges StateDiff{..} =
               address=address',
               codeHash=codeHash y,
               sourcePtr = uncurry A.SourcePtr <$> sourceCodeHash y,
+              indexFlag=indexFlag,
+              historyFlag=historyFlag,
               chainId=chainId,
               storage = Just . Map.map (fromMaybe "0" . newValue) $ storage y
               }
@@ -145,8 +147,8 @@ addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
 addStorageIfNeeded action = return action
 
 matchStateDiff :: StateDiff -> StateDiff -> Bool
-matchStateDiff (StateDiff (Just x) Nothing Nothing Nothing) (StateDiff (Just y) Nothing Nothing Nothing) = (codeHash $ head $ Map.elems x) == (codeHash $ head $ Map.elems y)
-matchStateDiff (StateDiff _ _ _ _) (StateDiff _ _ _ _) = False
+matchStateDiff (StateDiff (Just x) Nothing Nothing _ _ Nothing) (StateDiff (Just y) Nothing Nothing _ _ Nothing) = (codeHash $ head $ Map.elems x) == (codeHash $ head $ Map.elems y)
+matchStateDiff (StateDiff _ _ _ _ _ _) (StateDiff _ _ _ _ _ _) = False
 
 smashIt :: [StateDiff] -> [StateDiff] -> [[StateDiff]] -> [[StateDiff]]
 smashIt [] _ final = final
@@ -294,6 +296,8 @@ processTheMessages messages conn g = do
                                  codehash = codeHash,
                                  abi = strAbi,
                                  contractName = strName,
+                                 index=fromMaybe False indexFlag,
+                                 history=fromMaybe False historyFlag,
                                  chain = chain,
                                  contractData = ret}
 
