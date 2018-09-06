@@ -108,41 +108,54 @@ selfAddr = uses prvkey prvKey2Address
 
 authorize :: (StateMachineM m) => InEvent -> m Bool
 authorize = \case
-  IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
+  IMsg (MsgAuth addr _) _ -> do
+    ret <- uses validators (addr `elem`)
+    unless ret $
+      $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting message; sender not a validator: " ++ show addr
+    return ret
   _ -> return True
 
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
+  doAuthn <- use productionAuth
   let authenticated = authenticate iev
+  when (not authenticated && doAuthn) $
+    $logWarnS "blockstanbul/auth" . T.pack $
+      "Rejecting inevent; message failed authentication: " ++ show iev
   authorized <- authorize iev
   specificAuth <-
     case iev of
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
-        ---to check nonce for replay attack
+        -- Check nonce for replay attack
         slist <- use authSenders
-        nonceAuth <-
-          if (M.member addr slist)
-            then return $ (Just nonc) > (M.lookup addr slist)
-          else return False
-        let senderverified = verifyBenfInfo (benf,dir) sign
-        if (nonceAuth && Just addr == senderverified)
+        let nonceAuth = M.member addr slist && Just nonc > M.lookup addr slist
+            verifiedSender = verifyBenfInfo (benf,dir) sign
+        if (nonceAuth && Just addr == verifiedSender)
           then do
             authSenders %= M.insert addr nonc
             return True
-          else
+          else do
+            when doAuthn $
+              $logWarnS "blockstanbul/auth" "Rejecting NewBeneficiary; nonce or signature incorrect"
             return False
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
         let validatorMatch = vali == (getValidatorList pp)
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
-        return $ validatorMatch && Just addr == signatory
+        let ret = validatorMatch && Just addr == signatory
+        when (doAuthn && not ret) $
+          $logWarnS "blockstanbul/auth" "Rejecting Preprepare; mismatched validator or bad seal"
+        return ret
       IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-        return $ Just addr == verifyCommitmentSeal di seal
+        let ret = Just addr == verifyCommitmentSeal di seal
+        when (doAuthn && not ret) $
+          $logWarnS "blockstanbul/auth" "Rejecting Commit; bad seal"
+        return ret
       _ -> return True -- No specific auth for any other messages
-  doAuthn <- use productionAuth
   return $ if doAuthn
               then authorized && authenticated && specificAuth
               else authorized
+
 
 generateNonceMap :: [Address] -> M.Map Address Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
