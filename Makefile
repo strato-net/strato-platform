@@ -62,7 +62,7 @@ postgrest:
 
 prometheus:
 	@echo Now building prometheus...
-	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} make --directory=prometheus/
+	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} make --directory=prometheus-packager/
 
 smd:
 	@echo building smd...
