@@ -24,7 +24,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
 import Data.Maybe
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple
@@ -207,7 +206,7 @@ processTheMessages messages conn g = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-        liftIO . infoM "processTheMessages" . show $ "--------\n" <> A.formatAction row
+        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", A.formatAction row]
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
@@ -234,11 +233,15 @@ processTheMessages messages conn g = do
                     storeCachedContract g codeHash c
                     return c
                (False, Nothing) -> do
-                 liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
-                                     tshow codeHash <> ", addr:" <> tshow addr
+                 liftIO . warningM "processTheMessages" . show $ T.concat
+                   [ "Need to call getContractCompileFullSource (this can be slow): ch:"
+                   , tshow codeHash
+                   , ", src:"
+                   , tshow sourcePtr'
+                   ]
                  contractOrError <- getContractCompileFullSource addr codeHash chainId
                  traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                 liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
+                 liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow codeHash]
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
