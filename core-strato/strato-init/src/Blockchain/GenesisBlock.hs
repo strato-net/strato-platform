@@ -8,6 +8,9 @@ module Blockchain.GenesisBlock (
   BackupType(..)
 ) where
 
+
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
@@ -247,6 +250,7 @@ bootstrapIndexer key obGB =
 bootstrapSequencer :: Block -> IO OutputBlock
 bootstrapSequencer gb = do
     let clientId = KP.KString $ C8.pack SeqConstants.defaultKafkaClientId'
+    ch <- atomically $ newTMChan
     let dummySequencerCfg = SequencerConfig { depBlockDBCacheSize   = 0
                                             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
                                             , kafkaAddress          = Nothing
@@ -258,5 +262,6 @@ bootstrapSequencer gb = do
                                             , statsConfig           = Nothing
                                             , blockstanbulBlockPeriod = 0
                                             , blockstanbulRoundPeriod = 0
+                                            , blockstanbulBeneficiary = ch
                                             }
     runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg
