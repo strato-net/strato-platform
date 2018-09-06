@@ -22,6 +22,7 @@ module Blockchain.Sequencer.Monad (
   , createNewTimer
   , drainTMChan
   , drainTimeouts
+  , drainVotes
 ) where
 
 import           ClassyPrelude                             (atomically, STM)
@@ -204,6 +205,9 @@ drainTMChan ch = do
 
 drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ uses blockstanbulTimeouts (atomically . drainTMChan)
+
+drainVotes :: SequencerM [CandidateReceived]
+drainVotes = atomically . drainTMChan =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
