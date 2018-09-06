@@ -19,8 +19,10 @@ import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 
-import           API
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.Authentication
+import           Blockchain.Blockstanbul.EventLoop
+import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
 import           Blockchain.Format
@@ -31,9 +33,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class       (txChainId)
-import           Server
-import           Blockchain.Blockstanbul.EventLoop
-import           Blockchain.Blockstanbul.Authentication
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
 import qualified Network.Haskoin.Crypto     as HK
@@ -105,7 +104,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         mCtx = if pbft then Just ctx else Nothing
     fromLeft (error "webserver completed") <$>
       race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
-           (webserver testWebserverPort ch)
+           (API.webserver testWebserverPort ch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -224,32 +223,32 @@ spec = do
             esign <- signBenfInfo pvk (testAddr, True)
             --rlp seilize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
-                vote = CandidateReceived{API.sender=addr
-                                       , API.signature=esignStr
-                                       , recipient=testAddr
-                                       , votingdir=True
-                                       , nonce = 1}
-            liftIO $ uploadVote testWebserverPort vote
+                vote = API.CandidateReceived{API.sender=addr
+                                           , API.signature=esignStr
+                                           , API.recipient=testAddr
+                                           , API.votingdir=True
+                                           , API.nonce = 1}
+            liftIO $ API.uploadVote testWebserverPort vote
             checkForVotes
             bct' <- getBlockstanbulContext
             let unwrapbct = fromMaybe bct bct'
             let pv = _pendingvotes unwrapbct
                 val = M.lookup testAddr pv
-            val `shouldBe` Just(True)
-            pv `shouldBe` (M.singleton testAddr True)
+            val `shouldBe` Just True
+            pv `shouldBe` M.singleton testAddr True
             esign' <- signBenfInfo pvk (testAddr, False)
             let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
-                vote' = CandidateReceived{API.sender=addr
-                                       , API.signature=esignStr'
-                                       , recipient=testAddr
-                                       , votingdir=False
-                                       , nonce = 1}
-            liftIO $ uploadVote testWebserverPort vote'
+                vote' = API.CandidateReceived{API.sender=addr
+                                            , API.signature=esignStr'
+                                            , API.recipient=testAddr
+                                            , API.votingdir=False
+                                            , API.nonce = 1}
+            liftIO $ API.uploadVote testWebserverPort vote'
             checkForVotes
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
             let pv' = _pendingvotes unwrapbct'
                 val' = M.lookup testAddr pv'
-            val' `shouldBe` Just(True)
-            pv' `shouldBe` (M.singleton testAddr True)
-            _authSenders unwrapbct' `shouldBe` (M.singleton addr 1)
+            val' `shouldBe` Just True
+            pv' `shouldBe` M.singleton testAddr True
+            _authSenders unwrapbct' `shouldBe` M.singleton addr 1

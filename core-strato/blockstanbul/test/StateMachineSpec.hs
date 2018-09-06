@@ -94,7 +94,7 @@ spec = parallel $ do
         xsp `shouldBe` [ToCommit blk]
         -- Pretend that in this interval, the block was committed
         sendMessages [CommitResult (Right ())] `shouldReturn` []
-        -- The proposer *shouldn't* change, because the round number is the same          -- failing from here
+        -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
         v2 <- use view

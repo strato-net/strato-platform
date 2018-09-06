@@ -9,8 +9,6 @@
 module Blockchain.Sequencer where
 
 import           Control.Concurrent
-import           Control.Concurrent.STM.TMChan
-import           Control.Concurrent.STM
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -28,7 +26,7 @@ import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
-import           API
+import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -106,21 +104,17 @@ sequencer = do
       let ofs = maximum $ map fst inEvents
       setNextIngestedOffset ofs
 
-checkForVotes :: SequencerM()
+checkForVotes :: SequencerM ()
 checkForVotes = do
-    ch <- asks blockstanbulBeneficiary
-    x <- liftIO $ atomically $ tryReadTMChan ch
-    case x of
-         Nothing -> error "Channel unexpectedly closed"
-         Just (Nothing) -> error "Where is the vote?"
-         Just (Just br) -> do
-                let extsign = RL.rlpDecode
-                            . RL.rlpDeserialize
-                            . fst
-                            . B16.decode $ pack (API.signature br)
-                    bauth = MsgAuth { sender = (API.sender br), signature = extsign}
-                let ie = NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
-                blockstanbulSend [ie]
+    votes <- drainVotes
+    forM_ votes $ \br ->
+      let extsign = RL.rlpDecode
+                  . RL.rlpDeserialize
+                  . fst
+                  . B16.decode $ pack (API.signature br)
+          bauth = MsgAuth { sender = (API.sender br), signature = extsign}
+          ie = NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
+      in blockstanbulSend [ie]
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock
