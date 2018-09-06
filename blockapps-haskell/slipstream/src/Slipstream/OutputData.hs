@@ -17,7 +17,6 @@ import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import           Data.IORef.Lifted
 import qualified Data.Map                        as Map
-import           Data.Monoid                     ((<>))
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
@@ -47,16 +46,16 @@ typeText (_) = "jsonb"
 
 listToKeyStatement :: Text -> [(Text, b)] -> Text
 listToKeyStatement _ [] = ""
-listToKeyStatement _ [(x, _)] = "\"" <> x <> "\""
-listToKeyStatement s ((x,_):es) = "\"" <> x <> "\"" <> s <> (listToKeyStatement s es)
+listToKeyStatement _ [(x, _)] = T.concat ["\"", x, "\""]
+listToKeyStatement s ((x,_):es) = T.concat ["\"", x, "\"", s, (listToKeyStatement s es)]
 
 solidityValueToText :: Text -> SolidityValue -> Text
-solidityValueToText s (SolidityValueAsString x) = s <> (escapeQuotes x) <> s
-solidityValueToText s (SolidityBool x) = s <> tshow x <> s
-solidityValueToText s (SolidityNum x ) = s <> tshow x <> s
-solidityValueToText s (SolidityBytes x) = s <> (escapeQuotes $ tshow x) <> s
-solidityValueToText s (SolidityArray x) = s <> (decodeUtf8 . BL.toStrict $ encode x) <> s
-solidityValueToText s (SolidityObject x) = s <> (decodeUtf8 . BL.toStrict $ encode x) <> s
+solidityValueToText s (SolidityValueAsString x) = T.concat [s, (escapeQuotes x), s]
+solidityValueToText s (SolidityBool x) = T.concat [s, tshow x, s]
+solidityValueToText s (SolidityNum x ) = T.concat [s, tshow x, s]
+solidityValueToText s (SolidityBytes x) = T.concat [s, (escapeQuotes $ tshow x), s]
+solidityValueToText s (SolidityArray x) = T.concat [s, (decodeUtf8 . BL.toStrict $ encode x), s]
+solidityValueToText s (SolidityObject x) = T.concat [s, (decodeUtf8 . BL.toStrict $ encode x), s]
 
 escapeQuotes :: Text -> Text
 escapeQuotes = T.replace "\'" "\'\'" . T.replace "\"" "\\\""
@@ -72,22 +71,22 @@ arrayContent (SolidityObject x) = escapeQuotes $ tshow x
 arrayToString :: [SolidityValue] -> Text
 arrayToString [] = ""
 arrayToString [x] =  arrayContent x
-arrayToString (x:es) = arrayContent x <> ", " <> arrayToString es
+arrayToString (x:es) = T.concat [arrayContent x, ", ", arrayToString es]
 
 listToValueStatement :: Text -> [(a, SolidityValue)] -> Text
 listToValueStatement _ [] = ""
 listToValueStatement _ [(_, y)] = solidityValueToText "\'" y
-listToValueStatement s ((_, y):es) = solidityValueToText "\'" y <> s <> (listToValueStatement s es)
+listToValueStatement s ((_, y):es) = T.concat [solidityValueToText "\'" y, s, (listToValueStatement s es)]
 
 tableColumns :: [(Text, SolidityValue)] -> Text
 tableColumns [] = ""
-tableColumns [(x, y)] = "\"" <> x <> "\"" <> " " <> typeText y
-tableColumns ((x, y):es) = "\"" <> x <> "\"" <> " " <> typeText y <> ", " <> tableColumns es
+tableColumns [(x, y)] = T.concat ["\"", x, "\"", " ", typeText y]
+tableColumns ((x, y):es) = T.concat ["\"", x, "\"", " ", typeText y, ", ", tableColumns es]
 
 tableUpsert :: [(Text, SolidityValue)] -> Text
 tableUpsert [] = ""
-tableUpsert [(x, _)] = "\"" <> x <> "\"" <> " = excluded." <> "\"" <> x <> "\""
-tableUpsert ((x, _):es) = "\"" <> x <> "\"" <> " = excluded." <> "\"" <> x <> "\"" <>  ", " <> tableUpsert es
+tableUpsert [(x, _)] = T.concat ["\"", x, "\"", " = excluded.", "\"", x, "\""]
+tableUpsert ((x, _):es) = T.concat ["\"", x, "\"", " = excluded.", "\"", x, "\"",  ", ", tableUpsert es]
 
 
 dbConnect :: PGDatabase
@@ -140,43 +139,33 @@ createInserts globalsIORef = do
       then ""
       else ", "
 
-  liftIO . debugM "createInserts" . show $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
+  liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
+
+  when (not $ contractAlreadyCreated) $ do
+      let conVals = T.concat ["('", (codehash firstContract), "', '", (contractName firstContract), "', '", (abi firstContract), "', '", (chain firstContract), "')"]
+      let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
+      yield conIns
+      let createSt = T.concat ["create table if not exists \"", tableName, "\" (address text, \"chainId\" text", comma, tableColumns list, ", CONSTRAINT \"", tableName, "_pkey\" PRIMARY KEY (address, \"chainId\") );"]
+      yield createSt
+      _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+      return ()
+
+  let keySt = T.concat ["(", "address, \"chainId\"", comma, listToKeyStatement ", " list, ")"]
 
   if (length metadata > 1)
     then do
-      when (not $ contractAlreadyCreated) $ do
-          let conVals = "('" <> (codehash firstContract) <> "', '" <> (contractName firstContract) <> "', '" <> (abi firstContract) <> "', '" <> (chain firstContract) <> "')"
-          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
-          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          yield conIns
-
-      let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
-      yield createSt
-
-      let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
-
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-            let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma <> listToValueStatement ", " rowList <> ")"
+            let rowSt = T.concat ["(", "'", address row, "', '", chain row, "'", comma, listToValueStatement ", " rowList, ")"]
             return rowSt
 
       let inserts = T.intercalate ", " vals
-      let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+      let ins = T.concat ["insert into \"", (contractName firstContract), "\" ", keySt, " values ", inserts, " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"", comma, (tableUpsert list), ";"]
 
       yield ins
   else do
-    when(not contractAlreadyCreated) $ do
-          let conVals = "('" <> codehash firstContract <> "', '" <> contractName firstContract <> "', '" <> abi firstContract <> "', '" <> chain firstContract <> "')"
-          let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
-          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          yield conIns
-
-    let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <>"_pkey\" PRIMARY KEY (address, \"chainId\") );"
-    yield createSt
-
-    let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
-    let vals = "(" <> "'" <> address firstContract <> "', '" <> chain firstContract <> "'" <> comma  <> listToValueStatement ", " list <> ")"
-    let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+    let vals = T.concat ["(", "'", address firstContract, "', '", chain firstContract, "'", comma , listToValueStatement ", " list, ")"]
+    let ins = T.concat ["insert into \"", tableName, "\" ", keySt, " values ", vals, " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"", comma, (tableUpsert list), ";"]
     yield ins
 
   newCache <- readIORef globalsIORef
@@ -186,12 +175,12 @@ createInserts globalsIORef = do
   let newCacheList = Map.toList $ contractCache newCache
 
   --If ContractAndXabi resolvedName == name ++ "1" , then create view
-  viewSt <- if(resolvedName newCachedContract == Just (name newCachedContract <> "1"))
+  viewSt <- if(resolvedName newCachedContract == Just (T.concat [name newCachedContract, "1"]))
       then do
-        return $ "create or replace view \"" <> name newCachedContract <> "\" as select * from \"" <> name newCachedContract <> "1\";"
+        return $ T.concat ["create or replace view \"", name newCachedContract, "\" as select * from \"", name newCachedContract, "1\";"]
       else do
         --Get the first contract that uses the name
-        let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (officialName <> "1")) newCacheList
+        let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (T.concat [officialName, "1"])) newCacheList
         --Get the list of contracts that use the same name
         let sameNameList = filter (\(_, y) -> (name y) == (contractName firstContract)) newCacheList
         --Check how many have the same schema as the original contract
@@ -199,9 +188,8 @@ createInserts globalsIORef = do
             then filter (\(_, y) -> (contractSchema y) == (contractSchema $ snd $ head originalSchemaContract)) sameNameList
             else []
         --Create a UNION statement for every table that matches the schema of the original contract
-        let tableString = map (\table -> "UNION SELECT * FROM \"" <> fromMaybe (name newCachedContract) (resolvedName $ snd table) <> "\"") tableList
+        let tableString = map (\table -> T.concat ["UNION SELECT * FROM \"", fromMaybe (name newCachedContract) (resolvedName $ snd table), "\""]) tableList
 
-        return $ "create or replace view \"" <> (name newCachedContract) <> "\" as select * from \"" <> (name newCachedContract) <> "1\" " <> (T.intercalate " " tableString) <> ";"
+        return $ T.concat ["create or replace view \"", (name newCachedContract), "\" as select * from \"", (name newCachedContract), "1\" ", (T.intercalate " " tableString), ";"]
 
   yield viewSt
-  --return ()

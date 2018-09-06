@@ -24,7 +24,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
 import Data.Maybe
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.PostgreSQL.Simple
@@ -166,18 +165,18 @@ resolveContractName :: Integer -> Text -> Text -> [(Text, ContractAndXabi)] -> I
 resolveContractName inc codehash contractName cache = do
   let sameName = filter (\(_, y) -> findName y) cache
   if (null sameName)
-    then return $ contractName <> (T.pack $ show inc)
+    then return $ T.concat [contractName, (T.pack $ show inc)]
     else do
       case (lookup codehash sameName) of
         Nothing -> do
           resolveContractName (inc + 1) codehash contractName cache
         Just _ -> do
-          let newName = contractName <> (T.pack $ show inc)
+          let newName = T.concat [contractName, (T.pack $ show inc)]
           return newName
   where findName :: ContractAndXabi -> Bool
         findName cont = do
           case resolvedName cont of
-            Just x -> contractName <> (T.pack $ show inc) == x
+            Just x -> T.concat[contractName, (T.pack $ show inc)] == x
             Nothing -> True
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
@@ -231,7 +230,7 @@ processTheMessages messages conn g = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-        liftIO . infoM "processTheMessages" . show $ "--------\n" <> A.formatAction row
+        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", A.formatAction row]
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
@@ -262,20 +261,24 @@ processTheMessages messages conn g = do
                     storeCachedContract g codeHash newContractAndXabi
                     return newContractAndXabi
                (False, Nothing) -> do
-                  liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
-                                    tshow codeHash <> ", addr:" <> tshow addr
-                  contractOrError <- getContractCompileFullSource addr codeHash chainId
-                  traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                  liftIO . infoM "processTheMessages" . show $ "Done fetching the metadata for " <> tshow codeHash
-                  case contractOrError of
-                      Left e -> error e
-                      Right c -> do
-                        allContracts <- getAllContracts g
-                        resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
-                        let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
+                 liftIO . warningM "processTheMessages" . show $ T.concat
+                   [ "Need to call getContractCompileFullSource (this can be slow): ch:"
+                   , tshow codeHash
+                   , ", src:"
+                   , tshow sourcePtr'
+                   ]
+                 contractOrError <- getContractCompileFullSource addr codeHash chainId
+                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
+                 liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow codeHash]
+                 case contractOrError of
+                  Left e -> error e
+                  Right c -> do
+                    allContracts <- getAllContracts g
+                    resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
+                    let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
 
-                        storeCachedContract g codeHash newContractAndXabi
-                        return newContractAndXabi
+                    storeCachedContract g codeHash newContractAndXabi
+                    return newContractAndXabi
 
 
         let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
