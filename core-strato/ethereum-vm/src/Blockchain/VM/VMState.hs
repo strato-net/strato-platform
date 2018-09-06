@@ -1,14 +1,18 @@
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.VM.VMState (
   VMState(..),
+  storageDiffs,
   Memory(..),
   startingState,
   DebugCallCreate(..),
   ) where
 
+import           Control.Lens                 hiding (Context)
 import           Control.Monad
 import qualified Data.ByteString              as B
 import           Data.IORef
+import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
@@ -68,11 +72,14 @@ data VMState =
 
     writable         :: Bool, -- Whether to throw on attempted changes to storage
 
+    _storageDiffs    :: M.Map Address (M.Map Word256 Word256),
+
     --These last two variable are only used for the Ethereum tests.
     isRunningTests   :: Bool,
     debugCallCreates :: Maybe [DebugCallCreate]
 
     }
+makeLenses ''VMState
 
 
 instance Format VMState where
@@ -103,6 +110,7 @@ startingState isRunningTests' isHomestead env dbs' = do
                logs=[],
                environment=env,
                suicideList=S.empty,
+               _storageDiffs = M.empty,
 
                --only used for running ethereum tests
                isRunningTests=isRunningTests',
