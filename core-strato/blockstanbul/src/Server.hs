@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Server where 
+module Server where
 
 import Servant
 import Servant.Client
