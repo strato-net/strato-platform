@@ -31,6 +31,12 @@ instance Default Globals where
       createdContracts = Set.empty
       }
 
+getAllContracts :: MonadIO m =>
+                   IORef Globals -> m (Map Text ContractAndXabi)
+getAllContracts globalsIORef = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return contractCache
+
 storeCachedContract :: MonadIO m =>
                        IORef Globals -> Text -> ContractAndXabi -> m ()
 storeCachedContract globalsIORef sourceCodeHash c = do
@@ -88,5 +94,8 @@ data ContractAndXabi =
   ContractAndXabi {
     contract :: Either String Contract,
     xabi :: Text,
-    name :: Text
+    name :: Text,
+    resolvedName :: Maybe Text,
+    contractStored :: Bool,
+    contractSchema :: Maybe Text
   } deriving (Show)

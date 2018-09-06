@@ -9,12 +9,11 @@
 module Slipstream.Events where
 
 import qualified BlockApps.Ethereum       as Eth
-import qualified BlockApps.Solidity.Value as V
 import           Data.Aeson
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
-import qualified Data.Text                as T
 import           GHC.Generics
+import qualified BlockApps.Solidity.Value as V
 
 type Word256 = Integer
 type Word160 = Integer
@@ -89,6 +88,5 @@ data ProcessedContract = ProcessedContract {
   abi :: Text,
   contractName :: Text,
   chain :: Text,
-  contractData :: Map T.Text V.Value
+  contractData :: Map Text V.Value
 }
-
