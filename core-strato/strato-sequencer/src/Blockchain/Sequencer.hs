@@ -26,7 +26,7 @@ import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
-import           API
+import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB

@@ -16,7 +16,7 @@ import           Safe
 import           System.Environment
 
 import           Blockchain.Blockstanbul
-import           Server
+import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
