@@ -1,0 +1,81 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateChain: action Add Member Modal close overlay 1`] = `
+Object {
+  "isOpen": false,
+  "type": "CLOSE_ADD_MEMBER_MODAL",
+}
+`;
+
+exports[`CreateChain: action Add Member Modal open overlay 1`] = `
+Object {
+  "isOpen": true,
+  "type": "OPEN_ADD_MEMBER_MODAL",
+}
+`;
+
+exports[`CreateChain: action close overlay 1`] = `
+Object {
+  "isOpen": false,
+  "type": "CLOSE_CHAIN_MODAL",
+}
+`;
+
+exports[`CreateChain: action create chain failure 1`] = `
+Object {
+  "error": "error",
+  "isOpen": false,
+  "spinning": false,
+  "type": "CREATE_CHAIN_FAILURE",
+}
+`;
+
+exports[`CreateChain: action create chain request 1`] = `
+Object {
+  "args": Object {
+    "addRule": "MajorityRules",
+    "removeRule": "MajorityRules",
+  },
+  "balances": Array [
+    Object {
+      "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
+      "balance": 500000000000000,
+    },
+  ],
+  "isOpen": true,
+  "label": "airline cartel 9",
+  "members": Array [
+    Object {
+      "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
+      "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7…4cac9f77166ad92a0@172.16.0.5:30303?discport=30303",
+    },
+  ],
+  "spinning": true,
+  "src": "contract SimpleStorage {
+        uint public storedData;
+      }",
+  "type": "CREATE_CHAIN_REQUEST",
+}
+`;
+
+exports[`CreateChain: action create chain success 1`] = `
+Object {
+  "isOpen": false,
+  "key": "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+  "spinning": false,
+  "type": "CREATE_CHAIN_SUCCESS",
+}
+`;
+
+exports[`CreateChain: action open overlay 1`] = `
+Object {
+  "isOpen": true,
+  "type": "OPEN_CHAIN_MODAL",
+}
+`;
+
+exports[`CreateChain: action reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;
