@@ -65,3 +65,30 @@ main = hspec $ do
           "create table if not exists \"<CONTRACT>1\" (address text, \"chainId\" text, \"owners\" jsonb, CONSTRAINT \"<CONTRACT>1_pkey\" PRIMARY KEY (address, \"chainId\") );",
           "insert into \"<CONTRACT>1\" (address, \"chainId\", \"owners\") values ('<ADDRESS>', '<CHAIN>', '[{\"hash\":\"Owner_hash_181999847806006\",\"number\":\"18199984780605\"}]') on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", \"owners\" = excluded.\"owners\";",
           "create or replace view \"<CONTRACT>\" as select * from \"<CONTRACT>1\";"]
+
+  describe "Array serialization with history enabled" $ do
+    it "should create JSON entries" $ do
+      let input = [ProcessedContract {
+             address = "<ADDRESS>",
+             codehash = "<CODEHASH>",
+             abi = "<ABI>",
+             contractName = "<CONTRACT>",
+             index = True,
+             history = True,
+             chain = "<CHAIN>",
+             contractData = M.singleton "owners" $ V.ValueArrayDynamic [
+                V.ValueStruct [
+                  ("number", V.SimpleValue $ V.ValueUInt 18199984780605),
+                  ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
+            }]
+      let c = ContractAndXabi{contract = Left "test", xabi = "test", name = "<CONTRACT>", contractStored = False, resolvedName = Just "<CONTRACT>1", contractSchema = Nothing}
+      g <- newIORef def
+      storeCachedContract g "<CODEHASH>" c
+      runConduit (yield input .| createInserts g .| sinkList)
+        `shouldReturn` [
+          "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('<CODEHASH>', '<CONTRACT>', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
+          "create table if not exists \"<CONTRACT>1\" (address text, \"chainId\" text, \"owners\" jsonb, CONSTRAINT \"<CONTRACT>1_pkey\" PRIMARY KEY (address, \"chainId\") );",
+          "create table if not exists \"<CONTRACT>1_history\" (address text, \"chainId\" text, \"owners\" jsonb);",
+          "insert into \"<CONTRACT>1_history\" (address, \"chainId\", \"owners\") values ('<ADDRESS>', '<CHAIN>', '[{\"hash\":\"Owner_hash_181999847806006\",\"number\":\"18199984780605\"}]');",
+          "insert into \"<CONTRACT>1\" (address, \"chainId\", \"owners\") values ('<ADDRESS>', '<CHAIN>', '[{\"hash\":\"Owner_hash_181999847806006\",\"number\":\"18199984780605\"}]') on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", \"owners\" = excluded.\"owners\";",
+          "create or replace view \"<CONTRACT>\" as select * from \"<CONTRACT>1\";"]

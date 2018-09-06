@@ -124,6 +124,7 @@ convertRet metadata conn globalsIORef = runConduit $
 createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
+  --liftIO $ putStrLn $ "{}{METADATA}{}: " ++ show metadata
   let firstContract = head metadata
   let officialName = contractName firstContract
   let hashVal = codehash firstContract
@@ -148,6 +149,7 @@ createInserts globalsIORef = do
       let conIns = "insert into contract (\"codeHash\", contract, abi, \"chainId\") values " <> conVals <> " ON CONFLICT DO NOTHING;"
       yield conIns
       let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      --let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text", block_timestamp text, block_number text, transaction_hash text, message_sender text <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       yield createSt
 
       -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
@@ -160,10 +162,12 @@ createInserts globalsIORef = do
   if (length metadata > 1)
     then do
       let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
+      --let keySt = "(" <> "address, \"chainId\", block_timestamp, block_number, transaction_hash, message_sender" <> comma <> listToKeyStatement ", " list <> ")"
 
       vals <- forM metadata $ \row -> do
             let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
             let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma <> listToValueStatement ", " rowList <> ")"
+            --let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "', '" <> blockTimestamp row <> "', '" <> blockNumber row <> "', '" <> transactionHash row <> "', '" <> messageSender row <> comma <> listToValueStatement ", " rowList <> ")"
             return rowSt
       let inserts = T.intercalate ", " vals
 
@@ -171,8 +175,9 @@ createInserts globalsIORef = do
         -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
         let hist = "insert into \"" <> tableName <> "_history\" " <> keySt <> " values " <> inserts <> ";"
         yield hist
-      when (index firstContract) $ do
-        let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+      --when (index firstContract) $ do
+      when (True) $ do
+        let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"," <> " block_timestamp = excluded.block_timestamp , block_number = excluded.block_number, transaction_hash = excluded.transaction_hash, " <> "message_sender = excluded.message_sender" <> comma <> (tableUpsert list) <> ";"
         yield ins
 
   else do
@@ -182,7 +187,8 @@ createInserts globalsIORef = do
       -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
       let hist = "insert into \"" <> tableName <> "_history\" " <> keySt <> " values " <> vals <> ";"
       yield hist
-    when (index firstContract) $ do
+    --when (index firstContract) $ do
+    when (True) $ do
       let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
       yield ins
 

@@ -189,7 +189,8 @@ processTheMessages messages conn g = do
   let changes = map (concat . map stateDiffToChanges) inter
 
   unless (null messages) $
-    debugM "processTheMessages" . unlines . map show $ messages
+    --debugM "processTheMessages" . unlines . map show $ messages
+    warningM "processTheMessages" . unlines . map show $ messages
 
   case length messages of
    0 -> return ()
@@ -262,6 +263,7 @@ processTheMessages messages conn g = do
                     resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
                     let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
                     storeCachedContract g codeHash newContractAndXabi
+                    liftIO $ putStrLn $ "newContractAndXabi_1: " ++ show newContractAndXabi
                     return newContractAndXabi
                (False, Nothing) -> do
                   liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
@@ -277,6 +279,7 @@ processTheMessages messages conn g = do
                         let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
 
                         storeCachedContract g codeHash newContractAndXabi
+                        liftIO $ putStrLn $ "newContractAndXabi_2: " ++ show newContractAndXabi
                         return newContractAndXabi
 
 

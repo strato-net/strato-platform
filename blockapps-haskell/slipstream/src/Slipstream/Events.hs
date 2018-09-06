@@ -92,5 +92,9 @@ data ProcessedContract = ProcessedContract {
   chain :: Text,
   index :: Bool,
   history :: Bool,
+  --blockTimestamp :: Text,
+  --blockNumber :: Text,
+  --transactionHash :: Text,
+  --messageSender :: Text,
   contractData :: Map Text V.Value
-}
+} deriving (Show)
