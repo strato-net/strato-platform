@@ -40,6 +40,7 @@ import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import           Data.Time.Clock
+import           Prometheus
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -134,6 +135,9 @@ instance K.HasKafkaState SequencerM where
 instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
     putBlockstanbulContext = assign (blockstanbulContext . _Just)
+
+instance MonadMonitor SequencerM where
+    doIO = liftIO
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
