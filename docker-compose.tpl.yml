@@ -237,5 +237,3 @@ services:
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     build: .
     restart: always
-    ports:
-      - 9090:9090
