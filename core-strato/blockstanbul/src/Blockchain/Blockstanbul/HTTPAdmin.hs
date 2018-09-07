@@ -21,9 +21,10 @@ import Servant.Client
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad.IO.Class
-import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Handler.Warp
 import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.Wai.Middleware.Prometheus
+import Network.Wai
 
 -- API
 
@@ -59,12 +60,16 @@ createWebServer :: TMChan CandidateReceived -> Application
 createWebServer ch = serve adminAPI (admin ch)
 
 webserver :: Int -> TMChan CandidateReceived -> IO ()
-webserver prt ch = run prt $ logStdoutDev (createWebServer ch)
+webserver prt ch = run prt $ prometheusMid (createWebServer ch)
+
+prometheusMid :: Middleware
+prometheusMid = prometheus $ def
 
 -- Client
 
 getVote :: CandidateReceived -> ClientM CandidateReceived
 getVote = client (Proxy @ AdminAPI)
+
 
 uploadVote ::  Int -> CandidateReceived -> IO ()
 uploadVote prt cr = do

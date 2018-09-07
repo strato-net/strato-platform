@@ -82,8 +82,8 @@ sequencer = do
     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
-    P.incCounter sqcLdbBatchWrites
-    P.setGauge (fromIntegral (length pendingLDBWrites)) sqcLdbBatchSize
+    P.incCounter seqLdbBatchWrites
+    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
     $logInfoS "sequencer" "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
     unless (S.null chainIds) $ do
@@ -216,12 +216,12 @@ transformFullTransactions pairs = do
         wasTransactionHashWitnessed witnessHash >>= \case
           True -> do
             $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx itx
-            P.incCounter sqcTxsWitnessed
+            P.incCounter seqTxsWitnessed
             return Nothing
           False -> do
             $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx itx
             witnessTransactionHash witnessHash
-            P.incCounter sqcTxsUnwitnessed
+            P.incCounter seqTxsUnwitnessed
             return $ Just (ts,otx)
   let otxs = catMaybes mOtxs
   forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) -> do
@@ -317,7 +317,7 @@ hydrateAndEmit sb = do
               s | s == S.empty -> do
                 $logInfoS "hydrateAndEmit" . T.pack $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
                 hydratedBlock <- hydrateBlock ob
-                P.incCounter sqcBlocksReleased
+                P.incCounter seqBlocksReleased
                 markForVM $ OEBlock hydratedBlock
                 return ldbOp
               s -> do
@@ -327,7 +327,7 @@ hydrateAndEmit sb = do
           addLdbBatchOps $ catMaybes ldbOps
       NotReadyToEmit -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-          P.incCounter sqcBlocksEnqueued
+          P.incCounter seqBlocksEnqueued
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks blocks = do
@@ -339,7 +339,7 @@ transformBlocks blocks = do
       case mSb of
         Nothing -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-          P.incCounter sqcBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+          P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
         Just sb -> do
           witnessBlockHash (sbHash sb) sb
           hydrateAndEmit sb
@@ -473,18 +473,18 @@ readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
     ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
-    unsafeAddCounter (fromIntegral (length ret)) sqcKafkaUnseqRead
+    unsafeAddCounter (fromIntegral (length ret)) seqKafkaUnseqRead
     return ret
 
 writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents' events = void $ do
     void $ K.withKafkaRetry1s (writeSeqVmEvents events)
-    unsafeAddCounter (fromIntegral(length events)) sqcKafkaSeqWrites
+    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
 
 writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqP2pEvents' events = void $ do
     void $ K.withKafkaRetry1s (writeSeqP2pEvents events)
-    unsafeAddCounter (fromIntegral(length events)) sqcKafkaSeqWrites
+    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
@@ -494,14 +494,14 @@ getNextIngestedOffset = do
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
-  P.incCounter sqcKafkaCheckpointReads
+  P.incCounter seqKafkaCheckpointReads
   return ret
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    P.incCounter sqcKafkaCheckpointWrites
+    P.incCounter seqKafkaCheckpointWrites
     op <- K.withKafkaViolently $ K.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
