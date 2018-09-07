@@ -19,6 +19,7 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
+  logserver -d "${PWD}/logs" &> logs/logserver &
 
   if $mineBlocks
   then echo "Starting strato-adit"
