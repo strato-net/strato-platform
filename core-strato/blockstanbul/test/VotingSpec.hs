@@ -27,9 +27,9 @@ spec :: Spec
 spec = parallel $ do
   describe "test updateValidator" $ do
     it "update new list of validator" $ do
-      testUpdate `shouldBe` [Address 0x23451,Address 0x43123,Address 0x323,Address 0x23450]
-      testUpdateTwice `shouldBe` [Address 0x23451,Address 0x43123,Address 0x323,Address 0x23450]
-      testDropVoid `shouldBe` [Address 0x23451,Address 0x23452, Address 0x43123,Address 0x323]
-      testUpdatedrop `shouldBe` [Address 0x23451,Address 0x43123,Address 0x323]
-      testUpdatesize1 `shouldBe` [Address 0x43123, Address 0x23450]
-      testUpdatesize2 `shouldBe` [Address 0x43123,Address 0x323,Address 0x23450]
+      testUpdate `shouldBe` [Address 0x323, Address 0x23450, Address 0x23451, Address 0x43123]
+      testUpdateTwice `shouldBe` [Address 0x323, Address 0x23450, Address 0x23451,Address 0x43123]
+      testDropVoid `shouldBe` [Address 0x323, Address 0x23451,Address 0x23452, Address 0x43123]
+      testUpdatedrop `shouldBe` [Address 0x323, Address 0x23451,Address 0x43123]
+      testUpdatesize1 `shouldBe` [Address 0x23450,Address 0x43123]
+      testUpdatesize2 `shouldBe` [Address 0x323,Address 0x23450,Address 0x43123]

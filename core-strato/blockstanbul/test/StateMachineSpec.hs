@@ -32,14 +32,17 @@ import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
-testContext = newContext (View 20 18) [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
+testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
-runTest = runNoLoggingT . flip evalStateT testContext
+runTest = runNoLoggingT . flip evalStateT testContext . (disableAuth >>)
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
   getBlockstanbulContext = Just <$> get
+
+disableAuth :: StateMachineM m => m ()
+disableAuth = productionAuth .= False
 
 setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk' as = do
@@ -70,8 +73,9 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk' blk2' as seal ->
-      not (null as) ==> runTest $ do
+    it "can handle several rounds in succession" $ property $ \blk' blk2' as' seal ->
+      not (null as') ==> runTest $ do
+        let as = sortOn sender as'
         let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
@@ -140,17 +144,20 @@ spec = parallel $ do
         let blk = truncateExtra blk'
         proposer .= sender auth
         validators .= [sender auth]
+        pk <- use prvkey
+        pseal <- proposerSeal blk pk
+        let sealedBlk = addProposerSeal pseal blk
         curView <- use view
-        let hsh = blockHash blk
-        omsgs <- sendMessages [IMsg auth $ Preprepare curView blk]
+        let hsh = blockHash sealedBlk
+        omsgs <- sendMessages [IMsg auth $ Preprepare curView sealedBlk]
         map oMessage omsgs `shouldBe` [Prepare curView hsh]
         use proposal `shouldReturn` Just blk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do
+        productionAuth .= True
         proposer .= sender auth
         validators .= [sender auth]
-        authenticator .= const False
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -256,8 +263,8 @@ spec = parallel $ do
         use view `shouldReturn` curView
     it "rejects a message from an unauthenticated peer" $ property $ \auth blk seal ->
       runTest $ do
+        productionAuth .= True
         (curView, di) <- setupRound blk [sender auth]
-        authenticator .= const False
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.empty
         use view `shouldReturn` curView

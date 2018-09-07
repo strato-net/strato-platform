@@ -20,7 +20,9 @@ module Blockchain.Sequencer.Monad (
   , drainVM
   , createFirstTimer
   , createNewTimer
+  , drainTMChan
   , drainTimeouts
+  , drainVotes
 ) where
 
 import           ClassyPrelude                             (atomically, STM)
@@ -40,6 +42,7 @@ import qualified Data.Set                                  as S
 import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import qualified Blockchain.EthConf                        as EC
 import           Blockchain.ExtWord                        (Word256)
@@ -52,7 +55,6 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.StatsConf
-
 import           System.Directory                          (createDirectoryIfMissing)
 
 import qualified Database.LevelDB                          as LDB
@@ -95,6 +97,7 @@ data SequencerConfig =
                      , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
+                     , blockstanbulBeneficiary :: TMChan CandidateReceived
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
@@ -146,7 +149,6 @@ runSequencerM c mbc m = do
                          Nothing -> EC.mkConfiguredKafkaState kClId
                          Just addr -> K.mkKafkaState kClId addr
         ch <- atomically $ newTMChan
-
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
@@ -203,6 +205,9 @@ drainTMChan ch = do
 
 drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ uses blockstanbulTimeouts (atomically . drainTMChan)
+
+drainVotes :: SequencerM [CandidateReceived]
+drainVotes = atomically . drainTMChan =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
