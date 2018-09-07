@@ -6,7 +6,6 @@ module BlockApps.VaultWrapper.API where
 import           Data.Text                    (Text)
 import           Servant.API
 
-import           BlockApps.Ethereum           (Address(..))
 import           BlockApps.VaultWrapper.Types
 
 type API =
@@ -15,7 +14,11 @@ type API =
   :<|> "key"
     :> Header "X-USER-UNIQUE-NAME" Text -- Guess what? Our version of Servant is too old to make headers Required!
     :> Header "X-USER-ID" Text
-    :> Post '[JSON] Address
+    :> Get '[JSON] StatusAndAddress
+  :<|> "key"
+    :> Header "X-USER-UNIQUE-NAME" Text -- Guess what? Our version of Servant is too old to make headers Required!
+    :> Header "X-USER-ID" Text
+    :> Post '[JSON] StatusAndAddress
   :<|> "signature"
     :> Header "X-USER-UNIQUE-NAME" Text
     :> Header "X-USER-ID" Text
