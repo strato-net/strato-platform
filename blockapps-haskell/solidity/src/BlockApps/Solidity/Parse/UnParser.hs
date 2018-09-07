@@ -184,7 +184,7 @@ addFunction (name, contents) c =
                                                              }
                   , funcContents = Just $ Text.pack contents
                   , funcStateMutability = Just View
-                  , funcVisibility = Nothing
+                  , funcVisibility = Just Public
                   , funcModifiers = Nothing
                   }
   in c{xabiFuncs=Map.insert name (func) $ xabiFuncs c}
