@@ -1,0 +1,15 @@
+name: logserver
+synopsis: static file server for /var/lib/strato/logs
+github: blockapps/strato-platform/core-strato/logserver
+
+executables:
+  logserver:
+    source-dirs: exec_src/
+    main: LogServer.hs
+    dependencies:
+      - base
+      - hflags
+      - wai-app-static
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
