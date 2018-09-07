@@ -70,7 +70,6 @@ prometheusMid = prometheus $ def
 getVote :: CandidateReceived -> ClientM CandidateReceived
 getVote = client (Proxy @ AdminAPI)
 
-
 uploadVote ::  Int -> CandidateReceived -> IO ()
 uploadVote prt cr = do
   manager <- newManager defaultManagerSettings
