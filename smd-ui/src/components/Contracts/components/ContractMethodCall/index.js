@@ -27,7 +27,8 @@ class ContractMethodCall extends Component {
       this.props.contractName,
       address,
       this.props.symbolName,
-      this.props.lookup
+        this.props.lookup,
+        this.props.chainId
     );
     !isModePublic() && this.props.fetchAccounts(false, false);
   }

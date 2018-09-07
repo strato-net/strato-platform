@@ -117,6 +117,7 @@ class ContractCard extends Component {
                       symbolName={symbol}
                       fromCirrus={instance.fromCirrus}
                       fromBloc={instance.fromBloc}
+                      chainId={self.props.selectedChain}
                     />
                     : null
                 }

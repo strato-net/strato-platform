@@ -249,14 +249,15 @@ JOIN contracts_metadata CM
 JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM.id;
 -}
-getContractsAddressesQuery :: Query
+getContractsAddressesQuery :: Maybe ChainId -> Query
   ( Column PGText
   , Column PGBytea
   , Column PGTimestamptz
   , Column PGBytea
   )
-getContractsAddressesQuery = proc () -> do
+getContractsAddressesQuery chainId = proc () -> do
   (_,name,addr,timestamp,_,_,_,_,cid) <- contractsJoinTable -< ()
+  restrict -< cid .== constant chainId
   returnA -< (name,addr,timestamp,cid)
 
 {- |
@@ -276,17 +277,21 @@ JOIN contracts C2
 JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM2.id;
 -}
-getContractsNamesAsAddressesQuery :: Query
+getContractsNamesAsAddressesQuery :: Maybe ChainId -> Query
   ( Column PGText
   , Column PGText
   , Column PGTimestamptz
   , Column PGBytea
   )
-getContractsNamesAsAddressesQuery = joinF
-  (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_) -> (name,name2,timestamp,cid))
-  (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,cm2Id) -> contractmetadataId .== cm2Id)
-  (queryTable contractsInstanceTable)
-  linkedContractsJoinTable
+getContractsNamesAsAddressesQuery chainId = proc () -> do
+  (n1,n2,ts,cid) <- joinF
+    (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_) -> (name,name2,timestamp,cid))
+    (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,cm2Id) -> contractmetadataId .== cm2Id)
+    (queryTable contractsInstanceTable)
+    linkedContractsJoinTable
+    -< ()
+  restrict -< cid .== constant chainId
+  returnA -< (n1,n2,ts,cid)
 
 {- |
 SELECT

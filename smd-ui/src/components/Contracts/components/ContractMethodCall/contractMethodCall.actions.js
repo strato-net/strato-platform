@@ -21,13 +21,14 @@ export const methodCallCloseModal = function(key) {
   };
 }
 
-export const methodCallFetchArgs = function(name, address, symbol, key) {
+export const methodCallFetchArgs = function(name, address, symbol, key, chainId) {
   return {
     type: METHOD_CALL_FETCH_ARGS_REQUEST,
     name: name,
     address: address,
     symbol: symbol,
-    key: key
+      key: key,
+      chainId: chainId
   };
 }
 

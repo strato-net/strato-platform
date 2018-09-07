@@ -39,8 +39,8 @@ import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          as T
 import           BlockApps.XAbiConverter
 
-getContracts :: Bloc GetContractsResponse
-getContracts = blocTransaction $ do
+getContracts :: Maybe ChainId -> Bloc GetContractsResponse
+getContracts chainId = blocTransaction $ do
   let
     -- current bloc returns milliseconds
     -- TODO: get those extra 3 significant figures of accuracy
@@ -53,8 +53,8 @@ getContracts = blocTransaction $ do
     namesToMap = foldr'
       (\ (key,name,utc,cid) -> Map.insertWith (++) key [nameToVal name utc cid])
       Map.empty
-  contractsAddresses <- blocQuery getContractsAddressesQuery
-  contractsNamesAsAddresses <- blocQuery getContractsNamesAsAddressesQuery
+  contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
+  contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
   return . GetContractsResponse $
     addressesToMap contractsAddresses
     `Map.union`
