@@ -28,13 +28,14 @@ describe('BlockData: sagas', () => {
   describe('fetchBlockData generator:', () => {
 
     const action = {
-      type: FETCH_BLOCK_DATA
+      type: FETCH_BLOCK_DATA,
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
     }
 
     test('inspection', () => {
       const gen = fetchBlockData(action);
 
-      expect(gen.next().value).toEqual(call(getBlockData));
+      expect(gen.next().value).toEqual(call(getBlockData, action.chainId));
       expect(gen.next(blocksMock).value).toEqual(put(fetchBlockDataSuccess(blocksMock)));
       expect(gen.throw(error).value).toEqual(put(fetchBlockDataFailure(error)));
       expect(gen.next().done).toBe(true);

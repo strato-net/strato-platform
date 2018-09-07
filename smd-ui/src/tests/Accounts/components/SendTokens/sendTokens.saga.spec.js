@@ -1,5 +1,6 @@
 import watchSendTokens, {
-  sendTokens, sendTokensAPICall
+  sendTokens,
+  sendTokensAPICall
 } from '../../../../components/Accounts/components/SendTokens/sendTokens.saga';
 import {
   takeLatest,
@@ -28,14 +29,15 @@ describe('SendTokens: saga', () => {
 
     const action = {
       ...sendTokensForm,
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
       type: "SEND_TOKENS_REQUEST"
     };
 
     test('inspection', () => {
       const gen = sendTokens(action);
-      expect(gen.next().value).toEqual(call(sendTokensAPICall, action.from, action.fromAddress, action.toAddress, action.value, action.password));
+      expect(gen.next().value).toEqual(call(sendTokensAPICall, action.from, action.fromAddress, action.toAddress, action.value, action.password, action.chainId));
       expect(gen.next(sendTokensResponse).value).toEqual(put(sendTokensSuccess(sendTokensResponse)));
-      expect(gen.throw({message: error}).value).toEqual(put(sendTokensFailure(error)));
+      expect(gen.throw({ message: error }).value).toEqual(put(sendTokensFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 

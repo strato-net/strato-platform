@@ -242,6 +242,7 @@ Object {
       ],
     },
   ],
+  "selectedChain": "airline cartel 1",
 }
 `;
 

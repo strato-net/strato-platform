@@ -3,24 +3,23 @@
     , DataKinds
     , DeriveGeneric
     , FlexibleInstances
-    , KindSignatures
-    , TypeFamilies
+    , KindSignatures , TypeFamilies
 #-}
 
 module Slipstream.Events where
 
-import qualified BlockApps.Ethereum as Eth
-import Data.Aeson
-import Data.Map (Map)
-import qualified Data.Text as T
+import qualified BlockApps.Ethereum       as Eth
 import qualified BlockApps.Solidity.Value as V
-
-import GHC.Generics
+import           Data.Aeson
+import           Data.Map                 (Map)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           GHC.Generics
 
 type Word256 = Integer
 type Word160 = Integer
 
-type StateRoot=String
+type StateRoot = Text
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 
@@ -34,10 +33,10 @@ data StateDiff =
     -- blockNumber  :: Integer,
     -- blockHash    :: SHA,
     -- | The 'Eventual value is the initial state of the contract
-    createdAccounts :: Maybe (Map String AccountDiff),
+    createdAccounts :: Maybe (Map Text AccountDiff),
     -- | The 'Eventual value is the pre-deletion state of the contract
-    deletedAccounts :: Maybe (Map String AccountDiff),
-    updatedAccounts :: Maybe (Map String AccountDiff),
+    deletedAccounts :: Maybe (Map Text AccountDiff),
+    updatedAccounts :: Maybe (Map Text AccountDiff),
     chainId :: Maybe Eth.ChainId
     }
     deriving (Show, Generic)
@@ -68,28 +67,28 @@ data AccountDiff =
     balance      :: Maybe (Diff Integer),
     -- | Only present for newly created contracts, since the code can never
     -- change
-    code         :: Maybe String,
+    code         :: Maybe Text,
     -- | Since we want to always be able to identify account-type
     --codeHash :: SHA,
-    codeHash     :: String,
-    sourceCodeHash     :: Maybe (String, String),
+    codeHash     :: Text,
+    sourceCodeHash     :: Maybe (Text, Text),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot),
     -- | Only the storage keys that change are present in this map.
     --storage :: Map Word256 (Diff Word256)
-    storage      :: Map String (Diff String)
+    storage      :: Map Text (Diff Text)
     }
     deriving (Generic, Show)
 
 -- data family Diff a (v :: Detail)
 
 data ProcessedContract = ProcessedContract {
-  address :: String,
-  codehash :: String,
-  abi :: String,
-  contractName :: String,
-  chain :: String,
+  address :: Text,
+  codehash :: Text,
+  abi :: Text,
+  contractName :: Text,
+  chain :: Text,
   contractData :: Map T.Text V.Value
 }
 

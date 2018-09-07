@@ -9,9 +9,5 @@ export function validate(values) {
     errors.members = 'atleast add one member';
   }
 
-  if (!values.governanceContract) {
-    errors.governanceContract = 'required';
-  }
-
   return errors;
 }

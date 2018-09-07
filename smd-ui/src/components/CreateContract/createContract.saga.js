@@ -1,4 +1,4 @@
-import {takeLatest, put, call} from 'redux-saga/effects';
+import { takeLatest, put, call } from 'redux-saga/effects';
 import {
   CREATE_CONTRACT_REQUEST,
   createContractSuccess,
@@ -8,29 +8,31 @@ import {
   compileContractFailure,
   updateToast
 } from './createContract.actions';
-import {fetchContracts} from '../Contracts/contracts.actions';
-import {stopSubmit} from 'redux-form'
-import {CREATE_CONTRACT_FORM} from './'
-import {fetchCirrusInstances} from '../Contracts/components/ContractCard/contractCard.actions'
-import {env} from '../../env';
+import { fetchContracts } from '../Contracts/contracts.actions';
+import { stopSubmit } from 'redux-form'
+import { CREATE_CONTRACT_FORM } from './'
+import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
+import { env } from '../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&chainid=:chainId"
+const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function createContractApiCall(contract, src, username, address, password, args, chainId) {
-  return fetch(url.replace(":user", username).replace(":address", address).replace(":chainId", chainId), {
-    method: 'POST',
-    credentials: "include",
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({contract, value: 0, password, src, args})
-  }).then(function(response) {
-    return response.json();
-  }).catch(function(error) {
-    throw error;
-  });
+  const contractUrl = url.replace(":user", username).replace(":address", address);
+  return fetch(
+    chainId ? contractUrl.replace(":chainid", `chainid=${chainId}`) : contractUrl.replace("&:chainid", ''), {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ contract, value: 0, password, src, args })
+    }).then(function (response) {
+      return response.json();
+    }).catch(function (error) {
+      throw error;
+    });
 }
 
 export function compileContractApiCall(contractName, source, s) {
@@ -50,15 +52,15 @@ export function compileContractApiCall(contractName, source, s) {
           "searchable": searchable
         }
       ])
-    }).then(function(res) {
+    }).then(function (res) {
       if (res.ok) {
         return res.json();
       } else {
-        return res.text().then(function(value) {
+        return res.text().then(function (value) {
           throw value;
         });
       }
-    }).catch(function(error) {
+    }).catch(function (error) {
       throw error;
     });
   }
@@ -70,20 +72,20 @@ export function compileContractApiCall(contractName, source, s) {
       "Content-Type": "application/x-www-form-urlencoded"
     },
     body: "src=" + encodeURIComponent(source)
-  }).then(function(res) {
+  }).then(function (res) {
     if (res.ok) {
       return res.json();
     } else {
-      return res.text().then(function(value) {
+      return res.text().then(function (value) {
         throw value;
       });
     }
-  }).catch(function(error) {
+  }).catch(function (error) {
     throw error;
   });
 }
 
-export function * createContract(action) {
+export function* createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId);
     yield put(createContractSuccess(response));
@@ -95,21 +97,21 @@ export function * createContract(action) {
   }
 }
 
-export function * compileContract(action) {
+export function* compileContract(action) {
   try {
     let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
     yield put(compileContractSuccess(response));
   } catch (err) {
     yield put(compileContractFailure(err));
-    yield put(stopSubmit(CREATE_CONTRACT_FORM, {contract: String(err)}))
+    yield put(stopSubmit(CREATE_CONTRACT_FORM, { contract: String(err) }))
   }
 
 }
 
-export function * watchCompileContract() {
+export function* watchCompileContract() {
   yield takeLatest(COMPILE_CONTRACT_REQUEST, compileContract);
 }
 
-export default function * watchCreateContract() {
+export default function* watchCreateContract() {
   yield takeLatest(CREATE_CONTRACT_REQUEST, createContract);
 }

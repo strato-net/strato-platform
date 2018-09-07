@@ -19,6 +19,7 @@ Object {
 exports[`Accounts: action fetch account detail request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
   "name": "tanuj",
   "type": "FETCH_ACCOUNT_DETAIL_REQUEST",
 }
@@ -53,6 +54,7 @@ Object {
 
 exports[`Accounts: action fetch accounts request 1`] = `
 Object {
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
   "loadAddresses": true,
   "loadBalances": true,
   "type": "FETCH_ACCOUNTS",
@@ -172,6 +174,7 @@ Object {
 
 exports[`Accounts: action fetch user addresses request 1`] = `
 Object {
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
   "loadBalances": true,
   "name": "tanuj",
   "type": "FETCH_ACCOUNT_ADDRESS_REQUEST",

@@ -1,0 +1,232 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateChain: index errorMessageFor 1`] = `null`;
+
+exports[`CreateChain: index errorMessageFor 2`] = `"required"`;
+
+exports[`CreateChain: index isValidFileType 1`] = `undefined`;
+
+exports[`CreateChain: index isValidFileType 2`] = `"It should be an .sol extention file"`;
+
+exports[`CreateChain: index isValidFileType 3`] = `"Please add contract source file"`;
+
+exports[`CreateChain: index mapStateToProps with default state 1`] = `
+Object {
+  "createErrorMessage": null,
+  "isOpen": true,
+  "isSpinning": true,
+}
+`;
+
+exports[`CreateChain: index remove members 1`] = `
+Array [
+  Object {
+    "address": "f11b5c42f5b84efa07f6b0a32c3fc545ff509126",
+    "balance": 1000,
+    "enode": "enode://",
+    "username": "tanuj1000",
+  },
+]
+`;
+
+exports[`CreateChain: index remove members 2`] = `Array []`;
+
+exports[`CreateChain: index render component with empty values 1`] = `
+"<div className=\\"smd-pad-16\\">
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Chain\\" />
+  <Blueprint.Dialog iconName=\\"flows\\" isOpen={false} onClose={[undefined]} title=\\"Create New Chain\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body create-chain-form\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Chain Name
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Chain Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\" style={{...}}>
+              Contract
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Add Rule
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"addRule\\">
+                <option />
+                <option value=\\"MajorityRules\\">
+                  Majority Rules
+                </option>
+                <option value=\\"AutoApprove\\">
+                  Auto Approve
+                </option>
+                <option value=\\"TwoIn\\">
+                  Two In
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Remove Rule
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"removeRule\\">
+                <option />
+                <option value=\\"MajorityRules\\">
+                  Majority Rules
+                </option>
+                <option value=\\"AutoApprove\\">
+                  Auto Approve
+                </option>
+                <option value=\\"TwoIn\\">
+                  Two In
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              Chain Members
+            </label>
+            <div className=\\"pt-dialog-header no-member\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No Members
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} />
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Chain\\" />
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;
+
+exports[`CreateChain: index render component with values 1`] = `
+"<div className=\\"smd-pad-16\\">
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Chain\\" />
+  <Blueprint.Dialog iconName=\\"flows\\" isOpen={true} onClose={[undefined]} title=\\"Create New Chain\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body create-chain-form\\">
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Chain Name
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"chainName\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Chain Name\\" className=\\"pt-input form-width\\" tabIndex=\\"1\\" required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\" style={{...}}>
+              Contract
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Add Rule
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"addRule\\">
+                <option />
+                <option value=\\"MajorityRules\\">
+                  Majority Rules
+                </option>
+                <option value=\\"AutoApprove\\">
+                  Auto Approve
+                </option>
+                <option value=\\"TwoIn\\">
+                  Two In
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Remove Rule
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"removeRule\\">
+                <option />
+                <option value=\\"MajorityRules\\">
+                  Majority Rules
+                </option>
+                <option value=\\"AutoApprove\\">
+                  Auto Approve
+                </option>
+                <option value=\\"TwoIn\\">
+                  Two In
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"pt-form-group col-sm-12 pt-intent-danger\\">
+            <label className=\\"pt-label\\" htmlFor=\\"input-b\\">
+              Chain Members
+            </label>
+            <div className=\\"pt-dialog-header no-member\\">
+              <span className=\\"pt-dialog-header-title\\">
+                No Members
+              </span>
+            </div>
+            <span className=\\"error-text\\" />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} />
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Chain\\" />
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;

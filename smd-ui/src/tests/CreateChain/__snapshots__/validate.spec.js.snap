@@ -1,0 +1,10 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateChain: validate when form has no values 1`] = `
+Object {
+  "chainName": "required",
+  "members": "atleast add one member",
+}
+`;
+
+exports[`CreateChain: validate when form has values 1`] = `Object {}`;

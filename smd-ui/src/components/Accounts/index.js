@@ -37,7 +37,7 @@ class Accounts extends Component {
   }
 
   componentDidMount() {
-    this.props.fetchAccounts(true, true);
+    this.props.fetchAccounts(true, true, this.props.selectedChain);
     mixpanelWrapper.track('accounts_page_load')
   }
 
@@ -51,7 +51,7 @@ class Accounts extends Component {
       this.setState({ selected: null });
     } else {
       mixpanelWrapper.track('accounts_row_click');
-      this.props.fetchUserAddresses(user, true)
+      this.props.fetchUserAddresses(user, true, this.props.selectedChain)
     }
   }
 
@@ -157,7 +157,8 @@ class Accounts extends Component {
 export function mapStateToProps(state) {
   return {
     accounts: state.accounts.accounts,
-    filter: state.accounts.filter
+    filter: state.accounts.filter,
+    selectedChain: state.chains.selectedChain
   };
 }
 

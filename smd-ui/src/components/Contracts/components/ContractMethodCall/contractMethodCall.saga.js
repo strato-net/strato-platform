@@ -15,8 +15,7 @@ import { fetchState } from '../ContractCard/contractCard.actions';
 import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
-const methodUrl = env.BLOC_URL +
-  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&chainid=:chainid";
+const methodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
 
 export function getArgs(contractName, contractAddress, symbol) {
   return fetch(
@@ -37,13 +36,14 @@ export function getArgs(contractName, contractAddress, symbol) {
 }
 
 export function postMethodCall(payload) {
+  const localMethodUrl = methodUrl
+    .replace(':username', payload.username)
+    .replace(':userAddress', payload.userAddress)
+    .replace(":contractName", payload.contractName)
+    .replace(":contractAddress", payload.contractAddress);
+
   return fetch(
-    methodUrl
-      .replace(':username', payload.username)
-      .replace(':userAddress', payload.userAddress)
-      .replace(":contractName", payload.contractName)
-      .replace(":contractAddress", payload.contractAddress)
-      .replace(":chainid", payload.chainId),
+    payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", ''),
     {
       method: 'POST',
       credentials: "include",

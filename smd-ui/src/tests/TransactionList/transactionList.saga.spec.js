@@ -29,13 +29,14 @@ describe('TransactionList: sagas', () => {
 
     const action = {
       type: FETCH_TX,
-      last
+      last,
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
     };
 
     test('inspection', () => {
       const gen = fetchTx(action);
 
-      expect(gen.next().value).toEqual(call(getTx, action.last));
+      expect(gen.next().value).toEqual(call(getTx, action.last, action.chainId));
       expect(gen.next(transactions).value).toEqual(put(fetchTxSuccess(transactions)));
       expect(gen.throw(error).value).toEqual(put(fetchTxFailure(error)));
       expect(gen.next().done).toBe(true);

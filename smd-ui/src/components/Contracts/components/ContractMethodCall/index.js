@@ -118,6 +118,72 @@ class ContractMethodCall extends Component {
     </div>)
   }
 
+  renderChainFields() {
+    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+
+    if (chainLabel.length) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label label-margin">
+                Chain
+              </label>
+            </div>
+            <div className="col-sm-9">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => this.props.getLabelIds(e.target.value)
+                  }
+                  required
+                >
+                  <option />
+                  {
+                    chainLabel.map((label, i) => {
+                      return (
+                        <option key={label + i} value={label}>{label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label label-margin">
+                Chain Ids
+              </label>
+            </div>
+            <div className="col-sm-9">
+              <div className="pt-select smd-max-width">
+                <Field
+                  className="pt-input smd-max-width"
+                  component="select"
+                  name="chainId"
+                  required
+                >
+                  <option />
+                  {
+                    Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                      return (
+                        <option key={id + i} value={id}>{id}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  }
+
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
@@ -180,63 +246,7 @@ class ContractMethodCall extends Component {
                   <h5>Address: {this.props.contractAddress}</h5>
                 </div>
               </div>
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label label-margin">
-                    Chain
-                  </label>
-                </div>
-                <div className="col-sm-9">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="chainLabel"
-                      onChange={
-                        (e) => this.props.getLabelIds(e.target.value)
-                      }
-                      validate={required}
-                      required
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabel).map((label, i) => {
-                          return (
-                            <option key={label + i} value={label}>{label}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label label-margin">
-                    Chain Ids
-                  </label>
-                </div>
-                <div className="col-sm-9">
-                  <div className="pt-select smd-max-width">
-                    <Field
-                      className="pt-input smd-max-width"
-                      component="select"
-                      name="chainId"
-                      validate={required}
-                      required
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                          return (
-                            <option key={id + i} value={id}>{id}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
+              {this.renderChainFields()}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">

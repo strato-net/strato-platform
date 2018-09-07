@@ -28,9 +28,10 @@ describe('Accounts: action', () => {
     test('request', () => {
       const data = {
         loadAddresses: true,
-        loadBalances: true
+        loadBalances: true,
+        chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
       }
-      expect(fetchAccounts(data.loadAddresses, data.loadBalances)).toMatchSnapshot();
+      expect(fetchAccounts(data.loadAddresses, data.loadBalances, data.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {
@@ -53,9 +54,10 @@ describe('Accounts: action', () => {
     test('request', () => {
       let data = {
         name: 'tanuj',
-        loadBalances: true
+        loadBalances: true,
+        chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
       };
-      expect(fetchUserAddresses(data.name, data.loadBalances)).toMatchSnapshot();
+      expect(fetchUserAddresses(data.name, data.loadBalances, data.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {
@@ -89,9 +91,10 @@ describe('Accounts: action', () => {
     test('request', () => {
       let data = {
         name: 'tanuj',
-        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03'
+        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03',
+        chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
       };
-      expect(fetchAccountDetail(data.name, data.address)).toMatchSnapshot();
+      expect(fetchAccountDetail(data.name, data.address, data.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {

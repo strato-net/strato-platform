@@ -6,5 +6,6 @@ Object {
     "last": 15,
   },
   "queryResults": undefined,
+  "selectedChain": "airline cartel 1",
 }
 `;

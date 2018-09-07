@@ -1,8 +1,6 @@
 import React from 'react';
 import Accounts, { mapStateToProps } from '../../components/Accounts';
-import { error, accountsMock, filter, reducerAccounts, indexAccountsMock } from './accountsMock';
-import { deepClone } from '../helper/testHelper';
-import * as checkMode from '../../lib/checkMode';
+import { filter, indexAccountsMock } from './accountsMock';
 
 describe('Accounts: index', () => {
 
@@ -111,6 +109,7 @@ describe('Accounts: index', () => {
       accounts: indexAccountsMock,
       filter: filter,
       history: {},
+      selectedChain: 'airline cartel 1',
       fetchAccounts: jest.fn(),
       changeAccountFilter: jest.fn(),
       faucetRequest: jest.fn(),
@@ -121,14 +120,17 @@ describe('Accounts: index', () => {
       <Accounts.WrappedComponent {...props} />
     );
     expect(props.fetchAccounts).toHaveBeenCalled();
-    expect(props.fetchAccounts.mock.calls).toEqual([[true, true]]);
+    expect(props.fetchAccounts.mock.calls).toEqual([[true, true, props.selectedChain]]);
   });
 
   test('mapStateToProps with default values', () => {
     const state = {
       accounts: {
         accounts: indexAccountsMock,
-        filter: filter
+        filter: filter,
+      },
+      chains: {
+        selectedChain: 'airline cartel 1'
       }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();

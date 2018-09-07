@@ -256,6 +256,72 @@ class SendTokens extends Component {
     }
   }
 
+  renderChainFields() {
+    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+
+    if (chainLabel.length) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain
+              </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => this.props.getLabelIds(e.target.value)
+                  }
+                  required
+                >
+                  <option />
+                  {
+                    chainLabel.map((label, i) => {
+                      return (
+                        <option key={label + i} value={label}>{label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-sm-4 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain IDs
+              </label>
+            </div>
+            <div className="col-sm-8 smd-pad-4">
+              <div className="pt-select smd-max-width">
+                <Field
+                  className="pt-input smd-max-width"
+                  component="select"
+                  name="chainId"
+                  required
+                >
+                  <option />
+                  {
+                    Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                      return (
+                        <option key={id + i} value={id}>{id}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  }
+
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
@@ -286,61 +352,7 @@ class SendTokens extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Chain
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="chainLabel"
-                      onChange={
-                        (e) => this.props.getLabelIds(e.target.value)
-                      }
-                      required
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabel).map((label, i) => {
-                          return (
-                            <option key={label + i} value={label}>{label}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-4 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Chain IDs
-                  </label>
-                </div>
-                <div className="col-sm-8 smd-pad-4">
-                  <div className="pt-select smd-max-width">
-                    <Field
-                      className="pt-input smd-max-width"
-                      component="select"
-                      name="chainId"
-                      required
-                    >
-                      <option />
-                      {
-                        Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                          return (
-                            <option key={id + i} value={id}>{id}</option>
-                          )
-                        })
-                      }
-                    </Field>
-                  </div>
-                </div>
-              </div>
+              {this.renderChainFields()}
               <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">

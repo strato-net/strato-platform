@@ -3,8 +3,15 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
 import './chain.css';
+import { fetchChainDetail } from '../Chains/chains.actions';
 
 class Chain extends Component {
+
+  componentWillReceiveProps(nextProps) {
+    if (!Object.getOwnPropertyNames(nextProps.chain).length) {
+      nextProps.fetchChainDetail(nextProps.label, nextProps.id);
+    }
+  }
 
   showMembers(chain) {
     if (chain && chain.info && chain.info.balances && chain.info.balances.length > 0) {
@@ -75,5 +82,8 @@ export function mapStateToProps(state, ownProps) {
 export default withRouter(
   connect(
     mapStateToProps,
+    {
+      fetchChainDetail
+    }
   )(Chain)
 );

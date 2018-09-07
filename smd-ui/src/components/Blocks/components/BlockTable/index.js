@@ -13,8 +13,8 @@ import HexText from '../../../HexText';
 class BlockTable extends Component {
 
   componentDidMount() {
-    this.props.fetchBlockData();
-    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query);
+    this.props.fetchBlockData(this.props.selectedChain);
+    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query, this.props.selectedChain);
   }
 
   componentWillUnmount() {
@@ -23,7 +23,9 @@ class BlockTable extends Component {
 
   componentWillReceiveProps(newProps) {
     if (newProps.query !== this.props.query)
-      newProps.executeQuery(RESOURCE_TYPES.block, newProps.query);
+      newProps.executeQuery(RESOURCE_TYPES.block, newProps.query, newProps.selectedChain);
+    if (newProps.selectedChain !== this.props.selectedChain)
+      this.props.fetchBlockData(newProps.selectedChain);
   }
 
   // dispatchSubmit = () => {
@@ -37,7 +39,7 @@ class BlockTable extends Component {
 
   refresh = () => {
     this.props.clearQuery();
-    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query);
+    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query, this.props.selectedChain);
   };
 
   render() {
@@ -211,6 +213,7 @@ export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResult: state.queryEngine.queryResult,
+    selectedChain: state.chains.selectedChain
   };
 }
 const formed = reduxForm({ form: 'block-query' })(BlockTable);

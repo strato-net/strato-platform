@@ -11,11 +11,12 @@ import {
 
 import { env } from '../../../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/send?resolve&chainid=:chainId"
+const url = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
 
 export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainId) {
+  const sendUrl = url.replace(":user", from).replace(":address", fromAddress);
   return fetch(
-    url.replace(":user", from).replace(":address", fromAddress).replace(":chainId", chainId),
+    chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", ''),
     {
       method: 'POST',
       credentials: "include",

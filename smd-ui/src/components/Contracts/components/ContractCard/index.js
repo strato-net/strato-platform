@@ -44,7 +44,7 @@ class ContractCard extends Component {
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
               mixpanelWrapper.track("contract_state_clicked")
-              self.props.fetchState(name, instance.address);
+              self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
@@ -215,6 +215,7 @@ class ContractCard extends Component {
 
 export function mapStateToProps(state) {
   return {
+    selectedChain: state.chains.selectedChain
   };
 }
 

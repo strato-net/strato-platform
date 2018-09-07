@@ -31,7 +31,7 @@ import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
 
-const accountDataUrl = env.STRATO_URL + "/account?address=:address";
+const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
 const faucetUrl = env.STRATO_URL + "/faucet"
@@ -73,9 +73,10 @@ export function getUserAddressesApi(username) {
     });
 }
 
-export function getAccountDetailApi(address) {
+export function getAccountDetailApi(address, chainId) {
+  const localAccountDataUrl = chainId ? accountDataUrl.replace(":address", address).replace(":chainid", `chainid=${chainId}`) : accountDataUrl.replace(":address", address).replace("&:chainid", '')
   return fetch(
-    accountDataUrl.replace(":address", address),
+    localAccountDataUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -119,7 +120,7 @@ export function* getAccounts(action) {
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
     if (action.loadAddresses && response.length > 0) {
-      yield put(fetchUserAddresses(response[0], action.loadBalances));
+      yield put(fetchUserAddresses(response[0], action.loadBalances, action.chainId));
     }
   }
   catch (err) {
@@ -137,7 +138,7 @@ export function* getUserAddresses(action) {
     // const response = ["999"];
     yield put(fetchUserAddressesSuccess(action.name, response));
     if (action.loadBalances) {
-      yield response.map(address => put(fetchAccountDetail(action.name, address)));
+      yield response.map(address => put(fetchAccountDetail(action.name, address, action.chainId)));
     }
   }
   catch (err) {
@@ -147,7 +148,7 @@ export function* getUserAddresses(action) {
 
 export function* getAccountDetail(action) {
   try {
-    const response = yield call(getAccountDetailApi, action.address);
+    const response = yield call(getAccountDetailApi, action.address, action.chainId);
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }

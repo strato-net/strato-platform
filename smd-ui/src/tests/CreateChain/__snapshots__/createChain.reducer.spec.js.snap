@@ -1,0 +1,76 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateChain: reducer add member modal close overlay 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": true,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`CreateChain: reducer add member modal open overlay 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": true,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`CreateChain: reducer create chain failure 1`] = `
+Object {
+  "error": "error",
+  "isOpen": false,
+  "spinning": false,
+}
+`;
+
+exports[`CreateChain: reducer create chain modal close overlay 1`] = `
+Object {
+  "isOpen": false,
+}
+`;
+
+exports[`CreateChain: reducer create chain modal open overlay 1`] = `
+Object {
+  "isOpen": true,
+}
+`;
+
+exports[`CreateChain: reducer create chain request 1`] = `
+Object {
+  "isOpen": true,
+  "spinning": true,
+}
+`;
+
+exports[`CreateChain: reducer create chain success 1`] = `
+Object {
+  "isOpen": false,
+  "key": "64885c49cdc6fe5f15975596115a120ec1e9a616e88a22e0be0457f373d75b73",
+  "spinning": false,
+}
+`;
+
+exports[`CreateChain: reducer reset error 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": true,
+  "isOpen": true,
+  "key": null,
+  "spinning": false,
+}
+`;
+
+exports[`CreateChain: reducer set initial state 1`] = `
+Object {
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
