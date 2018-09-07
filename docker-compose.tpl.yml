@@ -118,7 +118,7 @@ services:
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
