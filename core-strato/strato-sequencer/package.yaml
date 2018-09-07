@@ -44,6 +44,7 @@ dependencies:
   - blockapps-haskoin
   - aeson
   - async
+  - prometheus-client
 
 ghc-options: -Wall -O2 -threaded
 
