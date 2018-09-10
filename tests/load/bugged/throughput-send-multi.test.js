@@ -17,48 +17,45 @@ describe('Throughput', function () {
 
   let userPairs;
 
-  const batchSize = util.getArgInt('--batchSize', 1);
-  const batchValue = util.getArgInt('--batchValue', 8);
-
   before(function * () {
     userPairs = yield createUserPairs();
   });
 
   it('should calculate send throughput for network', function * () {
 
-    for(var j=0;j < 1000; j++) {
-        const startTime = moment();
-        let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
-        const generators = [];
+for(var j=0;j < 1000; j++) {
+    const startTime = moment();
+    let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
+    const generators = [];
 
-        for(let node of nodes) {
-          const txs = createBatchTx(userPairs[node.id].bob);
-          generators.push(rest.sendList(userPairs[node.id].alice, txs, true, node.id));
-        }
-
-        console.log('Submitting txs');
-        const bStartTime = moment();
-        yield generators;
-        const bEndTime = moment();
-        console.log('Submitted txs');
-
-        secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
-
-        let balancesMatch = false;
-        let balanceCheck = 1;
-        while (!balancesMatch) {
-          //console.log(`Checking balances ${balanceCheck++}`);
-          balancesMatch = yield checkBalances(userPairs,j+1);
-          yield promiseTimeout(100);
-        }
-
-        const endTime = moment();
-        assert.isOk(balancesMatch, "All balances should match");
-        const seconds = endTime.diff(bEndTime, 'seconds');
-        console.log(`Approx TPS without Bloc: ${(batchSize * nodes.length) / seconds} tx/sec`);
-        const seconds2 = endTime.diff(startTime, 'seconds');
-        console.log(`Approx TPS  with   Bloc: ${(batchSize * nodes.length) / seconds2} tx/sec`);
+    for(let node of nodes) {
+      const txs = createBatchTx(userPairs[node.id].bob);
+      generators.push(rest.sendList(userPairs[node.id].alice, txs, true, node.id));
     }
+
+    console.log('Submitting txs');
+    const bStartTime = moment();
+    yield generators;
+    const bEndTime = moment();
+    console.log('Submitted txs');
+
+    secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
+
+    let balancesMatch = false;
+    let balanceCheck = 1;
+    while (!balancesMatch) {
+      //console.log(`Checking balances ${balanceCheck++}`);
+      balancesMatch = yield checkBalances(userPairs,j+1);
+      yield promiseTimeout(100);
+    }
+
+    const endTime = moment();
+    assert.isOk(balancesMatch, "All balances should match");
+    const seconds = endTime.diff(bEndTime, 'seconds');
+    console.log(`Approx TPS without Bloc: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
+    const seconds2 = endTime.diff(startTime, 'seconds');
+    console.log(`Approx TPS  with   Bloc: ${(config.batchSize * nodes.length) / seconds2} tx/sec`);
+}
   })
 
   // HELPER FUNCTIONS FOR TESTS
@@ -92,7 +89,7 @@ describe('Throughput', function () {
   }
 
   function * checkBalances(userPairs,k) {
-    const expectedBalance = new BigNumber(k * batchValue * batchSize)
+    const expectedBalance = new BigNumber(k * config.batchValue * config.batchSize)
       .times(constants.FINNEY);
     const promises = [];
     for (let node of nodes) {
@@ -108,8 +105,8 @@ describe('Throughput', function () {
 
   function createBatchTx(toUser) {
     var txs = [];
-    weiValue = new BigNumber(batchValue).times(constants.FINNEY).toNumber();
-    for (var i = 0; i < batchSize; i++) {
+    weiValue = new BigNumber(config.batchValue).times(constants.FINNEY).toNumber();
+    for (var i = 0; i < config.batchSize; i++) {
       txs.push({
         value: weiValue,
         toAddress: toUser.address

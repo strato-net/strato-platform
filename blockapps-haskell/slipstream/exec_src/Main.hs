@@ -9,32 +9,41 @@
     , FlexibleContexts
 #-}
 
+import Data.Default
+import Data.IORef
+import Database.PostgreSQL.Typed
+import HFlags
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
-import HFlags
+import System.IO
+import System.Log.Logger
+
 import Slipstream.MessageConsumer
-import Slipstream.OutputData
 import Slipstream.Options ()
-import Database.PostgreSQL.Typed
-import qualified Data.Map as Map
-import Data.IORef
+import Slipstream.OutputData
+
 
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
+  updateGlobalLogger rootLoggerName (setLevel INFO)
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stdin LineBuffering
+
+  putStrLn "Welcome to Slipstream!!!!"
 
   conn <- pgConnect dbConnect
 
   let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
-  dbInsert conCreate conn
+  dbInsert conn conCreate
   let conAlter =  "alter table contract add column if not exists \"chainId\" text;"
-  dbInsert conAlter conn
+  dbInsert conn conAlter
 
   let offset = 0 :: K.Offset
   let kafkaID = "queryStrato" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
-  cachedContractsIORef <- newIORef Map.empty
+  cachedContractsIORef <- newIORef def
 
   msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
 

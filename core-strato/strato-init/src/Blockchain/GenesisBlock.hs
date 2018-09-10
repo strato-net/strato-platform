@@ -49,7 +49,8 @@ import           Blockchain.Util
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
+import           Blockchain.Strato.StateDiff.Event
+import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffEvents, assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.MilenaTools               (commitSingleOffset)
@@ -145,7 +146,7 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "State diff has been generated"
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
-        writeSource (account, CodeInfo _ name src) = case account of
+        writeSource (account, CodeInfo _ src name) = case account of
             NonContract _ _ -> return ()
             ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
             ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
@@ -157,15 +158,19 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "best block info inserted"
     liftIO (bootstrapIndexer genBId obGB)
     $logInfoS "initgen" "indexer has been bootstrapped"
-    populateStorageDBs genesisBlock genesisChainId
+    let rewrite (_, CodeInfo bin src name) =
+          (superProprietaryStratoSHAHash bin, (superProprietaryStratoSHAHash . C8.pack $ src, name))
+        sourceCodeHashes = Map.fromList . map rewrite $ srcInfo
+        findSourceHash = flip Map.lookup sourceCodeHashes
+    populateStorageDBs findSourceHash genesisBlock genesisChainId
     $logInfoS "initgen" "populateStorageDBs is done"
     forM_ srcInfo writeSource
     $logInfoS "initgen" "SourceInfo has been written; End of initgen"
 
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    Block->Maybe Word256->m ()
-populateStorageDBs genesisBlock genesisChainId = do
+                    (SHA -> Maybe (SHA, String)) -> Block->Maybe Word256->m ()
+populateStorageDBs findSourceHash genesisBlock genesisChainId = do
 
     accountDB <- getStateDB
     res <- liftIO . runKafkaConfigured "strato-init" $ do
@@ -203,12 +208,9 @@ populateStorageDBs genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs diff (const "") (const "")
-
-
-
-
+      let diffTriple = destructStateDiff findSourceHash diff
       mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-        splitWriteStateDiffs [diff]
+        splitWriteStateDiffEvents diffTriple
       case filterResponse <$> mErr of
        Right [] -> return ()
        Right errs -> error . show $ errs

@@ -228,7 +228,7 @@ emitInitialStateDiff srcInfo bHash chainId sRoot = do
       updatedAccounts     = Map.empty
   }
   commitSqlDiffs diff (const "") (const "")
-  let writeSource (account, CodeInfo _ name src) = case account of
+  let writeSource (account, CodeInfo _ src name) = case account of
           NonContract _ _ -> return ()
           ContractNoStorage addr _ _ -> updateSource chainId addr name src
           ContractWithStorage addr _ _ _ -> updateSource chainId addr name src
