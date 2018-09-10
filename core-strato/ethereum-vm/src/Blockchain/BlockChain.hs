@@ -28,15 +28,18 @@ import qualified Control.Monad.State                     as State
 import           Control.Monad.Stats                     hiding (Success)
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
+import           Data.Aeson.Encode.Pretty                (encodePretty)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
+import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -98,6 +101,7 @@ import           Blockchain.Strato.StateDiff.Kafka
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
+
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -411,6 +415,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                                       , erStorageDiffs       = _storageDiffs newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -429,6 +434,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                                       , erStorageDiffs       = _storageDiffs newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -442,6 +448,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
+                               , erStorageDiffs = M.empty
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -535,6 +542,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       let ranBlockHash = hashFunction b
+          sDiffs = either (const M.empty) erStorageDiffs result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
       enqueueInsertTransactionResult $
@@ -547,7 +555,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = "" --BC.unpack $ BL.toStrict $ Aeson.encode addrDiff
+                               , transactionResultStateDiff        = T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
@@ -670,22 +678,27 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
-        return (codeHash, codeSrc)
-
-    let codeSource' x =
-          M.findWithDefault (error "missing code hash in codeSource map") x codeSourceMap
-
+        return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
+        
     codeNameMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeName <- codeContractName sr codeHash
         return (codeHash, codeName)
+
+    let
+      codeSource' x = fst $
+          M.findWithDefault (error $ "missing code hash in codeSource map: " ++ format x) x codeSourceMap
+      codeSourceHash' x = 
+          case (M.lookup x codeSourceMap, M.lookup x codeNameMap) of
+           (Just (_, sh), Just name) -> Just (sh, name)
+           _ -> Nothing
 
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     forM_ allDiffs $ \diff -> do
       when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
       when flags_diffPublish $
-          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diff
+          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff codeSourceHash' diff
           in withKafkaViolently $ do
               void $ writeStateDiffEvents deletionEvents
               void $ writeStateDiffEvents creationEvents

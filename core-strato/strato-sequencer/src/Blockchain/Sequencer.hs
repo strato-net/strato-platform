@@ -16,6 +16,8 @@ import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
+import           Data.ByteString.Char8                     (pack)
+import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (toList)
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
@@ -24,7 +26,7 @@ import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
 import           Blockchain.Blockstanbul
-
+import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -51,6 +53,7 @@ import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
+import qualified Blockchain.Data.RLP                       as RL
 
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
@@ -68,6 +71,7 @@ sequencer = do
     v <- currentView
     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
     blockstanbulSend . map Timeout =<< drainTimeouts
+    checkForVotes
     inEvents <- readUnseqEvents'
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     clearLdbBatchOps
@@ -99,6 +103,18 @@ sequencer = do
     unless (null inEvents) $ do
       let ofs = maximum $ map fst inEvents
       setNextIngestedOffset ofs
+
+checkForVotes :: SequencerM ()
+checkForVotes = do
+    votes <- drainVotes
+    forM_ votes $ \br ->
+      let extsign = RL.rlpDecode
+                  . RL.rlpDeserialize
+                  . fst
+                  . B16.decode $ pack (API.signature br)
+          bauth = MsgAuth { sender = (API.sender br), signature = extsign}
+          ie = NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
+      in blockstanbulSend [ie]
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock
