@@ -4,7 +4,7 @@ module Blockchain.Sequencer.Metrics where
 import           Prometheus                                as P
 
 seqLdbBatchWrites:: P.Metric P.Counter
-seqLdbBatchWrites = P.unsafeRegisterIO $ counter (P.Info "Ctr_sequencer_ldb_batch_writes" "Sequencer counter for ldb batch writes")
+seqLdbBatchWrites = P.unsafeRegisterIO $ counter (P.Info "ctr_sequencer_ldb_batch_writes" "Sequencer counter for ldb batch writes")
 
 seqLdbBatchSize :: P.Metric P.Gauge
 seqLdbBatchSize = P.unsafeRegisterIO $ gauge (P.Info "ctr_sequencer_ldb_batch_size" "Sequencer gauge for ldb batch size")
