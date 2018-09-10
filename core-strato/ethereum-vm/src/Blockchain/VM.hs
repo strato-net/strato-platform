@@ -12,6 +12,7 @@ module Blockchain.VM
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
+import           Control.Lens                       ((%=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -25,6 +26,7 @@ import qualified Data.ByteString.Char8              as BC
 import qualified Data.ByteString.Base16             as B16
 import           Data.Char
 import           Data.Function
+import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
@@ -412,6 +414,9 @@ runOperation SSTORE = do
   val <- pop::VMM Word256
 
   putStorageKeyVal p val --putStorageKeyVal will delete value if val=0
+
+  owner <- getEnvVar envOwner
+  storageDiffs %= M.alter (Just . M.insert p val . fromMaybe M.empty) owner
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -1218,6 +1223,7 @@ create_debugWrapper block owner value initCodeBytes = do
           forM_ (reverse $ logs finalVMState) addLog
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
+          storageDiffs %= M.unionWith M.union (_storageDiffs finalVMState)
           addToRefund (refund finalVMState)
 
           return $ Just newAddress
@@ -1252,6 +1258,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           forM_ (reverse $ logs finalVMState) addLog
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
+          storageDiffs %= M.unionWith M.union (_storageDiffs finalVMState)
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
           useGas (- vmGasRemaining finalVMState)

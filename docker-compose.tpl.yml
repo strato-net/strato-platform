@@ -82,6 +82,7 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
+    - PROCESS_MONITORING=${PROCESS_MONITORING}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
 #    - stateDiffTopic=${stateDiffTopic}
@@ -116,11 +117,13 @@ services:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
+    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
+    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
-    - seqDebugMode=${seqDebugMode}
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
@@ -132,14 +135,15 @@ services:
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
     - networkID=${networkID}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_user=postgres
+    - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
+    - seqDebugMode=${seqDebugMode}
     - statsEnable=${statsEnable}
     - statsFlush=${statsFlush}
     - statsHost=${statsHost}
@@ -149,8 +153,6 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper
-    - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -188,6 +190,7 @@ services:
     - vault-wrapper
     environment:
     - authBasic=${authBasic}
+    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - NODE_HOST=${NODE_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -233,3 +236,7 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    build: .
+    restart: always
