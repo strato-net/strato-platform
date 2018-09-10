@@ -331,11 +331,12 @@ hydrateAndEmit sb = do
           tick ctr_sequencer_blocks_enqueued
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks blocks = do
+transformBlocks = mapM_ $ \ib -> do
   hasPBFT <- blockstanbulRunning
-  if hasPBFT
-    then blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
-    else forM_ blocks $ \ib -> do
+  case (hasPBFT, ibOrigin ib) of
+    (True, TO.Quarry) -> blockstanbulSend [NewBlock . ingestBlockToBlock $ ib]
+    -- TODO(tim): external PBFT blocks should have their validators and seals checked
+    (_,_) -> do
       let mSb = ingestBlockToSequencedBlock ib
       case mSb of
         Nothing -> do
