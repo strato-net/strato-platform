@@ -33,6 +33,9 @@ build_haskell: prebuild build_buildbase
 	stack test --no-run-tests test-suite \
         # --profile --ghc-options="-fprof-auto -rtsopts"
 
+build_go: prebuild
+	cd contrails && make && make install BINDIR=../$(FAKEROOT)/usr/bin
+
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy-core
 	cp -fr licenses/* ${LICENSE_DIR}
@@ -46,7 +49,7 @@ pull_blockapps_js: prebuild
 		npm install blockapps-js yaml-parser    \
 	)
 
-build_docker: build_deploybase build_haskell pull_blockapps_js
+build_docker: build_deploybase build_haskell build_go pull_blockapps_js
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh mkCoinbase $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
