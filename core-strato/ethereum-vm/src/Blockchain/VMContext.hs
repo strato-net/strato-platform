@@ -36,7 +36,7 @@ import qualified Network.Kafka                      as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
-
+import           Prometheus
 
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Constants
@@ -202,6 +202,9 @@ instance HasSQLDB ContextM where
 
 instance RBDB.HasRedisBlockDB ContextM where
     getRedisBlockDB = contextRedisPool <$> get
+
+instance MonadMonitor ContextM where
+    doIO = liftIO
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (StatsT (ResourceT m)) a -> m (a, Context)
