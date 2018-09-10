@@ -2,6 +2,7 @@
 
 module BlockApps.VaultWrapper.Client
   ( getPing
+  , getKey
   , postKey
   , postSignature
   ) where
@@ -11,11 +12,11 @@ import           Data.Text                    (Text)
 import           Servant.API
 import           Servant.Client
 
-import           BlockApps.Ethereum           (Address(..))
 import           BlockApps.VaultWrapper.API
 import           BlockApps.VaultWrapper.Types
 
 getPing :: ClientM String
-postKey :: Maybe Text -> Maybe Text -> ClientM Address
+getKey :: Maybe Text -> Maybe Text -> ClientM StatusAndAddress
+postKey :: Maybe Text -> Maybe Text -> ClientM StatusAndAddress
 postSignature :: Maybe Text -> Maybe Text -> UserData -> ClientM SignatureDetails
-getPing :<|> postKey :<|> postSignature = client (Proxy @ API)
+getPing :<|> getKey :<|> postKey :<|> postSignature = client (Proxy @ API)

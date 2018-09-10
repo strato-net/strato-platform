@@ -30,7 +30,7 @@ all: build_all docker-compose
 
 build_all: bloc strato apex docs cirrus dappstore nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest smd prometheus vault-wrapper
+.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest prometheus smd vault-wrapper
 
 apex:
 	@echo Now building apex...

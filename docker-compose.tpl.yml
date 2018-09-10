@@ -118,7 +118,7 @@ services:
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey:-}
+    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
@@ -240,5 +240,3 @@ services:
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     build: .
     restart: always
-    ports:
-      - 9090:9090
