@@ -236,3 +236,9 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    build: .
+    restart: always
+    ports:
+      - 9090:9090
