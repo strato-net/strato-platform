@@ -219,6 +219,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   when authz $ case ev of
     NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
+    PreviousBlock blk -> do
+      -- TODO(tim): verify this block
+      -- TODO(tim): Does the validator list match the log at that point in time?
+      -- TODO(tim): Has the proposer from that (roundno, validator list) signed it?
+      -- TODO(tim): Have 2/3s of the validators signed it?
+      -- TODO(tim): Does it have a vote to record?
+      -- TODO(tim): Take the sequence number
+      yield . ToCommit $ blk
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal

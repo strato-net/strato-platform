@@ -75,6 +75,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
              | NewBlock Block
+             | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              deriving (Eq, Show)
 
