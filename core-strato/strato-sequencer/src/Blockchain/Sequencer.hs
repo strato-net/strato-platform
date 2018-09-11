@@ -307,7 +307,7 @@ hydrateAndEmit sb = do
   case readiness of
       NotReadyToEmit -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-          lift $ tick ctr_sequencer_blocks_enqueued
+          P.incCounter seqBlocksEnqueued
       (ReadyToEmit totalPastDifficulty) -> do
           -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
           dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
