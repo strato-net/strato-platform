@@ -112,6 +112,13 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
+enableHistory :: Text -> Bool
+enableHistory cName = elem cName ["Vehicle", "Hashmap"]
+
+--Populate exclusion list
+enableIndexing :: Text -> Bool
+enableIndexing cName = notElem cName [""]
+
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
 
@@ -124,22 +131,19 @@ convertRet metadata conn globalsIORef = runConduit $
 createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
-  --liftIO $ putStrLn $ "{}{METADATA}{}: " ++ show metadata
   let firstContract = head metadata
-  let officialName = contractName firstContract
   let hashVal = codehash firstContract
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
-  cachedContract <- getCachedContract globalsIORef hashVal
-
-  let tableName = case cachedContract of
-        Just c -> fromMaybe (contractName firstContract)(resolvedName c)
-        Nothing -> contractName firstContract
+  let tableName = contractName firstContract
 
   let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
   let comma = if (length list == 0)
       then ""
       else ", "
+
+  let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
+  --let keySt = "(" <> "address, \"chainId\", block_timestamp, block_number, transaction_hash, message_sender" <> comma <> listToKeyStatement ", " list <> ")"
 
   liftIO . debugM "createInserts" . show $ "In convertRet, " <> tshow hashVal <> " contractAlreadyCreated = " <> tshow contractAlreadyCreated
 
@@ -153,66 +157,24 @@ createInserts globalsIORef = do
       yield createSt
 
       -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
-      when (history firstContract) $ do
+      when (enableHistory tableName) $ do
         let histSt = "create table if not exists \"" <> tableName <> "_history\" (address text, \"chainId\" text" <> comma <> tableColumns list <> ");"
         yield histSt
       _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
       return ()
+  vals <- forM metadata $ \row -> do
+        let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+        let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma <> listToValueStatement ", " rowList <> ")"
+        --let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "', '" <> blockTimestamp row <> "', '" <> blockNumber row <> "', '" <> transactionHash row <> "', '" <> messageSender row <> comma <> listToValueStatement ", " rowList <> ")"
+        return rowSt
+  let inserts = T.intercalate ", " vals
 
-  if (length metadata > 1)
-    then do
-      let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
-      --let keySt = "(" <> "address, \"chainId\", block_timestamp, block_number, transaction_hash, message_sender" <> comma <> listToKeyStatement ", " list <> ")"
+  when (enableHistory tableName) $ do
+    -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
+    let hist = "insert into \"" <> tableName <> "_history\" " <> keySt <> " values " <> inserts <> ";"
+    yield hist
 
-      vals <- forM metadata $ \row -> do
-            let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-            let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "'" <> comma <> listToValueStatement ", " rowList <> ")"
-            --let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "', '" <> blockTimestamp row <> "', '" <> blockNumber row <> "', '" <> transactionHash row <> "', '" <> messageSender row <> comma <> listToValueStatement ", " rowList <> ")"
-            return rowSt
-      let inserts = T.intercalate ", " vals
-
-      when (history firstContract) $ do
-        -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
-        let hist = "insert into \"" <> tableName <> "_history\" " <> keySt <> " values " <> inserts <> ";"
-        yield hist
-      --when (index firstContract) $ do
-      when (True) $ do
-        let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"," <> " block_timestamp = excluded.block_timestamp , block_number = excluded.block_number, transaction_hash = excluded.transaction_hash, " <> "message_sender = excluded.message_sender" <> comma <> (tableUpsert list) <> ";"
-        yield ins
-
-  else do
-    let keySt = "(" <> "address, \"chainId\"" <> comma <> listToKeyStatement ", " list <> ")"
-    let vals = "(" <> "'" <> address firstContract <> "', '" <> chain firstContract <> "'" <> comma  <> listToValueStatement ", " list <> ")"
-    when (history firstContract) $ do
-      -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
-      let hist = "insert into \"" <> tableName <> "_history\" " <> keySt <> " values " <> vals <> ";"
-      yield hist
-    --when (index firstContract) $ do
-    when (True) $ do
-      let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> vals <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
-      yield ins
-
-  newCache <- readIORef globalsIORef
-  newCachedContract <-  case Map.lookup hashVal $ contractCache newCache of
-        Just x -> return x
-        Nothing -> return ContractAndXabi{contract = Left "error", xabi = "error", name = "error", contractStored = False, resolvedName = Nothing, contractSchema = Nothing}
-  let newCacheList = Map.toList $ contractCache newCache
-
-  --If ContractAndXabi resolvedName == name ++ "1" , then create view
-  viewSt <- if(resolvedName newCachedContract == Just (name newCachedContract <> "1"))
-      then do
-        return $ "create or replace view \"" <> name newCachedContract <> "\" as select * from \"" <> name newCachedContract <> "1\";"
-      else do
-        --Get the first contract that uses the name
-        let originalSchemaContract = filter (\(_, y) -> resolvedName y == Just (officialName <> "1")) newCacheList
-        --Get the list of contracts that use the same name
-        let sameNameList = filter (\(_, y) -> (name y) == (contractName firstContract)) newCacheList
-        --Check how many have the same schema as the original contract
-        let tableList = if (not $ null originalSchemaContract)
-            then filter (\(_, y) -> (contractSchema y) == (contractSchema $ snd $ head originalSchemaContract)) sameNameList
-            else []
-        --Create a UNION statement for every table that matches the schema of the original contract
-        let tableString = map (\table -> "UNION SELECT * FROM \"" <> fromMaybe (name newCachedContract) (resolvedName $ snd table) <> "\"") tableList
-        return $ "create or replace view \"" <> (name newCachedContract) <> "\" as select * from \"" <> (name newCachedContract) <> "1\" " <> (T.intercalate " " tableString) <> ";"
-
-  yield viewSt
+  when (enableIndexing tableName) $ do
+    let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"" <> comma <> (tableUpsert list) <> ";"
+    --let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"," <> " block_timestamp = excluded.block_timestamp , block_number = excluded.block_number, transaction_hash = excluded.transaction_hash, " <> "message_sender = excluded.message_sender" <> comma <> (tableUpsert list) <> ";"
+    yield ins

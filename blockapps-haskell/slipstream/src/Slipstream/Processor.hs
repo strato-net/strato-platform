@@ -164,24 +164,6 @@ smashIt (x:[]) tmp final =
     then (final ++ [[x]])
     else final ++ [tmp ++ [x]]
 
-resolveContractName :: Integer -> Text -> Text -> [(Text, ContractAndXabi)] -> IO Text
-resolveContractName inc codehash contractName cache = do
-  let sameName = filter (\(_, y) -> findName y) cache
-  if (null sameName)
-    then return $ contractName <> (T.pack $ show inc)
-    else do
-      case (lookup codehash sameName) of
-        Nothing -> do
-          resolveContractName (inc + 1) codehash contractName cache
-        Just _ -> do
-          let newName = contractName <> (T.pack $ show inc)
-          return newName
-  where findName :: ContractAndXabi -> Bool
-        findName cont = do
-          case resolvedName cont of
-            Just x -> contractName <> (T.pack $ show inc) == x
-            Nothing -> True
-
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
   let tempChanges = map (toStateDiff . BL.fromStrict) messages
@@ -258,13 +240,8 @@ processTheMessages messages conn g = do
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    --Resolve Name Issues
-                    allContracts <- getAllContracts g
-                    resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
-                    let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
-                    storeCachedContract g codeHash newContractAndXabi
-                    liftIO $ putStrLn $ "newContractAndXabi_1: " ++ show newContractAndXabi
-                    return newContractAndXabi
+                    storeCachedContract g codeHash c
+                    return c
                (False, Nothing) -> do
                   liftIO . warningM "processTheMessages" . show $ "Need to call getContractCompileFullSource (this can be slow): ch:" <>
                                     tshow codeHash <> ", addr:" <> tshow addr
@@ -274,13 +251,8 @@ processTheMessages messages conn g = do
                   case contractOrError of
                       Left e -> error e
                       Right c -> do
-                        allContracts <- getAllContracts g
-                        resName <- liftIO $ resolveContractName 1 codeHash (name c) $ Map.toList allContracts
-                        let newContractAndXabi = ContractAndXabi{contract = contract c, xabi = (xabi c), name = name c, resolvedName = Just resName, contractStored = contractStored c, contractSchema = Nothing}
-
-                        storeCachedContract g codeHash newContractAndXabi
-                        liftIO $ putStrLn $ "newContractAndXabi_2: " ++ show newContractAndXabi
-                        return newContractAndXabi
+                        storeCachedContract g codeHash c
+                        return c
 
 
         let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
