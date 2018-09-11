@@ -8,8 +8,8 @@
 
 module Blockchain.Blockstanbul.HTTPAdmin (
   CandidateReceived(..),
-  uploadVote,
-  createWebServer
+  webserver,
+  uploadVote
 ) where
 
 import Servant
@@ -21,6 +21,8 @@ import Servant.Client
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad.IO.Class
+import Network.Wai.Middleware.RequestLogger
+import Network.Wai.Handler.Warp
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 
 -- API
@@ -55,6 +57,9 @@ createVote ch cr = do
 
 createWebServer :: TMChan CandidateReceived -> Application
 createWebServer ch = serve adminAPI (admin ch)
+
+webserver :: Int -> TMChan CandidateReceived -> IO ()
+webserver prt ch = run prt $ logStdoutDev (createWebServer ch)
 
 -- Client
 

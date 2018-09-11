@@ -16,6 +16,7 @@ import           Control.Lens                       ((%=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Stats
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
@@ -941,8 +942,8 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
   dbs' <- get
   vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
 
-  result <- lift $
-      flip runStateT vmState{
+  result <- lift . lift $
+      runNoStatsT $ flip runStateT vmState{
                          callDepth=callDepth',
                          vmGasRemaining=availableGas,
                          suicideList=preExistingSuicideList} $

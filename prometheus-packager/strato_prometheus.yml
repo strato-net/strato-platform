@@ -1,4 +1,4 @@
-# Strato Prometheus Configuration
+# my global config
 global:
   scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
   evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
@@ -16,22 +16,15 @@ rule_files:
   # - "first_rules.yml"
   # - "second_rules.yml"
 
-# Processes to scrape
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
 scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'prometheus'
+
+    # metrics_path defaults to '/metrics'
     metrics_path: '/prometheus/metrics'
+    # scheme defaults to 'http'.
+
     static_configs:
     - targets: ['localhost:9090']
-  - job_name: 'strato-sequencer'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['strato:8050']
-  - job_name: 'ethereum-vm'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['strato:8000']
-    metric_relabel_configs:
-    - source_labels: [__name__]
-      regex: '(prometheus)_(.*)'
-      replacement: '${2}'
-      target_label: pool

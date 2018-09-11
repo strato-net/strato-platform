@@ -36,9 +36,7 @@ import           Blockchain.Strato.Model.Class       (txChainId)
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
 import qualified Network.Haskoin.Crypto     as HK
-import           Network.Wai.Handler.Warp
-import           Network.Wai.Middleware.RequestLogger
-import           Network.Wai.Middleware.Prometheus
+
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
 import           Test.Hspec.Contrib.HUnit            ()
@@ -106,10 +104,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         mCtx = if pbft then Just ctx else Nothing
     fromLeft (error "webserver completed") <$>
       race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
-           ( run testWebserverPort
-               . logStdoutDev
-               . prometheus def
-               . API.createWebServer $ ch)
+           (API.webserver testWebserverPort ch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 

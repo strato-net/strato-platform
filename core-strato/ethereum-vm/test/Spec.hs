@@ -13,6 +13,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 import           System.Directory
 import qualified Data.ByteString.Char8   as C8
@@ -50,7 +51,7 @@ main = do
   hspec spec
 
 runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m (a, Context)
+                 StateT Context (StatsT (ResourceT m)) a -> m (a, Context)
 runContextM' f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
@@ -69,7 +70,7 @@ runContextM' f = do
         --conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
         --redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
         --let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-        runStateT f (Context
+        runNoStatsT$ runStateT f (Context
                         MP.MPDB{MP.ldb=sdb, MP.stateRoot= MP.StateRoot stateRoot}
                         hdb
                         cdb
