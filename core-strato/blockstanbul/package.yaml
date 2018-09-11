@@ -30,8 +30,6 @@ dependencies:
   - transformers
   - monad-logger
   - wai-extra
-  - wai-middleware-prometheus
-  - wai
   - warp
   - http-client
 

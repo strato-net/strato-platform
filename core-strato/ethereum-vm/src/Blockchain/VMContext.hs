@@ -26,6 +26,7 @@ import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                           as M
 import qualified Database.LevelDB                   as DB
@@ -35,7 +36,7 @@ import qualified Network.Kafka                      as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
-import           Prometheus
+
 
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Constants
@@ -91,7 +92,13 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        }
 makeLenses ''Context
 
-type ContextM = StateT Context (ResourceT (LoggingT IO))
+type ContextM = StateT Context (StatsT (ResourceT (LoggingT IO)))
+
+instance (MonadResource m) => MonadResource (StatsT m) where
+    liftResourceT = lift . liftResourceT
+
+instance (MonadLogger m) => MonadLogger (StatsT m) where
+    monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
 
 instance HasMemTXResultDB ContextM where
   enqueueInsertTransactionResults txrs = do
@@ -196,11 +203,8 @@ instance HasSQLDB ContextM where
 instance RBDB.HasRedisBlockDB ContextM where
     getRedisBlockDB = contextRedisPool <$> get
 
-instance MonadMonitor ContextM where
-    doIO = liftIO
-
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                StateT Context  (ResourceT m) a -> m (a, Context)
+                StateT Context (StatsT (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
@@ -216,7 +220,7 @@ runContextM f = do
         conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
         redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
         let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-        runStateT f (Context
+        runStatsTConfigured $ runStateT f (Context
                         MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
                         hdb
                         cdb
@@ -237,10 +241,10 @@ runContextM f = do
                         False)
 
 
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
+evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m Context
+execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()

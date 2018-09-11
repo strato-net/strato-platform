@@ -40,8 +40,8 @@ dependencies:
   - ordered-containers
   - persistent-postgresql
   - postgresql-simple
-  - prometheus-client
   - resourcet
+  - statsdi
   - strato-adit
   - strato-conf
   - strato-genesis
@@ -55,9 +55,6 @@ dependencies:
   - time
   - transformers
   - vector
-  - wai-middleware-prometheus
-  - warp
-  - async
 
 library:
   source-dirs: src/
