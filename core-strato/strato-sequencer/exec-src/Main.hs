@@ -24,6 +24,9 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Monad
 import qualified Network.Haskoin.Crypto     as HK
 import qualified Network.Kafka.Protocol     as KP
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.RequestLogger
+import           Network.Wai.Middleware.Prometheus
 
 import           Flags
 
@@ -68,4 +71,6 @@ main = do
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
     , blockstanbulBeneficiary = chv
   }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) (webserver flags_blockstanbul_port chv)
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) $ run flags_blockstanbul_port ((if flags_seq_debug_mode then logStdoutDev else id)
+                                                                         . (prometheus def)
+                                                                         . createWebServer $ chv)
