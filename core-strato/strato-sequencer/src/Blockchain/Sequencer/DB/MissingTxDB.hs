@@ -13,8 +13,8 @@ getMissingTxsDB = missingTxs <$> getPrivateHashDB
 putMissingTxsDB :: HasPrivateHashDB m => S.Set SHA -> m ()
 putMissingTxsDB txs = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingTxs = txs }
 
-lookupMissingTx :: HasPrivateHashDB m => SHA -> m Bool
-lookupMissingTx tx = S.member tx <$> getMissingTxsDB
+isMissingTX :: HasPrivateHashDB m => SHA -> m Bool
+isMissingTX tx = S.member tx <$> getMissingTxsDB
 
 insertMissingTx :: HasPrivateHashDB m => SHA -> m ()
 insertMissingTx tx = getMissingTxsDB >>= putMissingTxsDB . S.insert tx
