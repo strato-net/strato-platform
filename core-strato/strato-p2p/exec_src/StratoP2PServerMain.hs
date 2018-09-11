@@ -2,9 +2,12 @@
 {-# LANGUAGE TemplateHaskell   #-}
 
 import           Control.Concurrent
+import           Control.Concurrent.Async
 import           Control.Monad
 import           Control.Monad.Logger
 import           HFlags
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.Prometheus
 
 import           Blockchain.Output
 import           Blockchain.ServOptions
@@ -17,4 +20,6 @@ main = do
   if flags_runUDPServer
     then void . forkIO $ runLoggingT ethereumDiscovery printLogMsg
     else return ()
-  runLoggingT stratoP2PServer printLogMsg
+  race_
+    (run 10249 metricsApp)
+    (runLoggingT stratoP2PServer printLogMsg)
