@@ -13,7 +13,6 @@ import           Control.Concurrent                        hiding (yield)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Stats                       hiding (prefix)
 import           Control.Monad.IO.Class                    (liftIO)
 import           System.Clock
 
@@ -25,7 +24,7 @@ import           Data.Maybe                                (catMaybes, fromMaybe
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
-
+import           Prometheus                                as P
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
@@ -84,8 +83,8 @@ sequencer = do
     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
-    tick ctr_sequencer_ldb_batch_writes
-    setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
+    P.incCounter seqLdbBatchWrites
+    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
     $logInfoS "sequencer" "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
     unless (S.null chainIds) $ do
@@ -218,12 +217,12 @@ transformFullTransactions pairs = do
         wasTransactionHashWitnessed witnessHash >>= \case
           True -> do
             $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx itx
-            tick ctr_sequencer_txs_witnessed
+            P.incCounter seqTxsWitnessed
             return Nothing
           False -> do
             $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx itx
             witnessTransactionHash witnessHash
-            tick ctr_sequencer_txs_unwitnessed
+            P.incCounter seqTxsUnwitnessed
             return $ Just (ts,otx)
   let otxs = catMaybes mOtxs
   forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) -> do
@@ -308,7 +307,7 @@ hydrateAndEmit sb = do
   case readiness of
       NotReadyToEmit -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-          lift $ tick ctr_sequencer_blocks_enqueued
+          lift $ P.incCounter seqBlocksEnqueued
       (ReadyToEmit totalPastDifficulty) -> do
           -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
           dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
@@ -337,13 +336,15 @@ hydrateAndEmit sb = do
               then do
                 logHydrate $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
                 hydratedBlock <- lift . hydrateBlock $ ob
-                lift $ tickBy 1 ctr_sequencer_blocks_released
+                lift $ P.incCounter seqBlocksReleased
                 yield hydratedBlock
+
                 return ldbOp
               else do
                 logHydrate $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
                 lift $ mapM_ insertGetTransactionsDB depTXS
                 return Nothing
+
           lift . addLdbBatchOps . catMaybes $ ldbOps
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
@@ -353,10 +354,11 @@ transformBlocks = mapM_ $ \ib -> do
     Nothing -> do
       $logWarnS "transformEvents/emitBlocks" . T.pack
         $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-      tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+      P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
       witnessBlockHash (sbHash sb) sb
       hydrateAndEmit sb
+
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
@@ -485,18 +487,18 @@ readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
     ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
-    tickBy (length ret) ctr_sequencer_kafka_unseq_reads
+    unsafeAddCounter (fromIntegral (length ret)) seqKafkaUnseqRead
     return ret
 
 writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents' events = void $ do
     void $ K.withKafkaRetry1s (writeSeqVmEvents events)
-    tickBy (length events) ctr_sequencer_kafka_seq_writes
+    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
 
 writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
 writeSeqP2pEvents' events = void $ do
     void $ K.withKafkaRetry1s (writeSeqP2pEvents events)
-    tickBy (length events) ctr_sequencer_kafka_seq_writes
+    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
@@ -506,14 +508,14 @@ getNextIngestedOffset = do
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
-  tick ctr_sequencer_kafka_checkpoint_reads
+  P.incCounter seqKafkaCheckpointReads
   return ret
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    tick ctr_sequencer_kafka_checkpoint_writes
+    P.incCounter seqKafkaCheckpointWrites
     op <- K.withKafkaViolently $ K.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
