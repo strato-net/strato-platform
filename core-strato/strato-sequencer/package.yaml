@@ -34,7 +34,6 @@ dependencies:
   - bytestring
   - ethereum-rlp
   - time
-  - statsdi
   - stm
   - stm-chans
   - conduit-combinators
@@ -44,6 +43,11 @@ dependencies:
   - blockapps-haskoin
   - aeson
   - async
+  - prometheus-client
+  - warp
+  - servant-server
+  - wai-extra
+  - wai-middleware-prometheus
 
 ghc-options: -Wall -O2 -threaded
 
