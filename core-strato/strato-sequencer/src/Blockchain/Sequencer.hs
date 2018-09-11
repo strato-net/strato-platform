@@ -269,10 +269,7 @@ transformFullTransactions pairs = do
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
-                  when (isJust mBlock) $ do
-                    let Just block = mBlock
-                    evs <- hydrateAndEmit block
-                    mapM_ (markForVM . OEBlock) evs
+                  mapM_ hydrateAndEmit mBlock
                 depTxs -> do
                   $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
@@ -287,8 +284,19 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
     then transformPrivateHashTXs pairs
     else transformFullTransactions pairs
 
-hydrateAndEmit :: SequencedBlock -> SequencerM [OutputBlock]
-hydrateAndEmit sb = runConduit $ hydrateAndEmit' .| sinkList
+hydrateAndEmit :: SequencedBlock -> SequencerM ()
+hydrateAndEmit sb = do
+  wetBlocks <- runConduit $ hydrateAndEmit' .| sinkList
+  hasPBFT <- blockstanbulRunning
+  if not hasPBFT
+    then mapM_ (markForVM . OEBlock) $ wetBlocks
+    else let convert :: OutputBlock -> InEvent
+             convert outBlock = case obOrigin outBlock of
+                                    TO.Quarry -> NewBlock . outputBlockToBlock $ outBlock
+                                    _ -> PreviousBlock . outputBlockToBlock $ outBlock
+         -- Blockstanbul will check that the seals and validators match up before
+         -- announcing it to the network or forwarding to the EVM.
+         in blockstanbulSend . map convert $ wetBlocks
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
@@ -348,16 +356,7 @@ transformBlocks = mapM_ $ \ib -> do
       tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
       witnessBlockHash (sbHash sb) sb
-      hasPBFT <- blockstanbulRunning
-      wetBlocks <- hydrateAndEmit sb
-      if not hasPBFT
-        then mapM_ (markForVM . OEBlock) wetBlocks
-        else let block = ingestBlockToBlock ib
-                 inEvent = case ibOrigin ib of
-                          TO.Quarry -> NewBlock block
-                          _ -> PreviousBlock block
-                 wetEvents = map (PreviousBlock . outputBlockToBlock) wetBlocks
-             in blockstanbulSend (inEvent:wetEvents)
+      hydrateAndEmit sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
@@ -396,10 +395,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
-                  when (isJust mBlock) $ do
-                    let Just block = mBlock
-                    vmevs <- hydrateAndEmit block
-                    mapM_ (markForVM . OEBlock) vmevs
+                  mapM_ hydrateAndEmit mBlock
                 depTxs -> do
                   $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
