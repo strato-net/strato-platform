@@ -8,7 +8,8 @@
 {-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
-import           Control.Concurrent
+import           Conduit
+import           Control.Concurrent                        hiding (yield)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -268,9 +269,7 @@ transformFullTransactions pairs = do
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
-                  when (isJust mBlock) $ do
-                    let Just block = mBlock
-                    hydrateAndEmit block
+                  mapM_ hydrateAndEmit mBlock
                 depTxs -> do
                   $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
@@ -287,63 +286,77 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
 
 hydrateAndEmit :: SequencedBlock -> SequencerM ()
 hydrateAndEmit sb = do
+  wetBlocks <- runConduit $ hydrateAndEmit' .| sinkList
+  hasPBFT <- blockstanbulRunning
+  if not hasPBFT
+    then mapM_ (markForVM . OEBlock) $ wetBlocks
+    else let convert :: OutputBlock -> InEvent
+             convert outBlock = case obOrigin outBlock of
+                                    TO.Quarry -> NewBlock . outputBlockToBlock $ outBlock
+                                    _ -> PreviousBlock . outputBlockToBlock $ outBlock
+         -- Blockstanbul will check that the seals and validators match up before
+         -- announcing it to the network or forwarding to the EVM.
+         in blockstanbulSend . map convert $ wetBlocks
+ where
+ hydrateAndEmit' :: Conduit () SequencerM OutputBlock
+ hydrateAndEmit' = do
   t0 <- liftIO $ getTime Realtime
-  readiness <- enqueueIfParentNotEmitted sb
+  readiness <- lift $ enqueueIfParentNotEmitted sb
   t1 <- liftIO $ getTime Realtime
+  let logHydrate = $logInfoS "hydrateAndEmit" . T.pack
   $logDebug . T.pack $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
   case readiness of
+      NotReadyToEmit -> do
+          $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
+          lift $ tick ctr_sequencer_blocks_enqueued
       (ReadyToEmit totalPastDifficulty) -> do
-          dryChain <- buildEmissionChain sb totalPastDifficulty -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
+          -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
+          dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
           if (dryChain /= [])
             then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
             else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
-          mapM_ (markForP2P . OEBlock . snd) dryChain
+          mapM_ (lift . markForP2P . OEBlock . snd) dryChain
           ldbOps <- forM dryChain $ \(ldbOp, ob) -> do
             let bHash = blockHeaderHash $ obBlockData ob
-            $logInfoS "hydrateAndEmit" . T.pack $ prettyOBlock ob
+            logHydrate $ prettyOBlock ob
             forM_ (obReceiptTransactions ob) $ \tx -> do
               when (isPrivateHashTX tx) $ do
                 let TD.PrivateHashTX{TD.transactionTxHash = th'} = otBaseTx tx
                     th = SHA th'
-                $logInfoS "hydrateAndEmit" . T.pack $ "Looking up transaction hash " ++ format th ++ " in MissingTxDB"
-                lookupMissingTx th >>= \case
-                  False -> do
-                    $logInfoS "hydrateAndEmit" . T.pack $ "Transaction hash " ++ format th ++ " is not missing"
-                    return ()
-                  True -> do
-                    $logInfoS "hydrateAndEmit" . T.pack $ "Transaction hash " ++ format th ++ " is missing. Inserting into TxBlockDB and DependentTxDB"
-                    insertTxBlock th bHash
-                    insertDependentTx bHash th
-            lookupDependentTxs bHash >>= \case
-              s | s == S.empty -> do
-                $logInfoS "hydrateAndEmit" . T.pack $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
-                hydratedBlock <- hydrateBlock ob
-                tickBy 1 ctr_sequencer_blocks_released
-                markForVM $ OEBlock hydratedBlock
+                logHydrate $ "Looking up transaction hash " ++ format th ++ " in MissingTxDB"
+                missing <- lift . isMissingTX $ th
+                if missing
+                  then do
+                    logHydrate $ "Transaction hash " ++ format th ++ " is missing. Inserting into TxBlockDB and DependentTxDB"
+                    lift $ insertTxBlock th bHash
+                    lift $ insertDependentTx bHash th
+                  else do
+                    logHydrate $ "Transaction hash " ++ format th ++ " is not missing"
+            depTXS <- lift . lookupDependentTxs $ bHash
+            if S.null depTXS
+              then do
+                logHydrate $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
+                hydratedBlock <- lift . hydrateBlock $ ob
+                lift $ tickBy 1 ctr_sequencer_blocks_released
+                yield hydratedBlock
                 return ldbOp
-              s -> do
-                $logInfoS "hydrateAndEmit" . T.pack $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
-                mapM_ insertGetTransactionsDB s
+              else do
+                logHydrate $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
+                lift $ mapM_ insertGetTransactionsDB depTXS
                 return Nothing
-          addLdbBatchOps $ catMaybes ldbOps
-      NotReadyToEmit -> do
-          $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-          tick ctr_sequencer_blocks_enqueued
+          lift . addLdbBatchOps . catMaybes $ ldbOps
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks blocks = do
-  hasPBFT <- blockstanbulRunning
-  if hasPBFT
-    then blockstanbulSend $ map (NewBlock . ingestBlockToBlock) blocks
-    else forM_ blocks $ \ib -> do
-      let mSb = ingestBlockToSequencedBlock ib
-      case mSb of
-        Nothing -> do
-          $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-          tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-        Just sb -> do
-          witnessBlockHash (sbHash sb) sb
-          hydrateAndEmit sb
+transformBlocks = mapM_ $ \ib -> do
+  let mSb = ingestBlockToSequencedBlock ib
+  case mSb of
+    Nothing -> do
+      $logWarnS "transformEvents/emitBlocks" . T.pack
+        $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+      tick ctr_sequencer_blocks_ecrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+    Just sb -> do
+      witnessBlockHash (sbHash sb) sb
+      hydrateAndEmit sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
@@ -382,9 +395,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
-                  when (isJust mBlock) $ do
-                    let Just block = mBlock
-                    hydrateAndEmit block
+                  mapM_ hydrateAndEmit mBlock
                 depTxs -> do
                   $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
