@@ -5,6 +5,9 @@
 
 import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Concurrent.Async             as Async
+import           Network.Wai.Middleware.Prometheus
+import           Network.Wai.Handler.Warp
 import           HFlags
 
 import           Blockchain.Output
@@ -15,4 +18,4 @@ import           Executable.EVMFlags
 main :: IO ()
 main = do
   void $ $initHFlags "Ethereum VM"
-  runLoggingT ethereumVM printLogMsg
+  race_ (runLoggingT ethereumVM printLogMsg) (run 8000 metricsApp)
