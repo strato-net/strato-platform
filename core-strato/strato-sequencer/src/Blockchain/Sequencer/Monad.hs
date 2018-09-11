@@ -33,7 +33,6 @@ import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
 import           Data.Foldable                             (toList)
@@ -62,12 +61,6 @@ import qualified Database.LevelDB                          as LDB
 import qualified Network.Kafka                             as K
 import qualified Blockchain.MilenaTools                    as K
 import qualified Network.Kafka.Protocol                    as KP
-
-instance (MonadLogger m) => MonadLogger (StatsT m) where
-    monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
-
-instance (MonadResource m) => MonadResource (StatsT m) where
-    liftResourceT = lift . liftResourceT
 
 data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
@@ -101,7 +94,7 @@ data SequencerConfig =
                      , blockstanbulBeneficiary :: TMChan CandidateReceived
                      }
 
-type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
+type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
 
 instance HasDependentBlockDB SequencerM where
     getDependentBlockDB = use dependentBlockDB
@@ -142,7 +135,7 @@ instance MonadMonitor SequencerM where
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    a <- runResourceT . EC.runStatsT (statsConfig c) . flip runReaderT c $ do
+    a <- runResourceT . flip runReaderT c $ do
         dbCS     <- asks depBlockDBCacheSize
         dbPath   <- asks depBlockDBPath
         stxSize  <- asks seenTransactionDBSize
