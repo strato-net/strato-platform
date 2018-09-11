@@ -54,7 +54,7 @@ type PostBlocTransaction = "transaction"
   :> Post '[JSON] [BlocTransactionResult]
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
-  { postbloctransactionrequestAddress  :: Address
+  { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
@@ -71,7 +71,7 @@ instance FromJSON PostBlocTransactionRequest where
 instance ToSample PostBlocTransactionRequest where
   toSamples _ = singleSample $
     PostBlocTransactionRequest
-      (Address 0xdeadbeef)
+      (Just $ Address 0xdeadbeef)
       [BlocTransfer $ TransferPayload
         (Address 0x12345678)
         (Strung 600)
@@ -86,7 +86,7 @@ instance ToSchema PostBlocTransactionRequest where
     where
       ex :: PostBlocTransactionRequest
       ex = PostBlocTransactionRequest
-                 (Address 0xdeadbeef)
+                 (Just $ Address 0xdeadbeef)
                  [BlocTransfer $ TransferPayload
                    (Address 0x12345678)
                    (Strung 600)

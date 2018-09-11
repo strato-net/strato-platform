@@ -1,16 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Blockchain.Sequencer.SequencerSpec where
 
-import           Data.Maybe                          (isNothing)
+
+import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
+import           Data.Map                            as M (singleton,lookup)
+import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
 import           Control.Concurrent
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 
+import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.Authentication
+import           Blockchain.Blockstanbul.EventLoop
+import qualified Blockchain.Blockstanbul.HTTPAdmin as API
+import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
@@ -19,10 +33,12 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class       (txChainId)
-
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Kafka.Protocol              as KP
-
+import qualified Network.Haskoin.Crypto     as HK
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.RequestLogger
+import           Network.Wai.Middleware.Prometheus
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
 import           Test.Hspec.Contrib.HUnit            ()
@@ -31,6 +47,11 @@ import           Test.QuickCheck
 
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
+
+
+fromLeft :: a -> Either a b -> a
+fromLeft _ (Left a) = a
+fromLeft a _ = a
 
 stripTransactionsAndUncles :: IngestBlock -> IngestBlock
 stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [] }
@@ -41,10 +62,18 @@ dedupWindow = 100
 runTestM :: SequencerM a -> IO ()
 runTestM m = do
   gb <- makeGenesisBlock
-  void $ withTemporaryDepBlockDB gb m
+  void $ withTemporaryDepBlockDB False gb m
 
-withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
-withTemporaryDepBlockDB genesisBlock m = do
+testWebserverPort :: Int
+testWebserverPort = 8050
+
+runPBFTTestM :: SequencerM a -> IO ()
+runPBFTTestM m = do
+  gb <- makeGenesisBlock
+  void $ withTemporaryDepBlockDB True gb m
+
+withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
+withTemporaryDepBlockDB pbft genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
     timestamp    <- round <$> getPOSIXTime  :: IO Integer
@@ -52,7 +81,9 @@ withTemporaryDepBlockDB genesisBlock m = do
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
-    let kcid = KP.KString (C8.pack tempKCID)
+    ch <- atomically $ newTMChan
+    let
+        kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
                                , kafkaAddress          = Just (KP.Host (KP.KString "unused"), KP.Port 0000)
@@ -64,9 +95,21 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , statsConfig           = Nothing
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBeneficiary = ch
                                }
-
-    runLoggingT (runSequencerM cfg Nothing (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
+        bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+        pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+        myAddr = prvKey2Address pkey
+        vals = [myAddr]
+        auSenders = [myAddr]
+        ctx = newContext (View 0 0) vals auSenders pkey
+        mCtx = if pbft then Just ctx else Nothing
+    fromLeft (error "webserver completed") <$>
+      race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
+           ( run testWebserverPort
+               . logStdoutDev
+               . prometheus def
+               . API.createWebServer $ ch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -97,7 +140,7 @@ spec = do
         it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
-            outBlocks <- withTemporaryDepBlockDB gb $ do
+            outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> inChain)
               oes <- drainVM
               return [block | OEBlock block <- oes ]
@@ -108,7 +151,7 @@ spec = do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
-            outBlocks <- withTemporaryDepBlockDB gb $ do
+            outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> shuffled)
               oes <- drainVM
               return [block | OEBlock block <- oes ]
@@ -120,13 +163,13 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (10, dedupWindow - 1)
             inTxs  <- generate $ vectorOf inTxSize arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ do
+            outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
-            dedupedOut <- withTemporaryDepBlockDB gb $ do
+            dedupedOut <- withTemporaryDepBlockDB False gb $ do
               splitEvents dedupedIn
               drainVM
             length dedupedOut `shouldBe` length dedupedIn
@@ -136,7 +179,7 @@ spec = do
             ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
             inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
-            outTxs <- withTemporaryDepBlockDB gb $ do
+            outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
@@ -144,7 +187,7 @@ spec = do
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
-            dedupedOut <- withTemporaryDepBlockDB gb $ do
+            dedupedOut <- withTemporaryDepBlockDB False gb $ do
               splitEvents replicatedIn
               oes <- drainVM
               return [o | o@(OETx _ _) <- oes]
@@ -170,3 +213,47 @@ spec = do
         liftIO $ threadDelay 200 -- Who are you to judge?
         out <- drainTimeouts
         out `shouldMatchList` input
+
+      it "checks for votes" $ runPBFTTestM $ do
+        bc <- getBlockstanbulContext
+        case bc of
+          Nothing -> do
+            expectationFailure "BlockstanbulContext required"
+          Just bct -> do
+            let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+                pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                addr = prvKey2Address pvk
+                (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
+            --create the extendedsignature for (beneficiary, nonce)
+            esign <- signBenfInfo pvk (testAddr, True)
+            --rlp seilize and hex and string the signature
+            let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
+                vote = API.CandidateReceived{API.sender=addr
+                                           , API.signature=esignStr
+                                           , API.recipient=testAddr
+                                           , API.votingdir=True
+                                           , API.nonce = 1}
+            liftIO $ API.uploadVote testWebserverPort vote
+            checkForVotes
+            bct' <- getBlockstanbulContext
+            let unwrapbct = fromMaybe bct bct'
+            let pv = _pendingvotes unwrapbct
+                val = M.lookup testAddr pv
+            val `shouldBe` Just True
+            pv `shouldBe` M.singleton testAddr True
+            esign' <- signBenfInfo pvk (testAddr, False)
+            let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
+                vote' = API.CandidateReceived{API.sender=addr
+                                            , API.signature=esignStr'
+                                            , API.recipient=testAddr
+                                            , API.votingdir=False
+                                            , API.nonce = 1}
+            liftIO $ API.uploadVote testWebserverPort vote'
+            checkForVotes
+            bctn <- getBlockstanbulContext
+            let unwrapbct' = fromMaybe bct bctn
+            let pv' = _pendingvotes unwrapbct'
+                val' = M.lookup testAddr pv'
+            val' `shouldBe` Just True
+            pv' `shouldBe` M.singleton testAddr True
+            _authSenders unwrapbct' `shouldBe` M.singleton addr 1

@@ -3,6 +3,7 @@
 set -e
 set -x
 
+PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
@@ -109,24 +110,29 @@ runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$po
            --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
 
 set +x
-echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
-while sleep ${MONITORING_TIMER}; do
-  # check status for every monitored process
-  for monitored_pid in "${!MONITORED_PIDS[@]}"; do
-    # if process with pid does not exist
-    if ! (ps -p ${monitored_pid} > /dev/null); then
-      echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
-      # Kill all the rest of monitored processes
-      for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
-        if ps -p ${pid_to_kill} > /dev/null; then
-          echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
-          kill -9 ${pid_to_kill} || true
-          echo "done"
-        fi
-      done
-      echo "CONTAINER IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /logs/ in the container"
-      # Keep container running idle
-      tail -f /dev/null
-    fi
+if [ "${PROCESS_MONITORING}" = true ] ; then
+  echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
+  while sleep ${MONITORING_TIMER}; do
+    # check status for every monitored process
+    for monitored_pid in "${!MONITORED_PIDS[@]}"; do
+      # if process with pid does not exist
+      if ! (ps -p ${monitored_pid} > /dev/null); then
+        echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+        # Kill all the rest of monitored processes
+        for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+          if ps -p ${pid_to_kill} > /dev/null; then
+            echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+            kill -9 ${pid_to_kill} || true
+            echo "done"
+          fi
+        done
+        echo "CONTAINER IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /logs/ in the container"
+        # Keep container running idle
+        tail -f /dev/null
+      fi
+    done
   done
-done
+else
+  echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /logs/ directory in the container for logs"
+  tail -f /dev/null
+fi

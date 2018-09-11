@@ -30,17 +30,24 @@ dependencies:
   - blockapps-milena
   - binary
   - base64-bytestring
+  - base16-bytestring
   - bytestring
   - ethereum-rlp
   - time
-  - statsdi
   - stm
   - stm-chans
   - conduit-combinators
   - blockstanbul
+  - stm-chans
   - lens
   - blockapps-haskoin
   - aeson
+  - async
+  - prometheus-client
+  - warp
+  - servant-server
+  - wai-extra
+  - wai-middleware-prometheus
 
 ghc-options: -Wall -O2 -threaded
 

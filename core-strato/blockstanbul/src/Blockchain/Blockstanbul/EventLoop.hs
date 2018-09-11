@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
@@ -32,8 +33,8 @@ data NextType = Round RoundNumber | Sequence SequenceNumber
 data BlockstanbulContext = BlockstanbulContext {
   -- view describes which consensus round is under consideration.
     _view :: View
-  -- authenticator authenticates wire messages are coming from the right sender
-  , _authenticator :: InEvent -> Bool
+  -- Whether to really authenticate, or just to pretend to.
+  , _productionAuth :: Bool
   -- The block proposed for this round
   , _proposal :: Maybe Block
   -- The designated participant to suggest a block for this round
@@ -58,6 +59,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
+  , _authSenders :: M.Map Address Int
 }
 
 makeLenses ''BlockstanbulContext
@@ -76,14 +78,14 @@ debugShowCtx = do
   debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
-newContext :: View -> [Address] -> HK.PrvKey -> BlockstanbulContext
-newContext v as pk =
+newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
+newContext v as senderlist pk =
   let prop = case as of
                  [] -> 0x0 -- TODO(tim): C? In my Haskell? It's more likely than you think.
                  (a:_) -> a
   in BlockstanbulContext
      { _view = v
-     , _authenticator = const True -- TODO(tim): Authenticate
+     , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
      , _validators = as
@@ -98,19 +100,65 @@ newContext v as pk =
      , _prvkey = pk
      , _blockcount = 0
      , _blockLock = Nothing
+     , _authSenders = generateNonceMap senderlist
      }
 
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
+authorize :: (StateMachineM m) => InEvent -> m Bool
+authorize = \case
+  IMsg (MsgAuth addr _) _ -> do
+    ret <- uses validators (addr `elem`)
+    unless ret $
+      $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting message; sender not a validator: " ++ show addr
+    return ret
+  _ -> return True
+
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
-  authn <- use authenticator
-  if not (authn iev)
-    then return False
-    else case iev of
-            IMsg (MsgAuth addr _) _ -> uses validators (addr `elem`)
-            _ -> return True -- No sender for timeouts!
+  doAuthn <- use productionAuth
+  let authenticated = authenticate iev
+  when (not authenticated && doAuthn) $
+    $logWarnS "blockstanbul/auth" . T.pack $
+      "Rejecting inevent; message failed authentication: " ++ show iev
+  authorized <- authorize iev
+  specificAuth <-
+    case iev of
+      NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
+        -- Check nonce for replay attack
+        slist <- use authSenders
+        let nonceAuth = M.member addr slist && Just nonc > M.lookup addr slist
+            verifiedSender = verifyBenfInfo (benf,dir) sign
+        if (nonceAuth && Just addr == verifiedSender)
+          then do
+            authSenders %= M.insert addr nonc
+            return True
+          else do
+            when doAuthn $
+              $logWarnS "blockstanbul/auth" "Rejecting NewBeneficiary; nonce or signature incorrect"
+            return False
+      IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
+        vali <- use validators
+        let validatorMatch = vali == (getValidatorList pp)
+            signatory = verifyProposerSeal pp =<< getProposerSeal pp
+        let ret = validatorMatch && Just addr == signatory
+        when (doAuthn && not ret) $
+          $logWarnS "blockstanbul/auth" "Rejecting Preprepare; mismatched validator or bad seal"
+        return ret
+      IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+        let ret = Just addr == verifyCommitmentSeal di seal
+        when (doAuthn && not ret) $
+          $logWarnS "blockstanbul/auth" "Rejecting Commit; bad seal"
+        return ret
+      _ -> return True -- No specific auth for any other messages
+  return $ if doAuthn
+              then authorized && authenticated && specificAuth
+              else authorized
+
+
+generateNonceMap :: [Address] -> M.Map Address Int
+generateNonceMap = M.fromList . flip zip (repeat 0)
 
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
@@ -135,6 +183,7 @@ nextRound nt = do
   val <- use validators
   vot <- use voted
   validators .= updateValidator val vot
+
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
@@ -168,8 +217,16 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary benf decision  -> do
+    NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
+    PreviousBlock blk -> do
+      -- TODO(tim): verify this block
+      -- TODO(tim): Does the validator list match the log at that point in time?
+      -- TODO(tim): Has the proposer from that (roundno, validator list) signed it?
+      -- TODO(tim): Have 2/3s of the validators signed it?
+      -- TODO(tim): Does it have a vote to record?
+      -- TODO(tim): Take the sequence number
+      yield . ToCommit $ blk
     NewBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal

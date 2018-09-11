@@ -2,6 +2,7 @@ name: blockstanbul
 ghc-options: -Wall -Werror
 
 dependencies:
+  - aeson
   - base
   - binary
   - blockapps-data
@@ -20,13 +21,23 @@ dependencies:
   - lens
   - mtl
   - QuickCheck
+  - servant-client
+  - servant-server
+  - stm
+  - stm-chans
   - strato-model
   - text
   - transformers
   - monad-logger
+  - wai-extra
+  - wai-middleware-prometheus
+  - wai
+  - warp
+  - http-client
 
 library:
   source-dirs: src/
+
 
 tests:
   blockstanbul-test:

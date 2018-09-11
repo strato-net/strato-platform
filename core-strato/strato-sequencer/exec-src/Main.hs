@@ -3,6 +3,9 @@
 module Main where
 
 import           Control.Monad.Logger
+import           Control.Concurrent.Async             as Async
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
@@ -13,6 +16,7 @@ import           Safe
 import           System.Environment
 
 import           Blockchain.Blockstanbul
+import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
@@ -20,6 +24,9 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Monad
 import qualified Network.Haskoin.Crypto     as HK
 import qualified Network.Kafka.Protocol     as KP
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.RequestLogger
+import           Network.Wai.Middleware.Prometheus
 
 import           Flags
 
@@ -28,6 +35,7 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators
+  putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
                           (_, "") -> Nothing
@@ -35,8 +43,10 @@ main = do
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
       eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
       validators = fromRight (error "invalid validators") eValidators
+      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+      authSenders = fromRight (error "invalid validators") eAuthSenders
       -- TODO(tim): Use proper initial values for the view
-      ctx = newContext (View 0 0) validators
+      ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
              then return Nothing
@@ -46,7 +56,7 @@ main = do
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
                 return . Just . ctx $ pkey
-
+  chv <- atomically $ newTMChan
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize
     , depBlockDBPath        = flags_depblockdbpath
@@ -59,5 +69,8 @@ main = do
     , statsConfig           = EC.statsConfig EC.ethConf
     , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
+    , blockstanbulBeneficiary = chv
   }
-  runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) $ run flags_blockstanbul_port ((if flags_seq_debug_mode then logStdoutDev else id)
+                                                                         . (prometheus def)
+                                                                         . createWebServer $ chv)

@@ -34,7 +34,6 @@ module Blockchain.VM.VMM (
 
 import           Control.Monad
 import           Control.Monad.Logger
-import           Control.Monad.Stats
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -62,7 +61,7 @@ import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
-type VMM = ExceptT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
+type VMM = ExceptT VMException (StateT VMState (ResourceT (LoggingT IO)))
 --type VMM2 = ExceptT VMException (StateT VMState (ResourceT IO))
 
 instance HasMemAddressStateDB VMM where
