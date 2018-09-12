@@ -25,7 +25,6 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
-import           Control.Monad.Stats                     hiding (Success)
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Data.Aeson.Encode.Pretty                (encodePretty)
@@ -45,6 +44,7 @@ import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
+import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
@@ -194,11 +194,11 @@ timeIt f = do
     timeAfter <- liftIO getPOSIXTime
     return (timeAfter - timeBefore, result)
 
-timeit :: (MonadIO m, MonadLogger m, MonadStats m) => String -> Maybe Timer -> m a -> m a
+timeit :: (MonadIO m, MonadLogger m) => String -> Maybe (P.Metric P.Gauge) -> m a -> m a
 timeit message timer f = do
     (diff, ret) <- timeIt f
     $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff ::Double) ++ "s"
-    forM_ timer (time diff)
+    liftIO $ forM_ timer (P.setGauge (realToFrac diff))
     return ret
 
 addBlocks :: [OutputBlock] -> ContextM ()
@@ -257,7 +257,7 @@ addBlocks blocks' = do
         calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
 
   where
-    timerToUse = Just time_vm_block_insertion_mined
+    timerToUse = Just vmBlockInsertionMined
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
@@ -301,11 +301,11 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
     valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b'
     case valid of
-        Right _ -> tick ctr_vm_blocks_valid
-        Left  _ -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
+        Right _ -> P.incCounter vmBlocksValid
+        Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
-    tick ctr_vm_blocks_mined
-    tick ctr_vm_blocks_processed
+    P.incCounter vmBlocksMined
+    P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
     return ()
 
@@ -330,7 +330,7 @@ addTransactions b blockGas (t:rest) = do
   afterMap <- getAddressStateDBMap
 
   printTransactionMessage t result deltaT
-  time deltaT time_vm_tx_mined
+  P.setGauge (realToFrac deltaT) vmTxMined
 
   outputTransactionResult b blockHeaderHash Mined $ TxRunResult t result deltaT beforeMap afterMap
 
@@ -353,7 +353,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     beforeMap <- getAddressStateDBMap
     (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateDBMap
-    time time' time_vm_tx_mining
+    P.setGauge (realToFrac time') vmTxMining
     printTransactionMessage tx result time'
     let trr = TxRunResult tx result time' beforeMap afterMap
     case result of
@@ -394,18 +394,18 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                       return (transactionTo bt)
     success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
-    let txTypeCounter = if isContractCreationTX bt then ctr_vm_tx_creation else ctr_vm_tx_call
-    lift $ tick txTypeCounter
+    let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
+    lift $ P.incCounter txTypeCounter
     if success
         then do
             (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (transactionGasLimit bt - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
-            lift $ tick ctr_vm_txs_processed
+            lift $ P.incCounter vmTxsProcessed
             case result of
                 Left e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-                    lift $ tick ctr_vm_txs_unsuccessful
+                    lift $ P.incCounter vmTxsUnsuccessful
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erRemainingTxGas     = if e == RevertException
                                                                   then vmGasRemaining newVMState'
@@ -427,7 +427,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     forM_ (S.toList $ suicideList newVMState') $ \address' -> do
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
-                    lift $ tick ctr_vm_txs_successful
+                    lift $ P.incCounter vmTxsSuccessful
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
                                        , erRemainingTxGas     = vmGasRemaining newVMState'
                                        , erReturnVal          = returnVal newVMState'
