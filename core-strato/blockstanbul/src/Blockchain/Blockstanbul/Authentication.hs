@@ -1,17 +1,20 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Authentication
   ( module Blockchain.Blockstanbul.Authentication
   , module Blockchain.Blockstanbul.Model.Authentication
   ) where
 
-import Control.Monad (liftM2, liftM3)
+import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
-import qualified Data.ByteString as B
-import Data.ByteString.Lazy
-import Data.List (sort)
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.List (sort)
+import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
 import MonadUtils (liftIO1)
 import Test.QuickCheck
 
@@ -19,7 +22,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.Address
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB()
+import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
@@ -115,13 +118,13 @@ finalHash = hash
 
 signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool) -> m ExtendedSignature
 signBenfInfo pk bnf =
-  let msg = unSHA . hash . toStrict $ encode (bnf)
+  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
   in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
-  let msg = unSHA . hash . toStrict $ encode (bnf)
+  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
 signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
@@ -138,3 +141,28 @@ authenticate (IMsg (MsgAuth addr sig) tm) =
       mAddress = pubKey2Address <$> mKey
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
+
+replayHistoricBlock :: [Address] -> Word256 -> Block -> Either String Word256
+replayHistoricBlock realValidators seqNo blk = do
+  -- TODO(tim): This needs to be fixed for validator voting, as the current list
+  -- may have diverged from the validators at the time of commit
+  let ExtraData{..} = cookRawExtra . view extraLens $ blk
+  IstanbulExtra{..} <- case _istanbul of
+    Nothing -> Left "no istanbul metadata"
+    Just ist -> Right ist
+  let mProp = verifyProposerSeal blk =<< _proposedSig
+      signers = S.fromList
+              . mapMaybe (verifyCommitmentSeal (blockHash blk))
+              $ _commitment
+      blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
+  unless (seqNo + 1 == blockNo) $
+    Left "unexpected block number"
+  unless (realValidators == _validatorList) $
+    Left "mismatched validators"
+  unless (mProp `elem` map Just realValidators) $
+    Left "no verifiable proposer seal"
+  unless (signers `S.isSubsetOf` S.fromList realValidators) $
+    Left "unknown signers"
+  unless (3 * S.size signers > 2 * length realValidators) $
+    Left "not enough commit seals"
+  Right . fromIntegral $ seqNo + 1
