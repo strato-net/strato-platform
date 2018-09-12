@@ -2,7 +2,6 @@ pipeline {
   agent {
     label "test"
   }
-  options { disableConcurrentBuilds() }
   parameters {string(name: 'PLATFORM_BRANCH_NAME', defaultValue: 'develop', description: 'blockapps/strato-platform git branch name to build upon. Skip the "origin/" part.\n' +
     'This job will build using the pipeline from Jenkinsfile.test and all the code in this branch.')}
   stages {
