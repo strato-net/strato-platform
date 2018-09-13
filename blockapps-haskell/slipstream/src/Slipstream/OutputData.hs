@@ -142,17 +142,15 @@ createInserts globalsIORef = do
       else ", "
 
   let keySt = T.concat ["(", "address, \"chainId\"", comma, listToKeyStatement ", " list, ")"]
-  --let keySt = "(" <> "address, \"chainId\", block_timestamp, block_number, transaction_hash, message_sender" <> comma <> listToKeyStatement ", " list <> ")"
-
+  
   liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   when (not $ contractAlreadyCreated) $ do
-      let conVals = T.concat ["('", codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
+      let conVals = T.concat ["('", T.pack $ show $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
       let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
       yield conIns
       let createSt = T.concat ["create table if not exists \"", tableName, "\" (address text, \"chainId\" text", comma, tableColumns list, ", CONSTRAINT \"", tableName, "_pkey\" PRIMARY KEY (address, \"chainId\") );"]
-      --let createSt = "create table if not exists \"" <> tableName <> "\" (address text, \"chainId\" text", block_timestamp text, block_number text, transaction_hash text, message_sender text <> comma <> tableColumns list <> ", CONSTRAINT \"" <> tableName <> "_pkey\" PRIMARY KEY (address, \"chainId\") );"
       yield createSt
 
       -- Write block timestamp, block number, transaction hash, message sender, chain ID, and contract state
@@ -163,8 +161,7 @@ createInserts globalsIORef = do
       return ()
   vals <- forM metadata $ \row -> do
         let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-        let rowSt = T.concat ["(", "'", address row, "', '", chain row, "'", comma, listToValueStatement ", " rowList, ")"]
-        --let rowSt = "(" <> "'" <> address row <> "', '" <> chain row <> "', '" <> blockTimestamp row <> "', '" <> blockNumber row <> "', '" <> transactionHash row <> "', '" <> messageSender row <> comma <> listToValueStatement ", " rowList <> ")"
+        let rowSt = T.concat ["(", "'", T.pack $ show $ address row, "', '", chain row, "'", comma, listToValueStatement ", " rowList, ")"]
         return rowSt
   let inserts = T.intercalate ", " vals
 
@@ -175,5 +172,4 @@ createInserts globalsIORef = do
 
   when (enableIndexing tableName) $ do
     let ins = T.concat ["insert into \"", tableName, "\" ", keySt, " values ", inserts, " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"", comma, (tableUpsert list), ";"]
-    --let ins = "insert into \"" <> tableName <> "\" " <> keySt <> " values " <> inserts <> " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"," <> " block_timestamp = excluded.block_timestamp , block_number = excluded.block_number, transaction_hash = excluded.transaction_hash, " <> "message_sender = excluded.message_sender" <> comma <> (tableUpsert list) <> ";"
     yield ins
