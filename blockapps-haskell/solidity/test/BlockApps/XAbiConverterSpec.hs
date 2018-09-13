@@ -8,7 +8,6 @@ import           Test.Hspec
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as ByteString
 --import           Data.List
-import qualified Data.Map as Map
 import           Data.Maybe
 import           BlockApps.Solidity.Xabi
 --import           BlockApps.Solidity.Xabi.Type
@@ -20,11 +19,9 @@ spec :: Spec
 spec =
   describe "Xabi" $
     it "should convert a first pass xabi to a contract, then to a second pass xabi" $ do
-      pendingWith "bork test"
       let firstPass = fromMaybe undefined $ decode firstPassString
           secondPass = fromMaybe undefined $ decode secondPassString::Xabi
-      --We don't yet put constructors in the contract to xabi conversion, so I remove this field for the test.
-      contractToXabi (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass{xabiConstr=Map.empty}
+      contractToXabi "MyContract" (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass
 
 secondPassString::ByteString.ByteString
 secondPassString =
@@ -101,46 +98,49 @@ secondPassString =
          }
       },
       "constr":{
-         "_author":{
-            "type":"Address",
-            "index":1
-         },
-         "_userOwner":{
-            "type":"Address",
-            "index":0
-         },
-         "_hash":{
-            "type":"Bytes",
-            "index":2,
-            "bytes":32
-         },
-         "_contents":{
-            "dynamic":true,
-            "type":"String",
-            "index":4
-         },
-         "_tags":{
-            "dynamic":true,
-            "entry":{
-               "type":"Bytes",
-               "bytes":32
+         "MyContract":{
+            "args":{
+              "_author":{
+                  "type":"Address",
+                  "index":1
+              },
+              "_userOwner":{
+                  "type":"Address",
+                  "index":0
+              },
+              "_hash":{
+                  "type":"Bytes",
+                  "index":2,
+                  "bytes":32
+              },
+              "_contents":{
+                  "dynamic":true,
+                  "type":"String",
+                  "index":4
+              },
+              "_tags":{
+                  "dynamic":true,
+                  "entry":{
+                    "type":"Bytes",
+                    "bytes":32
+                  },
+                  "type":"Array",
+                  "index":3
+              }
             },
-            "type":"Array",
-            "index":3
+            "vals":{}
          }
       },
       "vars":{
          "hash":{
             "atBytes":160,
             "type":"Bytes",
-            "bytes":32,
-            "public":true
+            "bytes":32
          },
          "contents":{
             "atBytes":192,
             "dynamic":true,
-            "type":"String",
-            "public":true
+            "type":"String"
          },
          "readers":{
             "atBytes":32,
@@ -151,23 +151,19 @@ secondPassString =
             "key":{
                "type":"Address"
             },
-            "type":"Mapping",
-            "public":true
+            "type":"Mapping"
          },
          "owner":{
             "atBytes":0,
-            "type":"Address",
-            "public":true
+            "type":"Address"
          },
          "author":{
             "atBytes":96,
-            "type":"Address",
-            "public":true
+            "type":"Address"
          },
          "userOwner":{
             "atBytes":64,
-            "type":"Address",
-            "public":true
+            "type":"Address"
          },
          "tags":{
             "atBytes":128,
@@ -176,8 +172,7 @@ secondPassString =
                "type":"Bytes",
                "bytes":32
             },
-            "type":"Array",
-            "public":true
+            "type":"Array"
          }
       }
    }
@@ -279,34 +274,37 @@ firstPassString =
          }
       },
       "constr":{
-         "_author":{
-            "type":"Address",
-            "index":1
-         },
-         "_userOwner":{
-            "type":"Address",
-            "index":0
-         },
-         "_hash":{
-            "dynamic":false,
-            "type":"Bytes",
-            "index":2,
-            "bytes":32
-         },
-         "_contents":{
-            "dynamic":true,
-            "type":"String",
-            "index":4
-         },
-         "_tags":{
-            "dynamic":true,
-            "entry":{
-               "dynamic":false,
-               "type":"Bytes",
-               "bytes":32
+         "MyContract":{
+            "args":{
+              "_author":{
+                  "type":"Address",
+                  "index":1
+              },
+              "_userOwner":{
+                  "type":"Address",
+                  "index":0
+              },
+              "_hash":{
+                  "type":"Bytes",
+                  "index":2,
+                  "bytes":32
+              },
+              "_contents":{
+                  "dynamic":true,
+                  "type":"String",
+                  "index":4
+              },
+              "_tags":{
+                  "dynamic":true,
+                  "entry":{
+                    "type":"Bytes",
+                    "bytes":32
+                  },
+                  "type":"Array",
+                  "index":3
+              }
             },
-            "type":"Array",
-            "index":3
+            "vals":{}
          }
       },
       "vars":{
