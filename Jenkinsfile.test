@@ -23,7 +23,8 @@ pipeline {
             if [ -d "strato-platform" ]; then
               cd strato-platform
               git fetch origin
-              git reset --hard origin/${PLATFORM_BRANCH_NAME}
+              git reset --hard HEAD^
+              git checkout origin/${PLATFORM_BRANCH_NAME}
               cd ..
             else
               git clone https://github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
