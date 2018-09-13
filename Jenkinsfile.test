@@ -10,9 +10,9 @@ pipeline {
         wrap([$class: 'BuildUser']) {
           script {
             try {
-              currentBuild.description = "${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// anon"
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// anon"
             }
           }
         }
