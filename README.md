@@ -8,6 +8,8 @@
 Install the latest docker from https://www.docker.com/community-edition
 
 ### Stack
+Stack v1.7.1 is required to build strato-platform with docker env enabled
+
 Most unix systems (incl. ubuntu and mac):
 ```
 curl -sSL https://get.haskellstack.org/ | sh
@@ -15,6 +17,9 @@ curl -sSL https://get.haskellstack.org/ | sh
 
 ### NodeJS
 core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still used in coinbase generation)
+
+### MacOS ONLY - Docker for Mac setting requirements:
+In Docker for Mac "Preferences" -> "Advanced" allocate at least *2 CPU cores, 6 Gb RAM and 2Gb Swap* to a Docker VM
 
 ## Build
 
@@ -78,7 +83,8 @@ stack ls dependencies --license --no-include-base --depth 1
 
 TBD
 
-## APPENDIX: Libraries used in build process
+## (**DEPRECATED** for docker-env stack builds) APPENDIX: Libraries used in build process
+
 For the list of currenty used libraries see Dockerfile.deploybase for run-time libs and Dockerfile.buildbase for compilation lib requirements
 These libraries are no longer required to be installed on the host since we use docker-enabled Stack. So we keep them here just in case:
 
@@ -109,7 +115,7 @@ sudo ./b2 install
 
 #### Mac people:
 
-TBD
+None library dependencies
 
 #### Known issue with 'happy' lib when building on host (non-docker-enabled stack)
 

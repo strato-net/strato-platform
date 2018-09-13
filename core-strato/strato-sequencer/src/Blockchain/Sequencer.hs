@@ -307,7 +307,7 @@ hydrateAndEmit sb = do
   case readiness of
       NotReadyToEmit -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-          P.incCounter seqBlocksEnqueued
+          lift $ P.incCounter seqBlocksEnqueued
       (ReadyToEmit totalPastDifficulty) -> do
           -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
           dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
@@ -336,7 +336,7 @@ hydrateAndEmit sb = do
               then do
                 logHydrate $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
                 hydratedBlock <- lift . hydrateBlock $ ob
-                P.incCounter seqBlocksReleased
+                lift $ P.incCounter seqBlocksReleased
                 yield hydratedBlock
 
                 return ldbOp
