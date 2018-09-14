@@ -224,7 +224,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
     compileOneContract PostCompileRequest{..} = do
       idsAndDetails <- compileContract postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
-        let eBlockappsjsXabi = completeXabi . contractdetailsXabi $ details
+        let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
@@ -237,7 +237,7 @@ postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
          partialXabis <- Map.fromList <$> parseXabi "src" (Text.unpack postxabirequestSrc)
-         traverse completeXabi partialXabis
+         Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwError . AnError .
             ("contract compilation for xabi failed: " <>) . Text.pack $msg
@@ -248,11 +248,11 @@ completeContractDetailXabi :: ContractDetails -> ContractDetails
 completeContractDetailXabi cd =
   let eXabi = xAbiToContract $ contractdetailsXabi cd in
   case eXabi of
-    Right xabi -> cd { contractdetailsXabi = contractToXabi xabi }
+    Right xabi -> cd { contractdetailsXabi = contractToXabi (contractdetailsName cd) xabi }
     Left _ -> cd
 
 
-completeXabi :: Xabi -> Either String Xabi
-completeXabi xabi = do
+completeXabi :: Text -> Xabi -> Either String Xabi
+completeXabi name xabi = do
   c <- xAbiToContract xabi
-  return $ contractToXabi c
+  return $ contractToXabi name c

@@ -1,8 +1,7 @@
 pipeline {
   agent {
-    label "cd10"
+    label "test"
   }
-  options { disableConcurrentBuilds() }
   parameters {string(name: 'PLATFORM_BRANCH_NAME', defaultValue: 'develop', description: 'blockapps/strato-platform git branch name to build upon. Skip the "origin/" part.\n' +
     'This job will build using the pipeline from Jenkinsfile.test and all the code in this branch.')}
   stages {
@@ -11,17 +10,27 @@ pipeline {
         wrap([$class: 'BuildUser']) {
           script {
             try {
-              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // ${BUILD_USER_FIRST_NAME}"
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} // anon"
+              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// anon"
             }
           }
         }
-        sh '''#!/bin/bash -le
-          set -x
-          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-          docker ps
-        '''
+        withEnv(["PLATFORM_BRANCH_NAME=${env.PLATFORM_BRANCH_NAME}"]) {
+          sh '''#!/bin/bash -le
+            set -x
+            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+            if [ -d "strato-platform" ]; then
+              cd strato-platform
+              git fetch origin
+              git reset --hard HEAD^
+              git checkout origin/${PLATFORM_BRANCH_NAME}
+              cd ..
+            else
+              git clone https://github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
+            fi
+          '''
+        }
       }
     }
 
@@ -29,6 +38,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
+          cd strato-platform
           REPO=private make all
         '''
       }
@@ -40,9 +50,9 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started
-          cp docker-compose.yml strato-getting-started/
+          cp strato-platform/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=cd10.eastus.cloudapp.azure.com
+          NODE_HOST=$(</host)
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
@@ -77,12 +87,13 @@ pipeline {
             withCredentials([
               usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
             ]) {
-              archiveArtifacts artifacts: "docker-compose.yml"
+              archiveArtifacts artifacts: "strato-platform/docker-compose.yml"
               sh '''#!/bin/bash -le
-              set -x
-              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              docker-compose -f docker-compose.push.yml push
-            '''
+                set -x
+                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                cd strato-platform
+                docker-compose -f docker-compose.push.yml push
+              '''
             }
           },
 
@@ -113,7 +124,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running core-strato unit tests"
-              cd core-strato
+              cd strato-platform/core-strato
               ./run_unit_tests.sh
             '''
           },
@@ -122,7 +133,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests'
-              cd blockapps-haskell
+              cd strato-platform/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -131,7 +142,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
-              cd smd-ui
+              cd strato-platform/smd-ui
               docker build -f Dockerfile.test .
             '''
           },
@@ -139,7 +150,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running local integration tests'
-              cd tests
+              cd strato-platform/tests
               npm install
               npm run test:truchainz
             '''
@@ -153,17 +164,14 @@ pipeline {
     success {
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
       )
-      sh '''
-        echo "Build Successful for Git branch: $BRANCH_NAME"
-      '''
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
       )
     }
   }
