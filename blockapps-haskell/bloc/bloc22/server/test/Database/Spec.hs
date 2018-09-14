@@ -128,6 +128,10 @@ solcSpec =
         let solPath = "./test/contracts/DataTypeString.sol"
             expectedPath = "./test/contracts/DataTypeStringGetSource.sol"
         testAugment solPath expectedPath
+      it "should use modern constructor syntax" $ do
+        let solPath = "./test/contracts/Ctor.sol"
+            expectedPath = "./test/contracts/CtorGetSource.sol"
+        testAugment solPath expectedPath
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
