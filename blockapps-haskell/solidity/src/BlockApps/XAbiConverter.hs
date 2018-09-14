@@ -244,7 +244,7 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
   funcs <-
-    for (Map.toList xabiFuncs) $ \(name, func) -> do
+    for (Map.toList $ Map.union xabiFuncs xabiConstr) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
       return ((name, theFunction), Nothing)
 
@@ -257,8 +257,8 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 --------------------------------------------
 --Inverse Conversion
 
-contractToXabi::Contract->Xabi
-contractToXabi Contract{..} =
+contractToXabi :: Text -> Contract -> Xabi
+contractToXabi cName Contract{..} =
   let
     functions =
       Map.fromList
@@ -277,11 +277,13 @@ contractToXabi Contract{..} =
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
     isFunction _ = False
+    isConstructor k = const (k == cName)
+    (constructors, funcs) = Map.partitionWithKey isConstructor functions
 
   in
     Xabi{
-      xabiFuncs = functions,
-      xabiConstr = Map.empty,
+      xabiFuncs = funcs,
+      xabiConstr = constructors,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
