@@ -61,32 +61,32 @@ instance ToSchema Xabi where
     & mapped.name ?~ "Xabi schema"
     & mapped.schema.description ?~ "Xabi types"
     & mapped.schema.example ?~ toJSON sampleXabi
-    where
-      sampleXabi :: Xabi
-      sampleXabi = Xabi
-        { xabiFuncs = Map.fromList
-          [ ("get", Func { funcArgs = Map.fromList []
-                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcContents = Just "return x; "
-                         , funcStateMutability  = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcVals = Map.fromList []
-                         , funcContents = Just "return; "
-                         , funcStateMutability  = Just Pure
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          ]
-        , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-        , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-        , xabiEvents = Map.empty
-        , xabiIsLibrary = False
-        }
+
+sampleXabi :: Xabi
+sampleXabi = Xabi
+  { xabiFuncs = Map.fromList
+    [ ("get", Func { funcArgs = Map.fromList []
+                   , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                   , funcContents = Just "return x; "
+                   , funcStateMutability  = Just View
+                   , funcVisibility = Nothing
+                   , funcModifiers = Nothing
+                   })
+    , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                   , funcVals = Map.fromList []
+                   , funcContents = Just "return; "
+                   , funcStateMutability  = Just Pure
+                   , funcVisibility = Nothing
+                   , funcModifiers = Nothing
+                   })
+    ]
+  , xabiConstr = Map.fromList []
+  , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+  , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+  , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+  , xabiEvents = Map.empty
+  , xabiIsLibrary = False
+  }
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
@@ -326,31 +326,6 @@ instance ToSchema ContractDetails where
         , contractdetailsName = "DetailsName"
         , contractdetailsXabi = sampleXabi
         , contractdetailsChainId = Nothing
-        }
-      sampleXabi :: Xabi
-      sampleXabi = Xabi
-        { xabiFuncs = Map.fromList
-          [ ("get", Func { funcArgs = Map.fromList []
-                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcContents = Just "return x; "
-                         , funcStateMutability = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcVals = Map.fromList []
-                         , funcContents = Just "return; "
-                         , funcStateMutability = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          ]
-        , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-        , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-        , xabiEvents = Map.empty
-        , xabiIsLibrary = False
         }
 
 --------------------------------------------------------------------------------

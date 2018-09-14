@@ -109,15 +109,7 @@ instance ToSample BlocTransactionData where
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
       , contractdetailsName       = "Contract Name"
-      , contractdetailsXabi       = Xabi {
-                                      xabiFuncs     = Map.empty
-                                    , xabiConstr    = Map.empty
-                                    , xabiVars      = Map.empty
-                                    , xabiTypes     = Map.empty
-                                    , xabiModifiers = Map.empty
-                                    , xabiEvents    = Map.empty
-                                    , xabiIsLibrary = False
-                                    }
+      , contractdetailsXabi       = sampleXabi
       , contractdetailsChainId    = Nothing
       }
     , Call [] -- probably make a better Call sample
