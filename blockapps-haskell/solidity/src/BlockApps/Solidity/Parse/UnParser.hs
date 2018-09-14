@@ -41,7 +41,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
   <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
   <> List.concat (List.map (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract))
-  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
+  <> List.concat (List.map (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract))
   <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
   <> "\n}"
 
@@ -86,11 +86,14 @@ unparseVarType (Contract contractName) = Text.unpack contractName
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
-unparseFunc (name, Func{..}) =
-  Text.unpack $
-    "function "
-    <> name
-    <> "("
+unparseFunc (name, f) = Text.unpack $ "function " <> name <> unparseFuncWithoutName f
+
+unparseCtor :: Func -> String
+unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+
+unparseFuncWithoutName :: Func -> Text
+unparseFuncWithoutName Func{..} =
+       "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
     <> case funcStateMutability of
