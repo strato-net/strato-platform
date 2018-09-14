@@ -87,6 +87,9 @@ sampleXabi = Xabi
   , xabiEvents = Map.empty
   , xabiIsLibrary = False
   }
+
+xabiEmpty :: Xabi
+xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty False
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)

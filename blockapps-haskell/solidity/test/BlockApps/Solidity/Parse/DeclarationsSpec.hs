@@ -2,7 +2,6 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
-import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -200,7 +199,7 @@ spec = do
       struct' `shouldBe` struct
 
   describe "Declarations - solidityContract" $ do
-    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty False
+    let xempty = xabiEmpty
     let parseContract = runParser solidityContract "" ""
     let nameOf (NamedXabi n _) = n
         nameOf _ = error "unexpected pragma"
@@ -211,6 +210,9 @@ spec = do
     it "should parse an empty library" $ do
       parseContract "library l {}" `shouldBe`
           Right (NamedXabi "l" (xempty{xabiIsLibrary=True}, []))
+    it "should try 2" $ do
+      parseContract "library Library {}" `shouldBe`
+          Right (NamedXabi "Library" (xempty{xabiIsLibrary=True}, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\

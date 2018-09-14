@@ -30,7 +30,9 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
-     "contract "
+     (if xabiIsLibrary contract
+        then "library "
+        else "contract ")
   <> Text.unpack name
   <> (case inherited of
         [] -> ""

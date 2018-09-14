@@ -29,9 +29,8 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  isLib <- do
-    ((reserved "contract" >> return False) <|>
-     (reserved "library" >> return True))
+  isLib <- ((reserved "contract") >> return False)
+        <|> ((reserved "library") >> return True)
   contractName' <- identifier
   setContractName contractName'
   baseConstrs <- option [] $ do
