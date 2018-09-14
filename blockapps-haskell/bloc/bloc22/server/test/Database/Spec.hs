@@ -135,7 +135,7 @@ solcSpec =
       it "should unparse libraries" $ do
         let solPath = "./test/contracts/Library.sol"
             expectedPath = "./test/contracts/LibraryGetSource.sol"
-        writeAugment solPath expectedPath
+        testAugment solPath expectedPath
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
