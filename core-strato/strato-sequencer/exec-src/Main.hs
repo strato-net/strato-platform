@@ -71,6 +71,6 @@ main = do
     , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
     , blockstanbulBeneficiary = chv
   }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) $ run flags_blockstanbul_port ((if flags_seq_debug_mode then logStdoutDev else id)
+  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) $ run flags_blockstanbul_port
                                                                          . (prometheus def)
                                                                          . createWebServer $ chv)
