@@ -256,7 +256,13 @@ processTheMessages messages conn g = do
                                  abi = strAbi,
                                  contractName = strName,
                                  chain = chain,
-                                 contractData = ret}
+                                 contractData = ret,
+                                 blockHash = blockHash,          -- Keccak256
+                                 blockTimestamp = blockTimestamp,     -- UTCTime
+                                 blockNumber = blockNumber,        -- Integer
+                                 transactionHash = transactionHash,    -- Keccak256
+                                 transactionSender = transactionSender  -- Address
+                               }
 
       if (length processedList > 0) then liftIO $ convertRet processedList conn g else return()
 
