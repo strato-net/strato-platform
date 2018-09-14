@@ -37,6 +37,7 @@ data Xabi = Xabi
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
   , xabiEvents    :: Map Text Event
+  , xabiIsLibrary :: Bool
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -51,6 +52,7 @@ instance FromJSON Xabi where
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
          <*> v .:? "events" .!= Map.empty
+         <*> v .:? "is_library" .!= False
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -83,6 +85,7 @@ instance ToSchema Xabi where
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         , xabiEvents = Map.empty
+        , xabiIsLibrary = False
         }
 --------------------------------------------------------------------------------
 
@@ -347,6 +350,7 @@ instance ToSchema ContractDetails where
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         , xabiEvents = Map.empty
+        , xabiIsLibrary = False
         }
 
 --------------------------------------------------------------------------------

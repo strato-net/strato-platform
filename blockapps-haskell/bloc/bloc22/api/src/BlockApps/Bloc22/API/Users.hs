@@ -116,6 +116,7 @@ instance ToSample BlocTransactionData where
                                     , xabiTypes     = Map.empty
                                     , xabiModifiers = Map.empty
                                     , xabiEvents    = Map.empty
+                                    , xabiIsLibrary = False
                                     }
       , contractdetailsChainId    = Nothing
       }

@@ -34,19 +34,19 @@ transformXabi xabi@Xabi{..} vars = do
   newXabiVars <- for (Map.toList vars) $ \(varName, val) -> do
     case Map.lookup varName xabiVars of
       Nothing -> error "Cannot assign value to a nonexiting contract variable"
-      Just Xabi.VarType{..} -> do 
+      Just Xabi.VarType{..} -> do
         let initialVal = Just $ Text.unpack val
             newVarType = Xabi.VarType varTypeAtBytes varTypePublic varTypeConstant initialVal varTypeType
-        return (varName, newVarType)   
-  let updateVarVal varName curVal = if (Just curVal) == Map.lookup varName (Map.fromList newXabiVars) 
-                                       then Just curVal 
+        return (varName, newVarType)
+  let updateVarVal varName curVal = if (Just curVal) == Map.lookup varName (Map.fromList newXabiVars)
+                                       then Just curVal
                                        else Map.lookup varName (Map.fromList newXabiVars)
-  _ <- map (\(varName, _) -> Map.updateWithKey updateVarVal varName xabiVars) newXabiVars 
-  
+  _ <- map (\(varName, _) -> Map.updateWithKey updateVarVal varName xabiVars) newXabiVars
+
   let contract' = case xAbiToContract xabi of
                     Left x -> error x
                     Right c -> c
-  decodeStorageKey (typeDefs contract') (mainStruct contract') ["Gov"] 0 Nothing Nothing True 
+  decodeStorageKey (typeDefs contract') (mainStruct contract') ["Gov"] 0 Nothing Nothing True
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
@@ -287,7 +287,8 @@ contractToXabi cName Contract{..} =
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
-      xabiEvents = Map.empty
+      xabiEvents = Map.empty,
+      xabiIsLibrary = False
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType

@@ -26,12 +26,12 @@ import qualified BlockApps.Solidity.Xabi.Def          as Xabi
 import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
-
-
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  reserved "contract" <|> reserved "library"
+  isLib <- do
+    ((reserved "contract" >> return False) <|>
+     (reserved "library" >> return True))
   contractName' <- identifier
   setContractName contractName'
   baseConstrs <- option [] $ do
@@ -60,6 +60,7 @@ solidityContract = do
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
+             , xabiIsLibrary = isLib
            },
         map (Text.pack . fst) baseConstrs
       )
