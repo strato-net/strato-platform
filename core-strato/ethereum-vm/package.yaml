@@ -58,6 +58,8 @@ dependencies:
   - wai-middleware-prometheus
   - warp
   - async
+  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
+                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
 
 library:
   source-dirs: src/
