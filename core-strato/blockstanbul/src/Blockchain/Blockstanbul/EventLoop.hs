@@ -15,11 +15,12 @@ import Data.Maybe
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 import Text.Printf
-
+import Prometheus                                as P
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
 import Blockchain.Format
@@ -283,6 +284,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                        let unwrapVal = fromMaybe M.empty val
                        let nval = M.insert pr vot unwrapVal
                        voted %= M.insert bnef nval
+                   liftIO $ P.incCounter pbftPreprepare
                    yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
@@ -295,6 +297,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         (blockLock .=) =<< (use proposal)
         pk <- use prvkey
         seal <- commitmentSeal di pk
+        liftIO $ P.incCounter pbftPrepare
         yield =<< signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
@@ -310,8 +313,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Nothing -> error "TODO(tim): Decide how to handle this"
           Just blk -> do
             let seals = map snd . M.elems $ cs
+            liftIO $ P.incCounter pbftCommit
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
+      liftIO $ P.incCounter pbftRoundchange
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
       total <- uses validators length
