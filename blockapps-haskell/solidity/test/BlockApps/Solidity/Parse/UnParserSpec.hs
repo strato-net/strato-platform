@@ -4,8 +4,10 @@ module BlockApps.Solidity.Parse.UnParserSpec where
 
 import           Test.Hspec
 import qualified Data.Map.Strict as Map
+import           Data.List (isInfixOf)
 -- import           Text.Parsec                          hiding (parse)
-import BlockApps.Solidity.Parse.UnParser (unparseFunc)
+import BlockApps.Solidity.Parse.UnParser (unparseFunc, unparseSourceUnit)
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi.Type
 import BlockApps.Solidity.Xabi
 
@@ -45,6 +47,11 @@ spec = do
       let ret = unparseFunc ("fsm", func)
           expected = "function fsm() returns (ErrorCodes, ProjectState) {\n        \n    }"
       ret `shouldBe` expected
+
+  describe "Unparser - library" $ do
+    it "should unparse a library" $ do
+      let xabi = xabiEmpty{xabiIsLibrary=True}
+      unparseSourceUnit (NamedXabi "SafeMath" (xabi, [])) `shouldSatisfy` isInfixOf "library SafeMath"
 
 
 expectedFunc :: String

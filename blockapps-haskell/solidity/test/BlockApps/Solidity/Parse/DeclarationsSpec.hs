@@ -2,7 +2,6 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
-import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -200,23 +199,30 @@ spec = do
       struct' `shouldBe` struct
 
   describe "Declarations - solidityContract" $ do
-    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+    let xempty = xabiEmpty
+    let parseContract = runParser solidityContract "" ""
     let nameOf (NamedXabi n _) = n
         nameOf _ = error "unexpected pragma"
     it "should parse an empty contract" $ do
       let contractString = "contract a {}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
+    it "should parse an empty library" $ do
+      parseContract "library l {}" `shouldBe`
+          Right (NamedXabi "l" (xempty{xabiIsLibrary=True}, []))
+    it "should try 2" $ do
+      parseContract "library Library {}" `shouldBe`
+          Right (NamedXabi "Library" (xempty{xabiIsLibrary=True}, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\
             \    function r() {}\
             \}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       (nameOf <$> eRes) `shouldBe` Right "q"
     it "should parse a commented contract" $ do
       let contractString = "contract b { // don't dead open inside \n}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "b" (xempty, []))
     it "should parse nested a nested comments contract" $ do
       let contractString = "contract c { \
@@ -224,7 +230,7 @@ spec = do
                            \  function hidden () { \
                            \  // bam! double comment \
                            \ */ }"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "c" (xempty, []))
     it "should parse unbalanced braces inside a string" $ do
       let contractString = "contract d { \
@@ -241,7 +247,7 @@ spec = do
                            \    return \"(\"; \
                            \  } \
                            \}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       nameOf <$> eRes `shouldBe` Right "e"
 
     it "should parse unbalanced strings inside a comment" $ do
@@ -250,7 +256,7 @@ spec = do
                                     "    return // \"  ",
                                     "  } ",
                                     "}"]
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       nameOf<$> eRes `shouldBe` Right "f"
 
   let isLeft (Right _) = False

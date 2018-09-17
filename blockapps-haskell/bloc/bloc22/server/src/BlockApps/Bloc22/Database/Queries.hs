@@ -1520,7 +1520,7 @@ getContractXabiByMetadataId metadataId = do
   constr <- getXabiConstrQuery metadataId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
-  return $ Xabi funcs constr vars typeDefs Map.empty Map.empty -- TODO: Add modifiers table and pull modifiers from there
+  return $ Xabi funcs constr vars typeDefs Map.empty Map.empty False -- TODO: Add modifiers table and pull modifiers from there
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
 getContractContractByMetadataId metadataId = getContractRetry 0
