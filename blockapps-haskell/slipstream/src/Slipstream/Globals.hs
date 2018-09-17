@@ -96,7 +96,6 @@ data ContractAndXabi =
     contract :: Either String Contract,
     xabi :: Text,
     name :: Text,
-    resolvedName :: Maybe Text,
     contractStored :: Bool,
     contractSchema :: Maybe Text
   } deriving (Show)

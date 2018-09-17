@@ -84,7 +84,6 @@ getContract name hash chainId = do
         contract = xAbiToContract xabi
         , xabi = T.pack . show $ JSON.toJSON xabi
         , name = name
-        , resolvedName = Nothing
         , contractStored = False
         , contractSchema = Nothing
         }
@@ -100,7 +99,6 @@ getContractCompileFullSource address hash chainId = do
         contract = xAbiToContract $ contractdetailsXabi contractDetails
         , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
         , name = T.replace "\"" "" $ contractdetailsName contractDetails
-        , resolvedName = Nothing
         , contractStored = False
         , contractSchema = Nothing
       }

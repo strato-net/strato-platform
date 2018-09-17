@@ -26,6 +26,7 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
+import           BlockApps.Ethereum
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -112,11 +113,11 @@ isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
 enableHistory :: Text -> Bool
-enableHistory cName = elem cName ["Vehicle", "Hashmap"]
+enableHistory cName = elem cName ["Vehicle", "Hashmap", "SimpleStorageHistory"]
 
 --Populate exclusion list
 enableIndexing :: Text -> Bool
-enableIndexing cName = notElem cName [""]
+enableIndexing cName = notElem cName ["SimpleStorageNoIndexing"]
 
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
@@ -141,13 +142,13 @@ createInserts globalsIORef = do
       then ""
       else ", "
 
-  let keySt = T.concat ["(", "address, \"chainId\"", comma, listToKeyStatement ", " list, ")"]
+  let keySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender", comma, listToKeyStatement ", " list, ")"]
 
   liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   when (not $ contractAlreadyCreated) $ do
-      let conVals = T.concat ["('", tshow $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
+      let conVals = T.concat ["('", T.pack $ keccak256String $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
       let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
       yield conIns
       let createSt = T.concat
@@ -180,13 +181,13 @@ createInserts globalsIORef = do
               , "', '"
               , chain row
               , "', '"
-              , tshow $ blockHash row
+              , T.pack $ keccak256String $ blockHash row
               , "', '"
               , tshow $ blockTimestamp row
               , "', '"
               , tshow $ blockNumber row
               , "', '"
-              , tshow $ transactionHash row
+              , T.pack $ keccak256String $ transactionHash row
               ,"', '"
               , tshow $ transactionSender row
               , "'"
