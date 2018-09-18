@@ -35,6 +35,7 @@ scrape_configs:
       regex: '(prometheus)_(.*)'
       replacement: '${2}'
       target_label: pool
-    - source_labels: [__name__]
-      regex: '(go|time_)'
-      action: drop
+#
+#  - source_labels: [__name__]
+#   regex: '(go|time_)'
+#   action: drop
