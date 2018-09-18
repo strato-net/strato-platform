@@ -94,7 +94,6 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
 import qualified Blockchain.Strato.StateDiff             as SD (StateDiff)
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
@@ -538,7 +537,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultMiningStatus     = mined
                                , transactionResultChainId          = chainId
                                }
-      when (mined == Mined) $ do
+      when (flags_diffPublish && mined == Mined) $ do
         actions <- forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a
           return $ Action
@@ -670,7 +669,7 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
         return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
-        
+
     codeNameMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeName <- codeContractName sr codeHash
@@ -679,18 +678,8 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     let
       codeSource' x = fst $
           M.findWithDefault (error $ "missing code hash in codeSource map: " ++ format x) x codeSourceMap
-      codeSourceHash' x = 
-          case (M.lookup x codeSourceMap, M.lookup x codeNameMap) of
-           (Just (_, sh), Just name) -> Just (sh, name)
-           _ -> Nothing
 
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     forM_ allDiffs $ \diff -> do
       when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
-      when flags_diffPublish $
-          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff codeSourceHash' diff
-          in withKafkaViolently $ do
-              void $ writeStateDiffEvents deletionEvents
-              void $ writeStateDiffEvents creationEvents
-              void $ writeStateDiffEvents updateEvents
