@@ -550,7 +550,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                      signer
                      a
                      addressStateCodeHash
-                     Nothing
+                     Nothing -- TODO: Retrieve the sourceptr
                      (Just s)
         void . withKafkaViolently $ writeAnyTypeWithAToJSONInstanceToKafka actions
 

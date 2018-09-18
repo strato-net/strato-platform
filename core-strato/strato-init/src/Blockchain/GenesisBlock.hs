@@ -52,8 +52,7 @@ import           Blockchain.Util
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Event
-import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffEvents, assertTopicCreation)
+import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.MilenaTools               (commitSingleOffset)
@@ -173,7 +172,7 @@ initializeGenesisBlock backupType genesisBlockName = do
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
                     (SHA -> Maybe (SHA, String)) -> Block->Maybe Word256->m ()
-populateStorageDBs findSourceHash genesisBlock genesisChainId = do
+populateStorageDBs _ genesisBlock genesisChainId = do
 
     accountDB <- getStateDB
     res <- liftIO . runKafkaConfigured "strato-init" $ do
@@ -211,13 +210,6 @@ populateStorageDBs findSourceHash genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs diff (const "") (const "")
-      let diffTriple = destructStateDiff findSourceHash diff
-      mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-        splitWriteStateDiffEvents diffTriple
-      case filterResponse <$> mErr of
-       Right [] -> return ()
-       Right errs -> error . show $ errs
-       Left err -> error . show $ err
 
 bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =

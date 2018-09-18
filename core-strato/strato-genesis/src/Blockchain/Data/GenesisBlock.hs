@@ -39,11 +39,9 @@ import           Blockchain.SHA
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs)
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
@@ -234,9 +232,3 @@ emitInitialStateDiff srcInfo bHash chainId sRoot = do
           ContractWithStorage addr _ _ _ -> updateSource chainId addr name src
 
   forM_ srcInfo writeSource
-  mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-    splitWriteStateDiffs [diff]
-  case filterResponse <$> mErr of
-     Right [] -> return ()
-     Right errs -> error . show $ errs
-     Left err -> error . show $ err
