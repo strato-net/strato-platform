@@ -955,8 +955,8 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           return (Left e, vmState'{logs=[]})
       (_, stateAfter) -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ stateAfter
-          putStorageMap $ contextStorageMap $ dbs stateAfter
-          putAddressStateDBMap $ contextAddressStateDBMap $ dbs stateAfter
+          putStorageTxMap $ contextStorageTxMap $ dbs stateAfter
+          putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs stateAfter
 
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
@@ -1208,8 +1208,8 @@ create_debugWrapper block owner value initCodeBytes = do
       ((result, finalVMState), finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-      putStorageMap $ contextStorageMap finalDBs
-      putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+      putStorageTxMap $ contextStorageTxMap finalDBs
+      putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
       setGasRemaining $ vmGasRemaining finalVMState
 
@@ -1248,8 +1248,8 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-  putStorageMap $ contextStorageMap finalDBs
-  putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+  putStorageTxMap $ contextStorageTxMap finalDBs
+  putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 
   case result of

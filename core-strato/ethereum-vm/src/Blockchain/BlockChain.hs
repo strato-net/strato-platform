@@ -325,9 +325,11 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
 addTransactions _ remGas [] = return remGas
 addTransactions b blockGas (t:rest) = do
-  beforeMap <- getAddressStateDBMap
+  flushMemAddressStateTxToBlockDB
+  flushStorageTxDBToBlockDB
+  beforeMap <- getAddressStateTxDBMap
   !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
-  afterMap <- getAddressStateDBMap
+  afterMap <- getAddressStateTxDBMap
 
   printTransactionMessage t result deltaT
   P.setGauge (realToFrac deltaT) vmTxMined
@@ -350,9 +352,11 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
-    beforeMap <- getAddressStateDBMap
+    flushMemAddressStateTxToBlockDB
+    flushStorageTxDBToBlockDB
+    beforeMap <- getAddressStateTxDBMap
     (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
-    afterMap <- getAddressStateDBMap
+    afterMap <- getAddressStateTxDBMap
     P.setGauge (realToFrac time') vmTxMining
     printTransactionMessage tx result time'
     let trr = TxRunResult tx result time' beforeMap afterMap

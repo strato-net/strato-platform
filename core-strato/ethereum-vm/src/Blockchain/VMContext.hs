@@ -73,8 +73,10 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextCodeDB              :: CodeDB
                        , contextBlockSummaryDB      :: BlockSummaryDB
                        , contextSQLDB               :: SQLDB
-                       , contextAddressStateDBMap   :: M.Map Address AddressStateModification
-                       , contextStorageMap          :: M.Map (Address, Word256) Word256
+                       , contextAddressStateTxDBMap :: M.Map Address AddressStateModification
+                       , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
+                       , contextStorageTxMap        :: M.Map (Address, Word256) Word256
+                       , contextStorageBlockMap     :: M.Map (Address, Word256) Word256
                        , contextBlockHashRoot       :: MP.StateRoot
                        , contextGenesisRoot         :: MP.StateRoot
                        , contextCurrentBlockHash    :: SHA
@@ -167,19 +169,30 @@ instance K.HasKafkaState ContextM where
         put $ ctx {contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateDBMap = contextAddressStateDBMap <$> get
-  putAddressStateDBMap theMap = do
+  getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
+  putAddressStateTxDBMap theMap = do
     cxt <- get
-    put $ cxt{contextAddressStateDBMap=theMap}
+    put $ cxt{contextAddressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = contextAddressStateBlockDBMap <$> get
+  putAddressStateBlockDBMap theMap = do
+    cxt <- get
+    put $ cxt{contextAddressStateBlockDBMap=theMap}
 
 instance HasStorageDB ContextM where
-  getStorageDB = do
+  getStorageTxDB = do
     cxt <- get
     return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageMap cxt)
-  putStorageMap theMap = do
+            contextStorageTxMap cxt)
+  putStorageTxMap theMap = do
     cxt <- get
-    put cxt{contextStorageMap=theMap}
+    put cxt{contextStorageTxMap=theMap}
+  getStorageBlockDB = do
+    cxt <- get
+    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
+            contextStorageBlockMap cxt)
+  putStorageBlockMap theMap = do
+    cxt <- get
+    put cxt{contextStorageBlockMap=theMap}
 
 instance HasHashDB ContextM where
   getHashDB = contextHashDB <$> get
@@ -224,6 +237,8 @@ runContextM f = do
                         conn
                         M.empty
                         M.empty
+                        M.empty
+                        M.empty
                         MP.emptyTriePtr
                         MP.emptyTriePtr
                         (SHA 0)
@@ -258,8 +273,8 @@ getNewAddress address = do
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getStorageDB
-  putStorageMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
+  (_, storageMap) <- getStorageTxDB
+  putStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get
