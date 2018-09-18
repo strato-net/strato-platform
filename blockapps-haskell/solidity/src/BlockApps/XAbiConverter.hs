@@ -34,19 +34,19 @@ transformXabi xabi@Xabi{..} vars = do
   newXabiVars <- for (Map.toList vars) $ \(varName, val) -> do
     case Map.lookup varName xabiVars of
       Nothing -> error "Cannot assign value to a nonexiting contract variable"
-      Just Xabi.VarType{..} -> do 
+      Just Xabi.VarType{..} -> do
         let initialVal = Just $ Text.unpack val
             newVarType = Xabi.VarType varTypeAtBytes varTypePublic varTypeConstant initialVal varTypeType
-        return (varName, newVarType)   
-  let updateVarVal varName curVal = if (Just curVal) == Map.lookup varName (Map.fromList newXabiVars) 
-                                       then Just curVal 
+        return (varName, newVarType)
+  let updateVarVal varName curVal = if (Just curVal) == Map.lookup varName (Map.fromList newXabiVars)
+                                       then Just curVal
                                        else Map.lookup varName (Map.fromList newXabiVars)
-  _ <- map (\(varName, _) -> Map.updateWithKey updateVarVal varName xabiVars) newXabiVars 
-  
+  _ <- map (\(varName, _) -> Map.updateWithKey updateVarVal varName xabiVars) newXabiVars
+
   let contract' = case xAbiToContract xabi of
                     Left x -> error x
                     Right c -> c
-  decodeStorageKey (typeDefs contract') (mainStruct contract') ["Gov"] 0 Nothing Nothing True 
+  decodeStorageKey (typeDefs contract') (mainStruct contract') ["Gov"] 0 Nothing Nothing True
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
@@ -244,7 +244,7 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
   funcs <-
-    for (Map.toList xabiFuncs) $ \(name, func) -> do
+    for (Map.toList $ Map.union xabiFuncs xabiConstr) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
       return ((name, theFunction), Nothing)
 
@@ -257,8 +257,8 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 --------------------------------------------
 --Inverse Conversion
 
-contractToXabi::Contract->Xabi
-contractToXabi Contract{..} =
+contractToXabi :: Text -> Contract -> Xabi
+contractToXabi cName Contract{..} =
   let
     functions =
       Map.fromList
@@ -277,15 +277,18 @@ contractToXabi Contract{..} =
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
     isFunction _ = False
+    isConstructor k = const (k == cName)
+    (constructors, funcs) = Map.partitionWithKey isConstructor functions
 
   in
     Xabi{
-      xabiFuncs = functions,
-      xabiConstr = Map.empty,
+      xabiFuncs = funcs,
+      xabiConstr = constructors,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
-      xabiEvents = Map.empty
+      xabiEvents = Map.empty,
+      xabiIsLibrary = False
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType

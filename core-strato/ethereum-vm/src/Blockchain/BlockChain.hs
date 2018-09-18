@@ -48,6 +48,7 @@ import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
+import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -61,7 +62,6 @@ import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Data.TXOrigin                as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
@@ -72,7 +72,6 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
-import qualified Blockchain.Mining                       as Mining
 import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
 import           Blockchain.Util
@@ -87,7 +86,6 @@ import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
-import qualified Blockchain.Bagger.BaggerState           as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
@@ -96,7 +94,6 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
 import qualified Blockchain.Strato.StateDiff             as SD (StateDiff)
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
@@ -214,38 +211,11 @@ addBlocks blocks' = do
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
       forM_ filtered $ \block -> timeit "Block insertion" timerToUse $ do
-        replace <- case (obOrigin block) of
-          TO.Quarry -> do
-            cache <- Bagger.miningCache <$> Bagger.getBaggerState
-            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
-                blockSR = blockDataStateRoot $ obBlockData block
-            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
-            $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
-            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
-              then do
-                putBlockHeaderInChainDB (blockHeader block)
-                _ <- setParentStateRoot block
-                let lastRun = Bagger.lastExecutedTxs cache
-                    updates = if (flags_miner == Mining.Instant)
-                                then lastRun
-                                else [trr | trr <- lastRun,
-                                            otx <- obReceiptTransactions block,
-                                            (otHash otx) == (otHash $ trrTransaction trr)]
-                $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
-                addBlockTransactions False block
-                Bagger.updateTxCallback
-                  updates
-                  (blockHeaderPartialHash $ obBlockData block)
-                  (blockHeaderHash $ obBlockData block)
-                  Mined
-                return True
-              else return False
-          _ -> addBlock block >> return True
-        when replace $ do
-          (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
-          when didReplaceThisTime . liftIO $ do
-            writeIORef didReplaceBest True
-            writeIORef replacedBest (block, replacedBits)
+        addBlock block
+        (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
+        when didReplaceThisTime . liftIO $ do
+          writeIORef didReplaceBest True
+          writeIORef replacedBest (block, replacedBits)
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
       when didReplaceBest' $ do
@@ -325,9 +295,11 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
 addTransactions _ remGas [] = return remGas
 addTransactions b blockGas (t:rest) = do
-  beforeMap <- getAddressStateDBMap
+  flushMemAddressStateTxToBlockDB
+  flushStorageTxDBToBlockDB
+  beforeMap <- getAddressStateTxDBMap
   !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
-  afterMap <- getAddressStateDBMap
+  afterMap <- getAddressStateTxDBMap
 
   printTransactionMessage t result deltaT
   P.setGauge (realToFrac deltaT) vmTxMined
@@ -350,9 +322,11 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
-    beforeMap <- getAddressStateDBMap
+    flushMemAddressStateTxToBlockDB
+    flushStorageTxDBToBlockDB
+    beforeMap <- getAddressStateTxDBMap
     (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
-    afterMap <- getAddressStateDBMap
+    afterMap <- getAddressStateTxDBMap
     P.setGauge (realToFrac time') vmTxMining
     printTransactionMessage tx result time'
     let trr = TxRunResult tx result time' beforeMap afterMap
@@ -504,7 +478,7 @@ outputTransactionResult :: BlockData
                         -> MiningStatus
                         -> TxRunResult
                         -> ContextM ()
-outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
   let
     (txrStatus, message, gasRemaining) =
       case result of
@@ -563,6 +537,22 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultMiningStatus     = mined
                                , transactionResultChainId          = chainId
                                }
+      when (flags_diffPublish && mined == Mined) $ do
+        actions <- forM (M.toList sDiffs) $ \(a,s) -> do
+          AddressState{..} <- getAddressState a
+          return $ Action
+                     Blockchain.Data.Action.Update
+                     ranBlockHash
+                     (blockDataTimestamp b)
+                     (blockDataNumber b)
+                     theHash
+                     chainId
+                     signer
+                     a
+                     addressStateCodeHash
+                     Nothing
+                     (Just s)
+        void . withKafkaViolently $ writeAnyTypeWithAToJSONInstanceToKafka actions
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
@@ -679,7 +669,7 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
         return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
-        
+
     codeNameMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeName <- codeContractName sr codeHash
@@ -688,18 +678,8 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     let
       codeSource' x = fst $
           M.findWithDefault (error $ "missing code hash in codeSource map: " ++ format x) x codeSourceMap
-      codeSourceHash' x = 
-          case (M.lookup x codeSourceMap, M.lookup x codeNameMap) of
-           (Just (_, sh), Just name) -> Just (sh, name)
-           _ -> Nothing
 
     let codeContractName' x =
           M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     forM_ allDiffs $ \diff -> do
       when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
-      when flags_diffPublish $
-          let (deletionEvents, creationEvents, updateEvents) = destructStateDiff codeSourceHash' diff
-          in withKafkaViolently $ do
-              void $ writeStateDiffEvents deletionEvents
-              void $ writeStateDiffEvents creationEvents
-              void $ writeStateDiffEvents updateEvents

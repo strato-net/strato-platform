@@ -5,6 +5,7 @@ module Blockchain.DB.MemAddressStateDB (
   formatAddressStateDBMap,
   getAddressState,
   putAddressState,
+  flushMemAddressStateTxToBlockDB,
   flushMemAddressStateDB,
   getAllAddressStates,
   deleteAddressState,
@@ -33,17 +34,24 @@ formatAddressStateDBMap theMap = unlines $
      (M.toList theMap)
 
 class HasMemAddressStateDB m where
-  getAddressStateDBMap :: m (M.Map Address AddressStateModification)
-  putAddressStateDBMap :: M.Map Address AddressStateModification -> m ()
+  getAddressStateTxDBMap    :: m (M.Map Address AddressStateModification)
+  putAddressStateTxDBMap    :: M.Map Address AddressStateModification -> m ()
+  getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
+  putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
 
 getAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
                  Address -> m AddressState
 getAddressState address = do
-  theMap <- getAddressStateDBMap
+  theMap <- getAddressStateTxDBMap
   case M.lookup address theMap of
     Just (ASModification addressState) -> return addressState
     Just ASDeleted                     -> return blankAddressState
-    Nothing                            -> DB.getAddressState address
+    Nothing                            -> do
+      theBMap <- getAddressStateBlockDBMap
+      case M.lookup address theBMap of
+        Just (ASModification addressState) -> return addressState
+        Just ASDeleted                     -> return blankAddressState
+        Nothing                            -> DB.getAddressState address
 
 getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
                      m [(Address, AddressState)]
@@ -52,33 +60,47 @@ getAllAddressStates = DB.getAllAddressStates
 putAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
                  Address -> AddressState -> m ()
 putAddressState address newState = do
-  theMap <- getAddressStateDBMap
-  putAddressStateDBMap (M.insert address (ASModification newState) theMap)
+  theMap <- getAddressStateTxDBMap
+  putAddressStateTxDBMap (M.insert address (ASModification newState) theMap)
+
+flushMemAddressStateTxToBlockDB :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+                                m ()
+flushMemAddressStateTxToBlockDB = do
+  txMap <- getAddressStateTxDBMap
+  blkMap <- getAddressStateBlockDBMap
+  putAddressStateBlockDBMap $ txMap `M.union` blkMap
+  putAddressStateTxDBMap M.empty
 
 flushMemAddressStateDB::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
                         m ()
 flushMemAddressStateDB = do
-  theMap <- getAddressStateDBMap
+  flushMemAddressStateTxToBlockDB
+  theMap <- getAddressStateBlockDBMap
   forM_ (M.toList theMap) $ \(address, modification) -> do
                            case modification of
                              ASModification addressState -> DB.putAddressState address addressState
                              ASDeleted                   -> DB.deleteAddressState address
-  putAddressStateDBMap M.empty
+  putAddressStateBlockDBMap M.empty
 
 deleteAddressState :: (HasMemAddressStateDB m, HasStateDB m) =>
                     Address -> m ()
 deleteAddressState address = do
-  theMap <- getAddressStateDBMap
-  putAddressStateDBMap (M.insert address ASDeleted theMap)
+  theMap <- getAddressStateTxDBMap
+  putAddressStateTxDBMap (M.insert address ASDeleted theMap)
 
 addressStateExists :: (HasMemAddressStateDB m, HasStateDB m) =>
                     Address -> m Bool
 addressStateExists address = do
-  theMap <- getAddressStateDBMap
+  theMap <- getAddressStateTxDBMap
   case M.lookup address theMap of
     Just (ASModification _) -> return True
     Just ASDeleted          -> return False
-    Nothing                 -> DB.addressStateExists address
+    Nothing                 -> do
+      theBMap <- getAddressStateBlockDBMap
+      case M.lookup address theBMap of
+        Just (ASModification _) -> return True
+        Just ASDeleted          -> return False
+        Nothing                 -> DB.addressStateExists address
 
 
 --Dummy version of the functions useful for turning off caching in debug situations
