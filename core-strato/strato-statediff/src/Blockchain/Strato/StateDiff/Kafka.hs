@@ -6,6 +6,7 @@ module Blockchain.Strato.StateDiff.Kafka
     , readStateDiffEventsFromTopic
     , writeStateDiffEvents
     , writeStateDiffs
+    , writeAnyTypeWithAToJSONInstanceToKafka
     , splitWriteStateDiffs
     , splitWriteStateDiffEvents
     ) where
@@ -45,6 +46,9 @@ writeStateDiffEvents = KW.produceMessages . map mkTopicAndMessage
 
 writeStateDiffs :: K.Kafka k => [StateDiff] -> k [KP.ProduceResponse]
 writeStateDiffs = KW.produceMessages . map mkTopicAndMessage
+
+writeAnyTypeWithAToJSONInstanceToKafka :: (ToJSON a, K.Kafka k) => [a] -> k [KP.ProduceResponse]
+writeAnyTypeWithAToJSONInstanceToKafka = KW.produceMessages . map mkTopicAndMessage
 
 -- splitWriteStateDiffs is useful if there is a statediff that is over 1MB on the wire,
 -- as the broker will reject it.

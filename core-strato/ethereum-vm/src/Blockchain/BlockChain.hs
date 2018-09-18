@@ -48,6 +48,7 @@ import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
+import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -478,7 +479,7 @@ outputTransactionResult :: BlockData
                         -> MiningStatus
                         -> TxRunResult
                         -> ContextM ()
-outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
   let
     (txrStatus, message, gasRemaining) =
       case result of
@@ -537,6 +538,22 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultMiningStatus     = mined
                                , transactionResultChainId          = chainId
                                }
+      when (mined == Mined) $ do
+        actions <- forM (M.toList sDiffs) $ \(a,s) -> do
+          AddressState{..} <- getAddressState a
+          return $ Action
+                     Blockchain.Data.Action.Update
+                     ranBlockHash
+                     (blockDataTimestamp b)
+                     (blockDataNumber b)
+                     theHash
+                     chainId
+                     signer
+                     a
+                     addressStateCodeHash
+                     Nothing
+                     (Just s)
+        void . withKafkaViolently $ writeAnyTypeWithAToJSONInstanceToKafka actions
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do

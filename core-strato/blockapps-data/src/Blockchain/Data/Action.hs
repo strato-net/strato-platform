@@ -24,17 +24,17 @@ instance ToJSON SourcePtr where
 instance FromJSON SourcePtr where
 
 data Action = Action
-  { actionType         :: ActionType
-  , blockHash          :: SHA
-  , blockTimestamp     :: UTCTime
-  , blockNumber        :: Integer
-  , transactionHash    :: SHA
-  , transactionChainId :: Maybe Word256
-  , transactionSender  :: Address
-  , address            :: Address
-  , codeHash           :: SHA
-  , sourcePtr          :: Maybe SourcePtr
-  , storage            :: Maybe (Map Word256 Word256)
+  { actionType           :: ActionType
+  , actionBlockHash      :: SHA
+  , actionBlockTimestamp :: UTCTime
+  , actionBlockNumber    :: Integer
+  , actionTxHash         :: SHA
+  , actionTxChainId      :: Maybe Word256
+  , actionTxSender       :: Address
+  , actionAddress        :: Address
+  , actionCodeHash       :: SHA
+  , actionSourcePtr      :: Maybe SourcePtr
+  , actionStorage        :: Maybe (Map Word256 Word256)
   } deriving (Show, Generic)
 
 instance ToJSON Action where
