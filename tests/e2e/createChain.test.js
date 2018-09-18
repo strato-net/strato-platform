@@ -66,7 +66,7 @@ describe("Create Chain", function() {
     assert.deepEqual(label, chainInfo.label, "chain labels should be identical");
 
     for(var i=0; i < 10; i++) {
-      const txResult = yield rest.send(alice, bob, 123456, chainId);
+      const txResult = yield rest.send(alice, bob, 123456, false, null, chainId);
       console.log('### TRANSACTION RESULT ###', txResult);
     }
 
