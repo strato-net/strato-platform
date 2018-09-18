@@ -61,7 +61,6 @@ import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Data.TXOrigin                as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import qualified Blockchain.DB.AddressStateDB            as NoCache
 import qualified Blockchain.DB.BlockSummaryDB            as BSDB
@@ -72,7 +71,6 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
-import qualified Blockchain.Mining                       as Mining
 import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
 import           Blockchain.Util
@@ -87,7 +85,6 @@ import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
-import qualified Blockchain.Bagger.BaggerState           as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
@@ -214,38 +211,11 @@ addBlocks blocks' = do
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
       forM_ filtered $ \block -> timeit "Block insertion" timerToUse $ do
-        replace <- case (obOrigin block) of
-          TO.Quarry -> do
-            cache <- Bagger.miningCache <$> Bagger.getBaggerState
-            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
-                blockSR = blockDataStateRoot $ obBlockData block
-            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
-            $logInfoS "addBlocks" . T.pack $ "Block  state root: " ++ format blockSR
-            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
-              then do
-                putBlockHeaderInChainDB (blockHeader block)
-                _ <- setParentStateRoot block
-                let lastRun = Bagger.lastExecutedTxs cache
-                    updates = if (flags_miner == Mining.Instant)
-                                then lastRun
-                                else [trr | trr <- lastRun,
-                                            otx <- obReceiptTransactions block,
-                                            (otHash otx) == (otHash $ trrTransaction trr)]
-                $logInfoS "addBlocks" $ T.pack ("Block data from Quarry: " ++ format (obBlockData block))
-                addBlockTransactions False block
-                Bagger.updateTxCallback
-                  updates
-                  (blockHeaderPartialHash $ obBlockData block)
-                  (blockHeaderHash $ obBlockData block)
-                  Mined
-                return True
-              else return False
-          _ -> addBlock block >> return True
-        when replace $ do
-          (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
-          when didReplaceThisTime . liftIO $ do
-            writeIORef didReplaceBest True
-            writeIORef replacedBest (block, replacedBits)
+        addBlock block
+        (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
+        when didReplaceThisTime . liftIO $ do
+          writeIORef didReplaceBest True
+          writeIORef replacedBest (block, replacedBits)
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
       when didReplaceBest' $ do
