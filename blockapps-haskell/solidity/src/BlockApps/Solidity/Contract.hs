@@ -25,7 +25,7 @@ getNextAvailablePosition p _ = p{Storage.offset=Storage.offset p+1, Storage.byte
 
 --Given the next available position, return the actual chosen position and the number of primary bytes used (this doesn't include bytes used at other memory locations, like the content of a large string)
 getPositionAndSize::TypeDefs->Storage.Position->Type->(Storage.Position, Word256)
-getPositionAndSize _ p (SimpleType TypeBool) = (p,1)
+getPositionAndSize _ p (SimpleType TypeBool) = (getNextAvailablePosition p 1, 1)
 
 getPositionAndSize _ p (SimpleType TypeInt8)=(getNextAvailablePosition p 1, 1)
 getPositionAndSize _ p (SimpleType TypeInt16)=(getNextAvailablePosition p 2, 2)
