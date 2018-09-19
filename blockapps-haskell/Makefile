@@ -44,6 +44,7 @@ build_deploybase: prebuild
 
 build_docker: build_deploybase build_solidity build_haskell
 	cp -f Dockerfile $(FAKEROOT)
+	cp -f history.txt $(BLOCHOME)
 	cp -f doit.sh $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)

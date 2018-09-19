@@ -147,6 +147,8 @@ createInserts globalsIORef = do
 
   liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
+  liftIO $ putStrLn $ "flags_historyList: " ++ show flags_historyList
+
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   when (not $ contractAlreadyCreated) $ do
       let conVals = T.concat ["('", T.pack $ keccak256String $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
