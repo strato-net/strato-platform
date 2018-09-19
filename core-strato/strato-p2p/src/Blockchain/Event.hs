@@ -18,7 +18,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
-import           Data.Conduit.List                     (iterM)
 import           Data.List
 import           Data.Map                              (toList)
 import           Data.Maybe
@@ -43,7 +42,6 @@ import           Blockchain.DBM
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
-import           Blockchain.Metrics
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
@@ -94,11 +92,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
-handleEvents mode peer = iterM recordEvent .| handleEvents' mode peer .| iterM recordMessage
-
-handleEvents' :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
-             =>  DebugMode -> PPeer -> Conduit Event m Message
-handleEvents' mode peer = awaitForever $ \case
+handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
     MsgEvt Ping     -> yield Pong

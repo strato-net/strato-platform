@@ -69,11 +69,11 @@ mkEthP2PEventSource :: ( Monad m
                     -> EthCryptState
                     -> [Source m Event]
                     -> m (Source m Event)
-mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
+mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSourcesCloseForAny (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
-        .| tap (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
     , seqEventNotificationSource
         .| CL.map NewSeqEvent
@@ -83,7 +83,11 @@ mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit str outCtx = tap (displayMessage Outbound str) .| messageToBytes .| ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx =
+     CL.iterM recordMessage
+  .| CL.iterM (displayMessage Outbound str)
+  .| messageToBytes
+  .| ethEncrypt outCtx
 
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
@@ -91,7 +95,7 @@ handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context
                        -> Conduit Event m Message
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
-    yieldRecord Hello { version = 4
+    yield Hello { version = 4
                       , clientId = stratoVersionString
                       , capability = [ ETH . fromIntegral $ ethVersion
                                      , IST . fromIntegral $ blockstanbulVersion
@@ -106,7 +110,7 @@ handleMsgClientConduit myId peer = do
                 Nothing -> error "we don't have a local BestBlock"
                 Just (RedisBestBlock hash _ tdiff) -> do
                     genHash <- lift getGenesisBlockHash
-                    yieldRecord Status {
+                    yield Status {
                         protocolVersion = fromIntegral ethVersion,
                         networkID       = ourNetworkID,
                         totalDifficulty = fromIntegral tdiff,
@@ -121,7 +125,7 @@ handleMsgClientConduit myId peer = do
                 void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                yieldRecord $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
+                yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
@@ -144,7 +148,7 @@ handleMsgServerConduit myPubkey peer = do
                 port = 0,
                 nodeId = myPubkey
             }
-            yieldRecord helloMsg'
+            yield helloMsg'
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
@@ -155,7 +159,7 @@ handleMsgServerConduit myPubkey peer = do
                     genHash <- lift getGenesisBlockHash
                     when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                    yieldRecord Status {
+                    yield Status {
                         protocolVersion=fromIntegral ethVersion,
                         networkID=flags_networkID,
                         totalDifficulty= fromIntegral tdiff,
@@ -165,14 +169,11 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
 
-yieldRecord :: (MonadIO m) => Message -> ConduitM i Message m ()
-yieldRecord msg = recordMessage msg >> yield msg
-
 awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
-    Just ev@(MsgEvt msg) -> recordEvent ev >> return (Just msg)
+    Just (MsgEvt msg) -> return (Just msg)
     Nothing              -> return Nothing
-    Just ev              -> recordEvent ev >> awaitMsg
+    _                    -> awaitMsg
 
 assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
                 => Maybe Message
