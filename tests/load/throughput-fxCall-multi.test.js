@@ -19,6 +19,8 @@ describe('Throughput - fx call', function () {
   let users;
   let contracts = [];
 
+  const batchSize = util.getArgInt('--batchSize', 1);
+
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
@@ -28,23 +30,21 @@ describe('Throughput - fx call', function () {
   });
 
   it('should calculate method call throughput for network', function * () {
-   for(var k = 0; k < 1000; k++) {    
+   for(var k = 0; k < 1000; k++) {
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
     const generators = [];
 
     for(let node of nodes) {
       const user = users[node.id];
-      const txs = yield createBatchTx(user, contracts[node.id]);      
-      generators.push(rest.callList(user, user.address, txs, true, node.id));
+      const txs = yield createBatchTx(user, contracts[node.id]);
+      generators.push(rest.callList(user, txs, true, node.id));
     }
 
     const bStartTime = moment();
     yield generators;
     const bEndTime = moment();
-
     // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
-
     let statesMatch = false;
     while (!statesMatch) {
       statesMatch = yield checkStates(k+1);
@@ -55,7 +55,7 @@ describe('Throughput - fx call', function () {
     assert.isOk(statesMatch, "All states should match");
     const seconds = endTime.diff(startTime, 'seconds');
     const seconds2 = endTime.diff(bEndTime, 'seconds');
-    const numTxs = (config.batchSize * nodes.length);
+    const numTxs = (batchSize * nodes.length);
     console.log(`${numTxs/seconds2}, ${numTxs/seconds}`);
    }
   })
@@ -91,7 +91,7 @@ describe('Throughput - fx call', function () {
     let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
-      stateMatches &= (state.x == k*config.batchSize);
+      stateMatches &= (state.x == k*batchSize);
       if(!stateMatches)  {
         break;
       }
@@ -104,18 +104,17 @@ describe('Throughput - fx call', function () {
 
     acct = yield rest.getAccount(fromUser.address);
 
-    for (var i = 0; i < config.batchSize; i++) {
+    for (var i = 0; i < batchSize; i++) {
       txs.push({
         contractAddress: contract.address,
         contractName: contract.name,
         args: {},
         value: 0,
         methodName: 'increment',
-	txParams: { nonce: acct[0].nonce }
+	      txParams: { nonce: acct[0].nonce }
       });
     }
     return txs;
   }
 
 });
-
