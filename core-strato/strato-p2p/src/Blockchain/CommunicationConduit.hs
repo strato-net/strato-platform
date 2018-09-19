@@ -42,6 +42,7 @@ import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
+import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.SeqEventNotify
 import           Blockchain.ServOptions
@@ -123,7 +124,9 @@ handleMsgClientConduit myId peer = do
                 yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
-    handleEvents (if flags_debugFail then Fail else Log) peer
+    CL.iterM recordEvent
+      .| handleEvents (if flags_debugFail then Fail else Log) peer
+      .| CL.iterM recordMessage
 
       where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 

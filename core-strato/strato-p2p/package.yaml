@@ -47,6 +47,7 @@ dependencies:
   - mtl
   - network
   - persistent
+  - prometheus-client
   - resourcet
   - SafeSemaphore
   - stm
