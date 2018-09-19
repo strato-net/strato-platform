@@ -13,6 +13,7 @@ github: blockapps/strato-platform/core-strato/strato-p2p
 
 dependencies:
   - array
+  - async
   - base >= 4 && < 5
   - base16-bytestring
   - binary
@@ -46,6 +47,7 @@ dependencies:
   - mtl
   - network
   - persistent
+  - prometheus-client
   - resourcet
   - SafeSemaphore
   - stm
@@ -56,6 +58,8 @@ dependencies:
   - time
   - transformers
   - transformers-base
+  - wai-middleware-prometheus
+  - warp
   - ansi-wl-pprint
   - strato-conf
   - strato-sequencer

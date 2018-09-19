@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 
 module Blockchain.Event (
-  Event(..),
+  module Blockchain.EventModel,
   handleEvents,
   maxReturnedHeaders,
   getBestKafkaBlockNumber
@@ -39,6 +39,7 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
 import           Blockchain.SHA
@@ -54,8 +55,6 @@ import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Debug.Trace                           (trace)
-
-data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt | AbortEvt String deriving (Show)
 
 -- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
