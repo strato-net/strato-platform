@@ -38,6 +38,7 @@ data Xabi = Xabi
   , xabiModifiers :: Map Text Modifier
   , xabiEvents    :: Map Text Event
   , xabiIsLibrary :: Bool
+  , xabiUsing     :: Map Text Using
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -53,6 +54,7 @@ instance FromJSON Xabi where
          <*> v .:? "mods" .!= Map.empty
          <*> v .:? "events" .!= Map.empty
          <*> v .:? "is_library" .!= False
+         <*> v .:? "using" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -86,10 +88,11 @@ sampleXabi = Xabi
   , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
   , xabiEvents = Map.empty
   , xabiIsLibrary = False
+  , xabiUsing = Map.singleton "SafeMath" (Using "for uint256")
   }
 
 xabiEmpty :: Xabi
-xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty False
+xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty False Map.empty
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
@@ -255,7 +258,7 @@ instance FromJSON Event where
   parseJSON (Object o) = Event
                      <$> (o .: "anonymous")
                      <*> (o .: "logs")
-  parseJSON o = error $ "parseJSON Xabi.Event: Expected Object, got: " ++ show o
+  parseJSON o = typeMismatch "Xabi.Event: Expected Object" o
 
 instance Arbitrary Event where arbitrary = genericArbitrary uniform
 
@@ -274,7 +277,25 @@ instance ToSchema Event where
           ]
         }
 
-data Using = Using {} deriving (Eq,Show,Generic)
+newtype Using = Using String deriving (Eq,Show,Generic)
+
+instance ToJSON Using where
+  toJSON (Using dec) = String . Text.pack $ dec
+
+instance FromJSON Using where
+  parseJSON (String t) = pure . Using . Text.unpack $ t
+  parseJSON o = typeMismatch "Xabi.Using" o
+
+instance Arbitrary Using where
+  arbitrary = Using <$> arbitrary
+
+instance ToSchema Using where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+     & mapped.name ?~ "Using schema"
+     & mapped.schema.description ?~ "Xabi of a `using` declaration"
+     & mapped.schema.example ?~ toJSON sampleUsing
+     where sampleUsing :: Using
+           sampleUsing = Using "for uint[]"
 
 
 data ContractDetails = ContractDetails

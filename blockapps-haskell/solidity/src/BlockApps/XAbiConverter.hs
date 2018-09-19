@@ -288,7 +288,8 @@ contractToXabi cName Contract{..} =
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
       xabiEvents = Map.empty,
-      xabiIsLibrary = False
+      xabiIsLibrary = False,
+      xabiUsing = Map.empty
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType
