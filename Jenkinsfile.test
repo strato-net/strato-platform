@@ -22,9 +22,10 @@ pipeline {
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
             if [ -d "strato-platform" ]; then
               cd strato-platform
+              git checkout -f
               git fetch origin
-              git reset --hard HEAD^
-              git checkout origin/${PLATFORM_BRANCH_NAME}
+              git checkout ${PLATFORM_BRANCH_NAME}
+              git pull
               cd ..
             else
               git clone https://github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}

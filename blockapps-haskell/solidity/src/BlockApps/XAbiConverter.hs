@@ -60,10 +60,11 @@ fieldsToStruct typeDefs' vars =
      fields=OMap.fromList
             $ (map (\((n,t),c) -> (n, (constantValue c, t))) constants)
             ++ zipWith (\(n, t) p -> (n, (Right p, t))) variables positions,
-     size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
+     size = fromIntegral $ 32 * Storage.offset positionAfter +  roundUp (Storage.byte positionAfter)
      }
   where
     constantValue mval = maybe (error "fieldsToStruct: You must supply a value to a constant") Left mval
+    roundUp n = if n == 0 then 0 else 32
 
 addPositions::TypeDefs->Storage.Position -> [Type] -> (Storage.Position, [Storage.Position])
 addPositions _ p [] = (p, [])
@@ -288,7 +289,8 @@ contractToXabi cName Contract{..} =
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
       xabiEvents = Map.empty,
-      xabiIsLibrary = False
+      xabiIsLibrary = False,
+      xabiUsing = Map.empty
       }
 
 fieldToVarType :: TypeDefs -> (Either Text Storage.Position, Type) -> Xabi.VarType

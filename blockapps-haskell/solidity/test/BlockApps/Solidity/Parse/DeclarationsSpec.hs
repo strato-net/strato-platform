@@ -346,6 +346,22 @@ spec = do
     it "should parse initialized public public constants" $
       parseVarName "uint public public constant nothing = 0x0;" `shouldBe` Right "nothing"
 
+  describe "Declarations - usingDeclaration" $ do
+    let parseUsing = runParser usingDeclaration "" ""
+    it "should parse a basic using" $
+      parseUsing "using SafeMath for uint256;" `shouldBe` Right ("SafeMath", UsingDeclaration (Using "for uint256"))
+    it "should fail without the keyword" $
+      parseUsing "unsign SafeMath for uint256;" `shouldSatisfy` isLeft
+    it "should fail without an identifier" $
+      parseUsing "using 888 for uint256;" `shouldSatisfy` isLeft
+    it "should fail without *some* text after the identifier" $
+      parseUsing "using name;" `shouldSatisfy` isLeft
+    it "should require a trailing semicolon" $
+      parseUsing "using name for type" `shouldSatisfy` isLeft
+    it "should not try to detect what is valid" $
+      parseUsing "using name 105927)&(^!#$;" `shouldBe` Right ("name", UsingDeclaration (Using "105927)&(^!#$"))
+
+
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
 printLeft (Right _) = return ()
