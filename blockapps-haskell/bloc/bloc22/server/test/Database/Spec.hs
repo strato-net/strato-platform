@@ -132,6 +132,10 @@ solcSpec =
         let solPath = "./test/contracts/Ctor.sol"
             expectedPath = "./test/contracts/CtorGetSource.sol"
         testAugment solPath expectedPath
+      it "should preserve using declarations" $ do
+        let solPath = "./test/contracts/Using.sol"
+            expectedPath = "./test/contracts/UsingGetSource.sol"
+        testAugment solPath expectedPath
       it "should unparse libraries" $ do
         let solPath = "./test/contracts/Library.sol"
             expectedPath = "./test/contracts/LibraryGetSource.sol"
@@ -140,6 +144,7 @@ solcSpec =
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
         mods `shouldSatisfy` isRight
+
 
 fromEither :: (Show a) => Either String a -> IO a
 fromEither x = do
