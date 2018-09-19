@@ -29,50 +29,51 @@ data ActionType = Create | Delete | Update deriving (Eq,Show, Generic)
 data SourcePtr = SourcePtr { sourceHash :: Keccak256, contractName :: Text} deriving (Eq, Show, Generic)
 
 data Action = Action
-  { actionType         :: ActionType -- either Create, Delete, or Update
-  , blockHash          :: Keccak256
-  , blockTimestamp     :: UTCTime
-  , blockNumber        :: Integer
-  , transactionHash    :: Keccak256
-  , transactionChainId :: Maybe ChainId
-  , transactionSender  :: Address
-  , address            :: Address
-  , codeHash           :: Keccak256
-  , sourcePtr          :: Maybe SourcePtr
-  , storage            :: Maybe (Map (Hex Word256) (Hex Word256))
+  { actionType            :: ActionType -- either Create, Delete, or Update
+  , actionBlockHash       :: Keccak256
+  , actionBlockTimestamp  :: UTCTime
+  , actionBlockNumber     :: Integer
+  , actionTxHash          :: Keccak256
+  , actionTxChainId       :: Maybe ChainId
+  , actionTxSender        :: Address
+  , actionAddress         :: Address
+  , actionCodeHash        :: Keccak256
+  , actionSourcePtr       :: Maybe SourcePtr
+  , actionStorage         :: Maybe (Map (Hex Word256) (Hex Word256))
   } deriving (Show, Generic)
 
 instance FromJSON Action
 instance FromJSON ActionType
 instance FromJSON SourcePtr
 instance FromJSONKey Action
-instance FromJSONKey (Hex Word256)
+instance FromJSONKey (Hex Word256) where
+    fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 formatAction :: Action -> Text
 formatAction Action{..} = T.concat
   [ tshow actionType
   , ", blockHash: "
-  , tshow blockHash
+  , tshow actionBlockHash
   , ", blockTimestamp: "
-  , tshow blockTimestamp
+  , tshow actionBlockTimestamp
   , ", blockNumber: "
-  , tshow blockNumber
+  , tshow actionBlockNumber
   , ", transactionHash: "
-  , tshow transactionHash
+  , tshow actionTxHash
   , ", "
-  , (case transactionChainId of
+  , (case actionTxChainId of
        Nothing -> ""
        Just c -> T.concat ["in chain", tshow c])
   , " with address: "
-  , tshow address
+  , tshow actionAddress
   , " with "
-  , tshow (maybe 0 M.size storage)
+  , tshow (maybe 0 M.size actionStorage)
   , " items\n"
   , "    codeHash = "
-  , tshow codeHash
+  , tshow actionCodeHash
   , "\n"
   , "    sourcePtr = "
-  , tshow sourcePtr
+  , tshow actionSourcePtr
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show

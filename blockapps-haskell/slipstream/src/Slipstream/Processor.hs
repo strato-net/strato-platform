@@ -112,7 +112,7 @@ storageToFunction s k =
 
 hasContract::Action->Bool
 hasContract action =
-  if (A.codeHash action == emptyHash)
+  if (A.actionCodeHash action == emptyHash)
     then False
     else True
 
@@ -121,8 +121,8 @@ storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
 
 addStorageIfNeeded::Action->Bloc Action
 addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
-  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show address }
-  return $ action'{A.storage = Just . Map.fromList $ map storageToList storage'}
+  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show actionAddress }
+  return $ action'{A.actionStorage = Just . Map.fromList $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
 matchAction :: A.Action -> A.Action -> Bool
@@ -151,6 +151,8 @@ processTheMessages messages conn g = do
 
   unless (null messages) $
     debugM "processTheMessages" . unlines . map show $ messages
+
+  liftIO $ putStrLn $ "messages: " ++ show messages
 
   case length messages of
    0 -> return ()
@@ -198,42 +200,42 @@ processTheMessages messages conn g = do
         A.Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
-          case sourcePtr of
+          case actionSourcePtr of
             Just x -> do
-              storeCachedSourcePtr g codeHash x
-              return sourcePtr
+              storeCachedSourcePtr g actionCodeHash x
+              return actionSourcePtr
             Nothing -> do
-              getCachedSourcePtr g codeHash
+              getCachedSourcePtr g actionCodeHash
 
-        maybeCachedContract <- getCachedContract g codeHash
+        maybeCachedContract <- getCachedContract g actionCodeHash
         sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
-        let addr = Address . fst . head . readHex $ show address
+        let addr = Address . fst . head . readHex $ show actionAddress
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
                  let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
-                 contractOrError <- getContract contName codeHash transactionChainId
+                 contractOrError <- getContract contName actionCodeHash actionTxChainId
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    storeCachedContract g codeHash c
+                    storeCachedContract g actionCodeHash c
                     return c
                (False, Nothing) -> do
                  liftIO . warningM "processTheMessages" . show $ T.concat
                    [ "Need to call getContractCompileFullSource (this can be slow): ch:"
-                   , tshow codeHash
+                   , tshow actionCodeHash
                    , ", src:"
                    , tshow sourcePtr'
                    ]
-                 contractOrError <- getContractCompileFullSource addr codeHash transactionChainId
+                 contractOrError <- getContractCompileFullSource addr actionCodeHash actionTxChainId
                  traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                 liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow codeHash]
+                 liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
                  case contractOrError of
                   Left e -> error e
                   Right c -> do
-                    storeCachedContract g codeHash c
+                    storeCachedContract g actionCodeHash c
                     return c
 
 
@@ -245,21 +247,21 @@ processTheMessages messages conn g = do
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-        let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
-        let chain = case transactionChainId of
+        let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
+        let chain = case actionTxChainId of
                      Nothing -> ""
                      Just (ChainId x) -> T.pack $ showHex x ""
-        return ProcessedContract{address = address,
-                                 codehash = codeHash,
+        return ProcessedContract{address = actionAddress,
+                                 codehash = actionCodeHash,
                                  abi = strAbi,
                                  contractName = strName,
                                  chain = chain,
                                  contractData = ret,
-                                 blockHash = blockHash,          -- Keccak256
-                                 blockTimestamp = blockTimestamp,     -- UTCTime
-                                 blockNumber = blockNumber,        -- Integer
-                                 transactionHash = transactionHash,    -- Keccak256
-                                 transactionSender = transactionSender  -- Address
+                                 blockHash = actionBlockHash,          -- Keccak256
+                                 blockTimestamp = actionBlockTimestamp,     -- UTCTime
+                                 blockNumber = actionBlockNumber,        -- Integer
+                                 transactionHash = actionTxHash,    -- Keccak256
+                                 transactionSender = actionTxSender  -- Address
                                }
 
       if (length processedList > 0) then liftIO $ convertRet processedList conn g else return()

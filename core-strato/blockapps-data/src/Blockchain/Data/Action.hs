@@ -40,4 +40,5 @@ data Action = Action
 instance ToJSON Action where
 instance FromJSON Action where
 
-instance FromJSONKey Word256 where
+instance Ae.FromJSONKey Word256 where
+    fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
