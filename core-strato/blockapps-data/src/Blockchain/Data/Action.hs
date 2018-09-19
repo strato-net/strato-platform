@@ -39,5 +39,3 @@ data Action = Action
 
 instance ToJSON Action where
 instance FromJSON Action where
-
-instance FromJSONKey Word256 where
