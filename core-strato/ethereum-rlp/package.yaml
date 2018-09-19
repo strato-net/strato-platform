@@ -49,23 +49,35 @@ default-extensions:
   - TypeOperators
   - UnboxedTuples
 
+dependencies:
+  - bytestring == 0.10.*
+  - base16-bytestring == 0.1.*
+  - ansi-wl-pprint == 0.6.*
+  - base >= 4 && < 5
+  - containers == 0.5.11.0
+  - deepseq
+  - binary
+
 library:
   source-dirs: library/
   exposed-modules: Blockchain.Data.RLP
-  dependencies:
-    - bytestring == 0.10.*
-    - base16-bytestring == 0.1.*
-    - ansi-wl-pprint == 0.6.*
-    - base >= 4 && < 5
-    - containers == 0.5.11.0
 
 tests:
   test:
     source-dirs: test/
     main: Main.hs
     dependencies:
-      - ethereum-rlp
       - test-framework == 0.8.*
       - test-framework-hunit == 0.3.*
       - HUnit == 1.*
-      - base == 4.*
+      - hspec
+      - ethereum-rlp
+
+benchmarks:
+  rlpserial:
+    source-dirs: bench/
+    main: RLPShootout.hs
+    dependencies:
+      - ethereum-rlp
+      - criterion
+      - random-bytestring

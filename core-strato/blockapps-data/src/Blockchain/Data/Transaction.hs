@@ -67,13 +67,6 @@ import           System.Clock
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
-instance NFData Address
-instance NFData Code
-instance NFData SHA
-instance NFData TXOrigin
-instance NFData Transaction
-instance NFData RawTransaction
-
 instance TransactionLike Transaction where
     txHash        = \case
                        PrivateHashTX{..} -> SHA transactionTxHash

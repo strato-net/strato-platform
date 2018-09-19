@@ -14,6 +14,7 @@
 
 module Blockchain.Data.DataDefs where
 
+import           Control.DeepSeq
 import           Control.Monad.Trans.Class (lift)
 
 import           Database.Persist
@@ -69,3 +70,8 @@ instance BIN.Binary UTCTime where
   get = (posixSecondsToUTCTime . fromInteger) <$> BIN.get
 
 instance BIN.Binary BlockData where
+
+instance NFData BlockData
+instance NFData SHA
+instance NFData TXOrigin
+instance NFData RawTransaction

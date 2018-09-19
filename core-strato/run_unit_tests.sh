@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
 set -e
+set -x
 
 declare -i RESULT=0
 TESTS=(
   blockapps-data
-  blockapps-haskoin
   blockapps-ecrecover
+  blockapps-haskoin
   blockstanbul
   ethereum-discovery
   ethereum-rlp
@@ -26,8 +27,9 @@ REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)
 trap "docker rm -f ${REDIS}" EXIT
 
 for tst in ${TESTS[@]}; do
-  stack test $tst
-  RESULT=RESULT+$?
+  time stack test $tst
 done
 
-exit $RESULT
+for tst in ${TEST_AND_BENCH[@]}; do
+  time stack test $tst
+done
