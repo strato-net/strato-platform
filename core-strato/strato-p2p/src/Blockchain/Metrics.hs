@@ -5,7 +5,7 @@ module Blockchain.Metrics ( recordEvent
 
 import Prometheus
 import Control.Monad.IO.Class
-import Blockchain.Event
+import Blockchain.EventModel
 import Blockchain.Data.Wire
 import qualified Blockchain.Blockstanbul as PBFT
 

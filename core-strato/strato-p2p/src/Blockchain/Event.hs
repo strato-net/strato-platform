@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 
 module Blockchain.Event (
-  Event(..),
+  module Blockchain.EventModel,
   handleEvents,
   maxReturnedHeaders,
   getBestKafkaBlockNumber
@@ -18,6 +18,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
+import           Data.Conduit.List                     (iterM)
 import           Data.List
 import           Data.Map                              (toList)
 import           Data.Maybe
@@ -39,8 +40,10 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
+import           Blockchain.Metrics
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
@@ -54,8 +57,6 @@ import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Debug.Trace                           (trace)
-
-data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt | AbortEvt String deriving (Show)
 
 -- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
@@ -93,7 +94,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
-handleEvents = iterM recordEvent .| handleEvents' mode peer .| iterM recordMessage
+handleEvents mode peer = iterM recordEvent .| handleEvents' mode peer .| iterM recordMessage
 
 handleEvents' :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
