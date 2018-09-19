@@ -70,9 +70,9 @@ services:
     restart: always
   bloc:
     depends_on:
+    - postgres
     - strato
     - vault-wrapper
-    - postgres
     environment:
     - loglevel=${loglevel}
     - kafkaHost=kafka
