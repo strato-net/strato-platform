@@ -813,7 +813,7 @@ getAccountTxParams addr chainId = \case
       accts <- blocStrato $ getAccountsFilter
         accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
       case listToMaybe accts of
-        Nothing   -> throwError . UserError $ "strato error: failed to find account"
+        Nothing   -> throwError . UserError $ "User does not have a balance"
         Just acct -> return $ accountNonce acct
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
