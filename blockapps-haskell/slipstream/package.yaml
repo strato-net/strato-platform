@@ -46,6 +46,7 @@ dependencies:
   - scientific
   - semigroups
   - servant-client
+  - split
   - template-haskell
   - text
   - time

@@ -113,3 +113,6 @@ instance Format Word256 where
 instance Ae.ToJSONKey Word256 where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
     where f = T.pack . format
+
+instance Ae.FromJSONKey Word256 where
+    fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)

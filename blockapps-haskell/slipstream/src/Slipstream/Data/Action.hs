@@ -45,7 +45,6 @@ data Action = Action
 instance FromJSON Action
 instance FromJSON ActionType
 instance FromJSON SourcePtr
-instance FromJSONKey Action
 instance FromJSONKey (Hex Word256) where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 

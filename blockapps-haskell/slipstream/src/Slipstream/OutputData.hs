@@ -27,6 +27,7 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 import           BlockApps.Ethereum
+import           Data.List.Split
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -112,8 +113,8 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-enableHistory :: Text -> Bool
-enableHistory cName = elem cName ["Vehicle", "Hashmap", "SimpleStorageHistory"]
+enableHistory :: String -> Bool
+enableHistory cName = elem cName $ splitOn "," flags_historyList
 
 --Populate exclusion list
 enableIndexing :: Text -> Bool
@@ -162,7 +163,7 @@ createInserts globalsIORef = do
               , "_pkey\" PRIMARY KEY (address, \"chainId\") );" ]
       yield createSt
 
-      when (enableHistory tableName) $ do
+      when (enableHistory $ T.unpack tableName) $ do
         let histSt = T.concat
               [ "create table if not exists \""
               , tableName
@@ -197,7 +198,7 @@ createInserts globalsIORef = do
         return rowSt
   let inserts = T.intercalate ", " vals
 
-  when (enableHistory tableName) $ do
+  when (enableHistory $ T.unpack tableName) $ do
     let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
     yield hist
 

@@ -152,8 +152,6 @@ processTheMessages messages conn g = do
   unless (null messages) $
     debugM "processTheMessages" . unlines . map show $ messages
 
-  liftIO $ putStrLn $ "messages: " ++ show messages
-
   case length messages of
    0 -> return ()
    1 -> infoM "processTheMessages" "1 message has arrived"
