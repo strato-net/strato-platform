@@ -358,7 +358,7 @@ runOperation BLOCKHASH = do
   case (inRange, isRunningTests vmState) of
    (False, _) -> push (0::Word256)
    (True, False) -> do
-          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') $ blockHeaderHash currentBlock
+          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') (blockDataParentHash currentBlock)
           case maybeBlockHash of
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
