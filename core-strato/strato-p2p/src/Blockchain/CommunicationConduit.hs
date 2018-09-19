@@ -91,14 +91,14 @@ handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context
                        -> Conduit Event m Message
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
-    yield Hello { version = 4
-                , clientId = stratoVersionString
-                , capability = [ ETH . fromIntegral $ ethVersion
-                               , IST . fromIntegral $ blockstanbulVersion
-                               ]
-                , port = 0
-                , nodeId = myId
-                }
+    yieldRecord Hello { version = 4
+                      , clientId = stratoVersionString
+                      , capability = [ ETH . fromIntegral $ ethVersion
+                                     , IST . fromIntegral $ blockstanbulVersion
+                                     ]
+                      , port = 0
+                      , nodeId = myId
+                      }
     $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} ->
@@ -106,7 +106,7 @@ handleMsgClientConduit myId peer = do
                 Nothing -> error "we don't have a local BestBlock"
                 Just (RedisBestBlock hash _ tdiff) -> do
                     genHash <- lift getGenesisBlockHash
-                    yield Status {
+                    yieldRecord Status {
                         protocolVersion = fromIntegral ethVersion,
                         networkID       = ourNetworkID,
                         totalDifficulty = fromIntegral tdiff,
@@ -121,12 +121,10 @@ handleMsgClientConduit myId peer = do
                 void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
+                yieldRecord $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
-    CL.iterM recordEvent
-      .| handleEvents (if flags_debugFail then Fail else Log) peer
-      .| CL.iterM recordMessage
+    handleEvents (if flags_debugFail then Fail else Log) peer
 
       where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
@@ -146,7 +144,7 @@ handleMsgServerConduit myPubkey peer = do
                 port = 0,
                 nodeId = myPubkey
             }
-            yield helloMsg'
+            yieldRecord helloMsg'
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
@@ -157,7 +155,7 @@ handleMsgServerConduit myPubkey peer = do
                     genHash <- lift getGenesisBlockHash
                     when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                    yield Status {
+                    yieldRecord Status {
                         protocolVersion=fromIntegral ethVersion,
                         networkID=flags_networkID,
                         totalDifficulty= fromIntegral tdiff,
@@ -167,11 +165,14 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
 
-awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
+yieldRecord :: (MonadIO m) => Message -> ConduitM i Message m ()
+yieldRecord msg = recordMessage msg >> yield msg
+
+awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
-    Just (MsgEvt msg) -> return $ Just msg
-    Nothing           -> return Nothing
-    _                 -> awaitMsg
+    Just ev@(MsgEvt msg) -> recordEvent ev >> return (Just msg)
+    Nothing              -> return Nothing
+    Just ev              -> recordEvent ev >> awaitMsg
 
 assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
                 => Maybe Message

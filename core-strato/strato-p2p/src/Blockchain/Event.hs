@@ -93,7 +93,11 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
-handleEvents mode peer = awaitForever $ \case
+handleEvents = iterM recordEvent .| handleEvents' mode peer .| iterM recordMessage
+
+handleEvents' :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
+             =>  DebugMode -> PPeer -> Conduit Event m Message
+handleEvents' mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
     MsgEvt Ping     -> yield Pong
