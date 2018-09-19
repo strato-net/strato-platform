@@ -40,4 +40,4 @@ vmTxMined :: P.Metric P.Gauge
 vmTxMined= P.unsafeRegisterIO $ gauge (P.Info "vm_tx_mined" "evm gauge for tx mined")
 
 vmTxMining :: P.Metric P.Gauge
-vmTxMining = P.unsafeRegisterIO $ gauge (P.Info "vm_tx_mining " "evm gauge for transaction mining")
+vmTxMining = P.unsafeRegisterIO $ gauge (P.Info "vm_tx_mining" "evm gauge for transaction mining")
