@@ -29,12 +29,17 @@ import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
+import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+
+data SeqLoopEvent = TimerFire PBFT.RoundNumber
+                  | VoteMade PBFT.CandidateReceived
+                  | UnseqEvent IngestEvent deriving (Eq, Show, GHCG.Generic)
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock

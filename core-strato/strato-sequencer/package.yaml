@@ -18,6 +18,7 @@ dependencies:
   - blockapps-util
   - strato-conf
   - clock
+  - conduit
   - containers
   - directory
   - extra

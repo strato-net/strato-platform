@@ -8,8 +8,10 @@
 {-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
+import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
+import           Control.Concurrent.STM.TMChan
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -63,35 +65,26 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-sequencer :: SequencerM ()
-sequencer = do
+unseqReader :: TMChan IngestEvent -> SequencerM ()
+unseqReader ch = forever $ do
+  inEvents <- readUnseqEvents'
+  $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
+  atomically . forM_ inEvents $ writeTMChan ch . snd
+  unless (null inEvents) $ do
+    let ofs = maximum . map fst $ inEvents
+    setNextIngestedOffset ofs
+
+sequencer :: Conduit () SequencerM SeqLoopEvent -> SequencerM ()
+sequencer source = do
   bootstrapBlockstanbul
-  forever $ do
-    $logDebugS "seq/loop/start" ""
-    v <- currentView
-    $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
-    blockstanbulSend . map Timeout =<< drainTimeouts
-    checkForVotes
-    inEvents <- readUnseqEvents'
-    $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
-    clearLdbBatchOps
-    clearGetChainsDB
-    clearGetTransactionsDB
-    t0 <- liftIO $ getTime Realtime
-    splitEvents $ map snd inEvents
-    t1 <- liftIO $ getTime Realtime
-    $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
-    pendingLDBWrites <- gets _ldbBatchOps
-    applyLDBBatchWrites $ toList pendingLDBWrites
-    P.incCounter seqLdbBatchWrites
-    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
-    $logInfoS "sequencer" "Applied pending LDB writes"
-    chainIds <- gets _getChainsDB
-    unless (S.null chainIds) $ do
-      markForP2P . OEGetChain $ toList chainIds
-    txHashes <- gets _getTransactionsDB
-    unless (S.null txHashes) $ do
-      markForP2P . OEGetTx $ toList txHashes
+  go (newResumableSource source)
+ where
+  go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
+  go src = do
+    (src', events) <- src $$++ sinkList
+    checkForVotes [cr | VoteMade cr <- events]
+    checkForTimeouts [rn | TimerFire rn <- events]
+    checkForUnseq [iev | UnseqEvent iev <- events]
     vmEvs <- drainVM
     unless (null vmEvs) $ do
       writeSeqVmEvents' vmEvs
@@ -100,21 +93,64 @@ sequencer = do
     unless (null p2pEvs) $ do
       writeSeqP2pEvents' p2pEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-    unless (null inEvents) $ do
-      let ofs = maximum $ map fst inEvents
-      setNextIngestedOffset ofs
+    go src'
 
-checkForVotes :: SequencerM ()
-checkForVotes = do
-    votes <- drainVotes
-    forM_ votes $ \br ->
-      let extsign = RL.rlpDecode
-                  . RL.rlpDeserialize
-                  . fst
-                  . B16.decode $ pack (API.signature br)
-          bauth = MsgAuth { sender = (API.sender br), signature = extsign}
-          ie = NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
-      in blockstanbulSend [ie]
+clearAll :: SequencerM ()
+clearAll = clearLdb
+checkForUnseq :: [IngestEvent] -> SequencerM ()
+checkForUnseq = splitEvents
+
+-- checkForKafka ::
+--     $logDebugS "seq/loop/start" ""
+--     v <- currentView
+--     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
+--     blockstanbulSend . map Timeout =<< drainTimeouts
+--     checkForVotes
+--     inEvents <- readUnseqEvents'
+--     clearLdbBatchOps
+--     clearGetChainsDB
+--     clearGetTransactionsDB
+--     t0 <- liftIO $ getTime Realtime
+--     splitEvents $ map snd inEvents
+--     t1 <- liftIO $ getTime Realtime
+--     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
+--     pendingLDBWrites <- gets _ldbBatchOps
+--     applyLDBBatchWrites $ toList pendingLDBWrites
+--     P.incCounter seqLdbBatchWrites
+--     P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
+--     $logInfoS "sequencer" "Applied pending LDB writes"
+--     chainIds <- gets _getChainsDB
+--     unless (S.null chainIds) $ do
+--       markForP2P . OEGetChain $ toList chainIds
+--     txHashes <- gets _getTransactionsDB
+--     unless (S.null txHashes) $ do
+--       markForP2P . OEGetTx $ toList txHashes
+--     vmEvs <- drainVM
+--     unless (null vmEvs) $ do
+--       writeSeqVmEvents' vmEvs
+--       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+--     p2pEvs <- drainP2P
+--     unless (null p2pEvs) $ do
+--       writeSeqP2pEvents' p2pEvs
+--       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+--     unless (null inEvents) $ do
+--       let ofs = maximum $ map fst inEvents
+--       setNextIngestedOffset ofs
+--
+
+checkForTimeouts :: [RoundNumber] -> SequencerM ()
+checkForTimeouts = blockstanbulSend . map Timeout
+
+checkForVotes :: [CandidateReceived] -> SequencerM ()
+checkForVotes = blockstanbulSend . map translate
+  where translate :: CandidateReceived -> InEvent
+        translate br =
+          let extsign = RL.rlpDecode
+                      . RL.rlpDeserialize
+                      . fst
+                      . B16.decode $ pack (API.signature br)
+              bauth = MsgAuth { sender = (API.sender br), signature = extsign}
+          in NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
 
 -- bootstrap genesis block into leveldb if needed
 bootstrap :: BDB.Block -> SequencerM OutputBlock

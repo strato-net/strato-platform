@@ -35,7 +35,7 @@ data CandidateReceived = CandidateReceived { sender :: Address
                                            , recipient :: Address
                                            , votingdir :: Bool
                                            , nonce :: Int
-                                           } deriving (Show,GHCG.Generic)
+                                           } deriving (Eq, Show, GHCG.Generic)
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
