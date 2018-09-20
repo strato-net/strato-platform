@@ -81,6 +81,7 @@ sequencer source = do
  where
   go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
   go src = do
+    clearAll
     (src', events) <- src $$++ sinkList
     checkForVotes [cr | VoteMade cr <- events]
     checkForTimeouts [rn | TimerFire rn <- events]
@@ -96,46 +97,25 @@ sequencer source = do
     go src'
 
 clearAll :: SequencerM ()
-clearAll = clearLdb
-checkForUnseq :: [IngestEvent] -> SequencerM ()
-checkForUnseq = splitEvents
+clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
 
--- checkForKafka ::
---     $logDebugS "seq/loop/start" ""
---     v <- currentView
---     $logDebugS "seq/blockstanbul" . T.pack $ "View: " ++ format v
---     blockstanbulSend . map Timeout =<< drainTimeouts
---     checkForVotes
---     inEvents <- readUnseqEvents'
---     clearLdbBatchOps
---     clearGetChainsDB
---     clearGetTransactionsDB
---     t0 <- liftIO $ getTime Realtime
---     splitEvents $ map snd inEvents
---     t1 <- liftIO $ getTime Realtime
---     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
---     pendingLDBWrites <- gets _ldbBatchOps
---     applyLDBBatchWrites $ toList pendingLDBWrites
---     P.incCounter seqLdbBatchWrites
---     P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
---     $logInfoS "sequencer" "Applied pending LDB writes"
---     chainIds <- gets _getChainsDB
---     unless (S.null chainIds) $ do
---       markForP2P . OEGetChain $ toList chainIds
---     txHashes <- gets _getTransactionsDB
---     unless (S.null txHashes) $ do
---       markForP2P . OEGetTx $ toList txHashes
---     vmEvs <- drainVM
---     unless (null vmEvs) $ do
---       writeSeqVmEvents' vmEvs
---       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
---     p2pEvs <- drainP2P
---     unless (null p2pEvs) $ do
---       writeSeqP2pEvents' p2pEvs
---       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
---     unless (null inEvents) $ do
---       let ofs = maximum $ map fst inEvents
---       setNextIngestedOffset ofs
+checkForUnseq :: [IngestEvent] -> SequencerM ()
+checkForUnseq inEvents = do
+    t0 <- liftIO $ getTime Realtime
+    splitEvents inEvents
+    t1 <- liftIO $ getTime Realtime
+    $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
+    pendingLDBWrites <- gets _ldbBatchOps
+    applyLDBBatchWrites $ toList pendingLDBWrites
+    P.incCounter seqLdbBatchWrites
+    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
+    $logInfoS "sequencer" "Applied pending LDB writes"
+    chainIds <- gets _getChainsDB
+    unless (S.null chainIds) $ do
+      markForP2P . OEGetChain $ toList chainIds
+    txHashes <- gets _getTransactionsDB
+    unless (S.null txHashes) $ do
+      markForP2P . OEGetTx $ toList txHashes
 --
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
