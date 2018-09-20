@@ -37,6 +37,7 @@ dependencies:
   - time
   - stm
   - stm-chans
+  - stm-conduit
   - conduit-combinators
   - blockstanbul
   - stm-chans

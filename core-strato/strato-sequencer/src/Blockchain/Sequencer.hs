@@ -21,7 +21,6 @@ import           System.Clock
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (toList)
-import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
@@ -30,6 +29,7 @@ import           Prometheus                                as P
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
+import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.DependentTxDB
@@ -46,7 +46,6 @@ import           Blockchain.Sequencer.DB.TxBlockDB
 import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.Sequencer.Event
 
-import           Blockchain.Sequencer.Kafka
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
@@ -57,25 +56,15 @@ import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
-import qualified Blockchain.MilenaTools                    as K
-import qualified Network.Kafka.Protocol                    as KP
-
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-unseqReader :: TMChan IngestEvent -> SequencerM ()
-unseqReader ch = forever $ do
-  inEvents <- readUnseqEvents'
-  $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
-  atomically . forM_ inEvents $ writeTMChan ch . snd
-  unless (null inEvents) $ do
-    let ofs = maximum . map fst $ inEvents
-    setNextIngestedOffset ofs
 
-sequencer :: Conduit () SequencerM SeqLoopEvent -> SequencerM ()
-sequencer source = do
+sequencer :: SequencerM ()
+sequencer = do
+  source <- fuseChannels
   bootstrapBlockstanbul
   go (newResumableSource source)
  where
@@ -88,11 +77,11 @@ sequencer source = do
     checkForUnseq [iev | UnseqEvent iev <- events]
     vmEvs <- drainVM
     unless (null vmEvs) $ do
-      writeSeqVmEvents' vmEvs
+      writeSeqVmEvents vmEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
     p2pEvs <- drainP2P
     unless (null p2pEvs) $ do
-      writeSeqP2pEvents' p2pEvs
+      writeSeqP2pEvents p2pEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
     go src'
 
@@ -116,7 +105,6 @@ checkForUnseq inEvents = do
     txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
---
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
 checkForTimeouts = blockstanbulSend . map Timeout
@@ -153,14 +141,15 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
               bootstrapGenesisBlock hash difficulty
               shouldEmit <- bootstrapDoEmit <$> ask
               when shouldEmit $ do
-                  assertTopicCreation'
-                  writeSeqVmEvents' [OEBlock shortCircuit]  -- todo handle the error :)
-                  writeSeqP2pEvents' [OEBlock shortCircuit]  -- todo handle the error :)
+                  error "TODO(tim): redefine bootstrapSequencer :: BDB.BLock -> IO OutputBlock"
+                  -- assertTopicCreation'
+                  -- writeSeqVmEvents [OEBlock shortCircuit]  -- todo handle the error :)
+                  -- writeSeqP2pEvents [OEBlock shortCircuit]  -- todo handle the error :)
               return shortCircuit
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
-  writeSeqVmEvents' [OECreateBlockCommand]
+  writeSeqVmEvents [OECreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend :: [InEvent] -> SequencerM ()
@@ -499,45 +488,12 @@ prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
 
-assertTopicCreation' :: SequencerM ()
-assertTopicCreation' = void $ K.withKafkaViolently assertTopicCreation
+writeSeqVmEvents :: [OutputEvent] -> SequencerM ()
+writeSeqVmEvents events = do
+    ch <- asks (seqVMEvents . cablePackage)
+    atomically . mapM_ (writeTMChan ch) $ events
 
-readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
-readUnseqEvents' = do
-    offset <- getNextIngestedOffset
-    $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
-    unsafeAddCounter (fromIntegral (length ret)) seqKafkaUnseqRead
-    return ret
-
-writeSeqVmEvents' :: [OutputEvent] -> SequencerM ()
-writeSeqVmEvents' events = void $ do
-    void $ K.withKafkaRetry1s (writeSeqVmEvents events)
-    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
-
-writeSeqP2pEvents' :: [OutputEvent] -> SequencerM ()
-writeSeqP2pEvents' events = void $ do
-    void $ K.withKafkaRetry1s (writeSeqP2pEvents events)
-    unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
-
-getNextIngestedOffset :: SequencerM KP.Offset
-getNextIngestedOffset = do
-  group  <- getKafkaConsumerGroup
-  ret <- K.withKafkaRetry1s (K.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
-    Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
-        setNextIngestedOffset 0 >> getNextIngestedOffset
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
-    Right (ofs, _) -> return ofs
-  P.incCounter seqKafkaCheckpointReads
-  return ret
-
-setNextIngestedOffset :: KP.Offset -> SequencerM ()
-setNextIngestedOffset newOffset = do
-    group  <- getKafkaConsumerGroup
-    $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    P.incCounter seqKafkaCheckpointWrites
-    op <- K.withKafkaViolently $ K.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
-    op & \case
-        Left err ->
-            error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
-        Right () -> return ()
+writeSeqP2pEvents :: [OutputEvent] -> SequencerM ()
+writeSeqP2pEvents events = do
+    ch <- asks (seqP2PEvents . cablePackage)
+    atomically . mapM_ (writeTMChan ch) $ events
