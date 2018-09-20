@@ -155,14 +155,6 @@ pipeline {
               npm install
               npm run test:truchainz
             '''
-          },
-          'Strato benchmarks': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running strato benchmarks'
-              cd core-strato
-              ./run_benchmarks.sh
-            '''
           }
         )
       }
