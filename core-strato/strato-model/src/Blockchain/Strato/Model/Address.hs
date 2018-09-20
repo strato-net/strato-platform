@@ -9,6 +9,7 @@ module Blockchain.Strato.Model.Address
       formatAddress
     ) where
 
+import           Control.DeepSeq
 import           Control.Monad
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
@@ -127,3 +128,5 @@ instance FromHttpApiData Address where
 
 instance ToHttpApiData Address where
   toUrlPiece = T.pack . formatAddress
+
+instance NFData Address

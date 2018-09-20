@@ -110,7 +110,7 @@ pipeline {
               set -x
               echo "Running core-strato unit tests"
               cd strato-platform/core-strato
-              ./run_unit_tests.sh
+              ./run_unit_tests_long.sh
             '''
           },
 

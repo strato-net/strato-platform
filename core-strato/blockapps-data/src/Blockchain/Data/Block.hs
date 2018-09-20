@@ -5,6 +5,7 @@ module Blockchain.Data.Block (
   extraLens
   ) where
 
+import Control.DeepSeq
 import Data.Binary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
@@ -27,3 +28,4 @@ extraLens :: Lens' Block BS.ByteString
 extraLens = blockDataLens . extraDataLens
 
 instance Binary Block where
+instance NFData Block

@@ -13,6 +13,7 @@ dependencies:
   - conduit
   - conduit-combinators
   - crypto-api
+  - deepseq
   - derive
   - ethereum-encryption
   - ethereum-rlp
@@ -51,3 +52,11 @@ tests:
       - hspec-expectations-lifted
       - merkle-patricia-db
       - time
+
+benchmarks:
+  one-node:
+    source-dirs: bench/
+    main: OneNode.hs
+    dependencies:
+      - blockstanbul
+      - criterion
