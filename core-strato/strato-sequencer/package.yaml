@@ -34,6 +34,7 @@ dependencies:
   - base16-bytestring
   - bytestring
   - ethereum-rlp
+  - lifted-async
   - time
   - stm
   - stm-chans

@@ -21,7 +21,8 @@ module Blockchain.Sequencer.Gregor
   , writeSeqVmEvents
   ) where
 
-import           ClassyPrelude              (atomically, TMChan, writeTMChan)
+import           ClassyPrelude              (atomically, TMChan, writeTMChan, STM, tryReadTMChan, peekTMChan)
+import           Control.Concurrent.Async.Lifted (race)
 import           Control.Lens               hiding (op)
 import           Control.Monad.State
 import           Control.Monad.Logger
@@ -107,15 +108,6 @@ writeSeqP2pEvents events = do
 assertTopicCreation :: GregorM ()
 assertTopicCreation = void $ K.withKafkaViolently SK.assertTopicCreation
 
-unseqReader :: TMChan IngestEvent -> GregorM ()
-unseqReader ch = forever $ do
-  inEvents <- readUnseqEvents'
-  $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
-  atomically . forM_ inEvents $ writeTMChan ch . snd
-  unless (null inEvents) $ do
-    let ofs = maximum . map fst $ inEvents
-    setNextIngestedOffset ofs
-
 getNextIngestedOffset :: GregorM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
@@ -142,7 +134,35 @@ runTheGregor :: GregorConfig -> IO ()
 runTheGregor cfg = runGregorM cfg loop
  where
   loop :: GregorM ()
-  loop = return ()
-  -- TODO(tim): unseq {kafka] -> unseq {TMChan]
-  --            seqp2p {TMChan] -> seqp2p {kafka]
-  --            seqvm {TMChan] -> seqvm {kafka]
+  loop = forever $ do
+    unseqOrSeq <- race readUnseqEvents' (race readP2P readVM)
+    case unseqOrSeq of
+      Left inEvents -> do
+        $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
+        ch <- use gregorUnseq
+        atomically . forM_ inEvents $ writeTMChan ch . snd
+        unless (null inEvents) $ do
+          let ofs = maximum . map fst $ inEvents
+          setNextIngestedOffset ofs
+      Right (Left p2pEvents) -> writeSeqP2pEvents p2pEvents
+      Right (Right vmEvents) -> writeSeqVmEvents vmEvents
+
+readP2P :: GregorM [OutputEvent]
+readP2P = (atomically . readCh) =<< use gregorSeqP2P
+
+readVM :: GregorM [OutputEvent]
+readVM = (atomically . readCh) =<< use gregorSeqVM
+
+drainTMChan :: TMChan a -> STM [a]
+drainTMChan ch = do
+  mmx <- tryReadTMChan ch
+  case mmx of
+    Nothing -> return []
+    Just Nothing -> return []
+    Just (Just x) -> (x:) <$> drainTMChan ch
+
+readCh :: TMChan OutputEvent -> STM [OutputEvent]
+readCh ch = do
+  -- Block until at least 1 element is available
+  _ <- peekTMChan ch
+  drainTMChan ch
