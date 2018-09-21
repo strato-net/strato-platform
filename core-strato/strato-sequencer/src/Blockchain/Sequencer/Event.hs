@@ -39,7 +39,9 @@ import           Blockchain.Sequencer.BinaryInstances      ()
 
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
-                  | UnseqEvent IngestEvent deriving (Eq, Show, GHCG.Generic)
+                  | UnseqEvent IngestEvent
+                  | WaitTerminated
+                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock

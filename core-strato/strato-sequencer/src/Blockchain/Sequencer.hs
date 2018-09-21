@@ -79,7 +79,9 @@ sequencer = do
     -- enough elements are found. Something like a combination with sinkVectorN
     -- and a conduit that closes after a certain amount of time.
     -- Maybe a WaitTimeout is written to the channel?
-    (src', events) <- src $$++ takeC 1 .| sinkList
+    createWaitTimer
+    (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
+    (src'', ()) <- src' $$++ dropC 1 -- Remove the wait termination
     $logDebugS "sequencer/events" . T.pack . show $ events
     checkForVotes [cr | VoteMade cr <- events]
     checkForTimeouts [rn | TimerFire rn <- events]
@@ -92,7 +94,7 @@ sequencer = do
     unless (null p2pEvs) $ do
       writeSeqP2pEvents p2pEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-    go src'
+    go src''
 
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB

@@ -22,10 +22,12 @@ module Blockchain.Sequencer.Monad (
   , drainTimeouts
   , drainVotes
   , fuseChannels
+  , createWaitTimer
 ) where
 
-import           ClassyPrelude                             (atomically, STM)
+import           ClassyPrelude                             (atomically, STM, threadDelay)
 import           Prelude                                   hiding (round)
+import           Control.Concurrent                        (forkIO)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
@@ -70,6 +72,7 @@ data SequencerContext = SequencerContext
                       , _vmEvents            :: Q.Seq OutputEvent
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _blockstanbulContext :: Maybe BlockstanbulContext
+                      , _loopTimeout             :: TMChan ()
                       }
 makeLenses ''SequencerContext
 
@@ -128,6 +131,7 @@ runSequencerM c mbc m = do
         dbPath   <- asks depBlockDBPath
         stxSize  <- asks seenTransactionDBSize
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
+        loopCh <- atomically newTMChan
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
@@ -139,6 +143,7 @@ runSequencerM c mbc m = do
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
             , _blockstanbulContext = mbc
+            , _loopTimeout = loopCh
             }
     return $ fst a
 
@@ -202,7 +207,14 @@ fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
   votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
+  loop <- use loopTimeout
   mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
                , sourceTMChan votes .| mapC VoteMade
-               , sourceTMChan timers .| mapC TimerFire]
+               , sourceTMChan timers .| mapC TimerFire
+               , sourceTMChan loop .| mapC (const WaitTerminated)]
                4096 -- 🙏
+
+createWaitTimer :: SequencerM ()
+createWaitTimer = do
+    lch <- use loopTimeout
+    void . liftIO . forkIO $ threadDelay 40000000 {- 40ms -} >> atomically (writeTMChan lch ())
