@@ -194,8 +194,8 @@ populateStorageDBs findSourceHash genesisBlock genesisChainId = do
       let fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
           filteredAddressState =
             if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
-            then realAddressState
-            else realAddressState{addressStateContractRoot=MP.blankStateRoot}
+            then fullAddressState
+            else fullAddressState{addressStateContractRoot=MP.blankStateRoot}
           fullAddrStates = [(address, fullAddressState)]
           filteredAddrStates = [(address, filteredAddressState)]
 
