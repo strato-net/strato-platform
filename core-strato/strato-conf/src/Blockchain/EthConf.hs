@@ -12,14 +12,11 @@ module Blockchain.EthConf (
       BlockConf(..),
       EthUniqueId(..),
       PrivKey(..),
-      StatsConf(..), runStatsTConfigured, runStatsT,
       ethConf,
       connStr,
     ) where
 
 import           Control.Monad.Except       (ExceptT (..))
-import           Control.Monad.IO.Class
-import qualified Control.Monad.Stats        as StatsT
 import           Control.Monad.Trans.State
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as B8
@@ -29,16 +26,13 @@ import           Data.Yaml
 import           Database.PostgreSQL.Simple (ConnectInfo (..))
 import qualified Database.PostgreSQL.Simple as PS (postgreSQLConnectionString)
 import qualified Database.Redis             as Redis
-import           Network.HostName
 import           Network.Kafka
 import qualified Network.Kafka.Protocol     as KP
-import           System.Environment         (getProgName)
 import           System.IO.Unsafe
 
 import           GHC.Generics
 
 import           Blockchain.PrivateKeyConf
-import           Blockchain.StatsConf
 
 data EthConf =
     EthConf {
@@ -50,8 +44,7 @@ data EthConf =
         levelDBConfig      :: LevelDBConf,
         quarryConfig       :: QuarryConf,
         blockConfig        :: BlockConf,
-        discoveryConfig    :: DiscoveryConf,
-        statsConfig        :: Maybe StatsConf
+        discoveryConfig    :: DiscoveryConf
     } deriving (Generic)
 
 instance FromJSON EthConf
@@ -188,31 +181,3 @@ lookupRedisBlockDBConfig = let r = redisBlockDBConfig ethConf in
         Redis.connectMaxConnections = redisMaxConnections r,
         Redis.connectMaxIdleTime    = fromRational (redisMaxIdleTime r % 1)
     }
-
-ourProgName :: String
-ourProgName = unsafePerformIO getProgName
-{-# NOINLINE ourProgName #-}
-
-ourHostName :: String
-ourHostName = unsafePerformIO getHostName
-{-# NOINLINE ourHostName #-}
-
-assertingStratoTags :: StatsConf -> StatsT.StatsTConfig
-assertingStratoTags conf = toStatsTConfig modified
-    where modified     = conf { statsDefaultTags = hostnameTag:prognameTag:existingTags }
-          existingTags = statsDefaultTags conf
-          tagNames     = fst <$> existingTags
-          prognameTag  = if "exe" `elem` tagNames
-                         then error "statsConfig: strato reserves the `exe` tag, but it was specified"
-                         else ("exe", ourProgName)
-          hostnameTag  = if "hostname" `elem` tagNames
-                         then error "statsConfig: strato reserves the `hostname` tag, but it was specified"
-                         else ("hostname", ourHostName)
-
-runStatsTConfigured :: (MonadIO m) => StatsT.StatsT m a -> m a
-runStatsTConfigured = runStatsT (statsConfig ethConf)
-
-runStatsT :: (MonadIO m) => Maybe StatsConf -> StatsT.StatsT m a -> m a
-runStatsT mc action = case mc of
-    Nothing -> StatsT.runNoStatsT action
-    Just c -> StatsT.runStatsT action (assertingStratoTags c)

@@ -54,7 +54,6 @@ import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
-import           Blockchain.StatsConf
 import           System.Directory                          (createDirectoryIfMissing)
 
 import qualified Database.LevelDB                          as LDB
@@ -88,7 +87,6 @@ data SequencerConfig =
                      , kafkaConsumerGroup    :: KP.ConsumerGroup
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
-                     , statsConfig           :: Maybe StatsConf
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan CandidateReceived

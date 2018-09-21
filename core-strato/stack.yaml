@@ -25,7 +25,6 @@ packages:
 - strato-statediff/
 - test-suite/
 - blockapps-haskoin/
-- statsdi/
 - ethereum-rlp/
 - blockstanbul/
 extra-deps:
