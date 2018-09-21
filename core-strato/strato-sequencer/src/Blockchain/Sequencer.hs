@@ -21,7 +21,7 @@ import           System.Clock
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (toList)
-import           Data.Maybe                                (catMaybes, fromMaybe, fromJust, isJust, mapMaybe)
+import           Data.Maybe                                (catMaybes, fromJust, isJust, mapMaybe)
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -49,7 +49,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
-import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TransactionDef            as TD
@@ -120,32 +119,6 @@ checkForVotes = blockstanbulSend . map translate
               bauth = MsgAuth { sender = (API.sender br), signature = extsign}
           in NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
 
--- bootstrap genesis block into leveldb if needed
-bootstrap :: BDB.Block -> SequencerM OutputBlock
-bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us} = helper
-    where shortCircuit = OutputBlock { obOrigin              = TO.Direct
-                                     , obBlockData           = bd
-                                     , obBlockUncles         = us
-                                     , obTotalDifficulty     = difficulty
-                                     , obReceiptTransactions = kludge <$> txs
-                                     }
-          hash       = BDB.blockHeaderHash bd
-          difficulty = BDB.blockDataDifficulty bd
-          kludge t   = fromMaybe fallback (wrapIngestBlockTransaction hash t)
-              where fallback = OutputTx { otOrigin = TO.BlockHash hash
-                                        , otSigner = A.Address 0
-                                        , otBaseTx = t
-                                        , otHash   = TX.transactionHash t
-                                        }
-          helper = do
-              bootstrapGenesisBlock hash difficulty
-              shouldEmit <- bootstrapDoEmit <$> ask
-              when shouldEmit $ do
-                  error "TODO(tim): redefine bootstrapSequencer :: BDB.BLock -> IO OutputBlock"
-                  -- assertTopicCreation'
-                  -- writeSeqVmEvents [OEBlock shortCircuit]  -- todo handle the error :)
-                  -- writeSeqP2pEvents [OEBlock shortCircuit]  -- todo handle the error :)
-              return shortCircuit
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do

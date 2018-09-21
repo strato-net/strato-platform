@@ -9,8 +9,6 @@ module Blockchain.GenesisBlock (
 ) where
 
 
-import           Control.Concurrent.STM
-import           Control.Concurrent.STM.TMChan
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
@@ -55,19 +53,15 @@ import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffEvents, assertTopicCreation)
 
-import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.MilenaTools               (commitSingleOffset)
-import           Blockchain.Output                    (printLogMsg)
-import           Blockchain.Sequencer                 (bootstrap)
-import qualified Blockchain.Sequencer.Constants       as SeqConstants
+import           Blockchain.Sequencer.Bootstrap       (bootstrapSequencer)
 import           Blockchain.Sequencer.Event           (OutputBlock)
-import           Blockchain.Sequencer.Monad
 import qualified Network.Kafka                        as K
 import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured)
+import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
@@ -247,22 +241,3 @@ bootstrapIndexer key obGB =
                 putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
                 runner
     in runner
-
-
-bootstrapSequencer :: Block -> IO OutputBlock
-bootstrapSequencer gb = do
-    let clientId = KP.KString $ C8.pack SeqConstants.defaultKafkaClientId'
-    ch <- atomically $ newTMChan
-    let dummySequencerCfg = SequencerConfig { depBlockDBCacheSize   = 0
-                                            , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
-                                            , kafkaAddress          = Nothing
-                                            , kafkaClientId         = clientId
-                                            , kafkaConsumerGroup    = lookupConsumerGroup clientId
-                                            , seenTransactionDBSize = 10
-                                            , syncWrites            = False
-                                            , bootstrapDoEmit       = True
-                                            , blockstanbulBlockPeriod = 0
-                                            , blockstanbulRoundPeriod = 0
-                                            , blockstanbulBeneficiary = ch
-                                            }
-    runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg

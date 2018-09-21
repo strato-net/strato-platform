@@ -67,7 +67,6 @@ main = do
         , depBlockDBPath        = flags_depblockdbpath
         , seenTransactionDBSize = flags_txdedupwindow
         , syncWrites            = flags_syncwrites
-        , bootstrapDoEmit       = True
         , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
         , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
         , blockstanbulBeneficiary = chv

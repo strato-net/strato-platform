@@ -30,10 +30,11 @@ import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.ChainHelpers
+import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
-import           Blockchain.Strato.Model.Class       (txChainId)
+import           Blockchain.Strato.Model.Class       (txChainId, blockHash, blockHeaderDifficulty)
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
@@ -102,8 +103,11 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         auSenders = [myAddr]
         ctx = newContext (View 0 0) vals auSenders pkey
         mCtx = if pbft then Just ctx else Nothing
+        hash = blockHash . ingestBlockToBlock $ genesisBlock
+        difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
+        boot = bootstrapGenesisBlock hash difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg)
+      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) printLogMsg)
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def

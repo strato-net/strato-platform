@@ -79,7 +79,6 @@ data SequencerConfig =
                      , depBlockDBPath        :: String
                      , seenTransactionDBSize :: Int
                      , syncWrites            :: Bool
-                     , bootstrapDoEmit       :: Bool
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan CandidateReceived

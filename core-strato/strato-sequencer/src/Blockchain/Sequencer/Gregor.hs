@@ -15,6 +15,10 @@ module Blockchain.Sequencer.Gregor
   (
     GregorConfig(..)
   , runTheGregor
+  , runGregorM
+  , assertTopicCreation
+  , writeSeqP2pEvents
+  , writeSeqVmEvents
   ) where
 
 import           ClassyPrelude              (atomically, TMChan, writeTMChan)
