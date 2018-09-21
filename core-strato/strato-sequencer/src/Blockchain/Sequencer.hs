@@ -63,14 +63,24 @@ import           Blockchain.Util
 
 sequencer :: SequencerM ()
 sequencer = do
+  $logInfoS "sequencer" "Sequencer startup"
   source <- fuseChannels
   bootstrapBlockstanbul
+  $logInfoS "sequencer" "Sequencer initialized"
   go (newResumableSource source)
  where
   go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
-  go src = do
+  go src = timeAction seqLoopTiming $ do
+    $logInfoS "sequencer" "top of seqloop"
     clearAll
-    (src', events) <- src $$++ sinkList
+    -- TODO(tim): This was initially sinkList, but it blocks forever, filling
+    -- the list. It's suboptimal to extract 1 element per iteration, but
+    -- investigation is needed to wait until either a timeout is reached or
+    -- enough elements are found. Something like a combination with sinkVectorN
+    -- and a conduit that closes after a certain amount of time.
+    -- Maybe a WaitTimeout is written to the channel?
+    (src', events) <- src $$++ takeC 1 .| sinkList
+    $logDebugS "sequencer/events" . T.pack . show $ events
     checkForVotes [cr | VoteMade cr <- events]
     checkForTimeouts [rn | TimerFire rn <- events]
     checkForUnseq [iev | UnseqEvent iev <- events]
@@ -89,8 +99,9 @@ clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
 
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
+    withLabel "unseq" (unsafeAddCounter . fromIntegral . length $ inEvents) seqLoopEvents
     t0 <- liftIO $ getTime Realtime
-    splitEvents inEvents
+    timeAction seqSplitEventsTiming $ splitEvents inEvents
     t1 <- liftIO $ getTime Realtime
     $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
     pendingLDBWrites <- gets _ldbBatchOps
@@ -106,10 +117,14 @@ checkForUnseq inEvents = do
       markForP2P . OEGetTx $ toList txHashes
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
-checkForTimeouts = blockstanbulSend . map Timeout
+checkForTimeouts rns = do
+  withLabel "timeout" (unsafeAddCounter . fromIntegral . length $ rns) seqLoopEvents
+  blockstanbulSend . map Timeout $ rns
 
 checkForVotes :: [CandidateReceived] -> SequencerM ()
-checkForVotes = blockstanbulSend . map translate
+checkForVotes crs = do
+  withLabel "vote" (unsafeAddCounter . fromIntegral . length $ crs) seqLoopEvents
+  blockstanbulSend . map translate $ crs
   where translate :: CandidateReceived -> InEvent
         translate br =
           let extsign = RL.rlpDecode

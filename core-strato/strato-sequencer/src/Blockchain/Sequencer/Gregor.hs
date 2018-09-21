@@ -21,8 +21,10 @@ module Blockchain.Sequencer.Gregor
   , writeSeqVmEvents
   ) where
 
-import           ClassyPrelude              (atomically, TMChan, writeTMChan, STM, tryReadTMChan, peekTMChan)
-import           Control.Concurrent.Async.Lifted (race)
+import           ClassyPrelude              (atomically, TMChan, writeTMChan, STM,
+                                             tryReadTMChan, tryPeekTMChan,
+                                             threadDelay)
+import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Lens               hiding (op)
 import           Control.Monad.State
 import           Control.Monad.Logger
@@ -92,18 +94,18 @@ readUnseqEvents' = do
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
     -- its really [(nextOffset, eventAtThisOffset)]
     ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (SK.readUnseqEvents offset)
-    P.unsafeAddCounter (fromIntegral (length ret)) seqKafkaUnseqRead
+    P.unsafeAddCounter (fromIntegral (length ret)) gregorUnseqRead
     return ret
 
 writeSeqVmEvents :: [OutputEvent] -> GregorM ()
 writeSeqVmEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqVmEvents events)
-    P.unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
+    P.unsafeAddCounter (fromIntegral(length events)) gregorVMWrite
 
 writeSeqP2pEvents :: [OutputEvent] -> GregorM ()
 writeSeqP2pEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqP2pEvents events)
-    P.unsafeAddCounter (fromIntegral(length events)) seqKafkaSeqWrites
+    P.unsafeAddCounter (fromIntegral(length events)) gregorP2PWrite
 
 assertTopicCreation :: GregorM ()
 assertTopicCreation = void $ K.withKafkaViolently SK.assertTopicCreation
@@ -116,14 +118,15 @@ getNextIngestedOffset = do
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show SK.unseqEventsTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
-  P.incCounter seqKafkaCheckpointReads
+  P.incCounter gregorKafkaCheckpointReads
   return ret
 
 setNextIngestedOffset :: KP.Offset -> GregorM ()
 setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    P.incCounter seqKafkaCheckpointWrites
+    P.incCounter gregorKafkaCheckpointWrites
+    P.setGauge (fromIntegral newOffset) gregorUnseqOffset
     op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
@@ -131,27 +134,37 @@ setNextIngestedOffset newOffset = do
         Right () -> return ()
 
 runTheGregor :: GregorConfig -> IO ()
-runTheGregor cfg = runGregorM cfg loop
- where
-  loop :: GregorM ()
-  loop = forever $ do
-    unseqOrSeq <- race readUnseqEvents' (race readP2P readVM)
-    case unseqOrSeq of
-      Left inEvents -> do
-        $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
-        ch <- use gregorUnseq
-        atomically . forM_ inEvents $ writeTMChan ch . snd
-        unless (null inEvents) $ do
-          let ofs = maximum . map fst $ inEvents
-          setNextIngestedOffset ofs
-      Right (Left p2pEvents) -> writeSeqP2pEvents p2pEvents
-      Right (Right vmEvents) -> writeSeqVmEvents vmEvents
+runTheGregor cfg = runGregorM cfg $ race_ unseqReader seqWriters
 
-readP2P :: GregorM [OutputEvent]
-readP2P = (atomically . readCh) =<< use gregorSeqP2P
+unseqReader :: GregorM ()
+unseqReader = forever . timeAction gregorUnseqTiming $ do
+  inEvents <- readUnseqEvents'
+  P.withLabel "unseq_events" P.incCounter gregorLoop
+  $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
+  ch <- use gregorUnseq
+  atomically . forM_ inEvents $ writeTMChan ch . snd
+  hd <- atomically $ tryPeekTMChan ch
+  $logDebugS "gregor/unseqchHead" . T.pack . show $ hd
+  P.unsafeAddCounter (fromIntegral (length inEvents)) gregorUnseqWrite
+  unless (null inEvents) $ do
+    let ofs = maximum . map fst $ inEvents
+    setNextIngestedOffset ofs
 
-readVM :: GregorM [OutputEvent]
-readVM = (atomically . readCh) =<< use gregorSeqVM
+seqWriters :: GregorM ()
+seqWriters = forever . timeAction gregorSeqTiming $ do
+  vmch <- use gregorSeqVM
+  vmevs <- atomically $ drainTMChan vmch
+  unless (null vmevs) $ do
+    P.withLabel "seq_vm_events" P.incCounter gregorLoop
+    P.unsafeAddCounter (fromIntegral $ length vmevs) gregorVMRead
+    writeSeqVmEvents vmevs
+  p2pch <- use gregorSeqP2P
+  p2pevs <- atomically $ drainTMChan p2pch
+  unless (null p2pevs) $ do
+    P.withLabel "seq_p2p_events" P.incCounter gregorLoop
+    P.unsafeAddCounter (fromIntegral $ length p2pevs) gregorP2PRead
+    writeSeqP2pEvents p2pevs
+  threadDelay 1000000 -- 1ms
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do
@@ -160,9 +173,3 @@ drainTMChan ch = do
     Nothing -> return []
     Just Nothing -> return []
     Just (Just x) -> (x:) <$> drainTMChan ch
-
-readCh :: TMChan OutputEvent -> STM [OutputEvent]
-readCh ch = do
-  -- Block until at least 1 element is available
-  _ <- peekTMChan ch
-  drainTMChan ch

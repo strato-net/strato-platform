@@ -4,14 +4,16 @@
 module Blockchain.Sequencer.SequencerSpec where
 
 
+import           ClassyPrelude                       (atomically)
 import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (singleton,lookup)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
+
+import           Conduit
 import           Control.Concurrent
-import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import           Control.Exception                   (finally)
 import           Control.Monad
@@ -89,7 +91,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , depBlockDBPath        = fullPath
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
-                               , bootstrapDoEmit       = False
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = vch
@@ -261,3 +262,17 @@ spec = do
             val' `shouldBe` Just True
             pv' `shouldBe` M.singleton testAddr True
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
+
+    describe "fuseChannels" $ do
+      it "should multiplex event types" $ property $ \vote rn iev -> runTestM $ do
+        tch <- asks blockstanbulTimeouts
+        atomically . writeTMChan tch $ rn
+        uch <- asks $ unseqEvents . cablePackage
+        atomically . writeTMChan uch $ iev
+        vch <- asks blockstanbulBeneficiary
+        atomically . writeTMChan vch $ vote
+        src0 <- newResumableSource <$> fuseChannels
+        (src1, ev1) <- src0 $$++ headC
+        (src2, ev2) <- src1 $$++ headC
+        (_, ev3) <- src2 $$++ headC
+        [ev1, ev2, ev3] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev, Just $ VoteMade vote]

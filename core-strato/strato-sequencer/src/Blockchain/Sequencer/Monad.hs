@@ -200,8 +200,8 @@ addLdbBatchOps ops = do
 fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
 fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
-  votes <- asks $ blockstanbulBeneficiary
-  timers <- asks $ blockstanbulTimeouts
+  votes <- asks blockstanbulBeneficiary
+  timers <- asks blockstanbulTimeouts
   mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
                , sourceTMChan votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire]
