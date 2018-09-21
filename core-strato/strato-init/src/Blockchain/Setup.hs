@@ -51,7 +51,6 @@ import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.PrivateKeyConf
-import           Blockchain.StatsConf               (defaultStatsConf)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
@@ -216,18 +215,8 @@ defaultConfig =
       kafkaConfig        = defaultKafkaConfig,
       blockConfig        = defaultBlockConfig,
       quarryConfig       = defaultQuarryConfig,
-      discoveryConfig    = defaultDiscoveryConfig,
-      statsConfig        = statsConfig'
+      discoveryConfig    = defaultDiscoveryConfig
     }
-
-    where statsConfig' = if flags_statsEnable
-                         then Just (defaultStatsConf { statsHost          = flags_statsHost
-                                                     , statsPort          = flags_statsPort
-                                                     , statsFlushInterval = flags_statsFlush
-                                                     , statsPrefix        = flags_statsPrefix
-                                                     , statsSuffix        = flags_statsSuffix
-                                                     })
-                         else Nothing
 
 defaultPeers :: [(String,Int)]
 defaultPeers =
