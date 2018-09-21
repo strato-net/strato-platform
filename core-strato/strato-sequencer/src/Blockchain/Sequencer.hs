@@ -70,7 +70,8 @@ sequencer = do
   go (newResumableSource source)
  where
   go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
-  go src = timeAction seqLoopTiming $ do
+  go src = timeAction seqLoopTiming body >>= go
+   where body = do
     $logInfoS "sequencer" "top of seqloop"
     clearAll
     -- TODO(tim): This was initially sinkList, but it blocks forever, filling
@@ -94,7 +95,7 @@ sequencer = do
     unless (null p2pEvs) $ do
       writeSeqP2pEvents p2pEvs
       $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-    go src''
+    return src''
 
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
