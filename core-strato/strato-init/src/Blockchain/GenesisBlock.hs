@@ -191,27 +191,29 @@ populateStorageDBs findSourceHash genesisBlock genesisChainId = do
       --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
       --since this contract has giant arrays that would choke strato
       --(yes, this temprary feature is hardcoded into the whole platform for one client)
-      let realAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
-          addressState =
+      let fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
+          filteredAddressState =
             if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
             then realAddressState
             else realAddressState{addressStateContractRoot=MP.blankStateRoot}
-          genAddrStates = [(address, addressState)]
+          fullAddrStates = [(address, fullAddressState)]
+          filteredAddrStates = [(address, filteredAddressState)]
 
-      accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
+      fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
+      filteredAccountDiffs <- mapM eventualAccountState . Map.fromList $ filteredAddrStates
 
-      let diff = StateDiff {
+      let statediff ad = StateDiff {
             StateDiff.chainId   = genesisChainId,
             blockNumber         = 0,
             StateDiff.blockHash = blockHash genesisBlock,
             StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
-            createdAccounts     = accountDiffs,
+            createdAccounts     = ad,
             deletedAccounts     = Map.empty,
             updatedAccounts     = Map.empty
             }
 
-      commitSqlDiffs diff (const "") (const "")
-      let diffTriple = destructStateDiff findSourceHash diff
+      commitSqlDiffs (statediff fullAccountDiffs) (const "") (const "")
+      let diffTriple = destructStateDiff findSourceHash (statediff filteredAccountDiffs)
       mErr <- liftIO . runKafkaConfigured "strato-init" $ do
         splitWriteStateDiffEvents diffTriple
       case filterResponse <$> mErr of
