@@ -22,37 +22,37 @@ spec = do
         it "should convert 4 args with types: uint256, uint32[], bytes10, and bytes" $ do
           let
             args = ValueArrayFixed 4
-                    [ SimpleValue (ValueUInt256 291)
-                    , ValueArrayDynamic [ SimpleValue (ValueUInt32 1110)
-                                        , SimpleValue (ValueUInt32 1929)
+                    [ SimpleValue (ValueInt False (Just 32) 291)
+                    , ValueArrayDynamic [ SimpleValue (ValueInt False (Just 4) 1110)
+                                        , SimpleValue (ValueInt False (Just 4) 1929)
                                         ]
-                    , SimpleValue (ValueBytes10 "1234567890")
-                    , SimpleValue (ValueBytes "Hello, world!")
+                    , SimpleValue (ValueBytes (Just 10) "1234567890")
+                    , SimpleValue (ValueBytes Nothing "Hello, world!")
                     ]
             (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
           toStorage args `shouldBe` dataBytestring
         it "should convert 1 arg with type uint256" $ do
           let
             args = ValueArrayFixed 1
-                    [ SimpleValue (ValueUInt256 98127491) ]
+                    [ SimpleValue (ValueInt False (Just 32) 98127491) ]
             (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000005d94e83"
           toStorage args `shouldBe` dataBytestring
         it "should convert 2 arg with type uint256, addresss" $ do
           let
             args = ValueArrayFixed 2
-                    [ SimpleValue (ValueUInt256 324124), SimpleValue (ValueAddress (Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826))]
+                    [ SimpleValue (ValueInt True (Just 32) 324124), SimpleValue (ValueAddress (Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826))]
             (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000004f21c000000000000000000000000cd2a3d9f938e13cd947ec05abc7fe734df8dd826"
           toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type uint" $ do
         let
           args = ValueArrayFixed 1
-                  [ SimpleValue (ValueUInt 3) ]
+                  [ SimpleValue (ValueInt False Nothing 3) ]
           (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000003"
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type int" $ do
         let
           args = ValueArrayFixed 1
-                  [ SimpleValue (ValueInt (-1)) ]
+                  [ SimpleValue (ValueInt True Nothing (-1)) ]
           (dataBytestring,_) = Base16.decode "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type address" $ do
@@ -65,7 +65,7 @@ spec = do
         pendingWith "Need to find a correct bytestring to compare against, blockapps-js returns empty-string"
         let
           args = ValueArrayFixed 1
-            [ SimpleValue $ ValueBytes
+            [ SimpleValue $ ValueBytes Nothing
               (fst $ Base16.decode "adb591795f9e9047f9117163b83c2ebcd5edc4503644d59a98cf911aef0367f8adb591795f9e9047f9117163b83c2ebcd5edc4503644")
             ]
           (dataBytestring,_) = undefined
@@ -73,7 +73,7 @@ spec = do
       it "should convert 1 arg with type bytes32" $ do
         let
           args = ValueArrayFixed 1
-                  [ SimpleValue (ValueBytes32 (fst $ Base16.decode "adb591795f9e9047f9117163b83c2ebcd5edc4503644d59a98cf911aef0367f8")) ]
+                  [ SimpleValue (ValueBytes (Just 32) (fst $ Base16.decode "adb591795f9e9047f9117163b83c2ebcd5edc4503644d59a98cf911aef0367f8")) ]
           (dataBytestring,_) = Base16.decode "adb591795f9e9047f9117163b83c2ebcd5edc4503644d59a98cf911aef0367f8"
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type bool" $ do
@@ -97,16 +97,16 @@ spec = do
         let
           args = ValueArrayFixed 1
                   [ ValueArrayDynamic
-                    [ SimpleValue $ ValueUInt 1
-                    , SimpleValue $ ValueUInt 2
-                    , SimpleValue $ ValueUInt 3
-                    , SimpleValue $ ValueUInt 4
-                    , SimpleValue $ ValueUInt 4
-                    , SimpleValue $ ValueUInt 5
-                    , SimpleValue $ ValueUInt 66
-                    , SimpleValue $ ValueUInt 75
-                    , SimpleValue $ ValueUInt 754
-                    , SimpleValue $ ValueUInt 98
+                    [ SimpleValue $ ValueInt False Nothing 1
+                    , SimpleValue $ ValueInt False Nothing 2
+                    , SimpleValue $ ValueInt False Nothing 3
+                    , SimpleValue $ ValueInt False Nothing 4
+                    , SimpleValue $ ValueInt False Nothing 4
+                    , SimpleValue $ ValueInt False Nothing 5
+                    , SimpleValue $ ValueInt False Nothing 66
+                    , SimpleValue $ ValueInt False Nothing 75
+                    , SimpleValue $ ValueInt False Nothing 754
+                    , SimpleValue $ ValueInt False Nothing 98
                     ]
                   ]
           (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000000000000000000000000000004b00000000000000000000000000000000000000000000000000000000000002f20000000000000000000000000000000000000000000000000000000000000062"
@@ -115,9 +115,9 @@ spec = do
         let
           args = ValueArrayFixed 1
                   [ ValueArrayFixed 3
-                    [ SimpleValue $ ValueUInt 1
-                    , SimpleValue $ ValueUInt 2
-                    , SimpleValue $ ValueUInt 3
+                    [ SimpleValue $ ValueInt False Nothing 1
+                    , SimpleValue $ ValueInt False Nothing 2
+                    , SimpleValue $ ValueInt False Nothing 3
                     ]
                   ]
           (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"
@@ -128,10 +128,10 @@ spec = do
           args = ValueArrayFixed 5
                   [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
-                  , SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                  , ValueArrayDynamic 
-                      [ SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                      , SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ValueArrayDynamic
+                      [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                      , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
                       ]
                   , SimpleValue . ValueString $ "Account Data should be able to be as long as you want ideally 12343432442431"
                   ]
@@ -147,22 +147,22 @@ spec = do
   describe "bytestringToValues and toStorage" $ do
     it "should decode and encode: uint" $ do
       let
-        types = [ SimpleType TypeUInt ]
+        types = [ SimpleType (TypeInt False Nothing) ]
         (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000003"
         mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'
     it "should decode and encode: int" $ do
       let
-        types = [ SimpleType TypeInt ]
+        types = [ SimpleType (TypeInt True Nothing) ]
         (dataBytestring,_) = Base16.decode "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0ff"
         mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'
     it "should decode and encode: address" $ do
       let
         types = [ SimpleType TypeAddress ]
@@ -170,32 +170,36 @@ spec = do
         mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'
     it "should decode and encode: uint, int, uint[], bytes" $ do
       let
-        types = [ SimpleType TypeUInt, SimpleType TypeInt, TypeArrayDynamic (SimpleType TypeUInt), SimpleType TypeBytes ]
+        types = [ SimpleType (TypeInt False Nothing)
+                , SimpleType (TypeInt True Nothing)
+                , TypeArrayDynamic (SimpleType (TypeInt False Nothing))
+                , SimpleType (TypeBytes Nothing)
+                ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000005b303132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738390000000000"
         mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'
     it "should decode and encode: uint256, uint32[], bytes10, and bytes" $ do
       let
         types =
-          [ SimpleType TypeUInt256
-          , TypeArrayDynamic (SimpleType TypeUInt32)
-          , SimpleType TypeBytes10
-          , SimpleType TypeBytes
+          [ SimpleType (TypeInt False $ Just 32)
+          , TypeArrayDynamic (SimpleType $ TypeInt False $ Just 4)
+          , SimpleType (TypeBytes $ Just 10)
+          , SimpleType (TypeBytes Nothing)
           ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
         -- mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
         mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'
     it "should decode and encode: bool" $ do
       let
         types =
@@ -204,5 +208,5 @@ spec = do
         mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
-        Just bytes = mBytes
-      dataBytestring `shouldBe` bytes
+        Just bytes' = mBytes
+      dataBytestring `shouldBe` bytes'

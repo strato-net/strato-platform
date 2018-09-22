@@ -18,25 +18,25 @@ spec =
     it "should generate a selector for a function with no arguments" $
       generateSelector [] "doit" [] "4d536fe3"
     it "should generate a selector for a function with one int argument" $
-      generateSelector [] "doit" [SimpleType TypeInt] "45db85b8"
+      generateSelector [] "doit" [SimpleType $ TypeInt True Nothing] "45db85b8"
     it "should generate a selector for a function with three varied intN arguments" $
-      generateSelector [] "doit" (map SimpleType [TypeInt8, TypeInt48, TypeInt200]) "31f92024"
+      generateSelector [] "doit" (map (SimpleType . TypeInt True . Just) [1, 6, 25]) "31f92024"
 
     it "should generate a selector for a function with one uint argument" $ do
-      generateSelector [] "goForIt" [SimpleType TypeUInt] "e7b3ef24"
+      generateSelector [] "goForIt" [SimpleType $ TypeInt False Nothing] "e7b3ef24"
     it "should generate a selector for a function with three varied uintN arguments" $ do
-      generateSelector [] "goForIt" (map SimpleType [TypeUInt8, TypeUInt48, TypeUInt200]) "2a17bbf5"
+      generateSelector [] "goForIt" (map (SimpleType . TypeInt False . Just) [1, 6, 25]) "2a17bbf5"
       
     it "should generate a selector for a function with one bytes argument" $ do
-      generateSelector [] "makeItHappen" [SimpleType TypeBytes] "3aae8c6c"
+      generateSelector [] "makeItHappen" [SimpleType $ TypeBytes Nothing] "3aae8c6c"
     it "should generate a selector for a function with three varied bytesN arguments" $ do
-      generateSelector [] "makeItHappen" (map SimpleType [TypeBytes1, TypeBytes10, TypeBytes20]) "f719f0c1"
+      generateSelector [] "makeItHappen" (map (SimpleType . TypeBytes . Just) [1, 10, 20]) "f719f0c1"
       
     it "should generate a selector for a function with one string argument" $ do
       generateSelector [] "f" [SimpleType TypeString] "91e145ef"
       
     it "should generate a selector for a function with one fixed array argument" $ do
-      generateSelector [] "doit" [TypeArrayFixed 10 (SimpleType TypeInt)] "76be8dcc"
+      generateSelector [] "doit" [TypeArrayFixed 10 (SimpleType $ TypeInt True Nothing)] "76be8dcc"
     it "should generate a selector for a function with one dynamic array argument" $ do
       generateSelector [] "doit" [TypeArrayDynamic (SimpleType TypeString)] "2a146d1b"
 --    it "should generate a selector for a function with one mapping argument" $ do

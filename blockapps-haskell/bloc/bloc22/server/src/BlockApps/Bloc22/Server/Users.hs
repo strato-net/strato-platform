@@ -722,7 +722,7 @@ functionResult hash mtxr cmId funcName index = do
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
-  TypeEnum _ -> SimpleType TypeUInt256
+  TypeEnum _ -> SimpleType $ TypeInt True $ Just 32
   TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
@@ -745,43 +745,35 @@ constructArgValues args argNamesTypes = do
       determineValue valStr (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
-            Xabi.Int _ _ ->
-              textToArgType "Int" False ""
-            Xabi.String dy ->
-              textToArgType "String" (fromMaybe False dy) ""
-            Xabi.Bytes dy by ->
-              textToArgType ("Bytes" <> maybe "" (Text.pack . show) by) (fromMaybe False dy) ""
-            Xabi.Bool ->
-              textToArgType "Bool" False ""
-            Xabi.Address ->
-              textToArgType "Address" False ""
-            Xabi.Struct _ _ ->
-              textToArgType "Struct" False ""
-            Xabi.Enum{} ->
-              textToArgType "Enum" False ""
+            Xabi.Int (Just True) b -> Right  $ SimpleType $ TypeInt True $ fmap toInteger b
+            Xabi.Int _           b -> Right  $ SimpleType $ TypeInt False $ fmap toInteger b
+            Xabi.String _          -> Right  $ SimpleType $ TypeString
+            Xabi.Bytes _ b         -> Right  $ SimpleType $ TypeBytes $ fmap toInteger b
+            Xabi.Bool              -> Right  $ SimpleType $ TypeBool
+            Xabi.Address           -> Right  $ SimpleType $ TypeAddress
+            Xabi.Struct _ name     -> Right  $ TypeStruct name
+            Xabi.Enum _ name _     -> Right  $ TypeEnum name
             Xabi.Array ety len ->
               let
                 ettyty = case ety of
-                  Xabi.Int{} -> "Int"
-                  Xabi.String{} -> "String"
-                  Xabi.Bytes _ by -> "Bytes" <> maybe "" (Text.pack . show) by
-                  Xabi.Bool -> "Bool"
-                  Xabi.Address -> "Address"
-                  Xabi.Struct{} -> "Struct"
-                  Xabi.Enum{} -> "Enum"
-                  Xabi.Array{} ->
-                    error "Array of array not supported"
-                  Xabi.Contract{} -> "Contract"
-                  Xabi.Mapping{} -> "Mapping"
-                  Xabi.Label{} -> "Int" -- since Enums are converted to Ints
-              in
-                textToArgType ("Array" <> maybe "" (Text.pack . show) len) (isNothing len) ettyty
-            Xabi.Contract{} ->
-              textToArgType "Contract" False ""
-            Xabi.Mapping dy _ _ ->
-              textToArgType "Mapping" (fromMaybe False dy) ""
-            Xabi.Label _ ->
-              textToArgType "Int" False "" -- since Enums are converted to Ints
+                  Xabi.Int (Just True) b -> Right  $ SimpleType $ TypeInt True $ fmap toInteger b
+                  Xabi.Int _           b -> Right  $ SimpleType $ TypeInt False $ fmap toInteger b
+                  Xabi.String _          -> Right  $ SimpleType $ TypeString
+                  Xabi.Bytes _ b         -> Right  $ SimpleType $ TypeBytes $ fmap toInteger b
+                  Xabi.Bool              -> Right  $ SimpleType $ TypeBool
+                  Xabi.Address           -> Right  $ SimpleType $ TypeAddress
+                  Xabi.Struct _ name     -> Right  $ TypeStruct name
+                  Xabi.Enum _ name _     -> Right  $ TypeEnum name
+                  Xabi.Array{}           -> Left   $ error "Arrays of arrays are not allowed as function arguments"
+                  Xabi.Contract name     -> Right  $ TypeContract name
+                  Xabi.Mapping{}         -> Left   $ error "Arrays of mappings are not allowed as function arguments"
+                  Xabi.Label{}           -> Right  $ SimpleType $ TypeInt False Nothing
+              in case len of
+                   Just l                -> TypeArrayFixed l <$> ettyty
+                   Nothing               -> TypeArrayDynamic <$> ettyty
+            Xabi.Contract name           -> Right  $ TypeContract name
+            Xabi.Mapping _ _ _           -> Left   $ error "Mappings are not allowed as function arguments"
+            Xabi.Label _                 -> Right  $ SimpleType $ TypeInt False Nothing -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
