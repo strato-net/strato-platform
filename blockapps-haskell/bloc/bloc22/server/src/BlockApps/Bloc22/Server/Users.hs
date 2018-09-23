@@ -745,35 +745,35 @@ constructArgValues args argNamesTypes = do
       determineValue valStr (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
-            Xabi.Int (Just True) b -> Right  $ SimpleType $ TypeInt True $ fmap toInteger b
-            Xabi.Int _           b -> Right  $ SimpleType $ TypeInt False $ fmap toInteger b
-            Xabi.String _          -> Right  $ SimpleType $ TypeString
-            Xabi.Bytes _ b         -> Right  $ SimpleType $ TypeBytes $ fmap toInteger b
-            Xabi.Bool              -> Right  $ SimpleType $ TypeBool
-            Xabi.Address           -> Right  $ SimpleType $ TypeAddress
-            Xabi.Struct _ name     -> Right  $ TypeStruct name
-            Xabi.Enum _ name _     -> Right  $ TypeEnum name
+            Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
+            Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
+            Xabi.String _          -> Right . SimpleType $ TypeString
+            Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
+            Xabi.Bool              -> Right . SimpleType $ TypeBool
+            Xabi.Address           -> Right . SimpleType $ TypeAddress
+            Xabi.Struct _ name     -> Right $ TypeStruct name
+            Xabi.Enum _ name _     -> Right $ TypeEnum name
             Xabi.Array ety len ->
               let
                 ettyty = case ety of
-                  Xabi.Int (Just True) b -> Right  $ SimpleType $ TypeInt True $ fmap toInteger b
-                  Xabi.Int _           b -> Right  $ SimpleType $ TypeInt False $ fmap toInteger b
-                  Xabi.String _          -> Right  $ SimpleType $ TypeString
-                  Xabi.Bytes _ b         -> Right  $ SimpleType $ TypeBytes $ fmap toInteger b
-                  Xabi.Bool              -> Right  $ SimpleType $ TypeBool
-                  Xabi.Address           -> Right  $ SimpleType $ TypeAddress
-                  Xabi.Struct _ name     -> Right  $ TypeStruct name
-                  Xabi.Enum _ name _     -> Right  $ TypeEnum name
-                  Xabi.Array{}           -> Left   $ error "Arrays of arrays are not allowed as function arguments"
-                  Xabi.Contract name     -> Right  $ TypeContract name
-                  Xabi.Mapping{}         -> Left   $ error "Arrays of mappings are not allowed as function arguments"
-                  Xabi.Label{}           -> Right  $ SimpleType $ TypeInt False Nothing
+                  Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
+                  Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
+                  Xabi.String _          -> Right . SimpleType $ TypeString
+                  Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
+                  Xabi.Bool              -> Right . SimpleType $ TypeBool
+                  Xabi.Address           -> Right . SimpleType $ TypeAddress
+                  Xabi.Struct _ name     -> Right $ TypeStruct name
+                  Xabi.Enum _ name _     -> Right $ TypeEnum name
+                  Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
+                  Xabi.Contract name     -> Right $ TypeContract name
+                  Xabi.Mapping{}         -> Left "Arrays of mappings are not allowed as function arguments"
+                  Xabi.Label{}           -> Right . SimpleType $ TypeInt False Nothing
               in case len of
                    Just l                -> TypeArrayFixed l <$> ettyty
                    Nothing               -> TypeArrayDynamic <$> ettyty
-            Xabi.Contract name           -> Right  $ TypeContract name
-            Xabi.Mapping _ _ _           -> Left   $ error "Mappings are not allowed as function arguments"
-            Xabi.Label _                 -> Right  $ SimpleType $ TypeInt False Nothing -- since Enums are converted to Ints
+            Xabi.Contract name           -> Right $ TypeContract name
+            Xabi.Mapping _ _ _           -> Left "Mappings are not allowed as function arguments"
+            Xabi.Label _                 -> Right . SimpleType $ TypeInt False Nothing -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
