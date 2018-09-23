@@ -24,10 +24,10 @@ data SimpleType
   = TypeBool
   | TypeAddress
   | TypeString
-  | TypeInt { signed :: Bool
-            , bytes  :: Maybe Integer
+  | TypeInt { intSigned :: Bool
+            , intSize   :: Maybe Integer
             }
-  | TypeBytes { bytes :: Maybe Integer
+  | TypeBytes { bytesSize :: Maybe Integer
               }
   deriving (Show,Read)
 

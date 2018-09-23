@@ -12,6 +12,7 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
+import           Data.LargeWord          (Word256)
 import           Data.List               (intersperse)
 import           Data.Maybe              (fromMaybe)
 import           Data.Monoid
@@ -20,10 +21,10 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Encoding      as Text
 import           Data.Traversable        (for)
+import           Data.Word               (Word8)
 import           Text.Read
 
 import           BlockApps.Ethereum
-import           BlockApps.Solidity.Int
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 
