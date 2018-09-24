@@ -5,11 +5,11 @@
 module Blockchain.Data.Action where
 
 import           Blockchain.Data.Address
-import           Blockchain.ExtWord      (Word256)
+import           Blockchain.ExtWord           (Word256)
 import           Blockchain.SHA
 import           Data.Aeson
-import           Data.Map.Strict         (Map)
-import           Data.Text               (Text)
+import           Data.Map.Strict              (Map)
+import           Data.Text                    (Text)
 import           Data.Time
 import           GHC.Generics
 
@@ -18,7 +18,7 @@ data ActionType = Create | Delete | Update deriving (Eq, Show, Generic)
 instance ToJSON ActionType where
 instance FromJSON ActionType where
 
-data SourcePtr = SourcePtr { sourceHash :: Text, contractName :: Text} deriving (Eq, Show, Generic)
+data SourcePtr = SourcePtr { sourceHash :: SHA, contractName :: Text} deriving (Eq, Show, Generic)
 
 instance ToJSON SourcePtr where
 instance FromJSON SourcePtr where

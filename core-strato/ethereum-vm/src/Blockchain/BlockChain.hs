@@ -99,6 +99,7 @@ import           Blockchain.Strato.StateDiff.Kafka
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 
+import qualified Blockchain.Strato.Model.SHA             as H
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -543,12 +544,10 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
       when (flags_diffPublish && mined == Mined) $ do
         actions <- forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a
-          srcHash <- codeSource addressStateCodeHash
-          liftIO $ putStrLn $ "+++srcHash+++: " ++ show srcHash
+          src <- codeSource addressStateCodeHash
+          let srcHash = H.superProprietaryStratoSHAHash $ BC.pack src
           contName <- codeContractName addressStateCodeHash
-          liftIO $ putStrLn $ "+++contName+++: " ++ show contName
-          let sPtr = Just SourcePtr{sourceHash = T.pack srcHash, contractName = T.pack contName}
-          liftIO $ putStrLn $ "+++SourcePtr+++: " ++ show sPtr
+          let sPtr = Just SourcePtr{sourceHash = srcHash, contractName = T.pack contName}
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
