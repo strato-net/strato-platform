@@ -108,7 +108,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         boot = bootstrapGenesisBlock hash difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) printLogMsg)
+      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
@@ -264,7 +264,7 @@ spec = do
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
 
     describe "fuseChannels" $ do
-      it "should multiplex event types" $ property $ \vote rn iev -> runTestM $ do
+      it "should multiplex event types" $ withMaxSuccess 5 $ property $ \vote rn iev -> runTestM $ do
         tch <- asks blockstanbulTimeouts
         atomically . writeTMChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
