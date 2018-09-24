@@ -78,15 +78,17 @@ makeLenses ''SequencerContext
 
 
 data SequencerConfig =
-     SequencerConfig { depBlockDBCacheSize   :: Int
-                     , depBlockDBPath        :: String
-                     , seenTransactionDBSize :: Int
-                     , syncWrites            :: Bool
+     SequencerConfig { depBlockDBCacheSize     :: Int
+                     , depBlockDBPath          :: String
+                     , seenTransactionDBSize   :: Int
+                     , syncWrites              :: Bool
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan CandidateReceived
-                     , blockstanbulTimeouts :: TMChan RoundNumber
+                     , blockstanbulTimeouts    :: TMChan RoundNumber
                      , cablePackage            :: CablePackage
+                     , maxEventsPerIter        :: Int
+                     , maxUsPerIter            :: Int
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
@@ -214,7 +216,7 @@ fuseChannels = do
                , sourceTMChan loop .| mapC (const WaitTerminated)]
                4096 -- 🙏
 
-createWaitTimer :: SequencerM ()
-createWaitTimer = do
+createWaitTimer :: Int -> SequencerM ()
+createWaitTimer dt = do
     lch <- use loopTimeout
-    void . liftIO . forkIO $ threadDelay 10000 {- 10ms -} >> atomically (writeTMChan lch ())
+    void . liftIO . forkIO $ threadDelay dt >> atomically (writeTMChan lch ())

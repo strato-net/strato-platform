@@ -67,7 +67,15 @@ function newnode {
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+  if [ -n "${seqMaxEventsPerIter}" ]; then
+    evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
+  fi
+  if [ -n "${seqMaxUsPerIter}" ]; then
+    usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
+  fi
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
+    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1

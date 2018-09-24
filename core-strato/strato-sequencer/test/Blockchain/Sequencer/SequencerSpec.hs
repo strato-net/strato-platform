@@ -96,6 +96,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulBeneficiary = vch
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
+                               , maxUsPerIter = 200
+                               , maxEventsPerIter = 4
                                }
         bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
         pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes

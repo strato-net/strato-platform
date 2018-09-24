@@ -16,7 +16,6 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.IO.Class                    (liftIO)
-import           System.Clock
 
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
@@ -75,10 +74,10 @@ sequencer = do
          body = do
           $logInfoS "sequencer" "top of seqloop"
           clearAll
-          createWaitTimer
-          -- TODO(tim): It would be nice to figure out a way to just take the
-          -- first N events when they are available before the wait timeout
-          (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
+          dt <- asks maxUsPerIter
+          createWaitTimer dt
+          maxEvents <- asks maxEventsPerIter
+          (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| takeC maxEvents .| sinkList
           (src'', ()) <- src' $$++ dropWhileC (== WaitTerminated)
           $logDebugS "sequencer/events" . T.pack . show $ events
           checkForVotes [cr | VoteMade cr <- events]

@@ -72,6 +72,8 @@ main = do
         , blockstanbulBeneficiary = chv
         , blockstanbulTimeouts = cht
         , cablePackage = pkg
+        , maxEventsPerIter = flags_seq_max_events_per_iter
+        , maxUsPerIter = flags_seq_max_us_per_iter
         }
       gregorCfg = GregorConfig
         { kafkaAddress          = mKafkaAddress

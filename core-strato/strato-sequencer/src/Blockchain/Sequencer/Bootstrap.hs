@@ -62,6 +62,8 @@ bootstrapSequencer Block{blockBlockData = bd,
             , blockstanbulBeneficiary = vch
             , blockstanbulTimeouts = tch
             , cablePackage = pkg
+            , maxEventsPerIter = 65
+            , maxUsPerIter = 20000
             }
       flip runLoggingT printLogMsg . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
