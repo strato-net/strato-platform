@@ -9,6 +9,21 @@ import           Data.List
 import           Data.Text       (Text)
 import qualified Data.Text       as Text
 
+typeUInt :: SimpleType
+typeUInt = TypeInt False Nothing
+
+typeInt :: SimpleType
+typeInt = TypeInt True Nothing
+
+typeUInt256 :: SimpleType
+typeUInt256 = TypeInt False (Just 32)
+
+typeInt256 :: SimpleType
+typeInt256 = TypeInt True (Just 32)
+
+typeBytes :: SimpleType
+typeBytes = TypeBytes Nothing
+
 data Type
   = SimpleType SimpleType
   | TypeArrayDynamic Type

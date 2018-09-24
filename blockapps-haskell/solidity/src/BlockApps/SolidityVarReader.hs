@@ -224,7 +224,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       lastWord64::Word256->Word64
       lastWord64 (LargeKey x _) = x
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
-    in SimpleValue $ ValueBytes Nothing $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+    in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType (TypeBytes Nothing) -> --small string, less than 32 bytes
     let
@@ -232,18 +232,18 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       lastWord64::Word256->Word64
       lastWord64 (LargeKey x _) = x
     in
-      SimpleValue $ ValueBytes Nothing $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
+      SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes Nothing bytes) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType (TypeBytes Nothing)
+      SimpleValue (ValueBytes Nothing bytes) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes
     in
       SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
   TypeArrayFixed size ty -> if len
-    then SimpleValue $ ValueInt False Nothing $ fromIntegral size
+    then SimpleValue $ valueUInt $ fromIntegral size
     else ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
@@ -252,7 +252,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
 
   TypeArrayDynamic ty -> if len
-    then SimpleValue $ ValueInt False Nothing (toInteger $ storage offset)
+    then SimpleValue $ valueUInt (toInteger $ storage offset)
     else ValueArrayDynamic theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty

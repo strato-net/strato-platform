@@ -26,14 +26,14 @@ spec =
       contractToXabi "MyContract" (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass
     it "should derive the correct size of a struct definition ending with a single-byte type" $ do
       let tdefs = TypeDefs M.empty M.empty
-          fields = [(("exceptionID"   , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("exceptionType" , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("exceptionLevel", SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("stateType"     , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("state"         , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("timeoutLength" , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("minValue"      , SimpleType $ TypeInt False Nothing), Nothing)
-                   ,(("maxValue"      , SimpleType $ TypeInt False Nothing), Nothing)
+          fields = [(("exceptionID"   , SimpleType typeUInt), Nothing)
+                   ,(("exceptionType" , SimpleType typeUInt), Nothing)
+                   ,(("exceptionLevel", SimpleType typeUInt), Nothing)
+                   ,(("stateType"     , SimpleType typeUInt), Nothing)
+                   ,(("state"         , SimpleType typeUInt), Nothing)
+                   ,(("timeoutLength" , SimpleType typeUInt), Nothing)
+                   ,(("minValue"      , SimpleType typeUInt), Nothing)
+                   ,(("maxValue"      , SimpleType typeUInt), Nothing)
                    ,(("isWarning"     , SimpleType $ TypeBool   ), Nothing)
                    ]
       Struct.size (fieldsToStruct tdefs fields) `shouldBe` fromIntegral (32 * length fields)

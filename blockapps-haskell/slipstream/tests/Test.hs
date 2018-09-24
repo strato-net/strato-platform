@@ -50,7 +50,7 @@ main = hspec $ do
              chain = "<CHAIN>",
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
                 V.ValueStruct [
-                  ("number", V.SimpleValue $ V.ValueInt False Nothing 18199984780605),
+                  ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
 

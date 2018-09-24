@@ -30,6 +30,21 @@ import           BlockApps.Solidity.TypeDefs
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
+valueUInt :: Integer -> SimpleValue
+valueUInt = ValueInt False Nothing
+
+valueInt :: Integer -> SimpleValue
+valueInt = ValueInt True Nothing
+
+valueUInt256 :: Integer -> SimpleValue
+valueUInt256 = ValueInt False (Just 32)
+
+valueInt256 :: Integer -> SimpleValue
+valueInt256 = ValueInt False (Just 32)
+
+valueBytes :: ByteString -> SimpleValue
+valueBytes = ValueBytes Nothing
+
 data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic [Value]
@@ -140,8 +155,8 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
                   (ByteString.drop (fromIntegral (start::Word256)) totalBytes)
               len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
               lenAsInt = fromIntegral (len::Word256)
-              valueBytes = ByteString.take (size * lenAsInt) rb
-              arrayBytes = ByteString.append lengthBytes valueBytes
+              vBytes = ByteString.take (size * lenAsInt) rb
+              arrayBytes = ByteString.append lengthBytes vBytes
             rest <- toBytesTypePair restOfBytes tailTypes
             return $ (arrayBytes, headType) : rest
         SimpleType (TypeBytes Nothing) -> do
@@ -170,10 +185,10 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
             Nothing -> Nothing
             Just size -> do
               let
-                (typeBytes, restOfBytes) = ByteString.splitAt size b
+                (tBytes, restOfBytes) = ByteString.splitAt size b
               rest <- toBytesTypePair restOfBytes tailTypes
               return $
-                (typeBytes,headType) : rest
+                (tBytes,headType) : rest
 
 
 valueToText :: Value -> Maybe Text

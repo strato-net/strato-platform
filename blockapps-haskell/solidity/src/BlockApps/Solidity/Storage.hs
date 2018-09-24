@@ -18,7 +18,7 @@ import           BlockApps.Solidity.Value
 toStorage :: Value -> ByteString
 toStorage = \case
   SimpleValue v -> simpleToStorage v
-  ValueArrayDynamic vs -> toStorage (SimpleValue (ValueInt False Nothing k))
+  ValueArrayDynamic vs -> toStorage (SimpleValue (valueUInt k))
                           `ByteString.append`
                           toStorage (ValueArrayFixed k vs)
     where
@@ -33,7 +33,7 @@ toStorage = \case
       head'' =  zipWith f tailLengths  head'
         where
           f t = fromMaybe
-                  (toStorage $ SimpleValue $ ValueInt False Nothing $ fromIntegral $ t + headLength)
+                  (toStorage $ SimpleValue $ valueUInt $ fromIntegral $ t + headLength)
     in
       ByteString.concat head'' `ByteString.append` ByteString.concat tail'
 
@@ -49,15 +49,15 @@ toStorage = \case
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
-  ValueBool v -> simpleToStorage $ ValueInt False Nothing $ bool 0 1 v
+  ValueBool v -> simpleToStorage $ valueUInt $ bool 0 1 v
   ValueInt False _ v -> ByteString.pack $ go False v
   ValueInt True  _ v -> ByteString.pack $ if (v < 0)
                                             then go True ((negate v) - 1)
                                             else go False v
-  ValueAddress v -> simpleToStorage . ValueInt False Nothing . fromIntegral $ unAddress v
-  ValueBytes Nothing v -> padRight32 $ ByteString.append (simpleToStorage (ValueInt False Nothing (toInteger $ ByteString.length v))) v
+  ValueAddress v -> simpleToStorage . valueUInt . fromIntegral $ unAddress v
+  ValueBytes Nothing v -> padRight32 $ ByteString.append (simpleToStorage (valueUInt (toInteger $ ByteString.length v))) v
   ValueBytes (Just _) v -> padRight32 v
-  ValueString v -> simpleToStorage . ValueBytes Nothing $ Text.encodeUtf8 v
+  ValueString v -> simpleToStorage . valueBytes $ Text.encodeUtf8 v
   where
     paddingLen bs =
       let
