@@ -479,6 +479,9 @@ outputTransactionResult :: BlockData
                         -> TxRunResult
                         -> ContextM ()
 outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
+  let stateRt = MP.StateRoot $ blockHeaderStateRoot b
+  let codeSource = getSource False stateRt
+  let codeContractName = getContractName False stateRt
   let
     (txrStatus, message, gasRemaining) =
       case result of
@@ -540,6 +543,12 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
       when (flags_diffPublish && mined == Mined) $ do
         actions <- forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a
+          srcHash <- codeSource addressStateCodeHash
+          liftIO $ putStrLn $ "+++srcHash+++: " ++ show srcHash
+          contName <- codeContractName addressStateCodeHash
+          liftIO $ putStrLn $ "+++contName+++: " ++ show contName
+          let sPtr = Just SourcePtr{sourceHash = T.pack srcHash, contractName = T.pack contName}
+          liftIO $ putStrLn $ "+++SourcePtr+++: " ++ show sPtr
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
@@ -550,7 +559,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                      signer
                      a
                      addressStateCodeHash
-                     Nothing -- TODO: Retrieve the sourceptr
+                     sPtr
                      (Just s)
         void . withKafkaViolently $ writeAnyTypeWithAToJSONInstanceToKafka actions
 
