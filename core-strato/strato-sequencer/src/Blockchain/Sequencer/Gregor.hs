@@ -164,7 +164,7 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
     P.withLabel "seq_p2p_events" P.incCounter gregorLoop
     P.unsafeAddCounter (fromIntegral $ length p2pevs) gregorP2PRead
     writeSeqP2pEvents p2pevs
-  threadDelay 1000000 -- 1ms
+  threadDelay 1000 -- 1ms
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do
