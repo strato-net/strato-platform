@@ -1,16 +1,17 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 module Blockchain.Blockstanbul.Metrics where
 
-import           Prometheus                                as P
+import           Prometheus
 
-pbftPrepare :: P.Metric P.Counter
-pbftPrepare = P.unsafeRegisterIO $ counter (P.Info "pbft_prepare_messages" "pbft counter for prepare messages")
+inEventMetric :: Metric (Vector String Counter)
+inEventMetric = unsafeRegisterIO
+               . vector "inevent_type"
+               . counter
+               $ Info "pbft_inevent" "Count of pbft inEvent"
 
-pbftCommit :: P.Metric P.Counter
-pbftCommit = P.unsafeRegisterIO $ counter (P.Info "pbft_commit_messages" "pbft counter for commited messages")
+outEventMetric :: Metric (Vector String Counter)
+outEventMetric = unsafeRegisterIO
+               . vector "outevent_type"
+               . counter
+               $ Info "pbft_outevent" "Count of pbft outEvent"
 
-pbftPreprepare :: P.Metric P.Counter
-pbftPreprepare = P.unsafeRegisterIO $ counter (P.Info "pbft_preprepare_messages" "pbft counter for preprepare messages")
-
-pbftRoundchange :: P.Metric P.Counter
-pbftRoundchange = P.unsafeRegisterIO $ counter (P.Info "pbft_roundchange_messages" "pbft counter for roundchange messages")
