@@ -1,7 +1,0 @@
-pkg/
-.git/
-.gitignore
-.gitattributes
-Makefile
-Dockerfile
-node_modules/

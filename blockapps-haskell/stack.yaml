@@ -6,8 +6,6 @@ packages:
 - bloc/bloc22/client
 - bloc/bloc22/server
 - bloc/exe
-- cirrus/api
-- cirrus/client
 - ethereum
 - ethereum-abi
 - slipstream
