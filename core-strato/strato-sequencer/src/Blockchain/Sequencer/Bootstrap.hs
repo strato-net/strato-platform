@@ -57,7 +57,6 @@ bootstrapSequencer Block{blockBlockData = bd,
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
             , seenTransactionDBSize = 10
             , syncWrites            = False
-            , statsConfig           = Nothing
             , blockstanbulBlockPeriod = 0
             , blockstanbulRoundPeriod = 0
             , blockstanbulBeneficiary = vch
