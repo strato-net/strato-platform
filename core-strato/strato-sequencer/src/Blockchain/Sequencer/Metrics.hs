@@ -87,10 +87,11 @@ gregorUnseqOffset :: Metric Gauge
 gregorUnseqOffset = unsafeRegisterIO . gauge
                   $ Info "gregor_unseq_kafka_offset" "Gauges number of unseq events read"
 
-timeAction :: (Observer metric, MonadMonitor m, MonadIO m) => Metric metric -> m () -> m ()
+timeAction :: (Observer metric, MonadMonitor m, MonadIO m) => Metric metric -> m a -> m a
 timeAction metric act = do
     start <- liftIO $ getTime Monotonic
-    act
+    res <- act
     end <- liftIO $ getTime Monotonic
     let duration = toNanoSecs (end `diffTimeSpec` start) % 1000000000
     observe (fromRational duration) metric
+    return res

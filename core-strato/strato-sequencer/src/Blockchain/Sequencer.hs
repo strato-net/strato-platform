@@ -71,31 +71,32 @@ sequencer = do
  where
   go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
   go src = timeAction seqLoopTiming body >>= go
-   where body = do
-    $logInfoS "sequencer" "top of seqloop"
-    clearAll
-    -- TODO(tim): This was initially sinkList, but it blocks forever, filling
-    -- the list. It's suboptimal to extract 1 element per iteration, but
-    -- investigation is needed to wait until either a timeout is reached or
-    -- enough elements are found. Something like a combination with sinkVectorN
-    -- and a conduit that closes after a certain amount of time.
-    -- Maybe a WaitTimeout is written to the channel?
-    createWaitTimer
-    (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
-    (src'', ()) <- src' $$++ dropC 1 -- Remove the wait termination
-    $logDebugS "sequencer/events" . T.pack . show $ events
-    checkForVotes [cr | VoteMade cr <- events]
-    checkForTimeouts [rn | TimerFire rn <- events]
-    checkForUnseq [iev | UnseqEvent iev <- events]
-    vmEvs <- drainVM
-    unless (null vmEvs) $ do
-      writeSeqVmEvents vmEvs
-      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-    p2pEvs <- drainP2P
-    unless (null p2pEvs) $ do
-      writeSeqP2pEvents p2pEvs
-      $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-    return src''
+   where body :: SequencerM (ResumableSource SequencerM SeqLoopEvent)
+         body = do
+          $logInfoS "sequencer" "top of seqloop"
+          clearAll
+          -- TODO(tim): This was initially sinkList, but it blocks forever, filling
+          -- the list. It's suboptimal to extract 1 element per iteration, but
+          -- investigation is needed to wait until either a timeout is reached or
+          -- enough elements are found. Something like a combination with sinkVectorN
+          -- and a conduit that closes after a certain amount of time.
+          -- Maybe a WaitTimeout is written to the channel?
+          createWaitTimer
+          (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
+          (src'', ()) <- src' $$++ dropC 1 -- Remove the wait termination
+          $logDebugS "sequencer/events" . T.pack . show $ events
+          checkForVotes [cr | VoteMade cr <- events]
+          checkForTimeouts [rn | TimerFire rn <- events]
+          checkForUnseq [iev | UnseqEvent iev <- events]
+          vmEvs <- drainVM
+          unless (null vmEvs) $ do
+            writeSeqVmEvents vmEvs
+            $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+          p2pEvs <- drainP2P
+          unless (null p2pEvs) $ do
+            writeSeqP2pEvents p2pEvs
+            $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+          return src''
 
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
