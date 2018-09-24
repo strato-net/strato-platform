@@ -217,4 +217,4 @@ fuseChannels = do
 createWaitTimer :: SequencerM ()
 createWaitTimer = do
     lch <- use loopTimeout
-    void . liftIO . forkIO $ threadDelay 40000000 {- 40ms -} >> atomically (writeTMChan lch ())
+    void . liftIO . forkIO $ threadDelay 40000 {- 40ms -} >> atomically (writeTMChan lch ())
