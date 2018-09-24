@@ -75,13 +75,9 @@ sequencer = do
          body = do
           $logInfoS "sequencer" "top of seqloop"
           clearAll
-          -- TODO(tim): This was initially sinkList, but it blocks forever, filling
-          -- the list. It's suboptimal to extract 1 element per iteration, but
-          -- investigation is needed to wait until either a timeout is reached or
-          -- enough elements are found. Something like a combination with sinkVectorN
-          -- and a conduit that closes after a certain amount of time.
-          -- Maybe a WaitTimeout is written to the channel?
           createWaitTimer
+          -- TODO(tim): It would be nice to figure out a way to just take the
+          -- first N events when they are available before the wait timeout
           (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
           (src'', ()) <- src' $$++ dropC 1 -- Remove the wait termination
           $logDebugS "sequencer/events" . T.pack . show $ events
