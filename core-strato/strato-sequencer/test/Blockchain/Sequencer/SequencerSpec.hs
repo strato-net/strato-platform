@@ -210,7 +210,6 @@ spec = do
         drainP2P `shouldReturn` []
 
       it "queues timeouts" $ runTestM $ do
-        liftIO $ pendingWith "TODO(tim): bring into the new age"
         let input = [20, 45, 30]
         local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $ do
           mapM_ createNewTimer input
@@ -219,7 +218,6 @@ spec = do
         out `shouldMatchList` input
 
       it "checks for votes" $ runPBFTTestM $ do
-        liftIO $ pendingWith "TODO(tim): bring into the new age"
         bc <- getBlockstanbulContext
         case bc of
           Nothing -> do
@@ -229,9 +227,9 @@ spec = do
                 pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
-            --create the extendedsignature for (beneficiary, nonce)
+            -- create the extendedsignature for (beneficiary, nonce)
             esign <- signBenfInfo pvk (testAddr, True)
-            --rlp seilize and hex and string the signature
+            --rlp serialize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
                                            , API.signature=esignStr
@@ -239,7 +237,9 @@ spec = do
                                            , API.votingdir=True
                                            , API.nonce = 1}
             liftIO $ API.uploadVote testWebserverPort vote
-            checkForVotes []
+            voteList <- drainVotes
+            voteList `shouldMatchList` [vote]
+            checkForVotes voteList
             bct' <- getBlockstanbulContext
             let unwrapbct = fromMaybe bct bct'
             let pv = _pendingvotes unwrapbct
@@ -254,7 +254,9 @@ spec = do
                                             , API.votingdir=False
                                             , API.nonce = 1}
             liftIO $ API.uploadVote testWebserverPort vote'
-            checkForVotes []
+            voteList' <- drainVotes
+            voteList' `shouldMatchList` [vote']
+            checkForVotes voteList'
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
             let pv' = _pendingvotes unwrapbct'
