@@ -100,10 +100,7 @@ clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
     withLabel "unseq" (unsafeAddCounter . fromIntegral . length $ inEvents) seqLoopEvents
-    t0 <- liftIO $ getTime Realtime
     timeAction seqSplitEventsTiming $ splitEvents inEvents
-    t1 <- liftIO $ getTime Realtime
-    $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
     P.incCounter seqLdbBatchWrites
@@ -294,11 +291,8 @@ hydrateAndEmit sb = do
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
-  t0 <- liftIO $ getTime Realtime
-  readiness <- lift $ enqueueIfParentNotEmitted sb
-  t1 <- liftIO $ getTime Realtime
   let logHydrate = $logInfoS "hydrateAndEmit" . T.pack
-  $logDebug . T.pack $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
+  readiness <- lift $ enqueueIfParentNotEmitted sb
   case readiness of
       NotReadyToEmit -> do
           $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
