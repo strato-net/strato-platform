@@ -14,7 +14,6 @@ import Blockchain.Blockstanbul
 import qualified Blockchain.Blockstanbul.BenchmarkLib as PBFT
 import Blockchain.Sequencer
 import Blockchain.Sequencer.Monad
-import Control.Monad.Stats
 
 import Criterion.Main
 
@@ -25,7 +24,6 @@ runFakeSequencerM :: SequencerConfig -> SequencerContext -> SequencerM a -> IO a
 runFakeSequencerM cfg ctx mv = do
     flip runLoggingT noLog
   . runResourceT
-  . runNoStatsT
   . flip runReaderT cfg
   $ evalStateT mv ctx
 
