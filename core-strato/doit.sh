@@ -140,7 +140,7 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then
