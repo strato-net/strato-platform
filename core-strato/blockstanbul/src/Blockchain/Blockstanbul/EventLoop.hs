@@ -402,17 +402,17 @@ recordInEvent = \case
                IMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter inEventMetric
                IMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
                Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
-               CommitResult _ -> liftIO $ withLabel "to_commit_block" incCounter inEventMetric
+               CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
                NewBlock _ -> liftIO $ withLabel "new_block" incCounter inEventMetric
                PreviousBlock _ -> liftIO $ withLabel "previous_block" incCounter inEventMetric
                NewBeneficiary _ _ ->liftIO $ withLabel "new_beneficiary" incCounter inEventMetric
 
 recordOutEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => OutEvent -> m ()
 recordOutEvent = \case
-                OMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter inEventMetric
-                OMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter inEventMetric
-                OMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter inEventMetric
-                OMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
-                ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter inEventMetric
-                MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter inEventMetric
-                ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter inEventMetric
+                OMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter outEventMetric
+                OMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter outEventMetric
+                OMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter outEventMetric
+                OMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter outEventMetric
+                ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter outEventMetric
+                MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter outEventMetric
+                ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter outEventMetric
