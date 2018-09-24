@@ -37,10 +37,10 @@ data TestConfig = TestConfig
   , testContractAddress          :: Address
   , simpleMappingContractName    :: Text
   , simpleMappingContractAddress :: Address
-  , twoContractsContractName    :: Text
-  , twoContractsContractAddress :: Address
-  , txParams                     :: Maybe TxParams
-  , txParamsLowNonce             :: Maybe TxParams
+  , twoContractsContractName     :: Text
+  , twoContractsContractAddress  :: Address
+  , testTxParams                 :: Maybe TxParams
+  , testTxParamsLowNonce         :: Maybe TxParams
   , simpleStorageSrc             :: Text
   , testSrc                      :: Text
   , simpleMappingSrc             :: Text
@@ -103,7 +103,7 @@ getResolvedTxMulti testConfig io = do
 
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
-  result <- flip getBlocTransactionResult True $ blocTransactionHash bloc
+  result <- getBlocTransactionResult (blocTransactionHash bloc) Nothing True
   case blocTransactionStatus result of 
     Pending -> resolveBlocTx result
     _ -> return result

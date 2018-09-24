@@ -81,8 +81,8 @@ setup = do
       , simpleMappingContractAddress = Address 0x0
       , twoContractsContractName = "C1"
       , twoContractsContractAddress = Address 0x0
-      , txParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
-      , txParamsLowNonce = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) (Just $ Nonce 0)
+      , testTxParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
+      , testTxParamsLowNonce = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) (Just $ Nonce 0)
       , simpleStorageSrc = simpleStorageSource
       , testSrc = testSource
       , simpleMappingSrc = simpleMappingSource
@@ -97,7 +97,7 @@ setup = do
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListRequest = UploadListRequest
@@ -111,7 +111,7 @@ setup = do
       _ <- postUsersFill (userName testConfig) addr1 True
       _ <- postUsersFill (userName testConfig) addr2 True
       _ <- postContractsCompile [postCompileRequest1]
-      unresolvedResults <- postUsersUploadList (userName testConfig) addr1 True uploadListRequest
+      unresolvedResults <- postUsersUploadList (userName testConfig) addr1 Nothing True uploadListRequest
       simpleStorageResult
         : _ <- sequence $ map resolveBlocTx unresolvedResults
       let
