@@ -722,7 +722,7 @@ functionResult hash mtxr cmId funcName index = do
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
-  TypeEnum _ -> SimpleType $ TypeInt True $ Just 32
+  TypeEnum _ -> SimpleType $ TypeInt False $ Just 32
   TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
