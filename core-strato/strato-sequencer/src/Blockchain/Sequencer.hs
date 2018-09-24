@@ -79,7 +79,7 @@ sequencer = do
           -- TODO(tim): It would be nice to figure out a way to just take the
           -- first N events when they are available before the wait timeout
           (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| sinkList
-          (src'', ()) <- src' $$++ dropC 1 -- Remove the wait termination
+          (src'', ()) <- src' $$++ dropWhileC (== WaitTerminated)
           $logDebugS "sequencer/events" . T.pack . show $ events
           checkForVotes [cr | VoteMade cr <- events]
           checkForTimeouts [rn | TimerFire rn <- events]
