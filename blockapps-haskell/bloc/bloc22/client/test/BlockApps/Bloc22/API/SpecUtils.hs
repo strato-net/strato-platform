@@ -37,10 +37,10 @@ data TestConfig = TestConfig
   , testContractAddress          :: Address
   , simpleMappingContractName    :: Text
   , simpleMappingContractAddress :: Address
-  , twoContractsContractName    :: Text
-  , twoContractsContractAddress :: Address
-  , txParams                     :: Maybe TxParams
-  , txParamsLowNonce             :: Maybe TxParams
+  , twoContractsContractName     :: Text
+  , twoContractsContractAddress  :: Address
+  , testTxParams                 :: Maybe TxParams
+  , testTxParamsLowNonce         :: Maybe TxParams
   , simpleStorageSrc             :: Text
   , testSrc                      :: Text
   , simpleMappingSrc             :: Text
@@ -61,7 +61,7 @@ readSolFile filename = do
 
 resolveTx :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTx testConfig@TestConfig{..} hash = do
-  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocUrl)
+  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocUrl)
   case eResult of
     Left _ -> return eResult
     Right result -> 
@@ -86,7 +86,7 @@ getResolvedBatchTx testConfig io = do
 resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTxMulti testConfig@TestConfig{..} hash = do
   let Just blocclient = blocUrlMulti
-  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocclient)
+  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocclient)
   case eResult of
     Left _ -> return eResult
     Right result -> 
@@ -103,7 +103,7 @@ getResolvedTxMulti testConfig io = do
 
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
-  result <- flip getBlocTransactionResult True $ blocTransactionHash bloc
+  result <- getBlocTransactionResult (blocTransactionHash bloc) Nothing True
   case blocTransactionStatus result of 
     Pending -> resolveBlocTx result
     _ -> return result
