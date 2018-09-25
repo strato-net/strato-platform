@@ -4,6 +4,8 @@ volumes:
     driver: local
   pgdata:
     driver: local
+  prometheusdata:
+    driver: local
 services:
   smd:
     depends_on:
@@ -70,9 +72,9 @@ services:
     restart: always
   bloc:
     depends_on:
+    - postgres
     - strato
     - vault-wrapper
-    - postgres
     environment:
     - loglevel=${loglevel}
     - kafkaHost=kafka
@@ -85,7 +87,7 @@ services:
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
-#    - stateDiffTopic=${stateDiffTopic}
+    #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
@@ -182,11 +184,12 @@ services:
     restart: always
   nginx:
     depends_on:
+    - apex
     - bloc
     - postgrest
+    - prometheus
     - smd
     - strato
-    - apex
     - vault-wrapper
     environment:
     - authBasic=${authBasic}
@@ -235,8 +238,10 @@ services:
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/run/docker.sock
   prometheus:
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     build: .
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    volumes:
+    - prometheusdata:/prometheus
     restart: always

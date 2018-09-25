@@ -3,15 +3,11 @@
 
 module Blockchain.Display (
   displayMessage,
-  tap,
   MsgDirection(..)
   ) where
 
 
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans
-import           Data.Conduit
 import qualified Data.Text                   as T
 
 
@@ -27,10 +23,6 @@ prefix Outbound ""        = CL.green "msg send: "
 prefix Inbound ""       = CL.cyan  "msg recv: "
 prefix Outbound peerName  = CL.green $ peerName ++ " send: "
 prefix Inbound peerName = CL.cyan  $ peerName ++ " recv: "
-
---This must exist somewhere already
-tap :: MonadIO m => (a -> m ()) -> Conduit a m a
-tap f = awaitForever $ \x -> lift (f x) >> yield x
 
 displayMessage :: MonadLogger m => MsgDirection-> String -> Message -> m ()
 displayMessage _ _ Ping = return ()

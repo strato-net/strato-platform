@@ -63,7 +63,8 @@ xabiMerge x y =
     xabiEvents = xabiEvents x `Map.union` xabiEvents y,
     -- This doesn't make any sense, I broke the type ¯\_(ツ)_/¯
     -- Please don't try to merge libraries
-    xabiIsLibrary = xabiIsLibrary x && xabiIsLibrary y
+    xabiIsLibrary = xabiIsLibrary x && xabiIsLibrary y,
+    xabiUsing = xabiUsing x `Map.union` xabiUsing y
     }
   where
     bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32

@@ -39,12 +39,13 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
         xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
-  <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
-  <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
-  <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
-  <> List.concat (List.map (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract))
-  <> List.concat (List.map (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract))
-  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
+  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
+  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
+  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 
 unparseVar :: (Text, VarType) -> String
@@ -144,6 +145,9 @@ unparseEvent (name, Event{..}) = Text.unpack $
   <> ")"
   <> (if eventAnonymous then "anonymous" else "")
   <> ";"
+
+unparseUsing :: (Text, Using) -> String
+unparseUsing (name, Using body) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
 unparseTypes :: (Text, Xabi.Def) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) =

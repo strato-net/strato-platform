@@ -8,6 +8,7 @@ module Blockchain.Data.TransactionDef (
   partialRLPDecode
   ) where
 
+import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString              as B
 import           Data.Maybe                   (maybeToList)
@@ -55,6 +56,8 @@ data Transaction =
     transactionTxHash    :: Word256,
     transactionChainHash :: Word256
     } deriving (Show, Read, Eq, Ord, Generic)
+
+instance NFData Transaction
 
 instance Binary Transaction where
   put = put . rlpSerialize . rlpEncode

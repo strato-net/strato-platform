@@ -42,6 +42,7 @@ import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
+import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.SeqEventNotify
 import           Blockchain.ServOptions
@@ -68,11 +69,11 @@ mkEthP2PEventSource :: ( Monad m
                     -> EthCryptState
                     -> [Source m Event]
                     -> m (Source m Event)
-mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
+mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSourcesCloseForAny (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
-        .| tap (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
     , seqEventNotificationSource
         .| CL.map NewSeqEvent
@@ -82,7 +83,11 @@ mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit str outCtx = tap (displayMessage Outbound str) .| messageToBytes .| ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx =
+     CL.iterM recordMessage
+  .| CL.iterM (displayMessage Outbound str)
+  .| messageToBytes
+  .| ethEncrypt outCtx
 
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
@@ -91,13 +96,13 @@ handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
-                , clientId = stratoVersionString
-                , capability = [ ETH . fromIntegral $ ethVersion
-                               , IST . fromIntegral $ blockstanbulVersion
-                               ]
-                , port = 0
-                , nodeId = myId
-                }
+                      , clientId = stratoVersionString
+                      , capability = [ ETH . fromIntegral $ ethVersion
+                                     , IST . fromIntegral $ blockstanbulVersion
+                                     ]
+                      , port = 0
+                      , nodeId = myId
+                      }
     $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} ->
@@ -164,11 +169,11 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
 
-awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
+awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
-    Just (MsgEvt msg) -> return $ Just msg
-    Nothing           -> return Nothing
-    _                 -> awaitMsg
+    Just (MsgEvt msg) -> return (Just msg)
+    Nothing              -> return Nothing
+    _                    -> awaitMsg
 
 assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
                 => Maybe Message

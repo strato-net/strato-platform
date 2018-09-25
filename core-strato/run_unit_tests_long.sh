@@ -7,16 +7,19 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
-  blockapps-haskoin
-  blockstanbul
   ethereum-discovery
-  ethereum-rlp
   ethereum-vm
   merkle-patricia-db
   strato-genesis
   strato-init
   strato-p2p
   strato-redis-blockdb
+)
+
+TEST_AND_BENCH=(
+  blockapps-haskoin
+  blockstanbul
+  ethereum-rlp
   strato-sequencer
 )
 
@@ -30,5 +33,5 @@ for tst in ${TESTS[@]}; do
 done
 
 for tst in ${TEST_AND_BENCH[@]}; do
-  time stack test $tst
+  time stack test --bench $tst "--ba=--output=../${tst}.html"
 done

@@ -92,7 +92,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
                                , bootstrapDoEmit       = False
-                               , statsConfig           = Nothing
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = ch

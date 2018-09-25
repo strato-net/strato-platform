@@ -15,6 +15,7 @@ library:
     - binary
     - bytestring
     - cryptonite
+    - deepseq
     - lens
     - path-pieces
     - memory

@@ -251,7 +251,6 @@ bootstrapSequencer gb = do
                                             , seenTransactionDBSize = 10
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
-                                            , statsConfig           = Nothing
                                             , blockstanbulBlockPeriod = 0
                                             , blockstanbulRoundPeriod = 0
                                             , blockstanbulBeneficiary = ch

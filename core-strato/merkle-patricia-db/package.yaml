@@ -19,6 +19,7 @@ dependencies:
   - bytestring
   - cryptohash
   - data-default
+  - deepseq
   - ethereum-rlp
   - blockapps-util
   - leveldb-haskell

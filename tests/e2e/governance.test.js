@@ -54,23 +54,26 @@ describe("Create Chain", function() {
                  ,{address: bob.address, enode: members[1].enode}
 		 ];
     chainId = yield rest.createChain(label, mems, bals, src, args);
+    yield promiseTimeout(1000);
+    const chainInfo = yield rest.getChainInfo(chainId);
+    console.log('###CHAININFO###', chainInfo);
   });
   
   it('should add and remover a member from the chain', function* () {
-    this.timeout(5000);
+    this.timeout(config.timeout);
 
     const addName = 'voteToAdd';
     const removeName = 'voteToRemove';
     const gov = { name: 'Governance', address: '0000000000000000000000000000000000000100' }
     const args = { m: '00000000000000000000000000000000deadbeef', e: 'enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.6:30303?discport=30303' }
 
-    yield rest.callMethod(alice, gov, addName, args, 0, chainId, false);
+    yield rest.callMethod(alice, gov, addName, args, 0, false, chainId);
 
     const chainInfo1 = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo1);
     assert.deepEqual(chainInfo1.members.length, 3, "member should be added");
 
-    yield rest.callMethod(alice, gov, removeName, args, 0, chainId, false);
+    yield rest.callMethod(alice, gov, removeName, args, 0, false, chainId);
 
     const chainInfo2 = yield rest.getChainInfo(chainId);
     console.log('###CHAININFO###',chainInfo2);

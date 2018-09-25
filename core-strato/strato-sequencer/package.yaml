@@ -85,3 +85,13 @@ tests:
       - hspec-contrib
       - strato-sequencer
       - hspec-expectations-lifted
+
+benchmarks:
+  send-to-blockstanbul:
+    source-dirs: bench/
+    main: BlockstanbulSend.hs
+    dependencies:
+      - blockstanbul
+      - strato-sequencer
+      - criterion
+      - parallel
