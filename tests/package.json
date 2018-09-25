@@ -11,7 +11,7 @@
     "test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js"
   },
   "dependencies": {
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#develop",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#safe_read",
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",
