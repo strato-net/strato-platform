@@ -28,9 +28,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: bloc strato apex docs cirrus dappstore nginx postgrest prometheus smd vault-wrapper
+build_all: bloc strato apex docs dappstore nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: bloc strato apex docs cirrus dappstore nginx postgrest prometheus smd vault-wrapper
+.PHONY: bloc strato apex docs dappstore nginx postgrest prometheus smd vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -43,10 +43,6 @@ bloc:
 docs:
 	@echo Now building docs...
 	BASIL_DOCKER_TAG=${REPO_URL}docs:${VERSION} make --directory=blockapps-swagger/
-
-cirrus:
-	@echo Now building cirrus...
-	BASIL_DOCKER_TAG=${REPO_URL}cirrus:${VERSION} make --directory=cirrus/
 
 dappstore:
 	@echo Now building dappstore...
