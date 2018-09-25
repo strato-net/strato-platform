@@ -80,8 +80,8 @@ getContractsState :: ContractName
                   -> MaybeNamed Address
                   -> Maybe ChainId
                   -> Maybe Text
-                  -> Maybe Int
-                  -> Maybe Int
+                  -> Maybe Integer
+                  -> Maybe Integer
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
@@ -106,6 +106,8 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
       "Expected address or \"Latest\": saw " <> somethingElse
 
   fetchLimit <- asks stateFetchLimit
+  let ofs = fromMaybe 0 mOffset
+      cnt = fromMaybe fetchLimit mCount
 
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
@@ -116,8 +118,8 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                (mainStruct contract')
                [name]
                0
-               (fromMaybe 0 mOffset)
-               (fromMaybe fetchLimit mCount)
+               ofs
+               cnt
                mLength
       in join <$> mapM (getStorageRange address) ranges
 
@@ -129,9 +131,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
     Just name ->
-      let ofs = fromMaybe 0 mOffset
-          cnt = fromMaybe fetchLimit mCount
-          vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 ofs cnt mLength [name]
+      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 ofs cnt mLength [name]
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
 
@@ -206,7 +206,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   storage' <- blocStrato $ getStorage
     storageFilterParams{qsAddress = Just address}
 
-  fetchLimit <- asks stateFetchLimit
+  fetchLimit <- fromInteger <$> asks stateFetchLimit
 
   let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap

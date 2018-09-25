@@ -27,7 +27,7 @@ import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 import           BlockApps.SolidityVarReader       (decodeStorageKey)
 
-transformXabi :: Int -> Xabi -> Map.Map Text Text -> [(Word256, Word256)]
+transformXabi :: Integer -> Xabi -> Map.Map Text Text -> [(Word256, Word256)]
 transformXabi fetchLimit xabi@Xabi{..} vars = do
   newXabiVars <- for (Map.toList vars) $ \(varName, val) -> do
     case Map.lookup varName xabiVars of

@@ -90,13 +90,16 @@ byteStringToWord256 bs =
   in LargeKey w1 (LargeKey w2 (LargeKey w3 w4))
 
 getArrayStartingKey :: Word256 -> Word256
-getArrayStartingKey = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256 . word256ToByteString
+getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
-decodeStorageKeySimple :: SimpleType -> Word256 -> Int -> Int -> [(Word256, Word256)]
-decodeStorageKeySimple TypeString          o ofs cnt = let sk = getArrayStartingKey o
-                                                           ofs' = fromIntegral $ ofs `div` 32 -- Since each element is one byte
-                                                           cnt' = fromIntegral $ (ofs+cnt-1) `div` 32
-                                                        in [(o, 1),(sk+ofs', cnt')]
+getArrayStartingKeyBS :: ByteString -> Word256
+getArrayStartingKeyBS = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256
+
+decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
+decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o
+                                                           ofs' = fromInteger $ sk + (ofs `quot` 32) -- Since each element is one byte
+                                                           cnt' = fromInteger $ (ofs + cnt - 1) `quot` 32
+                                                        in [(o, 1),(ofs', cnt')]
 decodeStorageKeySimple (TypeBytes Nothing) o ofs cnt = decodeStorageKeySimple TypeString o ofs cnt
 decodeStorageKeySimple _                   o _   _   = [(o, 1)] -- All other simple types fit into one storage cell
 
@@ -105,8 +108,8 @@ decodeStorageKey
   -> Struct
   -> [Text]
   -> Word256
-  -> Int
-  -> Int
+  -> Integer
+  -> Integer
   -> Bool
   -> [(Word256, Word256)]
 decodeStorageKey _ _ [] _ _ _ _ = []
@@ -123,13 +126,16 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
             else
               let startingKey = getArrayStartingKey offset
                   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-              in [(offset, 1), (startingKey + fromIntegral ofs, elementSize * fromIntegral cnt)]
+                  ofs' = fromInteger $ toInteger startingKey + toInteger ofs
+                  cnt' = fromInteger $ toInteger elementSize * toInteger cnt
+              in [(offset, 1), (ofs',cnt')]
         TypeArrayFixed n ty -> do
           if len
             then []
             else
               let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-              in [(offset, elementSize * fromIntegral n)]
+                  n' = fromInteger $ toInteger elementSize * toInteger n
+              in [(offset, n')]
         TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
@@ -145,7 +151,7 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
         TypeContract _ -> [(offset, 1)]
 
 decodeValues
-  :: Int
+  :: Integer
   -> TypeDefs
   -> Struct
   -> Storage
@@ -159,8 +165,8 @@ decodeValuesFromList
   -> Struct
   -> Storage
   -> Word256
-  -> Int
-  -> Int
+  -> Integer
+  -> Integer
   -> Bool
   -> [Text]
   -> [(Text, Value)]
@@ -178,8 +184,8 @@ decodeValue
   -> Storage
   -> Word256
   -> Struct
-  -> Int
-  -> Int
+  -> Integer
+  -> Integer
   -> Bool
   -> Text
   -> Maybe Value
@@ -195,8 +201,8 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
 decodeValue'
   :: TypeDefs
   -> Storage
-  -> Int
-  -> Int
+  -> Integer
+  -> Integer
   -> Bool
   -> Storage.Position
   -> Type
@@ -248,9 +254,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     else ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      ofs' :: Word256 = fromIntegral ofs
-      cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') $ fromIntegral cnt
-      theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
+      cnt' = min ((toInteger size) - ofs) cnt
+      theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition (toInteger elementSize)) [ofs .. (ofs + cnt' - 1)]
 
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
@@ -258,9 +263,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-      ofs' :: Word256 = fromIntegral ofs
-      cnt' :: Word256 = max 0 . min ((storage offset) - ofs') $ fromIntegral cnt
-      theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
+      cnt' = min ((toInteger $ storage offset) - ofs) cnt
+      theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition (toInteger elementSize)) <$> [ofs..(ofs + cnt' - 1)]
       startingKey = getArrayStartingKey offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -289,7 +293,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
 
 decodeMapValue
-  :: Int
+  :: Integer
   -> TypeDefs
   -> Struct
   -> Storage
@@ -320,7 +324,7 @@ decodeMapValue fetchLimit typeDefs' Struct{..} storage mappingName keyName = do
        return $ word256ToByteString $ fromInteger keyAsInteger
      x -> throwError $ "Sorry, This route doesn't support maps with keys of type: " ++ show x
 
-  let valPositionInt = byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
+  let valPositionInt = getArrayStartingKeyBS $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
       getValPosition::SimpleType->Text->Storage.Position->Storage.Position
       getValPosition _ _ _ = Storage.positionAt valPositionInt  --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
@@ -432,17 +436,17 @@ decodeInt storage offset byte constructor =
 
 
 
-arrayPosition::Word256->Word256->Storage.Position
+arrayPosition :: Integer -> Integer -> Storage.Position
 arrayPosition elementSize x | elementSize <= 32 =
   let
     itemsPerWord = 32 `quot` elementSize
     (o, b) = x `quotRem` itemsPerWord
   in
-   Storage.Position{offset=o, byte=fromIntegral $ elementSize * b}
+   Storage.Position{offset=fromInteger $ o, byte = fromInteger $ elementSize * b}
 
-arrayPosition elementSize x = 
+arrayPosition elementSize x =
   let
     wordsPerItem = elementSize `quot` 32
-    o = x * wordsPerItem
+    o = fromInteger $ x * wordsPerItem
   in
     Storage.Position{offset=o, byte=0}
