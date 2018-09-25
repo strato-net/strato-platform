@@ -140,9 +140,7 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
-                    --statsEnable=$statsEnable --statsHost=$statsHost --statsPort=$statsPort \
-                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix'"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then
@@ -232,13 +230,6 @@ setEnv sqlDiff true
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
-
-setEnv statsEnable false
-setEnv statsHost telegraf
-setEnv statsPort 8125
-setEnv statsFlush 1000
-setEnv statsPrefix ""
-setEnv statsSuffix ""
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

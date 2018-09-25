@@ -23,7 +23,7 @@ spec
   . beforeAll (newManager defaultManagerSettings) $ do
   describe "getTxsLast" $
     it "works" $ \ mgr -> do
-      txs <- runClientM (getTxsLast 10) (ClientEnv mgr stratoDev)
+      txs <- runClientM (getTxsLast 10 Nothing) (ClientEnv mgr stratoDev)
       txs `shouldSatisfy` isRight
   describe "getTxsFilter" $ do
     it "works with a nonempty filter" $ \ mgr -> do
@@ -38,7 +38,7 @@ spec
       txs `shouldSatisfy` isLeft
   describe "getBlocksLast" $
     it "works" $ \ mgr -> do
-      txs <- runClientM (getBlocksLast 10) (ClientEnv mgr stratoDev)
+      txs <- runClientM (getBlocksLast 10 Nothing) (ClientEnv mgr stratoDev)
       txs `shouldSatisfy` isRight
   describe "getBlocksFilter" $ do
     it "works with a nonempty filter" $ \ mgr -> do

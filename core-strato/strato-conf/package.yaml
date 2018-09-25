@@ -28,4 +28,3 @@ library:
     - mtl
     - transformers
     - hedis
-    - statsdi
