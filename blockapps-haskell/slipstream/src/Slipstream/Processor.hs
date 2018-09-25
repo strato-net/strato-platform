@@ -201,6 +201,7 @@ processTheMessages messages conn g = do
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
             , deployMode= deployFlag   -- :: Severity
+            , stateFetchLimit = flags_stateFetchLimit
             }
 
   _ <- enterBloc2 env $ do
@@ -257,7 +258,8 @@ processTheMessages messages conn g = do
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-        let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
+        fetchLimit <- asks stateFetchLimit
+        let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
         let chain = case chainId of
                      Nothing -> ""
                      Just (ChainId x) -> T.pack $ showHex x ""

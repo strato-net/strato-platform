@@ -35,7 +35,6 @@ import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
-import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -103,12 +102,12 @@ decodeStorageKey
   -> Struct
   -> [Text]
   -> Word256
-  -> Maybe Int
-  -> Maybe Int
+  -> Int
+  -> Int
   -> Bool
   -> [(Word256, Word256)]
 decodeStorageKey _ _ [] _ _ _ _ = []
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len =
+decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
   case OMap.lookup varName (fields struct') of
     Nothing -> []
     Just (Left _, _) -> []
@@ -120,10 +119,8 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len
             then [(offset, 1)]
             else
               let startingKey = getArrayStartingKey offset
-                  ofs = fromIntegral $ maybe 0 id mOffset
-                  cnt = fromIntegral $ maybe 100 id mCount -- Default to page size of 100 entries
                   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-              in [(offset, 1), (startingKey + ofs, elementSize * cnt)]
+              in [(offset, 1), (startingKey + fromIntegral ofs, elementSize * fromIntegral cnt)]
         TypeArrayFixed n ty -> do
           if len
             then []
@@ -145,21 +142,22 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len
         TypeContract _ -> [(offset, 1)]
 
 decodeValues
-  :: TypeDefs
+  :: Int
+  -> TypeDefs
   -> Struct
   -> Storage
   -> Word256
   -> [(Text, Value)]
-decodeValues typeDefs' struct'@Struct{..} storage offset =
-  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (map fst $ OMap.assocs fields)
+decodeValues fetchLimit typeDefs' struct'@Struct{..} storage offset =
+  decodeValuesFromList typeDefs' struct' storage offset 0 fetchLimit False (map fst $ OMap.assocs fields)
 
 decodeValuesFromList
   :: TypeDefs
   -> Struct
   -> Storage
   -> Word256
-  -> Maybe Int
-  -> Maybe Int
+  -> Int
+  -> Int
   -> Bool
   -> [Text]
   -> [(Text, Value)]
@@ -177,8 +175,8 @@ decodeValue
   -> Storage
   -> Word256
   -> Struct
-  -> Maybe Int
-  -> Maybe Int
+  -> Int
+  -> Int
   -> Bool
   -> Text
   -> Maybe Value
@@ -194,8 +192,8 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
 decodeValue'
   :: TypeDefs
   -> Storage
-  -> Maybe Int
-  -> Maybe Int
+  -> Int
+  -> Int
   -> Bool
   -> Storage.Position
   -> Type
@@ -247,8 +245,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     else ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      ofs' :: Word256 = fromIntegral . toInteger $ maybe 0 id ofs
-      cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') . fromIntegral $ maybe 100 id cnt
+      ofs' :: Word256 = fromIntegral ofs
+      cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') $ fromIntegral cnt
       theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
 
   TypeArrayDynamic ty -> if len
@@ -257,8 +255,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-      ofs' = maybe 0 id ofs
-      cnt' = max 0 . min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
+      ofs' :: Word256 = fromIntegral ofs
+      cnt' :: Word256 = max 0 . min ((storage offset) - ofs') $ fromIntegral cnt
       theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
       startingKey = getArrayStartingKey offset
 
@@ -279,7 +277,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> error ""
-     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage (Storage.alignedByte position)
+     Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 
@@ -288,7 +286,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
 
 decodeMapValue
-  :: TypeDefs
+  :: Int
+  -> TypeDefs
   -> Struct
   -> Storage
   -> Text
@@ -296,7 +295,7 @@ decodeMapValue
   -> Either String Value
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
-decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
+decodeMapValue fetchLimit typeDefs' Struct{..} storage mappingName keyName = do
   (eTxtPos, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
   position <-
@@ -318,12 +317,12 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
        return $ word256ToByteString $ fromInteger keyAsInteger
      x -> throwError $ "Sorry, This route doesn't support maps with keys of type: " ++ show x
 
-  let valPositionInt=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
+  let valPositionInt = byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
       getValPosition::SimpleType->Text->Storage.Position->Storage.Position
       getValPosition _ _ _ = Storage.positionAt valPositionInt  --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
 
-  let val = decodeValue' typeDefs' storage Nothing Nothing False valPosition toType
+  let val = decodeValue' typeDefs' storage 0 fetchLimit False valPosition toType
 
   return val
 

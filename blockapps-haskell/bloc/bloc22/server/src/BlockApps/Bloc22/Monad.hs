@@ -108,6 +108,7 @@ data BlocEnv = BlocEnv
   , dbPool          :: Pool Connection
   , logLevel        :: Severity
   , deployMode      :: DeployMode
+  , stateFetchLimit :: Int
   }
 
 data BlocError

@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.Reader.Class      (asks)
 import           Data.Foldable
 import           Data.Int
 import           Data.LargeWord                  (Word256)
@@ -104,6 +105,8 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
+  fetchLimit <- asks stateFetchLimit
+
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
       storageFilterParams{qsAddress = Just address}
@@ -113,8 +116,8 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                (mainStruct contract')
                [name]
                0
-               mOffset
-               mCount
+               (fromMaybe 0 mOffset)
+               (fromMaybe fetchLimit mCount)
                mLength
       in join <$> mapM (getStorageRange address) ranges
 
@@ -122,11 +125,13 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
 
   ret <- case mName of
     Nothing ->
-      let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+      let vals = decodeValues fetchLimit (typeDefs contract') (mainStruct contract') storage 0
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
     Just name ->
-      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
+      let ofs = fromMaybe 0 mOffset
+          cnt = fromMaybe fetchLimit mCount
+          vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 ofs cnt mLength [name]
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
 
@@ -201,9 +206,11 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   storage' <- blocStrato $ getStorage
     storageFilterParams{qsAddress = Just address}
 
+  fetchLimit <- asks stateFetchLimit
+
   let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
-      ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
+      ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
