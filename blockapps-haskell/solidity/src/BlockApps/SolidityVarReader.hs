@@ -92,10 +92,13 @@ byteStringToWord256 bs =
 getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256 . word256ToByteString
 
-decodeStorageKeySimple :: SimpleType -> Word256 -> [(Word256, Word256)]
-decodeStorageKeySimple TypeString          o = [(o, 1 `shiftL` 32)] -- TODO: Create real string instance
-decodeStorageKeySimple (TypeBytes Nothing) o = [(o, 1 `shiftL` 32)] -- TODO: Create real bytes instance
-decodeStorageKeySimple _                   o = [(o, 1)] -- All other simple types fit into one storage cell
+decodeStorageKeySimple :: SimpleType -> Word256 -> Int -> Int -> [(Word256, Word256)]
+decodeStorageKeySimple TypeString          o ofs cnt = let sk = getArrayStartingKey o
+                                                           ofs' = fromIntegral $ ofs `div` 32 -- Since each element is one byte
+                                                           cnt' = fromIntegral $ (ofs+cnt-1) `div` 32
+                                                        in [(o, 1),(sk+ofs', cnt')]
+decodeStorageKeySimple (TypeBytes Nothing) o ofs cnt = decodeStorageKeySimple TypeString o ofs cnt
+decodeStorageKeySimple _                   o _   _   = [(o, 1)] -- All other simple types fit into one storage cell
 
 decodeStorageKey
   :: TypeDefs
@@ -113,7 +116,7 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
     Just (Left _, _) -> []
     Just (Right Storage.Position{..}, theType) ->
       case theType of
-        SimpleType ty -> decodeStorageKeySimple ty offset
+        SimpleType ty -> decodeStorageKeySimple ty offset ofs cnt
         TypeArrayDynamic ty -> do
           if len
             then [(offset, 1)]
