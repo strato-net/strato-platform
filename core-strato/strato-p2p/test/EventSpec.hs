@@ -57,6 +57,7 @@ testContext = do
                  , unseqSink=sinkTMChan ch False
                  , vmEventsSink=sinkNull
                  , vmTrace=[]
+                 , connectionTimeout=60
                  })
 
 testPeer :: DataPeer.PPeer
