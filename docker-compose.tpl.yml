@@ -118,6 +118,7 @@ services:
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - seqDebugMode=${seqDebugMode}

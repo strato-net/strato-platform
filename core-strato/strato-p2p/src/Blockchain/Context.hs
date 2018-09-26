@@ -36,8 +36,10 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Options
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
+
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
 
@@ -56,7 +58,8 @@ data Context =
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
         vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
-        actionTimestamp     :: Maybe UTCTime
+        actionTimestamp     :: Maybe UTCTime,
+        connectionTimeout   :: Int
     }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
@@ -133,6 +136,7 @@ initContext = do
                  , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
                  , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
+                 , connectionTimeout=flags_connectionTimeout
                  }
 
 
