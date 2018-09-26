@@ -352,10 +352,10 @@ transformBlocks blocks = do
         Just sb -> do
           witnessBlockHash (sbHash sb) sb
           hydrateAndEmit sb
-	where convert :: IngestBlock -> InEvent
-				convert inBlock = case ibOrigin inBlock of
-															TO.Quarry -> NewBlock . ingestBlockToBlock $ inBlock
-														  _ -> PreviousBlock . ingestBlockToBlock $ inBlock
+  where convert :: IngestBlock -> InEvent
+        convert inBlock = case ibOrigin inBlock of
+                              TO.Quarry -> NewBlock . ingestBlockToBlock $ inBlock
+                              _ -> PreviousBlock . ingestBlockToBlock $ inBlock
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
