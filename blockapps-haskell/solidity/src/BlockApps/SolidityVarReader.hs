@@ -126,8 +126,8 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
             else
               let startingKey = getArrayStartingKey offset
                   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-                  ofs' = fromInteger $ toInteger startingKey + toInteger ofs
-                  cnt' = fromInteger $ toInteger elementSize * toInteger cnt
+                  ofs' = fromInteger $ ofs + toInteger startingKey
+                  cnt' = fromInteger $ cnt * toInteger elementSize
               in [(offset, 1), (ofs',cnt')]
         TypeArrayFixed n ty -> do
           if len
