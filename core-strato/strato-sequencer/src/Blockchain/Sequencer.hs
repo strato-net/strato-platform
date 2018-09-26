@@ -63,35 +63,36 @@ import           Blockchain.Util
 sequencer :: SequencerM ()
 sequencer = do
   $logInfoS "sequencer" "Sequencer startup"
-  source <- fuseChannels
+  source <- newResumableSource <$> fuseChannels
   bootstrapBlockstanbul
   $logInfoS "sequencer" "Sequencer initialized"
-  go (newResumableSource source)
+  go source
  where
   go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
-  go src = timeAction seqLoopTiming body >>= go
-   where body :: SequencerM (ResumableSource SequencerM SeqLoopEvent)
-         body = do
-          $logInfoS "sequencer" "top of seqloop"
-          clearAll
-          dt <- asks maxUsPerIter
-          createWaitTimer dt
-          maxEvents <- asks maxEventsPerIter
-          (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| takeC maxEvents .| sinkList
-          (src'', ()) <- src' $$++ dropWhileC (== WaitTerminated)
-          $logDebugS "sequencer/events" . T.pack . show $ events
-          checkForVotes [cr | VoteMade cr <- events]
-          checkForTimeouts [rn | TimerFire rn <- events]
-          checkForUnseq [iev | UnseqEvent iev <- events]
-          vmEvs <- drainVM
-          unless (null vmEvs) $ do
-            writeSeqVmEvents vmEvs
-            $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
-          p2pEvs <- drainP2P
-          unless (null p2pEvs) $ do
-            writeSeqP2pEvents p2pEvs
-            $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-          return src''
+  go src = oneSequencerIter src >>= go
+
+oneSequencerIter :: ResumableSource SequencerM SeqLoopEvent -> SequencerM (ResumableSource SequencerM SeqLoopEvent)
+oneSequencerIter src = timeAction seqLoopTiming $ do
+  $logInfoS "sequencer" "top of seqloop"
+  clearAll
+  dt <- asks maxUsPerIter
+  createWaitTimer dt
+  maxEvents <- asks maxEventsPerIter
+  (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| takeC maxEvents .| sinkList
+  (src'', ()) <- src' $$++ dropWhileC (== WaitTerminated)
+  $logDebugS "sequencer/events" . T.pack . show $ events
+  checkForVotes [cr | VoteMade cr <- events]
+  checkForTimeouts [rn | TimerFire rn <- events]
+  checkForUnseq [iev | UnseqEvent iev <- events]
+  vmEvs <- drainVM
+  unless (null vmEvs) $ do
+    writeSeqVmEvents vmEvs
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+  p2pEvs <- drainP2P
+  unless (null p2pEvs) $ do
+    writeSeqP2pEvents p2pEvs
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+  return src''
 
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB

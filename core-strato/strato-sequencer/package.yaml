@@ -80,6 +80,7 @@ tests:
   strato-sequencer-spec:
     source-dirs:   test
     main:          Main.hs
+    ghc-options: -threaded
     dependencies:
       - HUnit
       - QuickCheck

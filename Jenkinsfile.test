@@ -106,6 +106,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
+              sleep 20
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
               docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
@@ -155,6 +156,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running local integration tests'
+              sleep 40
               cd strato-platform/tests
               npm install
               npm run test:truchainz

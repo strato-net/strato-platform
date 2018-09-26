@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
@@ -97,7 +98,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
-                               , maxEventsPerIter = 4
+                               , maxEventsPerIter = 1
                                }
         bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
         pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
@@ -110,7 +111,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         boot = bootstrapGenesisBlock hash difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
+      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) printLogMsg)
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
@@ -280,3 +281,19 @@ spec = do
         (src2, ev2) <- src1 $$++ headC
         (_, ev3) <- src2 $$++ headC
         [ev1, ev2, ev3] `shouldMatchList` [Just $ TimerFire rn, Just $ UnseqEvent iev, Just $ VoteMade vote]
+
+    describe "sequencer" $ do
+      it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
+        uch <- asks $ unseqEvents . cablePackage
+        atomically . writeTMChan uch $ iev
+        src <- newResumableSource <$> fuseChannels
+        $logInfoS "seqtest" "before theloop"
+        void $ oneSequencerIter src
+        $logInfoS "seqtest" "after the loop"
+        vmch <- asks $ seqVMEvents . cablePackage
+        vmevs <- atomically . drainTMChan $ vmch
+        vmevs `shouldBe` []
+        p2pch <- asks $ seqP2PEvents . cablePackage
+        p2pevs <- atomically . drainTMChan $ p2pch
+        p2pevs `shouldBe` []
+
