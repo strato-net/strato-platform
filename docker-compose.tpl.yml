@@ -124,6 +124,7 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}

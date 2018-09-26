@@ -356,8 +356,9 @@ handleEvents mode peer = awaitForever $ \case
             Just oldTS -> do
                 ts <- liftIO getCurrentTime
                 let diffTime = ts `diffUTCTime` oldTS
-                liftIO $ setTitle $ "timer: " ++ show (60 - diffTime)
-                when (diffTime > 60) $ do
+                maxTime <- gets (fromIntegral . connectionTimeout)
+                liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
+                when (diffTime > maxTime) $ do
                     yield $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
