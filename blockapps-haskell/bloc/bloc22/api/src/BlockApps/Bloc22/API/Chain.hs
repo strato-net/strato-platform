@@ -39,6 +39,7 @@ import           BlockApps.Strato.TypeLits
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
   { chaininputSrc      :: Text
+  , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
   , chaininputArgs     :: Map Text ArgValue
@@ -66,7 +67,7 @@ instance FromJSON ChainInput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToJSON ChainInput where
-  toJSON = genericToJSON (aesonPrefix camelCase) 
+  toJSON = genericToJSON (aesonPrefix camelCase)
 
 exampleSrc :: Text
 exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
@@ -80,6 +81,7 @@ exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 exChainInput :: ChainInput
 exChainInput = ChainInput
     { chaininputSrc = exampleSrc
+    , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
