@@ -28,7 +28,7 @@ class MenuBar extends Component {
         <div>
           <span className="pt-navbar-divider" />
           <a href='/prometheus' target="_black" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_clicK") }}>Prometheus Graphs</button>
+            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
           </a>
           <a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">
             <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>

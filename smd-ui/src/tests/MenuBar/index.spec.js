@@ -85,7 +85,7 @@ describe('MenuBar: index', () => {
         ).dive().dive().dive();
 
         wrapper.find('button').first().simulate('click');
-        expect(wrapper.find('button').get(1)).toMatchSnapshot();
+        expect(wrapper.find('button').get(BLOC_DOCS_OFFSET)).toMatchSnapshot();
       });
 
       test('execute strato api', () => {
@@ -109,7 +109,7 @@ describe('MenuBar: index', () => {
           </Provider>
         ).dive().dive().dive();
 
-        wrapper.find('button').at(1).simulate('click');
+        wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
         expect(wrapper.find('button').get(STRATO_DOCS_OFFSET)).toMatchSnapshot();
       });
 
