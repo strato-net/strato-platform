@@ -35,6 +35,7 @@ dependencies:
   - wai
   - warp
   - http-client
+  - prometheus-client
 
 library:
   source-dirs: src/

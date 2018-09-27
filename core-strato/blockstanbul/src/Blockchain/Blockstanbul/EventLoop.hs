@@ -14,12 +14,13 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
+import Prometheus
 import Text.Printf
-
 import Blockchain.Data.Address
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
+import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
 import Blockchain.Format
@@ -372,9 +373,10 @@ sendMessages wms = do
       return []
     Just ctx -> do
       let base = yieldMany wms
+              .| iterMC recordInEvent
               .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . show)
               .| eventLoop ctx
-              `fuseUpstream` iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show)
+              `fuseUpstream` (iterMC recordOutEvent .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
       return evs
@@ -392,3 +394,25 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
+
+recordInEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => InEvent -> m ()
+recordInEvent = \case
+               IMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter inEventMetric
+               IMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter inEventMetric
+               IMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter inEventMetric
+               IMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
+               Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
+               CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
+               NewBlock _ -> liftIO $ withLabel "new_block" incCounter inEventMetric
+               PreviousBlock _ -> liftIO $ withLabel "previous_block" incCounter inEventMetric
+               NewBeneficiary _ _ ->liftIO $ withLabel "new_beneficiary" incCounter inEventMetric
+
+recordOutEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => OutEvent -> m ()
+recordOutEvent = \case
+                OMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter outEventMetric
+                OMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter outEventMetric
+                OMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter outEventMetric
+                OMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter outEventMetric
+                ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter outEventMetric
+                MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter outEventMetric
+                ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter outEventMetric
