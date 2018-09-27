@@ -6,6 +6,11 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import * as checkMode from '../../lib/checkMode';
 
+const PROMETHEUS_OFFSET = 0;
+const BLOC_DOCS_OFFSET = 1;
+const STRATO_DOCS_OFFSET = 2;
+const LOGOUT_OFFSET = 3;
+
 describe('MenuBar: index', () => {
 
   let store = createStore(combineReducers({ form: formReducer }));
@@ -80,10 +85,10 @@ describe('MenuBar: index', () => {
         ).dive().dive().dive();
 
         wrapper.find('button').first().simulate('click');
-        expect(wrapper.find('button').get(0)).toMatchSnapshot();
+        expect(wrapper.find('button').get(1)).toMatchSnapshot();
       });
 
-      test('execute stato api', () => {
+      test('execute strato api', () => {
         const props = {
           currentUser: { username: 'tanuj44' },
           isLoggedIn: true,
@@ -105,7 +110,7 @@ describe('MenuBar: index', () => {
         ).dive().dive().dive();
 
         wrapper.find('button').at(1).simulate('click');
-        expect(wrapper.find('button').get(1)).toMatchSnapshot();
+        expect(wrapper.find('button').get(STRATO_DOCS_OFFSET)).toMatchSnapshot();
       });
 
       test('execute logout', () => {
@@ -129,8 +134,8 @@ describe('MenuBar: index', () => {
           </Provider>
         ).dive().dive().dive();
 
-        wrapper.find('button').at(2).simulate('click');
-        expect(wrapper.find('button').get(2)).toMatchSnapshot();
+        wrapper.find('button').at(LOGOUT_OFFSET).simulate('click');
+        expect(wrapper.find('button').get(LOGOUT_OFFSET)).toMatchSnapshot();
         expect(props.logout).toHaveBeenCalled();
       });
 
@@ -232,10 +237,10 @@ describe('MenuBar: index', () => {
         ).dive().dive().dive();
 
         wrapper.find('button').first().simulate('click');
-        expect(wrapper.find('button').get(0)).toMatchSnapshot();
+        expect(wrapper.find('button').get(BLOC_DOCS_OFFSET)).toMatchSnapshot();
       });
 
-      test('execute stato api', () => {
+      test('execute strato api', () => {
         const props = {
           isLoggedIn: false,
           currentUser: { username: null },
@@ -256,8 +261,8 @@ describe('MenuBar: index', () => {
           </Provider>
         ).dive().dive().dive();
 
-        wrapper.find('button').at(1).simulate('click');
-        expect(wrapper.find('button').get(1)).toMatchSnapshot();
+        wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
+        expect(wrapper.find('button').get(STRATO_DOCS_OFFSET)).toMatchSnapshot();
       });
 
     });
