@@ -1,0 +1,36 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>BlockApps PBFT Overview - {{ .Params.instance }}</h1>
+
+  <h3>InEvent</h3>
+  <div id="ineventGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#ineventGraph"),
+    expr: "pbft_inevent",
+    name: '[[inevent_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Events",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>OutEvent</h3>
+  <div id="outeventGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#outeventGraph"),
+    expr: "pbft_outevent",
+    name: '[[outevent_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Events",
+    yUnits: "count",
+  })
+  </script>
+
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

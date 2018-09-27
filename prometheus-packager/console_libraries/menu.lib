@@ -53,6 +53,16 @@
   {{ end }}
 {{ end }}
 
+{{ template "_menuItem" (args . "pbft-overview.html" "PBFT") }}
+{{ if match "^pbft" .Path }}
+  {{ if .Params.instance }}
+  <ul>
+    <li {{ if eq .Path "pbft-overview.html" }}class="prom_lhs_menu_selected"{{ end }}>
+      <a href="pbft-overview.html?instance={{ .Params.instance }}">{{.Params.instance }}</a>
+    </li>
+  </ul>
+  {{ end }}
+{{ end }}
 
 </ul>
 </div>
