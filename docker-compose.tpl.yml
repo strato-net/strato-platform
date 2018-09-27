@@ -12,6 +12,7 @@ services:
     - apex
     - bloc
     - postgrest
+    - prometheus
     - strato
     environment:
     - APEX_URL=${APEX_URL}
