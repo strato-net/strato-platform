@@ -41,7 +41,6 @@ import           Blockchain.DBM
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
-import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
@@ -239,7 +238,8 @@ handleEvents mode peer = awaitForever $ \case
         lift $ putBlockHeaders remainingHeaders
         if null remainingHeaders
             then when (newCount > 0) $ do
-                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) flags_maxReturnedHeaders 0 Forward
+                mrh <- gets maxReturnedHeaders
+                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
@@ -379,7 +379,8 @@ syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogg
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        yield $ GetBlockHeaders (BlockNumber num) flags_maxReturnedHeaders 0 d
+        mrh <- gets maxReturnedHeaders
+        yield $ GetBlockHeaders (BlockNumber num) mrh 0 d
         stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool

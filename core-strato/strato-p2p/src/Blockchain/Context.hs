@@ -59,7 +59,8 @@ data Context =
         vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
-        connectionTimeout   :: Int
+        connectionTimeout   :: Int,
+        maxReturnedHeaders  :: Int
     }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
@@ -124,8 +125,8 @@ runContextM :: (MonadBaseControl IO m )
 runContextM s f = void . runResourceT $ runStateT f s
 
 initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-            => m Context
-initContext = do
+            => Int -> m Context
+initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return Context { actionTimestamp = Nothing
@@ -137,6 +138,7 @@ initContext = do
                  , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
                  , connectionTimeout=flags_connectionTimeout
+                 , maxReturnedHeaders = maxHeaders
                  }
 
 
