@@ -125,7 +125,7 @@ handleMsgClientConduit myId peer = do
                 void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
+                yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) flags_maxReturnedHeaders 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
