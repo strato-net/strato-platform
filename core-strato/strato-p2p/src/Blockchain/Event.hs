@@ -7,7 +7,6 @@
 module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
-  maxReturnedHeaders,
   getBestKafkaBlockNumber
   ) where
 
@@ -78,10 +77,6 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
     where helper xs' = case drop n xs' of
                            (y:ys) -> y : helper ys
                            []     -> []
-
--- todo: seriously???
-maxReturnedHeaders :: Int
-maxReturnedHeaders = 1000
 
 peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
@@ -243,7 +238,8 @@ handleEvents mode peer = awaitForever $ \case
         lift $ putBlockHeaders remainingHeaders
         if null remainingHeaders
             then when (newCount > 0) $ do
-                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) maxReturnedHeaders 0 Forward
+                mrh <- gets maxReturnedHeaders
+                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
@@ -383,7 +379,8 @@ syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogg
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d
+        mrh <- gets maxReturnedHeaders
+        yield $ GetBlockHeaders (BlockNumber num) mrh 0 d
         stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool

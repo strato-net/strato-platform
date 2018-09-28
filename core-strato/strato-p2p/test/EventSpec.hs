@@ -58,6 +58,7 @@ testContext = do
                  , vmEventsSink=sinkNull
                  , vmTrace=[]
                  , connectionTimeout=60
+                 , maxReturnedHeaders=1000
                  })
 
 testPeer :: DataPeer.PPeer

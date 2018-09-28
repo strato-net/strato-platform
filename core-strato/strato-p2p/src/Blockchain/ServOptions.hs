@@ -9,4 +9,5 @@ defineFlag "l:listen" (30303 :: Int) "Listen on port"
 defineFlag "runUDPServer" True "Turn the UDP server on/off"
 defineFlag "networkID" (1::Int) "Turn the UDP server on/off"
 defineFlag "name" ("Indiana Jones" :: String) "Who to greet."
+defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
 

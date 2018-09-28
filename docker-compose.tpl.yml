@@ -12,6 +12,7 @@ services:
     - apex
     - bloc
     - postgrest
+    - prometheus
     - strato
     environment:
     - APEX_URL=${APEX_URL}
@@ -132,6 +133,7 @@ services:
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
     - mineBlocks=${mineBlocks:-true}

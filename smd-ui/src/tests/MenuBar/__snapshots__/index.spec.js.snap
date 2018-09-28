@@ -20,7 +20,7 @@ exports[`MenuBar: index renders enterprise mode button execute block api 1`] = `
 </button>
 `;
 
-exports[`MenuBar: index renders enterprise mode button execute stato api 1`] = `
+exports[`MenuBar: index renders enterprise mode button execute strato api 1`] = `
 <button
   className="pt-button pt-minimal pt-small"
   onClick={[Function]}
@@ -53,6 +53,11 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Prometheus Graphs
+        </button>
+      </a>
       <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Bloc API
@@ -106,6 +111,11 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Prometheus Graphs
+        </button>
+      </a>
       <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Bloc API
@@ -141,7 +151,7 @@ exports[`MenuBar: index renders public mode button execute logout 1`] = `
 </button>
 `;
 
-exports[`MenuBar: index renders public mode button execute stato api 1`] = `
+exports[`MenuBar: index renders public mode button execute strato api 1`] = `
 <button
   className="pt-button pt-minimal pt-small"
   onClick={[Function]}
@@ -174,6 +184,11 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Prometheus Graphs
+        </button>
+      </a>
       <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Bloc API
