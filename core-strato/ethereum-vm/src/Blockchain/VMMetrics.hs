@@ -34,7 +34,7 @@ vmTxsCreation :: P.Metric P.Counter
 vmTxsCreation = P.unsafeRegisterIO $ counter (P.Info "vm_txs_creation" "evm counter for txs creation")
 
 vmBlockInsertionMined :: P.Metric P.Gauge
-vmBlockInsertionMined = P.unsafeRegisterIO $ gauge (P.Info "vm_block_insertion-mined" "evm gauge for block insertion mined")
+vmBlockInsertionMined = P.unsafeRegisterIO $ gauge (P.Info "vm_block_insertion_mined" "evm gauge for block insertion mined")
 
 vmTxMined :: P.Metric P.Gauge
 vmTxMined= P.unsafeRegisterIO $ gauge (P.Info "vm_tx_mined" "evm gauge for tx mined")

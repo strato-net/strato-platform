@@ -9,11 +9,11 @@
   new PromConsole.Graph({
     node: document.querySelector("#levelDb"),
     expr: [
-      "seq_ldb_batch-writes",
-      "seq_ldb_batch-size",
+      "seq_ldb_batch_writes",
+      "seq_ldb_batch_size",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2) },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "",
@@ -31,7 +31,7 @@
       "seq_txs_unwitnessed",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2) },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "txs",
@@ -50,7 +50,7 @@
       "seq_blocks_released",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2)},
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "Blocks",
@@ -64,13 +64,13 @@
   new PromConsole.Graph({
     node: document.querySelector("#seqKafka"),
     expr: [
-      "seq_kafka_checkpoint-reads",
-      "seq_kafka_checkpoint-writes",
-      "seq_kafka_unsequenced-reads",
-      "seq_kafka_sequenced-writes",
+      "seq_kafka_checkpoint_reads",
+      "seq_kafka_checkpoint_writes",
+      "seq_kafka_unsequenced_reads",
+      "seq_kafka_sequenced_writes",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2) },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "Events",
