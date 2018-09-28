@@ -4,10 +4,10 @@ module Blockchain.Sequencer.Metrics where
 import           Prometheus                                as P
 
 seqLdbBatchWrites:: P.Metric P.Counter
-seqLdbBatchWrites = P.unsafeRegisterIO $ counter (P.Info "seq_ldb_batch_writes" "Sequencer counter for ldb batch writes")
+seqLdbBatchWrites = P.unsafeRegisterIO $ counter (P.Info "seq_ldb_batch-writes" "Sequencer counter for ldb batch writes")
 
 seqLdbBatchSize :: P.Metric P.Gauge
-seqLdbBatchSize = P.unsafeRegisterIO $ gauge (P.Info "seq_ldb_batch_size" "Sequencer gauge for ldb batch size")
+seqLdbBatchSize = P.unsafeRegisterIO $ gauge (P.Info "seq_ldb_batch-size" "Sequencer gauge for ldb batch size")
 
 seqTxsWitnessed :: P.Metric P.Counter
 seqTxsWitnessed = P.unsafeRegisterIO $ counter (P.Info "seq_txs_witnessed" "Sequencer counter for transactions witnessed")
@@ -22,16 +22,16 @@ seqBlocksEnqueued :: P.Metric P.Counter
 seqBlocksEnqueued = P.unsafeRegisterIO $ counter (P.Info "seq_blocks_enqueued" "Sequencer counter for blocks enqueued")
 
 seqKafkaCheckpointWrites :: P.Metric P.Counter
-seqKafkaCheckpointWrites = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_checkpoint_writes" "Sequencer counter for kafka checkpoint writes")
+seqKafkaCheckpointWrites = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_checkpoint-writes" "Sequencer counter for kafka checkpoint writes")
 
 seqKafkaCheckpointReads :: P.Metric P.Counter
-seqKafkaCheckpointReads = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_checkpoint_reads" "Sequencer counter for kafka checkpoint reads")
+seqKafkaCheckpointReads = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_checkpoint-reads" "Sequencer counter for kafka checkpoint reads")
 
 seqKafkaSeqWrites :: P.Metric P.Counter
-seqKafkaSeqWrites = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_sequenced_writes" "Sequencer counter for kafka sequenced_writes")
+seqKafkaSeqWrites = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_sequenced-writes" "Sequencer counter for kafka sequenced_writes")
 
 seqKafkaUnseqRead :: P.Metric P.Counter
-seqKafkaUnseqRead = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_unsequenced_reads" "Sequencer counter for kafka unsequenced reads")
+seqKafkaUnseqRead = P.unsafeRegisterIO $ counter (P.Info "seq_kafka_unsequenced-reads" "Sequencer counter for kafka unsequenced reads")
 
 seqBlocksReleased :: P.Metric P.Counter
 seqBlocksReleased = P.unsafeRegisterIO $ counter (P.Info "seq_blocks_released" "Sequencer counter for blocks released")

@@ -1,0 +1,82 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>BlockApps Sequencer Overview - {{ .Params.instance }}</h1>
+
+  <h3>Level DB</h3>
+  <div id="levelDb"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#levelDb"),
+    expr: [
+      "seq_ldb_batch-writes",
+      "seq_ldb_batch-size",
+    ],
+    name: function(metric) {
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Transactions</h3>
+  <div id="transactions"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#transactions"),
+    expr: [
+      "seq_txs_witnessed",
+      "seq_txs_unwitnessed",
+    ],
+    name: function(metric) {
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "txs",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Blocks</h3>
+  <div id="seqBlocks"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#seqBlocks"),
+    expr: [
+      "seq_blocks_ecrfail",
+      "seq_blocks_enqueued",
+      "seq_blocks_released",
+    ],
+    name: function(metric) {
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Blocks",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Kafka</h3>
+  <div id="seqKafka"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#seqKafka"),
+    expr: [
+      "seq_kafka_checkpoint-reads",
+      "seq_kafka_checkpoint-writes",
+      "seq_kafka_unsequenced-reads",
+      "seq_kafka_sequenced-writes",
+    ],
+    name: function(metric) {
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3)[2] },
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Events",
+    yUnits: "count",
+  })
+  </script>
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}
