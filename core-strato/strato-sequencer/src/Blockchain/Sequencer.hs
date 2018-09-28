@@ -286,7 +286,16 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
 hydrateAndEmit :: SequencedBlock -> SequencerM ()
 hydrateAndEmit sb = do
   wetBlocks <- runConduit $ hydrateAndEmit' .| sinkList
-  mapM_ (markForVM . OEBlock) $ wetBlocks
+  hasPBFT <- blockstanbulRunning
+  if not hasPBFT
+    then mapM_ (markForVM . OEBlock) $ wetBlocks
+    else let convert :: OutputBlock -> InEvent
+             convert outBlock = case obOrigin outBlock of
+                                    TO.Quarry -> UnannouncedBlock . outputBlockToBlock $ outBlock
+                                    _ -> PreviousBlock . outputBlockToBlock $ outBlock
+         -- Blockstanbul will check that the seals and validators match up before
+         -- announcing it to the network or forwarding to the EVM.
+         in blockstanbulSend . map convert $ wetBlocks
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
@@ -339,23 +348,17 @@ hydrateAndEmit sb = do
           lift . addLdbBatchOps . catMaybes $ ldbOps
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks blocks = do
-  hasPBFT <- blockstanbulRunning
-  if hasPBFT
-    then blockstanbulSend $ map convert blocks
-    else forM_ blocks $ \ib -> do
-      let mSb = ingestBlockToSequencedBlock ib
-      case mSb of
-        Nothing -> do
-          $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-          P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-        Just sb -> do
-          witnessBlockHash (sbHash sb) sb
-          hydrateAndEmit sb
-  where convert :: IngestBlock -> InEvent
-        convert inBlock = case ibOrigin inBlock of
-                              TO.Quarry -> UnannouncedBlock . ingestBlockToBlock $ inBlock
-                              _ -> PreviousBlock . ingestBlockToBlock $ inBlock
+transformBlocks = mapM_ $ \ib -> do
+  let mSb = ingestBlockToSequencedBlock ib
+  case mSb of
+    Nothing -> do
+      $logWarnS "transformEvents/emitBlocks" . T.pack
+        $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+      P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+    Just sb -> do
+      witnessBlockHash (sbHash sb) sb
+      hydrateAndEmit sb
+
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
