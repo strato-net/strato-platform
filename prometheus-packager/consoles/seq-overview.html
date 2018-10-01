@@ -13,7 +13,7 @@
       "seq_ldb_batch_size",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2).join("-")  },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2).join("_")  },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "",
@@ -70,7 +70,7 @@
       "seq_kafka_sequenced_writes",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2).join("-")  },
+      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2).join("_")  },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "Events",
