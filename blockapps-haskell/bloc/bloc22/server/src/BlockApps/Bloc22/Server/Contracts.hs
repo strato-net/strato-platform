@@ -106,7 +106,9 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
 
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
-      storageFilterParams{qsAddress = Just address}
+      storageFilterParams{ qsAddress = Just address
+                         , qsChainId = chainId
+                         }
     Just name ->
       let ranges = decodeStorageKey
                (typeDefs contract')
