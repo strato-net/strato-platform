@@ -167,7 +167,7 @@ handleEvents mode peer = awaitForever $ \case
             -- check if blockheaders we recieved have parents.
             parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
-            let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
+            let missingParents  = [sha | (sha, Nothing) <- parentsInDB, sha /= SHA 0]
             unless (null missingParents) $ do
                  bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                  let fetchNumber = numFromRedis bestBlock + 1
