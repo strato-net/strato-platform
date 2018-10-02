@@ -1,0 +1,109 @@
+flags: {}
+packages:
+- blockapps-haskell/bloc/bloc22/api
+- blockapps-haskell/bloc/bloc22/client
+- blockapps-haskell/bloc/bloc22/server
+- blockapps-haskell/bloc/exe
+- blockapps-haskell/ethereum
+- blockapps-haskell/slipstream
+- blockapps-haskell/solidity
+- blockapps-haskell/strato/api
+- blockapps-haskell/strato/client
+- blockapps-haskell/strato/server
+- blockapps-haskell/vault-wrapper/api
+- blockapps-haskell/vault-wrapper/client
+- core-strato/blockapps-milena
+- core-strato/strato-conf/
+- core-strato/miner-ethash/
+- core-strato/merkle-patricia-db/
+- core-strato/blockapps-data/
+- core-strato/ecrecover/
+- core-strato/fast-ecrecover/
+- core-strato/strato-init/
+- core-strato/ethereum-discovery/
+- core-strato/ethereum-encryption/
+- core-strato/ethereum-vm/
+- core-strato/blockapps-util/
+- core-strato/strato-api/
+- core-strato/blockapps-tools/
+- core-strato/strato-genesis/
+- core-strato/strato-adit/
+- core-strato/strato-index/
+- core-strato/strato-sequencer/
+- core-strato/ethereum-jsonrpc/
+- core-strato/strato-model/
+- core-strato/strato-p2p/
+- core-strato/strato-redis-blockdb/
+- core-strato/strato-statediff/
+- core-strato/test-suite/
+- core-strato/blockapps-haskoin/
+- core-strato/ethereum-rlp/
+- core-strato/blockstanbul/
+- vault-wrapper/Strato/Strato23/api
+- vault-wrapper/Strato/Strato23/client
+- vault-wrapper/Strato/Strato23/server
+- location:
+    git: https://github.com/echatav/secp256k1-haskell/
+    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
+  extra-dep: true
+- location:
+    git: https://github.com/echatav/servant-aeson-specs/
+    commit: cedbf002b0d5855c17dc91de97e966ee339604fa
+  extra-dep: true
+- location:
+    git: https://github.com/iostat/relapse
+    commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
+  extra-dep: true
+
+extra-deps:
+- Crypto-4.2.5.1
+- bytestring-arbitrary-0.1.1
+- conduit-1.2.13.1
+- containers-0.5.11.0 # temp re-added, will remove
+- dequeue-0.1.12
+- diagrams-html5-1.4.1
+- ether-0.5.1.0 # temp re-added, will remove
+- ethereum-rlp-0.1.0
+- global-lock-0.1
+- hflags-0.4.3
+- json-rpc-client-0.2.5.0
+- json-rpc-server-0.2.6.0
+- milena-0.5.2.1
+- monad-logger-0.3.28.1 # temp re-added, will remove
+- monadIO-0.11.0.0
+- murmur3-1.0.3
+- nibblestring-0.0.3
+- opaleye-0.6.7001.0
+- ordered-containers-0.1.0
+- parsec3-numbers-0.1.0
+- pbkdf-1.1.1.1
+- pcg-random-0.1.3.5
+- random-bytestring-0.1.3.1
+- resourcet-1.1.11
+- saltine-0.0.0.4
+- servant-options-0.1.0.0
+- static-canvas-0.2.0.3
+- transformers-0.5.5.0
+- yesod-raml-0.2.0
+
+resolver: lts-10.10 #also duplicated in docker section below
+compiler: ghc-8.0.2 # temp re-added, will remove - @see https://blockapps.atlassian.net/browse/STRATO-1086
+compiler-check: newer-minor
+extra-include-dirs:
+- /usr/local/include
+
+extra-lib-dirs:
+- /usr/local/lib
+
+ghc-options:
+  "$locals": -Wall -Werror
+  strato-api: -Wall -Werror -fno-warn-orphans
+  strato-p2p: -Wall -Werror  -XMonoLocalBinds
+  strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
+  blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
+
+docker:
+  enable: true
+  image: "strato-buildbase:lts-10.10"
+  set-user: true
+  run-args: ["--ulimit=nofile=60000"]

@@ -1,4 +1,5 @@
 REPO_URL ?= EMPTY
+ifneq ($(MAKECMDGOALS), build_buildbase)
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -11,7 +12,11 @@ endif
 ifeq ($(REPO_URL),EMPTY)
   $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
 endif
+endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
+
+STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
+TMPDIR=/tmp/strato-docker-dummy
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -36,7 +41,7 @@ apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
 
-bloc:
+bloc: build_buildbase
 	@echo Now building bloc...
 	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
 
@@ -64,11 +69,11 @@ smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
-strato:
+strato: build_buildbase
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
-vault-wrapper:
+vault-wrapper: build_buildbase
 	@echo Now building vault-wrapper...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=vault-wrapper/
 
@@ -78,6 +83,12 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
+
+build_buildbase:
+	mkdir -p $(TMPDIR)
+	blockapps-haskell/pull_solc.sh 0.4.24 $(TMPDIR) $(TMPDIR)/license
+	cp -f Dockerfile.buildbase $(TMPDIR)
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 
 test:
 	@echo ${VERSION}

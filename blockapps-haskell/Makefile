@@ -9,8 +9,6 @@ LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
 
-STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
-
 SOLC_VERSION=0.4.24
 
 all: build_docker clean
@@ -27,12 +25,7 @@ prebuild:
 build_solidity: prebuild
 	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin $(LICENSE_SOURCE_DIR)/solidity
 
-build_buildbase: prebuild build_solidity
-	cp -f Dockerfile.buildbase /tmp/docker-dummy-bloc
-	cp -f $(FAKEROOT)/usr/bin/solc /tmp/docker-dummy-bloc
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-bloc-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy-bloc/Dockerfile.buildbase /tmp/docker-dummy-bloc
-
-build_haskell: prebuild build_buildbase
+build_haskell: prebuild build_solidity
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
