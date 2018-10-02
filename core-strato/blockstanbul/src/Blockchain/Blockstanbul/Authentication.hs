@@ -167,4 +167,4 @@ replayHistoricBlock realValidators seqNo blk = do
   Right . fromIntegral $ seqNo + 1
 
 isHistoricBlock :: Block -> Bool
-isHistoricBlock = (> 32) . BS.length . view extraDataLens
+isHistoricBlock = (> 32) . B.length . view extraLens
