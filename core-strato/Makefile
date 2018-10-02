@@ -19,10 +19,7 @@ prebuild:
 	mkdir -p $(LICENSE_SOURCE_DIR)
 	mkdir -p /tmp/docker-dummy-core
 
-build_buildbase: prebuild
-	make -f ../Makefile build_buildbase
-
-build_haskell: build_buildbase
+build_haskell: prebuild
 	stack setup
 	# installing happy-1.19.8 explicitly to avoid the error while building 3rd party lib "language-javascript-0.6.0.11" - remove when migrated to compiler ghc-8.2.2 in stack.yaml
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
