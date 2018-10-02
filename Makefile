@@ -1,5 +1,4 @@
 REPO_URL ?= EMPTY
-ifneq ($(MAKECMDGOALS), build_buildbase)
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -11,7 +10,6 @@ ifeq ($(REPO),public)
 endif
 ifeq ($(REPO_URL),EMPTY)
   $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
-endif
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
