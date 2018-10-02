@@ -327,7 +327,7 @@ spec = parallel $ do
         sendMessages [IMsg a $ RoundChange next] `shouldReturn` []
         use view `shouldReturn` next
 
-  describe "A new block message" $ do
+  describe "An UnannouncedBlock message" $ do
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
         let blk = over extraLens (BS.take 32) blk''
@@ -335,7 +335,7 @@ spec = parallel $ do
         validators .= [me]
         proposer .= me
         v <- use view
-        omsgs <- sendMessages [NewBlock blk]
+        omsgs <- sendMessages [Unannounced blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         v' `shouldBe` v
         let initData = L.view extraLens blk
@@ -350,13 +350,13 @@ spec = parallel $ do
           (== Just me) . (>>= verifyProposerSeal blk')
 
   describe "Block locks" $ do
-    it "takes priority over NewBlocks" $ property $ \lock blk ->
+    it "takes priority over UnannouncedBlocks" $ property $ \lock blk ->
       runTest $ do
         me <- selfAddr
         validators .= [me]
         proposer .= me
         blockLock .= Just lock
-        omsgs <- sendMessages [NewBlock blk]
+        omsgs <- sendMessages [UnannouncedBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         blk' `shouldBe` lock
         v <- use view

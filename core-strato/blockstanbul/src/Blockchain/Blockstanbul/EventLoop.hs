@@ -228,7 +228,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       -- TODO(tim): Does it have a vote to record?
       -- TODO(tim): Take the sequence number
       yield . ToCommit $ blk
-    NewBlock blk' -> do
+    UnannoucedBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
       leader <- use proposer
@@ -403,7 +403,7 @@ recordInEvent = \case
                IMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
                Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
                CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
-               NewBlock _ -> liftIO $ withLabel "new_block" incCounter inEventMetric
+               UnannouncedBlock _ -> liftIO $ withLabel "unannounced_block" incCounter inEventMetric
                PreviousBlock _ -> liftIO $ withLabel "previous_block" incCounter inEventMetric
                NewBeneficiary _ _ ->liftIO $ withLabel "new_beneficiary" incCounter inEventMetric
 
