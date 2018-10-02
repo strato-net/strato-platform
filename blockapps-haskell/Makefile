@@ -24,10 +24,7 @@ prebuild:
 build_solidity: prebuild
 	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin $(LICENSE_SOURCE_DIR)/solidity
 
-build_buildbase: build_solidity
-	make -f ../Makefile SOLC_VERSION=$(SOLC_VERSION)
-
-build_haskell: prebuild build_buildbase
+build_haskell: prebuild build_solidity
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 

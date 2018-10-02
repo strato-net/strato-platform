@@ -1,5 +1,4 @@
 REPO_URL ?= EMPTY
-ifneq ($(MAKECMDGOALS), build_buildbase)
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -12,12 +11,10 @@ endif
 ifeq ($(REPO_URL),EMPTY)
   $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
 endif
-endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 TMPDIR=/tmp/strato-docker-dummy
-SOLC_VERSION=0.4.24
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -87,7 +84,7 @@ docker-compose:
 
 build_buildbase:
 	mkdir -p $(TMPDIR)
-	blockapps-haskell/pull_solc.sh $(SOLC_VERSION) $(TMPDIR) $(TMPDIR)/license
+	blockapps-haskell/pull_solc.sh 0.4.24 $(TMPDIR) $(TMPDIR)/license
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 	stack exec -- stack install happy-1.19.8
