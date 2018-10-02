@@ -1,4 +1,4 @@
-BASILWORK=.basil-work
+BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
 NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
@@ -6,8 +6,6 @@ STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
-
-STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 
 all: build_docker clean
 
@@ -22,10 +20,9 @@ prebuild:
 	mkdir -p /tmp/docker-dummy-core
 
 build_buildbase: prebuild
-	cp -f Dockerfile.buildbase /tmp/docker-dummy-core
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=stack-core-buildbase:${STACK_RESOLVER} -f /tmp/docker-dummy-core/Dockerfile.buildbase /tmp/docker-dummy-core
+	make -f ../Makefile build_buildbase
 
-build_haskell: prebuild build_buildbase
+build_haskell: build_buildbase
 	stack setup
 	# installing happy-1.19.8 explicitly to avoid the error while building 3rd party lib "language-javascript-0.6.0.11" - remove when migrated to compiler ghc-8.2.2 in stack.yaml
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8

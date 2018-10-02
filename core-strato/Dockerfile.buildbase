@@ -1,3 +1,0 @@
-ARG STACK_RESOLVER
-
-FROM fpco/stack-build:${STACK_RESOLVER}
