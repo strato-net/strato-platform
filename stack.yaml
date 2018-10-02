@@ -63,7 +63,6 @@ extra-deps:
 - dequeue-0.1.12
 - diagrams-html5-1.4.1
 - ether-0.5.1.0 # temp re-added, will remove
-- ethereum-rlp-0.1.0
 - global-lock-0.1
 - hflags-0.4.3
 - json-rpc-client-0.2.5.0
