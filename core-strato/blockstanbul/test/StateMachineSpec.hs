@@ -335,7 +335,7 @@ spec = parallel $ do
         validators .= [me]
         proposer .= me
         v <- use view
-        omsgs <- sendMessages [Unannounced blk]
+        omsgs <- sendMessages [UnannouncedBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         v' `shouldBe` v
         let initData = L.view extraLens blk
