@@ -157,7 +157,7 @@ replayHistoricBlock realValidators seqNo blk = do
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
   unless (seqNo + 1 == blockNo) $
     Left "unexpected block number"
-  unless (realValidators == _validatorList) $
+  unless (S.fromList realValidators == S.fromList _validatorList) $
     Left "mismatched validators"
   unless (mProp `elem` map Just realValidators) $
     Left "no verifiable proposer seal"
