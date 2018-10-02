@@ -88,11 +88,19 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              deriving (Eq, Show)
 
+instance Format InEvent where
+  format (IMsg a m) = format $ WireMessage a m
+  format x = show x
+
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
               deriving (Eq, Show, Generic)
+
+instance Format OutEvent where
+  format (OMsg a m) = format $ WireMessage a m
+  format x = show x
 
 instance NFData OutEvent
 
