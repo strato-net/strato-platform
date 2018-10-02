@@ -289,7 +289,7 @@ hydrateAndEmit sb = do
   hasPBFT <- blockstanbulRunning
   if not hasPBFT
     then mapM_ (markForVM . OEBlock) $ wetBlocks
-    else let convert :: Block -> InEvent
+    else let convert :: BDB.Block -> InEvent
              convert blk = if isHistoricBlock blk
                              then PreviousBlock blk
                              else UnannouncedBlock blk
