@@ -22,6 +22,7 @@ import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
+import qualified Blockchain.Strato.Model.Colors as CL
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
