@@ -73,7 +73,7 @@ main = do
   stratoUrl <- parseBaseUrl flags_stratourl
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
-  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 (toEnum flags_loglevel) mode
+  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 (toEnum flags_loglevel) mode flags_stateFetchLimit
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv)
 
