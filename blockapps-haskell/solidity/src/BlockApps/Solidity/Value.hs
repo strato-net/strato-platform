@@ -14,7 +14,6 @@ import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
 import           Data.LargeWord          (Word256)
 import           Data.List               (intersperse)
-import           Data.Maybe              (fromMaybe)
 import           Data.Monoid
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
@@ -71,24 +70,23 @@ data SimpleValue
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
-  TypeBool -> if (bytesToNum False (Just 1)) /= 0
+  TypeBool -> if (bytesToNum False) /= 0
                 then Just $ ValueBool True
                 else Just $ ValueBool False
   TypeAddress -> ValueAddress <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
-  TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
+  TypeInt s b -> Just . ValueInt s b $ bytesToNum s
   TypeBytes b -> Just $ ValueBytes b bs
   where
-    bytesToNum :: Bool -> Maybe Integer -> Integer
-    bytesToNum signed' bytes' = if ByteString.null bs then 0 else
+    bytesToNum :: Bool -> Integer
+    bytesToNum signed' = if ByteString.null bs then 0 else
       let bs' = ByteString.unpack bs
           h = head bs'
           neg = if signed'
                   then h >= 0x80
                   else False
-          bys = fromMaybe 32 bytes'
           a = go neg bs' 0
-       in (if neg then negate (a + 1) else a) `mod` (1 `shiftL` fromInteger (8 * bys))
+       in if neg then negate (a + 1) else a
     go :: Bool -> [Word8] -> Integer -> Integer
     go _   []     x = x
     go inv (w:ws) x =
