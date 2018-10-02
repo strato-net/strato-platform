@@ -28,7 +28,7 @@ pipeline {
                 git checkout -f
                 git fetch origin
                 git checkout ${PLATFORM_BRANCH_NAME}
-                git pull
+                git reset --hard origin/${PLATFORM_BRANCH_NAME}
                 cd ..
               else
                 git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
