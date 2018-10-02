@@ -1,4 +1,4 @@
-BASILWORK=.basil-work
+BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
 NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
