@@ -1,9 +1,8 @@
-BASILWORK=.basil-work
-BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
+BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
 FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
-BUILDER_HOME=$(BASILWORK_ABS)/builder_home
+BUILDER_HOME=$(BASILWORK)/builder_home
 DEPLOYBASE_NAME=bloch-deploybase
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
