@@ -39,9 +39,6 @@ packages:
 - core-strato/blockapps-haskoin/
 - core-strato/ethereum-rlp/
 - core-strato/blockstanbul/
-- vault-wrapper/Strato/Strato23/api
-- vault-wrapper/Strato/Strato23/client
-- vault-wrapper/Strato/Strato23/server
 - location:
     git: https://github.com/echatav/secp256k1-haskell/
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c

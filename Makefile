@@ -73,7 +73,7 @@ strato: build_buildbase
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
-vault-wrapper: build_buildbase
+vault-wrapper:
 	@echo Now building vault-wrapper...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=vault-wrapper/
 
