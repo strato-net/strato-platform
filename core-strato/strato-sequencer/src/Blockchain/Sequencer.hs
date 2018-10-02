@@ -289,13 +289,13 @@ hydrateAndEmit sb = do
   hasPBFT <- blockstanbulRunning
   if not hasPBFT
     then mapM_ (markForVM . OEBlock) $ wetBlocks
-    else let convert :: OutputBlock -> InEvent
-             convert outBlock = case obOrigin outBlock of
-                                    TO.Quarry -> UnannouncedBlock . outputBlockToBlock $ outBlock
-                                    _ -> PreviousBlock . outputBlockToBlock $ outBlock
+    else let convert :: Block -> InEvent
+             convert blk = if isHistoricBlock blk
+                             then PreviousBlock blk
+                             else UnannouncedBlock blk
          -- Blockstanbul will check that the seals and validators match up before
          -- announcing it to the network or forwarding to the EVM.
-         in blockstanbulSend . map convert $ wetBlocks
+         in blockstanbulSend . map (convert . outputBlockToBlock) $ wetBlocks
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
