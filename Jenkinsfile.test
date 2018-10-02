@@ -17,20 +17,24 @@ pipeline {
           }
         }
         withEnv(["PLATFORM_BRANCH_NAME=${env.PLATFORM_BRANCH_NAME}"]) {
-          sh '''#!/bin/bash -le
-            set -x
-            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-            if [ -d "strato-platform" ]; then
-              cd strato-platform
-              git checkout -f
-              git fetch origin
-              git checkout ${PLATFORM_BRANCH_NAME}
-              git pull
-              cd ..
-            else
-              git clone https://github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
-            fi
-          '''
+          withCredentials([
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')
+          ]) {
+            sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+              if [ -d "strato-platform" ]; then
+                cd strato-platform
+                git checkout -f
+                git fetch origin
+                git checkout ${PLATFORM_BRANCH_NAME}
+                git pull
+                cd ..
+              else
+                git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
+              fi
+            '''
+          }
         }
       }
     }
