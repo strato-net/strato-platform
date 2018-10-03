@@ -228,7 +228,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       -- TODO(tim): Does it have a vote to record?
       -- TODO(tim): Take the sequence number
       yield . ToCommit $ blk
-    UnannoucedBlock blk' -> do
+    UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
       leader <- use proposer
