@@ -228,7 +228,7 @@ spec = parallel $ do
   describe "A commit message" $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
-        let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
+        let blk = addProposerSeal seal . addValidators (S.fromList [sender auth]) $ blk'
         validators .= S.fromList [sender auth]
         proposal .= Just blk
         curView <- use view
@@ -273,12 +273,12 @@ spec = parallel $ do
     it "waits for 2/3s of commits" $ property $ \sig blk' as seal ->
       runTest $ do
         let blk = addProposerSeal seal . addValidators as $ blk'
-        validators .= S.fromList as
+        validators .= as
         proposal .= Just blk
         curView <- use view
         let di = blockHash blk
         let count =  2 * length as `div` 3
-            (front, back) = splitAt count as
+            (front, back) = splitAt count . S.toList $ as
             toCommit a = IMsg (MsgAuth a sig) $ Commit curView di seal
             earlyCommits = map toCommit front
             tippingPoint = map toCommit . take 1 $ back
@@ -292,7 +292,7 @@ spec = parallel $ do
           let got = cookRawExtra . L.view extraLens $ b
           _vanity got `shouldBe` (BS.take 32 . L.view extraLens $ blk)
           let Just ist = _istanbul got
-          _validatorList ist `shouldBe` sort as
+          _validatorList ist `shouldBe` S.toList as
           _proposedSig ist `shouldBe` Just seal
           _commitment ist `shouldSatisfy` (== count+1) . length
           finalHash b `shouldBe` di

@@ -12,7 +12,6 @@ import Control.Lens
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import MonadUtils (liftIO1)
@@ -42,10 +41,10 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens $ B.take 32
 
-addValidators :: [Address] -> Block -> Block
+addValidators :: S.Set Address -> Block -> Block
 addValidators vs = over extraLens $
     uncookRawExtra
-  . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
+  . set istanbul (Just (IstanbulExtra (S.toList vs) Nothing []))
   . cookRawExtra
 
 getValidatorList :: Block -> [Address]
@@ -142,7 +141,7 @@ authenticate (IMsg (MsgAuth addr sig) tm) =
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
 
-replayHistoricBlock :: [Address] -> Word256 -> Block -> Either String Word256
+replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String Word256
 replayHistoricBlock realValidators seqNo blk = do
   -- TODO(tim): This needs to be fixed for validator voting, as the current list
   -- may have diverged from the validators at the time of commit
@@ -157,12 +156,12 @@ replayHistoricBlock realValidators seqNo blk = do
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
   unless (seqNo + 1 == blockNo) $
     Left "unexpected block number"
-  unless (S.fromList realValidators == S.fromList _validatorList) $
+  unless (realValidators == S.fromList _validatorList) $
     Left "mismatched validators"
-  unless (mProp `elem` map Just realValidators) $
+  unless (mProp `S.member` S.map Just realValidators) $
     Left "no verifiable proposer seal"
-  unless (signers `S.isSubsetOf` S.fromList realValidators) $
+  unless (signers `S.isSubsetOf` realValidators) $
     Left "unknown signers"
-  unless (3 * S.size signers > 2 * length realValidators) $
+  unless (3 * S.size signers > 2 * S.size realValidators) $
     Left "not enough commit seals"
   Right . fromIntegral $ seqNo + 1

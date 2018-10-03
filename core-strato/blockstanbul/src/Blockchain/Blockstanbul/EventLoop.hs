@@ -253,7 +253,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                  let ((bnf,nonc),newPending) = M.deleteFindMin pending
                  pendingvotes .= newPending
                  return $ editBeneficiary blk bnf nonc
-        let blockWithVs = addValidators (S.toList vs) editedBlk
+        let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
