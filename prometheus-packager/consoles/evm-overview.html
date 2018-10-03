@@ -33,7 +33,7 @@
       "vm_block_insertion_mined",
     ],
     name: function(metric) {
-      return !metric.__name__ ? 'Used' : metric.__name__.split('_', 3).slice(2).join("_") },
+      return !metric.__name__ ? 'Used' : metric.__name__ },
     yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
     yTitle: "Blocks",

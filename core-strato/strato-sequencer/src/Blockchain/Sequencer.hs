@@ -431,15 +431,19 @@ splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
   case eventType of
     IETTransaction -> do
+      liftIO $ withLabel "inevent_type_transaction" incCounter eventsplitMetrics
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestTransactions"
       transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
     IETBlock -> do
+      liftIO $ withLabel "inevent_type_block" incCounter eventsplitMetrics
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlocks"
       transformBlocks $ map (\(IEBlock ob) -> ob) events
     IETGenesis -> do
+      liftIO $ withLabel "inevent_type_genesis" incCounter eventsplitMetrics
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
     IETBlockstanbul -> do
+      liftIO $ withLabel "inevent_type_blockstanbul" incCounter eventsplitMetrics
       $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
 

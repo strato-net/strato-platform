@@ -6,12 +6,15 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import           Blockchain.SHA
 
+import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Sequence                as Q
+import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenChainDB
+import           Blockchain.Sequencer.DB.Metrics
 
 getChainHashMap :: HasPrivateHashDB m => m (Map SHA (Bool, Word256))
 getChainHashMap = chainHashMap <$> getPrivateHashDB
@@ -23,7 +26,9 @@ lookupChainHash :: HasPrivateHashDB m => SHA -> m (Maybe (Bool, Word256))
 lookupChainHash h = M.lookup h <$> getChainHashMap
 
 insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
-insertChainHash h cid = getChainHashMap >>= putChainHashMap . M.insert h (False, cid)
+insertChainHash h cid = do
+  liftIO $ withLabel "insert_chain_hash" incCounter chainMetrics
+  getChainHashMap >>= putChainHashMap . M.insert h (False, cid)
 
 useChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 useChainHash h cid = getChainHashMap >>= putChainHashMap . M.alter (\_ -> Just (True, cid)) h

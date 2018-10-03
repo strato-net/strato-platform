@@ -3,10 +3,13 @@ module Blockchain.Sequencer.DB.SeenHashDB where
 
 import           Blockchain.SHA
 
+import           Control.Monad.IO.Class
 import           Data.Bimap                   (Bimap)
 import qualified Data.Bimap                   as B
+import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.Metrics
 
 getSeenHashDB :: HasPrivateHashDB m => m (Bimap SHA SHA)
 getSeenHashDB = seenHashes <$> getPrivateHashDB
@@ -29,4 +32,6 @@ lookupSeenChainHash ch = do
     else return Nothing
 
 insertSeenTxHash :: HasPrivateHashDB m => SHA -> SHA -> m ()
-insertSeenTxHash th ch = getSeenHashDB >>= putSeenHashDB . B.insert th ch
+insertSeenTxHash th ch = do
+  liftIO $ withLabel "seen_txs_Hash" incCounter txMetrics
+  getSeenHashDB >>= putSeenHashDB . B.insert th ch
