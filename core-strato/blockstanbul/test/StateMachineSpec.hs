@@ -19,6 +19,7 @@ import qualified Data.ByteString as BS
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
@@ -48,7 +49,7 @@ setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk' as = do
   let blk = truncateExtra blk'
   proposal .= Just blk
-  validators .= as
+  validators .= S.fromList as
   v <- use view
   let di = blockHash blk
   return (v, di)
@@ -69,7 +70,7 @@ spec = parallel $ do
         sendMessages [Timeout 10] `shouldReturn` []
     it "sets the pending round after a timeout" $ property $ \a1 a2 ->
       runTest $ do
-      validators .= [a1, a2]
+      validators .= S.fromList [a1, a2]
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
@@ -143,7 +144,7 @@ spec = parallel $ do
       runTest $ do
         let blk = truncateExtra blk'
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         pk <- use prvkey
         pseal <- proposerSeal blk pk
         let sealedBlk = addProposerSeal pseal blk
@@ -157,7 +158,7 @@ spec = parallel $ do
       runTest $ do
         productionAuth .= True
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -165,7 +166,7 @@ spec = parallel $ do
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
       runTest $ do
         proposer .= addr
-        validators .= [sender auth, addr]
+        validators .= S.fromList [sender auth, addr]
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -173,7 +174,7 @@ spec = parallel $ do
     it "rejects a preprepare from a non-validator" $ property $ \auth blk ->
       runTest $ do
         proposer .= sender auth
-        validators .= []
+        validators .= S.empty
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -181,7 +182,7 @@ spec = parallel $ do
     it "round-changes an old preprepare" $ property $ \auth blk ->
       runTest $ do
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         got <- sendMessages [IMsg auth $ Preprepare curView{_round = 3} blk]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21]
@@ -200,7 +201,7 @@ spec = parallel $ do
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
@@ -228,7 +229,7 @@ spec = parallel $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
         let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         proposal .= Just blk
         curView <- use view
         let di = blockHash blk
@@ -250,7 +251,7 @@ spec = parallel $ do
         use view `shouldReturn` curView
     it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
@@ -272,7 +273,7 @@ spec = parallel $ do
     it "waits for 2/3s of commits" $ property $ \sig blk' as seal ->
       runTest $ do
         let blk = addProposerSeal seal . addValidators as $ blk'
-        validators .= as
+        validators .= S.fromList as
         proposal .= Just blk
         curView <- use view
         let di = blockHash blk
@@ -332,7 +333,7 @@ spec = parallel $ do
       runTest $ do
         let blk = over extraLens (BS.take 32) blk''
         me <- selfAddr
-        validators .= [me]
+        validators .= S.singleton me
         proposer .= me
         v <- use view
         omsgs <- sendMessages [NewBlock blk]
@@ -353,7 +354,7 @@ spec = parallel $ do
     it "takes priority over NewBlocks" $ property $ \lock blk ->
       runTest $ do
         me <- selfAddr
-        validators .= [me]
+        validators .= S.singleton me
         proposer .= me
         blockLock .= Just lock
         omsgs <- sendMessages [NewBlock blk]
@@ -364,7 +365,7 @@ spec = parallel $ do
 
     it "round changes a preprepare that doesn't match the lock" $ property $ \lock blk a ->
       runTest $ do
-        validators .= [sender a]
+        validators .= S.fromList [sender a]
         proposer .= sender a
         blockLock .= Just lock
         v <- use view
@@ -375,7 +376,7 @@ spec = parallel $ do
     it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
       runTest $ do
         me <- selfAddr
-        validators .= me:as
+        validators .= S.fromList (me:as)
         blockLock .= Just blk
         _ <- sendMessages [CommitResult (Left "oops")]
         use blockLock `shouldReturn` Nothing
@@ -392,7 +393,7 @@ spec = parallel $ do
 
     let setBlock blk = do
           me <- selfAddr
-          validators .= [me]
+          validators .= S.singleton me
           proposal .= Just blk
           blockLock .= Just blk
 
