@@ -44,7 +44,7 @@ blockstanbulSendBench txcount txsize = do
   ctx <- benchContext
   runFakeSequencerM benchConfig ctx
                       . blockstanbulSend
-                      $ [NewBlock $ PBFT.makeBlock txcount txsize]
+                      $ [UnannouncedBlock $ PBFT.makeBlock txcount txsize]
 
 pageTest :: Int -> Benchmark
 pageTest n = bench (show n ++ "x 4KB") . nfIO . blockstanbulSendBench n $ 4092

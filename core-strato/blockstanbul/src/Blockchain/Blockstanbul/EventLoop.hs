@@ -12,11 +12,13 @@ import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 import Prometheus
 import Text.Printf
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
@@ -41,7 +43,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The designated participant to suggest a block for this round
   , _proposer :: Address
   -- The total group of participants
-  , _validators :: [Address]
+  , _validators :: S.Set Address
   -- Validators who have sent us a prepare for this round
   , _prepared :: M.Map Address SHA
   -- Validators who have sent us a commitment seal for this round
@@ -71,7 +73,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   debugLog "showctx/view" view format
   debugLog "showctx/proposer" proposer (printf "%x")
-  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String))
+  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
@@ -89,7 +91,7 @@ newContext v as senderlist pk =
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
-     , _validators = as
+     , _validators = S.fromList as
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPrepared = False
@@ -107,10 +109,13 @@ newContext v as senderlist pk =
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
+poolSize :: (StateMachineM m) => m Int
+poolSize = uses validators S.size
+
 authorize :: (StateMachineM m) => InEvent -> m Bool
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (addr `elem`)
+    ret <- uses validators (addr `S.member`)
     unless ret $
       $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting message; sender not a validator: " ++ show addr
     return ret
@@ -141,7 +146,7 @@ isAuthorized iev = do
             return False
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
-        let validatorMatch = vali == (getValidatorList pp)
+        let validatorMatch = vali == (S.fromList $ getValidatorList pp)
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
         let ret = validatorMatch && Just addr == signatory
         when (doAuthn && not ret) $
@@ -181,9 +186,9 @@ nextRound nt = do
       blockcount .= 0
 
    --update validators list
-  val <- use validators
+  val <- uses validators S.toList
   vot <- use voted
-  validators .= updateValidator val vot
+  validators .= (S.fromList $ updateValidator val vot)
 
   case nt of
     Sequence s -> view . sequence .= s
@@ -192,7 +197,7 @@ nextRound nt = do
       yield $ ResetTimer r
   vals <- use validators
   thisR <- use $ view . round
-  let leader = vals !! (fromIntegral thisR `mod` length vals)
+  let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
   self <- selfAddr
@@ -221,14 +226,18 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
     PreviousBlock blk -> do
-      -- TODO(tim): verify this block
-      -- TODO(tim): Does the validator list match the log at that point in time?
-      -- TODO(tim): Has the proposer from that (roundno, validator list) signed it?
-      -- TODO(tim): Have 2/3s of the validators signed it?
-      -- TODO(tim): Does it have a vote to record?
-      -- TODO(tim): Take the sequence number
-      yield . ToCommit $ blk
-    NewBlock blk' -> do
+      -- TODO(tim): This needs to be fixed for validator voting, as the current list
+      -- may have diverged from the validators at the time of commit
+      realValidators <- use validators
+      seqNo <- use $ view . sequence
+      let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
+      case eNextSeqNo of
+        Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
+        Right nextSeqNo -> do
+          view . sequence .= nextSeqNo
+          -- TODO(tim): Does it have a vote to record?
+          yield . ToCommit $ blk
+    UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
       leader <- use proposer
@@ -287,7 +296,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                    yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
-      total <- uses validators length
+      total <- poolSize
       let sameVoteCount = M.size . M.filter (==di) $ ps
       sameHash <- hasSameHash di
       hasSent <- use hasPrepared
@@ -299,7 +308,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
-      total <- uses validators length
+      total <- poolSize
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
@@ -315,7 +324,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
-      total <- uses validators length
+      total <- poolSize
       sentRN <- use pendingRound
       let sameRNCount = M.size . M.filter (== rn) $ rs
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
@@ -374,9 +383,9 @@ sendMessages wms = do
     Just ctx -> do
       let base = yieldMany wms
               .| iterMC recordInEvent
-              .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . show)
+              .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
               .| eventLoop ctx
-              `fuseUpstream` (iterMC recordOutEvent .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . show))
+              `fuseUpstream` (iterMC recordOutEvent .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
       return evs
@@ -403,7 +412,7 @@ recordInEvent = \case
                IMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
                Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
                CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
-               NewBlock _ -> liftIO $ withLabel "new_block" incCounter inEventMetric
+               UnannouncedBlock _ -> liftIO $ withLabel "unannounced_block" incCounter inEventMetric
                PreviousBlock _ -> liftIO $ withLabel "previous_block" incCounter inEventMetric
                NewBeneficiary _ _ ->liftIO $ withLabel "new_beneficiary" incCounter inEventMetric
 

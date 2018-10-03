@@ -35,7 +35,7 @@ import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
-import           Data.Maybe                       (maybe)
+import           Data.Maybe                       (fromJust, fromMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -91,45 +91,52 @@ byteStringToWord256 bs =
   in LargeKey w1 (LargeKey w2 (LargeKey w3 w4))
 
 getArrayStartingKey :: Word256 -> Word256
-getArrayStartingKey = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256 . word256ToByteString
+getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
-decodeStorageKeySimple :: SimpleType -> Word256 -> [(Word256, Word256)]
-decodeStorageKeySimple TypeString          o = [(o, 1 `shiftL` 32)] -- TODO: Create real string instance
-decodeStorageKeySimple (TypeBytes Nothing) o = [(o, 1 `shiftL` 32)] -- TODO: Create real bytes instance
-decodeStorageKeySimple _                   o = [(o, 1)] -- All other simple types fit into one storage cell
+getArrayStartingKeyBS :: ByteString -> Word256
+getArrayStartingKeyBS = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256
+
+decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
+decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o
+                                                           ofs' = fromInteger $ sk + (ofs `quot` 32) -- Since each element is one byte
+                                                           cnt' = fromInteger $ (ofs + cnt - 1) `quot` 32
+                                                        in [(o, 1),(ofs', cnt')]
+decodeStorageKeySimple (TypeBytes Nothing) o ofs cnt = decodeStorageKeySimple TypeString o ofs cnt
+decodeStorageKeySimple _                   o _   _   = [(o, 1)] -- All other simple types fit into one storage cell
 
 decodeStorageKey
   :: TypeDefs
   -> Struct
   -> [Text]
   -> Word256
-  -> Maybe Int
-  -> Maybe Int
+  -> Integer
+  -> Integer
   -> Bool
   -> [(Word256, Word256)]
 decodeStorageKey _ _ [] _ _ _ _ = []
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len =
+decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
   case OMap.lookup varName (fields struct') of
     Nothing -> []
     Just (Left _, _) -> []
     Just (Right Storage.Position{..}, theType) ->
       case theType of
-        SimpleType ty -> decodeStorageKeySimple ty offset
+        SimpleType ty -> decodeStorageKeySimple ty offset ofs cnt
         TypeArrayDynamic ty -> do
           if len
             then [(offset, 1)]
             else
               let startingKey = getArrayStartingKey offset
-                  ofs = fromIntegral $ maybe 0 id mOffset
-                  cnt = fromIntegral $ maybe 100 id mCount -- Default to page size of 100 entries
                   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-              in [(offset, 1), (startingKey + ofs, elementSize * cnt)]
+                  ofs' = fromInteger $ ofs + toInteger startingKey
+                  cnt' = fromInteger $ cnt * toInteger elementSize
+              in [(offset, 1), (ofs',cnt')]
         TypeArrayFixed n ty -> do
           if len
             then []
             else
               let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-              in [(offset, elementSize * fromIntegral n)]
+                  n' = fromInteger $ toInteger elementSize * toInteger n
+              in [(offset, n')]
         TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
@@ -145,21 +152,22 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len
         TypeContract _ -> [(offset, 1)]
 
 decodeValues
-  :: TypeDefs
+  :: Integer
+  -> TypeDefs
   -> Struct
   -> Storage
   -> Word256
   -> [(Text, Value)]
-decodeValues typeDefs' struct'@Struct{..} storage offset =
-  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (map fst $ OMap.assocs fields)
+decodeValues fetchLimit typeDefs' struct'@Struct{..} storage offset =
+  decodeValuesFromList typeDefs' struct' storage offset 0 fetchLimit False (map fst $ OMap.assocs fields)
 
 decodeValuesFromList
   :: TypeDefs
   -> Struct
   -> Storage
   -> Word256
-  -> Maybe Int
-  -> Maybe Int
+  -> Integer
+  -> Integer
   -> Bool
   -> [Text]
   -> [(Text, Value)]
@@ -177,8 +185,8 @@ decodeValue
   -> Storage
   -> Word256
   -> Struct
-  -> Maybe Int
-  -> Maybe Int
+  -> Integer
+  -> Integer
   -> Bool
   -> Text
   -> Maybe Value
@@ -194,8 +202,8 @@ decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.
 decodeValue'
   :: TypeDefs
   -> Storage
-  -> Maybe Int
-  -> Maybe Int
+  -> Integer
+  -> Integer
   -> Bool
   -> Storage.Position
   -> Type
@@ -206,7 +214,15 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       SimpleValue (ValueInt _ (Just 1) word8) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1)
     in
      SimpleValue $ ValueBool $ word8 /= 0
-  SimpleType (TypeInt s b) -> decodeInt storage offset byte (ValueInt s b)
+  SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
+                                     b' = if byte + b > 32 then 0 else 32 - byte - b
+                                  in SimpleValue
+                                     . fromJust
+                                     . flip bytesToSimpleValue t
+                                     . ByteString.take b
+                                     . ByteString.drop b'
+                                     . word256ToByteString
+                                     $ storage offset
   SimpleType TypeAddress ->
     let
       SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
@@ -223,7 +239,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       len' = lastWord64 (storage offset) `div` 2
       lastWord64::Word256->Word64
       lastWord64 (LargeKey x _) = x
-      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
+      startingKey = getArrayStartingKey offset
     in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType (TypeBytes Nothing) -> --small string, less than 32 bytes
@@ -247,9 +263,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     else ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      ofs' :: Word256 = fromIntegral . toInteger $ maybe 0 id ofs
-      cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') . fromIntegral $ maybe 100 id cnt
-      theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
+      cnt' = min ((toInteger size) - ofs) cnt
+      theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition (toInteger elementSize)) [ofs .. (ofs + cnt' - 1)]
 
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
@@ -257,10 +272,9 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-      ofs' = maybe 0 id ofs
-      cnt' = max 0 . min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
-      theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
-      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
+      cnt' = min ((toInteger $ storage offset) - ofs) cnt
+      theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition (toInteger elementSize)) <$> [ofs..(ofs + cnt' - 1)]
+      startingKey = getArrayStartingKey offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
@@ -279,7 +293,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> error ""
-     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage (Storage.alignedByte position)
+     Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 
@@ -288,7 +302,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
 
 decodeMapValue
-  :: TypeDefs
+  :: Integer
+  -> TypeDefs
   -> Struct
   -> Storage
   -> Text
@@ -296,7 +311,7 @@ decodeMapValue
   -> Either String Value
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
-decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
+decodeMapValue fetchLimit typeDefs' Struct{..} storage mappingName keyName = do
   (eTxtPos, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
   position <-
@@ -318,12 +333,12 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
        return $ word256ToByteString $ fromInteger keyAsInteger
      x -> throwError $ "Sorry, This route doesn't support maps with keys of type: " ++ show x
 
-  let valPositionInt=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
+  let valPositionInt = getArrayStartingKeyBS $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
       getValPosition::SimpleType->Text->Storage.Position->Storage.Position
       getValPosition _ _ _ = Storage.positionAt valPositionInt  --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
 
-  let val = decodeValue' typeDefs' storage Nothing Nothing False valPosition toType
+  let val = decodeValue' typeDefs' storage 0 fetchLimit False valPosition toType
 
   return val
 
@@ -423,24 +438,17 @@ decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B
 encodeInt :: (Num t, Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
 encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte*8))) (offset,val)
 
-decodeInt::Num t=>
-           Storage->Word256->Int->(t->SimpleValue)->Value
-decodeInt storage offset byte constructor =
-  SimpleValue $ constructor $ fromIntegral $ (`shiftR` (byte*8)) $ storage offset
-
-
-
-arrayPosition::Word256->Word256->Storage.Position
+arrayPosition :: Integer -> Integer -> Storage.Position
 arrayPosition elementSize x | elementSize <= 32 =
   let
     itemsPerWord = 32 `quot` elementSize
     (o, b) = x `quotRem` itemsPerWord
   in
-   Storage.Position{offset=o, byte=fromIntegral $ elementSize * b}
+   Storage.Position{offset=fromInteger $ o, byte = fromInteger $ elementSize * b}
 
-arrayPosition elementSize x = 
+arrayPosition elementSize x =
   let
     wordsPerItem = elementSize `quot` 32
-    o = x * wordsPerItem
+    o = fromInteger $ x * wordsPerItem
   in
     Storage.Position{offset=o, byte=0}
