@@ -354,7 +354,7 @@ transformBlocks blocks = do
           hydrateAndEmit sb
   where convert :: IngestBlock -> InEvent
         convert inBlock = case ibOrigin inBlock of
-                              TO.Quarry -> NewBlock . ingestBlockToBlock $ inBlock
+                              TO.Quarry -> UnannouncedBlock . ingestBlockToBlock $ inBlock
                               _ -> PreviousBlock . ingestBlockToBlock $ inBlock
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()

@@ -22,6 +22,7 @@ import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
+import qualified Blockchain.Strato.Model.Colors as CL
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -67,8 +68,10 @@ derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
 
 instance Format WireMessage where
-  -- TODO(tim): Invest in better formatting.
-  format = show
+  format (WireMessage (MsgAuth s _) (Preprepare v theBlock)) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format s ++ "\n" ++ format theBlock
+  format (WireMessage (MsgAuth s _) (Prepare v theSHA)) = CL.blue "PREPARE " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
+  format (WireMessage (MsgAuth s _) (Commit v theSHA _)) = CL.blue "COMMIT " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
+  format (WireMessage (MsgAuth s _) (RoundChange v)) = CL.blue "ROUNDCHANGE " ++ format v ++ " " ++ format s
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -80,16 +83,24 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
              | CommitResult (Either Text ())
-             | NewBlock Block
+             | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              deriving (Eq, Show)
+
+instance Format InEvent where
+  format (IMsg a m) = format $ WireMessage a m
+  format x = show x
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
               deriving (Eq, Show, Generic)
+
+instance Format OutEvent where
+  format (OMsg a m) = format $ WireMessage a m
+  format x = show x
 
 instance NFData OutEvent
 

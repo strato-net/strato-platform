@@ -20,7 +20,7 @@ instance HasBlockstanbulContext (StateT BlockstanbulContext (NoLoggingT IO)) whe
 
 sendAllMessagesBench :: Int -> Int -> IO [OutEvent]
 sendAllMessagesBench txcount txsize =
-  runBlockstanbul . sendAllMessages $ [NewBlock $ makeBlock txcount txsize]
+  runBlockstanbul . sendAllMessages $ [Unannounced $ makeBlock txcount txsize]
 
 pageTest :: Int -> Benchmark
 pageTest n = bench (show n ++ "x4KB") . nfIO . sendAllMessagesBench n $ 4092
