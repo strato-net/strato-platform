@@ -157,6 +157,13 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              , obBlockUncles         = sbBlockUncles sb
                                                              }
 
+sequencedBlockToBlock :: SequencedBlock -> Block
+sequencedBlockToBlock sb = BDB.Block
+                         { BDB.blockBlockData = sbBlockData sb
+                         , BDB.blockReceiptTransactions = map otBaseTx $ sbReceiptTransactions sb
+                         , BDB.blockBlockUncles = sbBlockUncles sb
+                         }
+
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)

@@ -295,7 +295,9 @@ hydrateAndEmit sb = do
                              else UnannouncedBlock blk
          -- Blockstanbul will check that the seals and validators match up before
          -- announcing it to the network or forwarding to the EVM.
-         in blockstanbulSend . map (convert . outputBlockToBlock) $ wetBlocks
+         in blockstanbulSend . map convert $ if null wetBlocks
+                                               then [sequencedBlockToBlock sb]
+                                               else map outputBlockToBlock wetBlocks
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
