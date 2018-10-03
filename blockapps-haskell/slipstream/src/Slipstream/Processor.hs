@@ -133,7 +133,9 @@ storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (T.pack $ show k
 
 addStorageIfNeeded::Action->Bloc Action
 addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
-  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ T.unpack address }
+  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ T.unpack address
+                                                         , qsChainId = chainId
+                                                         }
   return $ action'{A.storage = Just . Map.fromList $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
