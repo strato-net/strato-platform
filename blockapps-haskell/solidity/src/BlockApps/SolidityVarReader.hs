@@ -35,6 +35,7 @@ import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
+import           Data.Maybe                       (fromJust, fromMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -213,7 +214,15 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       SimpleValue (ValueInt _ (Just 1) word8) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1)
     in
      SimpleValue $ ValueBool $ word8 /= 0
-  SimpleType (TypeInt s b) -> decodeInt storage offset byte (ValueInt s b)
+  SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
+                                     b' = if byte + b > 32 then 0 else 32 - byte - b
+                                  in SimpleValue
+                                     . fromJust
+                                     . flip bytesToSimpleValue t
+                                     . ByteString.take b
+                                     . ByteString.drop b'
+                                     . word256ToByteString
+                                     $ storage offset
   SimpleType TypeAddress ->
     let
       SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
@@ -428,13 +437,6 @@ decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B
 
 encodeInt :: (Num t, Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
 encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte*8))) (offset,val)
-
-decodeInt::Num t=>
-           Storage->Word256->Int->(t->SimpleValue)->Value
-decodeInt storage offset byte constructor =
-  SimpleValue $ constructor $ fromIntegral $ (`shiftR` (byte*8)) $ storage offset
-
-
 
 arrayPosition :: Integer -> Integer -> Storage.Position
 arrayPosition elementSize x | elementSize <= 32 =
