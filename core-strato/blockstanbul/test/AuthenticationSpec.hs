@@ -6,6 +6,7 @@ import Data.Maybe (fromMaybe, isJust, catMaybes)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Monoid ((<>))
+import qualified Data.Set as S
 import Data.Time.Clock.POSIX
 import Test.Hspec
 import Test.QuickCheck
@@ -111,29 +112,29 @@ spec = do
 
   describe "Historic Block" $ do
     it "Rejects a non-PBFT block" $
-      let got = replayHistoricBlock [] 20 testBlock
+      let got = replayHistoricBlock S.empty 20 testBlock
       in got `shouldBe` Left "no istanbul metadata"
 
     it "Rejects a block with the wrong block number" $ do
       let vals = [0xdeadbeef]
           blk = addValidators vals testBlock
-          got = replayHistoricBlock [] 300 blk
+          got = replayHistoricBlock S.empty 300 blk
       got `shouldBe` Left "unexpected block number"
 
     it "Rejects a block with the wrong validator list" $ do
-      let vals = map prvKey2Address [private]
+      let vals = map prvKey2Address . S.singleton $ private
           blk = addValidators vals testBlock
-          got = replayHistoricBlock [0xdeadbeef] 39 blk
+          got = replayHistoricBlock (S.singleton 0xdeadbeef) 39 blk
       got `shouldBe` Left "mismatched validators"
 
     it "Rejects a block without a proposer's signature" $ do
-      let vals = [0xdeadbeef]
+      let vals = S.singleton 0xdeadbeef
           blk = addValidators vals testBlock
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Left "no verifiable proposer seal"
 
     it "Rejects a block with a bad proposer's signature" $ do
-      let vals = [0xdeadbeef]
+      let vals = S.singleton 0xdeadbeef
           blk' = addValidators vals testBlock
       seal <- proposerSeal blk' private
       let blk = addProposerSeal seal blk'
@@ -141,7 +142,7 @@ spec = do
       got `shouldBe` Left "no verifiable proposer seal"
 
     it "Rejects a block without commit seals" $ do
-      let vals = map prvKey2Address [private]
+      let vals = S.fromList $ map prvKey2Address [private]
           blk' = addValidators vals testBlock
       seal <- proposerSeal blk' private
       let blk = addProposerSeal seal blk'
@@ -149,7 +150,7 @@ spec = do
       got `shouldBe` Left "not enough commit seals"
 
     it "Rejects a block with an unknown seal" $ do
-      let vals = map prvKey2Address [private]
+      let vals = S.fromList $ map prvKey2Address [private]
           blk'' = addValidators vals testBlock
       pSeal <- proposerSeal blk'' private
       let blk' = addProposerSeal pSeal blk''
@@ -159,7 +160,7 @@ spec = do
       got `shouldBe` Left "unknown signers"
 
     it "Accepts a block with 1 validator" $ do
-      let vals = map prvKey2Address [private]
+      let vals = S.fromList $ map prvKey2Address [private]
           blk'' = addValidators vals testBlock
       pSeal <- proposerSeal blk'' private
       let blk' = addProposerSeal pSeal blk''
