@@ -116,7 +116,7 @@ spec = do
       in got `shouldBe` Left "no istanbul metadata"
 
     it "Rejects a block with the wrong block number" $ do
-      let vals = [0xdeadbeef]
+      let vals = S.singleton 0xdeadbeef
           blk = addValidators vals testBlock
           got = replayHistoricBlock S.empty 300 blk
       got `shouldBe` Left "unexpected block number"

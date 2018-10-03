@@ -12,7 +12,6 @@ import Control.Lens
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import MonadUtils (liftIO1)
