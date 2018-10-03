@@ -18,6 +18,7 @@ import Prelude hiding (round, sequence)
 import Prometheus
 import Text.Printf
 import Blockchain.Data.Address
+import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.Messages
@@ -225,13 +226,17 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
     PreviousBlock blk -> do
-      -- TODO(tim): verify this block
-      -- TODO(tim): Does the validator list match the log at that point in time?
-      -- TODO(tim): Has the proposer from that (roundno, validator list) signed it?
-      -- TODO(tim): Have 2/3s of the validators signed it?
-      -- TODO(tim): Does it have a vote to record?
-      -- TODO(tim): Take the sequence number
-      yield . ToCommit $ blk
+      -- TODO(tim): This needs to be fixed for validator voting, as the current list
+      -- may have diverged from the validators at the time of commit
+      realValidators <- use validators
+      seqNo <- use $ view . sequence
+      let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
+      case eNextSeqNo of
+        Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
+        Right nextSeqNo -> do
+          view . sequence .= nextSeqNo
+          -- TODO(tim): Does it have a vote to record?
+          yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
