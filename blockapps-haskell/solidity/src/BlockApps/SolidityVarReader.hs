@@ -101,12 +101,15 @@ getArrayStartingKeyBS = byteStringToWord256 . ByteArray.convert . digestKeccak25
 
 decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [Word256]
 decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o
-                                                        in o : (fromInteger <$> range (sk + ofs) cnt)
+                                                           ofs' = sk + (ofs `quot` 32)
+                                                           cnt' = (cnt + 31) `quot` 32
+                                                        in o : (fromInteger <$> range ofs' cnt')
 decodeStorageKeySimple (TypeBytes Nothing) o ofs cnt = decodeStorageKeySimple TypeString o ofs cnt
 decodeStorageKeySimple _                   o _   _   = [o] -- All other simple types fit into one storage cell
 
 decodeStorageKey
-  :: TypeDefs
+  :: Integer
+  -> TypeDefs
   -> Struct
   -> [Text]
   -> Word256
@@ -114,43 +117,57 @@ decodeStorageKey
   -> Integer
   -> Bool
   -> [Word256]
-decodeStorageKey _ _ [] _ _ _ _ = []
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
+decodeStorageKey _ _ _ [] _ _ _ _ = []
+decodeStorageKey fetchLimit typeDefs'@TypeDefs{..} struct' (varName:vs) _ ofs cnt len =
   case OMap.lookup varName (fields struct') of
     Nothing -> []
     Just (Left _, _) -> []
     Just (Right Storage.Position{..}, theType) ->
-      case theType of
-        SimpleType ty -> decodeStorageKeySimple ty offset ofs cnt
-        TypeArrayDynamic ty -> do
-          if len
-            then [offset]
-            else
-              let startingKey = getArrayStartingKey offset
-                  (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-                  ofs' = ofs + toInteger startingKey
-                  cnt' = cnt * toInteger elementSize
-              in offset:(fromInteger <$> range ofs' cnt')
-        TypeArrayFixed n ty -> do
-          if len
-            then []
-            else
-              let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-                  n' = toInteger elementSize * toInteger n
-              in fromInteger <$> range (toInteger offset) n'
-        TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
-        TypeFunction name _ _ -> error $ "Cannot retrieve "
-                                       ++ show (ByteString.unpack name)
-                                       ++ ": Functions are not kept in storage"
-        TypeStruct name ->
-          case Map.lookup name structDefs of
-            Nothing -> error ""
-            Just theStruct -> fromInteger <$> range (toInteger offset) (toInteger $ size theStruct) -- TODO: support struct field accessors, e.g. vehicle.vin
-              -- case vs of
-              -- [] -> [(offset, size theStruct)]
-              -- vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
-        TypeEnum _ -> [offset]
-        TypeContract _ -> [offset]
+      decodeStorageKey' fetchLimit typeDefs' struct' vs theType ofs cnt len offset
+
+decodeStorageKey'
+  :: Integer
+  -> TypeDefs
+  -> Struct
+  -> [Text]
+  -> Type
+  -> Integer
+  -> Integer
+  -> Bool
+  -> Word256
+  -> [Word256]
+decodeStorageKey' fetchLimit typeDefs'@TypeDefs{..} struct' vs theType ofs cnt len offset =
+  case theType of
+    SimpleType ty -> decodeStorageKeySimple ty offset ofs cnt
+    TypeArrayDynamic ty -> do
+      if len
+        then [offset]
+        else
+          let startingKey = getArrayStartingKey offset
+              (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+              ofs' = ofs + toInteger startingKey
+              cnt' = cnt * ((toInteger elementSize + 31) `quot` 32) -- elementSize is bytes, not words
+          in offset:(concatMap (decodeStorageKey' fetchLimit typeDefs' struct' vs ty 0 fetchLimit False) (fromInteger <$> range ofs' cnt'))
+    TypeArrayFixed n ty -> do
+      if len
+        then []
+        else
+          let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+              n' = toInteger elementSize * ((toInteger n + 31) `quot` 32) -- elementSize is bytes, not words
+          in fromInteger <$> range (toInteger offset) n'
+    TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
+    TypeFunction name _ _ -> error $ "Cannot retrieve "
+                                   ++ show (ByteString.unpack name)
+                                   ++ ": Functions are not kept in storage"
+    TypeStruct name ->
+      case Map.lookup name structDefs of
+        Nothing -> error ""
+        Just theStruct -> fromInteger <$> range (toInteger offset) (toInteger $ size theStruct) -- TODO: support struct field accessors, e.g. vehicle.vin
+          -- case vs of
+          -- [] -> [(offset, size theStruct)]
+          -- vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
+    TypeEnum _ -> [offset]
+    TypeContract _ -> [offset]
 
 decodeValues
   :: Integer

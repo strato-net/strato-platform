@@ -116,6 +116,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                          }
     Just name ->
       let range = decodeStorageKey
+               fetchLimit
                (typeDefs contract')
                (mainStruct contract')
                [name]
