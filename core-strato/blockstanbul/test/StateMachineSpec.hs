@@ -228,7 +228,7 @@ spec = parallel $ do
   describe "A commit message" $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
-        let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
+        let blk = addProposerSeal seal . addValidators (S.fromList [sender auth]) $ blk'
         validators .= S.fromList [sender auth]
         proposal .= Just blk
         curView <- use view
@@ -273,7 +273,7 @@ spec = parallel $ do
     it "waits for 2/3s of commits" $ property $ \sig blk' as seal ->
       runTest $ do
         let blk = addProposerSeal seal . addValidators as $ blk'
-        validators .= S.fromList as
+        validators .= as
         proposal .= Just blk
         curView <- use view
         let di = blockHash blk

@@ -42,10 +42,10 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens $ B.take 32
 
-addValidators :: [Address] -> Block -> Block
+addValidators :: S.Set Address -> Block -> Block
 addValidators vs = over extraLens $
     uncookRawExtra
-  . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
+  . set istanbul (Just (IstanbulExtra (S.toList vs) Nothing []))
   . cookRawExtra
 
 getValidatorList :: Block -> [Address]

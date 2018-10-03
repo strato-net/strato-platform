@@ -122,7 +122,7 @@ spec = do
       got `shouldBe` Left "unexpected block number"
 
     it "Rejects a block with the wrong validator list" $ do
-      let vals = map prvKey2Address . S.singleton $ private
+      let vals = S.map prvKey2Address . S.singleton $ private
           blk = addValidators vals testBlock
           got = replayHistoricBlock (S.singleton 0xdeadbeef) 39 blk
       got `shouldBe` Left "mismatched validators"
