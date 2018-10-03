@@ -88,7 +88,7 @@ bytesToSimpleValue bs = \case
                   else False
           bys = fromMaybe 32 bytes'
           a = go neg bs' 0
-       in (if neg then negate (a + 1) else a) `mod` (1 `shiftL` fromInteger (8 * bys))
+       in (if neg then negate (a + 1) else a) `rem` (2 ^ (8 * bys))
     go :: Bool -> [Word8] -> Integer -> Integer
     go _   []     x = x
     go inv (w:ws) x =

@@ -119,18 +119,18 @@ type GetContractsState = "contracts"
   :> "state"
   :> QueryParam "chainid" ChainId
   :> QueryParam "name" Text
-  :> QueryParam "count" Int
-  :> QueryParam "offset" Int
+  :> QueryParam "count" Integer
+  :> QueryParam "offset" Integer
   :> QueryFlag "length"
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
 instance ToParam (QueryParam "name" Text) where
   toParam _ = DocQueryParam "name" [] "Names of contract variables" Normal
 
-instance ToParam (QueryParam "count" Int) where
+instance ToParam (QueryParam "count" Integer) where
   toParam _ = DocQueryParam "count" [] "Length of contract array slice" Normal
 
-instance ToParam (QueryParam "offset" Int) where
+instance ToParam (QueryParam "offset" Integer) where
   toParam _ = DocQueryParam "offset" [] "Starting index of contract array slice" Normal
 
 instance ToParam (QueryFlag "length") where
