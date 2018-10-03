@@ -12,6 +12,7 @@ import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 import Prometheus
@@ -41,7 +42,7 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The designated participant to suggest a block for this round
   , _proposer :: Address
   -- The total group of participants
-  , _validators :: [Address]
+  , _validators :: S.Set Address
   -- Validators who have sent us a prepare for this round
   , _prepared :: M.Map Address SHA
   -- Validators who have sent us a commitment seal for this round
@@ -71,7 +72,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   debugLog "showctx/view" view format
   debugLog "showctx/proposer" proposer (printf "%x")
-  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String))
+  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
@@ -89,7 +90,7 @@ newContext v as senderlist pk =
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
-     , _validators = as
+     , _validators = S.fromList as
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPrepared = False
@@ -107,10 +108,13 @@ newContext v as senderlist pk =
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
+poolSize :: (StateMachineM m) => m Int
+poolSize = uses validators S.size
+
 authorize :: (StateMachineM m) => InEvent -> m Bool
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (addr `elem`)
+    ret <- uses validators (addr `S.member`)
     unless ret $
       $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting message; sender not a validator: " ++ show addr
     return ret
@@ -141,7 +145,7 @@ isAuthorized iev = do
             return False
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vali <- use validators
-        let validatorMatch = vali == (getValidatorList pp)
+        let validatorMatch = vali == (S.fromList $ getValidatorList pp)
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
         let ret = validatorMatch && Just addr == signatory
         when (doAuthn && not ret) $
@@ -181,9 +185,9 @@ nextRound nt = do
       blockcount .= 0
 
    --update validators list
-  val <- use validators
+  val <- uses validators S.toList
   vot <- use voted
-  validators .= updateValidator val vot
+  validators .= (S.fromList $ updateValidator val vot)
 
   case nt of
     Sequence s -> view . sequence .= s
@@ -192,7 +196,7 @@ nextRound nt = do
       yield $ ResetTimer r
   vals <- use validators
   thisR <- use $ view . round
-  let leader = vals !! (fromIntegral thisR `mod` length vals)
+  let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
   self <- selfAddr
@@ -244,7 +248,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                  let ((bnf,nonc),newPending) = M.deleteFindMin pending
                  pendingvotes .= newPending
                  return $ editBeneficiary blk bnf nonc
-        let blockWithVs = addValidators vs editedBlk
+        let blockWithVs = addValidators (S.toList vs) editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
@@ -287,7 +291,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                    yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
-      total <- uses validators length
+      total <- poolSize
       let sameVoteCount = M.size . M.filter (==di) $ ps
       sameHash <- hasSameHash di
       hasSent <- use hasPrepared
@@ -299,7 +303,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
-      total <- uses validators length
+      total <- poolSize
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
       sameHash <- hasSameHash di
       -- TODO(tim): Is it necessary to check that we have prepared?
@@ -315,7 +319,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       rs <- roundChanged <%= M.insert (sender auth) rn
-      total <- uses validators length
+      total <- poolSize
       sentRN <- use pendingRound
       let sameRNCount = M.size . M.filter (== rn) $ rs
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
