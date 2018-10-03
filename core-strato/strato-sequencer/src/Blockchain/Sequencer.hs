@@ -314,7 +314,7 @@ hydrateAndEmit sb = do
           if (dryChain /= [])
             then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
             else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
-          hasPBFT <- blockstanbulRunning
+          hasPBFT <- lift blockstanbulRunning
           unless hasPBFT $
             mapM_ (lift . markForP2P . OEBlock . snd) dryChain
           ldbOps <- forM dryChain $ \(ldbOp, ob) -> do
