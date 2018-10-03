@@ -106,7 +106,7 @@ data StorageFilterParams = StorageFilterParams
   , qsKey      :: Maybe Natural
   , qsMinKey   :: Maybe Natural
   , qsMaxKey   :: Maybe Natural
-  , qsKeyRange :: Maybe [Natural]
+  , qsKeyRange :: [Natural]
   , qsValue    :: Maybe Natural
   , qsMinValue :: Maybe Natural
   , qsMaxValue :: Maybe Natural
@@ -115,7 +115,7 @@ data StorageFilterParams = StorageFilterParams
 
 storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing Nothing
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]

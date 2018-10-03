@@ -115,7 +115,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                          , qsChainId = chainId
                          }
     Just name ->
-      let ranges = decodeStorageKey
+      let range = decodeStorageKey
                (typeDefs contract')
                (mainStruct contract')
                [name]
@@ -123,7 +123,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                ofs
                cnt
                mLength
-      in join <$> mapM (getStorageRange address) ranges
+      in getStorageRange address range
 
   let storage = translateStorageMap storage'
 
@@ -144,12 +144,11 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
     ]
   return $ Map.fromList ret
   where
-    getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
-    getStorageRange a (o,c) = do
+    getStorageRange :: Address -> [Word256] -> Bloc [T.Storage]
+    getStorageRange a keys = do
       blocStrato $ getStorage
         storageFilterParams{ qsAddress = Just a
-                           , qsMinKey = Just . fromInteger $ toInteger o
-                           , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                           , qsKeyRange = fromIntegral <$> keys
                            , qsChainId = chainId
                            }
 

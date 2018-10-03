@@ -191,14 +191,14 @@ getTransFilter _           _                   = P.undefined ("no match in getTr
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
 getStorageFilter _ ("page",_)  = E.val True
 getStorageFilter _ ("index",_) = E.val True
+getStorageFilter _ ("keyrange", _) = E.val True
+getStorageFilter _ ("chainid", _) = E.val True
 getStorageFilter (storage,_) ("key", v)
   = storage E.^. StorageKey E.==. E.val (P.fromIntegral (toInteger' v) :: Word256)
 getStorageFilter (storage,_) ("minkey", v)
   = storage E.^. StorageKey E.>=. E.val (P.fromIntegral (toInteger' v) :: Word256)
 getStorageFilter (storage,_) ("maxkey", v)
   = storage E.^. StorageKey E.<=. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("keyrange", vs)
-  = storage E.^. StorageKey `E.in_` E.valList ((P.map (P.fromIntegral . toInteger') $ T.split (==',') vs) :: [Word256])
 getStorageFilter (storage,_) ("keystring", v)
   = storage E.^. StorageKey E.==. E.val (Bin.decode $ BS.fromStrict $ T.encodeUtf8 v :: Word256)
 getStorageFilter (storage,_) ("keyhex", v)
@@ -215,9 +215,6 @@ getStorageFilter (storage,_) ("addressid", v)
   = storage E.^. StorageAddressStateRefId E.==. E.val (toAddrId v)
 getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
   = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-getStorageFilter (_,addrStRef) ("chainid", v)
-  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
-
 getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
@@ -283,6 +280,12 @@ toParam a = Param a
 
 fromParam :: Param -> (Text,Text)
 fromParam (Param a) = a
+
+withGetParamList :: Text -> (Text -> a) -> Handler [a]
+withGetParamList name f = (P.map f . P.concatMap (T.splitOn ",")) <$> lookupGetParams name
+
+getParamList :: Text -> Handler [Text]
+getParamList = flip withGetParamList id
 
 data Param = Param (Text,Text)
 instance Eq Param where

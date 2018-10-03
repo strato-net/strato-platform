@@ -37,7 +37,8 @@ getStorageInfoR :: Handler Value
 getStorageInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 
-                 chainIds <- lookupGetParams "chainid"
+                 chainIds <- getParamList "chainid"
+                 keyRange <- withGetParamList "keyrange" $ P.fromIntegral . toInteger'
 
                  limit <- liftIO $ myFetchLimit
 
@@ -47,9 +48,11 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)) 
-
-                                        let chainCriteria = case chainIds of
+                                        let keyRangeCriteria = if null keyRange
+                                                                 then E.val True
+                                                                 else storage E.^. StorageKey `E.in_` E.valList keyRange
+                                            matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid))
+                                            chainCriteria = case chainIds of
                                               [] -> [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
                                               [cid] -> if (T.unpack cid == "main")
                                                            then  [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
@@ -59,10 +62,10 @@ getStorageInfoR = do
                                               cids -> P.map matchChainId cids
 
                                         let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
-                                        
+
                                         E.on (P.foldl1 (E.||.) $ P.map (criteria E.&&.) chainCriteria)
 
-                                        E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
+                                        E.where_ ((P.foldl1 (E.&&.) . (keyRangeCriteria:) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))
 
                                         E.limit $ limit
 

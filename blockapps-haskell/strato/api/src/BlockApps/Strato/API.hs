@@ -93,7 +93,7 @@ type API =
     :> QueryParam "key" Natural
     :> QueryParam "minkey" Natural
     :> QueryParam "maxkey" Natural
-    :> QueryParam "keyrange" [Natural]
+    :> QueryParams "keyrange" Natural
     :> QueryParam "value" Natural
     :> QueryParam "minvalue" Natural
     :> QueryParam "maxvalue" Natural
