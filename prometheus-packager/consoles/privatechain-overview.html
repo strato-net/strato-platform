@@ -1,0 +1,36 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>BlockApps Private Chain Overview - {{ .Params.instance }}</h1>
+
+  <h3>Chains</h3>
+  <div id="privatechainChains"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#privatechainChains"),
+    expr: "privatechain_chain",
+    name: '[[chain_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "chains",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Transactions</h3>
+  <div id="privatechainTxs"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#privatechainTxs"),
+    expr: "privatechain_tx",
+    name: '[[tx_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "txs",
+    yUnits: "count",
+  })
+  </script>
+
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

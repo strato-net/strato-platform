@@ -40,4 +40,4 @@ eventsplitMetrics :: Metric (Vector String Counter)
 eventsplitMetrics = unsafeRegisterIO
                    . vector "seq_event_type"
                    . counter
-                   $ Info "seq_event_type" "Counts for splitted events in sequencer"
+                   $ Info "seq_event_splitted" "Counts for splitted events in sequencer"

@@ -3,6 +3,20 @@
 {{ template "prom_content_head" . }}
   <h1>BlockApps Sequencer Overview - {{ .Params.instance }}</h1>
 
+  <h3>Split Ingested Events</h3>
+  <div id="seqEvents"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#seqEvents"),
+    expr: "seq_event_splitted",
+    name: '[[seq_event_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Events",
+    yUnits: "count",
+  })
+  </script>
+
   <h3>Level DB</h3>
   <div id="levelDb"></div>
   <script>
