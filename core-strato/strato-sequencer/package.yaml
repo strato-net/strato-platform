@@ -68,6 +68,7 @@ executables:
     main: KeyGen.hs
     dependencies:
       - strato-sequencer
+      - aeson-pretty
       - entropy
       - hflags
 
