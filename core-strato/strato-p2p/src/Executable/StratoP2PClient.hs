@@ -52,7 +52,7 @@ runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         -> CommPort      -- otherServiceCommPort
         -> m ()
 runPeer peer myPriv _ _ = runResourceT $ do
-  ctx <- initContext
+  ctx <- initContext flags_maxReturnedHeaders
   runContextM ctx $ do
     let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
         myPublic    = calculatePublic theCurve myPriv

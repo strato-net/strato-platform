@@ -34,7 +34,7 @@ governanceAddress :: Address
 governanceAddress = Address 0x100
 
 postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo (ChainInput src lbl balances chaininputArgs members) = do
+postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
@@ -43,7 +43,10 @@ postChainInfo (ChainInput src lbl balances chaininputArgs members) = do
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
-            _ -> throwError $ UserError "Multiple governance contracts are not allowed"
+            _ -> case cname of
+                   Nothing -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+                   Just name -> fmap Just $ blocMaybe "Could not find contract name in compilation details"
+                                      $ Map.lookup name idsAndDetails
   (cAcctInfo, codeInfo) <- case mContract of
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do

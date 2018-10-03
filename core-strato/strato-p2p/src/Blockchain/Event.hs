@@ -7,7 +7,6 @@
 module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
-  maxReturnedHeaders,
   getBestKafkaBlockNumber
   ) where
 
@@ -78,10 +77,6 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
     where helper xs' = case drop n xs' of
                            (y:ys) -> y : helper ys
                            []     -> []
-
--- todo: seriously???
-maxReturnedHeaders :: Int
-maxReturnedHeaders = 1000
 
 peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
@@ -172,7 +167,7 @@ handleEvents mode peer = awaitForever $ \case
             -- check if blockheaders we recieved have parents.
             parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
-            let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
+            let missingParents  = [sha | (sha, Nothing) <- parentsInDB, sha /= SHA 0]
             unless (null missingParents) $ do
                  bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                  let fetchNumber = numFromRedis bestBlock + 1
@@ -243,7 +238,8 @@ handleEvents mode peer = awaitForever $ \case
         lift $ putBlockHeaders remainingHeaders
         if null remainingHeaders
             then when (newCount > 0) $ do
-                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) maxReturnedHeaders 0 Forward
+                mrh <- gets maxReturnedHeaders
+                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
@@ -356,8 +352,9 @@ handleEvents mode peer = awaitForever $ \case
             Just oldTS -> do
                 ts <- liftIO getCurrentTime
                 let diffTime = ts `diffUTCTime` oldTS
-                liftIO $ setTitle $ "timer: " ++ show (60 - diffTime)
-                when (diffTime > 60) $ do
+                maxTime <- gets (fromIntegral . connectionTimeout)
+                liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
+                when (diffTime > maxTime) $ do
                     yield $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
@@ -382,7 +379,8 @@ syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogg
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d
+        mrh <- gets maxReturnedHeaders
+        yield $ GetBlockHeaders (BlockNumber num) mrh 0 d
         stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool

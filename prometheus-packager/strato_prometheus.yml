@@ -34,8 +34,13 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets: ['strato:8000']
-    metric_relabel_configs:
-    - source_labels: [__name__]
-      regex: '(prometheus)_(.*)'
-      replacement: '${2}'
-      target_label: pool
+
+#   metric_relabel_configs:
+#   - source_labels: [__name__]
+#     regex: '(prometheus)_(.*)'
+#     replacement: '${2}'
+#     target_label: pool
+#
+#  - source_labels: [__name__]
+#   regex: '(go|time_)'
+#   action: drop

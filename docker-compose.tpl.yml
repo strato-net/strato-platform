@@ -12,6 +12,7 @@ services:
     - apex
     - bloc
     - postgrest
+    - prometheus
     - strato
     environment:
     - APEX_URL=${APEX_URL}
@@ -124,6 +125,7 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
@@ -131,6 +133,7 @@ services:
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
     - mineBlocks=${mineBlocks:-true}
@@ -146,12 +149,6 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
-    - statsEnable=${statsEnable}
-    - statsFlush=${statsFlush}
-    - statsHost=${statsHost}
-    - statsPort=${statsPort}
-    - statsPrefix=${statsPrefix}
-    - statsSuffix=${statsSuffix}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper

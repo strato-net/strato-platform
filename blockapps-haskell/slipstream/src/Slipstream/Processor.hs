@@ -121,7 +121,9 @@ storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
 
 addStorageIfNeeded::Action->Bloc Action
 addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
-  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show actionAddress }
+  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show actionAddress
+                                                         , qsChainId = actionTxChainId
+                                                         }
   return $ action'{A.actionStorage = Just . Map.fromList $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
@@ -188,7 +190,8 @@ processTheMessages messages conn g = do
             , httpManager=mgr -- :: Manager
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
-            , deployMode= deployFlag
+            , deployMode= deployFlag   -- :: Severity
+            , stateFetchLimit = flags_stateFetchLimit
             }
 
   _ <- enterBloc2 env $ do
@@ -245,7 +248,8 @@ processTheMessages messages conn g = do
 
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
-        let ret = Map.fromList $ decodeValues (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
+        fetchLimit <- asks stateFetchLimit
+        let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
         let chain = case actionTxChainId of
                      Nothing -> ""
                      Just (ChainId x) -> T.pack $ showHex x ""

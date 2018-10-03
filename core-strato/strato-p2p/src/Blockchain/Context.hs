@@ -36,8 +36,10 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Options
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
+
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
 
@@ -56,7 +58,9 @@ data Context =
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
         vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
-        actionTimestamp     :: Maybe UTCTime
+        actionTimestamp     :: Maybe UTCTime,
+        connectionTimeout   :: Int,
+        maxReturnedHeaders  :: Int
     }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
@@ -121,8 +125,8 @@ runContextM :: (MonadBaseControl IO m )
 runContextM s f = void . runResourceT $ runStateT f s
 
 initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-            => m Context
-initContext = do
+            => Int -> m Context
+initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return Context { actionTimestamp = Nothing
@@ -133,6 +137,8 @@ initContext = do
                  , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
                  , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
+                 , connectionTimeout=flags_connectionTimeout
+                 , maxReturnedHeaders = maxHeaders
                  }
 
 

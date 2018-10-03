@@ -19,6 +19,9 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
+  if [ -n "${connectionTimeout}" ]; then
+    ctFlag="--connectionTimeout=${connectionTimeout}"
+  fi
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -32,14 +35,14 @@ function newnode {
 
   if $serveBlocks
   then echo "Starting strato-p2p-server"
-       runBackgroundProcess strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
+       runBackgroundProcess strato-p2p-server $ctFlag --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
        echo "Starting ethereum-discover"
        runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
   fi
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
+       runBackgroundProcess strato-p2p-client $ctFlag --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-client 2>&1
   fi
 
   evmMinLogLevel=LevelInfo
@@ -140,9 +143,7 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
-                    --statsEnable=$statsEnable --statsHost=$statsHost --statsPort=$statsPort \
-                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix'"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then
@@ -214,6 +215,7 @@ setEnv maxTxsPerBlock 500
 setEnv networkID 6
 setEnv genesisBlock ""
 setEnv bootnode ""
+setEnv maxReturnedHeaders 1000
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
@@ -232,13 +234,6 @@ setEnv sqlDiff true
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
-
-setEnv statsEnable false
-setEnv statsHost telegraf
-setEnv statsPort 8125
-setEnv statsFlush 1000
-setEnv statsPrefix ""
-setEnv statsSuffix ""
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

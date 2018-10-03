@@ -7,7 +7,6 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
-  blockapps-haskoin
   blockstanbul
   ethereum-discovery
   ethereum-rlp

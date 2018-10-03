@@ -319,10 +319,10 @@ createContractOnMulti src cn args config@TestConfig{..} = do
       , postuserscontractrequestPassword = pw
       , postuserscontractrequestContract = Just cn
       , postuserscontractrequestArgs = args
-      , postuserscontractrequestTxParams = txParams
+      , postuserscontractrequestTxParams = testTxParams
       , postuserscontractrequestValue = Just $ Strung 0
       }
-  result <- fromEither =<< (getResolvedTxMulti config $ runClientM (postUsersContract userName addr False postUsersContractRequest) blocclient)
+  result <- fromEither =<< (getResolvedTxMulti config $ runClientM (postUsersContract userName addr Nothing False postUsersContractRequest) blocclient)
   result `shouldSatisfy` (== Success) . blocTransactionStatus
   result `shouldSatisfy` isJust . blocTransactionTxResult
   result `shouldSatisfy` isJust . blocTransactionData
@@ -343,7 +343,7 @@ callMethodLocal method cAddr contractName methodArgs config@TestConfig{..} =
         , postuserscontractmethodMethod = method
         , postuserscontractmethodArgs = methodArgs
         , postuserscontractmethodValue = Just $ Strung 0
-        , postuserscontractmethodTxParams = txParams
+        , postuserscontractmethodTxParams = testTxParams
         }
   in fromEither =<<
      ( getResolvedTx config $
@@ -353,6 +353,7 @@ callMethodLocal method cAddr contractName methodArgs config@TestConfig{..} =
          userAddress
          (ContractName contractName)
          cAddr
+         Nothing
          False
          postUsersContractMethodRequest
        )
@@ -378,7 +379,7 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
             , methodcallMethodName = method
             , methodcallArgs = args
             , methodcallValue = Strung 0
-            , methodcallTxParams = txParams
+            , methodcallTxParams = testTxParams
             }
         }
   in getResolvedBatchTx config $
@@ -386,6 +387,7 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
      ( postUsersContractMethodList
        userName
        userAddress
+       Nothing
        False
        postMethodListRequest
      )
@@ -398,6 +400,7 @@ getStateLocal addr cn TestConfig{..} =
   ( getContractsState
     (ContractName cn)
     (Unnamed addr)
+    Nothing
     Nothing
     Nothing
     Nothing

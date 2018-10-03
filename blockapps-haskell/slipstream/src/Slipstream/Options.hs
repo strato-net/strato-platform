@@ -16,4 +16,5 @@ defineFlag "vaultwrapperurl" ("http://strato-int.centralus.cloudapp.azure.com/st
 defineFlag "kafkahost" ("kafka" :: String) "Kafka host"
 defineFlag "kafkaport" (9092 :: Int) "Kafka port"
 defineFlag "historyList" ("" :: String) "List of contract with enabled history"
+defineFlag "stateFetchLimit" (100::Integer) "The maximum number of array entries to return from the state route"
 -- defineFlag "cirrusurl" ("http://postgrest:3001"::String) "URL of the Cirrus server Bloc will connect to"
