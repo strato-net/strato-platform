@@ -232,8 +232,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
       case eNextSeqNo of
         Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
-        Right nextSeqNo -> do
-          view . sequence .= nextSeqNo
+        Right _ -> do
           -- TODO(tim): Does it have a vote to record?
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
@@ -360,6 +359,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
       blockLock .= Nothing
+      -- TODO(tim): More guards should be put in place to see that not just the view but
+      -- also the block numbers are in ascending order.
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where
