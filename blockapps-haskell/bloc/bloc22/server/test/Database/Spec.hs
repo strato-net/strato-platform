@@ -32,7 +32,7 @@ solcSpec =
         let solPath = "./test/contracts/AppMetadata.sol"
         soliditySrc <- pack <$> readFile solPath
         void . fromEither =<< compileSolcIO soliditySrc
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+        augmentedSrc <- unpack <$> (fromEither $ addToSource soliditySrc [addGetSource $ formatSrc soliditySrc])
         void . fromEither =<< compileSolcIO (pack augmentedSrc)
         augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
         augmentedXabi `shouldSatisfy` not . null . xabiModifiers . snd . (!! 0)
@@ -163,7 +163,7 @@ logleft x = case x of
   Right _ -> return ()
 
 augment :: Text -> Either String Text
-augment = addGetNameFuncToSource <=< addGetSourceFuncToSource
+augment src = addToSource src [addGetSource (formatSrc src), addGetName]
 
 testAugment :: String -> String -> IO ()
 testAugment solPath expectedPath = do

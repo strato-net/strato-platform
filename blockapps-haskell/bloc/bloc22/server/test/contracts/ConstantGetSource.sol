@@ -6,7 +6,6 @@ contract Constant {
         return "Constant";
     }
     function __getSource__() view public returns (string) {
-        return "pragma solidity ^0.4.8;\ncontract Constant {\n  uint constant x = 777777;\n}\n";  
-    
+        return "pragma solidity ^0.4.8;\ncontract Constant {\n  uint constant x = 777777;\n}\n";
     }
 }

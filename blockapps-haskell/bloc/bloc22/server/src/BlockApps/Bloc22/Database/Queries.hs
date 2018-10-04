@@ -1128,10 +1128,10 @@ insertContract parentContr contr bin binRuntime xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source' = do
-  source <- addGetSourceFuncToSource' source'
+  source <- addFuncsToSource source'
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
-    Error err -> blocError . AnError . Text.pack $ err
+    Error err -> blocError . UserError . Text.pack $ err
     -- Starting with 0.4.9, solc prepends a filename to abi keys.
     -- Bloc should too, but this change is easier :^)
     Success res -> return . Map.mapKeys (snd . Text.breakOnEnd ":") $ res
@@ -1139,8 +1139,8 @@ compileContract source' = do
   --       get rid of error
   --       name nicer, mabye merge with next let
   let maybeXabis = parseXabi "-" $ Text.unpack source
-      xabis = either (error . show) Map.fromList maybeXabis
-      contracts = Map.intersectionWith (,) xabis abiBins
+  xabis <- either (blocError . UserError . Text.pack) (return . Map.fromList) maybeXabis
+  let contracts = Map.intersectionWith (,) xabis abiBins
       details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
         ContractDetails
         { contractdetailsBin = bin
@@ -1171,8 +1171,8 @@ compileContract source' = do
 
   return metadataIds
   where
-    addGetSourceFuncToSource' src =
-      case addGetSourceFuncToSource src >>= addGetNameFuncToSource of
+    addFuncsToSource src =
+      case addToSource src [addGetSource (formatSrc src), addGetName] of
         Left err -> blocError . UserError .Text.pack $ err
         Right msg' -> return msg'
 

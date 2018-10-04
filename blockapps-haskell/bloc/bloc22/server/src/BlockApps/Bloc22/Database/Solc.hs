@@ -28,6 +28,7 @@ import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
 import BlockApps.Bloc22.Monad
+import BlockApps.Solidity.Xabi              (Xabi(..))
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Parse.UnParser
@@ -187,31 +188,29 @@ aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ 
 getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
 getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 
-addGetSourceFuncToSource :: Text -> Either String Text
-addGetSourceFuncToSource src = do
-  -- Supply empty string for parser as it's only used for error reporting
+addToSource :: Text -> [(SourceUnit -> SourceUnit)] -> Either String Text
+addToSource src funcs = do
   File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  return . pack . unparse . File . List.map addGetSource $ units
+  return . pack . unparse . File $ go units funcs
   where
-    addGetSource :: SourceUnit -> SourceUnit
-    addGetSource (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) =
-      NamedXabi name (addFunction ("__getSource__", "return \"" <> unpack (formatSrc src) <> "\";  ") xabi, ts)
-    addGetSource su = su
+    go us [] = us
+    go us (f:fs) = go (List.map f us) fs
 
-    formatSrc :: Text -> Text
-    formatSrc = replace "\"" "\\\""
-              . replace "\n" "\\n"
-              . replace "'" "\\'"
+addGetSource :: Text -> SourceUnit -> SourceUnit
+addGetSource src (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getSource__" src xabi, ts)
+addGetSource _ prag = prag
 
--- TODO: Merge with addGetSourceFunc if stable
-addGetNameFuncToSource :: Text -> Either String Text
-addGetNameFuncToSource src = do
-  File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  return . pack . unparse . File . List.map addGetName $ units
-  where addGetName :: SourceUnit -> SourceUnit
-        addGetName (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) =
-          NamedXabi name (addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts)
-        addGetName su = su
+addGetName :: SourceUnit -> SourceUnit
+addGetName (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getContractName__" name xabi, ts)
+addGetName prag = prag
+
+addF :: Text -> Text -> Xabi -> Xabi
+addF fName fBody = addFunction (fName, "return \"" <> unpack fBody <> "\";")
+
+formatSrc :: Text -> Text
+formatSrc = replace "\"" "\\\""
+          . replace "\n" "\\n"
+          . replace "'" "\\'"
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines
