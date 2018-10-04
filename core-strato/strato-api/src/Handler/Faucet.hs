@@ -78,7 +78,7 @@ postFaucetR = do
   where
     makeTX k a n = do
       liftIO $ putStrLn $ T.pack $ "nonce: " ++ (show n)
-      tx <- liftIO $ H.withSource H.devURandom (createMessageTX n (50000000000) (100000) a (1000*ether) "" k)
+      tx <- liftIO $ H.withSource H.devURandom (createMessageTX n (50000000000) (100000) a (1000*ether) "" Nothing k)
       liftIO $ putStrLn $ T.pack $ "tx for faucet: " ++ (show tx)
       return tx
     putTX k v n = do

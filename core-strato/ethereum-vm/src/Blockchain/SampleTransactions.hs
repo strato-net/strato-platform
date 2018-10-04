@@ -21,10 +21,10 @@ import           Blockchain.VM.Opcodes
 
 createContract::MonadIO m=>Integer->Integer->Code->PrvKey->SecretT m Transaction
 createContract val gl code prvKey =
-    createContractCreationTX 0 0x9184e72a000 gl val code prvKey
+    createContractCreationTX 0 0x9184e72a000 gl val code Nothing prvKey
 
 createMessage::MonadIO m=>Integer->Integer->Address->B.ByteString->PrvKey->SecretT m Transaction
-createMessage val gl toAddr theData prvKey = createMessageTX 0 0x9184e72a000 gl toAddr val theData prvKey
+createMessage val gl toAddr theData prvKey = createMessageTX 0 0x9184e72a000 gl toAddr val theData Nothing prvKey
 
 ----------------------
 
@@ -593,4 +593,4 @@ mysteryCode =
 
 createMysteryContract::MonadIO m=>PrvKey->SecretT m Transaction
 createMysteryContract prvKey =
-    createContractCreationTX  0 0x9184e72a000 8000 0 (compile mysteryCode) prvKey
+    createContractCreationTX  0 0x9184e72a000 8000 0 (compile mysteryCode) Nothing prvKey

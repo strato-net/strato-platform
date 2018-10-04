@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,12 +16,15 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Format
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.TypeLits
 
 import           Data.Aeson
 import           Data.Aeson.Types            (Parser)
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16      as B16
+import qualified Data.Map.Strict             as M
 import           Data.Maybe
+import           Data.Text                   (Text)
 import qualified Data.Text.Encoding          as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -37,7 +41,7 @@ data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show,
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
 
 instance ToJSON RawTransaction' where
-    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod cid r s v bn h o) next) =
+    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod cid r s v md bn h o) next) =
         object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
         "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod,
         "r" .= showHex r "",
@@ -49,7 +53,8 @@ instance ToJSON RawTransaction' where
         "timestamp" .= show t,
         "origin" .= format o
                ] ++ (("chainId" .=) <$> maybeToList cid)
-    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod cid r s v bn h o) next) =
+                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple) md) :: Maybe (NamedMap "key" Text "value" Text)))
+    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod cid r s v md bn h o) next) =
         object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
         "value" .= show val, "codeOrData" .= cod, "chainId" .= cid,
         "r" .= showHex r "",
@@ -61,6 +66,7 @@ instance ToJSON RawTransaction' where
         "timestamp" .= show t,
         "origin" .= format o
                ] ++ (("chainId" .=) <$> maybeToList cid)
+                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple) md) :: Maybe (NamedMap "key" Text "value" Text)))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap (fst . head . readHex)
@@ -78,6 +84,7 @@ instance FromJSON RawTransaction' where
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
       (tv :: Word8) <- parseHexStr (t .: "v")
+      md <- t .:? "metadata"
       bn <- t .:? "blockNumber" .!= (-1)
       h <- (t .: "hash")
       -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
@@ -103,6 +110,7 @@ instance FromJSON RawTransaction' where
                  (tr :: Integer)
                  (ts :: Integer)
                  (tv :: Word8)
+                 (fmap (map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
                  bn
                  h
                  o)
@@ -121,7 +129,7 @@ rtPrimeToRt (RawTransaction' x _) = x
 data Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-    toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tcid tr ts tv)) =
+    toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tcid tr ts tv md)) =
         object $ ["kind" .= ("Transaction" :: String),
                   "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
                   "nonce" .= tnon,
@@ -136,7 +144,8 @@ instance ToJSON Transaction' where
                   "hash" .= transactionHash tx,
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
-    toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv)) =
+                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple . M.toList) md) :: Maybe (NamedMap "key" Text "value" Text)))
+    toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv md)) =
         object $ ["kind" .= ("Transaction" :: String),
                   "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
                   "nonce" .= tnon,
@@ -150,6 +159,7 @@ instance ToJSON Transaction' where
                   "hash" .= transactionHash tx,
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
+                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple . M.toList) md) :: Maybe (NamedMap "key" Text "value" Text)))
     toJSON (Transaction' tx@(PrivateHashTX th tch)) =
         object ["r" .= showHex th "",
                 "s" .= showHex tch "",
@@ -172,14 +182,17 @@ instance FromJSON Transaction' where
           tr <- parseHexStr (t .: "r")
           ts <- parseHexStr (t .: "s")
           tv <- parseHexStr (t .: "v")
+          md <- t .:? "metadata"
 
           case tto of
             Nothing -> do
               (ti :: Code) <- (t .: "init")
-              return (Transaction' (ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv))
+              return . Transaction' . ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv $
+                (fmap (M.fromList . map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
             (Just to') -> do
               td <- (t .: "data")
-              return (Transaction' (MessageTX tnon tgp tgl to' tval td tcid tr ts tv))
+              return . Transaction' . MessageTX tnon tgp tgl to' tval td tcid tr ts tv $
+                (fmap (M.fromList . map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
     parseJSON _ = error "bad param when calling parseJSON for Transaction'"
 
 
@@ -362,7 +375,7 @@ data TransactionType = Contract | FunctionCall | Transfer  deriving (Eq, Show)
 --   toJSON x = object ["transactionType" .= show x]
 
 transactionSemantics :: Transaction -> TransactionType
-transactionSemantics (MessageTX _ _ _ (Address _) _ td _ _ _ _) = work
+transactionSemantics (MessageTX _ _ _ (Address _) _ td _ _ _ _ _) = work
     where work | (B.length td) > 0 = FunctionCall
                | otherwise = Transfer
 transactionSemantics _ = Contract
@@ -373,7 +386,7 @@ isAddr a = case a of
       Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _ _) = work
+rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _ _ _) = work
      where work | (not (isAddr ta))  = Contract
                 | (isAddr ta) &&  ((B.length cod) > 0)        = FunctionCall
                 | otherwise = Transfer

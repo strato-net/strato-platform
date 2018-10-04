@@ -334,7 +334,7 @@ eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockStrin
         f codeString blockString = do
           let id = "qqqq"
           _ <- liftIO $ H.withSource H.devURandom $
-            createMessageTX undefined undefined undefined undefined undefined undefined undefined
+            createMessageTX undefined undefined undefined undefined undefined undefined undefined undefined
           case strToByteString codeString of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
            Right codeBytes -> do

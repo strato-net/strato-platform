@@ -70,6 +70,7 @@ RawTransaction
     r Integer
     s Integer
     v Word8
+    metadata [TextPair] Maybe
     blockNumber Int
     txHash SHA
     origin TXOrigin

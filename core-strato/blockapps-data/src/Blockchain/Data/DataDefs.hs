@@ -22,6 +22,7 @@ import           Database.Persist.Quasi
 import           Database.Persist.Sql
 import           Database.Persist.TH
 
+import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 
@@ -62,6 +63,7 @@ migrateAll = do
 type Difficulty = Integer
 
 type MapPair = (Word256, Word256)
+type TextPair = (Text, Text)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
 

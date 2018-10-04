@@ -24,6 +24,7 @@ import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
 import qualified Data.Map                           as M
+import qualified Data.Text                          as T
 import           Data.Word
 import           GHC.Generics
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
@@ -196,6 +197,9 @@ instance RLPSerializable B.ByteString where
     rlpDecode (RLPString s) = s
     rlpDecode x = error ("rlpDecode for ByteString not defined for: " ++ show x)
 
+instance RLPSerializable T.Text where
+  rlpEncode = rlpEncode . T.unpack
+  rlpDecode = T.pack . rlpDecode
 
 -- serialization for tuples, triples, etc. of serializable types
 instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
