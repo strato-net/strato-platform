@@ -187,31 +187,27 @@ aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ 
 getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
 getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 
-addGetSourceFuncToSource :: Text -> Either String Text
-addGetSourceFuncToSource src = do
-  -- Supply empty string for parser as it's only used for error reporting
+addToSource :: Text -> [(Text -> SourceUnit -> SourceUnit)] -> Either String Text
+addToSource src funcs = do
   File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  return . pack . unparse . File . List.map addGetSource $ units
+  let src' = formatSrc src
+  return . pack . unparse . File $ go src' units funcs
   where
-    addGetSource :: SourceUnit -> SourceUnit
-    addGetSource (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) =
-      NamedXabi name (addFunction ("__getSource__", "return \"" <> unpack (formatSrc src) <> "\";  ") xabi, ts)
-    addGetSource su = su
-
-    formatSrc :: Text -> Text
+    go _ us [] = us
+    go s us (f:fs) = go s (List.map (f s) us) fs
     formatSrc = replace "\"" "\\\""
               . replace "\n" "\\n"
               . replace "'" "\\'"
 
--- TODO: Merge with addGetSourceFunc if stable
-addGetNameFuncToSource :: Text -> Either String Text
-addGetNameFuncToSource src = do
-  File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  return . pack . unparse . File . List.map addGetName $ units
-  where addGetName :: SourceUnit -> SourceUnit
-        addGetName (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) =
-          NamedXabi name (addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts)
-        addGetName su = su
+addGetSource :: Text -> SourceUnit -> SourceUnit
+addGetSource src (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF src xabi, ts)
+  where addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
+addGetSource _ prag = prag
+
+addGetName :: Text -> SourceUnit -> SourceUnit
+addGetName src (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF src xabi, ts)
+  where addF s = addFunction ("__getContractName__", "return \"" <> unpack s <> "\";")
+addGetName _ prag = prag
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines
