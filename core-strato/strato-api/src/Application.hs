@@ -29,38 +29,22 @@ import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPA
 import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
 
 import           Handler.AccountInfo
-import           Handler.AfterSubmission
-import           Handler.ApiDocs
-import           Handler.AppCreate
 import           Handler.BatchTransactionResult
 import           Handler.BlkLast
 import           Handler.BlockInfo
 import           Handler.ChainInfo
 import           Handler.Coinbase
 import           Handler.Common
-import           Handler.Demo
-import           Handler.Developer
 import           Handler.Faucet
-import           Handler.Help
-import           Handler.Home
-import           Handler.Login
 import           Handler.LogInfo
 import           Handler.Peers
-import           Handler.PushTransaction
 import           Handler.QueuedTransactions
-import           Handler.Raml
-import           Handler.RegisterApp
 import           Handler.Stats
 import           Handler.StorageInfo
-import           Handler.Test
-import           Handler.TransactionDemo
 import           Handler.TransactionInfo
 import           Handler.TransactionResult
-import           Handler.Tutorial
 import           Handler.TxLast
 import           Handler.UUIDInfo
-import           Handler.Version
-import           Handler.Wallet
 
 import           Blockchain.EthConf
 
