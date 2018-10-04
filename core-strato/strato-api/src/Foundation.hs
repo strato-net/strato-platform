@@ -60,7 +60,7 @@ instance HasHttpManager App where
 -- generates the rest of the code. Please see the linked documentation for an
 -- explanation for this split.
 
-mkYesodData "App" ($(parseRamlRoutesFile "config/routes.raml") <> $(parseRoutesFile "config/routes.static"))
+mkYesodData "App" $(parseRamlRoutesFile "config/routes.raml")
 
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
