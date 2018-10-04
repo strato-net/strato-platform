@@ -15,6 +15,7 @@ module Blockchain.Blockstanbul
   , finalHash
   , currentView
   , blockstanbulRunning
+  , isHistoricBlock
 ) where
 
 import Blockchain.Blockstanbul.EventLoop

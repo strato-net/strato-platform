@@ -286,7 +286,18 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
 hydrateAndEmit :: SequencedBlock -> SequencerM ()
 hydrateAndEmit sb = do
   wetBlocks <- runConduit $ hydrateAndEmit' .| sinkList
-  mapM_ (markForVM . OEBlock) $ wetBlocks
+  hasPBFT <- blockstanbulRunning
+  if not hasPBFT
+    then mapM_ (markForVM . OEBlock) $ wetBlocks
+    else let convert :: BDB.Block -> InEvent
+             convert blk = if isHistoricBlock blk
+                             then PreviousBlock blk
+                             else UnannouncedBlock blk
+         -- Blockstanbul will check that the seals and validators match up before
+         -- announcing it to the network or forwarding to the EVM.
+         in blockstanbulSend . map convert $ if null wetBlocks
+                                               then [sequencedBlockToBlock sb]
+                                               else map outputBlockToBlock wetBlocks
  where
  hydrateAndEmit' :: Conduit () SequencerM OutputBlock
  hydrateAndEmit' = do
@@ -305,7 +316,9 @@ hydrateAndEmit sb = do
           if (dryChain /= [])
             then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
             else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
-          mapM_ (lift . markForP2P . OEBlock . snd) dryChain
+          hasPBFT <- lift blockstanbulRunning
+          unless hasPBFT $
+            mapM_ (lift . markForP2P . OEBlock . snd) dryChain
           ldbOps <- forM dryChain $ \(ldbOp, ob) -> do
             let bHash = blockHeaderHash $ obBlockData ob
             logHydrate $ prettyOBlock ob
@@ -339,23 +352,17 @@ hydrateAndEmit sb = do
           lift . addLdbBatchOps . catMaybes $ ldbOps
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks blocks = do
-  hasPBFT <- blockstanbulRunning
-  if hasPBFT
-    then blockstanbulSend $ map convert blocks
-    else forM_ blocks $ \ib -> do
-      let mSb = ingestBlockToSequencedBlock ib
-      case mSb of
-        Nothing -> do
-          $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-          P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-        Just sb -> do
-          witnessBlockHash (sbHash sb) sb
-          hydrateAndEmit sb
-  where convert :: IngestBlock -> InEvent
-        convert inBlock = case ibOrigin inBlock of
-                              TO.Quarry -> UnannouncedBlock . ingestBlockToBlock $ inBlock
-                              _ -> PreviousBlock . ingestBlockToBlock $ inBlock
+transformBlocks = mapM_ $ \ib -> do
+  let mSb = ingestBlockToSequencedBlock ib
+  case mSb of
+    Nothing -> do
+      $logWarnS "transformEvents/emitBlocks" . T.pack
+        $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+      P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+    Just sb -> do
+      witnessBlockHash (sbHash sb) sb
+      hydrateAndEmit sb
+
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
