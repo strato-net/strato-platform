@@ -70,16 +70,17 @@ makeLenses ''BlockstanbulContext
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
   let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
-      debugLog loc lns f = join . uses lns $ $logInfoS loc . T.pack . f
-  debugLog "showctx/view" view format
-  debugLog "showctx/proposer" proposer (printf "%x")
-  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
+      infoLog loc lns f = join . uses lns $ $logInfoS loc . T.pack . f
+      debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
+  infoLog "showctx/view" view format
+  infoLog "showctx/proposer" proposer (printf "%x")
+  infoLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
+  infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
+  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
-  debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
-  debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
