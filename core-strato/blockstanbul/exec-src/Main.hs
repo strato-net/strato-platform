@@ -8,6 +8,7 @@ import           Data.ByteString.Base16              as B16
 import           Data.Either.Extra
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
+import           System.Environment
 
 import           Blockchain.Blockstanbul.Authentication
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
@@ -23,9 +24,9 @@ main :: IO()
 main = do
   s <- $initHFlags "blockstanbul-vote"
   putStrLn $ "Initiate a new round:" ++ show s
-  let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
+  pkey <- fromMaybe (error "PRIVATE KEY not set") <$> lookupEnv "PRIVATE_KEY"
   let recipient = Ae.eitherDecodeStrict (C8.pack flags_recipient) :: Either String Address 
-      pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack bytes
+      pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
       recipAddr = fromRight (error "Invalid Address") recipient
       addr = prvKey2Address pk
   esign <- signBenfInfo pk (recipAddr, flags_remove)
@@ -35,5 +36,5 @@ main = do
                                  , API.recipient=recipAddr
                                  , API.votingdir=flags_remove
                                  , API.nonce=flags_nonce}
-  API.uploadVote 8050 vote
+  API.uploadVote 8050 flags_node vote
 

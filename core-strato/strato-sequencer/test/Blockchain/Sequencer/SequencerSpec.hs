@@ -232,7 +232,7 @@ spec = do
                                            , API.recipient=testAddr
                                            , API.votingdir=True
                                            , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort vote
+            liftIO $ API.uploadVote testWebserverPort "localhost" vote
             checkForVotes
             bct' <- getBlockstanbulContext
             let unwrapbct = fromMaybe bct bct'
@@ -247,7 +247,7 @@ spec = do
                                             , API.recipient=testAddr
                                             , API.votingdir=False
                                             , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort vote'
+            liftIO $ API.uploadVote testWebserverPort "localhost" vote'
             checkForVotes
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn

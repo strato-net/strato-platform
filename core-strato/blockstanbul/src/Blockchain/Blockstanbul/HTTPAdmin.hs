@@ -61,10 +61,10 @@ createWebServer ch = serve adminAPI (admin ch)
 getVote :: CandidateReceived -> ClientM CandidateReceived
 getVote = client (Proxy @ AdminAPI)
 
-uploadVote ::  Int -> CandidateReceived -> IO ()
-uploadVote prt cr = do
+uploadVote ::  Int -> String -> CandidateReceived -> IO ()
+uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http "localhost" prt ""))
+  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt ""))
   case vot of
     Left err -> putStrLn $ "Error??/: " ++ show err
     Right cr'-> do
