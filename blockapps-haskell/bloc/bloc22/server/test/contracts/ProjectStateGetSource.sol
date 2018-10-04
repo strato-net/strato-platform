@@ -11,7 +11,6 @@ contract ProjectState {
         return "ProjectState";
     }
     function __getSource__() view public returns (string) {
-        return "contract ProjectState {\n\n    enum ProjectState {\n        NULL,\n        OPEN,\n        PRODUCTION,\n        INTRANSIT,\n        RECEIVED\n    }\n}";  
-    
+        return "contract ProjectState {\n\n    enum ProjectState {\n        NULL,\n        OPEN,\n        PRODUCTION,\n        INTRANSIT,\n        RECEIVED\n    }\n}";
     }
 }
