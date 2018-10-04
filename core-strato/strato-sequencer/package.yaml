@@ -48,6 +48,7 @@ dependencies:
   - servant-server
   - wai-extra
   - wai-middleware-prometheus
+  - deepseq
 
 ghc-options: -Wall -O2 -threaded
 

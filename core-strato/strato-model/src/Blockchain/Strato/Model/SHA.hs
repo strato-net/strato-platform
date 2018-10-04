@@ -4,6 +4,7 @@ module Blockchain.Strato.Model.SHA where
 
 import              Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import              Blockchain.Strato.Model.Util
+import              Control.DeepSeq
 import              Control.Monad                        (replicateM)
 import "cryptonite" Crypto.Hash                          (Digest, hash)
 import              Crypto.Hash.Algorithms               (Keccak_256, Keccak_512)
@@ -22,6 +23,8 @@ import              Numeric                              (readHex, showHex)
 import              Blockchain.Data.RLP
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
+
+instance NFData SHA
 
 unSHA :: SHA -> Word256
 unSHA (SHA w) = w

@@ -19,6 +19,7 @@ import           Blockchain.SHA
 import           Blockchain.Util
 import           Data.Maybe                         (maybeToList)
 
+import           Control.DeepSeq
 import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
@@ -32,6 +33,7 @@ data AddressState =
     addressStateChainId::Maybe Word256
     } deriving (Eq, Generic, Read, Show)
 
+instance NFData AddressState
 
 blankAddressState:: AddressState
 blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" , addressStateChainId = Nothing}

@@ -1,13 +1,20 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Bagger.BaggerState where
 
 import           Control.Applicative                (Alternative, empty)
+import           Control.DeepSeq
 
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
+
+import           GHC.Generics
 
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Bagger.TransactionList
@@ -23,6 +30,9 @@ import           Blockchain.SHA
 
 type ATL = M.Map Address TransactionList
 
+instance (NFData a, NFData b) => NFData (OMap a b) where
+  rnf m = OMap.assocs m `deepseq` ()
+
 data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
                                , bestBlockTxHashes     :: [SHA]
@@ -33,7 +43,9 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , promotedTransactions  :: [OutputTx]
                                , privateHashes         :: OMap SHA OutputTx
                                , startTimestamp        :: UTCTime
-                               } deriving (Show)
+                               } deriving (Show, Generic)
+
+instance NFData MiningCache
 
 data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
@@ -42,7 +54,9 @@ data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
-                               }
+                               } deriving (Generic)
+
+instance NFData BaggerState
 
 instance Show BaggerState where
     show b =    "BBBBB\n"
@@ -57,12 +71,18 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   , pending               = M.empty
                                   , queued                = M.empty
                                   , seen                  = M.empty
-                                  , calculateIntrinsicGas = error "reached defaultBaggerState"
+                                  , calculateIntrinsicGas = \_ _ -> 0xaaaaa
                                   }
 
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
-                                  , bestBlockHeader       = error "reached defaultMiningCache"
+                                  , bestBlockHeader       = (DD.BlockData
+                                      (SHA 0) (SHA 0) (Address 0x7777)
+                                      blankStateRoot blankStateRoot blankStateRoot
+                                      "" 100 100 100 100
+                                      (posixSecondsToUTCTime 0)
+                                      "" 137 (SHA 30))
+
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot
                                   , lastRewardedStateRoot = blankStateRoot
@@ -70,7 +90,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
                                   , privateHashes         = OMap.empty
-                                  , startTimestamp        = error "reached defaultMiningCache"
+                                  , startTimestamp        = posixSecondsToUTCTime 0
                                   }
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
