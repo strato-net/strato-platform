@@ -28,6 +28,7 @@ import           Network.Haskoin.Crypto                      (withSource)
 import qualified Network.Haskoin.Internals                   as Haskoin
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
+import           Test.Hspec.Expectations.Lifted
 
 import           Blockchain.BlockChain
 import qualified Blockchain.Colors                           as C
@@ -147,7 +148,7 @@ addressStates = do
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
-runTest::Test->ContextM (Either String String)
+runTest::Test-> ContextM ()
 runTest test = do
   let cid = chainId $ env test
 
@@ -185,7 +186,7 @@ runTest test = do
           blockBlockUncles = [] --error "blockUncles not set"
           }
 
-  (result, retVal, gasRemaining, tlogs, returnedCallCreates, _) <-
+  (result, retVal, gasRemaining, returnedCallCreates, _) <-
     case theInput test of
       IExec exec -> do
 
@@ -227,8 +228,8 @@ runTest test = do
         flushMemAddressStateDB
 
         case vmException vmState1 of
-         Nothing -> return (result, returnVal vmState1, vmGasRemaining vmState1, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Nothing -> return (result, returnVal vmState1, vmGasRemaining vmState1, debugCallCreates vmState1, Just vmState1)
+         Just _ -> return (Right (), Nothing, 0, Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of
@@ -263,7 +264,7 @@ runTest test = do
             Right (ExecResults remGas _ retVal _ rLogs _ _ _) -> do
               return ( Right (), retVal, remGas, rLogs, Just [], Nothing)
             Left _ -> do
-              return (Right (), Nothing, 0, [], Just [], Nothing)
+              return (Right (), Nothing, 0, Just [], Nothing)
 
   afterAddressStates <- addressStates
 
@@ -280,45 +281,19 @@ runTest test = do
     liftIO $ putStrLn "Expected -------------"
     liftIO $ putStrLn $ unlines $ showInfo <$> postTest
     liftIO $ putStrLn "End      -------------"
-
-  case (RawData (fromMaybe B.empty retVal) == out test,
-        (M.fromList afterAddressStates == M.fromList postTest) || (null postTest && isLeft result),
-        case remainingGas test of
-          Nothing -> True
-          Just x  -> gasRemaining == x,
-        tlogs == reverse (logs' test),
-        (callcreates test == fmap reverse returnedCallCreates) || (isNothing (callcreates test) && (returnedCallCreates == Just []))
-        ) of
-    (False, _, _, _, _) -> return $ Left $ "result doesn't match" -- : is " ++ showPart retVal ++ ", should be " ++ showPart (out test)
-    (_, False, _, _, _) -> return $ Left $ "address states don't match"
-    (_, _, False, _, _) -> return $ Left $ "remaining gas doesn't match: is " ++ show gasRemaining ++ ", should be " ++ show (remainingGas test) ++ ", diff=" ++ show (gasRemaining - fromJust (remainingGas test))
-    (_, _, _, False, _) -> do
-      liftIO $ putStrLn "llllllllllllllllllllll"
-      liftIO $ putStrLn $ show $ tlogs
-      liftIO $ putStrLn "llllllllllllllllllllll"
-      liftIO $ putStrLn $ show $ logs' test
-      liftIO $ putStrLn "llllllllllllllllllllll"
-      return $ Left "logs don't match"
-    (_, _, _, _, False) -> do
-      liftIO $ do
-        putStrLn $ "callcreates test = " ++ show (callcreates test)
-        putStrLn $ "returnedCallCreates = " ++ show returnedCallCreates
-
-      return $ Left $ "callcreates don't match"
-    _ -> return $ Right "Success"
-
-formatResult::(String, Either String String)->String
-formatResult (name, Left err)      = "> " ++ name ++ ": " ++ C.red err
-formatResult (name, Right message) = "> " ++ name ++ ": " ++ C.green message
+  RawData (fromMaybe B.empty retVal) `shouldBe` out test
+  unless (null postTest && isLeft result) $
+    afterAddressStates `shouldBe` postTest
+  _ <- case remainingGas test of
+    Nothing -> return ()
+    Just wantGas -> gasRemaining `shouldBe` wantGas
+  if isNothing (callcreates test)
+      then returnedCallCreates `shouldBe` Just []
+      else fmap reverse returnedCallCreates `shouldBe` callcreates test
 
 runTests::[(String, Test)]->ContextM ()
 runTests tests = do
-  results <-
-    forM tests $ \(name, test) -> do
-      --liftIO $ putStrLn $ "Running test: " ++ show name
-      result <- runTest test
-      return (name, result)
-  liftIO $ putStrLn $ intercalate "\n" $ formatResult <$> results
+    forM_ tests $ \(_, test) -> runTest test
 
 runAllTests::Maybe String->Maybe String->ContextM ()
 runAllTests maybeFileName maybeTestName= do

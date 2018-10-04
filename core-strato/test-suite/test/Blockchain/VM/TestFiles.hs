@@ -751,9 +751,10 @@ homesteadFiles = [
 
 testFiles::[String]
 testFiles =
-  vmTests ++
-  stateTests ++
-  homesteadFiles
+  -- vmTests ++
+  -- stateTests ++
+  -- homesteadFiles
+  ["./tests/VMTests/vmArithmeticTest/add0.json"]
 
 
 

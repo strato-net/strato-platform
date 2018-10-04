@@ -13,6 +13,7 @@ module Blockchain.VMContext
     , Config(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , runTestContextM
     , runContextM
     , evalContextM
     , execContextM
@@ -26,6 +27,7 @@ module Blockchain.VMContext
 
 
 import           Control.Lens                       hiding (Context(..))
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
@@ -36,12 +38,15 @@ import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Q
+import qualified Data.Text                          as T
 import qualified Database.LevelDB                   as DB
-import qualified Database.Persist.Postgresql        as SQL
+import qualified Database.Persist.Postgresql        as PSQL
+import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
 import qualified Network.Kafka                      as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
+import           System.IO.Temp
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
@@ -203,11 +208,48 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
+runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
+                   StateT Context (StatsT (ResourceT m)) a -> m (a, Context)
+runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
+  withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
+    runResourceT $ do
+      let ldbOptions = DB.defaultOptions {
+        DB.createIfMissing = True,
+        DB.cacheSize = flags_ldbCacheSize,
+        DB.blockSize = flags_ldbBlockSize
+      }
+      let openDB base = DB.open (tmpdir ++ base) ldbOptions
+      sdb <- openDB stateDBPath
+      hdb <- openDB hashDBPath
+      cdb <- openDB codeDBPath
+      blksumdb <- openDB blockSummaryCacheDBPath
+      conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack filepath) 20
+      redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+        Redis.connectHost = "localhost",
+        Redis.connectPort = Redis.PortNumber 2023,
+        Redis.connectDatabase = 0
+      }
+      let initialKafkaState = error "TODO(tim): require sinks"
+      runStateT f (Context
+                   MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                   hdb
+                   cdb
+                   blksumdb
+                   conn
+                   M.empty
+                   M.empty
+                   defaultBaggerState
+                   initialKafkaState
+                   Unspecified
+                   redisPool
+                   [] [] [])
+
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
+<<<<<<< HEAD
         conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
         flip runReaderT (Config conn) $ do
           let ldbOptions = DB.defaultOptions {
@@ -245,6 +287,42 @@ runContextM f = do
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+=======
+        let ldbOptions = DB.defaultOptions {
+            DB.createIfMissing = True,
+            DB.cacheSize       = flags_ldbCacheSize,
+            DB.blockSize       = flags_ldbBlockSize
+        }
+        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+        conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
+        redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
+        let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
+        runStateT f (Context
+                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                        hdb
+                        cdb
+                        blksumdb
+                        conn
+                        M.empty
+                        M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
+                        defaultBaggerState
+                        initialKafkaState
+                        Unspecified
+                        redisPool
+                        [] [] []
+                        flags_blockstanbul
+                        False)
+
+
+evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
+>>>>>>> 38af1ef2f... Attempt to revive the evm tests
 evalContextM f = fst <$> runContextM f
 
 execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context

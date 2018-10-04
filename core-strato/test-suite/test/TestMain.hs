@@ -6,54 +6,23 @@ module Main where
 
 import qualified Blockchain.VM.TestDescriptions as TD
 import           Control.Monad
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
-import qualified Data.ByteString.Lazy           as BL
-import           Data.Either
+import qualified Data.ByteString                as B
 import qualified Data.Map                       as M
+import           Executable.EVMFlags            ()
 import           HFlags
 import           System.Directory
-import           Test.HUnit
 
 import           Blockchain.VM.TestEthereum
 import           Blockchain.VM.TestFiles
 import           Blockchain.VMContext
 import           Blockchain.VMOptions           ()
 
-doTests :: [(String, TD.Test)] -> IO ()
+
+doTests :: [(String, TD.Test)] -> ContextM ()
 doTests tests = do
-  results <- flip runLoggingT noLog $ runContextM $ forM tests $ \(n, t) -> do
-    result <- runTest t
-    return $ (n, result)
-  let a = fst results :: [(String, Either String String)]
-  _ <- liftIO $ runTestTT $ TestList $ map f a
-  return ()
-    where
-  f :: (String, Either a b) -> Test.HUnit.Test
-  f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
-
-doTests' :: [(String, TD.Test)] -> ContextM Counts
-doTests' tests = do
-  results <- forM tests $ \(n, t) -> do
-    result <- runTest t
-    return $ (n, result)
-  let a = results :: [(String, Either String String)]
-  liftIO $ runTestTT $ TestList $ map f a
-    where
-  f :: (String, Either a b) -> Test.HUnit.Test
-  f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
-
-doTests'' :: [(String, TD.Test)] -> ContextM Test.HUnit.Test
-doTests'' tests = do
-  results <- forM tests $ \(n, t) -> do
-    result <- runTest t
-    return $ (n, result)
-  let a = results :: [(String, Either String String)]
-  return $ TestList $ map f a
-    where
-  f :: (String, Either a b) -> Test.HUnit.Test
-  f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
+  forM_ tests $ \(_, t) -> runTest t
 
 main::IO ()
 main = do
@@ -63,24 +32,14 @@ main = do
     error "You need to clone the git repository at https://github.com/ethereum/tests.git"
 
   putStrLn $ "\nRunning ethereum tests\n"
-  tests <- forM testFiles $ \theFileName -> do
-    theFile <- BL.readFile theFileName
+  forM_ testFiles $ \theFileName -> do
+    here <- getCurrentDirectory
+    putStrLn $ "I am " ++ here
+    theFile <- B.readFile theFileName
     putStrLn $ "\n - Running tests from " ++ theFileName
-    return $ case fmap fromJSON $ eitherDecode theFile::Either String (Result TD.Tests) of
+    case fmap fromJSON $ eitherDecodeStrict theFile::Either String (Result TD.Tests) of
         Right val ->
           case val of
-            Success tests -> TestLabel theFileName <$> (doTests'' (M.toList tests))
-            _             -> error $ "hit Failure for " ++ show theFileName
-        Left _ -> error "hit Left"
-
-  let g f mas = (fmap f) <$> sequence mas -- :: (Monad m, Traversable t) => (a -> b) -> t (m a) -> m (t b)
-  let b = g id tests
-
-  r <- do
-    flip runLoggingT noLog $ runContextM $ b
-
-  let rr = fst r :: [Test.HUnit.Test]
-  void $ runTestTT $ TestList $ rr
-
-  return ()
-
+            Success tests -> flip runLoggingT noLog $ runTestContextM $ doTests (M.toList tests)
+            x             -> error $ "hit Failure for " ++ show x
+        Left err -> error $ "unable to decode json: " ++ show err
