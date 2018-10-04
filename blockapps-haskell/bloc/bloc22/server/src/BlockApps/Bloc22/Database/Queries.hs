@@ -1172,7 +1172,7 @@ compileContract source' = do
   return metadataIds
   where
     addFuncsToSource src =
-      case addToSource src [addGetSource, addGetName] of
+      case addToSource src [addGetSource (formatSrc src), addGetName] of
         Left err -> blocError . UserError .Text.pack $ err
         Right msg' -> return msg'
 
