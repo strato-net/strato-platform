@@ -82,11 +82,17 @@ executables:
     main: BlockBackup.hs
 
   strato-ez-restore:
-    source-dirs: exec_src
+    source-dirs: exec_src/
     main: RestoreTool.hs
     dependencies:
       - strato-init
       - monad-control
+
+  mkCoinbase:
+    source-dirs: exec_src/
+    main: MkCoinbase.hs
+    dependencies:
+      - base64-bytestring
 
 tests:
   strato-init-test:

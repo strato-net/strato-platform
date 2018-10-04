@@ -48,7 +48,7 @@ pull_blockapps_js: prebuild
 
 build_docker: build_deploybase build_haskell pull_blockapps_js
 	cp -f Dockerfile $(FAKEROOT)
-	cp -f doit.sh mkCoinbase $(LIBHOME)
+	cp -f doit.sh $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
