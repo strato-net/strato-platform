@@ -83,15 +83,14 @@ debugShowCtx = do
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
-  let prop = case as of
-                 [] -> 0x0 -- TODO(tim): C? In my Haskell? It's more likely than you think.
-                 (a:_) -> a
+  let valSet = S.fromList as
+      prop = fromMaybe 0x0 . S.lookupMin $ valSet
   in BlockstanbulContext
      { _view = v
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
-     , _validators = S.fromList as
+     , _validators = valSet
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPrepared = False
