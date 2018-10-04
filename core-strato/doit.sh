@@ -80,11 +80,11 @@ function newnode {
 
 
   echo "Starting ethereum-vm"
-  runBackgroundProcess /usr/local/bin/ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
+  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" +RTS -N1 -hy -i4 -xt -xc  >> logs/ethereum-vm 2>&1
+                         "${tbFlag}" +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
