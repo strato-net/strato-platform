@@ -211,11 +211,9 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
      Nothing ->
        case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source"
-         [(_, x)] -> return x
+         [(_,x)] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-     Just contract' ->
-       blocMaybe "Could not find global contract metadataId" $
-         Map.lookup contract' idsAndDetails
+     Just contract' -> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
@@ -861,6 +859,7 @@ preparePostTx from tx = PostTransaction
   , posttransactionV = Hex v
   , posttransactionNonce = fromIntegral nonce'
   , posttransactionChainId = chainId
+  , posttransactionMetadata = Nothing
   }
   where
     kecc = keccak256 (rlpSerialize tx)

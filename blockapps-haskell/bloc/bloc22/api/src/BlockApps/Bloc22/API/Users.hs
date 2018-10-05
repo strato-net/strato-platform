@@ -102,6 +102,7 @@ instance ToSample BlocTransactionData where
       , posttransactionV          = Hex 0x1c
       , posttransactionNonce      = 9876
       , posttransactionChainId    = Nothing
+      , posttransactionMetadata   = Nothing
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
