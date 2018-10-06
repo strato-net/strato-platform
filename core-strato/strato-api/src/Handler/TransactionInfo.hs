@@ -74,7 +74,6 @@ postTransactionListR = do
 
    parserStart <- liftIO $ getTime Realtime
    tx <- parseJsonBody :: Handler (Result [RawTransaction'])
-   $logError "Finished JSON parser"
    case tx of
        (Success raws) -> do
           txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)

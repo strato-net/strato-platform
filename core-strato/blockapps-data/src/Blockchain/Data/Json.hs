@@ -16,7 +16,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Format
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.TypeLits
 
 import           Data.Aeson
 import           Data.Aeson.Types            (Parser)
@@ -24,7 +23,6 @@ import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16      as B16
 import qualified Data.Map.Strict             as M
 import           Data.Maybe
-import           Data.Text                   (Text)
 import qualified Data.Text.Encoding          as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -53,7 +51,7 @@ instance ToJSON RawTransaction' where
         "timestamp" .= show t,
         "origin" .= format o
                ] ++ (("chainId" .=) <$> maybeToList cid)
-                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple) md) :: Maybe (NamedMap "key" Text "value" Text)))
+                 ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod cid r s v md bn h o) next) =
         object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
         "value" .= show val, "codeOrData" .= cod, "chainId" .= cid,
@@ -66,7 +64,7 @@ instance ToJSON RawTransaction' where
         "timestamp" .= show t,
         "origin" .= format o
                ] ++ (("chainId" .=) <$> maybeToList cid)
-                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple) md) :: Maybe (NamedMap "key" Text "value" Text)))
+                 ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap (fst . head . readHex)
@@ -110,7 +108,7 @@ instance FromJSON RawTransaction' where
                  (tr :: Integer)
                  (ts :: Integer)
                  (tv :: Word8)
-                 (fmap (map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
+                 (M.toList <$> md)
                  bn
                  h
                  o)
@@ -144,7 +142,7 @@ instance ToJSON Transaction' where
                   "hash" .= transactionHash tx,
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
-                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple . M.toList) md) :: Maybe (NamedMap "key" Text "value" Text)))
+                 ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv md)) =
         object $ ["kind" .= ("Transaction" :: String),
                   "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
@@ -159,7 +157,7 @@ instance ToJSON Transaction' where
                   "hash" .= transactionHash tx,
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
-                 ++ (("metadata" .=) <$> maybeToList ((fmap (map fromTuple . M.toList) md) :: Maybe (NamedMap "key" Text "value" Text)))
+                 ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(PrivateHashTX th tch)) =
         object ["r" .= showHex th "",
                 "s" .= showHex tch "",
@@ -187,12 +185,10 @@ instance FromJSON Transaction' where
           case tto of
             Nothing -> do
               (ti :: Code) <- (t .: "init")
-              return . Transaction' . ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv $
-                (fmap (M.fromList . map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
+              return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")
-              return . Transaction' . MessageTX tnon tgp tgl to' tval td tcid tr ts tv $
-                (fmap (M.fromList . map toTuple) (md :: Maybe (NamedMap "key" Text "value" Text)))
+              return . Transaction' $ MessageTX tnon tgp tgl to' tval td tcid tr ts tv md
     parseJSON _ = error "bad param when calling parseJSON for Transaction'"
 
 
