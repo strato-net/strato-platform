@@ -1,17 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
 
 import           ClassyPrelude                       (atomically)
 import           Data.Maybe                          (isNothing, fromMaybe)
+import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (singleton,lookup)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
-
 
 import           Conduit
 import           Control.Concurrent
@@ -84,9 +83,9 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     let fullPath ="./.ethereumH/dep_block_" ++ show timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
-    pkg <- atomically $ newCablePackage
-    vch <- atomically $ newTMChan
-    tch <- atomically $ newTMChan
+    pkg <- atomically newCablePackage
+    vch <- atomically newTMChan
+    tch <- atomically newTMChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
@@ -98,7 +97,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
-                               , maxEventsPerIter = 1
+                               , maxEventsPerIter = 10
                                }
         bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
         pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
@@ -214,7 +213,7 @@ spec = do
 
       it "queues timeouts" $ runTestM $ do
         let input = [20, 45, 30]
-        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $ do
+        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $
           mapM_ createNewTimer input
         liftIO $ threadDelay 200 -- Who are you to judge?
         out <- drainTimeouts
@@ -223,7 +222,7 @@ spec = do
       it "checks for votes" $ runPBFTTestM $ do
         bc <- getBlockstanbulContext
         case bc of
-          Nothing -> do
+          Nothing ->
             expectationFailure "BlockstanbulContext required"
           Just bct -> do
             let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
@@ -288,3 +287,20 @@ spec = do
         atomically . writeTMChan uch $ iev
         src <- newResumableSource <$> fuseChannels
         void $ oneSequencerIter src
+
+      it "should not only return 1 event if multiple are pending" . runTestM $ do
+        tch <- asks blockstanbulTimeouts
+        atomically $ do
+          writeTMChan tch 20
+          writeTMChan tch 34
+          writeTMChan tch 92
+        src <- newResumableSource <$> fuseChannels
+        (_, evs) <- readEventsInBufferedWindow src
+        evs `shouldMatchList` map TimerFire [20, 34, 92]
+
+      it "should not return more than the fetchlimit" . runTestM $ do
+        tch <- asks blockstanbulTimeouts
+        src <- newResumableSource <$> fuseChannels
+        atomically $ mapM_ (writeTMChan tch) [10..30]
+        (_, evs) <- readEventsInBufferedWindow src
+        evs `shouldMatchList` map TimerFire [10..19]

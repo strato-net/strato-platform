@@ -72,7 +72,7 @@ data SequencerContext = SequencerContext
                       , _vmEvents            :: Q.Seq OutputEvent
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _blockstanbulContext :: Maybe BlockstanbulContext
-                      , _loopTimeout             :: TMChan ()
+                      , _loopTimeout         :: TMChan ()
                       }
 makeLenses ''SequencerContext
 
@@ -199,9 +199,7 @@ clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do
   existingOps <- use ldbBatchOps
-  let go e [] = e
-      go e (o:os) = go (e Q.|> o) os
-      newOps = go existingOps ops
+  let newOps = foldl (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
 fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
