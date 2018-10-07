@@ -99,11 +99,13 @@ readEventsInBufferedWindow src = do
   uch <- asks $ unseqEvents . cablePackage
   top <- atomically . tryPeekTMChan $ uch
   $logInfoS "sequencer/events" . T.pack . show $ "top is: " ++ show top
-  createWaitTimer dt
   -- There may be WaitTerminateds left over from the last iteration
   -- This will block indefinitely if there are no real messages to process,
   -- so `src` must be the only source of input to this thread.
   (src', ()) <- src $$++ dropWhileC (== WaitTerminated)
+  -- Only append the WaitTerminateds once we are certain that we will not drop them
+  -- again
+  createWaitTimer dt
   maxEvents <- asks maxEventsPerIter
   -- Takes up to maxEvents for a single buffer, waiting only as long as maxUsPerIter
   (src'', events) <- src' $$++ takeWhileC (/= WaitTerminated)
