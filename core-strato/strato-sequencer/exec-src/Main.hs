@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Main where
 
 import           Control.Monad.Logger
@@ -21,11 +22,12 @@ import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import           Blockchain.Output
 import           Blockchain.Sequencer
+import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
+import           Blockchain.Sequencer.CablePackage
 import qualified Network.Haskoin.Crypto     as HK
 import qualified Network.Kafka.Protocol     as KP
 import           Network.Wai.Handler.Warp
-import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
 
 import           Flags
@@ -56,20 +58,31 @@ main = do
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
                 return . Just . ctx $ pkey
-  chv <- atomically $ newTMChan
-  let cfg = SequencerConfig {
-      depBlockDBCacheSize   = flags_depblockcachesize
-    , depBlockDBPath        = flags_depblockdbpath
-    , kafkaClientId         = kafkaClientId'
-    , kafkaConsumerGroup    = EC.lookupConsumerGroup kafkaClientId'
-    , kafkaAddress          = mKafkaAddress
-    , seenTransactionDBSize = flags_txdedupwindow
-    , syncWrites            = flags_syncwrites
-    , bootstrapDoEmit       = True
-    , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
-    , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
-    , blockstanbulBeneficiary = chv
-  }
-  race_ (runLoggingT (runSequencerM cfg mCtx sequencer) printLogMsg) $ run flags_blockstanbul_port ((if flags_seq_debug_mode then logStdoutDev else id)
-                                                                         . (prometheus def)
-                                                                         . createWebServer $ chv)
+  pkg <- atomically newCablePackage
+  chv <- atomically newTMChan
+  cht <- atomically newTMChan
+
+  let seqCfg = SequencerConfig
+        { depBlockDBCacheSize   = flags_depblockcachesize
+        , depBlockDBPath        = flags_depblockdbpath
+        , seenTransactionDBSize = flags_txdedupwindow
+        , syncWrites            = flags_syncwrites
+        , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
+        , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
+        , blockstanbulBeneficiary = chv
+        , blockstanbulTimeouts = cht
+        , cablePackage = pkg
+        , maxEventsPerIter = flags_seq_max_events_per_iter
+        , maxUsPerIter = flags_seq_max_us_per_iter
+        }
+      gregorCfg = GregorConfig
+        { kafkaAddress          = mKafkaAddress
+        , kafkaClientId         = kafkaClientId'
+        , kafkaConsumerGroup    = EC.lookupConsumerGroup kafkaClientId'
+        , cablePackage = pkg
+        }
+  race_ (runTheGregor gregorCfg)
+      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer) printLogMsg)
+      . run flags_blockstanbul_port
+      . prometheus def
+      . createWebServer $ chv

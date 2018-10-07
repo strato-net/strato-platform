@@ -149,6 +149,8 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
+    - seqMaxEventsPerIter=${seqMaxEventsPerIter}
+    - seqMaxUsPerIter=${seqMaxUsPerIter}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper

@@ -46,6 +46,15 @@ data TrustedMessage = Preprepare View Block
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic)
 
+data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
+
+categorize :: TrustedMessage -> MessageKind
+categorize = \case
+  Preprepare{} -> PreprepareK
+  Prepare{} -> PrepareK
+  Commit{} -> CommitK
+  RoundChange{} -> RoundChangeK
+
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
@@ -152,7 +161,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
-  rlpDecode (RLPArray [code, (RLPString payload), addr, sig, seals ]) =
+  rlpDecode (RLPArray [code, RLPString payload, addr, sig, seals ]) =
       let auth = MsgAuth (rlpDecode addr) (rlpDecode sig)
           body = rlpDeserialize payload
       in WireMessage auth $
