@@ -287,13 +287,4 @@ spec = do
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTMChan uch $ iev
         src <- newResumableSource <$> fuseChannels
-        $logInfoS "seqtest" "before theloop"
         void $ oneSequencerIter src
-        $logInfoS "seqtest" "after the loop"
-        vmch <- asks $ seqVMEvents . cablePackage
-        vmevs <- atomically . drainTMChan $ vmch
-        vmevs `shouldBe` []
-        p2pch <- asks $ seqP2PEvents . cablePackage
-        p2pevs <- atomically . drainTMChan $ p2pch
-        p2pevs `shouldBe` []
-

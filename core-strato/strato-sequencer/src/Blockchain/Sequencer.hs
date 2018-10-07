@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
@@ -25,6 +24,8 @@ import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus                                as P
+import           Text.Printf
+
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Format
@@ -73,14 +74,8 @@ sequencer = do
 
 oneSequencerIter :: ResumableSource SequencerM SeqLoopEvent -> SequencerM (ResumableSource SequencerM SeqLoopEvent)
 oneSequencerIter src = timeAction seqLoopTiming $ do
-  $logInfoS "sequencer" "top of seqloop"
   clearAll
-  dt <- asks maxUsPerIter
-  createWaitTimer dt
-  maxEvents <- asks maxEventsPerIter
-  (src', events) <- src $$++ takeWhileC (/= WaitTerminated) .| takeC maxEvents .| sinkList
-  (src'', ()) <- src' $$++ dropWhileC (== WaitTerminated)
-  $logDebugS "sequencer/events" . T.pack . show $ events
+  (src', events) <- readEventsInBufferedWindow src
   checkForVotes [cr | VoteMade cr <- events]
   checkForTimeouts [rn | TimerFire rn <- events]
   checkForUnseq [iev | UnseqEvent iev <- events]
@@ -92,10 +87,46 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   unless (null p2pEvs) $ do
     writeSeqP2pEvents p2pEvs
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
-  return src''
+  return src'
 
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
+
+readEventsInBufferedWindow :: ResumableSource SequencerM SeqLoopEvent -> SequencerM (ResumableSource SequencerM SeqLoopEvent, [SeqLoopEvent])
+readEventsInBufferedWindow src = do
+  $logInfoS "sequencer/events" "Reading from fused channels..."
+  dt <- asks maxUsPerIter
+  createWaitTimer dt
+  -- There may be WaitTerminateds left over from the last iteration
+  -- This will block indefinitely if there are no real messages to process,
+  -- so `src` must be the only source of input to this thread.
+  (src', ()) <- src $$++ dropWhileC (== WaitTerminated)
+  maxEvents <- asks maxEventsPerIter
+  -- Takes up to maxEvents for a single buffer, waiting only as long as maxUsPerIter
+  (src'', events) <- src' $$++ takeWhileC (/= WaitTerminated)
+                          .| takeC maxEvents
+                          .| sinkList
+  $logDebugS "sequencer/events" . T.pack . show $ events
+  $logInfoS "sequencer/events" . T.pack . printf "read %d events from fused channels" $ length events
+  return (src'', events)
+
+checkForVotes :: [CandidateReceived] -> SequencerM ()
+checkForVotes crs = do
+  withLabel "vote" (unsafeAddCounter . fromIntegral . length $ crs) seqLoopEvents
+  blockstanbulSend . map translate $ crs
+  where translate :: CandidateReceived -> InEvent
+        translate br =
+          let extsign = RL.rlpDecode
+                      . RL.rlpDeserialize
+                      . fst
+                      . B16.decode $ pack (API.signature br)
+              bauth = MsgAuth { sender = (API.sender br), signature = extsign}
+          in NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
+
+checkForTimeouts :: [RoundNumber] -> SequencerM ()
+checkForTimeouts rns = do
+  withLabel "timeout" (unsafeAddCounter . fromIntegral . length $ rns) seqLoopEvents
+  blockstanbulSend . map Timeout $ rns
 
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
@@ -112,25 +143,6 @@ checkForUnseq inEvents = do
     txHashes <- gets _getTransactionsDB
     unless (S.null txHashes) $ do
       markForP2P . OEGetTx $ toList txHashes
-
-checkForTimeouts :: [RoundNumber] -> SequencerM ()
-checkForTimeouts rns = do
-  withLabel "timeout" (unsafeAddCounter . fromIntegral . length $ rns) seqLoopEvents
-  blockstanbulSend . map Timeout $ rns
-
-checkForVotes :: [CandidateReceived] -> SequencerM ()
-checkForVotes crs = do
-  withLabel "vote" (unsafeAddCounter . fromIntegral . length $ crs) seqLoopEvents
-  blockstanbulSend . map translate $ crs
-  where translate :: CandidateReceived -> InEvent
-        translate br =
-          let extsign = RL.rlpDecode
-                      . RL.rlpDeserialize
-                      . fst
-                      . B16.decode $ pack (API.signature br)
-              bauth = MsgAuth { sender = (API.sender br), signature = extsign}
-          in NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
-
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
