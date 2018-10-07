@@ -120,8 +120,8 @@ checkForVotes crs = do
                       . RL.rlpDeserialize
                       . fst
                       . B16.decode $ pack (API.signature br)
-              bauth = MsgAuth { sender = (API.sender br), signature = extsign}
-          in NewBeneficiary bauth ((API.recipient br), (API.votingdir br),(API.nonce br))
+              bauth = MsgAuth { sender = API.sender br, signature = extsign}
+          in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
 checkForTimeouts rns = do
@@ -138,10 +138,10 @@ checkForUnseq inEvents = do
     P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
     $logInfoS "sequencer" "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
-    unless (S.null chainIds) $ do
+    unless (S.null chainIds) $
       markForP2P . OEGetChain $ toList chainIds
     txHashes <- gets _getTransactionsDB
-    unless (S.null txHashes) $ do
+    unless (S.null txHashes) $
       markForP2P . OEGetTx $ toList txHashes
 
 bootstrapBlockstanbul :: SequencerM ()
@@ -161,8 +161,7 @@ blockstanbulSend msgs = do
             else sendAllMessages [CommitResult (Right ())]
     mapM_ createNewTimer [rn | ResetTimer rn <- resp]
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
-    let rewriteBlock = fmap OEBlock
-                     . fmap (flip sequencedBlockToOutputBlock 1)
+    let rewriteBlock = fmap (OEBlock . flip sequencedBlockToOutputBlock 1)
                      . ingestBlockToSequencedBlock
                      . blockToIngestBlock TO.Blockstanbul
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
@@ -182,7 +181,7 @@ blockstanbulSend msgs = do
     mapM_ markForP2P p2pevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
-transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
+transformPrivateHashTXs pairs = forM_ pairs $ \(_, IngestTx _ (TD.PrivateHashTX th' ch')) -> do
   $logInfoS "transformPrivateHashTXs" . T.pack $ "Transforming transaction " ++ format (SHA th') ++ " with chain hash " ++ format (SHA ch')
   let th = SHA th'
       ch = SHA ch'
@@ -211,7 +210,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(_, (IngestTx _ (TD.PrivateHashTX
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
-  mOtxs <- forM pairs $ \(ts,itx) -> do
+  mOtxs <- forM pairs $ \(ts,itx) ->
     case wrapTransaction itx of
       Nothing -> return Nothing
       Just otx -> do
@@ -227,13 +226,13 @@ transformFullTransactions pairs = do
             P.incCounter seqTxsUnwitnessed
             return $ Just (ts,otx)
   let otxs = catMaybes mOtxs
-  forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) -> do
+  forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) ->
     if not isPrivateChain
       then do
         $logInfoS "transformFullTransactions" . T.pack $ "Sending " ++ show (length txs) ++ "public transactions to P2P and the VM"
         mapM_ (markForVM . pairToOETx) txs
         mapM_ (markForP2P . pairToOETx) txs
-      else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \((Just chainId), ptxs) -> do
+      else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \(Just chainId, ptxs) -> do
         $logInfoS "transformFullTransactions" . T.pack $ "Transforming " ++ show (length txs) ++ "private transactions on chain " ++ format (SHA chainId)
         lookupSeenChain chainId >>= \case
           False -> do
@@ -290,7 +289,7 @@ hydrateAndEmit sb = do
   wetBlocks <- runConduit $ hydrateAndEmit' .| sinkList
   hasPBFT <- blockstanbulRunning
   if not hasPBFT
-    then mapM_ (markForVM . OEBlock) $ wetBlocks
+    then mapM_ (markForVM . OEBlock) wetBlocks
     else let convert :: BDB.Block -> InEvent
              convert blk = if isHistoricBlock blk
                              then PreviousBlock blk
@@ -312,7 +311,7 @@ hydrateAndEmit sb = do
       (ReadyToEmit totalPastDifficulty) -> do
           -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
           dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
-          if (dryChain /= [])
+          if dryChain /= []
             then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
             else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           hasPBFT <- lift blockstanbulRunning
@@ -321,7 +320,7 @@ hydrateAndEmit sb = do
           ldbOps <- forM dryChain $ \(ldbOp, ob) -> do
             let bHash = blockHeaderHash $ obBlockData ob
             logHydrate $ prettyOBlock ob
-            forM_ (obReceiptTransactions ob) $ \tx -> do
+            forM_ (obReceiptTransactions ob) $ \tx ->
               when (isPrivateHashTX tx) $ do
                 let TD.PrivateHashTX{TD.transactionTxHash = th'} = otBaseTx tx
                     th = SHA th'
@@ -332,7 +331,7 @@ hydrateAndEmit sb = do
                     logHydrate $ "Transaction hash " ++ format th ++ " is missing. Inserting into TxBlockDB and DependentTxDB"
                     lift $ insertTxBlock th bHash
                     lift $ insertDependentTx bHash th
-                  else do
+                  else
                     logHydrate $ "Transaction hash " ++ format th ++ " is not missing"
             depTXS <- lift . lookupDependentTxs $ bHash
             if S.null depTXS
@@ -417,7 +416,7 @@ isPrivateChainTX = isJust . txChainId
 
 hydrateBlock :: OutputBlock -> SequencerM OutputBlock
 hydrateBlock ob = do
-  otxs' <- forM (obReceiptTransactions ob) $ \otx -> do
+  otxs' <- forM (obReceiptTransactions ob) $ \otx ->
     case txType (otBaseTx otx) of
       PrivateHash -> do
         let sha = SHA . TD.transactionTxHash $ otBaseTx otx
