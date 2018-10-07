@@ -335,3 +335,12 @@ spec = do
         map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk''']
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
+
+      it "should be able to fetch if the write is after the read begins" . runTestM $ do
+        src <- newResumableSource <$> fuseChannels
+        uch <- asks blockstanbulTimeouts
+        void . liftIO . forkIO $ do
+          threadDelay 750
+          atomically . writeTMChan uch $ 987
+        (_, evs) <- readEventsInBufferedWindow src
+        evs `shouldMatchList` [TimerFire 987]
