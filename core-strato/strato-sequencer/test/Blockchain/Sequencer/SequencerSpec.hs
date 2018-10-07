@@ -113,7 +113,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         boot = bootstrapGenesisBlock hash difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) printLogMsg)
+      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
