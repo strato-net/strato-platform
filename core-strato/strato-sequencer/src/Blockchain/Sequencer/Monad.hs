@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances              #-}
 {-# LANGUAGE MultiParamTypeClasses          #-}
 {-# LANGUAGE TemplateHaskell                #-}
+{-# LANGUAGE OverloadedStrings              #-}
 {-# OPTIONS_GHC -fno-warn-orphans           #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
 module Blockchain.Sequencer.Monad (
@@ -41,6 +42,7 @@ import           Data.Conduit.TMChan
 import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
+import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus
 
@@ -217,4 +219,9 @@ fuseChannels = do
 createWaitTimer :: Int -> SequencerM ()
 createWaitTimer dt = do
     lch <- use loopTimeout
-    void . liftIO . forkIO $ threadDelay dt >> atomically (writeTMChan lch ())
+    $logInfoS "createWaitTimer" . T.pack . show $ dt
+    void . liftIO . forkIO $ do
+      threadDelay dt
+      now <- getCurrentTime
+      putStrLn $ "timer fired: " ++ show now
+      atomically (writeTMChan lch ())

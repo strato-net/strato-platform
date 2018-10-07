@@ -96,6 +96,9 @@ readEventsInBufferedWindow :: ResumableSource SequencerM SeqLoopEvent -> Sequenc
 readEventsInBufferedWindow src = do
   $logInfoS "sequencer/events" "Reading from fused channels..."
   dt <- asks maxUsPerIter
+  uch <- asks $ unseqEvents . cablePackage
+  top <- atomically . peekTMChan $ uch
+  $logInfoS "sequencer/events" . T.pack . show $ "top is: " ++ show top
   createWaitTimer dt
   -- There may be WaitTerminateds left over from the last iteration
   -- This will block indefinitely if there are no real messages to process,
