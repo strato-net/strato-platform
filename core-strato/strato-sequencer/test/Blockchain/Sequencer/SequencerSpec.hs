@@ -340,7 +340,7 @@ spec = do
         src <- newResumableSource <$> fuseChannels
         uch <- asks blockstanbulTimeouts
         void . liftIO . forkIO $ do
-          threadDelay 750
+          threadDelay 5000
           atomically . writeTMChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
