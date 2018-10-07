@@ -219,9 +219,7 @@ fuseChannels = do
 createWaitTimer :: Int -> SequencerM ()
 createWaitTimer dt = do
     lch <- use loopTimeout
-    $logInfoS "createWaitTimer" . T.pack . show $ dt
+    $logDebugS "createWaitTimer" . T.pack . show $ dt
     void . liftIO . forkIO $ do
       threadDelay dt
-      now <- getCurrentTime
-      putStrLn $ "timer fired: " ++ show now
       atomically (writeTMChan lch ())

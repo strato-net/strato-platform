@@ -98,7 +98,7 @@ readEventsInBufferedWindow src = do
   dt <- asks maxUsPerIter
   uch <- asks $ unseqEvents . cablePackage
   top <- atomically . tryPeekTMChan $ uch
-  $logInfoS "sequencer/events" . T.pack . show $ "top is: " ++ show top
+  $logDebugS "sequencer/events" . T.pack . show $ "top event is: " ++ show top
   -- There may be WaitTerminateds left over from the last iteration
   -- This will block indefinitely if there are no real messages to process,
   -- so `src` must be the only source of input to this thread.
