@@ -34,6 +34,7 @@ import           System.Directory
 import           System.Entropy
 import           System.FilePath
 
+import           Blockchain.APIFiles
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
@@ -351,6 +352,10 @@ oneTimeSetup genesisBlockName = do
                      peerId = uniqueString
                    }
                  }
+
+      inflateDir stratoAPICerts
+      inflateDir stratoAPIStaticDir
+      inflateDir stratoAPIConfigDir
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") cfg'
