@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
+
 module Blockchain.VMContext
     ( Context(..)
     , ContextBestBlockInfo(..)

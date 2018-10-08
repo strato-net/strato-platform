@@ -1,6 +1,5 @@
 BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
-NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
@@ -12,7 +11,6 @@ all: build_docker clean
 prebuild:
 	mkdir -p $(BASILWORK)
 	mkdir -p $(STACKWORK)
-	mkdir -p $(NPMWORK)
 	mkdir -p $(FAKEROOT)/usr/lib
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(STRATOHOME)
@@ -25,7 +23,13 @@ build_haskell: prebuild
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 	stack test --no-run-tests test-suite \
-        # --profile --ghc-options="-fprof-auto -rtsopts"
+
+build_haskell_profiled: prebuild build_buildbase
+	stack setup
+	# installing happy-1.19.8 explicitly to avoid the error while building 3rd party lib "language-javascript-0.6.0.11" - remove when migrated to compiler ghc-8.2.2 in stack.yaml
+	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
+	stack install --profile --work-dir .stack-work-profile --local-bin-path=$(FAKEROOT)/usr/bin
+	stack test    --profile --work-dir .stack-work-profile --no-run-tests test-suite
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy-core
@@ -33,17 +37,9 @@ build_deploybase: prebuild
 	docker build -t strato-deploybase:latest -f /tmp/docker-dummy-core/Dockerfile.deploybase /tmp/docker-dummy-core
 	rm -f /tmp/docker-dummy-core/Dockerfile.deploybase
 
-pull_blockapps_js: prebuild
-	( \
-		cd $(NPMWORK)                        && \
-		mkdir -p node_modules                && \
-		npm install blockapps-js yaml-parser    \
-	)
-
-build_docker: build_deploybase build_haskell pull_blockapps_js
+build_docker: build_deploybase build_haskell
 	cp -f Dockerfile $(FAKEROOT)
-	cp -f doit.sh mkCoinbase $(LIBHOME)
-	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
+	cp -f doit.sh $(LIBHOME)
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
 clean:

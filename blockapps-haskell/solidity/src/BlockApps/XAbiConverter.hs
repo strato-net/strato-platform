@@ -244,7 +244,7 @@ contractToXabi cName Contract{..} =
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,
       xabiEvents = Map.empty,
-      xabiIsLibrary = False,
+      xabiKind = ContractKind,
       xabiUsing = Map.empty
       }
 

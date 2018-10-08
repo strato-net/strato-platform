@@ -1,6 +1,7 @@
 'use strict'
 
 const ba = require('blockapps-rest');
+const BigNumber = require('bignumber.js');
 const co = require('co');
 require('co-mocha');
 const rest = ba.rest;
@@ -28,13 +29,19 @@ describe('Strato Load Test', function() {
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
   const batchDelay = util.getArgInt('--batchDelay', 0);
-  
+
 
   before(function * () {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(`User: ${admin.name} @ ${admin.address}`);
     yield rest.compileSearch([contractName], contractName, contractFilename);
+    let balance = new BigNumber(0);
+    while (balance.isZero()) {
+      yield promiseTimeout(500);
+      balance = yield rest.getBalance(admin.address);
+      console.log(`Balance is: ${balance}`);
+    }
   });
 
   it('Upload contracts', function * () {
@@ -47,7 +54,7 @@ describe('Strato Load Test', function() {
       const results = yield api.bloc.uploadList({
         password: adminPassword,
         contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
-        resolve: false 
+        resolve: false
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
@@ -65,20 +72,23 @@ describe('Strato Load Test', function() {
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);    
+    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
   });
-  
+
 });
 
 function * waitResult(address, batchSize, batchCount) {
-  let result = [{nonce: 0}];
-  while(result[0].nonce < batchSize*batchCount) {
-    console.log(`Current Nonce is: ${result[0].nonce}`)
+  let nonce = 0;
+  while(nonce < batchSize*batchCount) {
     yield promiseTimeout(500);
     try {
-    result = yield api.strato.account(address);
+      console.log(`Current Nonce is: ${nonce}`)
+      let result = yield api.strato.account(address);
+      console.log(`Result: ${JSON.stringify(result)}`);
+      nonce = result[0].nonce;
     } catch (e) {
+      console.error(e);
     }
   }
 }

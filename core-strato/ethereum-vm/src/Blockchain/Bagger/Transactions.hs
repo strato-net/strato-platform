@@ -1,7 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Bagger.Transactions where
 
+import           Control.DeepSeq
 import qualified Data.Map                           as M
 import           Data.Time.Clock
+
+import           GHC.Generics
 
 import           Blockchain.DB.MemAddressStateDB
 
@@ -19,13 +23,17 @@ data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrTime        :: NominalDiffTime
                                , trrBeforeMap   :: M.Map Address AddressStateModification
                                , trrAfterMap    :: M.Map Address AddressStateModification
-                               } deriving (Show)
+                               } deriving (Show, Generic)
+
+instance NFData TxRunResult
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- txCost, accountBalance
                              | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
                              | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
-                             deriving (Eq, Read, Show)
+                             deriving (Eq, Read, Show, Generic)
+
+instance NFData TransactionFailureCause
 
 data RunAttemptState = RunAttemptState { rasRanTxs    :: [TxRunResult]
                                        , rasUnranTxs  :: [OutputTx]

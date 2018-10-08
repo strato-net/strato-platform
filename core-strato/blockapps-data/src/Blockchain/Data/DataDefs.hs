@@ -72,6 +72,5 @@ instance BIN.Binary UTCTime where
 instance BIN.Binary BlockData where
 
 instance NFData BlockData
-instance NFData SHA
 instance NFData TXOrigin
 instance NFData RawTransaction

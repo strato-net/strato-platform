@@ -30,6 +30,21 @@ import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
+data XabiKind = ContractKind
+              | InterfaceKind
+              | LibraryKind deriving (Eq, Show, Generic)
+
+instance ToJSON XabiKind where
+instance FromJSON XabiKind where
+instance Arbitrary XabiKind where
+  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+
+instance ToSchema XabiKind where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Xabi Kind Schema"
+    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, or an interface"
+    & mapped.schema.example ?~ toJSON ContractKind
+
 data Xabi = Xabi
   { xabiFuncs     :: Map Text Func
   , xabiConstr    :: Map Text Func
@@ -37,7 +52,7 @@ data Xabi = Xabi
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
   , xabiEvents    :: Map Text Event
-  , xabiIsLibrary :: Bool
+  , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text Using
   } deriving (Eq,Show,Generic)
 
@@ -53,7 +68,7 @@ instance FromJSON Xabi where
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
          <*> v .:? "events" .!= Map.empty
-         <*> v .:? "is_library" .!= False
+         <*> v .:? "kind" .!= ContractKind
          <*> v .:? "using" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
@@ -87,12 +102,12 @@ sampleXabi = Xabi
   , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
   , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
   , xabiEvents = Map.empty
-  , xabiIsLibrary = False
+  , xabiKind = ContractKind
   , xabiUsing = Map.singleton "SafeMath" (Using "for uint256")
   }
 
 xabiEmpty :: Xabi
-xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty False Map.empty
+xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)

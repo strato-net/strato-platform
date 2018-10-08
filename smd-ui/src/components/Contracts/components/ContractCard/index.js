@@ -175,6 +175,8 @@ class ContractCard extends Component {
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
                       mixpanelWrapper.track("contracts_toggle_collapse_click");
+                      if (this.state.isOpen) 
+                        this.props.selectContractInstance(name, null);
                       this.setState({
                         isOpen: !this.state.isOpen
                       })

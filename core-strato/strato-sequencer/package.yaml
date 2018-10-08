@@ -18,6 +18,7 @@ dependencies:
   - blockapps-util
   - strato-conf
   - clock
+  - conduit
   - containers
   - directory
   - extra
@@ -33,9 +34,11 @@ dependencies:
   - base16-bytestring
   - bytestring
   - ethereum-rlp
+  - lifted-async
   - time
   - stm
   - stm-chans
+  - stm-conduit
   - conduit-combinators
   - blockstanbul
   - stm-chans
@@ -48,6 +51,7 @@ dependencies:
   - servant-server
   - wai-extra
   - wai-middleware-prometheus
+  - deepseq
 
 ghc-options: -Wall -O2 -threaded
 
@@ -68,6 +72,7 @@ executables:
     main: KeyGen.hs
     dependencies:
       - strato-sequencer
+      - aeson-pretty
       - entropy
       - hflags
 
@@ -75,6 +80,7 @@ tests:
   strato-sequencer-spec:
     source-dirs:   test
     main:          Main.hs
+    ghc-options: -threaded
     dependencies:
       - HUnit
       - QuickCheck

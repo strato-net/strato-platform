@@ -1,4 +1,4 @@
-.PHONY: test test-suite vm-tests multinode
+.PHONY: test test-suite vm-tests
 
 vm-tests:
 	echo "running vm tests"
@@ -18,17 +18,8 @@ integration:
 	-stack test strato-redis-blockdb
 	docker exec -t strato_strato_1 bash -c "cd /var/lib/strato; test-suite"
 
-multinode:
-	echo "testing multinode tests"
-	if [ -d "multinode-test" ]; then \
-	  echo "... multinode already checked out"; \
-	else \
-	  git clone https://github.com/blockapps/multinode-test multinode-test; \
-	fi
-	cd multinode-test/ && npm install && ./node_modules/mocha/bin/mocha test/ --reporter mochawesome
-
 unit:
 	echo "testing unit tests"
 	stack test ethereum-discovery strato-p2p strato-api blockapps-data
 
-test: unit test-suite vm-tests multinode
+test: unit test-suite vm-tests

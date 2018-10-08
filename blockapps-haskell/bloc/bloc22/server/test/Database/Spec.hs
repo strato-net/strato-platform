@@ -32,7 +32,7 @@ solcSpec =
         let solPath = "./test/contracts/AppMetadata.sol"
         soliditySrc <- pack <$> readFile solPath
         void . fromEither =<< compileSolcIO soliditySrc
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+        augmentedSrc <- unpack <$> (fromEither $ addToSource soliditySrc [addGetSource $ formatSrc soliditySrc])
         void . fromEither =<< compileSolcIO (pack augmentedSrc)
         augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
         augmentedXabi `shouldSatisfy` not . null . xabiModifiers . snd . (!! 0)
@@ -140,6 +140,10 @@ solcSpec =
         let solPath = "./test/contracts/Library.sol"
             expectedPath = "./test/contracts/LibraryGetSource.sol"
         testAugment solPath expectedPath
+      it "should unparse interfaces" $ do
+        let solPath = "./test/contracts/Interface.sol"
+            expectedPath = "./test/contracts/InterfaceGetSource.sol"
+        testAugment solPath expectedPath
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
         let mods = runParser (many solidityDeclaration) "" "-" "modifier onlyOwner { if(msg.sender != owner) throw; _; } modifier notOnlyOwner { if(msg.sender == owner) throw; _; }"
@@ -159,7 +163,7 @@ logleft x = case x of
   Right _ -> return ()
 
 augment :: Text -> Either String Text
-augment = addGetNameFuncToSource <=< addGetSourceFuncToSource
+augment src = addToSource src [addGetSource (formatSrc src), addGetName]
 
 testAugment :: String -> String -> IO ()
 testAugment solPath expectedPath = do

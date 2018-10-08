@@ -7,7 +7,6 @@ contract Ctor {
         return "Ctor";
     }
     function __getSource__() view public returns (string) {
-        return "contract Ctor {\n  constructor() {\n  }\n}\n";  
-    
+        return "contract Ctor {\n  constructor() {\n  }\n}\n";
     }
 }

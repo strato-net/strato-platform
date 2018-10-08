@@ -1,12 +1,5 @@
 library l {
 
-    function __getContractName__() view public returns (string) {
-        return "l";
-    }
-    function __getSource__() view public returns (string) {
-        return "library l {}\n\ncontract u {\n  using l for uint256;\n}\n";  
-    
-    }
 }contract u {
 
     using l for uint256;
@@ -15,7 +8,6 @@ library l {
         return "u";
     }
     function __getSource__() view public returns (string) {
-        return "library l {}\n\ncontract u {\n  using l for uint256;\n}\n";  
-    
+        return "library l {}\n\ncontract u {\n  using l for uint256;\n}\n";
     }
 }
