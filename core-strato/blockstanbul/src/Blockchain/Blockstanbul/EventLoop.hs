@@ -70,16 +70,17 @@ makeLenses ''BlockstanbulContext
 debugShowCtx :: StateMachineM m => m ()
 debugShowCtx = do
   let debugLog :: (StateMachineM m2) => T.Text -> LensLike' (Const (m2 ())) BlockstanbulContext a -> (a -> String) -> m2 ()
+      infoLog loc lns f = join . uses lns $ $logInfoS loc . T.pack . f
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
-  debugLog "showctx/view" view format
-  debugLog "showctx/proposer" proposer (printf "%x")
-  debugLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
+  infoLog "showctx/view" view format
+  infoLog "showctx/proposer" proposer (printf "%x")
+  infoLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
+  infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
+  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
-  debugLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
-  debugLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
@@ -269,12 +270,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             then do
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: block does not match lock"
-              $logDebugS "blockstanbul/roundchange" "lock mismatch"
+              $logInfoS "blockstanbul/roundchange" "lock mismatch"
               roundChange
             else
               if v /= v'
                 then do
-                  $logDebugS "blockstanbul/roundchange" . T.pack $
+                  $logInfoS "blockstanbul/roundchange" . T.pack $
                      "view mismatch (us, sender): " ++ format (v, v')
                   $logWarnS "blockstanbul/ppl" . T.pack $
                     printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
@@ -328,7 +329,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
-        $logDebugS "blockstanbul/roundchange" "agreed change"
+        $logInfoS "blockstanbul/roundchange" "agreed change"
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
@@ -344,19 +345,19 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       case r' `compare` _round v of
         LT ->
           let msg = printf "Ignoring stale timeout for %v (now %v)" r' (_round v)
-          in $logDebugS "blockstanbul" . T.pack $ msg
+          in $logInfoS "blockstanbul" . T.pack $ msg
         EQ -> do
           $logWarnS "blockstanbul" . T.pack $ printf "Round %v timed out" r'
-          $logDebugS "blockstanbul/roundchange" "timeout"
+          $logInfoS "blockstanbul/roundchange" "timeout"
           roundChange
         GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
-      $logDebugS "blockstanbul/roundchange" "commit failure (how...)"
+      $logInfoS "blockstanbul/roundchange" "commit failure (how...)"
       blockLock .= Nothing
       roundChange
     CommitResult (Right ()) -> do
-      $logDebugS "blockstanbul" "Successful block commit"
+      $logInfoS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
       blockLock .= Nothing
       -- TODO(tim): More guards should be put in place to see that not just the view but
