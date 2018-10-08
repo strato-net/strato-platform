@@ -78,6 +78,7 @@ tests:
       - base16-bytestring
       - bytestring
       - containers
+      - hflags
       - hspec
       - largeword
       - parsec
