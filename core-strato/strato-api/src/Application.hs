@@ -181,7 +181,10 @@ appMain = do
 
     -- Run the application with Warp
     -- runSettings (warpSettings foundation) app
-    runTLS defaultTlsSettings (warpSettings foundation) app
+    runTLS tls (warpSettings foundation) app
+  where
+    tls = (tlsSettingsChain "certs/star_blockapps_net.pem" ["certs/TrustedRoot.pem", "certs/DigiCertCA2.pem"] "certs/key.pem"){onInsecure=AllowInsecure}
+
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)
