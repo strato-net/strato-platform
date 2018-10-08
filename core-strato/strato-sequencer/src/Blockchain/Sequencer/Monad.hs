@@ -210,11 +210,12 @@ fuseChannels = do
   votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
-  mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
-               , sourceTMChan votes .| mapC VoteMade
-               , sourceTMChan timers .| mapC TimerFire
-               , sourceTMChan loop .| mapC (const WaitTerminated)]
-               4096 -- 🙏
+  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
+  debugLog <$> mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
+                            , sourceTMChan votes .| mapC VoteMade
+                            , sourceTMChan timers .| mapC TimerFire
+                            , sourceTMChan loop .| mapC (const WaitTerminated)]
+                            4096 -- 🙏
 
 createWaitTimer :: Int -> SequencerM ()
 createWaitTimer dt = do
