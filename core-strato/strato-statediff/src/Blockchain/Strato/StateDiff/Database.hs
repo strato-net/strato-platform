@@ -27,6 +27,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                                    as Map
+import           Data.Text                                   (Text)
+import qualified Data.Text                                   as T
 
 import           Blockchain.Strato.StateDiff
 
@@ -39,7 +41,7 @@ sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   commitSqlDiffs stateDiffs (const "") (const "")
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> (SHA -> String) -> (SHA -> String) -> m ()
+                  StateDiff -> (SHA -> Text) -> (SHA -> Text) -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} codeSource codeContractName = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
@@ -48,7 +50,7 @@ commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts,
     sequence_ $ Map.mapWithKey (updateAccount chainId blockNumber) updatedAccounts
 
 createAccount :: MonadIO m =>
-                 Maybe Word256 -> Integer -> (SHA -> String) -> (SHA -> String) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+                 Maybe Word256 -> Integer -> (SHA -> Text) -> (SHA -> Text) -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount chainId blockNumber codeSource codeContractName addressDiffs = do
   newAccounts <- forM addressDiffs $ \addressDiff -> do
     let (address, diff) = addressDiff
@@ -72,8 +74,8 @@ createAccount chainId blockNumber codeSource codeContractName addressDiffs = do
       addressStateRefCode = getField (theError address "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefSource = source,
-      addressStateRefContractName = name,
+      addressStateRefSource = T.unpack source,
+      addressStateRefContractName = T.unpack name,
       addressStateRefChainId = chainId
       }
     theError :: Address -> String -> a
@@ -111,13 +113,13 @@ updateAccount chainId blockNumber address diff = do
     takeIncremental Update{newValue} = newValue
 
 updateSource :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m) =>
-                Maybe Word256 -> Address -> String -> String -> m ()
+                Maybe Word256 -> Address -> Text -> Text -> m ()
 updateSource chainId address name source = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
     addrID <- getAddressStateSQL chainId address "update"
-    SQL.update addrID [ AddressStateRefSource =. source
-                      , AddressStateRefContractName =. name
+    SQL.update addrID [ AddressStateRefSource =. (T.unpack source)
+                      , AddressStateRefContractName =. (T.unpack name)
                       , AddressStateRefChainId =. chainId
                       ]
 

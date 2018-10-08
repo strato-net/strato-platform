@@ -40,7 +40,7 @@ main = do
   dbInsert conn conAlter
 
   let offset = 0 :: K.Offset
-  let kafkaID = "queryStrato" :: KafkaClientId
+  let kafkaID = "slipstream" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
   cachedContractsIORef <- newIORef def

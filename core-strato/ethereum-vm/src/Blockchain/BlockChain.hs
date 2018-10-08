@@ -38,7 +38,7 @@ import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
-import           Data.Text.Encoding                      (decodeUtf8)
+import           Data.Text.Encoding                      (decodeUtf8, encodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -545,9 +545,9 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
         actions <- forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a
           src <- codeSource addressStateCodeHash
-          let srcHash = H.superProprietaryStratoSHAHash $ BC.pack src
+          let srcHash = H.superProprietaryStratoSHAHash $ encodeUtf8 src
           contName <- codeContractName addressStateCodeHash
-          let sPtr = Just SourcePtr{sourceHash = srcHash, contractName = T.pack contName}
+          let sPtr = Just SourcePtr{sourceHash = srcHash, contractName = contName}
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
@@ -560,7 +560,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                      addressStateCodeHash
                      sPtr
                      (Just s)
-        void . withKafkaViolently $ writeAnyTypeWithAToJSONInstanceToKafka actions
+        void . withKafkaViolently $ writeJSONToKafka actions
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
@@ -654,8 +654,8 @@ splitCreateDiffs =
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> BlockData
-                           -> (MP.StateRoot -> SHA -> ContextM String)
-                           -> (MP.StateRoot -> SHA -> ContextM String)
+                           -> (MP.StateRoot -> SHA -> ContextM T.Text)
+                           -> (MP.StateRoot -> SHA -> ContextM T.Text)
                            -> ContextM ()
 calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
     let oldHash      = blockHeaderHash oldHeader
@@ -676,7 +676,7 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     codeSourceMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do
         codeSrc <- codeSource sr codeHash
-        return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ BC.pack codeSrc))
+        return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ encodeUtf8 codeSrc))
 
     codeNameMap <- fmap M.fromList $
       forM allNewCodeHashes $ \(sr,codeHash) -> do

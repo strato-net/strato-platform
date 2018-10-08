@@ -71,7 +71,7 @@ enterBloc2 env x = do
    Right v -> return v
 
 emptyHash :: Keccak256
-emptyHash = keccak256 "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+emptyHash = keccak256 B.empty
 
 getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either String ContractAndXabi)
 getContract name hash chainId = do
@@ -249,7 +249,7 @@ processTheMessages messages conn g = do
             --TODO: Add parsing of contract info to get flags (indexing, history)
 
         fetchLimit <- asks stateFetchLimit
-        let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") storage) 0
+        let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
         let chain = case actionTxChainId of
                      Nothing -> ""
                      Just (ChainId x) -> T.pack $ showHex x ""

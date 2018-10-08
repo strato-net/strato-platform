@@ -961,13 +961,13 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
+getSource :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
+getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
-getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
+getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getFromSelector sel isRunningTests' sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
@@ -1007,7 +1007,7 @@ getFromSelector sel isRunningTests' sr codeHash = do
   setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""
-    Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
+    Right ret -> return . T.pack . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
 
 create :: Bool
        -> Bool
