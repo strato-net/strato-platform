@@ -1,6 +1,5 @@
 BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
-NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
@@ -12,7 +11,6 @@ all: build_docker clean
 prebuild:
 	mkdir -p $(BASILWORK)
 	mkdir -p $(STACKWORK)
-	mkdir -p $(NPMWORK)
 	mkdir -p $(FAKEROOT)/usr/lib
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(STRATOHOME)
@@ -39,17 +37,9 @@ build_deploybase: prebuild
 	docker build -t strato-deploybase:latest -f /tmp/docker-dummy-core/Dockerfile.deploybase /tmp/docker-dummy-core
 	rm -f /tmp/docker-dummy-core/Dockerfile.deploybase
 
-pull_blockapps_js: prebuild
-	( \
-		cd $(NPMWORK)                        && \
-		mkdir -p node_modules                && \
-		npm install blockapps-js yaml-parser    \
-	)
-
-build_docker: build_deploybase build_haskell pull_blockapps_js
+build_docker: build_deploybase build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(LIBHOME)
-	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
 clean:

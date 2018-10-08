@@ -143,7 +143,6 @@ function cleanupDB {
 }
 
 function doInit {
-  cp -r /var/lib/node_modules /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
@@ -167,8 +166,6 @@ function doInit {
   fi
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
-
-  cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
 
   echo "Creating a random coinbase"
   mkCoinbase

@@ -15,9 +15,6 @@ Most unix systems (incl. ubuntu and mac):
 curl -sSL https://get.haskellstack.org/ | sh
 ```
 
-### NodeJS
-core-strato requires NodeJS 6+ to fetch blockapps-js (it's deprecated but still used in coinbase generation)
-
 ### MacOS ONLY - Docker for Mac setting requirements:
 In Docker for Mac "Preferences" -> "Advanced" allocate at least *2 CPU cores, 6 Gb RAM and 2Gb Swap* to a Docker VM
 
