@@ -6,7 +6,7 @@
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
-      formatAddress
+      formatAddress, stringAddress
     ) where
 
 import           Control.DeepSeq

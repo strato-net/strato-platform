@@ -71,7 +71,7 @@ getVote = client (Proxy @ AdminAPI)
 uploadVote ::  Int -> String -> CandidateReceived -> IO ()
 uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt ""))
+  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "blockstanbul/vote"))
   case vot of
     Left err -> putStrLn $ "Error??/: " ++ show err
     Right cr'-> do
