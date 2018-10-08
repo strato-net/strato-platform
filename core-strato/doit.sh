@@ -143,7 +143,6 @@ function cleanupDB {
 }
 
 function doInit {
-  cp -r /var/lib/node_modules /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
