@@ -168,8 +168,6 @@ function doInit {
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
-  cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
-
   echo "Creating a random coinbase"
   mkCoinbase
 }
