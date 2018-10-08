@@ -165,3 +165,6 @@ replayHistoricBlock realValidators seqNo blk = do
   unless (3 * S.size signers > 2 * S.size realValidators) $
     Left "not enough commit seals"
   Right . fromIntegral $ seqNo + 1
+
+isHistoricBlock :: Block -> Bool
+isHistoricBlock = (> 32) . B.length . view extraLens

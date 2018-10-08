@@ -8,7 +8,6 @@ contract DataTypeString {
         return "DataTypeString";
     }
     function __getSource__() view public returns (string) {
-        return "contract DataTypeString {\n    string[4] storedDatum;\n    struct StoredStruct {\n      string[3] values;\n    }\n}\n";  
-    
+        return "contract DataTypeString {\n    string[4] storedDatum;\n    struct StoredStruct {\n      string[3] values;\n    }\n}\n";
     }
 }

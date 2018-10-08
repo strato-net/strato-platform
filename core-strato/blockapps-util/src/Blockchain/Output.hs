@@ -4,6 +4,7 @@
 module Blockchain.Output
     ( printLogMsg
     , printToFile
+    , dropLogMsg
     , leftPad  -- todo: not enough NPM
     , rightPad  -- todo: not enough NPM
     ) where
@@ -66,6 +67,9 @@ formatLogOutput showTS timestamp tid loc logSource level msg = BC.pack $
     printf "%s%s%s | %s | %s | %s" tsAndDivider locAndDivider (formatLogLevel level) (formatThreadId tid) (formatLogSource logSource) (formatLogStr msg)
     where locAndDivider = if (level == LevelDebug || level == LevelWarn) then formatLoc loc ++ " | " else ""
           tsAndDivider = if showTS then '[':(timestamp ++ "] ") else ""
+
+dropLogMsg :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+dropLogMsg _ _ _ _ = return ()
 
 printLogMsg :: Loc
             -> LogSource

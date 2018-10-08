@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances              #-}
 {-# LANGUAGE MultiParamTypeClasses          #-}
 {-# LANGUAGE TemplateHaskell                #-}
+{-# LANGUAGE OverloadedStrings              #-}
 {-# OPTIONS_GHC -fno-warn-orphans           #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
 module Blockchain.Sequencer.Monad (
@@ -9,8 +10,6 @@ module Blockchain.Sequencer.Monad (
   , SequencerConfig(..)
   , SequencerM
   , runSequencerM
-  , getKafkaClientID
-  , getKafkaConsumerGroup
   , pairToOETx
   , markForVM
   , markForP2P
@@ -23,10 +22,13 @@ module Blockchain.Sequencer.Monad (
   , drainTMChan
   , drainTimeouts
   , drainVotes
+  , fuseChannels
+  , createWaitTimer
 ) where
 
-import           ClassyPrelude                             (atomically, STM)
+import           ClassyPrelude                             (atomically, STM, threadDelay)
 import           Prelude                                   hiding (round)
+import           Control.Concurrent                        (forkIO)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
@@ -35,17 +37,20 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
+import           Conduit
+import           Data.Conduit.TMChan
 import           Data.Foldable                             (toList)
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
+import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
-import qualified Blockchain.EthConf                        as EC
 import           Blockchain.ExtWord                        (Word256)
+import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
@@ -57,9 +62,6 @@ import           Blockchain.SHA
 import           System.Directory                          (createDirectoryIfMissing)
 
 import qualified Database.LevelDB                          as LDB
-import qualified Network.Kafka                             as K
-import qualified Blockchain.MilenaTools                    as K
-import qualified Network.Kafka.Protocol                    as KP
 
 data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
@@ -71,25 +73,24 @@ data SequencerContext = SequencerContext
                       , _ldbBatchOps         :: Q.Seq LDB.BatchOp
                       , _vmEvents            :: Q.Seq OutputEvent
                       , _p2pEvents           :: Q.Seq OutputEvent
-                      , _sequencerKafkaState :: K.KafkaState
                       , _blockstanbulContext :: Maybe BlockstanbulContext
-                      , _blockstanbulTimeouts :: TMChan RoundNumber
+                      , _loopTimeout         :: TMChan ()
                       }
 makeLenses ''SequencerContext
 
 
 data SequencerConfig =
-     SequencerConfig { depBlockDBCacheSize   :: Int
-                     , depBlockDBPath        :: String
-                     , seenTransactionDBSize :: Int
-                     , kafkaAddress          :: Maybe K.KafkaAddress
-                     , kafkaClientId         :: K.KafkaClientId
-                     , kafkaConsumerGroup    :: KP.ConsumerGroup
-                     , syncWrites            :: Bool
-                     , bootstrapDoEmit       :: Bool
+     SequencerConfig { depBlockDBCacheSize     :: Int
+                     , depBlockDBPath          :: String
+                     , seenTransactionDBSize   :: Int
+                     , syncWrites              :: Bool
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
                      , blockstanbulBeneficiary :: TMChan CandidateReceived
+                     , blockstanbulTimeouts    :: TMChan RoundNumber
+                     , cablePackage            :: CablePackage
+                     , maxEventsPerIter        :: Int
+                     , maxUsPerIter            :: Int
                      }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
@@ -119,10 +120,6 @@ instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
     putSeenTransactionDB = assign seenTransactionDB
 
-instance K.HasKafkaState SequencerM where
-    getKafkaState = use sequencerKafkaState
-    putKafkaState = assign sequencerKafkaState
-
 instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
     putBlockstanbulContext = assign (blockstanbulContext . _Just)
@@ -137,13 +134,8 @@ runSequencerM c mbc m = do
         dbCS     <- asks depBlockDBCacheSize
         dbPath   <- asks depBlockDBPath
         stxSize  <- asks seenTransactionDBSize
-        kClId    <- asks kafkaClientId
-        mAddr    <- asks kafkaAddress
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
-        let kState = case mAddr of
-                         Nothing -> EC.mkConfiguredKafkaState kClId
-                         Just addr -> K.mkKafkaState kClId addr
-        ch <- atomically $ newTMChan
+        loopCh <- atomically newTMChan
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
@@ -154,9 +146,8 @@ runSequencerM c mbc m = do
             , _ldbBatchOps         = Q.empty
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
-            , _sequencerKafkaState = kState
             , _blockstanbulContext = mbc
-            , _blockstanbulTimeouts = ch
+            , _loopTimeout = loopCh
             }
     return $ fst a
 
@@ -182,7 +173,7 @@ createFirstTimer = do
 
 createNewTimer :: RoundNumber -> SequencerM ()
 createNewTimer rn = do
-  ch <- use blockstanbulTimeouts
+  ch <- asks blockstanbulTimeouts
   let act :: AlarmClock UTCTime -> IO ()
       act _ = atomically $ writeTMChan ch rn
   alarm <- liftIO $ newAlarmClock act
@@ -199,7 +190,7 @@ drainTMChan ch = do
     Just (Just x) -> (x:) <$> drainTMChan ch
 
 drainTimeouts :: SequencerM [RoundNumber]
-drainTimeouts = join $ uses blockstanbulTimeouts (atomically . drainTMChan)
+drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 
 drainVotes :: SequencerM [CandidateReceived]
 drainVotes = atomically . drainTMChan =<< asks blockstanbulBeneficiary
@@ -210,13 +201,25 @@ clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do
   existingOps <- use ldbBatchOps
-  let go e [] = e
-      go e (o:os) = go (e Q.|> o) os
-      newOps = go existingOps ops
+  let newOps = foldl (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
-getKafkaClientID :: SequencerM K.KafkaClientId
-getKafkaClientID = kafkaClientId <$> ask
+fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
+fuseChannels = do
+  unseq <- asks $ unseqEvents . cablePackage
+  votes <- asks blockstanbulBeneficiary
+  timers <- asks blockstanbulTimeouts
+  loop <- use loopTimeout
+  mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
+               , sourceTMChan votes .| mapC VoteMade
+               , sourceTMChan timers .| mapC TimerFire
+               , sourceTMChan loop .| mapC (const WaitTerminated)]
+               4096 -- 🙏
 
-getKafkaConsumerGroup :: SequencerM KP.ConsumerGroup
-getKafkaConsumerGroup = kafkaConsumerGroup <$> ask
+createWaitTimer :: Int -> SequencerM ()
+createWaitTimer dt = do
+    lch <- use loopTimeout
+    $logDebugS "createWaitTimer" . T.pack . show $ dt
+    void . liftIO . forkIO $ do
+      threadDelay dt
+      atomically (writeTMChan lch ())

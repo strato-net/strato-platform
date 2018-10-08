@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
+import           Control.DeepSeq
 import           Data.Binary
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
@@ -28,12 +29,19 @@ import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
+import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+
+data SeqLoopEvent = TimerFire PBFT.RoundNumber
+                  | VoteMade PBFT.CandidateReceived
+                  | UnseqEvent IngestEvent
+                  | WaitTerminated
+                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
@@ -114,6 +122,7 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otSigner :: A.Address
                          , otBaseTx :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic)
+instance NFData OutputTx
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
@@ -156,6 +165,13 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              , obReceiptTransactions = sbReceiptTransactions sb
                                                              , obBlockUncles         = sbBlockUncles sb
                                                              }
+
+sequencedBlockToBlock :: SequencedBlock -> Block
+sequencedBlockToBlock sb = BDB.Block
+                         { BDB.blockBlockData = sbBlockData sb
+                         , BDB.blockReceiptTransactions = map otBaseTx $ sbReceiptTransactions sb
+                         , BDB.blockBlockUncles = sbBlockUncles sb
+                         }
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =

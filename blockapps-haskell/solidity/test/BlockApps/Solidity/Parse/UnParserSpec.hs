@@ -50,12 +50,16 @@ spec = do
 
   describe "Unparser - library" $ do
     it "should unparse a library" $ do
-      let xabi = xabiEmpty{xabiIsLibrary=True}
+      let xabi = xabiEmpty{xabiKind=LibraryKind}
       unparseSourceUnit (NamedXabi "SafeMath" (xabi, [])) `shouldSatisfy` isInfixOf "library SafeMath"
-
+  describe "Unparser - interface" $ do
+    it "should unparse an interface" $ do
+      let xabi = xabiEmpty{xabiKind=InterfaceKind}
+      unparseSourceUnit (NamedXabi "Stringer" (xabi, [])) `shouldSatisfy` isInfixOf "interface Stringer"
   describe "UnParser - unparseUsing" $ do
     it "should unparse using" $ do
       unparseUsing ("SafeMath", Using "for uint256") `shouldBe` "using SafeMath for uint256;\n"
+
 
 
 expectedFunc :: String

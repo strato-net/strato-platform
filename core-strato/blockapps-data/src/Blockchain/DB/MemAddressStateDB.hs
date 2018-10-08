@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.DB.MemAddressStateDB (
   HasMemAddressStateDB(..),
   AddressStateModification(..),
@@ -12,7 +13,9 @@ module Blockchain.DB.MemAddressStateDB (
 ) where
 
 import           Control.Monad
+import           Control.DeepSeq
 import qualified Data.Map                       as M
+import GHC.Generics
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -21,7 +24,9 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Format
 
-data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show)
+data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Generic)
+
+instance NFData AddressStateModification
 
 instance Format AddressStateModification where
   format (ASModification addressState) = "Address Modified:\n" ++ format addressState

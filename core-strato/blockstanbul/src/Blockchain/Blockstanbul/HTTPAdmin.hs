@@ -13,15 +13,19 @@ module Blockchain.Blockstanbul.HTTPAdmin (
 ) where
 
 import Servant
+import Control.Monad
 import Data.Aeson
 import qualified GHC.Generics                        as GHCG
-
-import Blockchain.Data.Address
 import Servant.Client
+
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad.IO.Class
 import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Test.QuickCheck
+
+import Blockchain.Data.Address
+import Blockchain.Data.ArbitraryInstances()
 
 -- API
 
@@ -35,13 +39,16 @@ data CandidateReceived = CandidateReceived { sender :: Address
                                            , recipient :: Address
                                            , votingdir :: Bool
                                            , nonce :: Int
-                                           } deriving (Show,GHCG.Generic)
+                                           } deriving (Eq, Show, GHCG.Generic)
 
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
 
 instance FromJSON CandidateReceived
 instance ToJSON CandidateReceived
+
+instance Arbitrary CandidateReceived where
+  arbitrary = liftM5 CandidateReceived arbitrary arbitrary arbitrary arbitrary arbitrary
 
 -- Server
 

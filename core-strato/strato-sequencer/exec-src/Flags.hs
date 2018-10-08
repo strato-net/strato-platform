@@ -29,3 +29,6 @@ defineFlag "blockstanbul_round_period_s" (10 :: Int)
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of admins. Admins can, for instance, nominate a new validator"
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
+
+defineFlag "seq_max_events_per_iter" (20 :: Int) "How many elements to wait for in each sequencer iteration"
+defineFlag "seq_max_us_per_iter" (10000 :: Int) "How many μs to spend waiting for elements"

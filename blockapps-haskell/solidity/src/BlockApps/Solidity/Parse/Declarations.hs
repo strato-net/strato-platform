@@ -29,8 +29,9 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  isLib <- ((reserved "contract") >> return False)
-        <|> ((reserved "library") >> return True)
+  kind <- (reserved "contract" >> return Xabi.ContractKind)
+        <|> (reserved "interface" >> return Xabi.InterfaceKind)
+        <|> (reserved "library" >> return Xabi.LibraryKind)
   contractName' <- identifier
   setContractName contractName'
   baseConstrs <- option [] $ do
@@ -60,7 +61,7 @@ solidityContract = do
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
-             , xabiIsLibrary = isLib
+             , xabiKind = kind
              , xabiUsing = Map.fromList using
            },
         map (Text.pack . fst) baseConstrs

@@ -83,15 +83,14 @@ debugShowCtx = do
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
-  let prop = case as of
-                 [] -> 0x0 -- TODO(tim): C? In my Haskell? It's more likely than you think.
-                 (a:_) -> a
+  let valSet = S.fromList as
+      prop = fromMaybe 0x0 . S.lookupMin $ valSet
   in BlockstanbulContext
      { _view = v
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
-     , _validators = S.fromList as
+     , _validators = valSet
      , _prepared = M.empty
      , _committed = M.empty
      , _hasPrepared = False
@@ -233,8 +232,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
       case eNextSeqNo of
         Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
-        Right nextSeqNo -> do
-          view . sequence .= nextSeqNo
+        Right _ -> do
           -- TODO(tim): Does it have a vote to record?
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
@@ -361,6 +359,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logDebugS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
       blockLock .= Nothing
+      -- TODO(tim): More guards should be put in place to see that not just the view but
+      -- also the block numbers are in ascending order.
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where

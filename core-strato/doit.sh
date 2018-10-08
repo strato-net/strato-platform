@@ -67,7 +67,15 @@ function newnode {
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+  if [ -n "${seqMaxEventsPerIter}" ]; then
+    evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
+  fi
+  if [ -n "${seqMaxUsPerIter}" ]; then
+    usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
+  fi
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
+    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -136,7 +144,6 @@ function cleanupDB {
 
 function doInit {
   cp -r /var/lib/node_modules /var/lib/strato/.
-  cp  /var/lib/mkCoinbase  /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
@@ -164,7 +171,7 @@ function doInit {
   cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
 
   echo "Creating a random coinbase"
-  ./mkCoinbase
+  mkCoinbase
 }
 
 # Find all logs greater than 10M, then copy and truncate

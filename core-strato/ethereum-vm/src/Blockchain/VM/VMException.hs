@@ -3,6 +3,8 @@ module Blockchain.VM.VMException (
   VMException(..)
   ) where
 
+import Control.DeepSeq
+
 data VMException =
   OutOfGasException |
   StackTooSmallException |
@@ -18,3 +20,5 @@ data VMException =
   WriteProtection |
   RevertException deriving (Show, Eq)
 
+instance NFData VMException where
+  rnf = flip seq ()

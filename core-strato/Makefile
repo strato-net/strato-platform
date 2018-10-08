@@ -25,7 +25,13 @@ build_haskell: prebuild
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 	stack test --no-run-tests test-suite \
-        # --profile --ghc-options="-fprof-auto -rtsopts"
+
+build_haskell_profiled: prebuild build_buildbase
+	stack setup
+	# installing happy-1.19.8 explicitly to avoid the error while building 3rd party lib "language-javascript-0.6.0.11" - remove when migrated to compiler ghc-8.2.2 in stack.yaml
+	stack install --local-bin-path=$(FAKEROOT)/usr/bin happy-1.19.8
+	stack install --profile --work-dir .stack-work-profile --local-bin-path=$(FAKEROOT)/usr/bin
+	stack test    --profile --work-dir .stack-work-profile --no-run-tests test-suite
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy-core
@@ -42,7 +48,7 @@ pull_blockapps_js: prebuild
 
 build_docker: build_deploybase build_haskell pull_blockapps_js
 	cp -f Dockerfile $(FAKEROOT)
-	cp -f doit.sh mkCoinbase $(LIBHOME)
+	cp -f doit.sh $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
