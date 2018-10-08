@@ -27,7 +27,7 @@ lookupChainHash h = M.lookup h <$> getChainHashMap
 
 insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 insertChainHash h cid = do
-  liftIO $ withLabel "insert_chains" incCounter chainMetrics
+  liftIO $ withLabel "chain_hash" incCounter chainMetrics
   getChainHashMap >>= putChainHashMap . M.insert h (False, cid)
 
 useChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
@@ -43,7 +43,9 @@ lookupChainBuffer :: HasPrivateHashDB m => Word256 -> m (CircularBuffer SHA)
 lookupChainBuffer cid = maybe emptyCircularBuffer id . M.lookup cid <$> getChainBuffers
 
 insertChainBuffer :: HasPrivateHashDB m => Word256 -> CircularBuffer SHA -> m ()
-insertChainBuffer cid buf = getChainBuffers >>= putChainBuffers . M.insert cid buf
+insertChainBuffer cid buf = do
+  liftIO $ withLabel "chain_buffer" incCounter chainMetrics
+  getChainBuffers >>= putChainBuffers . M.insert cid buf
 
 createChainBuffer :: HasPrivateHashDB m => Word256 -> m ()
 createChainBuffer = flip insertChainBuffer emptyCircularBuffer

@@ -30,7 +30,7 @@ insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m (SHA, SHA)
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
-    liftIO $ withLabel "insert_private_tx" incCounter txMetrics
+    liftIO $ withLabel "private_hash" incCounter txMetrics
     let r = txSigR tx
         s = txSigS tx
         h = txHash tx

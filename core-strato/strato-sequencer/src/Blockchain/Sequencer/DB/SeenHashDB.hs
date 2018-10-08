@@ -33,5 +33,5 @@ lookupSeenChainHash ch = do
 
 insertSeenTxHash :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertSeenTxHash th ch = do
-  liftIO $ withLabel "seen_tx_hashes" incCounter txMetrics
+  liftIO $ withLabel "seen_tx_hash" incCounter txMetrics
   getSeenHashDB >>= putSeenHashDB . B.insert th ch
