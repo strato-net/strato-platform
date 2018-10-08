@@ -17,24 +17,23 @@ import           Blockchain.Data.RLP
 
 defineFlag "node" ("" :: String) "Server with a running pbft node"
 defineFlag "recipient" ("" :: String) "The recipient address of the validator-to-be-added or to-be-removed"
-defineFlag "nonce" (0 :: Int) "Should be 0 for a first vote"
+defineFlag "nonce" (0 :: Int) "Should be 0 for a first vote. Each nonce from the same sender should be higher than previous nonce"
 defineFlag "remove" (False :: Bool) "The voting direction"
 
 main :: IO()
 main = do
-  s <- $initHFlags "blockstanbul-vote"
-  putStrLn $ "Initiate a new round:" ++ show s
+  _ <- $initHFlags "blockstanbul-vote"
   pkey <- fromMaybe (error "PRIVATE KEY not set") <$> lookupEnv "PRIVATE_KEY"
-  let recipient = Ae.eitherDecodeStrict (C8.pack flags_recipient) :: Either String Address 
+  let eRecipient = Ae.eitherDecodeStrict (C8.pack flags_recipient) :: Either String Address
       pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
-      recipAddr = fromRight (error "Invalid Address") recipient
-      addr = prvKey2Address pk
-  esign <- signBenfInfo pk (recipAddr, flags_remove)
+      recipient = fromRight (error "Invalid Address") eRecipient
+      sender = prvKey2Address pk
+  esign <- signBenfInfo pk (recipient, flags_remove)
   let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
-      vote = API.CandidateReceived{API.sender=addr
+      vote = API.CandidateReceived{API.sender=sender
                                  , API.signature=esignStr
-                                 , API.recipient=recipAddr
+                                 , API.recipient=recipient
                                  , API.votingdir=flags_remove
                                  , API.nonce=flags_nonce}
-  API.uploadVote 8050 flags_node vote
+  API.uploadVote 80 flags_node vote
 
