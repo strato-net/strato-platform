@@ -21,10 +21,10 @@ lookupTxBlocks tHash = M.lookup tHash <$> getTxBlockDB
 
 insertTxBlock :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertTxBlock tHash bHash = do
-  liftIO $ withLabel "txs_block" incCounter txMetrics
+  liftIO $ withLabel "tx_blocks" incCounter txMetrics
   getTxBlockDB >>= putTxBlockDB . M.insert tHash bHash
 
 removeTxBlock :: HasPrivateHashDB m => SHA -> m ()
 removeTxBlock tHash = do
-  liftIO $ withLabel "txs_block_removed" incCounter txMetrics
+  liftIO $ withLabel "tx_blocks_removed" incCounter txMetrics
   getTxBlockDB >>= putTxBlockDB . M.delete tHash

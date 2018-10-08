@@ -3,12 +3,16 @@ module Blockchain.Sequencer.DB.DependentTxDB where
 
 import           Blockchain.SHA
 
+import           Control.Monad
+import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Set                     as S
+import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.Metrics
 
 getDependentTxDB :: HasPrivateHashDB m => m (Map SHA (S.Set SHA))
 getDependentTxDB = dependentTxDB <$> getPrivateHashDB
@@ -21,13 +25,19 @@ lookupDependentTxs bHash = fromMaybe S.empty . M.lookup bHash <$> getDependentTx
 
 insertDependentTx :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertDependentTx bHash tHash = do
+  liftIO $ withLabel "dependent_tx" incCounter txMetrics
   m <- getDependentTxDB
   case M.lookup bHash m of
     Nothing -> putDependentTxDB (M.insert bHash (S.singleton tHash) m)
     Just ths -> putDependentTxDB (M.insert bHash (S.insert tHash ths) m)
 
 insertDependentTxs :: HasPrivateHashDB m => SHA -> S.Set SHA -> m ()
-insertDependentTxs bHash ths = getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
+insertDependentTxs bHash ths = do
+  let num = fromIntegral . S.size $ ths
+  liftIO $ withLabel "dependent_tx" (void . addCounter num) txMetrics
+  getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
 
 clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
-clearDependentTxs bHash = getDependentTxDB >>= putDependentTxDB . M.delete bHash
+clearDependentTxs bHash = do
+  liftIO $ withLabel "dependent_tx_removed" incCounter txMetrics
+  getDependentTxDB >>= putDependentTxDB . M.delete bHash

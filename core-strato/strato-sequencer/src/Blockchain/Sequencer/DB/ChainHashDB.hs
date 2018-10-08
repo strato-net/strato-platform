@@ -27,7 +27,7 @@ lookupChainHash h = M.lookup h <$> getChainHashMap
 
 insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 insertChainHash h cid = do
-  liftIO $ withLabel "insert_chain_hash" incCounter chainMetrics
+  liftIO $ withLabel "insert_chains" incCounter chainMetrics
   getChainHashMap >>= putChainHashMap . M.insert h (False, cid)
 
 useChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
