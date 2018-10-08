@@ -350,65 +350,6 @@ protocols: [ HTTP ]
   get:
    description: Query the storage
 
-/register:
-  description: |
-    handler: RegisterAppR
-  get:
-    description: Confirm that the developer registered an app.
-    queryParameters:
-      p:
-       description: unique id sent the developer in an email.
-       required: true
-       type: string
-
-  post:
-    description: Register a new application.
-    queryParameters:
-      app:
-        description: the name of the application being registered.
-        required: true
-        type: string
-      developer:
-        description: the name of the developer.
-        required: true
-        type: string
-      email:
-        description: the developer's email. This acts, in practice, as the developer's unique id.
-        required: true
-        type: string
-      appurl:
-        description: the URL of the app.
-        required: true
-        type: string
-      repourl:
-        description: the repo of the app.
-        required: false
-        type: string
-      loginpass:
-        description: the password associated with the developer account.
-        required: true
-        type: string
-
-/login:
-  description: |
-    handler: LoginR
-  post:
-    description:
-
-/wallet:
-  description: |
-    handler: WalletR
-  get:
-    description:
-  post:
-    description:
-
-/developer:
-  description: |
-    handler: DeveloperR
-  post:
-    description:
-
 /coinbase:
   description: |
     handler: CoinbaseR

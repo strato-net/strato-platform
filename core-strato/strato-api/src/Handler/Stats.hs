@@ -23,16 +23,6 @@ data Stats = Stats
 
 instance ToJSON Stats
 
-getStatsR :: Handler TypedContent
-getStatsR = selectRep $ do
-    provideRep $
-      defaultLayout $ do
-        setTitle "BlockApps.net - statistics"
-        $(widgetFile "stats")
-    provideJson stats
-  where
-    stats@Stats {..} = Stats "Strato" 1 "genesis"
-
 getStatDiffR :: Handler Value
 getStatDiffR  = do
   bestBlock <- getBestBlock
