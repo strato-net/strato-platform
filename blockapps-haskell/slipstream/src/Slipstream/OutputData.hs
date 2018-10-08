@@ -27,7 +27,6 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 import           BlockApps.Ethereum
-import           Data.List.Split
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -113,8 +112,8 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-enableHistory :: String -> Bool
-enableHistory cName = elem cName $ splitOn "," flags_historyList
+enableHistory :: MonadIO m => IORef Globals -> Text -> m Bool
+enableHistory = isHistoric
 
 --Populate exclusion list
 enableIndexing :: Text -> Bool
@@ -137,6 +136,7 @@ createInserts globalsIORef = do
   globals <- readIORef globalsIORef
   let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
   let tableName = contractName firstContract
+  history <- isHistoric globalsIORef tableName
 
   let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
   let comma = if (length list == 0)
@@ -147,7 +147,8 @@ createInserts globalsIORef = do
 
   liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
-  liftIO $ putStrLn $ "flags_historyList: " ++ show flags_historyList
+  historicContracts <- getHistoryList globalsIORef
+  liftIO $ putStrLn $ "flags_historyList: " ++ show historicContracts
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   when (not $ contractAlreadyCreated) $ do
@@ -165,7 +166,7 @@ createInserts globalsIORef = do
               , "_pkey\" PRIMARY KEY (address, \"chainId\") );" ]
       yield createSt
 
-      when (enableHistory $ T.unpack tableName) $ do
+      when history $ do
         let histSt = T.concat
               [ "create table if not exists \""
               , tableName
@@ -200,7 +201,7 @@ createInserts globalsIORef = do
         return rowSt
   let inserts = T.intercalate ", " vals
 
-  when (enableHistory $ T.unpack tableName) $ do
+  when history $ do
     let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
     yield hist
 

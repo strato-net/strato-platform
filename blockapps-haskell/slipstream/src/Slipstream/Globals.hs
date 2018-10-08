@@ -20,7 +20,8 @@ data Globals =
     createdSources :: Set Keccak256, -- list of source codes that have been compiled and have had their xabis put in the bloc tables
     contractCache :: Map Keccak256 ContractAndXabi, -- maps codehash to metadata
     sourcePtrCache :: Map Keccak256 SS.SourcePtr, -- maps codehash to (source hash, contract name)
-    createdContracts :: Set Keccak256 -- list of contracts that have had their tables made
+    createdContracts :: Set Keccak256, -- list of contracts that have had their tables made
+    historyList :: Set Text
     }
 
 instance Default Globals where
@@ -29,7 +30,8 @@ instance Default Globals where
       createdSources = Set.empty,
       contractCache = Map.empty,
       sourcePtrCache = Map.empty,
-      createdContracts = Set.empty
+      createdContracts = Set.empty,
+      historyList = Set.empty
       }
 
 getAllContracts :: MonadIO m =>
@@ -90,6 +92,18 @@ isContractCreated :: MonadIO m =>
 isContractCreated globalsIORef codeHash = do
   Globals{..} <- liftIO $ readIORef globalsIORef
   return $ codeHash `Set.member` createdContracts
+
+isHistoric :: MonadIO m =>
+              IORef Globals -> Text -> m Bool
+isHistoric globalsIORef name = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ name `Set.member` historyList
+
+getHistoryList :: MonadIO m =>
+                  IORef Globals -> m (Set Text)
+getHistoryList globalsIORef = do
+  g <- liftIO $ readIORef globalsIORef
+  return $ historyList g
 
 data ContractAndXabi =
   ContractAndXabi {
