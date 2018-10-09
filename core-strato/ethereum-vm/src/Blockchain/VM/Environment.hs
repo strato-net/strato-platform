@@ -25,5 +25,4 @@ data Environment =
       envTxHash      :: SHA,
       envChainId     :: Maybe Word256,
       envMetadata    :: Maybe (Map Text Text)
-    }
-
+    } deriving (Show)

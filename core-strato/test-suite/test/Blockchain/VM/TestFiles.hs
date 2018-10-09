@@ -754,7 +754,8 @@ testFiles =
   -- vmTests ++
   -- stateTests ++
   -- homesteadFiles
-  ["./tests/VMTests/vmArithmeticTest/add0.json"]
+  -- ["./tests/VMTests/vmArithmeticTest/add0.json"]
+  [ "./tests/VMTests/vmEnvironmentalInfo/address0.json"]
 
 
 

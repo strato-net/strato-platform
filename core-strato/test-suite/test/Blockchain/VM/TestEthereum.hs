@@ -6,6 +6,7 @@
 module Blockchain.VM.TestEthereum
     ( runAllTests
     , runTest
+    , runTests
     , noLog
     ) where
 
@@ -70,7 +71,7 @@ populateAndConvertAddressState cid owner addressState' = do
   addCode . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
-    \(key, val) -> do putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
+    \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
 
   addressState <- getAddressState owner
 
@@ -80,7 +81,7 @@ populateAndConvertAddressState cid owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
-      (cid)
+      cid
 
 showHexInt::Integer->String
 showHexInt x
@@ -92,7 +93,7 @@ showHexInt x
 
 getDataAndRevertAddressState::Address->AddressState->ContextM AddressState'
 getDataAndRevertAddressState _ addressState = do
-  theCode <- fmap (fromMaybe (error $ "Missing code in getDataAndRevertAddressState: " ++ format addressState)) $
+  theCode <- fromMaybe (error $ "Missing code in getDataAndRevertAddressState: " ++ format addressState) <$>
              getCode (addressStateCodeHash addressState)
 
   -- Copied wholesale from Context.hs:getAllStorageKeyVals'
@@ -103,13 +104,13 @@ getDataAndRevertAddressState _ addressState = do
     let mpdb = (contextStateDB dbs'){stateRoot=addressStateContractRoot addressState}
     kvs <- lift $ unsafeGetKeyVals mpdb ""
     let toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
-    return $ map (fmap $ toInt) kvs :: ContextM [(Key, Integer)]
+    return $ map (fmap toInt) kvs :: ContextM [(Key, Integer)]
 
   return $
     AddressState'
     (addressStateNonce addressState)
     (addressStateBalance addressState)
-    (M.mapKeys (byteString2Integer . nibbleString2ByteString) . M.map (fromIntegral) $ M.fromList storage)
+    (M.mapKeys (byteString2Integer . nibbleString2ByteString) . M.map fromIntegral $ M.fromList storage)
     (Code theCode)
 
 getNumber::String->Integer
@@ -131,8 +132,7 @@ showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code
     show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
          (if M.null s
           then ""
-          else ", " ++ (show $ M.toList $
-               M.map showHexInt $ M.mapKeys showHash s)
+          else (", " ++) . show . M.toList . M.map showHexInt . M.mapKeys showHash $ s
          ) ++
          (if B.null c then "" else ", CODE:[" ++ C.blue (format c) ++ "]")
 showInfo _ = undefined
@@ -142,7 +142,7 @@ addressStates = do
   addrStates <- getAllAddressStates
   let addrs = map fst addrStates
       states = map snd addrStates
-  states' <- mapM (uncurry getDataAndRevertAddressState) $ zip addrs states
+  states' <- zipWithM getDataAndRevertAddressState addrs states
   return $ zip addrs states'
 
 txToOutputTx :: Transaction -> OutputTx
@@ -150,6 +150,8 @@ txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
 runTest::Test-> ContextM ()
 runTest test = do
+  when flags_debugEnabled $
+    liftIO . print $ test
   let cid = chainId $ env test
 
   MP.initializeBlank =<< getStateDB
@@ -186,14 +188,14 @@ runTest test = do
           blockBlockUncles = [] --error "blockUncles not set"
           }
 
-  (result, retVal, gasRemaining, returnedCallCreates, _) <-
+  (result, retVal, gasRemaining, _, returnedCallCreates, _) <-
     case theInput test of
       IExec exec -> do
 
         let env' =
               Environment{
                 envGasPrice = getNumber $ gasPrice' exec,
-                envBlockHeader = blockBlockData $ block,
+                envBlockHeader = blockBlockData block,
                 envOwner = address' exec,
                 envOrigin = origin exec,
                 envInputData = theData $ data' exec,
@@ -216,11 +218,14 @@ runTest test = do
             runCodeFromStart
 
             vmState2 <- lift get
-            when flags_debugEnabled $ do
+            when flags_debugEnabled $
               liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
                                 intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
 
-            forM_ (suicideList vmState2) $ deleteAddressState
+            forM_ (suicideList vmState2) deleteAddressState
+        when flags_debugEnabled $ do
+          liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ result
+          liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ vmState1
 
         put $ dbs vmState1
 
@@ -228,8 +233,8 @@ runTest test = do
         flushMemAddressStateDB
 
         case vmException vmState1 of
-         Nothing -> return (result, returnVal vmState1, vmGasRemaining vmState1, debugCallCreates vmState1, Just vmState1)
-         Just _ -> return (Right (), Nothing, 0, Just [], Nothing)
+         Nothing -> return (result, returnVal vmState1, vmGasRemaining vmState1, logs vmState1, debugCallCreates vmState1, Just vmState1)
+         Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of
@@ -255,16 +260,17 @@ runTest test = do
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
-          runExceptT $ addTransaction True (blockBlockData $ block) (currentGasLimit $ env test) signedTransaction
+          runExceptT $ addTransaction True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
+        when flags_debugEnabled $
+          liftIO . putStrLn . ("addTransaction: " ++) . show $ result
 
         flushMemStorageDB
         flushMemAddressStateDB
 
-        case result of
-            Right (ExecResults remGas _ retVal _ rLogs _ _ _) -> do
-              return ( Right (), retVal, remGas, rLogs, Just [], Nothing)
-            Left _ -> do
-              return (Right (), Nothing, 0, Just [], Nothing)
+        return $ case result of
+            Right (ExecResults remGas _ retVal _ rLogs _ _ _) ->
+                      (Right (), retVal, remGas, rLogs, Just [], Nothing)
+            Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates
 
@@ -284,15 +290,13 @@ runTest test = do
   RawData (fromMaybe B.empty retVal) `shouldBe` out test
   unless (null postTest && isLeft result) $
     afterAddressStates `shouldBe` postTest
-  _ <- case remainingGas test of
-    Nothing -> return ()
-    Just wantGas -> gasRemaining `shouldBe` wantGas
+  mapM_ (gasRemaining `shouldBe`) $ remainingGas test
   if isNothing (callcreates test)
       then returnedCallCreates `shouldBe` Just []
       else fmap reverse returnedCallCreates `shouldBe` callcreates test
 
 runTests::[(String, Test)]->ContextM ()
-runTests tests = do
+runTests tests =
     forM_ tests $ \(_, test) -> runTest test
 
 runAllTests::Maybe String->Maybe String->ContextM ()
@@ -308,14 +312,14 @@ runAllTests maybeFileName maybeTestName= do
       runTestsInFile maybeTestName theFile
 
 runTestsInFile::Maybe String->BL.ByteString->ContextM ()
-runTestsInFile maybeTestName theFile = do
+runTestsInFile maybeTestName theFile =
 
-  case fmap fromJSON $ eitherDecode theFile::Either String (Result Tests) of
+  case fromJSON <$> eitherDecode theFile::Either String (Result Tests) of
     Left err -> liftIO $ putStrLn err
     Right val ->
       case val of
         Error err'    -> liftIO $ putStrLn err'
-        Success tests -> runTests (filter ((matchName maybeTestName) . fst) (M.toList tests))
+        Success tests -> runTests (filter (matchName maybeTestName . fst) (M.toList tests))
   where
     matchName::Maybe String->String->Bool
     matchName Nothing _    = True

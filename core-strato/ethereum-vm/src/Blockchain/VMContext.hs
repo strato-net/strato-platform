@@ -104,7 +104,11 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        }
 makeLenses ''Context
 
+
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+
+instance Show Context where
+  show = const "<context>"
 
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
@@ -209,7 +213,7 @@ instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
 runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
-                   StateT Context (StatsT (ResourceT m)) a -> m (a, Context)
+                   StateT Context (ResourceT m) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
     runResourceT $ do
@@ -238,11 +242,17 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                    conn
                    M.empty
                    M.empty
+                   MP.emptyTriePtr
+                   MP.emptyTriePtr
+                   (SHA 0)
+                   Nothing
                    defaultBaggerState
                    initialKafkaState
                    Unspecified
                    redisPool
-                   [] [] [])
+                   [] [] []
+                   False
+                   False)
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
