@@ -172,6 +172,9 @@ blockstanbulSend msgs = do
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
         vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+              ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
+
+
     unless (null blocks) $ do
       let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
       dt <- asks blockstanbulBlockPeriod
