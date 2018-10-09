@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Metrics where
 
 import Prometheus
