@@ -187,6 +187,17 @@ spec = parallel $ do
         got <- sendMessages [IMsg auth $ Preprepare curView{_round = 3} blk]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21]
 
+    it "round-changes and finds a gap from a future preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= sender auth
+        validators .= S.fromList [sender auth]
+        got <- sendMessages [IMsg auth $ Preprepare (View 347 400000) blk]
+        let omsgs = [o | o@(OMsg _ _) <- got]
+            other = got \\ omsgs
+        map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
+        other `shouldMatchList` [GapFound 18 400000]
+
+
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->
       runTest $ do

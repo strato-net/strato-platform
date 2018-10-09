@@ -277,6 +277,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                  "view mismatch (us, sender): " ++ format (v, v')
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+              when (_sequence v < _sequence v') $ do
+                let intSeq = fromIntegral . _sequence
+                yield $ GapFound (intSeq v) (intSeq v')
               roundChange
            | otherwise -> do
                blockcount += 1
@@ -424,3 +427,4 @@ recordOutEvent = \case
                 ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter outEventMetric
                 MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter outEventMetric
                 ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter outEventMetric
+                GapFound{} -> liftIO $ withLabel "gap_found" incCounter outEventMetric
