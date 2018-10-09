@@ -188,13 +188,14 @@ nextRound nt = do
    --update validators list
   val <- uses validators S.toList
   vot <- use voted
-  validators .= (S.fromList $ updateValidator val vot)
+  validators .= S.fromList (updateValidator val vot)
 
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
       view . round .= r
       yield $ ResetTimer r
+  use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals

@@ -1,7 +1,8 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards}
 module Blockchain.Blockstanbul.Metrics where
 
-import           Prometheus
+import Prometheus
+import Blockchain.Blockstanbul.Messages
 
 inEventMetric :: Metric (Vector String Counter)
 inEventMetric = unsafeRegisterIO
@@ -15,3 +16,13 @@ outEventMetric = unsafeRegisterIO
                . counter
                $ Info "pbft_outevent" "Count of pbft outEvent"
 
+currentView :: Metric (Vector String Gauge)
+currentView = unsafeRegisterIO
+            . vector "view_field"
+            . gauge
+            $ Info "pbft_current_view" "Current (Roundno, Seqno) of PBFT"
+
+recordView :: (MonadMonitor m) => View -> m ()
+recordView View{..} = do
+  withLabel "round_number" (setGauge _round) currentView
+  withLabel "sequence_number" (setGauge _sequence) currentView
