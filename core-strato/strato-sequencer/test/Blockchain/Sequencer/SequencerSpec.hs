@@ -5,6 +5,7 @@ module Blockchain.Sequencer.SequencerSpec where
 
 
 import           ClassyPrelude                       (atomically)
+import           Data.IORef
 import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (singleton,lookup)
@@ -19,6 +20,7 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
+import           Control.Monad.State.Class
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
@@ -214,13 +216,17 @@ spec = do
         drainP2P `shouldReturn` evs2
         drainP2P `shouldReturn` []
 
-      it "queues timeouts" $ runTestM $ do
+      it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
-        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $
+        local (\cfg -> cfg{blockstanbulRoundPeriod=0.00005}) $
           mapM_ createNewTimer input
-        liftIO $ threadDelay 200 -- Who are you to judge?
+        liftIO $ threadDelay 10000 -- Who are you to judge?
+        rnref <- gets _latestRoundNumber
+        liftIO $ atomicWriteIORef rnref 200
         out <- drainTimeouts
-        out `shouldMatchList` input
+        filter (==20) out `shouldBe` [20]
+        filter (==30) out `shouldBe` [30]
+        filter (==45) out `shouldContain` [45, 45, 45]
 
       it "checks for votes" $ runPBFTTestM $ do
         bc <- getBlockstanbulContext
