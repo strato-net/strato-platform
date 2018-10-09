@@ -38,13 +38,12 @@ data Action = Action
   , actionTxSender        :: Address
   , actionAddress         :: Address
   , actionCodeHash        :: Keccak256
-  , actionSourcePtr       :: Maybe SourcePtr
   , actionStorage         :: Maybe (Map (Hex Word256) (Hex Word256))
+  , actionMetadata        :: Maybe (Map Text Text)
   } deriving (Show, Generic)
 
 instance FromJSON Action
 instance FromJSON ActionType
-instance FromJSON SourcePtr
 instance FromJSONKey (Hex Word256) where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
@@ -71,8 +70,11 @@ formatAction Action{..} = T.concat
   , "    codeHash = "
   , tshow actionCodeHash
   , "\n"
-  , "    sourcePtr = "
-  , tshow actionSourcePtr
+  , "    storage   = "
+  , tshow actionStorage
+  , "\n"
+  , "    metadata  = "
+  , tshow actionMetadata
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show

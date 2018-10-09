@@ -166,8 +166,6 @@ instance ToSchema Account where
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountChainId        = Nothing
           , accountLatestBlockNum = 23
-          , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
-          , accountContractName   = Just "SimpleStorage"
           }
 
 instance ToSchema Difficulty
@@ -365,8 +363,6 @@ data Account = Account
   , accountCodeHash       :: Keccak256
   , accountChainId        :: Maybe ChainId
   , accountLatestBlockNum :: Natural
-  , accountSource         :: Text
-  , accountContractName   :: Maybe Text
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Account where

@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
 module Blockchain.Data.GenesisBlock (
@@ -18,7 +19,6 @@ import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.List.Split                      (chunksOf)
-import           Data.Text.Encoding                   (encodeUtf8)
 import           Data.Time.Clock.POSIX
 import           Numeric
 
@@ -200,65 +200,43 @@ initializeChainDBs :: ( MonadResource m
                       , HasStorageDB m
                       )
                    => Ext.Word256
+                   -> ChainInfo
                    -> StateRoot
                    -> m ()
-initializeChainDBs chainId sRoot = emitInitialStateDiff [] (SHA 0) (Just chainId) sRoot
-
-emitInitialStateDiff :: ( MonadResource m
-                        , HasCodeDB m
-                        , HasHashDB m
-                        , Mem.HasMemAddressStateDB m
-                        , RBDB.HasRedisBlockDB m
-                        , HasSQLDB m
-                        , HasStateDB m
-                        , HasStorageDB m
-                        )
-                     => [(AccountInfo, CodeInfo)]
-                     -> SHA
-                     -> Maybe Ext.Word256
-                     -> StateRoot
-                     -> m ()
-emitInitialStateDiff srcInfo bHash chainId sRoot = do
+initializeChainDBs chainId ChainInfo{..} sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
-      StateDiff.chainId   = chainId,
+      StateDiff.chainId   = Just chainId,
       blockNumber         = 0,
-      StateDiff.blockHash = bHash,
+      StateDiff.blockHash = SHA 0,
       StateDiff.stateRoot = sRoot,
       createdAccounts     = accountDiffs,
       deletedAccounts     = Map.empty,
       updatedAccounts     = Map.empty
   }
-  commitSqlDiffs diff (const "") (const "")
-  let writeSource (account, CodeInfo _ src name) = case account of
-          NonContract _ _ -> return ()
-          ContractNoStorage addr _ _ -> updateSource chainId addr name src
-          ContractWithStorage addr _ _ _ -> updateSource chainId addr name src
-      toSourcePtr (account, CodeInfo _ src name) = case account of
-          NonContract _ _ -> Nothing
-          ContractNoStorage _ _ c -> Just (c,(superProprietaryStratoSHAHash $ encodeUtf8 src, name))
-          ContractWithStorage _ _ c _ -> Just (c,(superProprietaryStratoSHAHash $ encodeUtf8 src, name))
-      sourcePtrs = Map.fromList . catMaybes $ map toSourcePtr srcInfo
-      getSourcePtr = fmap (uncurry A.SourcePtr) . flip Map.lookup sourcePtrs
+  commitSqlDiffs diff
+  let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
+        let cHash = hash $ codeInfoCode ci
+            md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
+         in (cHash, md)
+      getMetadata = flip Map.lookup metadatas
       toAction a d = A.Action
         { A.actionType = A.Create
         , A.actionBlockHash = SHA 0
         , A.actionBlockTimestamp = posixSecondsToUTCTime 0
         , A.actionBlockNumber = 0
-        , A.actionTxHash = SHA $ fromMaybe 0 chainId
-        , A.actionTxChainId = chainId
+        , A.actionTxHash = SHA chainId
+        , A.actionTxChainId = Just chainId
         , A.actionTxSender = Ad.Address 0
         , A.actionAddress = a
         , A.actionCodeHash = codeHash d
-        , A.actionSourcePtr = getSourcePtr $ codeHash d
         , A.actionStorage = Just . Map.map fromDiff $ storage d
+        , A.actionMetadata = getMetadata (codeHash d)
         }
       fromDiff (Value v) = v
       squashMap f = map (uncurry f) . Map.toList
       actions = squashMap toAction accountDiffs
-
-  forM_ srcInfo writeSource
   mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
   case filterResponse <$> mErr of
     Right [] -> return ()

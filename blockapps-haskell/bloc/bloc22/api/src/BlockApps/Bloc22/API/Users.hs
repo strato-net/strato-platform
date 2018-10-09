@@ -109,7 +109,8 @@ instance ToSample BlocTransactionData where
       , contractdetailsAddress    = Just (Named "Latest")
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
-      , contractdetailsName       = "Contract Name"
+      , contractdetailsName       = "Example"
+      , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
       , contractdetailsChainId    = Nothing
       }

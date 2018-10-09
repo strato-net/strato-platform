@@ -53,8 +53,6 @@ AddressStateRef
     codeHash SHA
     chainId Word256 Maybe
     latestBlockDataRefNumber Integer
-    source String
-    contractName String
     deriving Eq Read Show
 
 RawTransaction

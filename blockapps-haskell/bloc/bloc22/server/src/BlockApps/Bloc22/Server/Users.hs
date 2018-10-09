@@ -260,15 +260,15 @@ postUsersUploadList' ContractListParameters{..} sign = do
       (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           (names, cmIds, fIds) <- get
-          (bin, cmId, names') <- case Map.lookup name names of
-            Just (b, cm) -> return (b, cm, names)
+          (bin, src, cmId, names') <- case Map.lookup name names of
+            Just (b, src, cm) -> return (b, src, cm, names)
             Nothing -> do
-              (b16,cm) <- lift $ blocQuery1 $ proc () -> do
-                (bin16,_,_,_,_,cmId') <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,cmId')
+              (b16,src,cm) <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,src,cmId')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              return (b, cm, Map.insert name (b, cm) names)
+              return (b, src, cm, Map.insert name (b, src, cm) names)
           (mFunctionId, cmIds') <- case Map.lookup cmId cmIds of
             Just fId -> return (fId, cmIds)
             Nothing -> do
@@ -282,7 +282,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          let metadata = Just $ Map.fromList [("name",name)]
+          let metadata = Just $ Map.fromList [("src",src),("name",name)]
           tx <- lift . signAndPrepare sign fromAddr metadata $
               TransactionHeader
                 Nothing
@@ -391,7 +391,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
             Just cmId -> return (cmId, names)
             Nothing -> do
               (mapKey' :: Int32) <- lift $ blocQuery1 $ proc () -> do
-                (_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
+                (_,_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< cmId
               return (mapKey', Map.insert methodcallContractName mapKey' names)
           (contract', cmIds') <- case Map.lookup mapKey cmIds of
@@ -654,7 +654,7 @@ contractResult hash mtxr cmId name index = do
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
       xs::[Int32] <- lift $ blocQuery $ proc () -> do
-        (cmId',_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
+        (cmId',_,_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
         returnA -< cmId'
       if (isNothing $ listToMaybe xs)
         then do

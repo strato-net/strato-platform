@@ -38,7 +38,7 @@ import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
-import           Data.Text.Encoding                      (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -97,8 +97,6 @@ import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
-
-import qualified Blockchain.Strato.Model.SHA             as H
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -223,9 +221,7 @@ addBlocks blocks' = do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        let codeSource = getSource False
-            codeContractName = getContractName False
-        calculateAndEmitStateDiffs theBlock oldHeader codeSource codeContractName
+        calculateAndEmitStateDiffs theBlock oldHeader
       return $ concat actions
 
   where
@@ -484,18 +480,14 @@ outputTransactionResult :: BlockData
                         -> TxRunResult
                         -> ContextM [Action]
 outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
-  let stateRt = MP.StateRoot $ blockHeaderStateRoot b
-  let codeSource = getSource False stateRt
-  let codeContractName = getContractName False stateRt
-  let
-    (txrStatus, message, gasRemaining) =
-      case result of
-        Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
-        Right r  -> case erException r of
-                      Nothing -> (Success, "Success!", erRemainingTxGas r)
-                      Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
-    gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
-    etherUsed = gasUsed * fromInteger (transactionGasPrice t)
+  let (txrStatus, message, gasRemaining) =
+        case result of
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
+          Right r  -> case erException r of
+                        Nothing -> (Success, "Success!", erRemainingTxGas r)
+                        Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+      gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
+      etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   if not flags_createTransactionResults
     then return []
@@ -506,28 +498,23 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
           afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
-
-      --mpdb <- getStateDB
-      --addrDiff <- addrDbDiff mpdb stateRootBefore stateRootAfter
-
-      let (response, theTrace', theLogs) =
+          defaultNewAddrs = S.toList modified
+          moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
+          moveToFront _ = defaultNewAddrs
+          ranBlockHash = hashFunction b
+          sDiffs = either (const M.empty) erStorageDiffs result
+          mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+          (response, theTrace', theLogs) =
             case result of
               Left _ -> ("", [], []) --TODO keep the trace when the run fails
               Right r ->
                 (BC.unpack $ B16.encode $ fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
-
-      let defaultNewAddrs = S.toList modified
-          moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
-          moveToFront _ = defaultNewAddrs
 
       newAddresses <-
           case result of
               Left _ -> return []
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
-      let ranBlockHash = hashFunction b
-          sDiffs = either (const M.empty) erStorageDiffs result
-          mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
       enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
@@ -551,10 +538,6 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
         then return []
         else forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a
-          src <- codeSource addressStateCodeHash
-          let srcHash = H.superProprietaryStratoSHAHash $ encodeUtf8 src
-          contName <- codeContractName addressStateCodeHash
-          let sPtr = Just SourcePtr{sourceHash = srcHash, contractName = contName}
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
@@ -565,8 +548,8 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                      signer
                      a
                      addressStateCodeHash
-                     sPtr
                      (Just s)
+                     (transactionMetadata t)
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
@@ -660,10 +643,8 @@ splitCreateDiffs =
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> BlockData
-                           -> (MP.StateRoot -> SHA -> ContextM T.Text)
-                           -> (MP.StateRoot -> SHA -> ContextM T.Text)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
     let oldHash      = blockHeaderHash oldHeader
         oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
         newHeader    = blockHeader newBlock
@@ -677,23 +658,6 @@ calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
     let allDiffs = (diffs : chainDiffs)
-        allNewCodeHashes = splitCreateDiffs allDiffs
 
-    codeSourceMap <- fmap M.fromList $
-      forM allNewCodeHashes $ \(sr,codeHash) -> do
-        codeSrc <- codeSource sr codeHash
-        return (codeHash, (codeSrc, superProprietaryStratoSHAHash $ encodeUtf8 codeSrc))
-
-    codeNameMap <- fmap M.fromList $
-      forM allNewCodeHashes $ \(sr,codeHash) -> do
-        codeName <- codeContractName sr codeHash
-        return (codeHash, codeName)
-
-    let
-      codeSource' x = fst $
-          M.findWithDefault (error $ "missing code hash in codeSource map: " ++ format x) x codeSourceMap
-
-    let codeContractName' x =
-          M.findWithDefault (error "missing code hash in codeContractName map") x codeNameMap
     forM_ allDiffs $ \diff -> do
-      when flags_sqlDiff $ commitSqlDiffs diff codeSource' codeContractName'
+      when flags_sqlDiff $ commitSqlDiffs diff
