@@ -21,7 +21,8 @@ data Globals =
     contractCache :: Map Keccak256 ContractAndXabi, -- maps codehash to metadata
     sourcePtrCache :: Map Keccak256 SS.SourcePtr, -- maps codehash to (source hash, contract name)
     createdContracts :: Set Keccak256, -- list of contracts that have had their tables made
-    historyList :: Set Text
+    historyList :: Set Text,
+    noIndexList :: Set Text
     }
 
 instance Default Globals where
@@ -31,14 +32,13 @@ instance Default Globals where
       contractCache = Map.empty,
       sourcePtrCache = Map.empty,
       createdContracts = Set.empty,
-      historyList = Set.empty
+      historyList = Set.empty,
+      noIndexList = Set.empty
       }
 
 getAllContracts :: MonadIO m =>
                    IORef Globals -> m (Map Keccak256 ContractAndXabi)
-getAllContracts globalsIORef = do
-  Globals{..} <- liftIO $ readIORef globalsIORef
-  return contractCache
+getAllContracts = fmap contractCache . liftIO . readIORef
 
 storeCachedContract :: MonadIO m =>
                        IORef Globals -> Keccak256 -> ContractAndXabi -> m ()
@@ -46,7 +46,6 @@ storeCachedContract globalsIORef sourceCodeHash c = do
   globals@Globals{..} <- liftIO $ readIORef globalsIORef
   liftIO $ writeIORef globalsIORef
     globals{contractCache=Map.insert sourceCodeHash c contractCache}
-
 
 setSourceCreated :: MonadIO m =>
                     IORef Globals -> Keccak256 -> m ()
@@ -101,9 +100,17 @@ isHistoric globalsIORef name = do
 
 getHistoryList :: MonadIO m =>
                   IORef Globals -> m (Set Text)
-getHistoryList globalsIORef = do
-  g <- liftIO $ readIORef globalsIORef
-  return $ historyList g
+getHistoryList = fmap historyList . liftIO . readIORef
+
+shouldIndex :: MonadIO m =>
+              IORef Globals -> Text -> m Bool
+shouldIndex globalsIORef name = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return . not $ name `Set.member` noIndexList
+
+getNoIndexList :: MonadIO m =>
+                  IORef Globals -> m (Set Text)
+getNoIndexList = fmap noIndexList . liftIO . readIORef
 
 data ContractAndXabi =
   ContractAndXabi {

@@ -61,16 +61,28 @@ getChainInfo chainId = do
           where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
                 ai = \aInfo ->
                         let AccountInfoRef{..} = entityVal aInfo
-                         in if accountInfoRefCodeHash == Nothing
-                              then NonContract accountInfoRefAddress accountInfoRefBalance
-                              else if accountInfoRefMap == Nothing
-                                then ContractNoStorage accountInfoRefAddress accountInfoRefBalance
-                                    (fromJust accountInfoRefCodeHash)
-                                else ContractWithStorage accountInfoRefAddress accountInfoRefBalance
-                                  (fromJust accountInfoRefCodeHash) (fromJust accountInfoRefMap)
+                            acc | isNothing accountInfoRefCodeHash
+                                    = NonContract
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                | isNothing accountInfoRefMap
+                                    = ContractNoStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                | otherwise
+                                    = ContractWithStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                        (fromJust accountInfoRefMap)
+                         in acc
                 ci = \codeInfo ->
                         let CodeInfoRef{..} = entityVal codeInfo
-                         in CodeInfo codeInfoRefEvmByteCode (T.pack codeInfoRefContractCode) (T.pack codeInfoRefContractName)
+                         in CodeInfo
+                              codeInfoRefEvmByteCode
+                              (T.pack codeInfoRefContractCode)
+                              (T.pack codeInfoRefContractName)
 
 getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do

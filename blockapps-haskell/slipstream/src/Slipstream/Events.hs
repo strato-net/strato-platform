@@ -10,16 +10,12 @@ module Slipstream.Events where
 
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
-import           GHC.Generics
 import qualified BlockApps.Solidity.Value as V
 import           BlockApps.Ethereum (Keccak256, Address)
-import            Data.Time
+import           Data.Time
 
 type StateRoot = Text
 
-newtype SHA = SHA Integer deriving (Eq, Read, Show, Ord, Generic)
-
--- | Not a type, but a data kind
 data Detail = Incremental | Eventual
 
 data ProcessedContract = ProcessedContract {

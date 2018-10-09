@@ -20,12 +20,14 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.Foldable
+import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Pool
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -47,7 +49,7 @@ import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
 
 import Slipstream.Data.Action (Action)
-import qualified Slipstream.Data.Action as A
+import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
@@ -76,13 +78,13 @@ emptyHash = keccak256 B.empty
 getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either String ContractAndXabi)
 getContract name hash chainId = do
   if(hash == emptyHash)
-    then return $ (Left "noncontract accounts should have empty statediffs")
+    then return $ (Left "getContract called for an external account")
     else do
       xabi <- getContractXabi (ContractName name) (Named name) chainId
 
       return $ Right ContractAndXabi {
         contract = xAbiToContract xabi
-        , xabi = T.pack . show $ JSON.toJSON xabi
+        , xabi = decodeUtf8 . BL.toStrict $ JSON.encode xabi
         , name = name
         , contractStored = False
         , contractSchema = Nothing
@@ -91,7 +93,7 @@ getContract name hash chainId = do
 getContractCompileFullSource :: Address -> Keccak256 -> Maybe ChainId->Bloc (Either String ContractAndXabi)
 getContractCompileFullSource address hash chainId = do
   if (hash == emptyHash)
-    then return $ (Left "noncontract accounts should have empty statediffs")
+    then return $ (Left "getContractCompileFullSource called for an external account")
     else do
       contractDetails <- getContractDetailsByAddressOnly address chainId
 
@@ -105,51 +107,40 @@ getContractCompileFullSource address hash chainId = do
       return $ (Right ret)
 
 storageToFunction :: Map (Hex Word256) (Hex Word256) -> Storage
-storageToFunction s k =
-  case Map.lookup k (Map.mapKeys unHex s)  of
-   Nothing -> 0
-   Just x -> unHex x
+storageToFunction s k = maybe 0 unHex . Map.lookup k $ Map.mapKeys unHex s
 
 hasContract::Action->Bool
-hasContract action =
-  if (A.actionCodeHash action == emptyHash)
-    then False
-    else True
+hasContract = (/= emptyHash) . actionCodeHash
 
 storageToList :: BA.Storage -> (Hex Word256, Hex Word256)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
 
 addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded action'@A.Action{..} | actionType == A.Update = do
+addStorageIfNeeded action'@Action{..} | actionType == Update = do
   storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show actionAddress
                                                          , qsChainId = actionTxChainId
                                                          }
-  return $ action'{A.actionStorage = Just . Map.fromList $ map storageToList storage'}
+  return $ action'{actionStorage = Just . Map.fromList $ map storageToList storage'}
 addStorageIfNeeded action = return action
 
-matchAction :: A.Action -> A.Action -> Bool
-matchAction (A.Action (A.Create) _ _ _ _ _ _ _ x _ _) (A.Action (A.Create) _ _ _ _ _ _ _ y _ _) = x == y
-matchAction (A.Action _ _ _ _ _ _ _ _ _ _ _) (A.Action _ _ _ _ _ _ _ _ _ _ _) = False
+isSameCreateAs :: Action -> Action -> Bool
+isSameCreateAs x y = (((&&) `on` ((== Create) . actionType)) x y) && (((==) `on` actionCodeHash) x y)
 
-smashIt :: [Action] -> [Action] -> [[Action]] -> [[Action]]
-smashIt [] _ final = final
-smashIt (x:y:rest) tmp final = do
-  let newTmp = if (length tmp == 0)
-      then [x]
-      else tmp ++ [x]
-  case (matchAction x y) of
-    True -> smashIt ([y] ++ rest) newTmp final
-    False -> smashIt ([y] ++ rest) [] (final ++ [newTmp])
-smashIt (x:[]) tmp final =
-  if (null tmp)
-    then (final ++ [[x]])
-    else final ++ [tmp ++ [x]]
+groupSimilarActions :: [Action] -> [[Action]]
+groupSimilarActions as = go as [] []
+  where
+    go [] _ final = final
+    go [x] tmp final = final ++ [tmp ++ [x]]
+    go (x:y:rest) tmp final =
+      let newTmp = tmp ++ [x]
+       in if isSameCreateAs x y
+            then go (y:rest) newTmp final
+            else go (y:rest) [] (final ++ [newTmp])
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
 
-  let tempChanges = map (toAction . BL.fromStrict) messages
-  let changes = smashIt tempChanges [] []
+  let changes = groupSimilarActions $ map (toAction . BL.fromStrict) messages
 
   unless (null messages) $
     debugM "processTheMessages" . unlines . map show $ messages
@@ -197,8 +188,8 @@ processTheMessages messages conn g = do
   _ <- enterBloc2 env $ do
     forM (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
-        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", A.formatAction row]
-        A.Action{..} <- addStorageIfNeeded row
+        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+        Action{..} <- addStorageIfNeeded row
 
         sourcePtr' <-
           case actionSourcePtr of
@@ -209,14 +200,13 @@ processTheMessages messages conn g = do
               getCachedSourcePtr g actionCodeHash
 
         maybeCachedContract <- getCachedContract g actionCodeHash
-        sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
-        let addr = Address . fst . head . readHex $ show actionAddress
+        sourceIsCreated <- maybe (return False) (isSourceCreated g . sourceptrSourceHash) sourcePtr'
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
-                 let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
+                 let contName = maybe (error "name missing from sourcePtr") sourceptrContractName sourcePtr'
                  contractOrError <- getContract contName actionCodeHash actionTxChainId
                  case contractOrError of
                   Left e -> error e
@@ -230,8 +220,8 @@ processTheMessages messages conn g = do
                    , ", src:"
                    , tshow sourcePtr'
                    ]
-                 contractOrError <- getContractCompileFullSource addr actionCodeHash actionTxChainId
-                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
+                 contractOrError <- getContractCompileFullSource actionAddress actionCodeHash actionTxChainId
+                 traverse_ (setSourceCreated g . sourceptrSourceHash ) sourcePtr'
                  liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
                  case contractOrError of
                   Left e -> error e
@@ -259,11 +249,11 @@ processTheMessages messages conn g = do
                                  contractName = strName,
                                  chain = chain,
                                  contractData = ret,
-                                 blockHash = actionBlockHash,          -- Keccak256
-                                 blockTimestamp = actionBlockTimestamp,     -- UTCTime
-                                 blockNumber = actionBlockNumber,        -- Integer
-                                 transactionHash = actionTxHash,    -- Keccak256
-                                 transactionSender = actionTxSender  -- Address
+                                 blockHash = actionBlockHash,
+                                 blockTimestamp = actionBlockTimestamp,
+                                 blockNumber = actionBlockNumber,
+                                 transactionHash = actionTxHash,
+                                 transactionSender = actionTxSender
                                }
 
       if (length processedList > 0) then liftIO $ convertRet processedList conn g else return()

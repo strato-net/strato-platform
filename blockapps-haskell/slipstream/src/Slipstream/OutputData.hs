@@ -112,13 +112,6 @@ isFunction :: Value -> Bool
 isFunction (ValueFunction _ _ _) = False
 isFunction (_) = True
 
-enableHistory :: MonadIO m => IORef Globals -> Text -> m Bool
-enableHistory = isHistoric
-
---Populate exclusion list
-enableIndexing :: Text -> Bool
-enableIndexing cName = notElem cName ["SimpleStorageNoIndexing"]
-
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
 
@@ -148,7 +141,7 @@ createInserts globalsIORef = do
   liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
   historicContracts <- getHistoryList globalsIORef
-  liftIO $ putStrLn $ "flags_historyList: " ++ show historicContracts
+  liftIO . debugM "historicContracts" $ show historicContracts
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   when (not $ contractAlreadyCreated) $ do
@@ -177,9 +170,9 @@ createInserts globalsIORef = do
         yield histSt
       _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
       return ()
-  vals <- forM metadata $ \row -> do
+  let vals = flip map metadata $ \row ->
         let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-        let rowSt = T.concat
+         in T.concat
               [ "('"
               , tshow $ address row
               , "', '"
@@ -198,14 +191,14 @@ createInserts globalsIORef = do
               , comma
               , listToValueStatement ", " rowList
               , ")" ]
-        return rowSt
   let inserts = T.intercalate ", " vals
 
   when history $ do
     let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
     yield hist
 
-  when (enableIndexing tableName) $ do
+  index <- shouldIndex globalsIORef tableName
+  when index $ do
     let ins = T.concat
           [ "insert into \""
           , tableName

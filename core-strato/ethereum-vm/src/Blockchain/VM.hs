@@ -29,6 +29,7 @@ import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (decodeUtf8)
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -1007,7 +1008,7 @@ getFromSelector sel isRunningTests' sr codeHash = do
   setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""
-    Right ret -> return . T.pack . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
+    Right ret -> return . decodeUtf8 . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
 
 create :: Bool
        -> Bool

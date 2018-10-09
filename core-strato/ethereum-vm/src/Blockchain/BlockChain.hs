@@ -560,7 +560,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                      addressStateCodeHash
                      sPtr
                      (Just s)
-        void . withKafkaViolently $ writeJSONToKafka actions
+        void . withKafkaViolently $ writeActionJSONToKafka actions
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
@@ -657,7 +657,7 @@ calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData 
                            -> (MP.StateRoot -> SHA -> ContextM T.Text)
                            -> (MP.StateRoot -> SHA -> ContextM T.Text)
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when (flags_sqlDiff || flags_diffPublish) $ do
+calculateAndEmitStateDiffs newBlock oldHeader codeSource codeContractName = when flags_sqlDiff $ do
     let oldHash      = blockHeaderHash oldHeader
         oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
         newHeader    = blockHeader newBlock

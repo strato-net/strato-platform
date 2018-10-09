@@ -53,7 +53,7 @@ import           Blockchain.Util
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation, writeJSONToKafka, filterResponse)
+import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation, writeActionJSONToKafka, filterResponse)
 
 import           Blockchain.MilenaTools               (commitSingleOffset)
 import           Blockchain.Sequencer.Bootstrap       (bootstrapSequencer)
@@ -225,7 +225,7 @@ populateStorageDBs getSourceHash genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs (statediff fullAccountDiffs) (const "") (const "")
-      mErr <- liftIO . runKafkaConfigured "strato-init" $ writeJSONToKafka filteredActions
+      mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
       case filterResponse <$> mErr of
        Right [] -> return ()
        Right errs -> error . show $ errs
