@@ -24,5 +24,5 @@ currentView = unsafeRegisterIO
 
 recordView :: (MonadMonitor m) => View -> m ()
 recordView View{..} = do
-  withLabel "round_number" (setGauge _round) currentView
-  withLabel "sequence_number" (setGauge _sequence) currentView
+  withLabel "round_number" (setGauge . fromIntegral $ _round) currentView
+  withLabel "sequence_number" (setGauge . fromIntegral $ _sequence) currentView
