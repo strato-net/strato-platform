@@ -29,7 +29,7 @@ import Blockchain.Format
 import Blockchain.SHA
 import qualified Network.Haskoin.Crypto as HK
 
-type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m, MonadLogger m, MonadMonitor m)
+type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m, MonadLogger m)
 
 data NextType = Round RoundNumber | Sequence SequenceNumber
 

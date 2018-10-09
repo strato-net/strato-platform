@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Metrics where
 
+import Control.Monad.IO.Class
 import Prometheus
 import Blockchain.Blockstanbul.Messages
 
@@ -22,7 +23,7 @@ currentView = unsafeRegisterIO
             . gauge
             $ Info "pbft_current_view" "Current (Roundno, Seqno) of PBFT"
 
-recordView :: (MonadMonitor m) => View -> m ()
-recordView View{..} = do
+recordView :: (MonadIO m) => View -> m ()
+recordView View{..} = liftIO $ do
   withLabel "round_number" (setGauge . fromIntegral $ _round) currentView
   withLabel "sequence_number" (setGauge . fromIntegral $ _sequence) currentView
