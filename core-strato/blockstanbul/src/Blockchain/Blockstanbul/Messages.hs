@@ -105,6 +105,10 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
+                -- Announce that the global consensus is ahead of us by
+                -- some number of blocks, and hope that a higher power
+                -- will erase the gap with PreviousBlocks.
+              | GapFound {have :: Integer, require :: Integer}
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
