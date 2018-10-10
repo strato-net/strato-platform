@@ -48,8 +48,8 @@ import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
 
-import Slipstream.Data.Action (Action)
-import Slipstream.Data.Action
+import Slipstream.Data.Action hiding (SourcePtr(..))
+import qualified Slipstream.Data.Action as A (SourcePtr(..))
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
@@ -200,13 +200,13 @@ processTheMessages messages conn g = do
               getCachedSourcePtr g actionCodeHash
 
         maybeCachedContract <- getCachedContract g actionCodeHash
-        sourceIsCreated <- maybe (return False) (isSourceCreated g . sourceptrSourceHash) sourcePtr'
+        sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
 
         contractMetaData <-
               case (sourceIsCreated, maybeCachedContract) of
                (_, Just cachedContract) -> return cachedContract
                (True, Nothing) -> do
-                 let contName = maybe (error "name missing from sourcePtr") sourceptrContractName sourcePtr'
+                 let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
                  contractOrError <- getContract contName actionCodeHash actionTxChainId
                  case contractOrError of
                   Left e -> error e
@@ -221,7 +221,7 @@ processTheMessages messages conn g = do
                    , tshow sourcePtr'
                    ]
                  contractOrError <- getContractCompileFullSource actionAddress actionCodeHash actionTxChainId
-                 traverse_ (setSourceCreated g . sourceptrSourceHash ) sourcePtr'
+                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
                  liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
                  case contractOrError of
                   Left e -> error e
