@@ -74,8 +74,7 @@ main :: IO()
 main = do
   opt <- parseArgs
   putStrLn $ show opt
-  let pkey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8="
-  --pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+  pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
       sender = prvKey2Address pk
   esign <- signBenfInfo pk (optRecipient opt, (optRemove opt))
@@ -85,4 +84,4 @@ main = do
                                  , API.recipient=(optRecipient opt)
                                  , API.votingdir=(optRemove opt)
                                  , API.nonce=(optNonce opt)}
-  API.uploadVote 80 (optNode opt) vote  
+  API.uploadVote 80 (optNode opt) vote
