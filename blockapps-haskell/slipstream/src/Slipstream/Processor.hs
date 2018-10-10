@@ -109,8 +109,10 @@ getContractCompileFullSource address hash chainId = do
       }
       return $ Right ret
 
-storageToFunction :: Map (Hex Word256) (Hex Word256) -> Storage
-storageToFunction s k = maybe 0 unHex . Map.lookup k $ Map.mapKeys unHex s
+storageToFunction :: Map (Hex Word256) (Hex Word256) -> Map (Hex Word256) (Hex Word256) -> Storage
+storageToFunction primary fallback k = case Map.lookup (Hex k) primary of
+  Just (Hex w) -> w
+  Nothing -> maybe 0 unHex . Map.lookup k $ Map.mapKeys unHex fallback
 
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
@@ -118,13 +120,13 @@ hasContract = (/= emptyHash) . actionCodeHash
 storageToList :: BA.Storage -> (Hex Word256, Hex Word256)
 storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
 
-addStorageIfNeeded::Action->Bloc Action
-addStorageIfNeeded action'@Action{..} | actionType == Update = do
-  storage' <- blocStrato $ getStorage storageFilterParams{ qsAddress = Just . Address . fst . head . readHex $ show actionAddress
-                                                         , qsChainId = actionTxChainId
-                                                         }
-  return $ action'{actionStorage = Just . Map.fromList $ map storageToList storage'}
-addStorageIfNeeded action = return action
+addStorageIfNeeded::Action -> Bloc (Map (Hex Word256) (Hex Word256))
+addStorageIfNeeded Action{..} | actionType /= Update = return $ fromMaybe Map.empty actionStorage
+                              | otherwise = do
+  storage' <- blocStrato $ getStorage storageFilterParams { qsAddress = Just actionAddress
+                                                          , qsChainId = actionTxChainId
+                                                          }
+  return . Map.fromList $ map storageToList storage'
 
 isSameCreateAs :: Action -> Action -> Bool
 isSameCreateAs x y = (((&&) `on` ((== Create) . actionType)) x y) && (((==) `on` actionCodeHash) x y)
@@ -190,9 +192,9 @@ processTheMessages messages conn g = do
 
   enterBloc2 env $ do
     forM_ (map (filter hasContract) changes) $ \change -> do
-      processedList <- forM change $ \row -> do
+      processedList <- forM change $ \row@Action{..} -> do
         liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
-        Action{..} <- addStorageIfNeeded row
+        fallbackStorage <- addStorageIfNeeded row
 
         sourcePtr' <-
           case actionSourcePtr of
@@ -239,8 +241,9 @@ processTheMessages messages conn g = do
               --TODO: Add parsing of contract info to get flags (indexing, history)
 
           fetchLimit <- asks stateFetchLimit
-          let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
-          let chain = case actionTxChainId of
+          let storage = storageToFunction (fromMaybe Map.empty actionStorage) fallbackStorage
+              ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) storage 0
+              chain = case actionTxChainId of
                       Nothing -> ""
                       Just (ChainId x) -> T.pack $ showHex x ""
           pure ProcessedContract
