@@ -26,7 +26,8 @@ pipeline {
               if [ -d "strato-platform" ]; then
                 cd strato-platform
                 git checkout -f
-                git fetch https://$GH_USER:$GH_PASSWD@github.com/blockapps/strato-platform
+                git pull https://$GH_USER:$GH_PASSWD@github.com/blockapps/strato-platform
+                git fetch origin
                 git checkout ${PLATFORM_BRANCH_NAME}
                 git reset --hard origin/${PLATFORM_BRANCH_NAME}
                 cd ..
