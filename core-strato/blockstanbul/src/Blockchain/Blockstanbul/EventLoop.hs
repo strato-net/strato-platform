@@ -123,12 +123,11 @@ authorize = \case
 
 isAuthorized :: (StateMachineM m) => InEvent -> m Bool
 isAuthorized iev = do
-  -- TODO(tim): Rewrite this as a WriterT
   doAuthn <- use productionAuth
   let authenticated = authenticate iev
-  when (not authenticated && doAuthn) $
-    $logWarnS "blockstanbul/auth" . T.pack $
-      "Rejecting inevent; message failed authentication: " ++ show iev
+      warn = when doAuthn . $logWarnS "blockstanbul/auth" . T.pack
+  unless authenticated $
+    warn $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorized <- authorize iev
   specificAuth <-
     case iev of
@@ -142,8 +141,7 @@ isAuthorized iev = do
             authSenders %= M.insert addr nonc
             return True
           else do
-            when doAuthn $
-              $logWarnS "blockstanbul/auth" "Rejecting NewBeneficiary; nonce or signature incorrect"
+            warn "Rejecting NewBeneficiary; nonce or signature incorrect"
             return False
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vals <- use validators
@@ -151,20 +149,17 @@ isAuthorized iev = do
             validatorsMatch = vals == payloadVals
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
             signerMatches = Just addr == signatory
-        when doAuthn $ do
-          unless signerMatches $
-            $logWarnS "blockstanbul/auth" . T.pack $
-              "Rejecting Preprepare; signer " ++ show (format <$> signatory)
+        unless signerMatches $
+          warn $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
               ++ " is not sender " ++ format addr
-          unless validatorsMatch $
-            $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting Preprepare; payload validators "
+        unless validatorsMatch $
+          warn $ "Rejecting Preprepare; payload validators "
               ++ show (S.map format payloadVals) ++ " are not expected validators "
               ++ show (S.map format vals)
         return $ signerMatches && validatorsMatch
       IMsg (MsgAuth addr _) (Commit _ di seal) -> do
         let ret = Just addr == verifyCommitmentSeal di seal
-        when (doAuthn && not ret) $
-          $logWarnS "blockstanbul/auth" "Rejecting Commit; bad seal"
+        unless ret . warn $ "Rejecting Commit; bad seal"
         return ret
       _ -> return True -- No specific auth for any other messages
   return $ if doAuthn
