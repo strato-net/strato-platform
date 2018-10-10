@@ -46,7 +46,7 @@ import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-
+import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
 ethereumVM :: LoggingT IO ()
@@ -92,7 +92,7 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             writeBlockSummary b
-        addBlocks blocks
+        actions <- addBlocks blocks
 
         contextBlockRequested ||= (OECreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -120,6 +120,7 @@ ethereumVM = void . execContextM $ do
         -- todo: is this the best place to put this?
         flushLogEntries
         flushTransactionResults
+        void . K.withKafkaViolently $ writeActionJSONToKafka actions
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
