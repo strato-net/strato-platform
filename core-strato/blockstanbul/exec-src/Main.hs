@@ -64,6 +64,7 @@ parseArgs = do
   let header = "Usage: " ++ "blockstanbul-vote" ++ " [OPTION...]"
   let helpMessage = usageInfo header options
   case getOpt RequireOrder options argv of
+    ([], [], []) -> ioError (userError ("Specify flags please" ++ "\n" ++ helpMessage))
     (opts, [], []) ->
       case foldlM (flip id) defaultOptions opts of
         Right opt -> return opt
