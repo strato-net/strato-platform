@@ -26,8 +26,6 @@ import            GHC.Generics
 
 data ActionType = Create | Delete | Update deriving (Eq,Show, Generic)
 
-data SourcePtr = SourcePtr { sourceHash :: Keccak256, contractName :: Text} deriving (Eq, Show, Generic)
-
 data Action = Action
   { actionType            :: ActionType -- either Create, Delete, or Update
   , actionBlockHash       :: Keccak256
