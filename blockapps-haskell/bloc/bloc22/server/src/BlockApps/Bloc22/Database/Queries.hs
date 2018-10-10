@@ -400,6 +400,12 @@ getContractDetailsByAddressOnly contractAddr chainId = do
     [] -> throwError $ UserError "getContractDetailsByAddressOnly: couldn't find contract metadata id"
     name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
 
+getContractSourceByCodeHash :: Keccak256 -> Query (Column PGText)
+getContractSourceByCodeHash codeHash = proc () -> do
+  (_,_,src,_,_,_,_,ch,_,_) <- contractsJoinTable -< ()
+  restrict -< ch .== constant codeHash
+  returnA -< src
+
 insertXabiFunctionArg
   :: Int32
   -> Map Text Xabi.IndexedType
@@ -494,6 +500,25 @@ getContractsContractByAddressQuery contractName contractAddress chainId =
       contractByAddress contractName contractAddress chainId -< ()
     returnA -< (addr,cid,(bin,binRuntime,codeHash,xcodeHash,name,src,cmId))
 
+getContractsContractByCodeHashQuery
+  :: Keccak256
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , ( Column PGBytea
+      , Column PGBytea
+      , Column PGBytea
+      , Column PGBytea
+      , Column PGText
+      , Column PGText
+      , Column PGInt4
+    ) )
+getContractsContractByCodeHashQuery ch =
+  limit 1 $ proc () -> do
+    (cmId,name,src,addr,_,bin,binRuntime,codeHash,xcodeHash,cid) <-
+      contractByAddress contractName contractAddress chainId -< ()
+    restrict -< codeHash .== constant ch
+    returnA -< (addr,cid,(bin,binRuntime,codeHash,xcodeHash,name,src,cmId))
 {- |
 SELECT CM2.id
 FROM contracts_metadata CM
@@ -855,6 +880,22 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
           tuple <- blocQuery1 $
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) chainId tuple
+
+getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe ContractDetails)
+getContractDetailsByCodeHash codeHash = do
+    mDetails <- listToMaybe <$> blocQuery $ getContractsContractByCodeHashQuery codeHash
+    flip fmap mDetails <$> \(addr, cid, (bin,binr,ch,_ :: ByteString,name,src,cmId)) -> do
+      xabi <- getContractXabiAndMetadataId cmId
+      return ContractDetails
+        { contractdetailsBin = Text.decodeUtf8 bin
+        , contractdetailsAddress = addr
+        , contractdetailsBinRuntime = Text.decodeUtf8 binr
+        , contractdetailsCodeHash = ch
+        , contractdetailsName = name
+        , contractdetailsSrc = src
+        , contractdetailsXabi = xabi
+        , contractdetailsChainId = cid
+        }
 
 {- |
 WITH contract_id AS (
