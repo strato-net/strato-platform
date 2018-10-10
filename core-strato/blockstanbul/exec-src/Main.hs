@@ -4,6 +4,7 @@ module Main where
 
 import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16              as B16
+import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
@@ -17,44 +18,45 @@ import           Blockchain.Data.RLP
 
 data Options = Options
   { optRemove    :: Bool
-  , optRecipient :: Address
-  , optNode      :: String
-  , optNonce     :: Int
+  , optRecipient :: Either IOError Address
+  , optNode      :: Either IOError String
+  , optNonce     :: Either IOError Int
   } deriving Show
 
 defaultOptions :: Options
 defaultOptions  = Options
   { optRemove    = False
-  , optRecipient = 0x0000000000000000
-  , optNode      = ""
-  , optNonce     = 0
+  , optRecipient = Left (userError ("Give me a recipient address."))
+  , optNode      = Left (userError ("Give me a node."))
+  , optNonce     = Left (userError ("Give me a non-negative int for your nonce."))
   }
 
-options :: [OptDescr (Options -> Either String Options)]
+options :: [OptDescr (Options -> IO Options)]
 options =
    [Option ['n'] ["nonce"] 
       (ReqArg
-       (\ nc opts ->
-          case read nc of
-            nonc :: Int | nonc >= 0 -> Right opts { optNonce = nonc }
-            _ -> Left "--nonce must be a non-negative integer"
+       (\ nc opts -> do
+            let nonc = read nc :: Int
+            if (nonc >= 0)
+               then return $ opts { optNonce = Right nonc }
+               else ioError $ fromLeft (userError "") (optNonce opts)
        ) "Int")
      "REQUIRED; Should be greater than previous value."
   , Option ['r'] ["recipient"] 
       (ReqArg
-       (\ rp opts -> 
+       (\ rp opts -> do
            case stringAddress rp of
-             Just eRecipient -> Right opts { optRecipient = eRecipient }
-             Nothing -> Left "Invalid Recipient Address"
+             Just eRecipient -> return opts { optRecipient = Right eRecipient }
+             _ -> ioError $ fromLeft (userError "") (optRecipient opts)
        ) "Address")
     "REQUIRED; The beneficiary address."
   , Option ['d'] ["node"] 
       (ReqArg
-       (\ nd opts -> Right opts { optNode  = nd }) "Node IP Address")
+       (\ nd opts -> return opts { optNode  = Right nd }) "Node IP Address")
     "REQUIRED; The node server IP address."
   , Option ['e'] ["remove"] 
       (NoArg
-       (\ opts -> Right opts { optRemove = True}))
+       (\ opts -> return opts { optRemove = True}))
       "The voting direction"
    ]
 
@@ -64,12 +66,12 @@ parseArgs = do
   let header = "Usage: " ++ "blockstanbul-vote" ++ " [OPTION...]"
   let helpMessage = usageInfo header options
   case getOpt RequireOrder options argv of
-    ([], [], []) -> ioError (userError ("Specify flags please" ++ "\n" ++ helpMessage))
-    (opts, [], []) ->
-      case foldlM (flip id) defaultOptions opts of
-        Right opt -> return opt
-        Left errorMessage -> ioError (userError (errorMessage ++ "\n" ++ helpMessage))
-    (_, _, errs) -> ioError (userError (concat errs ++ helpMessage))
+    ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
+    (opts, _, _) -> foldlM (flip id) defaultOptions opts
+
+fromright :: Either IOError a -> a
+fromright (Right x) = x
+fromright (Left _) = error "not possible"
 
 main :: IO()
 main = do
@@ -78,11 +80,11 @@ main = do
   pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
       sender = prvKey2Address pk
-  esign <- signBenfInfo pk (optRecipient opt, (optRemove opt))
+  esign <- signBenfInfo pk (fromright (optRecipient opt), (optRemove opt))
   let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
       vote = API.CandidateReceived{API.sender=sender
                                  , API.signature=esignStr
-                                 , API.recipient=(optRecipient opt)
-                                 , API.votingdir=(optRemove opt)
-                                 , API.nonce=(optNonce opt)}
-  API.uploadVote 80 (optNode opt) vote
+                                 , API.recipient= fromright (optRecipient opt)
+                                 , API.votingdir= not (optRemove opt)
+                                 , API.nonce= fromright (optNonce opt)}
+  API.uploadVote 80 (fromright (optNode opt)) vote
