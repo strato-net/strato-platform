@@ -40,6 +40,7 @@ import           Control.Monad.Trans.Resource
 import           Conduit
 import           Data.Conduit.TMChan
 import           Data.Foldable                             (toList)
+import           Data.IORef
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
@@ -75,6 +76,7 @@ data SequencerContext = SequencerContext
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _blockstanbulContext :: Maybe BlockstanbulContext
                       , _loopTimeout         :: TMChan ()
+                      , _latestRoundNumber   :: IORef RoundNumber
                       }
 makeLenses ''SequencerContext
 
@@ -136,6 +138,7 @@ runSequencerM c mbc m = do
         stxSize  <- asks seenTransactionDBSize
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         loopCh <- atomically newTMChan
+        latestRound <- liftIO $ newIORef 0
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
@@ -147,7 +150,8 @@ runSequencerM c mbc m = do
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
             , _blockstanbulContext = mbc
-            , _loopTimeout = loopCh
+            , _loopTimeout         = loopCh
+            , _latestRoundNumber   = latestRound
             }
     return $ fst a
 
@@ -173,11 +177,21 @@ createFirstTimer = do
 
 createNewTimer :: RoundNumber -> SequencerM ()
 createNewTimer rn = do
+  rnref <- use latestRoundNumber
+  liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
   ch <- asks blockstanbulTimeouts
-  let act :: AlarmClock UTCTime -> IO ()
-      act _ = atomically $ writeTMChan ch rn
-  alarm <- liftIO $ newAlarmClock act
   dt <- asks blockstanbulRoundPeriod
+  let act :: AlarmClock UTCTime -> IO ()
+      act this = do
+        atomically $ writeTMChan ch rn
+        globalRN <- readIORef rnref
+        -- The first RoundChange for this message may have not
+        -- been seen, so we keep firing at the same interval
+        -- until an alarm lands and the round changes
+        unless (globalRN > rn) $ do
+          next <- addUTCTime dt <$> getCurrentTime
+          setAlarm this next
+  alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
 
