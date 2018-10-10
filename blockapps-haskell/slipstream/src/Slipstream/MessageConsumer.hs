@@ -71,14 +71,14 @@ lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
 getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
-getTheMessages offset = do
+getTheMessages offset@(K.Offset o) = do
   fetched <- fetch offset 0 lookupTopic
   let errorStatuses = concatMap (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
   case find (/= K.NoError) errorStatuses of
    Just e -> do
     liftIO . debugM "getTheMessages/kafka_response" . show $ fetched
     let topic = BC.unpack (lookupTopic ^. K.tName ^. K.kString)
-    error $ printf "There was a critical Kafka error while fetching messages: %s\ntopic = %s, offset = %e" (show e) topic (show offset)
+    error $ printf "There was a critical Kafka error while fetching messages: %s\ntopic = %s, offset = %d" (show e) topic o
    Nothing -> return ()
   let ret = (map tamPayload . fetchMessages) fetched
   return ret
