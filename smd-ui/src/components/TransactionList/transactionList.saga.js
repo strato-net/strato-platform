@@ -12,7 +12,7 @@ import { env } from '../../env';
 
 const url = env.STRATO_URL + "/transaction/last/15";
 
-export function getTx(chainId) {
+export function getTx(last, chainId) {
   const localUrl = chainId ? url + `?chainid=${chainId}` : url;
   return fetch(
     localUrl,

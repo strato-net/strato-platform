@@ -13,7 +13,7 @@ import HexText from '../../../HexText';
 class TransactionTable extends Component {
 
   componentDidMount() {
-    this.props.fetchTx(this.props.selectedChain);
+    this.props.fetchTx(null, this.props.selectedChain);
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   }
 
@@ -26,6 +26,7 @@ class TransactionTable extends Component {
       newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
     }
     if (newProps.selectedChain !== this.props.selectedChain) {
+      this.props.fetchTx(null, newProps.selectedChain);
       newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
     }
   }
@@ -52,7 +53,7 @@ class TransactionTable extends Component {
 
     function handleClick(hash) {
       mixpanelWrapper.track('transactions_row_click');
-      history.push('/transactions/' + hash);
+      history.push(`/transactions/${hash}`);
     }
 
     let txRows = this.props.queryResults.length && this.props.queryResults[0]['transactionType'] && this.props.queryResults.map(

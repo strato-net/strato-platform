@@ -92,6 +92,9 @@ describe('TransactionView', () => {
       const state = {
         transactions: {
           tx: updatedData
+        },
+        chains: {
+          selectedChain: '1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14'
         }
       };
 
@@ -112,6 +115,9 @@ describe('TransactionView', () => {
             "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
           ],
           "error": null
+        },
+        chains: {
+          selectedChain: '1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14'
         }
       };
 
