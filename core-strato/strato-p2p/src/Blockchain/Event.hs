@@ -344,7 +344,7 @@ handleEvents mode peer = awaitForever $ \case
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yield outbound
       OEAskForBlocks start end -> do
-        let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start) 0 Forward
+        let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
         $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
         yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
