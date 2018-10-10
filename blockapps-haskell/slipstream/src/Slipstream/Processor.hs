@@ -212,8 +212,9 @@ processTheMessages messages conn g = do
            (_, Just cachedContract) -> pure $ Right cachedContract
            (True, Nothing) -> do
              let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
-             contractOrError <- getContract contName actionCodeHash actionTxChainId
-                                  `catchError` (\_ -> return . Left $ "Error getting contract metadata for " <> contName)
+             contractOrError <- catchError
+                                  (getContract contName actionCodeHash actionTxChainId)
+                                  (\_ -> return . Left $ "Error getting contract metadata for " <> contName)
              for contractOrError $ \c -> do
                storeCachedContract g actionCodeHash c
                pure c
@@ -224,7 +225,9 @@ processTheMessages messages conn g = do
                , ", src:"
                , tshow sourcePtr'
                ]
-             contractOrError <- getContractCompileFullSource actionAddress actionCodeHash actionTxChainId
+             contractOrError <- catchError
+                                  (getContractCompileFullSource actionAddress actionCodeHash actionTxChainId)
+                                  (\_ -> return $ Left "getContractCompileFullSource: Error getting contract metadata")
              traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
              liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
              for contractOrError $ \c -> do
