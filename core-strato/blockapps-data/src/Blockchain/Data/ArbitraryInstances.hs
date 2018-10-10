@@ -10,6 +10,7 @@ import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Internal           as IB
 import qualified Data.Map                           as M    hiding (map, filter)
+import qualified Data.Text                          as T
 import           Data.Time
 
 import           System.IO.Unsafe                   (unsafePerformIO)
@@ -163,10 +164,10 @@ instance Arbitrary Enode where
           <*> (arbitrary `suchThat` maybe True (>=0))
 
 instance Arbitrary CodeInfo where
-  arbitrary = CodeInfo 
+  arbitrary = CodeInfo
       <$> arbitrary
-      <*> arbitrary
-      <*> arbitrary
+      <*> (T.pack <$> arbitrary)
+      <*> (T.pack <$> arbitrary)
 
 instance Arbitrary AccountInfo where
   arbitrary = NonContract

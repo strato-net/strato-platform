@@ -12,8 +12,9 @@ import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
-import           Data.Map                           as M        (fromList, toList)
+import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
+import qualified Data.Text                          as T
 
 import qualified Database.Esqueleto                 as E
 import           Database.Persist                               hiding (get)
@@ -59,16 +60,29 @@ getChainInfo chainId = do
                                          (M.fromList (map makePairs members)))
           where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
                 ai = \aInfo ->
-                        if (accountInfoRefCodeHash $ entityVal aInfo) == Nothing
-                          then NonContract ((accountInfoRefAddress $ entityVal aInfo)) (accountInfoRefBalance $ entityVal aInfo)
-                          else if (accountInfoRefMap $ entityVal aInfo) == Nothing
-                            then ContractNoStorage (accountInfoRefAddress $ entityVal aInfo) (accountInfoRefBalance $ entityVal aInfo)
-                                 (fromJust (accountInfoRefCodeHash $ entityVal aInfo))
-                            else ContractWithStorage (accountInfoRefAddress $ entityVal aInfo) (accountInfoRefBalance $ entityVal aInfo)
-                               (fromJust (accountInfoRefCodeHash $ entityVal aInfo)) (fromJust (accountInfoRefMap $ entityVal aInfo))
+                        let AccountInfoRef{..} = entityVal aInfo
+                            acc | isNothing accountInfoRefCodeHash
+                                    = NonContract
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                | isNothing accountInfoRefMap
+                                    = ContractNoStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                | otherwise
+                                    = ContractWithStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                        (fromJust accountInfoRefMap)
+                         in acc
                 ci = \codeInfo ->
-                        CodeInfo (codeInfoRefEvmByteCode $ entityVal codeInfo) (codeInfoRefContractCode $ entityVal codeInfo) 
-                          (codeInfoRefContractName $ entityVal codeInfo)
+                        let CodeInfoRef{..} = entityVal codeInfo
+                         in CodeInfo
+                              codeInfoRefEvmByteCode
+                              (T.pack codeInfoRefContractCode)
+                              (T.pack codeInfoRefContractName)
 
 getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do
@@ -105,7 +119,7 @@ putChainInfo chainId ChainInfo{..} = do
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
         parseCInfo ch (CodeInfo bc cc cn)  =
-          CodeInfoRef ch bc cc cn
+          CodeInfoRef ch bc (T.unpack cc) (T.unpack cn)
         parseMember chi (ad, en) =
           ChainMemberRef chi (showEnode en) ad
 

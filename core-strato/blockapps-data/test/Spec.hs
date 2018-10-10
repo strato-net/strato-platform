@@ -9,6 +9,7 @@ import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy.Char8      as C8
 import qualified Data.ByteString.Base16          as B16
 import qualified Data.HashMap.Strict                    as HM
+import           Data.Map.Strict                 (Map)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
@@ -34,6 +35,7 @@ main = hspec $ do
     enodeJSON
     accountInfoRLP
     accountInfoJSON
+    actionJSON
     codeInfoRLP
     codeInfoJSON
     chainInfoRLP
@@ -80,6 +82,11 @@ accountInfoJSON :: Spec
 accountInfoJSON = do
   it "should convert a AccountInfo to and from its JSON encoding" $ property $
     (\x -> jsonCheck (x :: AccountInfo))
+
+actionJSON :: Spec
+actionJSON = do
+  it "should convert an Action to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: Map Word256 Word256))
 
 codeInfoRLP :: Spec
 codeInfoRLP = do

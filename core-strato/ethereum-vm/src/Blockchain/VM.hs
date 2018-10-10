@@ -29,6 +29,7 @@ import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (decodeUtf8)
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -955,19 +956,19 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           return (Left e, vmState'{logs=[]})
       (_, stateAfter) -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ stateAfter
-          putStorageMap $ contextStorageMap $ dbs stateAfter
-          putAddressStateDBMap $ contextAddressStateDBMap $ dbs stateAfter
+          putStorageTxMap $ contextStorageTxMap $ dbs stateAfter
+          putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs stateAfter
 
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
+getSource :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
 
-getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
+getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
 
-getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
+getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM T.Text
 getFromSelector sel isRunningTests' sr codeHash = do
   theCode <- Code . fromMaybe B.empty <$> getCode codeHash
 
@@ -1007,7 +1008,7 @@ getFromSelector sel isRunningTests' sr codeHash = do
   setStateDBStateRoot stateRoot
   case eRes of
     Left _ -> return ""
-    Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
+    Right ret -> return . decodeUtf8 . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
 
 create :: Bool
        -> Bool
@@ -1208,8 +1209,8 @@ create_debugWrapper block owner value initCodeBytes = do
       ((result, finalVMState), finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-      putStorageMap $ contextStorageMap finalDBs
-      putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+      putStorageTxMap $ contextStorageTxMap finalDBs
+      putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
       setGasRemaining $ vmGasRemaining finalVMState
 
@@ -1248,8 +1249,8 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-  putStorageMap $ contextStorageMap finalDBs
-  putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+  putStorageTxMap $ contextStorageTxMap finalDBs
+  putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 
   case result of
