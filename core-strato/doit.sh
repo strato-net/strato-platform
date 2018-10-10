@@ -75,7 +75,7 @@ function newnode {
   fi
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+    --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
