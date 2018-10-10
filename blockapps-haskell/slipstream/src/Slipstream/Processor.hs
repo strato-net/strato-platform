@@ -18,16 +18,19 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import Data.Either (lefts,rights)
 import Data.IORef
 import Data.Foldable
 import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid ((<>))
 import Data.Pool
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
+import Data.Traversable (for)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -75,7 +78,7 @@ enterBloc2 env x = do
 emptyHash :: Keccak256
 emptyHash = keccak256 B.empty
 
-getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either String ContractAndXabi)
+getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either Text ContractAndXabi)
 getContract name hash chainId = do
   if(hash == emptyHash)
     then return $ (Left "getContract called for an external account")
@@ -90,7 +93,7 @@ getContract name hash chainId = do
         , contractSchema = Nothing
         }
 
-getContractCompileFullSource :: Address -> Keccak256 -> Maybe ChainId->Bloc (Either String ContractAndXabi)
+getContractCompileFullSource :: Address -> Keccak256 -> Maybe ChainId->Bloc (Either Text ContractAndXabi)
 getContractCompileFullSource address hash chainId = do
   if (hash == emptyHash)
     then return $ (Left "getContractCompileFullSource called for an external account")
@@ -104,7 +107,7 @@ getContractCompileFullSource address hash chainId = do
         , contractStored = False
         , contractSchema = Nothing
       }
-      return $ (Right ret)
+      return $ Right ret
 
 storageToFunction :: Map (Hex Word256) (Hex Word256) -> Storage
 storageToFunction s k = maybe 0 unHex . Map.lookup k $ Map.mapKeys unHex s
@@ -185,8 +188,8 @@ processTheMessages messages conn g = do
             , stateFetchLimit = flags_stateFetchLimit
             }
 
-  _ <- enterBloc2 env $ do
-    forM (map (filter hasContract) changes) $ \change -> do
+  enterBloc2 env $ do
+    forM_ (map (filter hasContract) changes) $ \change -> do
       processedList <- forM change $ \row -> do
         liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
         Action{..} <- addStorageIfNeeded row
@@ -202,60 +205,57 @@ processTheMessages messages conn g = do
         maybeCachedContract <- getCachedContract g actionCodeHash
         sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
 
-        contractMetaData <-
-              case (sourceIsCreated, maybeCachedContract) of
-               (_, Just cachedContract) -> return cachedContract
-               (True, Nothing) -> do
-                 let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
-                 contractOrError <- getContract contName actionCodeHash actionTxChainId
-                 case contractOrError of
-                  Left e -> error e
-                  Right c -> do
-                    storeCachedContract g actionCodeHash c
-                    return c
-               (False, Nothing) -> do
-                 liftIO . warningM "processTheMessages" . show $ T.concat
-                   [ "Need to call getContractCompileFullSource (this can be slow): ch:"
-                   , tshow actionCodeHash
-                   , ", src:"
-                   , tshow sourcePtr'
-                   ]
-                 contractOrError <- getContractCompileFullSource actionAddress actionCodeHash actionTxChainId
-                 traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                 liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
-                 case contractOrError of
-                  Left e -> error e
-                  Right c -> do
-                    storeCachedContract g actionCodeHash c
-                    return c
+        eContractMetadata <-
+          case (sourceIsCreated, maybeCachedContract) of
+           (_, Just cachedContract) -> pure $ Right cachedContract
+           (True, Nothing) -> do
+             let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
+             contractOrError <- getContract contName actionCodeHash actionTxChainId
+                                  `catchError` (\_ -> return . Left $ "Error getting contract metadata for " <> contName)
+             for contractOrError $ \c -> do
+               storeCachedContract g actionCodeHash c
+               pure c
+           (False, Nothing) -> do
+             liftIO . warningM "processTheMessages" . show $ T.concat
+               [ "Need to call getContractCompileFullSource (this can be slow): ch:"
+               , tshow actionCodeHash
+               , ", src:"
+               , tshow sourcePtr'
+               ]
+             contractOrError <- getContractCompileFullSource actionAddress actionCodeHash actionTxChainId
+             traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
+             liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
+             for contractOrError $ \c -> do
+               storeCachedContract g actionCodeHash c
+               pure c
 
+        for eContractMetadata $ \contractMetaData -> do
+          let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
+              strName = T.replace "\"" "" . name $ contractMetaData
+              cont = case contract contractMetaData of
+                      Left s -> error s
+                      Right c -> c
 
-        let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
-            strName = T.replace "\"" "" . name $ contractMetaData
-            cont = case contract contractMetaData of
-                    Left s -> error s
-                    Right c -> c
+              --TODO: Add parsing of contract info to get flags (indexing, history)
 
-            --TODO: Add parsing of contract info to get flags (indexing, history)
+          fetchLimit <- asks stateFetchLimit
+          let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
+          let chain = case actionTxChainId of
+                      Nothing -> ""
+                      Just (ChainId x) -> T.pack $ showHex x ""
+          pure ProcessedContract
+            { address = actionAddress
+            , codehash = actionCodeHash
+            , abi = strAbi
+            , contractName = strName
+            , chain = chain
+            , contractData = ret
+            , blockHash = actionBlockHash
+            , blockTimestamp = actionBlockTimestamp
+            , blockNumber = actionBlockNumber
+            , transactionHash = actionTxHash
+            , transactionSender = actionTxSender
+            }
 
-        fetchLimit <- asks stateFetchLimit
-        let ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (storageToFunction $ fromMaybe (error "can't handle the case where we need to fetch the state") actionStorage) 0
-        let chain = case actionTxChainId of
-                     Nothing -> ""
-                     Just (ChainId x) -> T.pack $ showHex x ""
-        return ProcessedContract{address = actionAddress,
-                                 codehash = actionCodeHash,
-                                 abi = strAbi,
-                                 contractName = strName,
-                                 chain = chain,
-                                 contractData = ret,
-                                 blockHash = actionBlockHash,
-                                 blockTimestamp = actionBlockTimestamp,
-                                 blockNumber = actionBlockNumber,
-                                 transactionHash = actionTxHash,
-                                 transactionSender = actionTxSender
-                               }
-
-      if (length processedList > 0) then liftIO $ convertRet processedList conn g else return()
-
-  return()
+      forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
+      when (not $ null processedList) . liftIO $ convertRet (rights processedList) conn g
