@@ -188,13 +188,14 @@ nextRound nt = do
    --update validators list
   val <- uses validators S.toList
   vot <- use voted
-  validators .= (S.fromList $ updateValidator val vot)
+  validators .= S.fromList (updateValidator val vot)
 
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
       view . round .= r
       yield $ ResetTimer r
+  use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
@@ -261,38 +262,35 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
-      if (sender auth /= pr)
-        then $logWarnS "blockstanbul/ppl" . T.pack $
+      mBlockLock <- use blockLock
+      case () of
+        () | sender auth /= pr ->
+              $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
-        else do
-          mBlockLock <- use blockLock
-          if (isJust mBlockLock && Just pp /= mBlockLock)
-            then do
+           | isJust mBlockLock && Just pp /= mBlockLock -> do
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: block does not match lock"
               $logInfoS "blockstanbul/roundchange" "lock mismatch"
               roundChange
-            else
-              if v /= v'
-                then do
-                  $logInfoS "blockstanbul/roundchange" . T.pack $
-                     "view mismatch (us, sender): " ++ format (v, v')
-                  $logWarnS "blockstanbul/ppl" . T.pack $
-                    printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-                  roundChange
-                else do
-                   blockcount += 1
-                   proposal .= Just pp
-                   pk <- use prvkey
-                   case extractBeneficiary pp of
-                     Nothing -> return()
-                     Just (bnef,vot) -> do
-                       -- insert the vote into map
-                       val <- uses voted $M.lookup bnef
-                       let unwrapVal = fromMaybe M.empty val
-                       let nval = M.insert pr vot unwrapVal
-                       voted %= M.insert bnef nval
-                   yield =<< signMessage pk (Prepare v (blockHash pp))
+           | v /= v' -> do
+              $logInfoS "blockstanbul/roundchange" . T.pack $
+                 "view mismatch (us, sender): " ++ format (v, v')
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
+              roundChange
+           | otherwise -> do
+               blockcount += 1
+               proposal .= Just pp
+               pk <- use prvkey
+               case extractBeneficiary pp of
+                 Nothing -> return()
+                 Just (bnef,vot) -> do
+                   -- insert the vote into map
+                   val <- uses voted $M.lookup bnef
+                   let unwrapVal = fromMaybe M.empty val
+                   let nval = M.insert pr vot unwrapVal
+                   voted %= M.insert bnef nval
+               yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
@@ -301,7 +299,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       hasSent <- use hasPrepared
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
-        (blockLock .=) =<< (use proposal)
+        (blockLock .=) =<< use proposal
         pk <- use prvkey
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
@@ -395,7 +393,7 @@ sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEv
 sendAllMessages wms = do
   out <- sendMessages wms
   $logDebugS "sendAllMessages" . T.pack . show $ out
-  case catMaybes . map loopback $ out of
+  case mapMaybe loopback out of
              [] -> return out
              wms' -> (out ++) <$> sendAllMessages wms'
 
@@ -407,10 +405,10 @@ blockstanbulRunning = isJust <$> getBlockstanbulContext
 
 recordInEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => InEvent -> m ()
 recordInEvent = \case
-               IMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter inEventMetric
-               IMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter inEventMetric
-               IMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter inEventMetric
-               IMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
+               IMsg _ Preprepare{} -> liftIO $ withLabel "preprepare_message" incCounter inEventMetric
+               IMsg _ Prepare{} -> liftIO $ withLabel "prepare_message" incCounter inEventMetric
+               IMsg _ Commit{} -> liftIO $ withLabel "commit_message" incCounter inEventMetric
+               IMsg _ RoundChange{} -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
                Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
                CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
                UnannouncedBlock _ -> liftIO $ withLabel "unannounced_block" incCounter inEventMetric
@@ -419,10 +417,10 @@ recordInEvent = \case
 
 recordOutEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => OutEvent -> m ()
 recordOutEvent = \case
-                OMsg _ (Preprepare _ _) -> liftIO $ withLabel "preprepare_message" incCounter outEventMetric
-                OMsg _ (Prepare _ _) -> liftIO $ withLabel "prepare_message" incCounter outEventMetric
-                OMsg _ (Commit _ _ _) -> liftIO $ withLabel "commit_message" incCounter outEventMetric
-                OMsg _ (RoundChange _) -> liftIO $ withLabel "roundchange_message" incCounter outEventMetric
+                OMsg _ Preprepare{} -> liftIO $ withLabel "preprepare_message" incCounter outEventMetric
+                OMsg _ Prepare{} -> liftIO $ withLabel "prepare_message" incCounter outEventMetric
+                OMsg _ Commit{} -> liftIO $ withLabel "commit_message" incCounter outEventMetric
+                OMsg _ RoundChange{} -> liftIO $ withLabel "roundchange_message" incCounter outEventMetric
                 ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter outEventMetric
                 MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter outEventMetric
                 ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter outEventMetric
