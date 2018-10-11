@@ -13,6 +13,8 @@ class Account extends Component {
       account
     } = this.props;
 
+    const faucetStatus = (this.props.faucet.accountAddress === address) && this.props.faucet.status;
+
     return (
       <div className="pt-card address-margin-bottom" key={address}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
@@ -23,14 +25,16 @@ class Account extends Component {
           </div>
           <div className="col-sm-2 text-right">
             <button
-              className="pt-button pt-intent-primary pt-small"
+              className={`pt-button ${faucetStatus ? 'pt-intent-warning' : 'pt-intent-primary'} pt-small`}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.props.faucetRequest(address, name);
-              }}>
-              Faucet
-              </button>
+                this.props.faucetRequest(address, name, 'faucet');
+              }}
+              disabled={faucetStatus}
+            >
+              {faucetStatus ? 'Pending' : 'Faucet'}
+            </button>
           </div>
         </div>
 
@@ -78,6 +82,7 @@ export function mapStateToProps(state, ownProps) {
   const address = ownProps.address;
   const accounts = state.accounts.accounts;
   return {
+    faucet: state.accounts.faucet,
     account: Object.getOwnPropertyNames(accounts).indexOf(name) >= 0 ? state.accounts.accounts[name][address] : {},
   };
 }

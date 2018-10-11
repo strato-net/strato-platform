@@ -79,11 +79,12 @@ export const fetchUserAddressesFailure = function (name, error) {
   }
 };
 
-export const fetchAccountDetail = function (name, address) {
+export const fetchAccountDetail = function (name, address, flag) {
   return {
     type: FETCH_ACCOUNT_DETAIL_REQUEST,
     name: name,
-    address: address
+    address: address,
+    flag: flag
   }
 };
 
@@ -105,11 +106,12 @@ export const fetchAccountDetailFailure = function (name, address, error) {
   }
 };
 
-export const faucetRequest = function (address, name) {
+export const faucetRequest = function (address, name, flag) {
   return {
     type: FAUCET_REQUEST,
     address,
     name,
+    flag
   }
 };
 
