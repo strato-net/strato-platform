@@ -209,6 +209,22 @@ contractByAddress contractName contractAddress chainId = proc () -> do
   restrict -< cid .== constant chainId
   returnA -< contract
 
+contractByCodeHash
+  :: Keccak256
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGText
+    , Column PGInt4
+    )
+contractByCodeHash codeHash = proc () -> do
+  contract@(_,_,ch,_,_,_,_) <- contractDetailsJoinTable -< ()
+  restrict -< ch .== constant codeHash
+  returnA -< contract
+
 contractNameFromAddress :: Address -> Maybe ChainId -> Query (Column PGText)
 contractNameFromAddress contractAddress chainId = proc () -> do
   (_,name,_,addr,_,_,_,_,_,cid) <- contractsJoinTable -< ()
@@ -505,20 +521,18 @@ getContractsContractByCodeHashQuery
   -> Query
     ( Column PGBytea
     , Column PGBytea
-    , ( Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGText
-      , Column PGText
-      , Column PGInt4
-    ) )
-getContractsContractByCodeHashQuery ch =
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGText
+    , Column PGInt4
+    )
+getContractsContractByCodeHashQuery codeHash =
   limit 1 $ proc () -> do
-    (cmId,name,src,addr,_,bin,binRuntime,codeHash,xcodeHash,cid) <-
-      contractByAddress contractName contractAddress chainId -< ()
-    restrict -< codeHash .== constant ch
-    returnA -< (addr,cid,(bin,binRuntime,codeHash,xcodeHash,name,src,cmId))
+    details@(_,_,ch,_,_,_,_) <-
+      contractByCodeHash codeHash -< ()
+    restrict -< ch .== constant codeHash
+    returnA -< details
 {- |
 SELECT CM2.id
 FROM contracts_metadata CM
@@ -883,18 +897,18 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
 
 getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe ContractDetails)
 getContractDetailsByCodeHash codeHash = do
-    mDetails <- listToMaybe <$> blocQuery $ getContractsContractByCodeHashQuery codeHash
-    flip fmap mDetails <$> \(addr, cid, (bin,binr,ch,_ :: ByteString,name,src,cmId)) -> do
-      xabi <- getContractXabiAndMetadataId cmId
+    mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
+    for mDetails $ \(bin,binr,ch,_ :: ByteString,name,src,cmId) -> do
+      xabi <- getContractXabiByMetadataId cmId
       return ContractDetails
         { contractdetailsBin = Text.decodeUtf8 bin
-        , contractdetailsAddress = addr
+        , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = Text.decodeUtf8 binr
         , contractdetailsCodeHash = ch
         , contractdetailsName = name
         , contractdetailsSrc = src
         , contractdetailsXabi = xabi
-        , contractdetailsChainId = cid
+        , contractdetailsChainId = Nothing
         }
 
 {- |

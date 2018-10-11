@@ -26,7 +26,6 @@ import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
-import           Data.Text.Encoding                 (decodeUtf8)
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf

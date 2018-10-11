@@ -17,7 +17,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Lazy.Char8           as BLC
-import           Data.Maybe                           (catMaybes, fromMaybe)
+import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
 import           Data.Time.Clock.POSIX
 import           Numeric

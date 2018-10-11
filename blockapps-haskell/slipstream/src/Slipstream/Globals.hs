@@ -7,12 +7,9 @@ import           BlockApps.Solidity.Contract
 import           Control.Monad.IO.Class
 import           Data.Default
 import           Data.IORef
-import           Data.Map                    (Map)
-import qualified Data.Map                    as Map
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
-import qualified Slipstream.Data.Action      as SS
 import           BlockApps.Ethereum
 
 data Globals =

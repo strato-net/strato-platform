@@ -21,7 +21,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
 import Data.IORef
-import Data.Foldable
 import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -31,7 +30,6 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
-import Data.Traversable (for)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -218,7 +216,8 @@ processTheMessages messages conn g = do
               then return . Left $ "No details found for code hash " <> (T.pack $ show actionCodeHash) <> " and no 'src' field found in actionMetadata"
               else do
                 fetchLimit <- asks stateFetchLimit
-                let strAbi = T.replace "\'" "\'\'" . decodeUtf8 . JSON.encode $ contractdetailsXabi details
+                let Just details = mDetails
+                    strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
                     strName = T.replace "\"" "" $ contractdetailsName details
                     cont = either error id . xAbiToContract $ contractdetailsXabi details
                     storage = storageToFunction (fromMaybe Map.empty actionStorage) fallbackStorage
@@ -226,7 +225,7 @@ processTheMessages messages conn g = do
                     chain = case actionTxChainId of
                             Nothing -> ""
                             Just (ChainId x) -> T.pack $ showHex x ""
-                pure . Just $ ProcessedContract
+                pure . Right . Just $ ProcessedContract
                   { address = actionAddress
                   , codehash = actionCodeHash
                   , abi = strAbi
