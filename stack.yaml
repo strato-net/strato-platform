@@ -81,6 +81,7 @@ extra-deps:
 - servant-options-0.1.0.0
 - static-canvas-0.2.0.3
 - transformers-0.5.5.0
+- wai-middleware-prometheus-1.0.0
 - yesod-raml-0.2.0
 
 resolver: lts-10.10 #also duplicated in docker section below
