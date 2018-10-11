@@ -14,7 +14,9 @@ pipeline {
           docker images -a
           rm -rf ~/.stack
           rm -rf strato-platform
-          git clone https://github.com/blockapps/strato-platform -b develop
+          git worktree remove -f strato-worktree
+          git wortkree add strato-worktree develop
+          git workree list
         '''
       }
     }
@@ -23,7 +25,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          cd strato-platform
+          cd strato-worktree
           REPO=private make all
         '''
       }
@@ -35,7 +37,7 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started
-          cp strato-platform/docker-compose.yml strato-getting-started/
+          cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=cd10.eastus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
@@ -72,11 +74,11 @@ pipeline {
             withCredentials([
               usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
             ]) {
-              archiveArtifacts artifacts: "strato-platform/docker-compose.yml"
+              archiveArtifacts artifacts: "strato-worktree/docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                cd strato-platform
+                cd strato-worktree
                 docker-compose -f docker-compose.push.yml push
               '''
             }
@@ -109,7 +111,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running core-strato unit tests"
-              cd strato-platform/core-strato
+              cd strato-worktree/core-strato
               ./run_unit_tests_long.sh
             '''
           },
@@ -118,7 +120,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests'
-              cd strato-platform/blockapps-haskell
+              cd strato-worktree/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -127,7 +129,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
-              cd strato-platform/smd-ui
+              cd strato-worktree/smd-ui
               docker build -f Dockerfile.test .
             '''
           },
