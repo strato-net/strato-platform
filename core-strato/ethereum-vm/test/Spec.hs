@@ -77,6 +77,8 @@ runContextM' f = do
                         (error "Postgres connection no initialized") --conn
                         M.empty
                         M.empty
+                        M.empty
+                        M.empty
                         MP.emptyTriePtr
                         MP.emptyTriePtr
                         (SHA 0)

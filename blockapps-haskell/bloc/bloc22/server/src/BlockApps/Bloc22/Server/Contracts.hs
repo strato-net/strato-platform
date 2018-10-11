@@ -248,7 +248,7 @@ postContractsXabi PostXabiRequest{..} =
          partialXabis <- Map.fromList <$> parseXabi "src" (Text.unpack postxabirequestSrc)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
-        Left msg -> throwError . AnError .
+        Left msg -> throwError . UserError .
             ("contract compilation for xabi failed: " <>) . Text.pack $msg
         Right xs -> return . PostXabiResponse $ xs
 

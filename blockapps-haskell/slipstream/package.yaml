@@ -32,6 +32,7 @@ dependencies:
   - hflags
   - hslogger
   - http-client
+  - largeword
   - lens
   - logging-effect
   - milena
@@ -45,6 +46,7 @@ dependencies:
   - scientific
   - semigroups
   - servant-client
+  - split
   - template-haskell
   - text
   - time
@@ -76,6 +78,7 @@ tests:
       - base16-bytestring
       - bytestring
       - containers
+      - hflags
       - hspec
       - largeword
       - parsec

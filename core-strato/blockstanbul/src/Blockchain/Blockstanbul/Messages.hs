@@ -46,6 +46,15 @@ data TrustedMessage = Preprepare View Block
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic)
 
+data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
+
+categorize :: TrustedMessage -> MessageKind
+categorize = \case
+  Preprepare{} -> PreprepareK
+  Prepare{} -> PrepareK
+  Commit{} -> CommitK
+  RoundChange{} -> RoundChangeK
+
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
@@ -96,6 +105,10 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
+                -- Announce that the global consensus is ahead of us by
+                -- some number of blocks, and hope that a higher power
+                -- will erase the gap with PreviousBlocks.
+              | GapFound {have :: Integer, require :: Integer}
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
@@ -152,7 +165,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
-  rlpDecode (RLPArray [code, (RLPString payload), addr, sig, seals ]) =
+  rlpDecode (RLPArray [code, RLPString payload, addr, sig, seals ]) =
       let auth = MsgAuth (rlpDecode addr) (rlpDecode sig)
           body = rlpDeserialize payload
       in WireMessage auth $

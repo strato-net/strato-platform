@@ -28,9 +28,11 @@ import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
 import BlockApps.Bloc22.Monad
+import BlockApps.Solidity.Xabi              (Xabi(..))
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Parse.UnParser
+import BlockApps.Solidity.Xabi
 
 
 -- Query parameters allowed:
@@ -185,52 +187,30 @@ aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ 
 
 getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
 getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
---  (postParamsAssoc, postFilesAssoc) <- runRequestBody
---  let postParams = Map.fromList $
---                   map (\(x,y) -> (Text.unpack x, Text.unpack y))
---                   postParamsAssoc
---      postFilesInfo =
---        Map.fromList $
---        map (\l -> (P.fst $ P.head l, Map.fromList $ map P.snd l)) $
---        List.groupBy ((==) `on` fst) $
---        map (\(a, b) ->
---          let (a1, a2) = List.break (== ':') $ Text.unpack a
---              a3 = maybe a2 id $ stripPrefix ":" a2
---          in (a1, (a3, b))
---          ) $
---        postFilesAssoc
---  mainFiles0 <- maybe (return Map.empty) getFileContents $
---                Map.lookup "main" postFilesInfo
---  importFiles <- maybe (return Map.empty) getFileContents $
---                 Map.lookup "import" postFilesInfo
---  let mainFiles = maybe mainFiles0 (\s -> Map.insert "src" s mainFiles0) $
---                  Map.lookup "src" postParams
---  return (postParams, mainFiles, importFiles)
 
-
-addGetSourceFuncToSource :: Text -> Either String Text
-addGetSourceFuncToSource src = do
-  -- Supply empty string for parser as it's only used for error reporting
+addToSource :: Text -> [(SourceUnit -> SourceUnit)] -> Either String Text
+addToSource src funcs = do
   File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  let src' = formatSrc src
-      addGetSource (NamedXabi name (xabi, ts)) = NamedXabi name (addF src' xabi, ts)
-      addGetSource prag = prag
-      modifiedContents = List.map addGetSource units
-  return . pack . unparse . File $ modifiedContents
+  return . pack . unparse . File $ go units funcs
   where
-    addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
-    formatSrc = replace "\"" "\\\""
-              . replace "\n" "\\n"
-              . replace "'" "\\'"
+    go us [] = us
+    go us (f:fs) = go (List.map f us) fs
 
--- TODO: Merge with addGetSourceFunc if stable
-addGetNameFuncToSource :: Text -> Either String Text
-addGetNameFuncToSource src = do
-  File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  let addGetName (NamedXabi name (xabi, ts)) = NamedXabi name (
-          addFunction ("__getContractName__", "return \"" <> unpack name <> "\";") xabi, ts)
-      addGetName prag = prag
-  return . pack . unparse . File . List.map addGetName $ units
+addGetSource :: Text -> SourceUnit -> SourceUnit
+addGetSource src (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getSource__" src xabi, ts)
+addGetSource _ prag = prag
+
+addGetName :: SourceUnit -> SourceUnit
+addGetName (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getContractName__" name xabi, ts)
+addGetName prag = prag
+
+addF :: Text -> Text -> Xabi -> Xabi
+addF fName fBody = addFunction (fName, "return \"" <> unpack fBody <> "\";")
+
+formatSrc :: Text -> Text
+formatSrc = replace "\"" "\\\""
+          . replace "\n" "\\n"
+          . replace "'" "\\'"
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines

@@ -97,7 +97,7 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
 
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
+newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
 
 instance (Integral n, Show n) => Show (Hex n) where
   show (Hex n) = showHex (toInteger n) ""
@@ -737,5 +737,5 @@ instance ToSchema AccountInfo where
     NamedSchema (Just "AccountInfo")
       ( mempty
         & type_ .~ SwaggerInteger
-        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer)) 
+        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer))
         & description ?~ "Account Info" )

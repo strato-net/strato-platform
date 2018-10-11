@@ -18,16 +18,16 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             if [ "$BUILD_TYPE" == "full" ]; then
-              rm -rf strato-platform
-              git clone https://github.com/blockapps/strato-platform -b develop
-              cd strato-platform
+              git worktree remove -f strato-worktree
+              git worktree add strato-worktree develop
+              cd strato-worktree
               git checkout ${REFSPEC}
             else
-              cd strato-platform
+              cd strato-worktree
               rm -rf docker-compose.push.yml docker-compose.yml
-              git fetch
               git checkout ${REFSPEC}
             fi
+            git worktree list
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
             docker ps
           '''
@@ -40,7 +40,7 @@ pipeline {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
           sh '''#!/bin/bash -le
             set -x
-            cd strato-platform
+            cd strato-worktree
             echo ${RELEASE_VERSION} > VERSION
             REPO=public make all
             '''
@@ -54,7 +54,7 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started
-          cp strato-platform/docker-compose.yml strato-getting-started/
+          cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=strato-int.centralus.cloudapp.azure.com
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
@@ -103,14 +103,14 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running core-strato unit tests"
-              cd strato-platform/core-strato
+              cd strato-worktree/core-strato
               ./run_unit_tests.sh
             '''},
           "Bloch tests": {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests to verify the build to be healthy'
-              cd strato-platform/blockapps-haskell
+              cd strato-worktree/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -136,7 +136,7 @@ pipeline {
           ]) {
             sh '''#!/bin/bash -le
               set -x
-              cd strato-platform
+              cd strato-worktree
               RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose -f docker-compose.push.yml push

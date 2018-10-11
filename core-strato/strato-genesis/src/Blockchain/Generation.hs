@@ -25,7 +25,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HM
 import Data.Scientific (floatingOrInteger)
-import qualified Data.Text as T
+import           Data.Text (Text)
 import qualified Data.Vector as V
 import Data.Text.Encoding
 import Data.Word
@@ -38,11 +38,11 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.ChainInfo
 
 data Type = Number Integer
-          | Stryng T.Text
+          | Stryng Text
           | List (V.Vector Type)
           | Struct [Type]
           -- TODO(tim): Make the key type generic over hashable things.
-          | Mapping (HM.HashMap T.Text Type)
+          | Mapping (HM.HashMap Text Type)
   deriving (Eq, Show, Generic)
 
 instance Ae.FromJSON Type where
@@ -60,7 +60,7 @@ instance Ae.FromJSON Type where
 -- and probably needs to be replaced with something more generic.
 -- For example, this prohibits mapping(address => mapping(address => bool)),
 -- both because it only uses a string key and because the values is not Type2
-data TypeHashMap = Type Type | MappingHashMap (HM.HashMap T.Text Type) deriving (Eq, Show, Generic)
+data TypeHashMap = Type Type | MappingHashMap (HM.HashMap Text Type) deriving (Eq, Show, Generic)
 
 toType :: TypeHashMap -> Type
 toType (Type t) = t
@@ -146,10 +146,10 @@ encodeAllRecords (Records recs) = map (encodeRecord 0) recs
 encodeJSON :: L.ByteString -> [[(Word256, Word256)]]
 encodeJSON = encodeAllRecords . Records . JS.parseLazyByteString (JS.arrayOf JS.value)
 
-insertContractsCount :: Int -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContractsCount :: Int -> Text -> Text -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
 insertContractsCount n name src code start gi = insertContracts (replicate n []) name src code start gi
 
-insertContractsJSON :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContractsJSON :: L.ByteString -> Text -> Text -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
 insertContractsJSON rawJSON name src code start gi = insertContracts (encodeJSON rawJSON) name src code start gi
 
 encodeAllRecordsHashMaps :: RecordsHashMap -> [[(Word256, Word256)]]
@@ -158,10 +158,10 @@ encodeAllRecordsHashMaps (RecordsHashMap recs) = encodeAllRecords . Records . ma
 encodeJSONHashMaps :: L.ByteString -> [[(Word256, Word256)]]
 encodeJSONHashMaps = encodeAllRecordsHashMaps . RecordsHashMap . JS.parseLazyByteString (JS.arrayOf JS.value)
 
-insertContractsJSONHashMaps :: L.ByteString -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContractsJSONHashMaps :: L.ByteString -> Text -> Text -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
 insertContractsJSONHashMaps rawJSON name src code start gi = insertContracts (encodeJSONHashMaps rawJSON) name src code start gi
 
-insertContracts :: [[(Word256, Word256)]] -> String -> String -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContracts :: [[(Word256, Word256)]] -> Text -> Text -> BS.ByteString -> Address -> GenesisInfo -> GenesisInfo
 insertContracts slotss name src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi

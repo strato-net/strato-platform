@@ -22,6 +22,8 @@ import Data.List
 import Control.Concurrent
 import Database.PostgreSQL.Typed
 import Data.IORef
+import System.Log.Logger
+import Text.Printf
 
 import Slipstream.Globals
 import Slipstream.Options
@@ -69,12 +71,15 @@ lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
 getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
-getTheMessages offset = do
+getTheMessages offset@(K.Offset o) = do
   fetched <- fetch offset 0 lookupTopic
-  let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
+  let errorStatuses = concatMap (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
   case find (/= K.NoError) errorStatuses of
-   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (lookupTopic ^. K.tName ^. K.kString) ++ ", offset = " ++ show offset
-   _ -> return ()
+   Just e -> do
+    liftIO . debugM "getTheMessages/kafka_response" . show $ fetched
+    let topic = BC.unpack (lookupTopic ^. K.tName ^. K.kString)
+    error $ printf "There was a critical Kafka error while fetching messages: %s\ntopic = %s, offset = %d" (show e) topic o
+   Nothing -> return ()
   let ret = (map tamPayload . fetchMessages) fetched
   return ret
 
@@ -82,7 +87,6 @@ getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals ->  K.Offset -
 getAndProcessMessages conn cache offset = do
   messages <- getTheMessages offset
   liftIO $ processTheMessages messages conn cache
-  if (length messages == 0)
-    then  liftIO $ threadDelay 1000000
-    else return()
-  getAndProcessMessages conn cache $ (offset + fromIntegral (length messages))
+  when (null messages) $
+    liftIO $ threadDelay 1000000
+  getAndProcessMessages conn cache $ offset + fromIntegral (length messages)

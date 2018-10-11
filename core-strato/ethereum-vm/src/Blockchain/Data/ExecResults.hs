@@ -1,9 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Data.ExecResults (
   ExecResults(..)
   ) where
 
+import           Control.DeepSeq
 import qualified Data.ByteString         as B
 import qualified Data.Map.Strict         as M
+import           GHC.Generics
 
 import           Blockchain.VM.VMException
 import           Blockchain.Data.Address
@@ -20,4 +23,6 @@ data ExecResults =
     erNewContractAddress :: Maybe Address,
     erStorageDiffs       :: M.Map Address (M.Map Word256 Word256),
     erException          :: Maybe VMException
-    } deriving (Show)
+    } deriving (Show, Generic)
+
+instance NFData ExecResults

@@ -209,10 +209,13 @@ spec = do
       eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
     it "should parse an empty library" $ do
       parseContract "library l {}" `shouldBe`
-          Right (NamedXabi "l" (xempty{xabiIsLibrary=True}, []))
+          Right (NamedXabi "l" (xempty{xabiKind=LibraryKind}, []))
     it "should try 2" $ do
       parseContract "library Library {}" `shouldBe`
-          Right (NamedXabi "Library" (xempty{xabiIsLibrary=True}, []))
+          Right (NamedXabi "Library" (xempty{xabiKind=LibraryKind}, []))
+    it "should parse an empty interface" $ do
+      parseContract "interface I {}" `shouldBe`
+          Right (NamedXabi "I" (xempty{xabiKind=InterfaceKind}, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\

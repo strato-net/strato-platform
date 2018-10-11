@@ -25,6 +25,7 @@ dependencies:
   - bytestring
   - containers
   - cryptohash
+  - deepseq
   - directory
   - either
   - ethereum-encryption

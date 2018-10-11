@@ -5,7 +5,6 @@ contract Version {
         return "Version";
     }
     function __getSource__() view public returns (string) {
-        return "contract Version {\n  uint version;\n}";  
-    
+        return "contract Version {\n  uint version;\n}";
     }
 }

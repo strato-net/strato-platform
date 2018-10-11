@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
+import           Control.DeepSeq
 import           Data.Binary
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
@@ -28,12 +29,19 @@ import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
+import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+
+data SeqLoopEvent = TimerFire PBFT.RoundNumber
+                  | VoteMade PBFT.CandidateReceived
+                  | UnseqEvent IngestEvent
+                  | WaitTerminated
+                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
@@ -99,6 +107,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEGetTx [SHA]
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
+                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer}
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -114,6 +123,7 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otSigner :: A.Address
                          , otBaseTx :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic)
+instance NFData OutputTx
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
@@ -156,6 +166,13 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              , obReceiptTransactions = sbReceiptTransactions sb
                                                              , obBlockUncles         = sbBlockUncles sb
                                                              }
+
+sequencedBlockToBlock :: SequencedBlock -> Block
+sequencedBlockToBlock sb = BDB.Block
+                         { BDB.blockBlockData = sbBlockData sb
+                         , BDB.blockReceiptTransactions = map otBaseTx $ sbReceiptTransactions sb
+                         , BDB.blockBlockUncles = sbBlockUncles sb
+                         }
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
@@ -291,6 +308,7 @@ instance Binary OutputEvent where
     put (OEGetTx tx)         = putWord8 6 >> put tx
     put (OEBlockstanbul m)   = putWord8 7 >> put m
     put (OECreateBlockCommand) = putWord8 8
+    put (OEAskForBlocks s e) = putWord8 9 >> put s >> put e
     get = do
         tag <- getWord8
         case tag of
@@ -302,7 +320,8 @@ instance Binary OutputEvent where
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
             7 -> OEBlockstanbul <$> get
-            8 -> return OECreateBlockCommand
+            8 -> pure OECreateBlockCommand
+            9 -> OEAskForBlocks <$> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
@@ -9,8 +10,6 @@ module Blockchain.GenesisBlock (
 ) where
 
 
-import           Control.Concurrent.STM
-import           Control.Concurrent.STM.TMChan
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
@@ -18,13 +17,15 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import           Data.Either                          (isLeft)
+import           Data.Either                                  (isLeft)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
 import qualified Data.Text                                    as T
+import           Data.Text.Encoding                           (encodeUtf8)
 import           System.Directory
 
 import           Blockchain.BackupBlocks
+import qualified Blockchain.Data.Action                       as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
@@ -52,22 +53,17 @@ import           Blockchain.Util
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Event
-import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffEvents, assertTopicCreation)
+import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation, writeActionJSONToKafka, filterResponse)
 
-import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.MilenaTools               (commitSingleOffset)
-import           Blockchain.Output                    (printLogMsg)
-import           Blockchain.Sequencer                 (bootstrap)
-import qualified Blockchain.Sequencer.Constants       as SeqConstants
+import           Blockchain.Sequencer.Bootstrap       (bootstrapSequencer)
 import           Blockchain.Sequencer.Event           (OutputBlock)
-import           Blockchain.Sequencer.Monad
 import qualified Network.Kafka                        as K
 import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured)
+import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
@@ -162,7 +158,7 @@ initializeGenesisBlock backupType genesisBlockName = do
     liftIO (bootstrapIndexer genBId obGB)
     $logInfoS "initgen" "indexer has been bootstrapped"
     let rewrite (_, CodeInfo bin src name) =
-          (superProprietaryStratoSHAHash bin, (superProprietaryStratoSHAHash . C8.pack $ src, name))
+          (superProprietaryStratoSHAHash bin, (superProprietaryStratoSHAHash $ encodeUtf8 src, name))
         sourceCodeHashes = Map.fromList . map rewrite $ srcInfo
         findSourceHash = flip Map.lookup sourceCodeHashes
     populateStorageDBs findSourceHash genesisBlock genesisChainId
@@ -172,8 +168,8 @@ initializeGenesisBlock backupType genesisBlockName = do
 
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    (SHA -> Maybe (SHA, String)) -> Block->Maybe Word256->m ()
-populateStorageDBs findSourceHash genesisBlock genesisChainId = do
+                    (SHA -> Maybe (SHA, T.Text)) -> Block -> Maybe Word256 -> m ()
+populateStorageDBs getSourceHash genesisBlock genesisChainId = do
 
     accountDB <- getStateDB
     res <- liftIO . runKafkaConfigured "strato-init" $ do
@@ -198,9 +194,25 @@ populateStorageDBs findSourceHash genesisBlock genesisChainId = do
             else fullAddressState{addressStateContractRoot=MP.blankStateRoot}
           fullAddrStates = [(address, fullAddressState)]
           filteredAddrStates = [(address, filteredAddressState)]
+          toAction a d = A.Action
+            { A.actionType = A.Create
+            , A.actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
+            , A.actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
+            , A.actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
+            , A.actionTxHash = SHA $ fromMaybe 0 genesisChainId
+            , A.actionTxChainId = genesisChainId
+            , A.actionTxSender = Ad.Address 0
+            , A.actionAddress = a
+            , A.actionCodeHash = codeHash d
+            , A.actionSourcePtr = uncurry A.SourcePtr <$> getSourceHash (codeHash d)
+            , A.actionStorage = Just . Map.map fromDiff $ storage d
+            }
+          fromDiff :: Diff Word256 'Eventual -> Word256
+          fromDiff (Value v) = v
+          squashMap f = map (uncurry f) . Map.toList
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-      filteredAccountDiffs <- mapM eventualAccountState . Map.fromList $ filteredAddrStates
+      filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
 
       let statediff ad = StateDiff {
             StateDiff.chainId   = genesisChainId,
@@ -213,9 +225,7 @@ populateStorageDBs findSourceHash genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs (statediff fullAccountDiffs) (const "") (const "")
-      let diffTriple = destructStateDiff findSourceHash (statediff filteredAccountDiffs)
-      mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-        splitWriteStateDiffEvents diffTriple
+      mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
       case filterResponse <$> mErr of
        Right [] -> return ()
        Right errs -> error . show $ errs
@@ -247,22 +257,3 @@ bootstrapIndexer key obGB =
                 putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
                 runner
     in runner
-
-
-bootstrapSequencer :: Block -> IO OutputBlock
-bootstrapSequencer gb = do
-    let clientId = KP.KString $ C8.pack SeqConstants.defaultKafkaClientId'
-    ch <- atomically $ newTMChan
-    let dummySequencerCfg = SequencerConfig { depBlockDBCacheSize   = 0
-                                            , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
-                                            , kafkaAddress          = Nothing
-                                            , kafkaClientId         = clientId
-                                            , kafkaConsumerGroup    = lookupConsumerGroup clientId
-                                            , seenTransactionDBSize = 10
-                                            , syncWrites            = False
-                                            , bootstrapDoEmit       = True
-                                            , blockstanbulBlockPeriod = 0
-                                            , blockstanbulRoundPeriod = 0
-                                            , blockstanbulBeneficiary = ch
-                                            }
-    runLoggingT (runSequencerM dummySequencerCfg Nothing (bootstrap gb)) printLogMsg

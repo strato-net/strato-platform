@@ -77,6 +77,7 @@ services:
     - strato
     - vault-wrapper
     environment:
+    - historyList=${historyList}
     - loglevel=${loglevel}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -149,6 +150,8 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
+    - seqMaxEventsPerIter=${seqMaxEventsPerIter}
+    - seqMaxUsPerIter=${seqMaxUsPerIter}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper
@@ -207,8 +210,8 @@ services:
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
-    - 80:80
-    - 443:443
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: always
