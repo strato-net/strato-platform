@@ -17,7 +17,7 @@ import           Data.Proxy
 import           Data.String
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
-import           Generic.Random.Generic
+import qualified Generic.Random                   as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -81,7 +81,7 @@ instance ToSample UserName where
 instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
 
-instance Arbitrary UserName where arbitrary = genericArbitrary uniform
+instance Arbitrary UserName where arbitrary = GR.genericArbitrary GR.uniform
 
 
 instance ToParamSchema UserName
@@ -101,7 +101,7 @@ data TxParams = TxParams
   , txparamsNonce    :: Maybe Nonce
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
+instance Arbitrary TxParams where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}

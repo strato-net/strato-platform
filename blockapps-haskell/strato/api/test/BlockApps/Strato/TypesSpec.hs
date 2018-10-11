@@ -6,7 +6,7 @@ module BlockApps.Strato.TypesSpec where
 
 import           Control.Applicative
 import           Data.Aeson
-import           Generic.Random.Generic
+import           Generic.Random
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck

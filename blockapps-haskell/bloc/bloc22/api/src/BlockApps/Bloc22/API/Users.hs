@@ -22,7 +22,7 @@ import qualified Data.Map                           as Map
 import           Data.Proxy
 import           Data.Text                          (Text)
 import qualified Data.Text.Encoding                 as Text
-import           Generic.Random.Generic
+import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
@@ -45,7 +45,7 @@ import           BlockApps.Strato.Types
 data BlocTransactionStatus = Success | Failure | Pending deriving (Eq,Show,Generic)
 
 instance Arbitrary BlocTransactionStatus where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON BlocTransactionStatus where
   parseJSON = genericParseJSON defaultOptions
@@ -64,7 +64,7 @@ data BlocTransactionData = Send   PostTransaction
                          deriving (Eq,Show,Generic)
 
 instance Arbitrary BlocTransactionData where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
@@ -132,7 +132,7 @@ data BlocTransactionResult = BlocTransactionResult
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionResult where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonDrop 15 camelCase)
@@ -253,7 +253,7 @@ data PostSendParameters = PostSendParameters
   , sendTxParams  :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 
-instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
+instance Arbitrary PostSendParameters where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostSendParameters where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -311,7 +311,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestValue    :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary PostUsersContractRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostUsersContractRequest where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
@@ -400,7 +400,7 @@ instance ToJSON UploadListRequest where
 instance FromJSON UploadListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-instance Arbitrary UploadListRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary UploadListRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample UploadListRequest where
   toSamples _ = noSamples
@@ -427,7 +427,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractValue        :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
+instance Arbitrary UploadListContract where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON UploadListContract where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
@@ -454,7 +454,7 @@ newtype PostUsersUploadListResponse = PostUsersUploadListResponse
 instance ToSchema PostUsersUploadListResponse
 
 instance Arbitrary PostUsersUploadListResponse where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostUsersUploadListResponse where
   toJSON (PostUsersUploadListResponse contractDetails) = object
@@ -500,7 +500,7 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary PostUsersContractMethodRequest where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON PostUsersContractMethodRequest where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 instance FromJSON PostUsersContractMethodRequest where
@@ -590,7 +590,7 @@ data PostSendListRequest = PostSendListRequest
   , postsendlistrequestTxs      :: [SendTransaction]
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostSendListRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary PostSendListRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostSendListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -627,7 +627,7 @@ data SendTransaction = SendTransaction
   , sendtransactionTxParams  :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
+instance Arbitrary SendTransaction where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON SendTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
@@ -649,7 +649,7 @@ instance ToSample PostSendListResponse where
   toSamples _ = noSamples
 
 instance Arbitrary PostSendListResponse where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 
 instance ToSchema PostSendListResponse where
@@ -704,7 +704,7 @@ data PostUsersContractMethodListResponse
 
 
 instance Arbitrary PostUsersContractMethodListResponse where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostUsersContractMethodListResponse where
   toJSON mlr = case mlr of
@@ -762,7 +762,7 @@ data MethodErrored = MethodErrored { erroredMethodCall :: MethodCall
   deriving (Eq,Show,Generic)
 
 instance Arbitrary MethodErrored where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON MethodErrored
 instance FromJSON MethodErrored
@@ -801,7 +801,7 @@ data PostMethodListRequest = PostMethodListRequest
   , postmethodlistrequestTxs      :: [MethodCall]
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostMethodListRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary PostMethodListRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostMethodListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -843,7 +843,7 @@ data MethodCall = MethodCall
   , methodcallTxParams        :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
+instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON MethodCall where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}

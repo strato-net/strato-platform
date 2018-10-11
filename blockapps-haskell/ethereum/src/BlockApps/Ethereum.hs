@@ -79,7 +79,7 @@ import           Data.Swagger
 import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
-import           Generic.Random.Generic
+import           Generic.Random
 import           GHC.Generics
 import           Numeric
 import           Numeric.Natural
