@@ -11,7 +11,10 @@ import {
   BALANCE_SUCCESS,
   BALANCE_FAILURE,
   FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
-  FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE
+  FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
+  FAUCET_REQUEST,
+  FAUCET_SUCCESS,
+  FAUCET_FAILURE
 } from './accounts.actions';
 
 const initialState = {
@@ -19,6 +22,10 @@ const initialState = {
   currentAccountDetail: null,
   filter: '',
   error: null,
+  faucet: {
+    status: false,
+    accountAddress: null
+  }
 };
 
 const reducer = function (state = initialState, action) {
@@ -150,6 +157,30 @@ const reducer = function (state = initialState, action) {
         ...state,
         currentAccountDetail: null,
         error: action.error
+      }
+    case FAUCET_REQUEST:
+      return {
+        ...state,
+        faucet: {
+          status: true,
+          accountAddress: action.address
+        }
+      }
+    case FAUCET_SUCCESS:
+      return {
+        ...state,
+        faucet: {
+          status: false,
+          accountAddress: null
+        }
+      }
+    case FAUCET_FAILURE:
+      return {
+        ...state,
+        faucet: {
+          status: false,
+          accountAddress: null
+        }
       }
     default:
       return state;

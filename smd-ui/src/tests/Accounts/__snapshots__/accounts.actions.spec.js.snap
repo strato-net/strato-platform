@@ -19,6 +19,7 @@ Object {
 exports[`Accounts: action fetch account detail request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "flag": "faucet",
   "name": "tanuj",
   "type": "FETCH_ACCOUNT_DETAIL_REQUEST",
 }
@@ -151,6 +152,7 @@ Object {
 exports[`Accounts: action fetch faucet request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+  "flag": "faucet",
   "name": "blockapps",
   "type": "FAUCET_REQUEST",
 }
