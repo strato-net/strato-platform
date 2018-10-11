@@ -18,7 +18,6 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             if [ "$BUILD_TYPE" == "full" ]; then
-              rm -rf strato-platform
               git worktree remove -f strato-worktree
               git worktree add strato-worktree develop
               cd strato-worktree
