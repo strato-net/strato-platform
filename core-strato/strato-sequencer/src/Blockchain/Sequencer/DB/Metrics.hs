@@ -1,6 +1,6 @@
 module Blockchain.Sequencer.DB.Metrics where
 
-import Prometheus
+import           Prometheus
 
 chainMetrics :: Metric (Vector String Counter)
 chainMetrics = unsafeRegisterIO
@@ -13,3 +13,9 @@ txMetrics = unsafeRegisterIO
            . vector "tx_type"
            . counter
            $ Info "privatechain_tx" "Count for private chain transactions"
+
+chainBuffer :: Metric (Vector String Gauge)
+chainBuffer = unsafeRegisterIO
+            . vector "chain_buffer"
+            . gauge
+            $ Info "privatechain_buffer" "Size count for each private chain ID"
