@@ -12,6 +12,7 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - bytestring
+  - classy-prelude
   - cpu
   - cryptohash
   - crypto-pubkey-types
@@ -35,6 +36,7 @@ dependencies:
   - strato-model
   - text
   - time
+  - transformers-base
   - unliftio
   - unliftio-core
   - monad-control
