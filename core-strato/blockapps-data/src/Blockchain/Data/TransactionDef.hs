@@ -112,8 +112,8 @@ instance RLPSerializable Transaction where
             cid' -> (Just $ rlpDecode cid', Nothing)
           (c:m:_) -> (Just $ rlpDecode c, Just $ rlpDecode m)
     in case partial of
-      p@PrivateHashTX{..} -> case cid of
-        Nothing -> p
+      PrivateHashTX{..} -> case cid of
+        Nothing -> PrivateHashTX (rlpDecode rVal) (rlpDecode sVal)
         Just _ -> error "rlpDecode Transaction: PrivateHashTX transactions can't have a chainId"
       p@MessageTX{} -> p {
         transactionV = fromInteger $ rlpDecode vVal,
