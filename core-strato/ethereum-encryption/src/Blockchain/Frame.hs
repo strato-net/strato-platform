@@ -58,7 +58,7 @@ updateMac theMac theKey value =
 
 ethEncrypt :: (MonadLogger m, Monad m)
            => EthCryptState
-           -> ConduitT B.ByteString B.ByteString m ()
+           -> ConduitM B.ByteString B.ByteString m ()
 ethEncrypt ethCryptState = do
   await >>= \case
     Nothing -> return ()
@@ -91,7 +91,7 @@ ethEncrypt ethCryptState = do
 
 cbSafeTake :: forall o m. Monad m
            => Int
-           -> ConduitT B.ByteString o m (Maybe B.ByteString)
+           -> ConduitM B.ByteString o m (Maybe B.ByteString)
 cbSafeTake i = do
     ret <- CB.take i
     if BL.length ret /= fromIntegral i
@@ -100,7 +100,7 @@ cbSafeTake i = do
 
 ethDecrypt :: (MonadLogger m, Monad m)
            => EthCryptState
-           -> ConduitT B.ByteString B.ByteString m ()
+           -> ConduitM B.ByteString B.ByteString m ()
 ethDecrypt ethCryptState = do
   headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
   headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16

@@ -86,7 +86,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s _        = ""
 
 handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
-             =>  DebugMode -> PPeer -> ConduitT Event Message m ()
+             =>  DebugMode -> PPeer -> ConduitM Event Message m ()
 handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
@@ -379,7 +379,7 @@ numFromRedis = \case
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
 syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
-          => Direction -> Integer -> ConduitT Event Message m ()
+          => Direction -> Integer -> ConduitM Event Message m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do

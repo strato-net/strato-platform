@@ -14,7 +14,7 @@ import           Data.Conduit
 import           Blockchain.Event
 
 timerSource :: (MonadLogger m, MonadIO m)
-            => ConduitT () Event m ()
+            => ConduitM () Event m ()
 timerSource = forever $ do
   liftIO $ threadDelay 1000000
   yield TimerEvt

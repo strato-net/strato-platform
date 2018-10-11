@@ -81,7 +81,7 @@ runStratoP2PComm cp addresses =
               .| serve addresses
               .|appSink app
 
-serve :: TVar (S.Set ConnectedPeer) -> ConduitT BS.ByteString BS.ByteString IO ()
+serve :: TVar (S.Set ConnectedPeer) -> ConduitM BS.ByteString BS.ByteString IO ()
 serve addresses = do
   Just request <- await
   Just response <- liftIO $ call [getPeers addresses, getNumPeers addresses] $ BLC.fromStrict request

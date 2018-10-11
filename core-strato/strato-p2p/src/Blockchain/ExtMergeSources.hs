@@ -27,14 +27,14 @@ chanSink
     :: MonadIO m
     => chan                     -- ^ The channel.
     -> (chan -> a -> STM ())    -- ^ The 'write' function.
-    -> ConduitT a Void m ()
+    -> ConduitM a Void m ()
 chanSink ch writer = CL.mapM_ $ atomically . writer ch
 {-# INLINE chanSink #-}
 
 mergeSourcesCloseForAny :: (MonadLogger mi, MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
-             => [ConduitT () a mi ()] -- ^ The sources to merge.
+             => [ConduitM () a mi ()] -- ^ The sources to merge.
              -> Int -- ^ The bound of the intermediate channel.
-             -> mi (ConduitT () a mo ())
+             -> mi (ConduitM () a mo ())
 mergeSourcesCloseForAny sx bound = do
     c <- atomically $ newTBMChan bound
     threadIdsVar <- atomically newEmptyTMVar

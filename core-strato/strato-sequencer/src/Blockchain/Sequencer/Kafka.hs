@@ -98,10 +98,10 @@ readFromTopic' topic offset = do
 {-# INLINE readFromTopic' #-}
 
 class HasUnseqSink k where
-  getUnseqSink :: k (ConduitT [IngestEvent] Void k ())
+  getUnseqSink :: k (ConduitM [IngestEvent] Void k ())
 
 class HasSeqSink k where
-  getSeqSink :: k (ConduitT [OutputEvent] Void k ())
+  getSeqSink :: k (ConduitM [OutputEvent] Void k ())
 
 emitKafkaTransactions :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
