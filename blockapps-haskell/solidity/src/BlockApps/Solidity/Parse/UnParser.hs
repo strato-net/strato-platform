@@ -123,7 +123,7 @@ unparseFuncWithoutName Func{..} =
     <> case funcContents of
         Just contents -> contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
-    <> "\n    }"
+    <> "}"
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
@@ -135,7 +135,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> case modifierContents of
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
-  <> "\n    }"
+  <> "}"
 
 unparseEvent :: (Text, Event) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
