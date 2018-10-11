@@ -25,7 +25,6 @@ import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
-import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
 import           Data.Word
 import           GHC.Generics
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
@@ -184,8 +183,11 @@ instance RLPSerializable Integer where
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
 
 instance RLPSerializable String where
-  rlpEncode = rlpEncode . T.pack
-  rlpDecode = T.unpack . rlpDecode
+  rlpEncode s = rlpEncode $ BC.pack s
+
+  rlpDecode (RLPString s) = BC.unpack s
+  rlpDecode (RLPScalar n) = [w2c $ fromIntegral n]
+  rlpDecode (RLPArray x) = error $ "Malformed RLP in call to rlpDecode for String: RLPObject is an array: " ++ show (pretty x)
 
 instance RLPSerializable B.ByteString where
     rlpEncode x | B.length x == 1 && B.head x < 128 = RLPScalar $ B.head x
@@ -196,11 +198,8 @@ instance RLPSerializable B.ByteString where
     rlpDecode x = error ("rlpDecode for ByteString not defined for: " ++ show x)
 
 instance RLPSerializable T.Text where
-  rlpEncode s = rlpEncode $ encodeUtf8 s
-
-  rlpDecode (RLPString s) = decodeUtf8 s
-  rlpDecode (RLPScalar n) = T.pack [w2c $ fromIntegral n]
-  rlpDecode (RLPArray x) = error $ "Malformed RLP in call to rlpDecode for Text: RLPObject is an array: " ++ show (pretty x)
+  rlpEncode = rlpEncode . T.unpack
+  rlpDecode = T.pack . rlpDecode
 
 -- serialization for tuples, triples, etc. of serializable types
 instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
