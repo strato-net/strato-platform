@@ -45,7 +45,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -69,62 +68,43 @@ import           Executable.EVMFlags
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
 
-data Context = Context { contextStateDB             :: MP.MPDB
-                       , contextHashDB              :: HashDB
-                       , contextCodeDB              :: CodeDB
-                       , contextBlockSummaryDB      :: BlockSummaryDB
-                       , contextSQLDB               :: SQLDB
-                       , contextAddressStateTxDBMap :: M.Map Address AddressStateModification
+data Context = Context { contextStateDB                :: MP.MPDB
+                       , contextHashDB                 :: HashDB
+                       , contextCodeDB                 :: CodeDB
+                       , contextBlockSummaryDB         :: BlockSummaryDB
+                       , contextSQLDB                  :: SQLDB
+                       , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
-                       , contextStorageTxMap        :: M.Map (Address, Word256) Word256
-                       , contextStorageBlockMap     :: M.Map (Address, Word256) Word256
-                       , contextBlockHashRoot       :: MP.StateRoot
-                       , contextGenesisRoot         :: MP.StateRoot
-                       , contextCurrentBlockHash    :: SHA
-                       , contextCurrentChainId      :: Maybe Word256
-                       , contextBaggerState         :: !BaggerState
-                       , contextKafkaState          :: K.KafkaState
-                       , contextBestBlockInfo       :: ContextBestBlockInfo
-                       , contextRedisPool           :: Redis.Connection
-                       , contextInsertTxResultQueue :: [TransactionResult]
-                       , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
-                       , contextLogDBQueue          :: [LogDB]
-                       , contextHasBlockstanbul     :: Bool
-                       , _contextBlockRequested      :: Bool
+                       , contextStorageTxMap           :: M.Map (Address, Word256) Word256
+                       , contextStorageBlockMap        :: M.Map (Address, Word256) Word256
+                       , contextBlockHashRoot          :: MP.StateRoot
+                       , contextGenesisRoot            :: MP.StateRoot
+                       , contextCurrentBlockHash       :: SHA
+                       , contextCurrentChainId         :: Maybe Word256
+                       , contextBaggerState            :: !BaggerState
+                       , contextKafkaState             :: K.KafkaState
+                       , contextBestBlockInfo          :: ContextBestBlockInfo
+                       , contextRedisPool              :: Redis.Connection
+                       , contextTxResultQueue          :: [TransactionResult]
+                       , contextLogDBQueue             :: [LogDB]
+                       , contextHasBlockstanbul        :: Bool
+                       , _contextBlockRequested        :: Bool
                        }
 makeLenses ''Context
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
 instance HasMemTXResultDB ContextM where
-  enqueueInsertTransactionResults txrs = do
+  enqueueTransactionResults txrs = do
     ctx <- get
-    let q = contextInsertTxResultQueue ctx
-    put $ ctx { contextInsertTxResultQueue = (q ++ txrs) }
-
-  flushInsertTransactionResults = do
-    ctx <- get
-    let toWrite = contextInsertTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.InsertTxResult <$> toWrite)
-    put $ ctx { contextInsertTxResultQueue = [] }
-
-  enqueueUpdateTransactionResults sss = do
-    ctx <- get
-    let q = contextUpdateTxResultQueue ctx
-    put $ ctx { contextUpdateTxResultQueue = (q ++ sss) }
-
-  flushUpdateTransactionResults = do
-    ctx <- get
-    let toWrite = contextUpdateTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.UpdateTxResult <$> toWrite)
-    put $ ctx { contextUpdateTxResultQueue = [] }
+    let q = contextTxResultQueue ctx
+    put $ ctx { contextTxResultQueue = (q ++ txrs) }
 
   flushTransactionResults = do
     ctx <- get
-    let toInsert = IM.InsertTxResult <$> contextInsertTxResultQueue ctx
-        toUpdate = IM.UpdateTxResult <$> contextUpdateTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (toInsert ++ toUpdate)
-    put $ ctx { contextInsertTxResultQueue = [], contextUpdateTxResultQueue = [] }
+    let toWrite = contextTxResultQueue ctx
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
+    put $ ctx { contextTxResultQueue = [] }
 
 instance HasMemLogDB ContextM where
   enqueueLogEntries ls = do
@@ -248,7 +228,7 @@ runContextM f = do
                         initialKafkaState
                         Unspecified
                         redisPool
-                        [] [] []
+                        [] []
                         flags_blockstanbul
                         False)
 

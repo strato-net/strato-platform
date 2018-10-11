@@ -29,7 +29,6 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
-import           Blockchain.Data.MiningStatus
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -48,10 +47,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    newTxRanCallback :: [TxRunResult] -> DD.BlockData -> m ()
-    updateTxCallback :: [TxRunResult] -> SHA -> SHA -> MiningStatus -> m ()
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, newTxRanCallback, updateTxCallback, txsDroppedCallback #-}
+    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -161,11 +158,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
                     $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
                     setStateDBStateRoot lastSR
-                    newTxRanCallback newTxs (obBlockData build)
-                    updateTxCallback newUpdates
-                                     (BDB.blockHeaderPartialHash tempRewarded)
-                                     (BDB.blockHeaderPartialHash $ obBlockData build)
-                                     Unmined
                     setStateDBStateRoot existingStateDbStateRoot
                     return build
           else do -- some transactions which were cached have been evicted, need to recalculate entire block cache

@@ -58,7 +58,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
@@ -135,10 +134,6 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot startingStateRoot
         return newStateRoot
 
-    newTxRanCallback inserts bd = mapM_ (outputTransactionResult bd blockHeaderPartialHash Unmined) inserts
-
-    updateTxCallback updates o n m = enqueueUpdateTransactionResults $ map (\h -> ((otHash $ trrTransaction h), o, n, m)) updates
-
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
         let (message, _, _, theHash) = baggerRejectionToTransactionResultBits rejection
@@ -147,7 +142,7 @@ instance Bagger.MonadBagger ContextM where
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
-            void $ putInsertTransactionResult
+            void $ putTransactionResult
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
@@ -162,7 +157,6 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultNewStorage       = ""
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
-                                       , transactionResultMiningStatus     = Unmined
                                        , transactionResultChainId          = transactionChainId . otBaseTx $ rejectedTx rejection
                                        }
 
@@ -476,10 +470,9 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 --outputTransactionMessage::IO ()
 outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
-                        -> MiningStatus
                         -> TxRunResult
                         -> ContextM [Action]
-outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
   let (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
@@ -516,7 +509,7 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       enqueueLogEntries $ mkLogEntry <$> theLogs
-      enqueueInsertTransactionResult $
+      enqueueTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message
@@ -531,10 +524,9 @@ outputTransactionResult b hashFunction mined (TxRunResult OutputTx{otHash=theHas
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
                                , transactionResultStatus           = Just txrStatus
-                               , transactionResultMiningStatus     = mined
                                , transactionResultChainId          = chainId
                                }
-      if (not (flags_diffPublish && mined == Mined))
+      if not flags_diffPublish
         then return []
         else forM (M.toList sDiffs) $ \(a,s) -> do
           AddressState{..} <- getAddressState a

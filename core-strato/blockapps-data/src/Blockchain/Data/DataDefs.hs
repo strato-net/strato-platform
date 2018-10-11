@@ -27,7 +27,6 @@ import           Data.Time
 import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin

@@ -96,7 +96,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    miningStatus MiningStatus
     chainId Word256 Maybe
     deriving Eq Read Show Generic
 
