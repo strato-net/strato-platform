@@ -210,7 +210,7 @@ instance HasSQLDB ContextM where
 instance RBDB.HasRedisBlockDB ContextM where
     getRedisBlockDB = contextRedisPool <$> get
 
-instance MonadMonitor ContextM where
+instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
