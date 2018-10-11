@@ -33,7 +33,7 @@ defaultOptions  = Options
 
 options :: [OptDescr (Options -> IO Options)]
 options =
-   [Option ['n'] ["nonce"] 
+   [Option ['n'] ["nonce"]
       (ReqArg
        (\ nc opts -> do
             let nonc = read nc :: Int
@@ -42,36 +42,40 @@ options =
                else ioError $ fromLeft (userError "") (optNonce opts)
        ) "Int")
      "REQUIRED; Should be greater than previous value."
-  , Option ['r'] ["recipient"] 
+  , Option ['r'] ["recipient"]
       (ReqArg
        (\ rp opts -> do
-           case stringAddress rp of
+           let strAddr = stringAddress rp
+           case strAddr of
              Just eRecipient -> return opts { optRecipient = Right eRecipient }
-             _ -> ioError $ fromLeft (userError "") (optRecipient opts)
+             Nothing -> ioError $ fromLeft (userError "") (optRecipient opts)
        ) "Address")
     "REQUIRED; The beneficiary address."
-  , Option ['d'] ["node"] 
+  , Option ['d'] ["node"]
       (ReqArg
-       (\ nd opts -> return opts { optNode  = Right nd }) "Node IP Address")
+       (\ nd opts -> return opts { optNode  = Right nd }
+       ) "Node IP Address")
     "REQUIRED; The node server IP address."
-  , Option ['e'] ["remove"] 
+  , Option ['e'] ["remove"]
       (NoArg
        (\ opts -> return opts { optRemove = True}))
       "The voting direction"
    ]
 
+helpMessage :: String
+helpMessage = usageInfo header options
+  where header = "Usage: " ++ "blockstanbul-vote" ++ " [OPTION...]"
+
 parseArgs :: IO Options
 parseArgs = do
   argv <- getArgs
-  let header = "Usage: " ++ "blockstanbul-vote" ++ " [OPTION...]"
-  let helpMessage = usageInfo header options
   case getOpt RequireOrder options argv of
     ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
     (opts, _, _) -> foldlM (flip id) defaultOptions opts
 
 fromright :: Either IOError a -> a
 fromright (Right x) = x
-fromright (Left _) = error "not possible"
+fromright (Left _) = error ("See errors above." ++ "\n" ++ helpMessage)
 
 main :: IO()
 main = do
@@ -87,4 +91,5 @@ main = do
                                  , API.recipient= fromright (optRecipient opt)
                                  , API.votingdir= not (optRemove opt)
                                  , API.nonce= fromright (optNonce opt)}
+  putStrLn $ show vote
   API.uploadVote 80 (fromright (optNode opt)) vote
