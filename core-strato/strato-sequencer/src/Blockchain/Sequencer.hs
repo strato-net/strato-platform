@@ -308,7 +308,7 @@ hydrateAndEmit sb = do
                                                then [sequencedBlockToBlock sb]
                                                else map outputBlockToBlock wetBlocks
  where
- hydrateAndEmit' :: Conduit () SequencerM OutputBlock
+ hydrateAndEmit' :: ConduitT () OutputBlock SequencerM ()
  hydrateAndEmit' = do
   let logHydrate = $logInfoS "hydrateAndEmit" . T.pack
   readiness <- lift $ enqueueIfParentNotEmitted sb

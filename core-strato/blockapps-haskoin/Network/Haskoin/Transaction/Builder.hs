@@ -28,7 +28,7 @@ import Control.DeepSeq (NFData, rnf)
 import Data.Maybe (catMaybes, maybeToList, isJust, fromJust, isNothing)
 import Data.List (find, nub)
 import Data.Word (Word64)
-import Data.Conduit (Sink, await, ($$))
+import Data.Conduit (await, runConduit, ConduitT, Void, (.|))
 import Data.Conduit.List (sourceList)
 import qualified Data.ByteString as BS (length, replicate, empty, null)
 import Data.Aeson
@@ -63,7 +63,7 @@ chooseCoins :: Coin c
             -> Either String ([c], Word64)
                -- ^ Coin selection result and change amount.
 chooseCoins target kbfee continue coins =
-    runIdentity $ sourceList coins $$ chooseCoinsSink target kbfee continue
+    runIdentity . runConduit $ sourceList coins .| chooseCoinsSink target kbfee continue
 
 -- | Coin selection algorithm for normal (non-multisig) transactions. This
 -- function returns the selected coins together with the amount of change to
@@ -73,7 +73,7 @@ chooseCoinsSink :: (Monad m, Coin c)
                 => Word64 -- ^ Target price to pay.
                 -> Word64 -- ^ Fee price per 1000 bytes.
                 -> Bool   -- ^ Try to find better solution when one is found
-                -> Sink c m (Either String ([c], Word64))
+                -> ConduitM c Void m (Either String ([c], Word64))
                    -- ^ Coin selection result and change amount.
 chooseCoinsSink target kbfee continue
     | target > 0 =
@@ -95,7 +95,7 @@ chooseMSCoins :: Coin c
               -> Either String ([c], Word64)
                  -- ^ Coin selection result and change amount.
 chooseMSCoins target kbfee ms continue coins =
-    runIdentity $ sourceList coins $$ chooseMSCoinsSink target kbfee ms continue
+    runIdentity . runConduit $ sourceList coins .| chooseMSCoinsSink target kbfee ms continue
 
 -- | Coin selection algorithm for multisignature transactions. This function
 -- returns the selected coins together with the amount of change to send back
@@ -107,7 +107,7 @@ chooseMSCoinsSink :: (Monad m, Coin c)
                   -> Word64     -- ^ Fee price per 1000 bytes.
                   -> (Int, Int) -- ^ Multisig parameters m of n (m,n).
                   -> Bool -- ^ Try to find better solution when one is found
-                  -> Sink c m (Either String ([c], Word64))
+                  -> ConduitM c Void m (Either String ([c], Word64))
                      -- ^ Coin selection result and change amount.
 chooseMSCoinsSink target kbfee ms continue
     | target > 0 =
@@ -126,7 +126,7 @@ greedyAddSink :: (Monad m, Coin c)
               => Word64          -- ^ Target to reach
               -> (Int -> Word64) -- ^ Coin count to fee function
               -> Bool            -- ^ Try to find better solutions
-              -> Sink c m (Maybe ([c], Word64)) -- (Selected coins, change)
+              -> ConduitM c Void m (Maybe ([c], Word64)) -- (Selected coins, change)
 greedyAddSink target fee continue =
     go [] 0 [] 0
   where

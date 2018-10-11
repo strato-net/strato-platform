@@ -190,14 +190,14 @@ generateNonceMap = M.fromList . flip zip (repeat 0)
 hasSameHash :: (StateMachineM m) => SHA -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
-roundChange :: (StateMachineM m) => Conduit InEvent m OutEvent
+roundChange :: (StateMachineM m) => ConduitT InEvent OutEvent m ()
 roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
   pendingRound .= Just (_round nextView)
   yield =<< signMessage pk (RoundChange nextView)
 
-nextRound :: (StateMachineM m) => NextType -> Conduit InEvent m OutEvent
+nextRound :: (StateMachineM m) => NextType -> ConduitT InEvent OutEvent m ()
 nextRound nt = do
   -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
   -- rather than reset everything in the state.

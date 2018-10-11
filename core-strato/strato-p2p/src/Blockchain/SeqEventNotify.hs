@@ -19,12 +19,11 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
 
 seqEventNotificationSource :: ( MonadIO m
-                              , MonadBaseControl IO m
                               , MonadResource m
                               , MonadLogger m
                               , K.HasKafkaState m
                               )
-                           => Source m OutputEvent
+                           => ConduitT () OutputEvent m ()
 seqEventNotificationSource = do
     ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
     loop ofs'

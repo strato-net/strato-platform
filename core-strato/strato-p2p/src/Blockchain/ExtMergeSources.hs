@@ -21,19 +21,20 @@ import qualified Data.Conduit.List            as CL
 import           Data.Conduit.TMChan          hiding (mergeSources)
 
 import           Data.Conduit
+import           Data.Void
 
 chanSink
     :: MonadIO m
     => chan                     -- ^ The channel.
     -> (chan -> a -> STM ())    -- ^ The 'write' function.
-    -> Sink a m ()
+    -> ConduitT a Void m ()
 chanSink ch writer = CL.mapM_ $ atomically . writer ch
 {-# INLINE chanSink #-}
 
 mergeSourcesCloseForAny :: (MonadLogger mi, MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
-             => [Source mi a] -- ^ The sources to merge.
+             => [ConduitT () a mi ()] -- ^ The sources to merge.
              -> Int -- ^ The bound of the intermediate channel.
-             -> mi (Source mo a)
+             -> mi (ConduitT () a mo ())
 mergeSourcesCloseForAny sx bound = do
     c <- atomically $ newTBMChan bound
     threadIdsVar <- atomically newEmptyTMVar
