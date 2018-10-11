@@ -3,6 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Main where
 
+import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
@@ -47,16 +48,27 @@ main = do
       validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       authSenders = fromRight (error "invalid validators") eAuthSenders
-      -- TODO(tim): Use proper initial values for the view
       ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
-             then return Nothing
+             then do
+                unless (null validators) . ioError . userError
+                    $ "cannot specify --validators with --blockstanbul=false"
+                return Nothing
              else do
                 skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
                 let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-                putStrLn . ("NODEKEY address: " ++) . formatAddress . prvKey2Address $ pkey
+                    selfAddress = prvKey2Address pkey
+                putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
+                when (null validators) . ioError . userError
+                    $ "must specify --validators with --blockstanbul"
+                unless (selfAddress `elem` validators) . ioError . userError
+                    $ "NODEKEY must correspond to an address within --validators"
+                unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
+                    $ "--blockstanbul_block_period_ms must be nonnegative"
+                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
+                    $ "--blockstanbul_round_period_s must be positive"
                 return . Just . ctx $ pkey
   pkg <- atomically newCablePackage
   chv <- atomically newTMChan
