@@ -77,37 +77,6 @@ enterBloc2 env x = do
 emptyHash :: Keccak256
 emptyHash = keccak256 B.empty
 
-getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either Text ContractAndXabi)
-getContract name hash chainId = do
-  if(hash == emptyHash)
-    then return $ (Left "getContract called for an external account")
-    else do
-      xabi <- getContractXabi (ContractName name) (Named name) chainId
-
-      return $ Right ContractAndXabi {
-        contract = xAbiToContract xabi
-        , xabi = decodeUtf8 . BL.toStrict $ JSON.encode xabi
-        , name = name
-        , contractStored = False
-        , contractSchema = Nothing
-        }
-
-getContractCompileFullSource :: Address -> Keccak256 -> Maybe ChainId->Bloc (Either Text ContractAndXabi)
-getContractCompileFullSource address hash chainId = do
-  if (hash == emptyHash)
-    then return $ (Left "getContractCompileFullSource called for an external account")
-    else do
-      contractDetails <- getContractDetailsByAddressOnly address chainId
-
-      let ret = ContractAndXabi {
-        contract = xAbiToContract $ contractdetailsXabi contractDetails
-        , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
-        , name = T.replace "\"" "" $ contractdetailsName contractDetails
-        , contractStored = False
-        , contractSchema = Nothing
-      }
-      return $ Right ret
-
 storageToFunction :: Map (Hex Word256) (Hex Word256) -> Map (Hex Word256) (Hex Word256) -> Storage
 storageToFunction primary fallback k = case Map.lookup (Hex k) primary of
   Just (Hex w) -> w
