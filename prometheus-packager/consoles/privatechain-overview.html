@@ -31,6 +31,20 @@
   })
   </script>
 
+  <h3>Chain Buffer</h3>
+  <div id="privatechainBuffer"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#privatechainBuffer"),
+    expr: "privatechain_buffer",
+    name: '[[chain_buffer]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "size",
+    yUnits: "",
+  })
+  </script>
+
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}

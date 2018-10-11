@@ -29,6 +29,10 @@
   <td>PBFT</td>
   <td><code>pbft</code></td>
 </tr>
+<tr>
+  <td>Private Chain</td>
+  <td><code>privatechain</code></td>
+</tr>
 </table>
 
 {{ template "prom_content_tail" . }}

@@ -31,6 +31,20 @@
   })
   </script>
 
+  <h3>View</h3>
+  <div id="viewGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#viewGraph"),
+    expr: "pbft_current_view",
+    name: '[[view_field]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "number",
+    yUnits: "",
+  })
+  </script>
+
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}
