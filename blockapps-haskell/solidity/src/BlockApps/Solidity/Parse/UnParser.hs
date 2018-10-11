@@ -185,16 +185,3 @@ unparseVals (name, theType) =
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
-
-addFunction :: (Text, String) -> Xabi -> Xabi
-addFunction (name, contents) c =
-  let func = Func { funcArgs = Map.empty
-                  , funcVals = Map.singleton "#0" IndexedType{ indexedTypeType=String (Just True)
-                                                             , indexedTypeIndex=0
-                                                             }
-                  , funcContents = Just $ Text.pack contents
-                  , funcStateMutability = Just View
-                  , funcVisibility = Just Public
-                  , funcModifiers = Nothing
-                  }
-  in c{xabiFuncs=Map.insert name (func) $ xabiFuncs c}
