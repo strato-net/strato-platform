@@ -3,7 +3,6 @@
 module Handler.TransactionResult where
 
 import           Blockchain.SHA
-import           Blockchain.Data.TransactionResultStatus
 import qualified Database.Esqueleto           as E
 import           Handler.Common
 import           Handler.Filters              (fromHexText)

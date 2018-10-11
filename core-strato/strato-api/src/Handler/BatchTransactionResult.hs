@@ -14,8 +14,6 @@ import           Import
 import           Numeric             (readHex)
 import qualified Prelude             as P
 
-import qualified Blockchain.Data.TransactionResultStatus as TRS
-
 data StrungSHA = StrungSHA { unStrungSHA :: SHA }
     deriving (Eq, Ord, Read, Show)
 

@@ -299,7 +299,7 @@ addTransactions bd bg ts = go bd bg ts []
       printTransactionMessage t result deltaT
       P.setGauge vmTxMined (realToFrac deltaT)
 
-      actions <- outputTransactionResult b blockHeaderHash Mined $ TxRunResult t result deltaT beforeMap afterMap
+      actions <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
 
       let remainingBlockGas =
             case result of
