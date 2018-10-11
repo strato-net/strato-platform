@@ -8,12 +8,15 @@ module Blockchain.Data.TransactionDef (
   partialRLPDecode
   ) where
 
+import           Control.Arrow                ((***))
 import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString              as B
 import           Data.Map.Strict              (Map)
+import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Text                    (Text)
+import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.Persist.TH
 import           GHC.Generics
 
@@ -108,9 +111,10 @@ instance RLPSerializable Transaction where
     let (cid,md) = case xs of
           [] -> (Nothing, Nothing)
           [c] -> case c of
-            a@(RLPArray _) -> (Nothing, Just $ rlpDecode a)
+            (RLPArray a) -> (Nothing, Just . M.fromList $ map ((decodeUtf8 *** decodeUtf8) . rlpDecode) a)
             cid' -> (Just $ rlpDecode cid', Nothing)
-          (c:m:_) -> (Just $ rlpDecode c, Just $ rlpDecode m)
+          (c:(RLPArray a):_) -> (Just $ rlpDecode c, Just . M.fromList $ map ((decodeUtf8 *** decodeUtf8) . rlpDecode) a)
+          (_:o:_) -> error $ "rlpDecode Transaction: Expected metadata to be an RLPArray, but got: " ++ show o
     in case partial of
       PrivateHashTX{..} -> case cid of
         Nothing -> PrivateHashTX (rlpDecode rVal) (rlpDecode sVal)
@@ -153,7 +157,7 @@ instance RLPSerializable Transaction where
                   rlpEncode $ transactionR,
                   rlpEncode $ transactionS
                   ] ++ (maybeToList chainId)
-                    ++ (maybeToList $ fmap rlpEncode transactionMetadata)
+                    ++ (maybeToList $ fmap (RLPArray . map (rlpEncode . (encodeUtf8 *** encodeUtf8)) . M.toList) transactionMetadata)
               ContractCreationTX{..} ->
                 RLPArray $ [
                   n, gp, gl, toAddr, val, i,
@@ -161,7 +165,7 @@ instance RLPSerializable Transaction where
                   rlpEncode $ transactionR,
                   rlpEncode $ transactionS
                   ] ++ (maybeToList chainId)
-                    ++ (maybeToList $ fmap rlpEncode transactionMetadata)
+                    ++ (maybeToList $ fmap (RLPArray . map (rlpEncode . (encodeUtf8 *** encodeUtf8)) . M.toList) transactionMetadata)
       _ -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show r
       where
         r = partialRLPEncode t
