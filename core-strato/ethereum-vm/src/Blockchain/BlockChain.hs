@@ -191,11 +191,11 @@ timeIt f = do
     timeAfter <- liftIO getPOSIXTime
     return (timeAfter - timeBefore, result)
 
-timeit :: (MonadIO m, MonadLogger m) => String -> Maybe (P.Metric P.Gauge) -> m a -> m a
+timeit :: (MonadIO m, MonadLogger m) => String -> Maybe P.Gauge -> m a -> m a
 timeit message timer f = do
     (diff, ret) <- timeIt f
     $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff ::Double) ++ "s"
-    liftIO $ forM_ timer (P.setGauge (realToFrac diff))
+    liftIO $ forM_ timer (flip P.setGauge (realToFrac diff))
     return ret
 
 addBlocks :: [OutputBlock] -> ContextM [Action]
@@ -307,7 +307,7 @@ addTransactions bd bg ts = go bd bg ts []
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT
-      P.setGauge (realToFrac deltaT) vmTxMined
+      P.setGauge vmTxMined (realToFrac deltaT)
 
       actions <- outputTransactionResult b blockHeaderHash Mined $ TxRunResult t result deltaT beforeMap afterMap
 
@@ -332,7 +332,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     beforeMap <- getAddressStateTxDBMap
     (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
-    P.setGauge (realToFrac time') vmTxMining
+    P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time'
     let trr = TxRunResult tx result time' beforeMap afterMap
     case result of
