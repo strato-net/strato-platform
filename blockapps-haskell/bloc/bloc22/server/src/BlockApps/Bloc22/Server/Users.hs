@@ -8,6 +8,7 @@
 
 module BlockApps.Bloc22.Server.Users where
 
+import           ClassyPrelude                     ((<>))
 import           Control.Concurrent
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
@@ -30,7 +31,6 @@ import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
-import           Data.Monoid
 import           Data.RLP
 import           Data.Set                          (isSubsetOf)
 import           Data.Text                         (Text)

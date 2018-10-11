@@ -121,13 +121,13 @@ convertRet metadata conn globalsIORef = runConduit $
   .| createInserts globalsIORef
   .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
-createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   unless (null metadata) $ do
     let firstContract = head metadata
     let hashVal = codehash firstContract
-    globals <- readIORef globalsIORef
+    globals <- liftIO $ readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
     let tableName = contractName firstContract
     history <- isHistoric globalsIORef tableName
@@ -169,7 +169,7 @@ createInserts globalsIORef = do
                 , tableColumns list
                 , ");" ]
           yield histSt
-        _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+        _ <- liftIO $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
         return ()
     let vals = flip map metadata $ \row ->
           let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row

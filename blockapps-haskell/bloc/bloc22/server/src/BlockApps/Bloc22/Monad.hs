@@ -26,6 +26,7 @@ import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
+import           Data.Text.Prettyprint.Doc
 import           Data.Time.Format
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
@@ -36,7 +37,6 @@ import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
 import           Servant.Client
-import qualified Text.PrettyPrint.Leijen.Text       as Leijen
 
 newtype Bloc x = Bloc
   { runBloc ::
@@ -62,7 +62,7 @@ instance MonadError BlocError Bloc where
   throwError err = do
     logWith logError (Text.pack (formatError err))
     Bloc $ throwError err
-  catchError m handle = do
+  catchError m handle =
     Bloc $ catchError (runBloc m) (runBloc . handle)
 
 dbErrorToUserError :: MonadError BlocError m => m a -> m a
@@ -137,16 +137,16 @@ boxIt string =
 filterPrintLog::MonadIO m=>Severity->WithSeverity (WithCallStack (WithTimestamp Text))->m ()
 filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
 filterPrintLog _ x =
-  liftIO . print . render Leijen.stringStrict $ x
+    liftIO . print . render pretty $ x
   where
-    render::(a0 -> Leijen.Doc)
-            -> WithSeverity (WithCallStack (WithTimestamp a0))
-            -> Leijen.Doc
-    render
-      = renderWithSeverity
-      . renderLocation
-      . renderWithTimestamp
-          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+    render :: (a0 -> Doc ann) -> WithSeverity (WithCallStack (WithTimestamp a0)) -> Doc ann
+    render = renderWithSeverity
+           . renderLocation
+           . renderWithTimestamp (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+
+renderLocation:: (a -> Doc ann) -> WithCallStack a -> Doc ann
+renderLocation k (WithCallStack stack msg) =
+  fill 40 (pretty (formatTopLocation $ getCallStack stack)) <> k msg
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
@@ -268,11 +268,6 @@ compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Argument
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
 
 
-
-renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
-renderLocation k (WithCallStack stack msg) =
-  Leijen.fill 40 (Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
-
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
@@ -295,7 +290,7 @@ blocQuery
 blocQuery q = do
   traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ runQuery conn q)
+  withResource pool (\conn -> liftIO $ runQuery conn q)
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
@@ -319,7 +314,8 @@ blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do
   logWithCallStack callStack logNotice "Updating the database"
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ modify conn)
+  withResource pool (liftIO . modify)
+
 blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
   logWithCallStack callStack logNotice "Updating the database"
