@@ -28,6 +28,7 @@ pipeline {
               rm -rf docker-compose.push.yml docker-compose.yml
               git checkout ${REFSPEC}
             fi
+            git worktree list
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
             docker ps
           '''
