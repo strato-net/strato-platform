@@ -23,7 +23,7 @@ describe('ContractMethodCall: action', () => {
   describe('fetch arguments', () => {
 
     test('request', () => {
-      expect(methodCallFetchArgs(modals.name, modals.address, modals.symbol, modals.key)).toMatchSnapshot();
+      expect(methodCallFetchArgs(modals.name, modals.address, modals.symbol, modals.key, modals.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {

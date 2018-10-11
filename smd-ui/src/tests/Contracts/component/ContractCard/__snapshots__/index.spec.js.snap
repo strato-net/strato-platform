@@ -1778,6 +1778,7 @@ ShallowWrapper {
     fetchCirrusInstances={[Function]}
     fetchState={[Function]}
     selectContractInstance={[Function]}
+    selectedChain="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
   />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
@@ -1980,6 +1981,7 @@ ShallowWrapper {
                         }
                       >
                         <withRouter(Connect(ReduxForm))
+                          chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                           contractName="Greeter"
                           fromBloc={false}
@@ -2871,6 +2873,7 @@ ShallowWrapper {
                         }
                       >
                         <withRouter(Connect(ReduxForm))
+                          chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                           contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                           contractName="Greeter"
                           fromBloc={false}
@@ -3029,6 +3032,7 @@ ShallowWrapper {
                           }
                         >
                           <withRouter(Connect(ReduxForm))
+                            chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                             contractName="Greeter"
                             fromBloc={false}
@@ -3227,6 +3231,7 @@ ShallowWrapper {
                           }
                         >
                           <withRouter(Connect(ReduxForm))
+                            chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                             contractName="Greeter"
                             fromBloc={false}
@@ -3361,6 +3366,7 @@ ShallowWrapper {
                           }
                         >
                           <withRouter(Connect(ReduxForm))
+                            chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                             contractName="Greeter"
                             fromBloc={false}
@@ -3492,6 +3498,7 @@ ShallowWrapper {
                             }
                           >
                             <withRouter(Connect(ReduxForm))
+                              chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                               contractName="Greeter"
                               fromBloc={false}
@@ -3696,6 +3703,7 @@ ShallowWrapper {
                               }
                             >
                               <withRouter(Connect(ReduxForm))
+                                chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 contractName="Greeter"
                                 fromBloc={false}
@@ -3804,6 +3812,7 @@ ShallowWrapper {
                                 }
                               >
                                 <withRouter(Connect(ReduxForm))
+                                  chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   contractName="Greeter"
                                   fromBloc={false}
@@ -3898,6 +3907,7 @@ ShallowWrapper {
                               "nodeType": "host",
                               "props": Object {
                                 "children": <withRouter(Connect(ReduxForm))
+                                  chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   contractName="Greeter"
                                   fromBloc={false}
@@ -3915,6 +3925,7 @@ ShallowWrapper {
                                 "key": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
                                 "nodeType": "function",
                                 "props": Object {
+                                  "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                   "contractAddress": "0293f9b10a4453667db7fcfe74728c9d821add4b",
                                   "contractName": "Greeter",
                                   "fromBloc": false,
@@ -4290,6 +4301,7 @@ ShallowWrapper {
                           }
                         >
                           <withRouter(Connect(ReduxForm))
+                            chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                             contractName="Greeter"
                             fromBloc={false}
@@ -5181,6 +5193,7 @@ ShallowWrapper {
                           }
                         >
                           <withRouter(Connect(ReduxForm))
+                            chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                             contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                             contractName="Greeter"
                             fromBloc={false}
@@ -5339,6 +5352,7 @@ ShallowWrapper {
                             }
                           >
                             <withRouter(Connect(ReduxForm))
+                              chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                               contractName="Greeter"
                               fromBloc={false}
@@ -5537,6 +5551,7 @@ ShallowWrapper {
                             }
                           >
                             <withRouter(Connect(ReduxForm))
+                              chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                               contractName="Greeter"
                               fromBloc={false}
@@ -5671,6 +5686,7 @@ ShallowWrapper {
                             }
                           >
                             <withRouter(Connect(ReduxForm))
+                              chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                               contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                               contractName="Greeter"
                               fromBloc={false}
@@ -5802,6 +5818,7 @@ ShallowWrapper {
                               }
                             >
                               <withRouter(Connect(ReduxForm))
+                                chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                 contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 contractName="Greeter"
                                 fromBloc={false}
@@ -6006,6 +6023,7 @@ ShallowWrapper {
                                 }
                               >
                                 <withRouter(Connect(ReduxForm))
+                                  chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                   contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   contractName="Greeter"
                                   fromBloc={false}
@@ -6114,6 +6132,7 @@ ShallowWrapper {
                                   }
                                 >
                                   <withRouter(Connect(ReduxForm))
+                                    chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                     contractName="Greeter"
                                     fromBloc={false}
@@ -6208,6 +6227,7 @@ ShallowWrapper {
                                 "nodeType": "host",
                                 "props": Object {
                                   "children": <withRouter(Connect(ReduxForm))
+                                    chainId="1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14"
                                     contractAddress="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                     contractName="Greeter"
                                     fromBloc={false}
@@ -6225,6 +6245,7 @@ ShallowWrapper {
                                   "key": "methodCallgreet0293f9b10a4453667db7fcfe74728c9d821add4b",
                                   "nodeType": "function",
                                   "props": Object {
+                                    "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
                                     "contractAddress": "0293f9b10a4453667db7fcfe74728c9d821add4b",
                                     "contractName": "Greeter",
                                     "fromBloc": false,
