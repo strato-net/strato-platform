@@ -15,7 +15,7 @@ pipeline {
           rm -rf ~/.stack
           rm -rf strato-platform
           git worktree remove -f strato-worktree
-          git wortkree add strato-worktree
+          git wortkree add strato-worktree develop
         '''
       }
     }
