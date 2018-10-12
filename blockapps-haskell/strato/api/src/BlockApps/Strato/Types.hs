@@ -62,7 +62,7 @@ import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           Data.Time
 import           Data.Word
-import           Generic.Random.Generic
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Numeric
 import           Numeric.Natural
@@ -196,7 +196,7 @@ instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
 
 instance Arbitrary x => Arbitrary (Strung x) where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 data WithNext x = WithNext
   { withoutNext :: x
@@ -269,7 +269,7 @@ instance ToJSON PostTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance Arbitrary PostTransaction where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample PostTransaction where
   toSamples _ = singleSample PostTransaction
@@ -483,7 +483,7 @@ data TransactionResult = TransactionResult
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON TransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)

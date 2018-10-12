@@ -1,29 +1,32 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Metrics where
 
 import Control.Monad.IO.Class
+import Data.Text
 import Prometheus
+
 import Blockchain.Blockstanbul.Messages
 
-inEventMetric :: Metric (Vector String Counter)
-inEventMetric = unsafeRegisterIO
-               . vector "inevent_type"
-               . counter
-               $ Info "pbft_inevent" "Count of pbft inEvent"
+inEventMetric :: Vector Text Counter
+inEventMetric = unsafeRegister
+              . vector "inevent_type"
+              . counter
+              $ Info "pbft_inevent" "Count of pbft inEvent"
 
-outEventMetric :: Metric (Vector String Counter)
-outEventMetric = unsafeRegisterIO
+outEventMetric :: Vector Text Counter
+outEventMetric = unsafeRegister
                . vector "outevent_type"
                . counter
                $ Info "pbft_outevent" "Count of pbft outEvent"
 
-currentView :: Metric (Vector String Gauge)
-currentView = unsafeRegisterIO
+currentView :: Vector Text Gauge
+currentView = unsafeRegister
             . vector "view_field"
             . gauge
             $ Info "pbft_current_view" "Current (Roundno, Seqno) of PBFT"
 
 recordView :: (MonadIO m) => View -> m ()
 recordView View{..} = liftIO $ do
-  withLabel "round_number" (setGauge . fromIntegral $ _round) currentView
-  withLabel "sequence_number" (setGauge . fromIntegral $ _sequence) currentView
+  withLabel currentView "round_number" (flip setGauge . fromIntegral $ _round)
+  withLabel currentView "sequence_number" (flip setGauge . fromIntegral $ _sequence)

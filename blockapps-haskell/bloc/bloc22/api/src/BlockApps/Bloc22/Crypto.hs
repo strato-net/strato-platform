@@ -27,7 +27,7 @@ import           Data.Maybe
 import           Data.String
 import           Data.Swagger.Internal.Schema
 import qualified Data.Text.Encoding                as Text
-import           Generic.Random.Generic
+import qualified Generic.Random                    as GR
 import           GHC.Generics
 import           Servant.Docs
 import           Test.QuickCheck
@@ -60,7 +60,7 @@ instance FromJSON Password where
   parseJSON = fmap (Password . Text.encodeUtf8) . parseJSON
 
 instance Arbitrary Password where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance IsString Password where
   fromString = Password . Char8.pack
@@ -137,7 +137,7 @@ instance ToSample KeyStore where
   toSamples _ = noSamples
 
 instance Arbitrary KeyStore where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance GToSchema (K1 i ByteString) where
   gdeclareNamedSchema _ _ _ = pure $ NamedSchema Nothing byteSchema

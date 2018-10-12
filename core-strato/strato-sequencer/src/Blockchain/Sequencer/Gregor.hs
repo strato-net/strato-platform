@@ -82,9 +82,6 @@ instance K.HasKafkaState GregorM where
   getKafkaState = use gregorKafkaState
   putKafkaState = assign gregorKafkaState
 
-instance P.MonadMonitor GregorM where
-  doIO = liftIO
-
 getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
 getKafkaConsumerGroup = use gregorConsumerGroup
 
@@ -94,18 +91,18 @@ readUnseqEvents' = do
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
     -- its really [(nextOffset, eventAtThisOffset)]
     ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (SK.readUnseqEvents offset)
-    P.unsafeAddCounter (fromIntegral (length ret)) gregorUnseqRead
+    P.unsafeAddCounter gregorUnseqRead (fromIntegral (length ret))
     return ret
 
 writeSeqVmEvents :: [OutputEvent] -> GregorM ()
 writeSeqVmEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqVmEvents events)
-    P.unsafeAddCounter (fromIntegral(length events)) gregorVMWrite
+    P.unsafeAddCounter gregorVMWrite (fromIntegral(length events))
 
 writeSeqP2pEvents :: [OutputEvent] -> GregorM ()
 writeSeqP2pEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqP2pEvents events)
-    P.unsafeAddCounter (fromIntegral(length events)) gregorP2PWrite
+    P.unsafeAddCounter gregorP2PWrite (fromIntegral(length events))
 
 assertTopicCreation :: GregorM ()
 assertTopicCreation = void $ K.withKafkaViolently SK.assertTopicCreation
@@ -126,7 +123,7 @@ setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
     P.incCounter gregorKafkaCheckpointWrites
-    P.setGauge (fromIntegral newOffset) gregorUnseqOffset
+    P.setGauge gregorUnseqOffset (fromIntegral newOffset)
     op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
@@ -139,13 +136,13 @@ runTheGregor cfg = runGregorM cfg $ race_ unseqReader seqWriters
 unseqReader :: GregorM ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
   inEvents <- readUnseqEvents'
-  P.withLabel "unseq_events" P.incCounter gregorLoop
+  P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
   ch <- use gregorUnseq
   atomically . forM_ inEvents $ writeTMChan ch . snd
   hd <- atomically $ tryPeekTMChan ch
   $logDebugS "gregor/unseqchHead" . T.pack . show $ hd
-  P.unsafeAddCounter (fromIntegral (length inEvents)) gregorUnseqWrite
+  P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
     let ofs = maximum . map fst $ inEvents
     setNextIngestedOffset ofs
@@ -155,14 +152,14 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
   vmch <- use gregorSeqVM
   vmevs <- atomically $ drainTMChan vmch
   unless (null vmevs) $ do
-    P.withLabel "seq_vm_events" P.incCounter gregorLoop
-    P.unsafeAddCounter (fromIntegral $ length vmevs) gregorVMRead
+    P.withLabel gregorLoop "seq_vm_events" P.incCounter
+    P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
     writeSeqVmEvents vmevs
   p2pch <- use gregorSeqP2P
   p2pevs <- atomically $ drainTMChan p2pch
   unless (null p2pevs) $ do
-    P.withLabel "seq_p2p_events" P.incCounter gregorLoop
-    P.unsafeAddCounter (fromIntegral $ length p2pevs) gregorP2PRead
+    P.withLabel gregorLoop "seq_p2p_events" P.incCounter
+    P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
     writeSeqP2pEvents p2pevs
   threadDelay 1000 -- 1ms
 

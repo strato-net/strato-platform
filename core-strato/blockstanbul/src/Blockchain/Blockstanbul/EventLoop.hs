@@ -410,25 +410,27 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
 
-recordInEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => InEvent -> m ()
-recordInEvent = \case
-               IMsg _ Preprepare{} -> liftIO $ withLabel "preprepare_message" incCounter inEventMetric
-               IMsg _ Prepare{} -> liftIO $ withLabel "prepare_message" incCounter inEventMetric
-               IMsg _ Commit{} -> liftIO $ withLabel "commit_message" incCounter inEventMetric
-               IMsg _ RoundChange{} -> liftIO $ withLabel "roundchange_message" incCounter inEventMetric
-               Timeout _ -> liftIO $ withLabel "timeout" incCounter inEventMetric
-               CommitResult _ -> liftIO $ withLabel "commit_result" incCounter inEventMetric
-               UnannouncedBlock _ -> liftIO $ withLabel "unannounced_block" incCounter inEventMetric
-               PreviousBlock _ -> liftIO $ withLabel "previous_block" incCounter inEventMetric
-               NewBeneficiary _ _ ->liftIO $ withLabel "new_beneficiary" incCounter inEventMetric
+recordInEvent :: (MonadIO m) => InEvent -> m ()
+recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
+  in case ev of
+   IMsg _ Preprepare{} -> inc "preprepare_message"
+   IMsg _ Prepare{} -> inc "prepare_message"
+   IMsg _ Commit{} -> inc "commit_message"
+   IMsg _ RoundChange{} -> inc "roundchange_message"
+   Timeout{} -> inc "timeout"
+   CommitResult{} -> inc "commit_result"
+   UnannouncedBlock{} -> inc "unannounced_block"
+   PreviousBlock{} -> inc "previous_block"
+   NewBeneficiary{} -> inc "new_beneficiary"
 
-recordOutEvent :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => OutEvent -> m ()
-recordOutEvent = \case
-                OMsg _ Preprepare{} -> liftIO $ withLabel "preprepare_message" incCounter outEventMetric
-                OMsg _ Prepare{} -> liftIO $ withLabel "prepare_message" incCounter outEventMetric
-                OMsg _ Commit{} -> liftIO $ withLabel "commit_message" incCounter outEventMetric
-                OMsg _ RoundChange{} -> liftIO $ withLabel "roundchange_message" incCounter outEventMetric
-                ToCommit _ -> liftIO $ withLabel "to_commit_block" incCounter outEventMetric
-                MakeBlockCommand -> liftIO $ withLabel "make_block_command" incCounter outEventMetric
-                ResetTimer _ -> liftIO $ withLabel "reset_timer" incCounter outEventMetric
-                GapFound{} -> liftIO $ withLabel "gap_found" incCounter outEventMetric
+recordOutEvent :: (MonadIO m) => OutEvent -> m ()
+recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter
+  in case ev of
+    OMsg _ Preprepare{} -> inc "preprepare_message"
+    OMsg _ Prepare{} -> inc "prepare_message"
+    OMsg _ Commit{} -> inc "commit_message"
+    OMsg _ RoundChange{} -> inc "roundchange_message"
+    ToCommit{} -> inc "to_commit_block"
+    MakeBlockCommand -> inc "make_block_command"
+    ResetTimer{} -> inc "reset_timer"
+    GapFound{} -> inc "gap_found"

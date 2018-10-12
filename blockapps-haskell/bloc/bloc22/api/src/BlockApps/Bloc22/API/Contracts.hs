@@ -20,7 +20,7 @@ import           Data.String                      (IsString (..))
 import           Data.Swagger
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
-import           Generic.Random.Generic
+import qualified Generic.Random                   as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -49,7 +49,7 @@ instance ToJSON AddressCreatedAt
 
 instance FromJSON AddressCreatedAt
 
-instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary uniform
+instance Arbitrary AddressCreatedAt where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema AddressCreatedAt where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -85,7 +85,7 @@ instance ToJSON GetContractsResponse where
 instance FromJSON GetContractsResponse where
   parseJSON = fmap GetContractsResponse . parseJSON
 
-instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary uniform
+instance Arbitrary GetContractsResponse where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample GetContractsResponse where
   toSamples _ = singleSample $ GetContractsResponse $ Map.singleton "Sample"
@@ -179,7 +179,7 @@ instance ToJSON FunctionName where
   toJSON (FunctionName _name) = toJSON _name
 
 instance Arbitrary FunctionName where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema FunctionName where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -296,7 +296,7 @@ data PostCompileRequest = PostCompileRequest
   , postcompilerequestSource       :: Text
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary uniform
+instance Arbitrary PostCompileRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostCompileRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -334,7 +334,7 @@ instance ToSample PostCompileResponse where
   toSamples _ = noSamples
 
 instance Arbitrary PostCompileResponse where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema PostCompileResponse where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -376,7 +376,7 @@ instance ToSample PostXabiRequest where
   toSamples _ = noSamples
 
 instance Arbitrary PostXabiRequest where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema PostXabiRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -400,7 +400,7 @@ instance ToSample PostXabiResponse where
   toSamples _ = noSamples
 
 instance Arbitrary PostXabiResponse where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema PostXabiResponse where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -431,7 +431,7 @@ instance FromJSON SymbolName where parseJSON = fmap SymbolName . parseJSON
 
 instance ToJSON SymbolName where toJSON (SymbolName _name) = toJSON _name
 
-instance Arbitrary SymbolName where arbitrary = genericArbitrary uniform
+instance Arbitrary SymbolName where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName _name) = _name

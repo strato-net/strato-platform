@@ -4,7 +4,7 @@
 module BlockApps.Strato.ClientSpec where
 
 import           Data.Either
-import           Generic.Random.Generic
+import           Generic.Random
 import           Network.HTTP.Client
 import           Servant.Client
 import           Test.Hspec

@@ -117,7 +117,7 @@ readEventsInBufferedWindow src = do
 
 checkForVotes :: [CandidateReceived] -> SequencerM ()
 checkForVotes crs = do
-  withLabel "vote" (unsafeAddCounter . fromIntegral . length $ crs) seqLoopEvents
+  withLabel seqLoopEvents "vote" (flip unsafeAddCounter . fromIntegral . length $ crs)
   blockstanbulSend . map translate $ crs
   where translate :: CandidateReceived -> InEvent
         translate br =
@@ -130,17 +130,17 @@ checkForVotes crs = do
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
 checkForTimeouts rns = do
-  withLabel "timeout" (unsafeAddCounter . fromIntegral . length $ rns) seqLoopEvents
+  withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
   blockstanbulSend . map Timeout $ rns
 
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
-    withLabel "unseq" (unsafeAddCounter . fromIntegral . length $ inEvents) seqLoopEvents
+    withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
     timeAction seqSplitEventsTiming $ splitEvents inEvents
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
     P.incCounter seqLdbBatchWrites
-    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
+    P.setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
     $logInfoS "sequencer" "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
     unless (S.null chainIds) $
