@@ -6,6 +6,7 @@
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
+import Control.Applicative ((<|>))
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
@@ -62,6 +63,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
+  , _lockSender :: Maybe Address
   , _authSenders :: M.Map Address Int
 }
 
@@ -77,6 +79,7 @@ debugShowCtx = do
   infoLog "showctx/validators" validators (show . map (printf "%x" :: Address -> String) . S.toList)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
+  infoLog "showctx/mLockedSender" lockSender (show . fmap format)
   debugLog "showctx/prepared" prepared show
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
@@ -103,6 +106,7 @@ newContext v as senderlist pk =
      , _prvkey = pk
      , _blockcount = 0
      , _blockLock = Nothing
+     , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
      }
 
@@ -111,6 +115,16 @@ selfAddr = uses prvkey prvKey2Address
 
 poolSize :: (StateMachineM m) => m Int
 poolSize = uses validators S.size
+
+clearLock :: (StateMachineM m) => m ()
+clearLock = do
+  blockLock .= Nothing
+  lockSender .= Nothing
+
+setLock :: StateMachineM m => m ()
+setLock = do
+  (blockLock .=) =<< use proposal
+  (lockSender .=) =<< uses proposer Just
 
 authorize :: (StateMachineM m) => InEvent -> m Bool
 authorize = \case
@@ -129,6 +143,7 @@ isAuthorized iev = do
   unless authenticated $
     warn $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorized <- authorize iev
+  mLockSender <- use lockSender
   specificAuth <-
     case iev of
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
@@ -143,12 +158,14 @@ isAuthorized iev = do
           else do
             warn "Rejecting NewBeneficiary; nonce or signature incorrect"
             return False
+      -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
+      -- but with incorrect extraData.
       IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
         vals <- use validators
         let payloadVals = S.fromList (getValidatorList pp)
             validatorsMatch = vals == payloadVals
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
-            signerMatches = Just addr == signatory
+            signerMatches = (mLockSender <|> Just addr) == signatory
         unless signerMatches $
           warn $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
               ++ " is not sender " ++ format addr
@@ -306,7 +323,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       hasSent <- use hasPrepared
       when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
         hasPrepared .= True
-        (blockLock .=) =<< use proposal
+        setLock
         pk <- use prvkey
         seal <- commitmentSeal di pk
         yield =<< signMessage pk (Commit v di seal)
@@ -341,7 +358,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         when (_sequence v < _sequence vn) $ do
           -- Assume that we have missed the commit of the locked block, because
           -- the rest of the nodes have moved on.
-          blockLock .= Nothing
+          clearLock
         case next of
           Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
@@ -359,12 +376,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     CommitResult (Left err) -> do
       $logWarnS "blockstanbul" err
       $logInfoS "blockstanbul/roundchange" "commit failure (how...)"
-      blockLock .= Nothing
+      clearLock
       roundChange
     CommitResult (Right ()) -> do
       $logInfoS "blockstanbul" "Successful block commit"
       s <- use $ view . sequence
-      blockLock .= Nothing
+      clearLock
       -- TODO(tim): More guards should be put in place to see that not just the view but
       -- also the block numbers are in ascending order.
       nextRound . Sequence $ s+1

@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
 
-import Test.Hspec (Spec, describe, it, parallel)
+import Test.Hspec (Spec, describe, it, parallel, pendingWith)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck
 
@@ -15,6 +15,7 @@ import Control.Monad hiding (sequence)
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.State
+import Crypto.Random.Entropy
 import qualified Data.ByteString as BS
 import Data.List
 import qualified Data.Map as M
@@ -36,7 +37,10 @@ testContext :: BlockstanbulContext
 testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
-runTest = runNoLoggingT . flip evalStateT testContext . (disableAuth >>)
+runTest = runAuthTest . (disableAuth >>)
+
+runAuthTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
+runAuthTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
@@ -434,3 +438,41 @@ spec = parallel $ do
             other = resp \\ omsgs
         map oMessage omsgs `shouldBe` [RoundChange next]
         other `shouldMatchList` [ResetTimer $ _round next, MakeBlockCommand]
+    describe "Authentication" $ do
+      let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
+                     -> StateT BlockstanbulContext (NoLoggingT IO) (Block, [OutEvent])
+          resendLock blk theirPK pk = do
+            v <- use view
+            me <- selfAddr
+            let them = prvKey2Address theirPK
+                vals = S.fromList [me, them]
+                blk' = truncateExtra blk
+                blk'' = addValidators vals blk'
+            validators .= vals
+            proposer .= me
+            pSeal <- proposerSeal blk'' pk
+            let lockBlk = addProposerSeal pSeal blk''
+            myKey <- use prvkey
+            OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+
+            lockSender .= Just them
+            blockLock .= Just lockBlk
+            omsgs <- sendMessages [IMsg auth wm]
+
+            return (lockBlk, omsgs)
+
+      it "accepts a block if the signer is the original sender" $ property $ \blk ->
+        runAuthTest $ do
+          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+          v <- use view
+          (lockBlk, omsgs) <- resendLock blk theirPK theirPK
+          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+      it "rejects a block if the signer is not the original sender" $ property $ \blk -> do
+        pendingWith "TODO(tim): Reorganize specific auth"
+        runAuthTest $ do
+          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+          v <- use view
+          myKey <- use prvkey
+          (_, omsgs) <- resendLock blk theirPK myKey
+          map oMessage omsgs `shouldBe` [RoundChange v]
