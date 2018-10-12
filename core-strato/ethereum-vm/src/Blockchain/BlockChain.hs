@@ -651,4 +651,4 @@ calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
 
     let allDiffs = diffs:chainDiffs
 
-    forM_ allDiffs $ lift . commitsqlDiffs
+    forM_ allDiffs $ lift . commitSqlDiffs

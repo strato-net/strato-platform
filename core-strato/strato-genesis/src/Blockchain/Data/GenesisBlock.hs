@@ -215,7 +215,7 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
       deletedAccounts     = Map.empty,
       updatedAccounts     = Map.empty
   }
-  runWithSQL commitSqlDiffs diff
+  runWithSQL $ commitSqlDiffs diff
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]

@@ -90,7 +90,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       lift $ terminateChain chainId
                     _ -> return ()
-                void $ LogDB.putLogDB l
+                void . lift $ LogDB.putLogDB l
             TxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
