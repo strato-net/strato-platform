@@ -63,8 +63,8 @@ mkEthP2PEventSource :: ( HasContextControl m
                        )
                     => AppData
                     -> EthCryptState
-                    -> [Source m Event]
-                    -> m (Source m Event)
+                    -> [ConduitM () Event m ()]
+                    -> m (ConduitM () Event m ())
 mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSourcesCloseForAny (
     [ appSource app
         .| ethDecrypt inCtx
@@ -78,7 +78,7 @@ mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSources
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
-                     -> Conduit Message m BC.ByteString
+                     -> ConduitM Message BC.ByteString m ()
 mkEthP2PEventConduit str outCtx =
      CL.iterM recordMessage
   .| CL.iterM (displayMessage Outbound str)
@@ -88,7 +88,7 @@ mkEthP2PEventConduit str outCtx =
 handleMsgClientConduit :: (HasContextControl m, MonadLogger m, MonadThrow m)
                        => Point
                        -> PPeer
-                       -> Conduit Event m Message
+                       -> ConduitM Event Message m ()
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
     yield Hello { version = 4
@@ -135,7 +135,7 @@ handleMsgClientConduit myId peer = do
 handleMsgServerConduit :: (HasContextControl m, MonadLogger m, MonadThrow m)
                  => Point
                  -> PPeer
-                 -> Conduit Event m Message
+                 -> ConduitM Event Message m ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" "about to parse message"
     awaitMsg >>= \case
@@ -189,7 +189,7 @@ cbSafeTake' :: forall o m. Monad m
             -> ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake' i = fromMaybe (error "cb\"Safe\"Take: not enough data") <$> cbSafeTake i
 
-getRLPData :: Monad m => Consumer B.ByteString m B.ByteString
+getRLPData :: Monad m => forall void . ConduitM B.ByteString void m B.ByteString
 getRLPData = (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
    x | x < 128                 -> return $ B.singleton x
    x | x >= 192 && x <= 192+55 -> do
@@ -202,14 +202,14 @@ getRLPData = (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
    x                             -> error $ "missing case in getRLPData: " ++ show x
 
 
-bytesToMessages :: Monad m => Conduit B.ByteString m Message
+bytesToMessages :: Monad m => ConduitM B.ByteString Message m ()
 bytesToMessages = forever $ do
     msgTypeData <- cbSafeTake' 1
     let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData :: Integer)
     objBytes <- getRLPData
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
-messageToBytes :: Monad m => Conduit Message m B.ByteString
+messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = do
     maybeMsg <- await
     case maybeMsg of

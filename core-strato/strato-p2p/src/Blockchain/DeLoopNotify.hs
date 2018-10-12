@@ -25,7 +25,7 @@ deLoopSource :: ( MonadIO m
              => ByteString
              -> CommPort
              -> String
-             -> Source m Event
+             -> ConduitM () Event m ()
 deLoopSource commHost commPort peerIP = forever $ do
   resolveIPOrHost peerIP >>= \case
     Left err -> $logInfoS "deLoopSource" . T.pack $ "Couldn't resolve IP or Host " ++ (show peerIP) ++ ": " ++ show err

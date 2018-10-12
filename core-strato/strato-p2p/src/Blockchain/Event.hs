@@ -381,6 +381,7 @@ numFromRedis = \case
 -- bestBlock to prevent us from getting stuck
 syncFetch :: (HasContext m, MonadLogger m)
           => Direction -> Integer -> Conduit Event m Message
+
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
