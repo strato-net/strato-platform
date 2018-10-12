@@ -132,7 +132,7 @@ class AddMember extends Component {
       balance: this.state.balance
     }
 
-    let errors = validate(data);
+    let errors = validate(data, this.state.form.userSelected);
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
@@ -151,6 +151,7 @@ class AddMember extends Component {
       <div >
         <Button onClick={() => {
           mixpanelWrapper.track("add_member_open_click");
+          this.setState({ username: null, address: null, balance: 0, enode: null });
           this.props.openAddMemberModal();
         }} className="pt-intent-primary pt-icon-add"
           style={{ marginTop: '8px' }}
@@ -166,33 +167,117 @@ class AddMember extends Component {
           <form>
             <div className="pt-dialog-body">
 
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Username
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    {this.userNameField(users, isPublicMode)}
-                    <br /><span className="error-text">{this.errorMessageFor('username')}</span>
+              {
+                !isPublicMode &&
+                <div className="row">
+                  <div className="col-sm-3 text-right" />
+                  <div className="col-sm-9 smd-pad-4">
+                    <Field
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={0}
+                      label='User'
+                      checked={this.state.form.userSelected}
+                      onClick={
+                        () => {
+                          this.setState((prevState) => {
+                            return { 
+                              form: { userSelected: !prevState.form.userSelected }, 
+                              username: null, 
+                              address: null, 
+                              balance: 0, 
+                              enode: null,
+                              errors: null
+                             };
+                          });
+                        }
+                      }
+                    /> User
+                    <Field
+                      style={{ marginLeft: 25 }}
+                      name="radio"
+                      component="input"
+                      type="radio"
+                      value={1}
+                      label='Address'
+                      checked={!this.state.form.userSelected}
+                      onClick={
+                        () => {
+                          this.setState((prevState) => {
+                            return { 
+                              form: { userSelected: !prevState.form.userSelected }, 
+                              username: null, 
+                              address: null, 
+                              balance: 0, 
+                              enode: null,
+                              errors: null
+                             };
+                          });
+                        }
+                      }
+                    /> Address
                   </div>
                 </div>
-              </div>
+              }
 
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Address
+              {
+                this.state.form.userSelected &&
+                <div>
+                  <div className="row">
+                    <div className="col-sm-3 text-right">
+                      <label className="pt-label smd-pad-4">
+                        Username
                   </label>
+                    </div>
+                    <div className="col-sm-9 smd-pad-4">
+                      <div className="pt-select">
+                        {this.userNameField(users, isPublicMode)}
+                        <br /><span className="error-text">{this.errorMessageFor('username')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-sm-3 text-right">
+                      <label className="pt-label smd-pad-4">
+                        Address
+                  </label>
+                    </div>
+                    <div className="col-sm-9 smd-pad-4">
+                      <div className="pt-select">
+                        {this.addressField(isPublicMode)}
+                        <br /><span className="error-text">{this.errorMessageFor('address')}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    {this.addressField(isPublicMode)}
+              }
+
+              {
+                !this.state.form.userSelected &&
+                <div className="row">
+                  <div className="col-sm-3 text-right">
+                    <label className="pt-label smd-pad-4">
+                      Address
+                  </label>
+                  </div>
+                  <div className="col-sm-9 smd-pad-4">
+                    <Field
+                      id="address"
+                      className="form-width pt-input"
+                      placeholder="address"
+                      name="address"
+                      component="input"
+                      dir="auto"
+                      title="address"
+                      onChange={(e) => this.handleAddressChange(e)}
+                      required
+                    />
                     <br /><span className="error-text">{this.errorMessageFor('address')}</span>
                   </div>
                 </div>
-              </div>
+              }
 
               <div className="row">
                 <div className="col-sm-3 text-right">
