@@ -144,6 +144,7 @@ instance ToSchema Transaction where
           , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
           , transactionOrigin          = "API"
           , transactionChainId         = Nothing
+          , transactionMetadata        = Nothing
           }
 
 instance ToSchema TransactionType
@@ -165,8 +166,6 @@ instance ToSchema Account where
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountChainId        = Nothing
           , accountLatestBlockNum = 23
-          , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
-          , accountContractName   = Just "SimpleStorage"
           }
 
 instance ToSchema Difficulty
@@ -235,6 +234,7 @@ data Transaction = Transaction
   , transactionR               :: Hex Natural
   , transactionS               :: Hex Natural
   , transactionV               :: Hex Word8
+  , transactionMetadata        :: Maybe (Map Text Text)
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
   , transactionOrigin          :: Text
@@ -260,6 +260,7 @@ data PostTransaction = PostTransaction
   , posttransactionV          :: Hex Word8
   , posttransactionNonce      :: Natural
   , posttransactionChainId    :: Maybe ChainId
+  , posttransactionMetadata   :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -272,20 +273,7 @@ instance Arbitrary PostTransaction where
   arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample PostTransaction where
-  toSamples _ = singleSample PostTransaction
-    { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-    , posttransactionGasLimit = 21000
-    , posttransactionCodeOrData = ""
-    , posttransactionGasPrice = 50000000000
-    , posttransactionTo = Just $ Address 0xdeadbeef
-    , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
-    , posttransactionValue = Strung 10000000000000000000
-    , posttransactionR = Hex 1 -- make valid examples
-    , posttransactionS = Hex 1 -- make valid examples
-    , posttransactionV = Hex 0x1c
-    , posttransactionNonce = 0
-    , posttransactionChainId = Nothing
-    }
+  toSamples _ = singleSample defaultPostTx
 
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
 defaultPostTx = PostTransaction
@@ -301,29 +289,13 @@ defaultPostTx = PostTransaction
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
     , posttransactionChainId = Nothing
+    , posttransactionMetadata = Nothing
     }
 
 instance ToSchema PostTransaction where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "Post Transaction"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostTransaction
-      ex = PostTransaction
-        { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-        , posttransactionGasLimit = 21000
-        , posttransactionCodeOrData = ""
-        , posttransactionGasPrice = 50000000000
-        , posttransactionTo = Just $ Address 0xdeadbeef
-        , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
-        , posttransactionValue = Strung 10000000000000000000
-        , posttransactionR = Hex 1 -- make valid examples
-        , posttransactionS = Hex 1 -- make valid examples
-        , posttransactionV = Hex 0x1c
-        , posttransactionNonce = 0
-        , posttransactionChainId = Nothing
-        }
-
+    & mapped.schema.example ?~ toJSON defaultPostTx
 
 toPostTx :: Transaction -> PostTransaction
 toPostTx Transaction{..} = PostTransaction
@@ -339,6 +311,7 @@ toPostTx Transaction{..} = PostTransaction
   , posttransactionV = transactionV
   , posttransactionNonce = unStrung transactionNonce
   , posttransactionChainId = transactionChainId
+  , posttransactionMetadata = transactionMetadata
   }
 
 
@@ -390,8 +363,6 @@ data Account = Account
   , accountCodeHash       :: Keccak256
   , accountChainId        :: Maybe ChainId
   , accountLatestBlockNum :: Natural
-  , accountSource         :: Text
-  , accountContractName   :: Maybe Text
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Account where

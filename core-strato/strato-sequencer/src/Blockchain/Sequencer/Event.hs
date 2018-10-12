@@ -391,6 +391,7 @@ instance TransactionLike OutputTx where
     txCode        = txCode . otBaseTx
     txData        = txData . otBaseTx
     txChainId     = txChainId . otBaseTx
+    txMetadata    = txMetadata . otBaseTx
 
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t

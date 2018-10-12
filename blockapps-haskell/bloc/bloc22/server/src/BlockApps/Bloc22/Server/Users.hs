@@ -166,7 +166,7 @@ postUsersSend userName addr chainId resolve
 postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
 postUsersSend' TransferParameters{..} sign = do
     params <- getAccountTxParams fromAddress chainId txParams
-    tx <- signAndPrepare sign fromAddress $
+    tx <- signAndPrepare sign fromAddress Nothing $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -206,22 +206,21 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   --TODO: check what happens with mismatching args
   idsAndDetails <- compileContract src
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-  (cmId,ContractDetails{..}) <-
+  (cName,(cmId,ContractDetails{..})) <-
     case contract of
      Nothing ->
        case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source"
-         [(_, x)] -> return x
+         [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-     Just contract' ->
-       blocMaybe "Could not find global contract metadataId" $
-         Map.lookup contract' idsAndDetails
+     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
+    metadata = Just $ Map.fromList [("src", src),("name", cName)]
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   mFunctionId <- getConstructorId cmId
   argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
-  tx <- signAndPrepare sign fromAddr $
+  tx <- signAndPrepare sign fromAddr metadata $
     TransactionHeader
       Nothing
       fromAddr
@@ -261,15 +260,15 @@ postUsersUploadList' ContractListParameters{..} sign = do
       (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           (names, cmIds, fIds) <- get
-          (bin, cmId, names') <- case Map.lookup name names of
-            Just (b, cm) -> return (b, cm, names)
+          (bin, src, cmId, names') <- case Map.lookup name names of
+            Just (b, src, cm) -> return (b, src, cm, names)
             Nothing -> do
-              (b16,cm) <- lift $ blocQuery1 $ proc () -> do
-                (bin16,_,_,_,_,cmId') <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,cmId')
+              (b16,src,cm) <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,src,cmId')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              return (b, cm, Map.insert name (b, cm) names)
+              return (b, src, cm, Map.insert name (b, src, cm) names)
           (mFunctionId, cmIds') <- case Map.lookup cmId cmIds of
             Just fId -> return (fId, cmIds)
             Nothing -> do
@@ -283,7 +282,8 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          tx <- lift . signAndPrepare sign fromAddr $
+          let metadata = Just $ Map.fromList [("src",src),("name",name)]
+          tx <- lift . signAndPrepare sign fromAddr metadata $
               TransactionHeader
                 Nothing
                 fromAddr
@@ -336,7 +336,7 @@ postUsersSendList' TransferListParameters{..} sign = do
               i
               chainId
         ) txs [0..]
-      txs' <- mapM (signAndPrepare sign fromAddr) txHeaders
+      txs' <- mapM (signAndPrepare sign fromAddr Nothing) txHeaders
       hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -391,7 +391,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
             Just cmId -> return (cmId, names)
             Nothing -> do
               (mapKey' :: Int32) <- lift $ blocQuery1 $ proc () -> do
-                (_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
+                (_,_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< cmId
               return (mapKey', Map.insert methodcallContractName mapKey' names)
           (contract', cmIds') <- case Map.lookup mapKey cmIds of
@@ -413,7 +413,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               zxcv <- lift $ getXabiFunctionsArgsQuery functionId
               return (zxcv, Map.insert functionId zxcv fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
-          tx <- lift . signAndPrepare sign fromAddr $
+          tx <- lift . signAndPrepare sign fromAddr Nothing $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -484,7 +484,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
     functionId <- getFunctionId cmId funcName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
-    tx <- signAndPrepare sign fromAddr $
+    tx <- signAndPrepare sign fromAddr Nothing $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -654,7 +654,7 @@ contractResult hash mtxr cmId name index = do
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
       xs::[Int32] <- lift $ blocQuery $ proc () -> do
-        (cmId',_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
+        (cmId',_,_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
         returnA -< cmId'
       if (isNothing $ listToMaybe xs)
         then do
@@ -861,6 +861,7 @@ preparePostTx from tx = PostTransaction
   , posttransactionV = Hex v
   , posttransactionNonce = fromIntegral nonce'
   , posttransactionChainId = chainId
+  , posttransactionMetadata = metadata
   }
   where
     kecc = keccak256 (rlpSerialize tx)
@@ -874,6 +875,10 @@ preparePostTx from tx = PostTransaction
     code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
     toAddr = transactionTo tx
     chainId = transactionChainId tx
+    metadata = transactionMetadata tx
 
-signAndPrepare :: Signer -> Address -> TransactionHeader -> Bloc PostTransaction
-signAndPrepare sign from = fmap (preparePostTx from) . sign . prepareUnsignedTx
+addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
+addMetadata m t = t{transactionMetadata = m}
+
+signAndPrepare :: Signer -> Address -> Maybe (Map Text Text) -> TransactionHeader -> Bloc PostTransaction
+signAndPrepare sign from md = fmap (preparePostTx from . addMetadata md) . sign . prepareUnsignedTx

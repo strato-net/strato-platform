@@ -6,7 +6,6 @@ module Blockchain.Strato.Indexer.Model
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs                (LogDB, TransactionResult)
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.ExtWord                      (Word256)
 import           Blockchain.Sequencer.Event
@@ -16,8 +15,8 @@ import           Data.Binary
 data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)
                 | LogDBEntry LogDB
-                | InsertTxResult TransactionResult
-                | UpdateTxResult (SHA, SHA, SHA, MiningStatus) -- TODO: Three SHA's with different meanings... newtype?
+                | TxResult TransactionResult
+                | UpdateTxResult (SHA, SHA, SHA, Bool) -- Deprecated
                 | NewChainInfo Word256 ChainInfo
                 deriving (Eq, Read, Show)
 
@@ -25,7 +24,6 @@ instance Binary LogDB
 instance Binary TransactionResult
 instance Binary TransactionFailureType
 instance Binary TransactionResultStatus
-instance Binary MiningStatus
 
 instance Binary IndexEvent where
     get = do
@@ -34,7 +32,7 @@ instance Binary IndexEvent where
             0 -> RanBlock <$> get
             1 -> NewBestBlock <$> get
             2 -> LogDBEntry <$> get
-            3 -> InsertTxResult <$> get
+            3 -> TxResult <$> get
             4 -> UpdateTxResult <$> get
             5 -> NewChainInfo <$> get <*> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
@@ -42,6 +40,6 @@ instance Binary IndexEvent where
     put (RanBlock b)       = putWord8 0 >> put b
     put (NewBestBlock n)   = putWord8 1 >> put n
     put (LogDBEntry e)     = putWord8 2 >> put e
-    put (InsertTxResult r) = putWord8 3 >> put r
+    put (TxResult r)       = putWord8 3 >> put r
     put (UpdateTxResult s) = putWord8 4 >> put s
     put (NewChainInfo w c) = putWord8 5 >> put w >> put c

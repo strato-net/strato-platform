@@ -11,6 +11,7 @@ library:
     - ansi-wl-pprint
     - base
     - base16-bytestring
+    - containers
     - ethereum-rlp
     - binary
     - bytestring

@@ -128,3 +128,4 @@ callSignature userName userId unsigned@UnsignedTransaction{..} = do
     (unHex v)
     (unHex r)
     (unHex s)
+    Nothing

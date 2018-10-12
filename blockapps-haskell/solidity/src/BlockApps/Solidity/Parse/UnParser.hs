@@ -123,7 +123,7 @@ unparseFuncWithoutName Func{..} =
     <> case funcContents of
         Just contents -> contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
-    <> "\n    }"
+    <> "}"
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
@@ -135,7 +135,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> case modifierContents of
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
-  <> "\n    }"
+  <> "}"
 
 unparseEvent :: (Text, Event) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
@@ -185,16 +185,3 @@ unparseVals (name, theType) =
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
-
-addFunction :: (Text, String) -> Xabi -> Xabi
-addFunction (name, contents) c =
-  let func = Func { funcArgs = Map.empty
-                  , funcVals = Map.singleton "#0" IndexedType{ indexedTypeType=String (Just True)
-                                                             , indexedTypeIndex=0
-                                                             }
-                  , funcContents = Just $ Text.pack contents
-                  , funcStateMutability = Just View
-                  , funcVisibility = Just Public
-                  , funcModifiers = Nothing
-                  }
-  in c{xabiFuncs=Map.insert name (func) $ xabiFuncs c}

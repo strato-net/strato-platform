@@ -21,7 +21,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
 import Data.IORef
-import Data.Foldable
 import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -30,8 +29,8 @@ import Data.Pool
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
 import Data.Traversable (for)
+import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -52,8 +51,7 @@ import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
 import BlockApps.SolidityVarReader
 
-import Slipstream.Data.Action hiding (SourcePtr(..))
-import qualified Slipstream.Data.Action as A (SourcePtr(..))
+import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
@@ -146,6 +144,9 @@ groupSimilarActions as = go as [] []
             then go (y:rest) newTmp final
             else go (y:rest) [] (final ++ [newTmp])
 
+withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
+withNothing m f = maybe f (pure . Just) m
+
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
 
@@ -203,72 +204,40 @@ processTheMessages messages conn g = do
             liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
             fallbackStorage <- addStorageIfNeeded row
 
-            sourcePtr' <-
-              case actionSourcePtr of
-                Just x -> do
-                  storeCachedSourcePtr g actionCodeHash x
-                  return actionSourcePtr
-                Nothing -> do
-                  getCachedSourcePtr g actionCodeHash
+            let md = fromMaybe Map.empty actionMetadata
+            mcd <- getContractDetailsByCodeHash actionCodeHash
+            mDetails <- withNothing mcd $ do
+              fmap join . for (Map.lookup "src" md) $ \src -> do
+                detailsMap <- compileContract src
+                fmap join . for (Map.lookup "name" md) $ \name -> do
+                  traverse (pure . snd) $ Map.lookup name detailsMap
 
-            maybeCachedContract <- getCachedContract g actionCodeHash
-            sourceIsCreated <- maybe (return False) (isSourceCreated g . A.sourceHash) sourcePtr'
-
-            eContractMetadata <-
-              case (sourceIsCreated, maybeCachedContract) of
-              (_, Just cachedContract) -> pure $ Right cachedContract
-              (True, Nothing) -> do
-                let contName = maybe (error "name missing from sourcePtr") A.contractName sourcePtr'
-                contractOrError <- catchError
-                                      (getContract contName actionCodeHash actionTxChainId)
-                                      (\_ -> return . Left $ "Error getting contract metadata for " <> contName)
-                for contractOrError $ \c -> do
-                  storeCachedContract g actionCodeHash c
-                  pure c
-              (False, Nothing) -> do
-                liftIO . warningM "processTheMessages" . show $ T.concat
-                  [ "Need to call getContractCompileFullSource (this can be slow): ch:"
-                  , tshow actionCodeHash
-                  , ", src:"
-                  , tshow sourcePtr'
-                  ]
-                contractOrError <- catchError
-                                      (getContractCompileFullSource actionAddress actionCodeHash actionTxChainId)
-                                      (\_ -> return $ Left "getContractCompileFullSource: Error getting contract metadata")
-                traverse_ (setSourceCreated g . A.sourceHash ) sourcePtr'
-                liftIO . infoM "processTheMessages" . show $ T.concat ["Done fetching the metadata for ", tshow actionCodeHash]
-                for contractOrError $ \c -> do
-                  storeCachedContract g actionCodeHash c
-                  pure c
-
-            for eContractMetadata $ \contractMetaData -> do
-              let strAbi = T.replace "\'" "\'\'" . xabi $ contractMetaData
-                  strName = T.replace "\"" "" . name $ contractMetaData
-                  cont = case contract contractMetaData of
-                          Left s -> error s
-                          Right c -> c
-
-                  --TODO: Add parsing of contract info to get flags (indexing, history)
-
-              fetchLimit <- asks stateFetchLimit
-              let storage = storageToFunction (fromMaybe Map.empty actionStorage) fallbackStorage
-                  ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) storage 0
-                  chain = case actionTxChainId of
-                          Nothing -> ""
-                          Just (ChainId x) -> T.pack $ showHex x ""
-              pure . Just $ ProcessedContract
-                { address = actionAddress
-                , codehash = actionCodeHash
-                , abi = strAbi
-                , contractName = strName
-                , chain = chain
-                , contractData = ret
-                , blockHash = actionBlockHash
-                , blockTimestamp = actionBlockTimestamp
-                , blockNumber = actionBlockNumber
-                , transactionHash = actionTxHash
-                , transactionSender = actionTxSender
-                }
+            if isNothing mDetails
+              then return . Left $ "No details found for code hash " <> (T.pack $ show actionCodeHash) <> " and no 'src' field found in actionMetadata"
+              else do
+                fetchLimit <- asks stateFetchLimit
+                let Just details = mDetails
+                    strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
+                    strName = T.replace "\"" "" $ contractdetailsName details
+                    cont = either error id . xAbiToContract $ contractdetailsXabi details
+                    storage = storageToFunction (fromMaybe Map.empty actionStorage) fallbackStorage
+                    ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) storage 0
+                    chain = case actionTxChainId of
+                            Nothing -> ""
+                            Just (ChainId x) -> T.pack $ showHex x ""
+                pure . Right . Just $ ProcessedContract
+                  { address = actionAddress
+                  , codehash = actionCodeHash
+                  , abi = strAbi
+                  , contractName = strName
+                  , chain = chain
+                  , contractData = ret
+                  , blockHash = actionBlockHash
+                  , blockTimestamp = actionBlockTimestamp
+                  , blockNumber = actionBlockNumber
+                  , transactionHash = actionTxHash
+                  , transactionSender = actionTxSender
+                  }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
       when (not $ null processedList) . liftIO $ convertRet (catMaybes $ rights processedList) conn g

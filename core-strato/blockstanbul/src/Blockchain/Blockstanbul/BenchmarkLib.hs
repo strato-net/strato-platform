@@ -38,7 +38,9 @@ oneTX size = ContractCreationTX {
   transactionChainId = Nothing,
   transactionR = 1 `shiftL` 200,
   transactionS = 1 `shiftL` 133,
-  transactionV = 27}
+  transactionV = 27,
+  transactionMetadata = Nothing
+  }
 
 benchContext :: BlockstanbulContext
 benchContext =

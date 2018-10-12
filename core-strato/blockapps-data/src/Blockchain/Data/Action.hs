@@ -18,11 +18,6 @@ data ActionType = Create | Delete | Update deriving (Eq, Show, Generic)
 instance ToJSON ActionType where
 instance FromJSON ActionType where
 
-data SourcePtr = SourcePtr { sourceHash :: SHA, contractName :: Text} deriving (Eq, Show, Generic)
-
-instance ToJSON SourcePtr where
-instance FromJSON SourcePtr where
-
 data Action = Action
   { actionType           :: ActionType
   , actionBlockHash      :: SHA
@@ -33,8 +28,8 @@ data Action = Action
   , actionTxSender       :: Address
   , actionAddress        :: Address
   , actionCodeHash       :: SHA
-  , actionSourcePtr      :: Maybe SourcePtr
   , actionStorage        :: Maybe (Map Word256 Word256)
+  , actionMetadata       :: Maybe (Map Text Text)
   } deriving (Show, Generic)
 
 instance ToJSON Action where
