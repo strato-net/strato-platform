@@ -1,13 +1,15 @@
 const { CONTRACTS_COUNT } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-const ContractInstance = require('../../models/strato/bloc22/contractsInstance');
-const config = require('../../config/app.config')
+const Contract = require('../../models/strato/bloc22/contract');
+const config = require('../../config/app.config');
+const db = require('../../models/strato/eth/connection');
 
 let contractsCount
 
 function getContractsCount() {
-  ContractInstance.count().then(contracts => {
-    const newContractsCount = contracts
+  // NOTE: ID greater than 2 is uesd because AppMetadata and owned contracts are first 2 rows. which is not uploaded by user 
+  Contract.count({ where: { id: { [db.Sequelize.Op.gt]: 2 } } }).then(contracts => {
+    const newContractsCount = contracts;
     if (contractsCount !== newContractsCount) {
       contractsCount = newContractsCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, CONTRACTS_COUNT, contractsCount)
