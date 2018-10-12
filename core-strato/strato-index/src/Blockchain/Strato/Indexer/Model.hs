@@ -16,6 +16,7 @@ data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)
                 | LogDBEntry LogDB
                 | TxResult TransactionResult
+                | UpdateTxResult (SHA, SHA, SHA, Bool) -- Deprecated
                 | NewChainInfo Word256 ChainInfo
                 deriving (Eq, Read, Show)
 
@@ -32,11 +33,13 @@ instance Binary IndexEvent where
             1 -> NewBestBlock <$> get
             2 -> LogDBEntry <$> get
             3 -> TxResult <$> get
-            4 -> NewChainInfo <$> get <*> get
+            4 -> UpdateTxResult <$> get
+            5 -> NewChainInfo <$> get <*> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
     put (RanBlock b)       = putWord8 0 >> put b
     put (NewBestBlock n)   = putWord8 1 >> put n
     put (LogDBEntry e)     = putWord8 2 >> put e
     put (TxResult r)       = putWord8 3 >> put r
-    put (NewChainInfo w c) = putWord8 4 >> put w >> put c
+    put (UpdateTxResult s) = putWord8 4 >> put s
+    put (NewChainInfo w c) = putWord8 5 >> put w >> put c

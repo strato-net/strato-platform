@@ -29,6 +29,7 @@ import Data.Pool
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Traversable (for)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
@@ -143,6 +144,9 @@ groupSimilarActions as = go as [] []
             then go (y:rest) newTmp final
             else go (y:rest) [] (final ++ [newTmp])
 
+withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
+withNothing m f = maybe f (pure . Just) m
+
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
 
@@ -202,15 +206,11 @@ processTheMessages messages conn g = do
 
             let md = fromMaybe Map.empty actionMetadata
             mcd <- getContractDetailsByCodeHash actionCodeHash
-            mDetails <- if isJust mcd
-              then return mcd
-              else case Map.lookup "src" md of
-                Nothing -> return Nothing
-                Just src -> do
-                  details <- compileContract src
-                  case Map.lookup "name" md of
-                    Nothing -> return Nothing
-                    Just name -> return . fmap snd $ Map.lookup name details
+            mDetails <- withNothing mcd $ do
+              fmap join . for (Map.lookup "src" md) $ \src -> do
+                detailsMap <- compileContract src
+                fmap join . for (Map.lookup "name" md) $ \name -> do
+                  traverse (pure . snd) $ Map.lookup name detailsMap
 
             if isNothing mDetails
               then return . Left $ "No details found for code hash " <> (T.pack $ show actionCodeHash) <> " and no 'src' field found in actionMetadata"

@@ -77,7 +77,16 @@ instance Format Transaction where
       "\n" ++
       "Transaction Hash:       " ++ show h ++ "\n" ++
       "Transaction Chain Hash: " ++ show ch ++ "\n")
-  format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d, transactionChainId=cid, transactionMetadata=md} =
+  format t@MessageTX
+             { transactionNonce=n
+             , transactionGasPrice=gp
+             , transactionGasLimit=gl
+             , transactionTo=to'
+             , transactionValue=v
+             , transactionData=d
+             , transactionChainId=cid
+             , transactionMetadata=md
+             } =
     CL.blue "Message Transaction" ++
     tab (
       "\n" ++
@@ -90,7 +99,15 @@ instance Format Transaction where
       "chainId: " ++ show cid ++ "\n" ++
       "metadata: " ++ show md ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
-  format t@ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode, transactionChainId=cid, transactionMetadata=md} =
+  format t@ContractCreationTX
+             { transactionNonce=n
+             , transactionGasPrice=gp
+             , transactionGasLimit=gl
+             , transactionValue=v
+             , transactionInit=theCode
+             , transactionChainId=cid
+             , transactionMetadata=md
+             } =
     CL.blue "Contract Creation Transaction" ++
     tab (
       "\n" ++

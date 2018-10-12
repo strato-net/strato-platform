@@ -10,6 +10,7 @@ import qualified Data.ByteString.Lazy.Char8      as C8
 import qualified Data.ByteString.Base16          as B16
 import qualified Data.HashMap.Strict                    as HM
 import           Data.Map.Strict                 (Map)
+import           Data.Maybe                      (isNothing)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
@@ -21,6 +22,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Data.Json
@@ -40,6 +42,10 @@ main = hspec $ do
     codeInfoJSON
     chainInfoRLP
     chainInfoJSON
+    transactionRLP
+    transactionJSON
+    transactionRLPBack
+    transactionJSONBack
     addressTesting
     rawtxRoundTrip
     blockDataRoundTrip
@@ -107,6 +113,28 @@ chainInfoJSON :: Spec
 chainInfoJSON = do
   it "should convert a ChainInfo to and from its JSON encoding" $ property $
     (\x -> jsonCheck (x :: ChainInfo))
+
+transactionRLP :: Spec
+transactionRLP = do
+  it "should convert a Transaction to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: Transaction))
+
+transactionJSON :: Spec
+transactionJSON = do
+  it "should convert a Transaction' to and from its JSON encoding" $ property $
+    jsonCheck . Transaction'
+
+transactionRLPBack :: Spec
+transactionRLPBack = do
+  it "should convert a Transaction to and from its RLP encoding for backwards compatibility" $
+    forAll (arbitrary `suchThat` (isNothing . txMetadata)) $
+    (\x -> rlpCheck (x :: Transaction))
+
+transactionJSONBack :: Spec
+transactionJSONBack = do
+  it "should convert a Transaction' to and from its JSON encoding for backwards compatibility" $
+    forAll (arbitrary `suchThat` (isNothing . txMetadata)) $
+    jsonCheck . Transaction'
 
 addressTesting :: Spec
 addressTesting = forM_ testAddresses $ \input -> do

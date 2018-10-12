@@ -28,7 +28,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
+import qualified Data.Sequence                      as Q
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as SQL
 import qualified Database.Redis                     as Redis
@@ -85,7 +87,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
                        , contextRedisPool              :: Redis.Connection
-                       , contextTxResultQueue          :: [TransactionResult]
+                       , contextTxResultQueue          :: Q.Seq TransactionResult
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
@@ -98,13 +100,13 @@ instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get
     let q = contextTxResultQueue ctx
-    put $ ctx { contextTxResultQueue = (q ++ txrs) }
+    put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
 
   flushTransactionResults = do
     ctx <- get
     let toWrite = contextTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
-    put $ ctx { contextTxResultQueue = [] }
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toList toWrite)
+    put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
   enqueueLogEntries ls = do
@@ -228,7 +230,8 @@ runContextM f = do
                         initialKafkaState
                         Unspecified
                         redisPool
-                        [] []
+                        Q.empty
+                        []
                         flags_blockstanbul
                         False)
 

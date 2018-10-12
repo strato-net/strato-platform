@@ -56,6 +56,8 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS block_transaction DROP COLUMN IF EXISTS block_id;"
   exec "ALTER TABLE IF EXISTS block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
   exec "ALTER TABLE IF EXISTS block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  exec "ALTER TABLE IF EXISTS raw_transaction ADD metadata TYPE varchar;"
+  exec "ALTER TABLE IF EXISTS address_state_ref DROP COLUMN IF EXISTS source;"
   migrateAuto
 
 -- todo newtype me
