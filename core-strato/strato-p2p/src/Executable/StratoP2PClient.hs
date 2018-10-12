@@ -101,12 +101,14 @@ getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
     Just _ -> runPeer peer myPriv otherServiceCommHost otherServiceCommPort
 
 
-runPeerInList :: PPeer
+runPeerInList :: Int
+              -> PPeer
               -> BC.ByteString
               -> CommPort
-              -> ContextM ()
-runPeerInList thePeer otherServiceHost otherServicePort = do
-  liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
+              -> LoggingT IO ()
+runPeerInList maxHeaders thePeer otherServiceHost otherServicePort = runContextM maxHeaders $ do
+  -- Don't connect to a peer more than once per minute, out of politeness.
+  liftIO $ disablePeerForSeconds thePeer 10
   getPubKeyRunPeer thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()
@@ -127,11 +129,11 @@ stratoP2PClient = do
         liftIO $ threadDelay 10000000
       multiThreadedClient peers sem = void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
-        unless isRunning $ do
-          (liftIO (SSem.tryWait sem)) >>= \case
+        unless isRunning $
+          liftIO (SSem.tryWait sem) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO . runContextM flags_maxReturnedHeaders $ do
-              result <- try $ runPeerInList p osch oscp
+            Just _  -> void . forkIO $ do
+              result <- try $ runPeerInList flags_maxReturnedHeaders p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 

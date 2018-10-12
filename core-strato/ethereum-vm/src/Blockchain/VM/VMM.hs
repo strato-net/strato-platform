@@ -51,7 +51,6 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
--- import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
@@ -62,7 +61,6 @@ import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
 type VMM = ExceptT VMException (StateT VMState (ResourceT (LoggingT IO)))
---type VMM2 = ExceptT VMException (StateT VMState (ResourceT IO))
 
 instance HasMemAddressStateDB VMM where
   getAddressStateTxDBMap = do

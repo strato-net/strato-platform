@@ -85,9 +85,7 @@ mkEthP2PEventConduit str outCtx =
   .| messageToBytes
   .| ethEncrypt outCtx
 
-handleMsgClientConduit :: (HasContextControl m, MonadLogger m, MonadThrow m
-                          -- , MonadBaseControl IO (ConduitM Event Message m))
-                          )
+handleMsgClientConduit :: (HasContextControl m, MonadLogger m, MonadThrow m)
                        => Point
                        -> PPeer
                        -> Conduit Event m Message

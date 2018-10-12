@@ -38,7 +38,7 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Strato.Indexer.Kafka
 
-data IConfig = IConfig { contextSQLDB :: SQLDB }
+newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
 data IContext = IContext {
     contextKafkaState   :: KafkaState,
