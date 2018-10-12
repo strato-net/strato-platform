@@ -77,7 +77,7 @@ class MenuBar extends Component {
                 }
                 required
               >
-                <option> Chain Label </option>
+                <option> Main Chain </option>
                 {
                   this.props.chainIds.map((label, i) => {
                     return (
