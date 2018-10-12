@@ -98,7 +98,6 @@ readFromTopic' topic offset = do
 class HasUnseqSink k where
   getUnseqSink :: k ([IngestEvent] -> k ())
 
-
 emitKafkaTransactions :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
