@@ -12,6 +12,7 @@
 module BlockApps.Bloc22.Database.Queries where
 
 
+import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Concurrent              (threadDelay)
 import           Control.Monad
@@ -30,7 +31,6 @@ import           Data.Int                        (Int32, Int64)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Profunctor
 import           Data.Profunctor.Product.Default
 import           Data.Text                       (Text)

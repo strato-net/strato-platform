@@ -54,6 +54,7 @@ module BlockApps.Ethereum
   , AccountInfo (..)
   ) where
 
+import           ClassyPrelude ((<>))
 import           Control.Lens.Operators
 import           Control.DeepSeq (NFData, rnf)
 import           Crypto.Hash
@@ -73,7 +74,6 @@ import           Data.LargeWord
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Proxy
 import           Data.RLP
 import           Data.Swagger

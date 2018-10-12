@@ -82,7 +82,7 @@ import           BlockApps.Strato.TypeLits
 newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
-  toUrlPiece = Text.pack . show . map toUrlPiece 
+  toUrlPiece = Text.pack . show . map toUrlPiece
 
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
@@ -507,12 +507,9 @@ data ChainInfo = ChainInfo
   } deriving (Eq, Show, Generic)
 
 
-instance KnownSymbol "address" where
-instance KnownSymbol "enode" where
-
-instance ToSchema (NamedTuple "address" Address "enode" Text) where 
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
-    & mapped.schema.description ?~ "address and enode pair" 
+instance ToSchema (NamedTuple "address" Address "enode" Text) where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "address and enode pair"
     & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)) :: NamedTuple "address" Address "enode" Text)
 
 exampleChainInfo :: ChainInfo
@@ -552,10 +549,8 @@ instance ToJSON ChainInfo where
     ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
 
-instance ToSchema ChainIdChainInfo where 
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
-    & mapped.schema.description ?~ "chainid and chaininfo pair" 
-    & mapped.schema.example ?~ toJSON ((NamedTuple (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781", exampleChainInfo)) :: ChainIdChainInfo) 
+instance ToSchema ChainIdChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "chainid and chaininfo pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781", exampleChainInfo)) :: ChainIdChainInfo)
