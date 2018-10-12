@@ -15,7 +15,6 @@ import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
-import           Data.IORef.Lifted
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Set                        as Set
@@ -26,6 +25,8 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
+import           UnliftIO.IORef
+
 import           BlockApps.Ethereum
 
 import Slipstream.Events
@@ -127,13 +128,13 @@ createInserts globalsIORef = do
   unless (null metadata) $ do
     let firstContract = head metadata
     let hashVal = codehash firstContract
-    globals <- liftIO $ readIORef globalsIORef
+    globals <- readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
     let tableName = contractName firstContract
     history <- isHistoric globalsIORef tableName
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
-    let comma = if (length list == 0)
+    let comma = if null list
         then ""
         else ", "
 
@@ -169,7 +170,7 @@ createInserts globalsIORef = do
                 , tableColumns list
                 , ");" ]
           yield histSt
-        _ <- liftIO $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+        _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
         return ()
     let vals = flip map metadata $ \row ->
           let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row

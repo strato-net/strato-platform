@@ -290,7 +290,7 @@ blocQuery
 blocQuery q = do
   traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
   pool <- asks dbPool
-  withResource pool (\conn -> liftIO $ runQuery conn q)
+  withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
