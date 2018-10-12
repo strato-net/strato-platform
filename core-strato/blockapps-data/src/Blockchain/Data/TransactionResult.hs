@@ -9,7 +9,6 @@ module Blockchain.Data.TransactionResult
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 
-import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Data.DataDefs
@@ -23,12 +22,12 @@ class (Monad m) => HasMemTXResultDB m where
   enqueueTransactionResult = enqueueTransactionResults . pure
 
 
-putTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+putTransactionResult :: HasSQLDB m
                      => TransactionResult
                      -> m (Key TransactionResult)
 putTransactionResult = fmap head . putTransactionResults . pure
 
-putTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+putTransactionResults :: HasSQLDB m
                       => [TransactionResult]
                       -> m [Key TransactionResult]
-putTransactionResults trs = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany trs)
+putTransactionResults trs = getSQLDB >>= runResourceT . SQL.runSqlPool (SQL.insertMany trs)

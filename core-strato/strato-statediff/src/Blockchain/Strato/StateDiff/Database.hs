@@ -31,13 +31,13 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m, MonadBaseControl IO m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m)=>
            Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs
 
-commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
+commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m)=>
                   StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   pool <- getSQLDB
@@ -82,14 +82,14 @@ getField def field =
     Just (Value x) -> x
     Nothing        -> def
 
-deleteAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
+deleteAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m) =>
                  Maybe Word256 -> Address -> SQL.SqlPersistT m ()
 deleteAccount chainId address = do
   addrID <- getAddressStateSQL chainId address "delete"
   SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
   SQL.delete addrID
 
-updateAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
+updateAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m) =>
                  Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount chainId blockNumber address diff = do
   addrID <- getAddressStateSQL chainId address "update"

@@ -40,6 +40,7 @@ dependencies:
   - memory
   - merkle-patricia-db
   - monad-logger
+  - mtl
   - persistent-postgresql
   - resourcet
   - scientific
@@ -56,6 +57,7 @@ dependencies:
   - text
   - time
   - transformers
+  - unliftio-core
   - unordered-containers
   - utf8-string
   - vector

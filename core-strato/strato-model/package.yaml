@@ -15,6 +15,7 @@ library:
     - ethereum-rlp
     - binary
     - bytestring
+    - classy-prelude
     - cryptonite
     - deepseq
     - lens

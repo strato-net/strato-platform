@@ -10,6 +10,7 @@ module Blockchain.Strato.Indexer.ApiIndexer
 import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.IO.Class             (liftIO)
+import           Control.Monad.Trans.Class          (lift)
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
@@ -45,7 +46,7 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
-        forM_ chainInfos $ uncurry putChainInfo
+        lift $ forM_ chainInfos . uncurry $ putChainInfo
         let blocks = [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks
@@ -56,29 +57,29 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         then do
             insertStartTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-            bids <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
+            bids <- lift $ putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime
             maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock
             num <- case maybeOldBestBlock of
                 Just x -> return x
-                Nothing -> blockDataRefNumber <$> sqlQuery (getJust bestBid)
+                Nothing -> fmap blockDataRefNumber . lift . sqlQuery . getJust $ bestBid
             --num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
             numTime <- liftIO $ getTime Realtime
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids
             zipTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "Old number: " ++ show num ++ " New Number: " ++ show num'
-            if (num' > num || num' == 0) then do 
+            if (num' > num || num' == 0) then do
                 liftIO $ putMVar oldBestBlock num'
                 putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
             else liftIO $ putMVar oldBestBlock num
             putTime <- liftIO $ getTime Realtime
-            $logInfoS "apiIndexer" . T.pack $ "put blocks into Postgres: " ++ show (resultsTime - insertStartTime) 
-            $logInfoS "apiIndexer" . T.pack $ "get IndexerBestBlockInfo: " ++ show (bestBidTime - resultsTime) 
-            $logInfoS "apiIndexer" . T.pack $ "query for best bid:       " ++ show (numTime - bestBidTime) 
-            $logInfoS "apiIndexer" . T.pack $ "get new best bid:         " ++ show (zipTime - numTime) 
-            $logInfoS "apiIndexer" . T.pack $ "put new best bid:         " ++ show (putTime - zipTime) 
+            $logInfoS "apiIndexer" . T.pack $ "put blocks into Postgres: " ++ show (resultsTime - insertStartTime)
+            $logInfoS "apiIndexer" . T.pack $ "get IndexerBestBlockInfo: " ++ show (bestBidTime - resultsTime)
+            $logInfoS "apiIndexer" . T.pack $ "query for best bid:       " ++ show (numTime - bestBidTime)
+            $logInfoS "apiIndexer" . T.pack $ "get new best bid:         " ++ show (zipTime - numTime)
+            $logInfoS "apiIndexer" . T.pack $ "put new best bid:         " ++ show (putTime - zipTime)
             return ([
                     resultsTime - insertStartTime
                     , bestBidTime - resultsTime

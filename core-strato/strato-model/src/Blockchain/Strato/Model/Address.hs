@@ -29,8 +29,8 @@ import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 
+import           ClassyPrelude                        ((<>))
 import qualified Data.Text                            as T
-import           Data.Monoid
 import           Text.Read                            (readMaybe)
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)

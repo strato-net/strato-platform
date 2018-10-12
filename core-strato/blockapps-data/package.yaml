@@ -54,6 +54,7 @@ dependencies:
   - text
   - time
   - transformers
+  - unliftio
   - unliftio-core
   - vector
 
