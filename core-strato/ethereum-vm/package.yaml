@@ -23,6 +23,7 @@ dependencies:
   - blockapps-milena
   - blockapps-util
   - bytestring
+  - classy-prelude
   - containers
   - cryptohash
   - deepseq
