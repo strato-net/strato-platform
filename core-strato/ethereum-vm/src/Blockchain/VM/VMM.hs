@@ -51,7 +51,7 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
-import           Blockchain.DB.SQLDB
+-- import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
@@ -128,8 +128,8 @@ instance HasCodeDB VMM where
 instance HasBlockSummaryDB VMM where
     getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get
 
-instance HasSQLDB VMM where
-    getSQLDB = lift $ fmap (contextSQLDB . dbs) get
+-- instance HasSQLDB VMM where
+--     getSQLDB = lift $ fmap (contextSQLDB . dbs) get
 
 class Word256Storable a where
   fromWord256::Word256->a
