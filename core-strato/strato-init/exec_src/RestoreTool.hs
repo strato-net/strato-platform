@@ -5,6 +5,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
@@ -15,7 +16,7 @@ import qualified Blockchain.BackupBlocks
 import qualified Blockchain.DB.SQLDB          as SQLDB
 import           Blockchain.EthConf
 
-instance (Monad m, MonadResource m, MonadBaseControl IO m) => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
+instance (MonadUnliftIO m, MonadResource m, MonadBaseControl IO m) => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
     getSQLDB = ask
 
 main :: IO ()

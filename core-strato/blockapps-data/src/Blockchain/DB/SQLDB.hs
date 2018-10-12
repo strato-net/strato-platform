@@ -5,6 +5,7 @@
 
 module Blockchain.DB.SQLDB (
   HasSQLDB(..),
+  WrapsSQLDB(..),
   SQLDB,
   sqlQuery,
   runPostgresConn,
@@ -13,6 +14,7 @@ module Blockchain.DB.SQLDB (
   ) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger         (MonadLogger, runNoLoggingT)
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
@@ -27,8 +29,12 @@ import           Blockchain.EthConf           (connStr)
 
 type SQLDB = SQL.ConnectionPool
 
-class (MonadIO m, MonadBaseControl IO m) => HasSQLDB m where
+class (MonadIO m, MonadUnliftIO m, {- TODO(tim): Remove -} MonadBaseControl IO m) => HasSQLDB m where
   getSQLDB :: m SQLDB
+
+class HasSQLDB m => WrapsSQLDB t m where
+  runWithSQL :: m a -> (t m) a
+
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a->m a
 sqlQuery q = do

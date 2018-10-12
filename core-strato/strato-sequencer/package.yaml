@@ -35,6 +35,7 @@ dependencies:
   - bytestring
   - ethereum-rlp
   - lifted-async
+  - monad-control
   - time
   - stm
   - stm-chans
@@ -52,6 +53,7 @@ dependencies:
   - wai-extra
   - wai-middleware-prometheus
   - deepseq
+  - exceptions
 
 ghc-options: -Wall -O2 -threaded
 

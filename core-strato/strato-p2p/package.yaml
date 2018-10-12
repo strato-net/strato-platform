@@ -68,6 +68,9 @@ dependencies:
   - hedis
   - lifted-async
   - blockstanbul
+  - unliftio
+  - unliftio-core
+  - exceptions
 
 ghc-options: -Wall -threaded
 

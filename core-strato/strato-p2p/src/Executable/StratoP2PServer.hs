@@ -16,27 +16,40 @@ import           Blockchain.RLPx
 import           Conduit
 import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
-import qualified Database.Persist.Types                as SQL
+import qualified Database.Persist.Sql                  as SQL
 
+import           Blockchain.DB.SQLDB
 import           Blockchain.ECIES
 import           Blockchain.EthConf
 import           Blockchain.P2PUtil
 import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 
-runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadThrow m)
+            => String
+            -> m (Maybe (SQL.Entity PPeer))
+getPeerByIP ip = do
+    db <- getSQLDB
+    SQL.runSqlPool actions db >>= \case
+        [] -> return Nothing
+        lst -> return . Just $ head lst
+
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+
+
+runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
              => PrivateNumber
              -> Int
              -> m ()
-runEthServer myPriv listenPort = do
-  ctx <- initContext flags_maxReturnedHeaders
+runEthServer myPriv listenPort = runContextM flags_maxReturnedHeaders $ do
   let myPubkey = calculatePublic theCurve myPriv
-  void . runContextM ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
+  void . runContextM flags_maxReturnedHeaders . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
     let theSockAddr = sockAddrToIP (appSockAddr app)
     getPeerByIP theSockAddr >>= \case
       Nothing -> do

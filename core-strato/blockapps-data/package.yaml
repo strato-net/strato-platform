@@ -54,6 +54,8 @@ dependencies:
   - text
   - time
   - transformers
+  - unliftio
+  - unliftio-core
   - vector
 
 ghc-options: -Wall -O2
