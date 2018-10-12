@@ -173,15 +173,16 @@ contractDetailsJoinTable :: Query
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   , Column PGText
   , Column PGText
   , Column PGInt4
   )
 contractDetailsJoinTable = joinF
-  (\ (_,name) (cmId,_,b,br,ch,xch,src) -> (b,br,ch,xch,name,src,cmId))
-  (\ (cId,_) (_,contractId,_,_,_,_,_) -> cId .== contractId)
+  (\ (_,name) (cmId,_,b,br,ch,xch,sh,src) -> (b,br,ch,xch,sh,name,src,cmId))
+  (\ (cId,_) (_,contractId,_,_,_,_,_,_) -> cId .== contractId)
   (queryTable contractsTable) $ joinF
-    (\ (cmId,cid,b,br,ch,xch,_) (_,_,src) -> (cmId,cid,b,br,ch,xch,src))
+    (\ (cmId,cid,b,br,ch,xch,sh) (_,_,src) -> (cmId,cid,b,br,ch,xch,sh,src))
     (\ (_,_,_,_,_,_,sh) (_,sh',_) -> sh .== sh')
     (queryTable contractsMetaDataTable)
     (queryTable contractsSourceTable)
@@ -216,13 +217,31 @@ contractByCodeHash
     , Column PGBytea
     , Column PGBytea
     , Column PGBytea
+    , Column PGBytea
     , Column PGText
     , Column PGText
     , Column PGInt4
     )
 contractByCodeHash codeHash = proc () -> do
-  contract@(_,_,ch,_,_,_,_) <- contractDetailsJoinTable -< ()
+  contract@(_,_,ch,_,_,_,_,_) <- contractDetailsJoinTable -< ()
   restrict -< ch .== constant codeHash
+  returnA -< contract
+
+contractBySourceHash
+  :: Keccak256
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGText
+    , Column PGInt4
+    )
+contractBySourceHash srcHash = proc () -> do
+  contract@(_,_,_,_,sh,_,_,_) <- contractDetailsJoinTable -< ()
+  restrict -< sh .== constant srcHash
   returnA -< contract
 
 contractNameFromAddress :: Address -> Maybe ChainId -> Query (Column PGText)
@@ -523,16 +542,16 @@ getContractsContractByCodeHashQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGBytea
+    , Column PGBytea
     , Column PGText
     , Column PGText
     , Column PGInt4
     )
 getContractsContractByCodeHashQuery codeHash =
   limit 1 $ proc () -> do
-    details@(_,_,ch,_,_,_,_) <-
-      contractByCodeHash codeHash -< ()
-    restrict -< ch .== constant codeHash
+    details <- contractByCodeHash codeHash -< ()
     returnA -< details
+
 {- |
 SELECT CM2.id
 FROM contracts_metadata CM
@@ -643,7 +662,7 @@ getContractsContractBySameNameQuery
     )
 getContractsContractBySameNameQuery contractName =
   limit 1 $ proc () -> do
-    (b,br,ch,xch,name,src,cmId) <- contractDetailsJoinTable -< ()
+    (b,br,ch,xch,_,name,src,cmId) <- contractDetailsJoinTable -< ()
     restrict -< name .== constant contractName
     returnA -< (b,br,ch,xch,name,src,cmId)
 
@@ -692,8 +711,8 @@ getContractsContractLatestQuery
     , Column PGInt4
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
-  (b,br,ch,xch,name,src,cmId) <-
-    orderBy (desc (\ (_,_,_,_,_,_,cmId) -> cmId))
+  (b,br,ch,xch,_,name,src,cmId) <-
+    orderBy (desc (\ (_,_,_,_,_,_,_,cmId) -> cmId))
       contractDetailsJoinTable -< ()
   restrict -< name .== constant contractName
   returnA -< (b,br,ch,xch,name,src,cmId)
@@ -898,7 +917,7 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
 getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe ContractDetails)
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
-    for mDetails $ \(bin,binr,ch,_ :: ByteString,name,src,cmId) -> do
+    for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
       xabi <- getContractXabiByMetadataId cmId
       return ContractDetails
         { contractdetailsBin = Text.decodeUtf8 bin
@@ -1165,6 +1184,25 @@ insertContract parentContr contr bin binRuntime src xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do
+  details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
+  if null details
+    then compileContractFromScratch source
+    else fmap Map.fromList . forM details $
+      \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
+        xabi <- getContractXabiByMetadataId cmId
+        return (name,(cmId, ContractDetails
+          { contractdetailsBin = Text.decodeUtf8 bin
+          , contractdetailsAddress = Nothing
+          , contractdetailsBinRuntime = Text.decodeUtf8 binr
+          , contractdetailsCodeHash = ch
+          , contractdetailsName = name
+          , contractdetailsSrc = src
+          , contractdetailsXabi = xabi
+          , contractdetailsChainId = Nothing
+          }))
+
+compileContractFromScratch :: Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContractFromScratch source = do
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
     Error err -> blocError . UserError . Text.pack $ err
