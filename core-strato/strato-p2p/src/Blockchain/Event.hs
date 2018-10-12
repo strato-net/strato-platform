@@ -11,8 +11,8 @@ module Blockchain.Event (
   ) where
 
 import           Control.Arrow                         ((&&&))
-import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
@@ -56,7 +56,7 @@ import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 import           Debug.Trace                           (trace)
 
 -- MonadBaseControl IO m, MonadIO m
-setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
+setTitleAndProduceBlocks :: (MonadIO m, MonadLogger m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
     let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
@@ -85,8 +85,12 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
-             =>  DebugMode -> PPeer -> Conduit Event m Message
+handleEvents :: ( HasSQLDB m
+                , RBDB.HasRedisBlockDB (StateT Context m)
+                , SK.HasUnseqSink (StateT Context m)
+                , MonadThrow m
+                , MonadLogger m)
+             =>  DebugMode -> PPeer -> ConduitM Event Message (StateT Context m) ()
 handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
@@ -95,7 +99,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (Transactions txs) -> do
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        _ <- lift $ insertTX mode txo Nothing txs
+        _ <- lift . lift $ insertTX mode txo Nothing txs
         SK.emitKafkaTransactions txo txs
         return ()
 
@@ -121,7 +125,7 @@ handleEvents mode peer = awaitForever $ \case
                     $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
                     syncFetch Forward fetchNumber
                 Just _  -> do
-                    lift . void $ setTitleAndProduceBlocks [block']
+                    void $ setTitleAndProduceBlocks [block']
                     void $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
@@ -232,7 +236,7 @@ handleEvents mode peer = awaitForever $ \case
         unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
-        newCount <- lift $ setTitleAndProduceBlocks blocks'
+        newCount <- setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
         let remainingHeaders = drop (length bodies) headers
         lift $ putBlockHeaders remainingHeaders
@@ -291,7 +295,7 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
-            throwIO PeerDisconnected
+            throwM PeerDisconnected
 
     NewSeqEvent oe -> case oe of
       OEBlock b  -> do

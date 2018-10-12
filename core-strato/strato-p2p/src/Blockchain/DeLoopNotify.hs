@@ -20,7 +20,6 @@ import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
 
 deLoopSource :: ( MonadIO m
-                , MonadBaseControl IO m
                 , MonadLogger m
                 )
              => ByteString

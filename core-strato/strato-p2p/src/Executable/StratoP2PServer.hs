@@ -16,6 +16,7 @@ import           Blockchain.RLPx
 import           Conduit
 import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
@@ -29,7 +30,7 @@ import           Blockchain.P2PUtil
 import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 
-runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
+runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
              => PrivateNumber
              -> Int
              -> m ()
@@ -38,7 +39,7 @@ runEthServer myPriv listenPort = do
   let myPubkey = calculatePublic theCurve myPriv
   void . runContextM ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
     let theSockAddr = sockAddrToIP (appSockAddr app)
-    getPeerByIP theSockAddr >>= \case
+    lift (getPeerByIP theSockAddr) >>= \case
       Nothing -> do
         $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
         liftIO (appCloseConnection app)

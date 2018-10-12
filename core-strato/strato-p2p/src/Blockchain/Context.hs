@@ -2,14 +2,16 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
     , ContextM
+    , ConfigM
     , initContext
     , runContextM
     , getDebugMsg
@@ -20,13 +22,14 @@ module Blockchain.Context
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
-    , addPeer
     , getPeerByIP
     ) where
 
 
 import           Conduit
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Text                             as T
 import           Data.Time.Clock
@@ -49,21 +52,30 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 
+newtype P2PConfig = P2PConfig {
+                    configSQLDB :: SQLDB
+                  }
+
 data Context =
     Context {
-        contextSQLDB        :: SQLDB,
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
-        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
+        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [VMEvent] m Void,
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
         connectionTimeout   :: Int,
         maxReturnedHeaders  :: Int
     }
 
-type ContextM = StateT Context (ResourceT (LoggingT IO))
+type ConfigM = ReaderT P2PConfig (ResourceT (LoggingT IO))
+-- type ConfigM a = ReaderT P2PConfig (ResourceT (LoggingT IO))
+
+instance (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadReader P2PConfig m) => HasSQLDB m where
+  getSQLDB = asks configSQLDB
+
+type ContextM = StateT Context ConfigM
 
 instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
     getKafkaState = contextKafkaState <$> get
@@ -74,13 +86,10 @@ instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
-  getSQLDB = contextSQLDB <$> get
-
 instance (MonadState Context m, MonadIO m) => HasUnseqSink m where
   getUnseqSink = gets unseqSink
 
-instance (MonadState Context m, MonadIO m, HasSQLDB m) => HasVMEventsSink m where
+instance (MonadState Context m, MonadIO m) => HasVMEventsSink m where
   getVMEventsSink = gets vmEventsSink
 
 getDebugMsg :: MonadState Context m => m String
@@ -118,50 +127,43 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-runContextM :: (MonadBaseControl IO m )
-            => s
-            -> StateT s (ResourceT m) a
+runContextM :: (MonadUnliftIO m, MonadBaseControl IO m)
+            => P2PConfig
+            -> Context
+            -> StateT Context (ReaderT P2PConfig (ResourceT m)) a
             -> m ()
-runContextM s f = void . runResourceT $ runStateT f s
+runContextM cfg cxt = void
+                    . runConfigM cfg
+                    . flip runStateT cxt
 
-initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-            => Int -> m Context
+runConfigM :: (MonadUnliftIO m, MonadBaseControl IO m)
+           => P2PConfig -> ReaderT P2PConfig (ResourceT m) a -> m a
+runConfigM cfg = runResourceT . flip runReaderT cfg
+
+
+initContext :: (MonadResource m, MonadUnliftIO m, MonadLogger m, MonadBaseControl IO m, Monad m)
+            => Int -> m (P2PConfig, Context)
 initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  return Context { actionTimestamp = Nothing
+  return (P2PConfig $ sqlDB' dbs,
+          Context { actionTimestamp = Nothing
                  , contextRedisBlockDB = redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
                  , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
                  , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
                  , connectionTimeout=flags_connectionTimeout
                  , maxReturnedHeaders = maxHeaders
-                 }
+                 })
 
-
-
-addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
-        => PPeer
-        -> m (SQL.Key PPeer)
-addPeer peer = do
-  db <- getSQLDB
-  maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
-  SQL.runSqlPool (actions maybePeer) db
-  where actions = \case
-            Nothing    -> SQL.insert peer
-            Just peer' -> do
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
-              return (SQL.entityKey peer')
-
-getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadThrow m)
             => String
             -> m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
     db <- getSQLDB
-    (SQL.runSqlPool actions db) >>= \case
+    SQL.runSqlPool actions db >>= \case
         [] -> return Nothing
         lst -> return . Just $ head lst
 
