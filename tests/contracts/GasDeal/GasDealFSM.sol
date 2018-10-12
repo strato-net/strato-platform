@@ -1,4 +1,4 @@
-import "/blockapps-sol/fsm/contracts/FSM.sol";
+import "./FSM.sol";
 import "./GasDealState.sol";
 import "./GasDealEvent.sol";
 contract GasDealFSM is FSM, GasDealState, GasDealEvent {

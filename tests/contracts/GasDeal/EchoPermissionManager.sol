@@ -1,4 +1,4 @@
-import "/blockapps-sol/auth/permission/contracts/PermissionManager.sol";
+import "./PermissionManager.sol";
 import "./EchoPermission.sol";
 import "./EchoRolePermissions.sol";
 

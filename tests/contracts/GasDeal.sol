@@ -1,17 +1,17 @@
-import "/blockapps-sol/util/contracts/Util.sol";
-import "/blockapps-sol/rest/contracts/RestStatus.sol";
-import "/server/dapp/echoPermission/contracts/EchoPermissionManager.sol";
-import "/server/dapp/deal/common/contracts/PriceType.sol";
-import "/server/dapp/deal/common/contracts/Args.sol";
-import "/server/dapp/deal/common/contracts/BaseDeal.sol";
-import "/server/dapp/deal/common/contracts/DealType.sol";
-import "/server/dapp/deal/common/contracts/PriceType.sol";
-import "/server/dapp/deal/common/contracts/Constants.sol";
+import "./GasDeal/Util.sol";
+import "./GasDeal/RestStatus.sol";
+import "./GasDeal/EchoPermissionManager.sol";
+import "./GasDeal/PriceType.sol";
+import "./GasDeal/Args.sol";
+import "./GasDeal/BaseDeal.sol";
+import "./GasDeal/DealType.sol";
+import "./GasDeal/PriceType.sol";
+import "./GasDeal/Constants.sol";
 
-import "./GasDealState.sol";
-import "./GasDealEvent.sol";
-import "./GasDealFSM.sol";
-import "./GasVolumeUnits.sol";
+import "./GasDeal/GasDealState.sol";
+import "./GasDeal/GasDealEvent.sol";
+import "./GasDeal/GasDealFSM.sol";
+import "./GasDeal/GasVolumeUnits.sol";
 
 /**
  * Gas Deal data container

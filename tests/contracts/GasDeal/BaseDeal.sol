@@ -1,8 +1,8 @@
-import "/blockapps-sol/meta/searchable/contracts/Searchable.sol";
-import "/server/dapp/echoPermission/contracts/EchoPermissionManager.sol";
-import "/server/dapp/deal/common/contracts/DealType.sol";
-import "/server/dapp/deal/common/contracts/PriceType.sol";
-import "/server/dapp/deal/common/contracts/RejectionType.sol";
+import "./Searchable.sol";
+import "./EchoPermissionManager.sol";
+import "./DealType.sol";
+import "./PriceType.sol";
+import "./RejectionType.sol";
 
 /**
  * Deal data container
