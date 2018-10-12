@@ -34,6 +34,7 @@ describe('Strato Load Test', function() {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(`User: ${admin.name} @ ${admin.address}`);
+    const { PriceType } = yield rest.getEnums(`${path.join(config.contractsPath,"GasDeal/PriceType.sol")}`)
     yield rest.compileSearch([contractName], contractName, contractFilename);
   });
 
