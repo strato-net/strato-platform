@@ -170,7 +170,9 @@ processTheMessages messages conn g = do
               traverse (pure . snd) $ Map.lookup name detailsMap
 
         if isNothing mDetails
-          then return . Left $ "No details found for code hash " <> (T.pack $ show actionCodeHash) <> " and no 'src' field found in actionMetadata"
+          then return . Left $ "No details found for code hash "
+                            <> (T.pack $ show actionCodeHash)
+                            <> " and no 'src' field found in actionMetadata"
           else do
             let Just details = mDetails
                 strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
@@ -179,7 +181,8 @@ processTheMessages messages conn g = do
                 chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
                 cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
             fetchLimit <- asks stateFetchLimit
-            oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0) <$> getContractState g actionAddress actionTxChainId
+            oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
+                          <$> getContractState g actionAddress actionTxChainId
             let newState = decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
             setContractState g actionAddress actionTxChainId newState
