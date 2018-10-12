@@ -27,7 +27,6 @@ import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Pool
 import Data.Maybe
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.Text.Encoding (decodeUtf8)
@@ -39,7 +38,6 @@ import Servant.Common.BaseUrl
 import System.Log.Logger
 import Data.LargeWord (Word256)
 
-import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
