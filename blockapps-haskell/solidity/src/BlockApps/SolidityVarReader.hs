@@ -186,9 +186,11 @@ decodeCacheValue'
 decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} value = \case
   SimpleType TypeBool ->
     let
-      SimpleValue (ValueInt _ (Just 1) word8) = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 1)
-    in
-     SimpleValue $ ValueBool $ word8 /= 0
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 1)
+     in case v of
+      SimpleValue (ValueInt _ (Just 1) word8) -> SimpleValue $ ValueBool $ word8 /= 0
+      b@(SimpleValue (ValueBool _)) -> b
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueBool, but got: " ++ show o
   SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
                                      b' = if byte + b > 32 then 0 else 32 - byte - b
                                   in fromMaybe value
@@ -201,14 +203,18 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
                                    <$> cache offset
   SimpleType TypeAddress ->
     let
-      SimpleValue (ValueInt _ _ addr) = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
-    in
-      SimpleValue . ValueAddress . Address $ fromIntegral addr
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
+     in case v of
+      SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAddress . Address $ fromIntegral addr
+      a@(SimpleValue (ValueAddress _)) -> a
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueAddress, but got: " ++ show o
   TypeContract _ ->
     let
-      SimpleValue (ValueAddress addr) = decodeCacheValue' typeDefs' cache position value $ SimpleType TypeAddress
-    in
-      ValueContract addr
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
+     in case v of
+      SimpleValue (ValueInt _ _ addr) -> ValueContract . Address $ fromIntegral addr
+      c@(ValueContract _) -> c
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
   SimpleType (TypeBytes (Just n)) -> decodeCacheByteString cache offset byte (fromInteger n) value
   SimpleType (TypeBytes Nothing) -> fromMaybe value . flip fmap (cache offset) $ \w ->
     if w `testBit` 0
@@ -229,9 +235,11 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes Nothing bytes) = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
-    in
-      SimpleValue . ValueString $ Text.decodeUtf8 bytes
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
+     in case v of
+      SimpleValue (ValueBytes Nothing bytes) -> SimpleValue . ValueString $ Text.decodeUtf8 bytes
+      s@(SimpleValue (ValueString _)) -> s
+      o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
