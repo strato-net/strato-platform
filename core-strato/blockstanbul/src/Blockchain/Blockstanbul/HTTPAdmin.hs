@@ -65,13 +65,14 @@ createWebServer ch = serve adminAPI (admin ch)
 
 -- Client
 
-getVote :: CandidateReceived -> ClientM CandidateReceived
-getVote = client (Proxy @ AdminAPI)
+getVote :: BasicAuthData -> CandidateReceived -> ClientM CandidateReceived
+getVote _ = client (Proxy @ AdminAPI)
 
 uploadVote ::  Int -> String -> CandidateReceived -> IO ()
 uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "blockstanbul/vote"))
+  let credential = BasicAuthData "admin" "admin"
+  vot <- runClientM (getVote credential cr) (ClientEnv manager (BaseUrl Http ipaddr prt "/blockstanbul"))
   case vot of
     Left err -> putStrLn $ "Error??/: " ++ show err
     Right cr'-> do
