@@ -13,6 +13,7 @@ import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           System.Directory
@@ -54,7 +55,7 @@ main = do
   hspec spec
 
 runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m (a, Context)
+                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM' f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT
