@@ -26,7 +26,6 @@ import           Conduit
 
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
-import           Data.Void
 
 import           Network.Kafka
 import           Network.Kafka.Producer
@@ -70,7 +69,7 @@ vmEventToBytes :: VMEvent -> B.ByteString
 vmEventToBytes = BL.toStrict . Binary.encode
 
 class HasVMEventsSink k where
-  getVMEventsSink :: k (Conduit [VMEvent] k Void)
+  getVMEventsSink :: k ([VMEvent] -> k ())
 
 produceVMEventsM :: (HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do

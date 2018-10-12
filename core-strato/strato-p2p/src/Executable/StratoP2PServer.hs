@@ -22,24 +22,36 @@ import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
-import qualified Database.Persist.Types                as SQL
+import qualified Database.Persist.Sql                  as SQL
 
+import           Blockchain.DB.SQLDB
 import           Blockchain.ECIES
 import           Blockchain.EthConf
 import           Blockchain.P2PUtil
 import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadThrow m)
+            => String
+            -> m (Maybe (SQL.Entity PPeer))
+getPeerByIP ip = do
+    db <- getSQLDB
+    SQL.runSqlPool actions db >>= \case
+        [] -> return Nothing
+        lst -> return . Just $ head lst
+
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+
+
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
              => PrivateNumber
              -> Int
              -> m ()
-runEthServer myPriv listenPort = do
-  ctx <- initContext flags_maxReturnedHeaders
+runEthServer myPriv listenPort = runContextM flags_maxReturnedHeaders $ do
   let myPubkey = calculatePublic theCurve myPriv
-  void . runContextM ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
+  void . runContextM flags_maxReturnedHeaders . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
     let theSockAddr = sockAddrToIP (appSockAddr app)
-    lift (getPeerByIP theSockAddr) >>= \case
+    getPeerByIP theSockAddr >>= \case
       Nothing -> do
         $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
         liftIO (appCloseConnection app)
