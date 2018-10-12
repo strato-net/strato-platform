@@ -19,6 +19,7 @@ const contractFilename = path.join(config.contractsPath, "GasDeal.sol");
 
 let txs = [];
 let txResults = [];
+let PriceType;
 
 describe('Strato Load Test', function() {
   this.timeout(9999 * 1000);
@@ -34,7 +35,9 @@ describe('Strato Load Test', function() {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(`User: ${admin.name} @ ${admin.address}`);
-    const { PriceType } = yield rest.getEnums(`${path.join(config.contractsPath,"GasDeal/PriceType.sol")}`)
+    const pricePath = path.join(config.contractsPath,"GasDeal/PriceType.sol")
+    PriceType = yield rest.getEnums(pricePath)
+    console.log(PriceType)
     yield rest.compileSearch([contractName], contractName, contractFilename);
   });
 
@@ -109,7 +112,7 @@ function factory_createUploadList(batchSize, batchIndex) {
         _counterPartyId: `counterPartyId_${batchIndex}_${i}`,
         _buyParty: `buyParty_${batchIndex}_${i}`,
         _sellParty: `sellParty_${batchIndex}_${i}`,
-        _priceType: PriceType.FIXED ,
+        _priceType: `priceType_${PriceType.FIXED}` ,
         _dealPrice: `dealPrice_${batchIndex}_${i}`,
         _indexPriceAdder: `indexPriceAdder_${batchIndex}_${i}`,
         _dealDate: `dealDate_${batchIndex}_${i}`,
