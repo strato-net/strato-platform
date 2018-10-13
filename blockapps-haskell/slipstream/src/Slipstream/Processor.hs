@@ -27,7 +27,6 @@ import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Pool
 import Data.Maybe
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.Text.Encoding (decodeUtf8)
@@ -39,13 +38,11 @@ import Servant.Common.BaseUrl
 import System.Log.Logger
 import Data.LargeWord (Word256)
 
-import BlockApps.Bloc22.API.Utils
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Xabi
-import BlockApps.Storage
 import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
@@ -76,42 +73,6 @@ enterBloc2 env x = do
 
 emptyHash :: Keccak256
 emptyHash = keccak256 B.empty
-
-getContract :: Text -> Keccak256 -> Maybe ChainId -> Bloc (Either Text ContractAndXabi)
-getContract name hash chainId = do
-  if(hash == emptyHash)
-    then return $ (Left "getContract called for an external account")
-    else do
-      xabi <- getContractXabi (ContractName name) (Named name) chainId
-
-      return $ Right ContractAndXabi {
-        contract = xAbiToContract xabi
-        , xabi = decodeUtf8 . BL.toStrict $ JSON.encode xabi
-        , name = name
-        , contractStored = False
-        , contractSchema = Nothing
-        }
-
-getContractCompileFullSource :: Address -> Keccak256 -> Maybe ChainId->Bloc (Either Text ContractAndXabi)
-getContractCompileFullSource address hash chainId = do
-  if (hash == emptyHash)
-    then return $ (Left "getContractCompileFullSource called for an external account")
-    else do
-      contractDetails <- getContractDetailsByAddressOnly address chainId
-
-      let ret = ContractAndXabi {
-        contract = xAbiToContract $ contractdetailsXabi contractDetails
-        , xabi = T.pack . show . JSON.toJSON $ contractdetailsXabi contractDetails
-        , name = T.replace "\"" "" $ contractdetailsName contractDetails
-        , contractStored = False
-        , contractSchema = Nothing
-      }
-      return $ Right ret
-
-storageToFunction :: Map (Hex Word256) (Hex Word256) -> Map (Hex Word256) (Hex Word256) -> Storage
-storageToFunction primary fallback k = case Map.lookup (Hex k) primary of
-  Just (Hex w) -> w
-  Nothing -> maybe 0 unHex . Map.lookup k $ Map.mapKeys unHex fallback
 
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
@@ -197,47 +158,48 @@ processTheMessages messages conn g = do
 
   enterBloc2 env $ do
     forM_ (map (filter hasContract) changes) $ \change -> do
-      processedList <- forM change $ \row@Action{..} ->
-        if (isNothing actionStorage || (Map.null $ fromJust actionStorage))
-          then return $ Right Nothing
+      processedList <- forM change $ \row@Action{..} -> do
+        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+
+        let md = fromMaybe Map.empty actionMetadata
+        mcd <- getContractDetailsByCodeHash actionCodeHash
+        mDetails <- withNothing mcd $ do
+          fmap join . for (Map.lookup "src" md) $ \src -> do
+            detailsMap <- compileContract src
+            fmap join . for (Map.lookup "name" md) $ \name -> do
+              traverse (pure . snd) $ Map.lookup name detailsMap
+
+        if isNothing mDetails
+          then return . Left $ "No details found for code hash "
+                            <> (T.pack $ show actionCodeHash)
+                            <> " and no 'src' field found in actionMetadata"
           else do
-            liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
-            fallbackStorage <- addStorageIfNeeded row
+            let Just details = mDetails
+                strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
+                strName = T.replace "\"" "" $ contractdetailsName details
+                cont = either error id . xAbiToContract $ contractdetailsXabi details
+                chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
+                cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
+            fetchLimit <- asks stateFetchLimit
+            oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
+                          <$> getContractState g actionAddress actionTxChainId
+            let newState = decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
+                ret = Map.fromList newState
+            setContractState g actionAddress actionTxChainId newState
 
-            let md = fromMaybe Map.empty actionMetadata
-            mcd <- getContractDetailsByCodeHash actionCodeHash
-            mDetails <- withNothing mcd $ do
-              fmap join . for (Map.lookup "src" md) $ \src -> do
-                detailsMap <- compileContract src
-                fmap join . for (Map.lookup "name" md) $ \name -> do
-                  traverse (pure . snd) $ Map.lookup name detailsMap
-
-            if isNothing mDetails
-              then return . Left $ "No details found for code hash " <> (T.pack $ show actionCodeHash) <> " and no 'src' field found in actionMetadata"
-              else do
-                fetchLimit <- asks stateFetchLimit
-                let Just details = mDetails
-                    strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
-                    strName = T.replace "\"" "" $ contractdetailsName details
-                    cont = either error id . xAbiToContract $ contractdetailsXabi details
-                    storage = storageToFunction (fromMaybe Map.empty actionStorage) fallbackStorage
-                    ret = Map.fromList $ decodeValues fetchLimit (typeDefs cont) (mainStruct cont) storage 0
-                    chain = case actionTxChainId of
-                            Nothing -> ""
-                            Just (ChainId x) -> T.pack $ showHex x ""
-                pure . Right . Just $ ProcessedContract
-                  { address = actionAddress
-                  , codehash = actionCodeHash
-                  , abi = strAbi
-                  , contractName = strName
-                  , chain = chain
-                  , contractData = ret
-                  , blockHash = actionBlockHash
-                  , blockTimestamp = actionBlockTimestamp
-                  , blockNumber = actionBlockNumber
-                  , transactionHash = actionTxHash
-                  , transactionSender = actionTxSender
-                  }
+            pure . Right . Just $ ProcessedContract
+              { address = actionAddress
+              , codehash = actionCodeHash
+              , abi = strAbi
+              , contractName = strName
+              , chain = chain
+              , contractData = ret
+              , blockHash = actionBlockHash
+              , blockTimestamp = actionBlockTimestamp
+              , blockNumber = actionBlockNumber
+              , transactionHash = actionTxHash
+              , transactionSender = actionTxSender
+              }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
       when (not $ null processedList) . liftIO $ convertRet (catMaybes $ rights processedList) conn g

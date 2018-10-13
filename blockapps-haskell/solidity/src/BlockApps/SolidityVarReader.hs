@@ -8,6 +8,7 @@
 
 module BlockApps.SolidityVarReader (
   decodeStorageKey,
+  decodeCacheValues,
   decodeValue,
   decodeValues,
   decodeValuesFromList,
@@ -50,7 +51,7 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
-import           BlockApps.Storage                (Storage)
+import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
 
 valueToSolidityValue::Value->SolidityValue
@@ -150,6 +151,143 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
               -- vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
         TypeEnum _ -> [(offset, 1)]
         TypeContract _ -> [(offset, 1)]
+
+decodeCacheValues
+  :: TypeDefs
+  -> Struct
+  -> Cache
+  -> Word256
+  -> [(Text, Value)]
+  -> [(Text, Value)]
+decodeCacheValues typeDefs' struct'@Struct{..} cache offset state =
+  zipWith fromMaybe state $ map (decodeCacheValue typeDefs' struct' cache offset) state
+
+decodeCacheValue
+  :: TypeDefs
+  -> Struct
+  -> Cache
+  -> Word256
+  -> (Text, Value)
+  -> Maybe (Text, Value)
+decodeCacheValue typeDefs' Struct{..} cache offset (name,value) = case OMap.lookup name fields of
+   Nothing -> Nothing
+   Just (Right position, theType) -> Just (name, decodeCacheValue' typeDefs' cache (position `Storage.addOffset` fromIntegral offset) value theType)
+   Just (Left text, theType) -> case (textToValue (Just typeDefs') text theType) of
+      Left err -> error $ "decodeCacheValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
+      Right val -> Just (name,val)
+
+decodeCacheValue'
+  :: TypeDefs
+  -> Cache
+  -> Storage.Position
+  -> Value
+  -> Type
+  -> Value
+decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} value = \case
+  SimpleType TypeBool ->
+    let
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 1)
+     in case v of
+      SimpleValue (ValueInt _ (Just 1) word8) -> SimpleValue $ ValueBool $ word8 /= 0
+      b@(SimpleValue (ValueBool _)) -> b
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueBool, but got: " ++ show o
+  SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
+                                     b' = if byte + b > 32 then 0 else 32 - byte - b
+                                  in fromMaybe value
+                                     $ SimpleValue
+                                     . fromJust
+                                     . flip bytesToSimpleValue t
+                                     . ByteString.take b
+                                     . ByteString.drop b'
+                                     . word256ToByteString
+                                   <$> cache offset
+  SimpleType TypeAddress ->
+    let
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
+     in case v of
+      SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAddress . Address $ fromIntegral addr
+      a@(SimpleValue (ValueAddress _)) -> a
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueAddress, but got: " ++ show o
+  TypeContract _ ->
+    let
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
+     in case v of
+      SimpleValue (ValueInt _ _ addr) -> ValueContract . Address $ fromIntegral addr
+      c@(ValueContract _) -> c
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
+  SimpleType (TypeBytes (Just n)) -> decodeCacheByteString cache offset byte (fromInteger n) value
+  SimpleType (TypeBytes Nothing) -> fromMaybe value . flip fmap (cache offset) $ \w ->
+    if w `testBit` 0
+      then --large string, 32+ bytes
+        let
+          len' = lastWord64 w `div` 2
+          lastWord64::Word256->Word64
+          lastWord64 (LargeKey x _) = x
+          startingKey = getArrayStartingKey offset
+        in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey+)) [0..] -- if the length is there, so should the data
+      else --small string, less than 32 bytes
+        let
+          len' = lastWord64 w .&. 0xfe `div` 2
+          lastWord64::Word256->Word64
+          lastWord64 (LargeKey x _) = x
+        in
+          SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString w
+
+  SimpleType TypeString ->
+    let
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
+     in case v of
+      SimpleValue (ValueBytes Nothing bytes) -> SimpleValue . ValueString $ Text.decodeUtf8 bytes
+      s@(SimpleValue (ValueString _)) -> s
+      o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
+
+  TypeFunction selector args returns -> ValueFunction selector args returns
+
+  TypeArrayFixed size ty ->
+    case value of
+      ValueArrayFixed sz vals | sz == size -> ValueArrayFixed size theList
+        where
+          (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+          theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` offset) val ty) [0..] vals
+      v -> error $ "decodeCacheValue': Expected ValueArrayFixed of size " ++ show size ++ ", but got: " ++ show v
+
+  TypeArrayDynamic ty ->
+    case value of
+      ValueArrayDynamic vals -> ValueArrayDynamic theList
+        where
+          vlen = length vals
+          len = fromMaybe vlen $ fromIntegral <$> cache offset
+          vals' = if len < vlen
+                    then take len vals
+                    else vals ++ replicate (len - vlen) (decodeCacheValue' typeDefs' (const $ Just 0) doesntMatter (error "decodeCacheValue': Evaluating non-existent array element") ty) -- Seems unnecessary, but we need a way to hand over a generic null value
+                      where doesntMatter = Storage.Position 0 0 -- Our cache function is (const $ Just 0), so we don't need to pass in the correct offset
+          (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+          theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` startingKey) val ty) [0..] vals'
+          startingKey = getArrayStartingKey offset
+      v -> error $ "decodeCacheValue': Expected ValueArrayDynamic, but got: " ++ show v
+
+  TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
+
+  TypeEnum name ->
+    case Map.lookup name enumDefs of
+      Nothing -> error $ "Solidity contract is using a missing enum: " ++ show name
+      Just enumset -> case value of
+        ValueEnum _ _ v ->
+          let
+            len' = Bimap.size enumset `shiftR` 8 + 1
+            val = fromMaybe v . fmap ((.&. ((1 `shiftL` 8*(fromIntegral len')) - 1)) . (`shiftR` (byte*8))) $ cache offset
+           in
+            case Bimap.lookup (fromIntegral val) enumset of
+              Nothing -> error "bad enum value"
+              Just x  -> ValueEnum name x val
+        v -> error $ "decodeCacheValue': Expected ValueEnum, but got: " ++ show v
+
+  TypeStruct name ->
+    case Map.lookup name structDefs of
+     Nothing -> error ""
+     Just theStruct -> case value of
+       ValueStruct kvs -> ValueStruct $ decodeCacheValues typeDefs' theStruct cache (Storage.alignedByte position) kvs
+       v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
 
 decodeValues
   :: Integer
@@ -434,6 +572,9 @@ encodeByteString offset byte size bs =
 
 decodeByteString::Storage->Word256->Int->Int->Value
 decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B16.encode $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+
+decodeCacheByteString :: Cache -> Word256 -> Int -> Int -> Value -> Value
+decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . B16.encode . ByteString.take size . ByteString.drop (32 - byte - size) . word256ToByteString <$> storage offset
 
 encodeInt :: (Num t, Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
 encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte*8))) (offset,val)
