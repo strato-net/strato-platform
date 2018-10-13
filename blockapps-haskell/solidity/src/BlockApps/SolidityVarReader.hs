@@ -41,6 +41,7 @@ import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 import           Data.Word
+import           Debug.Trace                      (traceShowId)
 import           Text.Printf
 import           Text.Read
 
@@ -160,7 +161,7 @@ decodeCacheValues
   -> [(Text, Value)]
   -> [(Text, Value)]
 decodeCacheValues typeDefs' struct'@Struct{..} cache offset state =
-  zipWith fromMaybe state $ map (decodeCacheValue typeDefs' struct' cache offset) state
+  zipWith fromMaybe state $ map (decodeCacheValue typeDefs' struct' cache offset) $ traceShowId state
 
 decodeCacheValue
   :: TypeDefs
