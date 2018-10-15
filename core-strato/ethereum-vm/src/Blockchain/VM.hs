@@ -1029,11 +1029,12 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
 create' :: VMM Code
 create' = do
 
+  owner <- getEnvVar envOwner
+  storageDiffs %= M.alter (Just . fromMaybe M.empty) owner
+
   runCodeFromStart
 
   vmState <- lift get
-
-  owner <- getEnvVar envOwner
 
   let codeBytes' = fromMaybe B.empty $ returnVal vmState
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes'

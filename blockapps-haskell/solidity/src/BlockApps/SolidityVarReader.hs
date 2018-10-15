@@ -259,8 +259,9 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
           len = fromMaybe vlen $ fromIntegral <$> cache offset
           vals' = if len < vlen
                     then take len vals
-                    else vals ++ replicate (len - vlen) (decodeCacheValue' typeDefs' (const $ Just 0) doesntMatter (error "decodeCacheValue': Evaluating non-existent array element") ty) -- Seems unnecessary, but we need a way to hand over a generic null value
-                      where doesntMatter = Storage.Position 0 0 -- Our cache function is (const $ Just 0), so we don't need to pass in the correct offset
+                    else vals ++ replicate (len - vlen) (decodeValue' typeDefs' (const 0) 0 0 False doesntMatter ty)
+                      -- Our cache function is (Just 0), so we don't need to pass in the correct offset
+                      where doesntMatter = Storage.Position 0 0
           (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
           theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` startingKey) val ty) [0..] vals'
           startingKey = getArrayStartingKey offset
