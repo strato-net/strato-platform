@@ -28,6 +28,8 @@ const Tour = ({ name, callback, run, steps, ref, autoStart, endTour, stopAllTour
         if ((event.type === 'step:after' && event.step.selector === finalStepSelector)) {
           if (nextPage) {
             history.push(nextPage);
+          } else {
+            stopAllToursFromAutostarting();
           }
           endTour(name);
         }
