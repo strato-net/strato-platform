@@ -27,25 +27,6 @@ import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
 import           BlockApps.SolidityVarReader       (decodeStorageKey)
 
-transformXabi :: Integer -> Xabi -> Map.Map Text Text -> [(Word256, Word256)]
-transformXabi fetchLimit xabi@Xabi{..} vars = do
-  newXabiVars <- for (Map.toList vars) $ \(varName, val) -> do
-    case Map.lookup varName xabiVars of
-      Nothing -> error "Cannot assign value to a nonexiting contract variable"
-      Just Xabi.VarType{..} -> do
-        let initialVal = Just $ Text.unpack val
-            newVarType = Xabi.VarType varTypeAtBytes varTypePublic varTypeConstant initialVal varTypeType
-        return (varName, newVarType)
-  let updateVarVal varName curVal = if (Just curVal) == Map.lookup varName (Map.fromList newXabiVars)
-                                       then Just curVal
-                                       else Map.lookup varName (Map.fromList newXabiVars)
-  _ <- map (\(varName, _) -> Map.updateWithKey updateVarVal varName xabiVars) newXabiVars
-
-  let contract' = case xAbiToContract xabi of
-                    Left x -> error x
-                    Right c -> c
-  decodeStorageKey (typeDefs contract') (mainStruct contract') ["Gov"] 0 0 fetchLimit True
-
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
   let
