@@ -6,7 +6,6 @@
 module BlockApps.XAbiConverter where
 
 import qualified Data.Bimap                        as Bimap
-import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                          as Map
 import qualified Data.Map.Ordered                  as OMap
@@ -25,7 +24,6 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import qualified BlockApps.Storage                 as Storage
-import           BlockApps.SolidityVarReader       (decodeStorageKey)
 
 fieldsToStruct::TypeDefs->[((Text, Type), Maybe Text)]->Struct
 fieldsToStruct typeDefs' vars =
