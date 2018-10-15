@@ -14,6 +14,7 @@ module Blockchain.Sequencer.Kafka (
     writeSeqVmEvents,
     writeSeqP2pEvents,
     HasUnseqSink(..),
+    HasSeqSink(..),
     emitKafkaTransactions,
     emitKafkaBlock,
     emitKafkaChainDetails,
@@ -21,6 +22,7 @@ module Blockchain.Sequencer.Kafka (
 ) where
 
 import           Conduit
+import           Data.Void
 import           Data.Binary                (Binary, decode, encode)
 
 import qualified Blockchain.Blockstanbul as PBFT
@@ -96,29 +98,32 @@ readFromTopic' topic offset = do
 {-# INLINE readFromTopic' #-}
 
 class HasUnseqSink k where
-  getUnseqSink :: k ([IngestEvent] -> k ())
+  getUnseqSink :: k (ConduitM [IngestEvent] Void k ())
+
+class HasSeqSink k where
+  getSeqSink :: k (ConduitM [OutputEvent] Void k ())
 
 emitKafkaTransactions :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
     sink <- getUnseqSink
-    sink ingestTxs
+    runConduit (yield ingestTxs .| sink)
 
 emitKafkaBlock :: (Monad m, HasUnseqSink m) => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
     sink <- getUnseqSink
-    sink [ingestBlock]
+    runConduit (yield [ingestBlock] .| sink)
 
 emitKafkaChainDetails :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
 emitKafkaChainDetails origin chainId details = do
     let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
     sink <- getUnseqSink
-    sink [ingestGenesis]
+    runConduit (yield [ingestGenesis] .| sink)
 
 emitBlockstanbulMsg :: (MonadIO m, HasUnseqSink m) => PBFT.WireMessage -> m ()
 emitBlockstanbulMsg wm = do
   let iem = IEBlockstanbul wm
   sink <- getUnseqSink
-  sink [iem]
+  runConduit (yield [iem] .| sink)

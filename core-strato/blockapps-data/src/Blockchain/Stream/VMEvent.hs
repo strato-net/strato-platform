@@ -26,10 +26,13 @@ import           Conduit
 
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
+import           Data.Void
 
 import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
+
+import           Blockchain.DB.SQLDB
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.RLP
@@ -69,9 +72,9 @@ vmEventToBytes :: VMEvent -> B.ByteString
 vmEventToBytes = BL.toStrict . Binary.encode
 
 class HasVMEventsSink k where
-  getVMEventsSink :: k ([VMEvent] -> k ())
+  getVMEventsSink :: k (Conduit [VMEvent] k Void)
 
-produceVMEventsM :: (HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
+produceVMEventsM :: (HasSQLDB m, HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
     x <- withKafkaViolently . produceMessages $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
@@ -80,7 +83,7 @@ produceVMEventsM vmEvents = do
     return offset
 
 -- todo: refactor this to consume produceVMEventsM
-produceVMEvents::(MonadIO m)=>[VMEvent]->m Offset
+produceVMEvents::(HasSQLDB m, MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
   result <- liftIO $ runKafkaConfigured "blockapps-data" $
             produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents

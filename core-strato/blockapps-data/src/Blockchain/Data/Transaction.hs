@@ -35,7 +35,6 @@ module Blockchain.Data.Transaction (
   ) where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                as B
@@ -159,10 +158,10 @@ tx2RawTXAndTime origin tx = do
   time <- liftIO getCurrentTime
   return $ txAndTime2RawTX origin tx (-1) time
 
-insertTXIfNew :: HasSQLDB m => TXOrigin -> Maybe Integer -> [Transaction] -> m Integer
+insertTXIfNew :: HasSQLDB m=>TXOrigin->Maybe Integer->[Transaction]->m Integer
 insertTXIfNew = insertTX Fail
 
-insertTX :: HasSQLDB m => DebugMode -> TXOrigin -> Maybe Integer -> [Transaction] -> m Integer
+insertTX::HasSQLDB m=>DebugMode->TXOrigin->Maybe Integer->[Transaction]->m Integer
 insertTX mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   beforeECRecover <- liftIO $ getTime Realtime
@@ -172,11 +171,11 @@ insertTX mode origin blockNum txs = do
   insertRawTX mode rawTXs
   return $ toNanoSecs $ afterECRecover - beforeECRecover
 
-insertTXIfNew' :: (MonadBaseControl IO m, MonadUnliftIO m)=>
+insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
                  TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
 insertTXIfNew' = insertTX' Fail
 
-insertTX' :: (MonadBaseControl IO m, MonadUnliftIO m) =>
+insertTX'::(MonadBaseControl IO m, MonadIO m)=>
            DebugMode->TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
 insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime

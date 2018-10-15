@@ -162,3 +162,6 @@ removeMember chainId address = do
 
 terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
 terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
+
+instance KnownSymbol "id" where
+instance KnownSymbol "info" where
