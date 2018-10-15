@@ -20,7 +20,6 @@ module Blockchain.Data.RawTransaction (
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Database.Persist.Postgresql  as SQL
@@ -30,13 +29,13 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 
 
-insertRawTX :: HasSQLDB m => DebugMode -> [RawTransaction] -> m ()
+insertRawTX :: HasSQLDB m=>DebugMode->[RawTransaction]->m ()
 insertRawTX m rawTXs= do
   db <- getSQLDB
   runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
 
 
-insertRawTX' :: (MonadBaseControl IO m, MonadUnliftIO m) =>
+insertRawTX'::(MonadBaseControl IO m, MonadIO m)=>
              DebugMode->[RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
 insertRawTX' mode rawTXs= do
   forM_ rawTXs $ \rawTX -> do

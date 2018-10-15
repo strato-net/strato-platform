@@ -8,7 +8,6 @@ module Blockchain.Strato.Indexer.TxrIndexer where
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class             (liftIO)
-import           Control.Monad.Trans.Class          (lift)
 import           Control.Exception                  (catch, SomeException)
 import           Data.Binary
 import qualified Data.ByteString                    as BS
@@ -73,7 +72,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       when (isJust mEnode) $ do
                         let Just enode = mEnode
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                        lift $ addMember chainId address enode' -- We only need the Text version for Postgres
+                        addMember chainId address enode' -- We only need the Text version for Postgres
                         mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
                         when (isJust mChainInfo) $ do
                           let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
@@ -81,20 +80,20 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                      lift $ removeMember chainId address
+                      removeMember chainId address
                       mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
                       when (isJust mChainInfo) $ do
                         let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
                         void . RBDB.withRedisBlockDB $ RBDB.putChainInfo chainId cInfo{members = Map.delete address ms}
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
-                      lift $ terminateChain chainId
+                      terminateChain chainId
                     _ -> return ()
-                void . lift $ LogDB.putLogDB l
+                void $ LogDB.putLogDB l
             TxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
-                void . lift $ TxrDB.putTransactionResult r
+                void $ TxrDB.putTransactionResult r
             _ -> return ()
         setKafkaCheckpoint nextIdx
 

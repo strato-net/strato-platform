@@ -11,11 +11,11 @@ module Blockchain.Event (
   ) where
 
 import           Control.Arrow                         ((&&&))
+import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Class
+import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
 import           Data.Map                              (toList)
@@ -36,6 +36,7 @@ import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
+import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EventModel
 import           Blockchain.EventException
@@ -55,7 +56,7 @@ import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 import           Debug.Trace                           (trace)
 
 -- MonadBaseControl IO m, MonadIO m
-setTitleAndProduceBlocks :: (HasContext m, MonadLogger m) => [Block] -> m Int
+setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
     let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
@@ -63,7 +64,7 @@ setTitleAndProduceBlocks blocks = do
     sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        sink . map ChainBlock $ newBlocks
+        runConduit $ yield (map ChainBlock newBlocks) .| sink
     return $ length newBlocks
 
 -- drop every n-th element from the list
@@ -84,9 +85,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-handleEvents :: ( HasContextControl m
-                , MonadThrow m
-                , MonadLogger m)
+handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> ConduitM Event Message m ()
 handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
@@ -122,7 +121,7 @@ handleEvents mode peer = awaitForever $ \case
                     $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
                     syncFetch Forward fetchNumber
                 Just _  -> do
-                    void $ setTitleAndProduceBlocks [block']
+                    lift . void $ setTitleAndProduceBlocks [block']
                     void $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
@@ -233,13 +232,13 @@ handleEvents mode peer = awaitForever $ \case
         unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
-        newCount <- setTitleAndProduceBlocks blocks'
+        newCount <- lift $ setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
         let remainingHeaders = drop (length bodies) headers
         lift $ putBlockHeaders remainingHeaders
         if null remainingHeaders
             then when (newCount > 0) $ do
-                mrh <- getMaxHeaders
+                mrh <- gets maxReturnedHeaders
                 yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
@@ -292,7 +291,7 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
-            throwM PeerDisconnected
+            throwIO PeerDisconnected
 
     NewSeqEvent oe -> case oe of
       OEBlock b  -> do
@@ -357,7 +356,7 @@ handleEvents mode peer = awaitForever $ \case
             Just oldTS -> do
                 ts <- liftIO getCurrentTime
                 let diffTime = ts `diffUTCTime` oldTS
-                maxTime <- getConnectionTimeout
+                maxTime <- gets (fromIntegral . connectionTimeout)
                 liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
                 when (diffTime > maxTime) $ do
                     yield $ Disconnect UselessPeer
@@ -379,14 +378,14 @@ numFromRedis = \case
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
-syncFetch :: (HasContext m, MonadLogger m)
-          => Direction -> Integer -> Conduit Event m Message
+syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
+          => Direction -> Integer -> ConduitM Event Message m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        mrh <- lift getMaxHeaders
+        mrh <- gets maxReturnedHeaders
         yield $ GetBlockHeaders (BlockNumber num) mrh 0 d
-        lift stampActionTimestamp
+        stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer tx = case tx of

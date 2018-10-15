@@ -1,6 +1,11 @@
+{-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module Blockchain.DBM (
@@ -9,7 +14,7 @@ module Blockchain.DBM (
   openDBs
   ) where
 
-import           Control.Monad.IO.Unlift
+
 import           Control.Monad.Trans.Resource
 
 import           Control.Monad.Logger         (runNoLoggingT)
@@ -20,10 +25,24 @@ import           Blockchain.EthConf
 
 data DebugMode = Log | Fail deriving (Eq)
 
-newtype DBs =
+--import Debug.Trace
+
+data DBs =
   DBs {
     sqlDB'::SQLDB
     }
 
-openDBs::(MonadResource m, MonadUnliftIO m, {- TODO(tim): Remove -} MonadBaseControl IO m)=>m DBs
-openDBs = fmap DBs . runNoLoggingT . SQL.createPostgresqlPool connStr $ 20
+{-
+connStr::SQL.ConnectionString
+connStr = "host=localhost dbname=eth user=postgres password=api port=5432"
+-}
+
+{-
+connStr'::SQL.ConnectionString
+connStr' = BC.pack $ "host=localhost dbname=eth user=postgres password=api port=" ++ show (port $ sqlConfig ethConf)
+-}
+
+openDBs::(MonadResource m, MonadBaseControl IO m)=>m DBs
+openDBs = do
+  sqldb <-   runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
+  return $ DBs sqldb

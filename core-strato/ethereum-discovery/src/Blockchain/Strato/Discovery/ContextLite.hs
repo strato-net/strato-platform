@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.ContextLite
   ( ContextLite -- (..)
@@ -14,25 +13,23 @@ module Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Control.Monad.Reader
-import           Control.Monad.IO.Unlift
+import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
 
-newtype ContextLite =
+data ContextLite =
   ContextLite { liteSQLDB::SQLDB }
 
--- TODO(tim): Remove MonadBaseControl
-instance (MonadUnliftIO m, MonadBaseControl IO m)=>HasSQLDB (ReaderT ContextLite m) where
-  getSQLDB = asks liteSQLDB
+instance (MonadBaseControl IO m, MonadResource m)=>HasSQLDB (StateT ContextLite m) where
+  getSQLDB = fmap liteSQLDB get
 
-initContextLite :: (MonadResource m, MonadUnliftIO m, MonadBaseControl IO m) => m ContextLite
+initContextLite :: (MonadResource m, MonadIO m, MonadBaseControl IO m) => m ContextLite
 initContextLite = do
   dbs <- openDBs
   return ContextLite { liteSQLDB = sqlDB' dbs }
 
-addPeer :: (HasSQLDB m, MonadResource m)=>PPeer->m (SQL.Key PPeer)
+addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>PPeer->m (SQL.Key PPeer)
 addPeer peer = do
   db <- getSQLDB
   maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
@@ -41,10 +38,10 @@ addPeer peer = do
   where actions mp = case mp of
             Nothing -> SQL.insert peer
             Just peer'-> do
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.pPeerPubkey peer]
+              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
               return (SQL.entityKey peer')
 
-getPeerByIP :: (HasSQLDB m, MonadResource m)=>String->m (Maybe (SQL.Entity PPeer))
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
   db <- getSQLDB
   entPeer <- runResourceT $ SQL.runSqlPool actions db
@@ -53,4 +50,6 @@ getPeerByIP ip = do
     []  -> return Nothing
     lst -> return $ Just . head $ lst
 
-  where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+  where actions = SQL.selectList [ PPeerIp SQL.==. (T.pack ip) ] []
+
+

@@ -52,7 +52,6 @@ data VMState =
   VMState {
     vmIsHomestead    :: Bool,
     dbs              :: Context,
-    sqldb            :: Config,
     vmGasRemaining   :: Integer,
     pc               :: Word256,
     memory           :: Memory,
@@ -90,14 +89,13 @@ instance Format VMState where
     "gasRemaining: " ++ show (vmGasRemaining state) ++ "\n" ++
     "stack: " ++ show (stack state) ++ "\n"
 
-startingState :: Bool->Bool->Environment->Config -> Context->IO VMState
-startingState isRunningTests' isHomestead env sqldb' dbs' = do
+startingState :: Bool->Bool->Environment->Context->IO VMState
+startingState isRunningTests' isHomestead env dbs' = do
   m <- newMemory
   return VMState
              {
                vmIsHomestead=isHomestead,
                dbs = dbs',
-               sqldb = sqldb',
                pc = 0,
                done=False,
                returnVal=Nothing,

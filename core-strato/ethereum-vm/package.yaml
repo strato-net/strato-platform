@@ -23,7 +23,6 @@ dependencies:
   - blockapps-milena
   - blockapps-util
   - bytestring
-  - classy-prelude
   - containers
   - cryptohash
   - deepseq
@@ -37,7 +36,6 @@ dependencies:
   - lens
   - leveldb-haskell
   - merkle-patricia-db
-  - monad-control
   - monad-logger
   - mtl
   - ordered-containers
@@ -57,7 +55,6 @@ dependencies:
   - text
   - time
   - transformers
-  - unliftio-core
   - vector
   - wai-middleware-prometheus
   - warp

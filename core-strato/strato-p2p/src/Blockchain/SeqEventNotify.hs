@@ -31,5 +31,6 @@ seqEventNotificationSource = do
               events <- lift $ K.withKafkaViolently $ readSeqP2pEvents nextOffset
               unless (null events) $ do -- stop bloating the logs
                 $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
-                forM_ events yield
+                forM_ events $ \e -> do
+                    yield $ e
               loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
