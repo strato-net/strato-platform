@@ -71,7 +71,7 @@ class MenuBar extends Component {
                 name="chainLabel"
                 onChange={
                   (e) => {
-                    const data = e.target.value === 'Chain Label' ? null : e.target.value;
+                    const data = e.target.value === 'Main Chain' ? null : e.target.value;
                     this.props.selectChain(data);
                   }
                 }
