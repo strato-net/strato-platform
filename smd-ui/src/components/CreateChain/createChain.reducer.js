@@ -7,6 +7,8 @@ import {
   OPEN_ADD_MEMBER_MODAL,
   CLOSE_ADD_MEMBER_MODAL,
   RESET_ERROR,
+  COMPILE_CHAIN_CONTRACT_SUCCESS,
+  COMPILE_CHAIN_CONTRACT_FAILURE,
 } from './createChain.actions';
 
 const initialState = {
@@ -14,7 +16,8 @@ const initialState = {
   isOpen: false,
   spinning: false,
   key: null,
-  error: null
+  error: null,
+  chainAbi: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -59,6 +62,18 @@ const reducer = function (state = initialState, action) {
         ...state,
         error: null
       };
+    case COMPILE_CHAIN_CONTRACT_SUCCESS:
+      let contracts = action.response && action.response.src && Object.keys(action.response.src);
+      return {
+        ...state,
+        chainAbi: action.response,
+        contractName: contracts && contracts[0]
+      }
+    case COMPILE_CHAIN_CONTRACT_FAILURE:
+      return {
+        ...state,
+        error: action.error
+      }
     default:
       return state;
   }
