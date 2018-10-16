@@ -46,10 +46,6 @@ data ChainInput  = ChainInput
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
-instance KnownSymbol "enode" where
-
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "address and balance pair"
@@ -147,14 +143,12 @@ instance ToSchema ChainOutput where
 
 
 type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
 
-exChainIdChainOutput :: ChainIdChainOutput 
+exChainIdChainOutput :: ChainIdChainOutput
 exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 instance ToSample ChainIdChainOutput where
-  toSamples _ = singleSample exChainIdChainOutput 
+  toSamples _ = singleSample exChainIdChainOutput
 
 instance ToSchema ChainIdChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy

@@ -319,6 +319,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
+  , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
   , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic)
@@ -330,6 +331,7 @@ instance ToJSON ContractDetails where
     , "bin-runtime" .= contractdetailsBinRuntime
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
+    , "src" .= contractdetailsSrc
     , "xabi" .= contractdetailsXabi
     , "chainId" .= contractdetailsChainId
     ]
@@ -342,6 +344,7 @@ instance FromJSON ContractDetails where
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
+      <*> obj .: "src"
       <*> obj .: "xabi"
       <*> obj .:? "chainId"
 
@@ -363,6 +366,7 @@ instance ToSchema ContractDetails where
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = keccak256 "digest"
         , contractdetailsName = "DetailsName"
+        , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
         , contractdetailsChainId = Nothing
         }

@@ -11,7 +11,7 @@ import           Data.Maybe                        (maybe, listToMaybe)
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           BlockApps.Bloc22.Database.Create  (createTables, hashNameTable)
+import           BlockApps.Bloc22.Database.Create  (createTables, hashNameTable, contractsSourceTable)
 
 data MigrationErrorBehavior = Throw | Catch
 
@@ -37,6 +37,8 @@ migrations = [ (Throw, createTables)
              , (Throw, addValueColumn)
              , (Throw, addMutabilityColumn)
              , (Throw, addChainIdColumn)
+             , (Throw, contractsSourceTable)
+             , (Throw, addSrcHashColumn)
              ]
 
 getSchemaVersion :: Query
@@ -63,3 +65,6 @@ ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
 
 addChainIdColumn :: Query
 addChainIdColumn = [sql| ALTER TABLE contracts_instance ADD COLUMN IF NOT EXISTS chainid bytea; |]
+
+addSrcHashColumn :: Query
+addSrcHashColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS src_hash bytea; |]

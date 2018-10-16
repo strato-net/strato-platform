@@ -29,7 +29,6 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
-import           Blockchain.Data.MiningStatus
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -48,10 +47,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    newTxRanCallback :: [TxRunResult] -> DD.BlockData -> m ()
-    updateTxCallback :: [TxRunResult] -> SHA -> SHA -> MiningStatus -> m ()
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, newTxRanCallback, updateTxCallback, txsDroppedCallback #-}
+    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -97,7 +94,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.bestBlockHeader       = bd
                                            , B.bestBlockTxHashes     = txShas
                                            , B.lastExecutedStateRoot = thisStateRoot
-                                           , B.lastRewardedStateRoot = thisStateRoot
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
@@ -137,17 +133,17 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
-                    (newSR, newGas, newExec, newUnexec, newTxs, newUpdates) <- case run of
-                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [], newRR', lastExec)
+                    (newSR, newGas, newExec, newUnexec) <- case run of
+                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
                             Left e -> do
                                 logRAE e
                                 case e of
-                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx, rtx, lastExec)
+                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
                                     (RecoverableFailure f rtx urtx nsr nbg) -> do
                                         txsDroppedCallback [f] []
                                         let theRejectedTx = rejectedTx f
                                         purgeFromPending theRejectedTx
-                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx, rtx, lastExec)
+                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
                                     x                                       -> error (show x)
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
@@ -158,14 +154,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
                     !build <- buildFromMiningCache
-                    !tempRewarded <- buildRewardedBlockHeader tempBlockHeader []
                     $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
                     setStateDBStateRoot lastSR
-                    newTxRanCallback newTxs (obBlockData build)
-                    updateTxCallback newUpdates
-                                     (BDB.blockHeaderPartialHash tempRewarded)
-                                     (BDB.blockHeaderPartialHash $ obBlockData build)
-                                     Unmined
                     setStateDBStateRoot existingStateDbStateRoot
                     return build
           else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
@@ -401,7 +391,6 @@ buildFromMiningCache = do
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
-    updateBaggerState (\s@B.BaggerState{B.miningCache = mc} -> s{B.miningCache = mc{B.lastRewardedStateRoot = DD.blockDataStateRoot rewardedBlockData}})
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles

@@ -5,6 +5,8 @@ import           Data.LargeWord
 
 type Storage = Word256 -> Word256
 
+type Cache = Word256 -> Maybe Word256
+
 data Position =
   Position { offset :: Word256
            , byte   :: Int

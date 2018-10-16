@@ -214,7 +214,7 @@ addLdbBatchOps ops = do
   let newOps = foldl (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
-fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
+fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
   votes <- asks blockstanbulBeneficiary

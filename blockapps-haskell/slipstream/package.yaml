@@ -52,6 +52,7 @@ dependencies:
   - time
   - transformers-base
   - transformers
+  - unliftio
   - unordered-containers
   - vector
 

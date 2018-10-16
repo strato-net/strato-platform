@@ -15,7 +15,6 @@ import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
-import           Data.IORef.Lifted
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Set                        as Set
@@ -26,6 +25,8 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
+import           UnliftIO.IORef
+
 import           BlockApps.Ethereum
 
 import Slipstream.Events
@@ -121,7 +122,7 @@ convertRet metadata conn globalsIORef = runConduit $
   .| createInserts globalsIORef
   .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
-createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
   unless (null metadata) $ do
@@ -133,7 +134,7 @@ createInserts globalsIORef = do
     history <- isHistoric globalsIORef tableName
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
-    let comma = if (length list == 0)
+    let comma = if null list
         then ""
         else ", "
 

@@ -3,8 +3,6 @@
 module Handler.TransactionResult where
 
 import           Blockchain.SHA
-import           Blockchain.Data.MiningStatus
-import           Blockchain.Data.TransactionResultStatus
 import qualified Database.Esqueleto           as E
 import           Handler.Common
 import           Handler.Filters              (fromHexText)
@@ -18,13 +16,10 @@ getTransactionResultR txHash      = do
   rs <- runDB $ E.select $
     E.from $ \(txr) -> do
     let matchHash = (txr E.^. TransactionResultTransactionHash) E.==. (E.val txHash)
-        miningStatus = (txr E.^. TransactionResultMiningStatus) E.==. (E.val Mined)
         matchChainId = case chainId of
           Nothing -> (E.isNothing $ txr E.^. TransactionResultChainId)
           Just cid -> (txr E.^. TransactionResultChainId) E.==. (E.just $ E.val cid)
-        failStatus = (E.not_ . E.isNothing  $ txr E.^. TransactionResultStatus)
-               E.&&. ((txr E.^. TransactionResultStatus) E.!=. (E.just $ E.val Success))
-    E.where_ (matchHash E.&&. matchChainId E.&&. (miningStatus E.||. failStatus))
+    E.where_ (matchHash E.&&. matchChainId)
     return txr
   returnJson $ P.map E.entityVal (rs :: [Entity TransactionResult])
 

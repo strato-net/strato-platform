@@ -5,8 +5,6 @@ module Blockchain.VM
     ( runCodeFromStart
     , call
     , create
-    , getSource
-    , getContractName
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
@@ -22,14 +20,12 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
-import qualified Data.ByteString.Base16             as B16
 import           Data.Char
 import           Data.Function
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
-import           Data.Text.Encoding                 (decodeUtf8)
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
@@ -962,54 +958,6 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
-getSource :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
-getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
-
-getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM T.Text
-getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
-
-getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM T.Text
-getFromSelector sel isRunningTests' sr codeHash = do
-  theCode <- Code . fromMaybe B.empty <$> getCode codeHash
-
-  stateRoot <- getStateRoot
-  setStateDBStateRoot sr
-  let env =
-        Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
-          envGasPrice=1,
-          envBlockHeader=BlockData{
-            blockDataParentHash = SHA 0,
-            blockDataUnclesHash = SHA 0,
-            blockDataCoinbase = Address 0,
-            blockDataStateRoot = MP.emptyTriePtr,
-            blockDataTransactionsRoot = MP.emptyTriePtr,
-            blockDataReceiptsRoot = MP.emptyTriePtr,
-            blockDataLogBloom = "",
-            blockDataDifficulty = 0,
-            blockDataNumber = 0,
-            blockDataGasLimit = 10000000000000000000,
-            blockDataGasUsed = 0,
-            blockDataTimestamp = posixSecondsToUTCTime 0,
-            blockDataExtraData = "",
-            blockDataNonce = 0,
-            blockDataMixHash = SHA 0
-            },
-          envOwner = Address 0,
-          envOrigin = Address 0,
-          envInputData = fst $ B16.decode sel,
-          envSender = Address 0,
-          envValue = 0,
-          envCode = theCode,
-          envJumpDests = getValidJUMPDESTs theCode
-          }
-  (eRes, _) <-
-    runVMM isRunningTests' True S.empty 0 env 1000000000000000000 $ call' True
-
-  setStateDBStateRoot stateRoot
-  case eRes of
-    Left _ -> return ""
-    Right ret -> return . decodeUtf8 . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
-
 create :: Bool
        -> Bool
        -> S.Set Address
@@ -1080,11 +1028,12 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
 create' :: VMM Code
 create' = do
 
+  owner <- getEnvVar envOwner
+  storageDiffs %= M.alter (Just . fromMaybe M.empty) owner
+
   runCodeFromStart
 
   vmState <- lift get
-
-  owner <- getEnvVar envOwner
 
   let codeBytes' = fromMaybe B.empty $ returnVal vmState
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes'

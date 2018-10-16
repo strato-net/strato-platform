@@ -102,13 +102,15 @@ instance ToSample BlocTransactionData where
       , posttransactionV          = Hex 0x1c
       , posttransactionNonce      = 9876
       , posttransactionChainId    = Nothing
+      , posttransactionMetadata   = Nothing
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
       , contractdetailsAddress    = Just (Named "Latest")
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
-      , contractdetailsName       = "Contract Name"
+      , contractdetailsName       = "Example"
+      , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
       , contractdetailsChainId    = Nothing
       }

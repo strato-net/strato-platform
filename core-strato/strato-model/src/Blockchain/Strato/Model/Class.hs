@@ -1,6 +1,8 @@
 module Blockchain.Strato.Model.Class where
 
 import qualified Data.ByteString                 as B
+import           Data.Map.Strict                 (Map)
+import           Data.Text                       (Text)
 import           Data.Time
 import           Data.Word
 
@@ -96,10 +98,11 @@ class (RLPSerializable t) => TransactionLike t where
     txCode        :: t -> Maybe Code
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
     txChainId     :: t -> Maybe Word256
+    txMetadata    :: t -> Maybe (Map Text Text)
 
     morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
-                txCode, txData, txChainId, morphTx #-}
+                txCode, txData, txChainId, txMetadata, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

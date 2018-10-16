@@ -4,80 +4,33 @@ module Slipstream.Globals where
 
 
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Value
 import           Control.Monad.IO.Class
 import           Data.Default
 import           Data.IORef
-import           Data.Map                    (Map)
-import qualified Data.Map                    as Map
+import           Data.Map.Strict             (Map)
+import qualified Data.Map.Strict             as M
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
-import qualified Slipstream.Data.Action      as SS
 import           BlockApps.Ethereum
 
 data Globals =
   Globals {
-    createdSources :: Set Keccak256, -- list of source codes that have been compiled and have had their xabis put in the bloc tables
-    contractCache :: Map Keccak256 ContractAndXabi, -- maps codehash to metadata
-    sourcePtrCache :: Map Keccak256 SS.SourcePtr, -- maps codehash to (source hash, contract name)
     createdContracts :: Set Keccak256, -- list of contracts that have had their tables made
     historyList :: Set Text,
-    noIndexList :: Set Text
+    noIndexList :: Set Text,
+    contractStates :: Map (Address,Maybe ChainId) [(Text,Value)]
     }
 
 instance Default Globals where
   def =
     Globals {
-      createdSources = Set.empty,
-      contractCache = Map.empty,
-      sourcePtrCache = Map.empty,
       createdContracts = Set.empty,
       historyList = Set.empty,
-      noIndexList = Set.empty
+      noIndexList = Set.empty,
+      contractStates = M.empty
       }
-
-getAllContracts :: MonadIO m =>
-                   IORef Globals -> m (Map Keccak256 ContractAndXabi)
-getAllContracts = fmap contractCache . liftIO . readIORef
-
-storeCachedContract :: MonadIO m =>
-                       IORef Globals -> Keccak256 -> ContractAndXabi -> m ()
-storeCachedContract globalsIORef sourceCodeHash c = do
-  globals@Globals{..} <- liftIO $ readIORef globalsIORef
-  liftIO $ writeIORef globalsIORef
-    globals{contractCache=Map.insert sourceCodeHash c contractCache}
-
-setSourceCreated :: MonadIO m =>
-                    IORef Globals -> Keccak256 -> m ()
-setSourceCreated globalsIORef sourceCodeHash = do
-  globals@Globals{..} <- liftIO $ readIORef globalsIORef
-  liftIO $ writeIORef globalsIORef
-    globals{createdSources=Set.insert sourceCodeHash createdSources}
-
-isSourceCreated :: MonadIO m =>
-                   IORef Globals -> Keccak256 -> m Bool
-isSourceCreated globalsIORef sourceCodeHash = do
-  Globals{..} <- liftIO $ readIORef globalsIORef
-  return $ sourceCodeHash `Set.member` createdSources
-
-getCachedContract :: MonadIO m =>
-                     IORef Globals -> Keccak256 -> m (Maybe ContractAndXabi)
-getCachedContract globalsIORef sourceCodeHash = do
-  Globals{..} <- liftIO $ readIORef globalsIORef
-  return $ Map.lookup sourceCodeHash contractCache
-
-storeCachedSourcePtr :: MonadIO m =>
-                        IORef Globals -> Keccak256 -> SS.SourcePtr -> m ()
-storeCachedSourcePtr globalsIORef codeHash c = do
-  globals@Globals{..} <- liftIO $ readIORef globalsIORef
-  liftIO $ writeIORef globalsIORef
-    globals{sourcePtrCache=Map.insert codeHash c sourcePtrCache}
-
-getCachedSourcePtr :: MonadIO m =>
-                      IORef Globals -> Keccak256 -> m (Maybe SS.SourcePtr)
-getCachedSourcePtr globalsIORef codeHash = do
-  Globals{..} <- liftIO $ readIORef globalsIORef
-  return $ Map.lookup codeHash sourcePtrCache
 
 setContractCreated :: MonadIO m =>
                       IORef Globals -> Keccak256 -> m ()
@@ -111,6 +64,19 @@ shouldIndex globalsIORef name = do
 getNoIndexList :: MonadIO m =>
                   IORef Globals -> m (Set Text)
 getNoIndexList = fmap noIndexList . liftIO . readIORef
+
+getContractState :: MonadIO m =>
+                     IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
+getContractState globalsIORef address chainId = do
+  Globals{..} <- liftIO $ readIORef globalsIORef
+  return $ M.lookup (address,chainId) contractStates
+
+setContractState :: MonadIO m =>
+                      IORef Globals -> Address -> Maybe ChainId -> [(Text,Value)] -> m ()
+setContractState globalsIORef address chainId values = do
+  globals@Globals{..} <- liftIO $ readIORef globalsIORef
+  liftIO $ writeIORef globalsIORef
+    globals{contractStates = M.insert (address,chainId) values contractStates}
 
 data ContractAndXabi =
   ContractAndXabi {

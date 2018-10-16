@@ -7,6 +7,7 @@
 
 module BlockApps.Bloc22.Server.Contracts where
 
+import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -16,7 +17,6 @@ import           Data.Int
 import           Data.LargeWord                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import           Data.Time.Clock.POSIX

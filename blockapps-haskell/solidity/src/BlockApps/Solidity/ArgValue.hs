@@ -3,9 +3,9 @@
 
 module BlockApps.Solidity.ArgValue where
 
+import           ClassyPrelude                ((<>))
 import           Control.Lens                 ((&), (?~))
 import           Data.Aeson
-import           Data.Monoid
 import           Data.Swagger
 import           Data.Text
 import qualified Data.Text as Text

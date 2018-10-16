@@ -57,6 +57,7 @@ dependencies:
   - containers == 0.5.11.0
   - deepseq
   - binary
+  - text
 
 library:
   source-dirs: library/
