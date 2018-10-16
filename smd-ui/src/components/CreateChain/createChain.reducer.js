@@ -17,7 +17,7 @@ const initialState = {
   spinning: false,
   key: null,
   error: null,
-  chainAbi: null
+  abi: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -66,7 +66,7 @@ const reducer = function (state = initialState, action) {
       let contracts = action.response && action.response.src && Object.keys(action.response.src);
       return {
         ...state,
-        chainAbi: action.response,
+        abi: action.response,
         contractName: contracts && contracts[0]
       }
     case COMPILE_CHAIN_CONTRACT_FAILURE:

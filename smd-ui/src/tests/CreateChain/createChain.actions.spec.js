@@ -6,8 +6,12 @@ import {
   createChain,
   createChainSuccess,
   createChainFailure,
-  resetError
+  resetError,
+  compileChainContract,
+  compileChainContractSuccess,
+  compileChainContractFailure
 } from "../../components/CreateChain/createChain.actions";
+import { xabiMock } from "./createChainMock";
 
 describe('CreateChain: action', () => {
 
@@ -53,6 +57,28 @@ describe('CreateChain: action', () => {
 
     test('failure', () => {
       expect(createChainFailure('error')).toMatchSnapshot();
+    });
+
+  });
+
+  describe('compile chain contract', () => {
+
+    const payload = {
+      name: "Governance",
+      contract: "contract Governance { string constant addRule = 'MajorityRules'; string constant removeRule = 'MajorityRules' }",
+      searchable: false
+    }
+
+    test('request', () => {
+      expect(compileChainContract(payload.label, payload.contract, payload.searchable)).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      expect(compileChainContractSuccess(xabiMock)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(compileChainContractFailure('error')).toMatchSnapshot();
     });
 
   });

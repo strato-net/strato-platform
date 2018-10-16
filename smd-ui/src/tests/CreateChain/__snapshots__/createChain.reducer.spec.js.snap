@@ -20,6 +20,67 @@ Object {
 }
 `;
 
+exports[`CreateChain: reducer compile chain contract failure 1`] = `
+Object {
+  "abi": null,
+  "error": "error",
+  "isAddMemberModalOpen": false,
+  "isOpen": true,
+  "key": null,
+  "spinning": true,
+}
+`;
+
+exports[`CreateChain: reducer compile chain contract success 1`] = `
+Object {
+  "abi": Object {
+    "src": Object {
+      "Governance": Object {
+        "constr": Object {},
+        "events": Object {},
+        "funcs": Object {},
+        "isLibrary": false,
+        "modifiers": Object {},
+        "types": Object {},
+        "using": Object {},
+        "vars": Object {
+          "addRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "removeRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "temp": Object {
+            "atBytes": 0,
+            "constant": null,
+            "dynamic": true,
+            "initialValue": null,
+            "public": null,
+            "type": "String",
+          },
+        },
+      },
+    },
+  },
+  "contractName": "Governance",
+  "error": null,
+  "isAddMemberModalOpen": false,
+  "isOpen": false,
+  "key": null,
+  "spinning": false,
+}
+`;
+
 exports[`CreateChain: reducer create chain failure 1`] = `
 Object {
   "error": "error",
@@ -67,6 +128,7 @@ Object {
 
 exports[`CreateChain: reducer set initial state 1`] = `
 Object {
+  "abi": null,
   "error": null,
   "isAddMemberModalOpen": false,
   "isOpen": false,

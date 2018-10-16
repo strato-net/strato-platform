@@ -7,8 +7,11 @@ import {
   resetError,
   createChain,
   createChainSuccess,
-  createChainFailure
+  createChainFailure,
+  compileChainContractFailure,
+  compileChainContractSuccess
 } from '../../components/CreateChain/createChain.actions';
+import { xabiMock } from './createChainMock';
 
 describe('CreateChain: reducer', () => {
 
@@ -26,7 +29,8 @@ describe('CreateChain: reducer', () => {
         isOpen: false,
         spinning: false,
         key: null,
-        error: null
+        error: null,
+        abi: null
       };
 
       const action = openCreateChainOverlay();
@@ -132,6 +136,40 @@ describe('CreateChain: reducer', () => {
       };
 
       const action = createChainFailure('error');
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+  })
+
+  describe('compile chain contract', () => {
+
+    // COMPILE_CHAIN_CONTRACT_SUCCESS
+    test('success', () => {
+      const initialState = {
+        isAddMemberModalOpen: false,
+        isOpen: false,
+        spinning: false,
+        key: null,
+        error: null,
+        abi: null
+      };
+
+      const action = compileChainContractSuccess(xabiMock);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    // COMPILE_CHAIN_CONTRACT_FAILURE
+    test('failure', () => {
+      const initialState = {
+        isAddMemberModalOpen: false,
+        isOpen: true,
+        spinning: true,
+        key: null,
+        error: null,
+        abi: null
+      };
+
+      const action = compileChainContractFailure('error');
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
 

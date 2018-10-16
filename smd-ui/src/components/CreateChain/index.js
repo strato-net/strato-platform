@@ -58,7 +58,7 @@ class CreateChain extends Component {
       });
 
       const args = {};
-      const abi = this.props.chainAbi.src;
+      const abi = this.props.abi.src;
       // This will take out all the constants defined in contract and append it to args
       Object.values(abi).forEach(val => {
         if (Object.keys(val.vars).length) {
@@ -192,7 +192,7 @@ class CreateChain extends Component {
   };
 
   compilation() {
-    const src = this.props.chainAbi && this.props.chainAbi.src;
+    const src = this.props.abi && this.props.abi.src;
     const contractname = this.props.contractName;
 
     if (src) {
@@ -200,12 +200,12 @@ class CreateChain extends Component {
       if (contract && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
           if (contract.vars[arg].initialValue) {
-            return (
-              <tr key={'arg' + i}>
-                <td>{arg}</td>
-                <td>{contract.vars[arg].initialValue}</td>
-              </tr>
-            );
+            return (<tr key={'arg' + i}>
+              <td>{arg}</td>
+              <td>{contract.vars[arg].initialValue}</td>
+            </tr>);
+          } else {
+            return null;
           }
         });
       } else {
@@ -351,7 +351,7 @@ export function mapStateToProps(state) {
     isOpen: state.createChain.isOpen,
     isSpinning: state.createChain.spinning,
     createErrorMessage: state.createChain.error,
-    chainAbi: state.createChain.chainAbi,
+    abi: state.createChain.abi,
     contractName: state.createChain.contractName
   };
 }

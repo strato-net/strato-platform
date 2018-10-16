@@ -124,3 +124,55 @@ export const mockResponse = [
     }
   }
 ];
+
+export const xabiMock = {
+  "src": {
+    "Governance": {
+      "modifiers": {
+
+      },
+      "funcs": {
+
+      },
+      "types": {
+
+      },
+      "using": {
+
+      },
+      "constr": {
+
+      },
+      "events": {
+
+      },
+      "isLibrary": false,
+      "vars": {
+        "removeRule": {
+          "atBytes": 0,
+          "dynamic": true,
+          "initialValue": "\"MajorityRules\"",
+          "type": "String",
+          "constant": true,
+          "public": null
+        },
+        "temp": {
+          "atBytes": 0,
+          "dynamic": true,
+          "initialValue": null,
+          "type": "String",
+          "constant": null,
+          "public": null
+        },
+        "addRule": {
+          "atBytes": 0,
+          "dynamic": true,
+          "initialValue": "\"MajorityRules\"",
+          "type": "String",
+          "constant": true,
+          "public": null
+        }
+      }
+    }
+  }
+}

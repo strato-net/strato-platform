@@ -2,6 +2,7 @@ import React from 'react';
 import CreateChain, { mapStateToProps } from '../../components/CreateChain';
 import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
+import { xabiMock } from './createChainMock';
 
 describe('CreateChain: index', () => {
 
@@ -112,6 +113,7 @@ describe('CreateChain: index', () => {
       isOpen: false,
       isSpinning: false,
       error: null,
+      abi: xabiMock,
       openCreateChainOverlay: jest.fn(),
       closeCreateChainOverlay: jest.fn(),
       handleSubmit: jest.fn(),
@@ -261,7 +263,9 @@ describe('CreateChain: index', () => {
       createChain: {
         isOpen: true,
         spinning: true,
-        error: null
+        error: null,
+        contractName: 'Governance',
+        abi: xabiMock
       }
     }
 
