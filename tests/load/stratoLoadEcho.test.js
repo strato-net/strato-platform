@@ -17,9 +17,12 @@ const adminPassword = '1234';
 const contractName = 'GasDeal';
 const contractFilename = path.join(config.contractsPath, "GasDeal.sol");
 
+const enums = require('./enums');
+const { GasDealEvent, PowerDealEvent, EchoRole, RestStatus, GasVolumeUnits, Constants, Args, PriceType } = enums
+
 let txs = [];
 let txResults = [];
-let PriceType;
+let priceType;
 
 describe('Strato Load Test', function() {
   this.timeout(9999 * 1000);
@@ -36,8 +39,8 @@ describe('Strato Load Test', function() {
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(`User: ${admin.name} @ ${admin.address}`);
     const pricePath = path.join(config.contractsPath,"GasDeal/PriceType.sol")
-    PriceType = yield rest.getEnums(pricePath)
-    console.log(PriceType)
+    priceType = yield rest.getEnums(pricePath)
+    console.log(priceType)
     yield rest.compileSearch([contractName], contractName, contractFilename);
   });
 
@@ -100,29 +103,75 @@ function isObject(val) {
   return ( (typeof val === 'function') || (typeof val === 'object') );
 }
 
+function createGasDealFixedArgs(uid, args) { // TODO ECHO-358
+    const sArgs = {
+      uid: `${uid}`,
+      isBuyDeal: true,
+      traderId: 1,
+      counterPartyId: 2,
+      buyParty: 'TestBuyParty',
+      sellParty: 'TestSellParty',
+      priceType: PriceType.FIXED,
+      dealPrice: 50012400,
+      indexPriceAdder: 0,
+      // Added in ECHO-358
+      dealDate: 'testDealDate',
+      beginFlowDate: 'testFlowDate',
+      endFlowDate: 'testFlowDate',
+      pipelineEBB: `PipelineEBB_${uid}`,
+      receiptLocation: `ReceiptLocation_${uid}`,
+      volume: 30,
+      volumeUnits: 2,  //GasVolumeUnits.MMBtu
+      strategy: 'strategy',
+    }
+    return Object.assign({}, sArgs, args);
+  };
+
+util.boolToBytes32 = (value) => {
+  if (value != undefined && value == true) {
+    return util.intToBytes32(1)
+  }
+  return util.intToBytes32(0)
+}
+
+function argsToBytes32(sArgs) {
+  // create b32
+  const args = Array.from({ length: Args.MAX }, () => (util.intToBytes32(0)));
+  // set b32 from string args
+  args[Args.UID] = util.toBytes32(sArgs.uid);
+  args[Args.IS_BUY_DEAL] = util.boolToBytes32(sArgs.isBuyDeal);
+  args[Args.TRADER_ID] = util.intToBytes32(sArgs.traderId);
+  args[Args.COUNTER_PARTY_ID] = util.intToBytes32(sArgs.counterPartyId);
+  args[Args.BUY_PARTY] = util.toBytes32(sArgs.buyParty);
+  args[Args.SELL_PARTY] = util.toBytes32(sArgs.sellParty);
+  // Added in ECHO-302, moved from setDetails
+  args[Args.DEAL_PRICE] = util.intToBytes32(sArgs.dealPrice);
+  args[Args.PRICE_TYPE] = util.intToBytes32(sArgs.priceType);
+  args[Args.DEAL_DATE] = util.toBytes32(sArgs.dealDate);
+  args[Args.BEGIN_FLOW_DATE] = util.toBytes32(sArgs.beginFlowDate);
+  args[Args.END_FLOW_DATE] = util.toBytes32(sArgs.endFlowDate);
+  args[Args.PIPELINE_EBB] = util.toBytes32(sArgs.pipelineEBB);
+  args[Args.RECEIPT_LOCATION] = util.toBytes32(sArgs.receiptLocation);
+  args[Args.VOLUME] = util.intToBytes32(sArgs.volume);
+  args[Args.INDEX_PRICE_ADDER] = util.intToBytes32(sArgs.indexPriceAdder);
+  args[Args.GAS_VOLUME_UNITS] = util.intToBytes32(sArgs.volumeUnits);
+  args[Args.STRATEGY] = util.toBytes32(sArgs.strategy);
+  return args;
+}
+
 function factory_createUploadList(batchSize, batchIndex) {
+ // const dapp = yield dappJs.bind(deployment.admin, deployment.contract);
   for (var i = 0; i < batchSize; i++) {
     //createGasDealFixedArgs
+    const uidt = util.uid();
+    console.log(uidt);
+    const sArgs = createGasDealFixedArgs(uidt);
+
     txs.push({
       contractName: contractName,
       args: {
-        _uid: `uid_${batchIndex}_${i}`,
-        _isBuyDeal: `isBuyDeal_${batchIndex}_${i}`,
-        _traderId: `traderId_${batchIndex}_${i}`,
-        _counterPartyId: `counterPartyId_${batchIndex}_${i}`,
-        _buyParty: `buyParty_${batchIndex}_${i}`,
-        _sellParty: `sellParty_${batchIndex}_${i}`,
-        _priceType: `priceType_${PriceType.FIXED}` ,
-        _dealPrice: `dealPrice_${batchIndex}_${i}`,
-        _indexPriceAdder: `indexPriceAdder_${batchIndex}_${i}`,
-        _dealDate: `dealDate_${batchIndex}_${i}`,
-        _beginFlowDate: `beginFlowDate_${batchIndex}_${i}`,
-        _endFlowDate: `endFlowDate_${batchIndex}_${i}`,
-        _pipelineEBB: `pipelineEBB_${batchIndex}_${i}`,
-        _receiptLocation: `receiptLocation_${batchIndex}_${i}`,
-        _volume: `volume_${batchIndex}_${i}`,
-        _volumeUnits: `volumeUnits_${batchIndex}_${i}`,
-        _strategy: `strategy_${batchIndex}_${i}`,
+        _echoPermissionManager:'2383914a2cffe7bb97e0b622481b945858e08188',
+        _bytes32Array:argsToBytes32(sArgs),
       },
       txParams: {
         gasLimit: 10000000,

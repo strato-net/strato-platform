@@ -7,6 +7,7 @@
     "test:e2e": "mocha e2e/compile.test.js && mocha e2e/createUser.test.js && mocha e2e/import.constructor.test.js && mocha e2e/import.test.js",
     "test:dataTypes": "mocha regressions/address.test.js && mocha regressions/bool.test.js && mocha regressions/bytes.test.js && mocha regressions/enum.test.js && mocha regressions/string.test.js && mocha regressions/uint.test.js && mocha regressions/negative.test.js",
     "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
+    "test:loadecho": "mocha load/stratoLoadEcho.test.js --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
     "test:upload": "mocha load/uploadString.test.js --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.js --batchCount 10 --batchSize 10",
     "test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js"
   },
@@ -15,6 +16,7 @@
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",
+    "enum": "^2.5.0",
     "json-to-csv": "^1.0.0",
     "mocha": "^3.4.2",
     "moment": "^2.22.2"
