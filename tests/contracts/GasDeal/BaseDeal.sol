@@ -76,13 +76,14 @@ contract BaseDeal is Searchable, RestStatus, DealType, PriceType, RejectionType 
   /**
    * Log an event for Audit Trail
    *
-   * @param {number} _dealType deal type
-   * @param {number} _gasDealEvent event type
-   * @param {number} _eventPayloadInt event payload - int
-   * @param {number} _eventPayloadString event payload - string
-   * @param {number} _userLocalTime local user time milli
-   * @param {number} _restStatus event RestStatus result
-   * @param {number} _dealState current deal state
+   * @param _msgSender address
+   * @param _dealType deal type
+   * @param _dealEvent event type
+   * @param _eventPayloadInt event payload - int
+   * @param _eventPayloadString event payload - string
+   * @param _userLocalTime local user time milli
+   * @param _restStatus event RestStatus result
+   * @param _dealState current deal state
    * @return {number, number, number} RestStatus, The new log entry index, searchCounter
    */
   function logEvent(

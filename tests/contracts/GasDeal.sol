@@ -157,11 +157,12 @@ contract GasDeal is BaseDeal, Util, Args, GasDealState, GasDealEvent, GasVolumeU
   /**
    * Log an event for Audit Trail
    *
-   * @param {number} _gasDealEvent event
-   * @param {number} _eventPayloadInt event payload - int
-   * @param {number} _eventPayloadString event payload - string
-   * @param {number} _userLocalTime local user time milli
-   * @param {number} _restStatus event RestStatus result
+   * @param _msgSender address
+   * @param _gasDealEvent event
+   * @param _eventPayloadInt event payload - int
+   * @param _eventPayloadString event payload - string
+   * @param _userLocalTime local user time milli
+   * @param _restStatus event RestStatus result
    * @return {number, number, number} RestStatus, The new log entry index, , searchCounter
    */
   function logEvent(
