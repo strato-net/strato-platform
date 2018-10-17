@@ -52,10 +52,10 @@ class TransactionView extends Component {
                       <td><strong>From</strong></td>
                       <td>{tx.from === undefined ? '' : <HexText value={tx.from} classes="smd-pad-2" />}</td>
                     </tr>
-                    <tr>
+                    {tx.to !== undefined && <tr>
                       <td><strong>To</strong></td>
-                      <td>{tx.to === undefined ? '' : <HexText value={tx.to} classes="smd-pad-2" />}</td>
-                    </tr>
+                      <td><HexText value={tx.to} classes="smd-pad-2" /></td>
+                    </tr>}
                     <tr>
                       <td><strong>Block Number</strong></td>
                       <td>{tx.blockNumber}</td>
