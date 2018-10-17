@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
 
-import Test.Hspec (Spec, describe, it, parallel, pendingWith)
+import Test.Hspec (Spec, describe, it, parallel)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck
 
@@ -468,11 +468,10 @@ spec = parallel $ do
           (lockBlk, omsgs) <- resendLock blk theirPK theirPK
           map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
 
-      it "rejects a block if the signer is not the original sender" $ property $ \blk -> do
-        pendingWith "TODO(tim): Reorganize specific auth"
+      it "accepts a block if the signer is not the original sender" $ property $ \blk ->
         runAuthTest $ do
           theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
           v <- use view
           myKey <- use prvkey
-          (_, omsgs) <- resendLock blk theirPK myKey
-          map oMessage omsgs `shouldBe` [RoundChange v]
+          (lockBlk, omsgs) <- resendLock blk theirPK myKey
+          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]

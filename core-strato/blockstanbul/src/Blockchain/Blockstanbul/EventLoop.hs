@@ -6,7 +6,6 @@
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
-import Control.Applicative ((<|>))
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
@@ -143,7 +142,6 @@ isAuthorized iev = do
   unless authenticated $
     warn $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorized <- authorize iev
-  mLockSender <- use lockSender
   specificAuth <-
     case iev of
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
@@ -160,20 +158,20 @@ isAuthorized iev = do
             return False
       -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
       -- but with incorrect extraData.
-      IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
+      IMsg _ (Preprepare _ pp) -> do
         vals <- use validators
         let payloadVals = S.fromList (getValidatorList pp)
             validatorsMatch = vals == payloadVals
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
-            signerMatches = (mLockSender <|> Just addr) == signatory
-        unless signerMatches $
+            signerExists = signatory `S.member` S.map Just vals
+        unless signerExists $
           warn $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
-              ++ " is not sender " ++ format addr
+              ++ " is not a known validator"
         unless validatorsMatch $
           warn $ "Rejecting Preprepare; payload validators "
               ++ show (S.map format payloadVals) ++ " are not expected validators "
               ++ show (S.map format vals)
-        return $ signerMatches && validatorsMatch
+        return $ signerExists && validatorsMatch
       IMsg (MsgAuth addr _) (Commit _ di seal) -> do
         let ret = Just addr == verifyCommitmentSeal di seal
         unless ret . warn $ "Rejecting Commit; bad seal"
