@@ -1,6 +1,7 @@
 'use strict'
 
 const ba = require('blockapps-rest');
+const BigNumber = require('bignumber.js');
 const co = require('co');
 require('co-mocha');
 const rest = ba.rest;
@@ -79,13 +80,16 @@ describe('Strato Load Test', function() {
 });
 
 function * waitResult(address, batchSize, batchCount) {
-  let result = [{nonce: 0}];
-  while(result[0].nonce < batchSize*batchCount) {
-    console.log(`Current Nonce is: ${result[0].nonce}`)
-    yield promiseTimeout(500);
-    try {
-    result = yield api.strato.account(address);
+  let nonce = 0;
+  while(nonce < batchSize*batchCount) {
+     yield promiseTimeout(500);
+     try {
+       console.log(`Current Nonce is: ${nonce}`)
+       let result = yield api.strato.account(address);
+       console.log(`Result: ${JSON.stringify(result)}`);
+       nonce = result[0].nonce;
     } catch (e) {
+      console.error(e);
     }
   }
 }
