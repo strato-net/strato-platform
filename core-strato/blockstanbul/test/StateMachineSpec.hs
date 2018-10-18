@@ -201,6 +201,16 @@ spec = parallel $ do
         map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
         other `shouldMatchList` [GapFound 18 400000]
 
+    it "round-changes and announces a lead from a past preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= sender auth
+        validators .= S.fromList [sender auth]
+        got <- sendMessages [IMsg auth $ Preprepare (View 347 2) blk]
+        let omsgs = [o | o@OMsg{} <- got]
+            other =got \\ omsgs
+        map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
+        other `shouldMatchList` [LeadFound 18 2]
+
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->

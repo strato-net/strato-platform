@@ -109,6 +109,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
               | GapFound {have :: Integer, require :: Integer}
+              | LeadFound {weHave :: Integer, theyHave :: Integer}
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
