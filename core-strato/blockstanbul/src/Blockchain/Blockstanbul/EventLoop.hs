@@ -353,10 +353,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
-        when (_sequence v < _sequence vn) $ do
-          -- Assume that we have missed the commit of the locked block, because
-          -- the rest of the nodes have moved on.
-          clearLock
         case next of
           Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
