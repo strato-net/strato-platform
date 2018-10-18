@@ -107,7 +107,9 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEGetTx [SHA]
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
+                 -- Ask and push for inclusive ranges of blocks
                  | OEAskForBlocks {askStart :: Integer, askEnd :: Integer}
+                 | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer}
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -309,6 +311,7 @@ instance Binary OutputEvent where
     put (OEBlockstanbul m)   = putWord8 7 >> put m
     put (OECreateBlockCommand) = putWord8 8
     put (OEAskForBlocks s e) = putWord8 9 >> put s >> put e
+    put (OEPushBlocks s e) = putWord8 10 >> put s >> put e
     get = do
         tag <- getWord8
         case tag of
@@ -322,6 +325,7 @@ instance Binary OutputEvent where
             7 -> OEBlockstanbul <$> get
             8 -> pure OECreateBlockCommand
             9 -> OEAskForBlocks <$> get <*> get
+            10 -> OEPushBlocks <$> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

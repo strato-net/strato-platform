@@ -172,7 +172,8 @@ blockstanbulSend msgs = do
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
         vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-              ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
+              ++ [OEAskForBlocks (l+1) h | GapFound l h <- resp]
+              ++ [OEPushBlocks (l+1) h | LeadFound h l <- resp]
 
 
     unless (null blocks) $ do

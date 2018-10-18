@@ -286,19 +286,21 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         () | sender auth /= pr ->
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
-           | isJust mBlockLock && Just pp /= mBlockLock -> do
-              $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: block does not match lock"
-              $logInfoS "blockstanbul/roundchange" "lock mismatch"
-              roundChange
            | v /= v' -> do
               $logInfoS "blockstanbul/roundchange" . T.pack $
                  "view mismatch (us, sender): " ++ format (v, v')
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-              when (_sequence v < _sequence v') $ do
-                let intSeq = fromIntegral . _sequence
+              let intSeq = fromIntegral . _sequence
+              when (_sequence v < _sequence v') $
                 yield $ GapFound (intSeq v) (intSeq v')
+              when (_sequence v > _sequence v') $
+                yield $ LeadFound (intSeq v) (intSeq v')
+              roundChange
+           | isJust mBlockLock && Just pp /= mBlockLock -> do
+              $logWarnS "blockstanbul/ppl" . T.pack $
+                printf "Rejecting proposal: block does not match lock"
+              $logInfoS "blockstanbul/roundchange" "lock mismatch"
               roundChange
            | otherwise -> do
                blockcount += 1
@@ -449,3 +451,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     MakeBlockCommand -> inc "make_block_command"
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
+    LeadFound{} -> inc "lead_found"

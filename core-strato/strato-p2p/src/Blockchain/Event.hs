@@ -25,6 +25,7 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           Text.Printf
 
 import           Blockchain.Colors
 import           Blockchain.Context
@@ -346,6 +347,15 @@ handleEvents mode peer = awaitForever $ \case
       OEAskForBlocks start end -> do
         let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
         $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+        yield outbound
+      OEPushBlocks start end -> do
+        chain <- RBDB.withRedisBlockDB $
+          RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start)
+        when (null chain) $
+          $logErrorS "handleEVents/OEPushBlocks" . T.pack $ printf
+            "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
+        let outbound = BlockHeaders . map snd $ chain
+        $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
         yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
