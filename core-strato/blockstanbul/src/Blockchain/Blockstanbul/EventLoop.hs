@@ -251,10 +251,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
+          blockNo = blockDataNumber . blockBlockData $ blk
       case eNextSeqNo of
-        Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
+        Left err -> $logWarnS "blockstanbul" . T.pack . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right _ -> do
           -- TODO(tim): Does it have a vote to record?
+          $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
