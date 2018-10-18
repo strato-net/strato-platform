@@ -350,7 +350,7 @@ handleEvents mode peer = awaitForever $ \case
         yield outbound
       OEPushBlocks start end -> do
         chain <- RBDB.withRedisBlockDB $
-          RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start)
+          RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
         when (null chain) $
           $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
             "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
