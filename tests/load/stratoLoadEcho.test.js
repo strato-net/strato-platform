@@ -39,10 +39,14 @@ describe('Strato Load Test', function() {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
     console.log(`User: ${admin.name} @ ${admin.address}`);
-    const pricePath = path.join(config.contractsPath,"GasDeal/PriceType.sol")
-    priceType = yield rest.getEnums(pricePath)
-    console.log(priceType)
     yield rest.compileSearch([contractName], contractName, contractFilename);
+    console.log(contractFilename)
+    let balance = new BigNumber(0);
+    while (balance.isZero()) {
+      yield promiseTimeout(500);
+      balance = yield rest.getBalance(admin.address);
+      console.log(`Balance is: ${balance}`);
+    }
   });
 
   it('Upload contracts', function * () {
@@ -55,7 +59,7 @@ describe('Strato Load Test', function() {
       const results = yield api.bloc.uploadList({
         password: adminPassword,
         contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
-        resolve: false 
+        resolve: true
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
@@ -125,7 +129,7 @@ function createGasDealFixedArgs(uid, args) { // TODO ECHO-358
       pipelineEBB: `PipelineEBB_${uid}`,
       receiptLocation: `ReceiptLocation_${uid}`,
       volume: 30,
-      volumeUnits: 2,  //GasVolumeUnits.MMBtu
+      volumeUnits: 0,  //GasVolumeUnits.MMBtu
       strategy: 'strategy',
     }
     return Object.assign({}, sArgs, args);
