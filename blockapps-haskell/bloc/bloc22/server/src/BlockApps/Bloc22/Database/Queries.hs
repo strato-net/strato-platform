@@ -227,6 +227,18 @@ contractByCodeHash codeHash = proc () -> do
   restrict -< ch .== constant codeHash
   returnA -< contract
 
+contractInstancesByCodeHash
+  :: Keccak256
+  -> Address
+  -> Maybe ChainId
+  -> Query (Column PGInt4)
+contractInstancesByCodeHash codeHash address chainId = proc () -> do
+  (cmId,_,_,addr,_,_,_,ch,_,cid) <- contractsJoinTable -< ()
+  restrict -< ch .== constant codeHash
+  restrict -< addr .== constant address
+  restrict -< cid .== constant chainId
+  returnA -< cmId
+
 contractBySourceHash
   :: Keccak256
   -> Query
@@ -914,12 +926,12 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) chainId tuple
 
-getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe ContractDetails)
+getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
       xabi <- getContractXabiByMetadataId cmId
-      return ContractDetails
+      return (cmId, ContractDetails
         { contractdetailsBin = Text.decodeUtf8 bin
         , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = Text.decodeUtf8 binr
@@ -928,7 +940,7 @@ getContractDetailsByCodeHash codeHash = do
         , contractdetailsSrc = src
         , contractdetailsXabi = xabi
         , contractdetailsChainId = Nothing
-        }
+        })
 
 {- |
 WITH contract_id AS (
@@ -1181,6 +1193,22 @@ insertContract parentContr contr bin binRuntime src xabi = do
     contrId bin binRuntime codeHash xcodeHash srcHash
   insertXabi metadataId parentContr xabi
   return metadataId
+
+insertContractInstance
+  :: Int32
+  -> Address
+  -> Maybe ChainId
+  -> Bloc Int32
+insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertManyReturning conn contractsInstanceTable
+  [
+  ( Nothing
+  , constant cmId
+  , constant address
+  , Nothing
+  , constant chainId
+  )
+  ]
+  (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do

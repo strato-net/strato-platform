@@ -605,16 +605,6 @@ evalAndReturn list = do
   let jbtrs = [btr | Just btr <- mbtrs]
       cl = contractsList state
   (nbtrs,_) <- do
-    void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable
-      [
-      ( Nothing
-      , constant cmId
-      , constant addr'
-      , Nothing
-      , constant chainId
-      )
-      | (addr', ContractCreationData cmId _ _ chainId _ _) <- cl
-      ]
     forStateT state cl $
       \(addr', ContractCreationData _ hash name chainId mtxr index) -> do
         st <- get
