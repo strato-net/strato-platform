@@ -32,7 +32,6 @@ insertPrivateHash tx = case txChainId tx of
         h = txHash tx
         rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
         sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-    insertTransaction tx
     insertChainHash rs chainId
     insertChainHash sr chainId
     chainHash <- getChainHash chainId
