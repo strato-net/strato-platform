@@ -33,7 +33,7 @@ describe('Strato Load Test', function() {
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
   const batchDelay = util.getArgInt('--batchDelay', 0);
-  
+
 
   before(function * () {
     console.log(`Creating admin user and contract`);
@@ -42,10 +42,19 @@ describe('Strato Load Test', function() {
     yield rest.compileSearch([contractName], contractName, contractFilename);
     console.log(contractFilename)
     let balance = new BigNumber(0);
+    let retryCounter = 0
     while (balance.isZero()) {
       yield promiseTimeout(500);
       balance = yield rest.getBalance(admin.address);
       console.log(`Balance is: ${balance}`);
+      retryCounter++;
+      if (retryCounter % 10 == 0) {
+        // Faucets can sometimes race against other faucets,
+        // so for now we are more forgiving about address funding.
+        // strato-api should be enhanced to accept concurrent faucets
+        // per block
+        yield rest.fill(admin);
+      }
     }
   });
 
@@ -77,10 +86,10 @@ describe('Strato Load Test', function() {
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);    
+    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
   });
-  
+
 });
 
 function * waitResult(address, batchSize, batchCount) {
