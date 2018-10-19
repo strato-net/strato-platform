@@ -76,7 +76,7 @@ getTheMessages offset@(K.Offset o) = do
   let errorStatuses = concatMap (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
   case find (/= K.NoError) errorStatuses of
    Just e -> do
-    liftIO . debugM "getTheMessages/kafka_response" . show $ fetched
+    liftIO . criticalM "getTheMessages/kafka_response" . show $ fetched
     let topic = BC.unpack (lookupTopic ^. K.tName ^. K.kString)
     error $ printf "There was a critical Kafka error while fetching messages: %s\ntopic = %s, offset = %d" (show e) topic o
    Nothing -> return ()

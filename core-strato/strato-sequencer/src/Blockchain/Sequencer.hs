@@ -181,6 +181,7 @@ blockstanbulSend' msg = do
   let vmevs = creates ++ rBlocks
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
+            ++ [OEPushBlocks (l+1) h | LeadFound h l <- resp]
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
     dt <- asks blockstanbulBlockPeriod

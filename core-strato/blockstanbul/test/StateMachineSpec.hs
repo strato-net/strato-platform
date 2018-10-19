@@ -201,6 +201,16 @@ spec = parallel $ do
         map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
         other `shouldMatchList` [GapFound 18 400000]
 
+    it "round-changes and announces a lead from a past preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= sender auth
+        validators .= S.fromList [sender auth]
+        got <- sendMessages [IMsg auth $ Preprepare (View 347 2) blk]
+        let omsgs = [o | o@OMsg{} <- got]
+            other =got \\ omsgs
+        map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
+        other `shouldMatchList` [LeadFound 18 2]
+
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->
@@ -421,23 +431,15 @@ spec = parallel $ do
       runTest $ do
         setBlock blk
         me <- selfAddr
-        next <- uses view (over round (+1))
-        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        roundPlus1 <- uses view (over round (+1))
+        let roundAndSequencePlus1 = over sequence (+1) roundPlus1
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange roundAndSequencePlus1]
         let omsgs = [o | o@(OMsg _ _) <- resp]
             other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange next, Preprepare next blk]
-        other `shouldBe` [ResetTimer $ _round next]
+        map oMessage omsgs `shouldBe` [RoundChange roundAndSequencePlus1,
+                                       Preprepare roundPlus1 blk]
+        other `shouldBe` [ResetTimer $ _round roundPlus1]
 
-    it "clears the lock after a future round change" $ property $ \blk sig ->
-      runTest $ do
-        setBlock blk
-        me <- selfAddr
-        next <- uses view (over round (+1) . over sequence (+1))
-        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
-        let omsgs = [o | o@(OMsg _ _) <- resp]
-            other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange next]
-        other `shouldMatchList` [ResetTimer $ _round next, MakeBlockCommand]
     describe "Authentication" $ do
       let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
                      -> StateT BlockstanbulContext (NoLoggingT IO) (Block, [OutEvent])
