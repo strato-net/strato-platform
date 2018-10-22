@@ -95,7 +95,7 @@ describe('Strato Load Test', function() {
 function * waitResult(address, batchSize, batchCount) {
   let nonce = 0;
   while(nonce < batchSize*batchCount) {
-     yield promiseTimeout(500);
+     yield promiseTimeout(5000);
      try {
        console.log(`Current Nonce is: ${nonce}`)
        let result = yield api.strato.account(address);
@@ -178,6 +178,7 @@ function argsToBytes32(sArgs) {
 
 function factory_createUploadList(batchSize, batchIndex) {
  // const dapp = yield dappJs.bind(deployment.admin, deployment.contract);
+  let nonceSave = batchSize * batchIndex
   for (var i = 0; i < batchSize; i++) {
     //createGasDealFixedArgs
     const uidt = util.uid();
@@ -193,7 +194,7 @@ function factory_createUploadList(batchSize, batchIndex) {
       txParams: {
         gasLimit: 10000000,
         gasPrice: 1,
-        nonce: batchSize * batchIndex + i
+        nonce: nonceSave + i
       }
     });
   }
