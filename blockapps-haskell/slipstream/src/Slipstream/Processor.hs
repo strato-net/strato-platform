@@ -20,6 +20,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
+import Data.Int (Int32)
 import Data.IORef
 import Data.Function
 import Data.Map (Map)
@@ -167,19 +168,22 @@ processTheMessages messages conn g = do
           fmap join . for (Map.lookup "src" md) $ \src -> do
             detailsMap <- compileContract src
             fmap join . for (Map.lookup "name" md) $ \name -> do
-              traverse (pure . snd) $ Map.lookup name detailsMap
+              traverse pure $ Map.lookup name detailsMap
 
         if isNothing mDetails
           then return . Left $ "No details found for code hash "
                             <> (T.pack $ show actionCodeHash)
                             <> " and no 'src' field found in actionMetadata"
           else do
-            let Just details = mDetails
+            let Just (cmId,details) = mDetails
                 strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
                 strName = T.replace "\"" "" $ contractdetailsName details
                 cont = either error id . xAbiToContract $ contractdetailsXabi details
                 chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
                 cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
+            (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
+              contractInstancesByCodeHash actionCodeHash actionAddress actionTxChainId
+            when (isNothing mInstance) . void $ insertContractInstance cmId actionAddress actionTxChainId
             fetchLimit <- asks stateFetchLimit
             oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
                           <$> getContractState g actionAddress actionTxChainId
