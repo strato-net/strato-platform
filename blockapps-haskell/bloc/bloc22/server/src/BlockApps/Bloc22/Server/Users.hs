@@ -606,13 +606,13 @@ evalAndReturn list = do
       cl = contractsList state
   (nbtrs,_) <- do
     forStateT state cl $
-      \(addr', ContractCreationData _ hash name chainId mtxr index) -> do
+      \(addr', ContractCreationData cmId hash name chainId mtxr index) -> do
         st <- get
         let cds = contractDetailsMap st
         (details, cds') <- case Map.lookup name cds of
           Just details' -> return (details'{contractdetailsAddress = Just (Unnamed addr')}, cds)
           Nothing -> do
-            details' <- lift $ getContractDetails name (Unnamed addr') chainId
+            details' <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') chainId
             return (details', Map.insert name details' cds)
         put st{contractDetailsMap = cds'}
         return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)

@@ -227,6 +227,23 @@ contractByCodeHash codeHash = proc () -> do
   restrict -< ch .== constant codeHash
   returnA -< contract
 
+contractByMetadataId
+  :: Int32
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGText
+    , Column PGInt4
+    )
+contractByMetadataId metadataId = proc () -> do
+  contract@(_,_,_,_,_,_,_,cmId) <- contractDetailsJoinTable -< ()
+  restrict -< cmId .== constant metadataId
+  returnA -< contract
+
 contractInstancesByCodeHash
   :: Keccak256
   -> Address
@@ -891,6 +908,20 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId
   returnA -< varName
 
+getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetailsByMetadataId cmId addr chainId = do
+  xabi <- getContractXabiByMetadataId cmId
+  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32) <- blocQuery1 $ contractByMetadataId cmId
+  return ContractDetails
+    { contractdetailsBin = Text.decodeUtf8 bin
+    , contractdetailsAddress = Just addr
+    , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
+    , contractdetailsCodeHash = codeHash
+    , contractdetailsName = name
+    , contractdetailsSrc = src
+    , contractdetailsXabi = xabi
+    , contractdetailsChainId = chainId
+    }
 
 getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
 getContractDetails contract@(ContractName contractName) contractId chainId = do
