@@ -2,6 +2,7 @@
       OverloadedStrings
     , DeriveGeneric
     , FlexibleContexts
+    , LambdaCase
 #-}
 
 module Slipstream.MessageConsumer where
@@ -78,11 +79,11 @@ getTheMessages offset = do
           Just e -> Left . show $ e
           Nothing -> Right . map tamPayload . fetchMessages $ fr
       shouldRetry :: (MonadIO m) => RetryStatus -> Either String [B.ByteString] -> m Bool
-      shouldRetry _ eResp= case eResp of
-                             Left e -> do
-                               liftIO . criticalM "getTheMessages/kafka_response" . show $ e
-                               return True
-                             Right _ -> return False
+      shouldRetry _ = \case
+                         Left e -> do
+                           liftIO . criticalM "getTheMessages/kafka_response" . show $ e
+                           return True
+                         Right _ -> return False
       policy :: RetryPolicy
       policy = limitRetriesByCumulativeDelay 20000000 . exponentialBackoff $ 40000
   fetched <- retrying policy shouldRetry . const $ extract <$> fetch offset 0 lookupTopic
