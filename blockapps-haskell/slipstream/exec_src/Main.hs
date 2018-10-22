@@ -19,6 +19,7 @@ import System.IO
 import System.Log.Logger
 
 import Slipstream.MessageConsumer
+import Slipstream.Options()
 import Slipstream.OutputData
 
 

@@ -15,8 +15,6 @@ isPublic=false
    isPublic=true
  fi
 
-echo "History list: $historyList"
-
 echo "Environment variables:
 slipstream:
 --pghost=\$postgres_host="${postgres_host}"
@@ -109,7 +107,7 @@ echo "Bloc is up - running slipstream now..."
 
 runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
-           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" --historyList="$historyList" &>> logs/slipstream
+           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
 
 set +x
 if [ "${PROCESS_MONITORING}" = true ] ; then

@@ -22,6 +22,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
 import Data.Int (Int32)
 import Data.IORef
+import Data.Foldable (for_)
 import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -181,6 +182,17 @@ processTheMessages messages conn g = do
                 cont = either error id . xAbiToContract $ contractdetailsXabi details
                 chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
                 cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
+                updateGlobal m (k,f) = for_ (Map.lookup k =<< actionMetadata) $ \v -> do
+                  let contracts = filter (not . T.null) $ T.splitOn "," v
+                  forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
+
+            detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
+            mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
+                                              ,("nohistory", removeFromHistoryList)
+                                              ,("noindex", addToNoIndexList)
+                                              ,("index", removeFromNoIndexList)
+                                              ]
+
             (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
               contractInstancesByCodeHash actionCodeHash actionAddress actionTxChainId
             when (isNothing mInstance) . void $ insertContractInstance cmId actionAddress actionTxChainId

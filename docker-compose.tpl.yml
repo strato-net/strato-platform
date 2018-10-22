@@ -77,7 +77,6 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - historyList=${historyList}
     - loglevel=${loglevel}
     - kafkaHost=kafka
     - kafkaPort=9092
