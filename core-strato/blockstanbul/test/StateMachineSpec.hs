@@ -69,19 +69,19 @@ spec = parallel $ do
         got <- sendMessages [Timeout 20, CommitResult (Left  "invalid hash")]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
 
-    it "ignores stale timeouts" $ do
-      runTest $ do
-        sendMessages [Timeout 10] `shouldReturn` []
+    it "ignores stale timeouts" .  runTest $
+      sendMessages [Timeout 10] `shouldReturn` []
     it "sets the pending round after a timeout" $ property $ \a1 a2 ->
       runTest $ do
       validators .= S.fromList [a1, a2]
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk' blk2' as' seal ->
+    it "can handle several rounds in succession" $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
         let as = sortOn sender as'
-        let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
+        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra) (blk'', blk2'')
+            blk = blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
@@ -104,7 +104,9 @@ spec = parallel $ do
         use proposer `shouldReturn` sender ppr
         v2 <- use view
         v2 `shouldBe` over sequence (+1) v
-        -- TODO(tim): blk2 should probably have blk as a parent
+        let blk2 = blk2'{blockBlockData = (blockBlockData blk2'){
+                          blockDataNumber = 20,
+                          blockDataParentHash = hsh}}
         let hsh2 = blockHash blk2
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
         map oMessage omsgs3 `shouldMatchList`
@@ -146,7 +148,8 @@ spec = parallel $ do
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
-        let blk = truncateExtra blk'
+        let blk = truncateExtra blk'{
+                    blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
         proposer .= sender auth
         validators .= S.fromList [sender auth]
         pk <- use prvkey
@@ -480,7 +483,8 @@ spec = parallel $ do
             me <- selfAddr
             let them = prvKey2Address theirPK
                 vals = S.fromList [me, them]
-                blk' = truncateExtra blk
+                blk' = truncateExtra blk{
+                         blockBlockData = (blockBlockData blk){blockDataNumber = 19}}
                 blk'' = addValidators vals blk'
             validators .= vals
             proposer .= me

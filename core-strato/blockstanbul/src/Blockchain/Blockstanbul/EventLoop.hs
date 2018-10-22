@@ -327,23 +327,29 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 yield $ LeadFound (intSeq v) (intSeq v')
               roundChange
            | isJust mBlockLock && Just pp /= mBlockLock -> do
-              $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: block does not match lock"
+              $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
               $logInfoS "blockstanbul/roundchange" "lock mismatch"
               roundChange
            | otherwise -> do
-               blockcount += 1
-               proposal .= Just pp
-               pk <- use prvkey
-               case extractBeneficiary pp of
-                 Nothing -> return()
-                 Just (bnef,vot) -> do
-                   -- insert the vote into map
-                   val <- uses voted $M.lookup bnef
-                   let unwrapVal = fromMaybe M.empty val
-                   let nval = M.insert pr vot unwrapVal
-                   voted %= M.insert bnef nval
-               yield =<< signMessage pk (Prepare v (blockHash pp))
+              wantParent <- use lastParent
+              case assertChainConsistency (_sequence v) wantParent pp of
+                Left err -> do
+                  $logWarnS "blockstanbul/ppl" $ "Rejecting proposal: " <> err
+                  $logInfoS "blockstanbul/roundchange" "chain inconsistency"
+                  roundChange
+                Right () -> do
+                  blockcount += 1
+                  proposal .= Just pp
+                  pk <- use prvkey
+                  case extractBeneficiary pp of
+                    Nothing -> return()
+                    Just (bnef,vot) -> do
+                      -- insert the vote into map
+                      val <- uses voted $M.lookup bnef
+                      let unwrapVal = fromMaybe M.empty val
+                      let nval = M.insert pr vot unwrapVal
+                      voted %= M.insert bnef nval
+                  yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
@@ -407,8 +413,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
       lastParent .= Just hsh
       clearLock
-      -- TODO(tim): More guards should be put in place to see that not just the view but
-      -- also the block numbers are in ascending order.
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
