@@ -303,7 +303,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
               -- TODO(tim): It may make sense to crash here, but it's also possible that
               -- peers will be able to commit the lock and historic replay of it
               -- could absolve us.
-              $logErrorS "blockstanbul" "Lock has wrong block number cannot commit"
+              $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
             yield MakeBlockCommand
           Right () -> do
             proposal .= Just realSealed
@@ -405,11 +405,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       roundChange
     CommitResult (Right hsh) -> do
       $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
-      s <- use $ view . sequence
       lastParent .= Just hsh
       clearLock
       -- TODO(tim): More guards should be put in place to see that not just the view but
       -- also the block numbers are in ascending order.
+      s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where
