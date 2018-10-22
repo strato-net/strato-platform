@@ -315,7 +315,9 @@ spec = do
         evs `shouldMatchList` map TimerFire [10..19]
 
       it "should forward new blocks to blockstanbul" . runPBFTTestM $ do
-        let iev = IEBlock . blockToIngestBlock TO.Morphism $ makeBlock 1 1
+        let blk' = makeBlock 1 1
+            blk = blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 1} }
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
         checkForUnseq [iev]
         p2pevs <- drainP2P
         let pbftEvs = [m | OEBlockstanbul (WireMessage _ m) <- p2pevs]
