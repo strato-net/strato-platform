@@ -98,7 +98,7 @@ spec = parallel $ do
         length xsp `shouldBe` 1
         xsp `shouldBe` [ToCommit blk]
         -- Pretend that in this interval, the block was committed
-        sendMessages [CommitResult (Right ())] `shouldReturn` []
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
@@ -139,7 +139,7 @@ spec = parallel $ do
         void $ sendMessages $ [IMsg ppr $ Preprepare v blk]
                            ++ [IMsg a $ Prepare v hsh | a <- as]
                            ++ [IMsg a $ Commit v hsh seal | a <- as]
-                           ++ [CommitResult (Right ())]
+                           ++ [CommitResult (Right (blockHash blk))]
         use view `shouldReturn` over sequence (+1) v
         use proposal `shouldReturn` Nothing
 
@@ -354,12 +354,41 @@ spec = parallel $ do
         use view `shouldReturn` next
 
   describe "An UnannouncedBlock message" $ do
+    let selfElected = do
+          me <- selfAddr
+          proposer .= me
+          validators .= S.singleton me
+
+    it "requires a matching block number" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32)
+                    blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 17}}
+        selfElected
+        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
+
+    it "requires a matching hash if known" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32)
+                    blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
+        selfElected
+        lastParent .= Just (SHA 0x999992)
+        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
+
+    it "accepts a block if the parent hash matches" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32)
+                    blk'{blockBlockData = (blockBlockData blk'){
+                      blockDataNumber = 19,
+                      blockDataParentHash = SHA 0x999992}}
+        selfElected
+        lastParent .= Just (SHA 0x999992)
+        sendMessages [UnannouncedBlock blk] `shouldNotReturn` [MakeBlockCommand]
+
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32) blk''
-        me <- selfAddr
-        validators .= S.singleton me
-        proposer .= me
+        let blk = over extraLens (BS.take 32) $
+                    blk''{blockBlockData = (blockBlockData blk''){blockDataNumber = 19}}
+        selfElected
         v <- use view
         omsgs <- sendMessages [UnannouncedBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
@@ -370,14 +399,16 @@ spec = parallel $ do
         let parsedExtra = cookRawExtra . L.view extraLens $ blk'
         L.view vanity parsedExtra `shouldBe` initData
         let Just ist = _istanbul parsedExtra
+        me <- selfAddr
         L.view validatorList ist `shouldBe` [me]
         L.view commitment ist `shouldBe` []
         L.view proposedSig ist `shouldSatisfy`
           (== Just me) . (>>= verifyProposerSeal blk')
 
   describe "Block locks" $ do
-    it "takes priority over UnannouncedBlocks" $ property $ \lock blk ->
+    it "takes priority over UnannouncedBlocks" $ property $ \lock' blk ->
       runTest $ do
+        let lock = lock'{blockBlockData = (blockBlockData lock'){blockDataNumber = 19}}
         me <- selfAddr
         validators .= S.singleton me
         proposer .= me
@@ -407,8 +438,9 @@ spec = parallel $ do
         use blockLock `shouldReturn` Nothing
 
         blockLock .= Just blk
-        _ <- sendMessages [CommitResult (Right ())]
+        _ <- sendMessages [CommitResult (Right (blockHash blk))]
         use blockLock `shouldReturn` Nothing
+        use lastParent `shouldReturn` Just (blockHash blk)
 
     it "Sets a lock after prepare consensus is reached" $ property $ \auth blk ->
       runTest $ do
@@ -425,7 +457,7 @@ spec = parallel $ do
     it "requests a new block after success" $ property $ \blk ->
       runTest $ do
         setBlock blk
-        sendMessages [CommitResult (Right ())] `shouldReturn` [MakeBlockCommand]
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` [MakeBlockCommand]
 
     it "re-issues the lock after round change" $ property $ \blk sig ->
       runTest $ do

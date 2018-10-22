@@ -91,7 +91,7 @@ roundchangeCode = 3
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
-             | CommitResult (Either Text ())
+             | CommitResult (Either Text SHA)
              | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}

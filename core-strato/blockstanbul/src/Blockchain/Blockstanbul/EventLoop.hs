@@ -12,6 +12,7 @@ import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Monoid ((<>))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
@@ -64,6 +65,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe Address
   , _authSenders :: M.Map Address Int
+  , _lastParent :: Maybe SHA
 }
 
 makeLenses ''BlockstanbulContext
@@ -107,6 +109,7 @@ newContext v as senderlist pk =
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
+     , _lastParent = Nothing
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -181,6 +184,17 @@ isAuthorized iev = do
               then authorized && authenticated && specificAuth
               else authorized
 
+assertChainConsistency :: HK.Word256 -> Maybe SHA -> Block -> Either T.Text ()
+assertChainConsistency seqNo wantParent blk = do
+  let blkData = blockBlockData blk
+      blkNo = fromIntegral . blockDataNumber $ blkData
+      gotParent = blockDataParentHash blkData
+  unless (seqNo + 1 == blkNo) .
+    Left . T.pack $ printf "Rejecting block; block #%d is not required #%d" blkNo (seqNo +1)
+  when (isJust wantParent && wantParent /= Just gotParent) .
+    Left . T.pack $ "Rejecting block; parent hash " ++ format gotParent ++ " is not required " ++
+                    format (fromMaybe (error "assertChainConsistency") wantParent)
+  Right ()
 
 generateNonceMap :: [Address] -> M.Map Address Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
@@ -253,7 +267,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
           blockNo = blockDataNumber . blockBlockData $ blk
       case eNextSeqNo of
-        Left err -> $logWarnS "blockstanbul" . T.pack . printf "Rejecting historical block #%d: %s" blockNo $ err
+        Left err -> $logWarnS "blockstanbul" . T.pack
+                    . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right _ -> do
           -- TODO(tim): Does it have a vote to record?
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
@@ -279,8 +294,20 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
-        proposal .= Just realSealed
-        yield =<< signMessage pk (Preprepare v realSealed)
+        wantParent <- use lastParent
+        seqNo <- use (view . sequence)
+        case assertChainConsistency seqNo wantParent realSealed of
+          Left err -> do
+            $logWarnS "blockstanbul" $ "Retrying to build block: " <> err
+            when (isJust mLocked) $ do
+              -- TODO(tim): It may make sense to crash here, but it's also possible that
+              -- peers will be able to commit the lock and historic replay of it
+              -- could absolve us.
+              $logErrorS "blockstanbul" "Lock has wrong block number cannot commit"
+            yield MakeBlockCommand
+          Right () -> do
+            proposal .= Just realSealed
+            yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -376,9 +403,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul/roundchange" "commit failure (how...)"
       clearLock
       roundChange
-    CommitResult (Right ()) -> do
-      $logInfoS "blockstanbul" "Successful block commit"
+    CommitResult (Right hsh) -> do
+      $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
       s <- use $ view . sequence
+      lastParent .= Just hsh
       clearLock
       -- TODO(tim): More guards should be put in place to see that not just the view but
       -- also the block numbers are in ascending order.

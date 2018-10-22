@@ -159,11 +159,13 @@ blockstanbulSend msgs = do
     resp' <- sendAllMessages msgs
     let blocks = [b | ToCommit b <- resp']
     resp <- (resp'++) <$>
-        if null blocks
-            then return []
+        case blocks of
+          [] -> return []
+          [b] ->
             -- TODO(tim): Block insertion can potentially fail, so there
             -- should be feedback here
-            else sendAllMessages [CommitResult (Right ())]
+            sendAllMessages [CommitResult . Right . blockHash $ b]
+          bs -> error $ "must commit at most one block at a time: " ++ show bs
     mapM_ createNewTimer [rn | ResetTimer rn <- resp]
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap (OEBlock . flip sequencedBlockToOutputBlock 1)
