@@ -81,7 +81,7 @@ spec = parallel $ do
       not (null as') ==> runTest $ do
         let as = sortOn sender as'
         let (blk', blk2') = over both (addProposerSeal seal . truncateExtra) (blk'', blk2'')
-            blk = blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
+            blk = setBlockNo 19 blk'
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
@@ -148,8 +148,7 @@ spec = parallel $ do
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
-        let blk = truncateExtra blk'{
-                    blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
+        let blk = truncateExtra . setBlockNo 19 $ blk'
         proposer .= sender auth
         validators .= S.fromList [sender auth]
         pk <- use prvkey
@@ -364,15 +363,13 @@ spec = parallel $ do
 
     it "requires a matching block number" $ property $ \blk' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32)
-                    blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 17}}
+        let blk = over extraLens (BS.take 32) . setBlockNo 17 $ blk'
         selfElected
         sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
 
     it "requires a matching hash if known" $ property $ \blk' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32)
-                    blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 19}}
+        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk'
         selfElected
         lastParent .= Just (SHA 0x999992)
         sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
@@ -389,8 +386,7 @@ spec = parallel $ do
 
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32) $
-                    blk''{blockBlockData = (blockBlockData blk''){blockDataNumber = 19}}
+        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk''
         selfElected
         v <- use view
         omsgs <- sendMessages [UnannouncedBlock blk]
@@ -411,7 +407,7 @@ spec = parallel $ do
   describe "Block locks" $ do
     it "takes priority over UnannouncedBlocks" $ property $ \lock' blk ->
       runTest $ do
-        let lock = lock'{blockBlockData = (blockBlockData lock'){blockDataNumber = 19}}
+        let lock = setBlockNo 19 lock'
         me <- selfAddr
         validators .= S.singleton me
         proposer .= me
@@ -483,13 +479,11 @@ spec = parallel $ do
             me <- selfAddr
             let them = prvKey2Address theirPK
                 vals = S.fromList [me, them]
-                blk' = truncateExtra blk{
-                         blockBlockData = (blockBlockData blk){blockDataNumber = 19}}
-                blk'' = addValidators vals blk'
+                blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
             validators .= vals
             proposer .= me
-            pSeal <- proposerSeal blk'' pk
-            let lockBlk = addProposerSeal pSeal blk''
+            pSeal <- proposerSeal blk' pk
+            let lockBlk = addProposerSeal pSeal blk'
             myKey <- use prvkey
             OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
 

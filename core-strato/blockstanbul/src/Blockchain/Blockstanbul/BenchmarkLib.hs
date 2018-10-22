@@ -14,7 +14,6 @@ import qualified Network.Haskoin.Crypto as HK
 
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Code
 import Blockchain.Data.Json
 import Blockchain.Data.TransactionDef
@@ -50,6 +49,5 @@ benchContext =
   in  newContext (View 200 40) [prvKey2Address pk] [] pk
 
 makeBlock :: Int -> Int -> Block
-makeBlock txcount txsize =
-  genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize),
-               blockBlockData = (blockBlockData genesisBlock){blockDataNumber = 41}}
+makeBlock txcount txsize = setBlockNo 41
+  genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize)}

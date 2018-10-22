@@ -29,7 +29,7 @@ import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Data.Address
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Format
@@ -315,9 +315,7 @@ spec = do
         evs `shouldMatchList` map TimerFire [10..19]
 
       it "should forward new blocks to blockstanbul" . runPBFTTestM $ do
-        let blk' = makeBlock 1 1
-            blk = blk'{blockBlockData = (blockBlockData blk'){blockDataNumber = 1} }
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
+        let iev = IEBlock . blockToIngestBlock TO.Morphism . setBlockNo 1 $ makeBlock 1 1
         checkForUnseq [iev]
         p2pevs <- drainP2P
         let pbftEvs = [m | OEBlockstanbul (WireMessage _ m) <- p2pevs]
@@ -327,20 +325,18 @@ spec = do
 
       it "should replay old blocks in blockstanbul" . runPBFTTestM $ do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let blk = makeBlock 2 1
-            blk' = addValidators (_validators ctx) blk{
-                      blockBlockData = (blockBlockData blk){blockDataNumber = 1}}
-        pseal <- proposerSeal blk' (_prvkey ctx)
-        let blk'' = addProposerSeal pseal blk'
-        cseal <- commitmentSeal (blockHash blk'') (_prvkey ctx)
-        let blk''' = addCommitmentSeals [cseal] blk''
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk'''
+        let blk = addValidators (_validators ctx) . setBlockNo 1 $ makeBlock 2 1
+        pseal <- proposerSeal blk (_prvkey ctx)
+        let blk' = addProposerSeal pseal blk
+        cseal <- commitmentSeal (blockHash blk') (_prvkey ctx)
+        let blk'' = addCommitmentSeals [cseal] blk'
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk''
         putBlockstanbulContext ctx
         checkForUnseq [iev]
         drainP2P `shouldReturn` []
         vmevs <- drainVM
         vmevs `shouldContain` [OECreateBlockCommand]
-        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk''']
+        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk'']
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
