@@ -23,7 +23,6 @@ import           Data.Maybe                                (catMaybes, fromJust,
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
-import           Data.Traversable                          (for)
 import           Prometheus                                as P
 import           Text.Printf
 
@@ -171,13 +170,10 @@ blockstanbulSend' msg = do
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
-      rewriteBlock b = do
-        let msb = getSequencedBlock b
-        for msb $ \sb -> do
-          witnessBlockHash (blockHeaderHash $ sbBlockData sb) sb
-          return . OEBlock $ sequencedBlockToOutputBlock sb 1
+      sbs = catMaybes $ map getSequencedBlock blocks
+      rBlocks = map (OEBlock . flip sequencedBlockToOutputBlock 1) sbs
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
-  rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
+  mapM_ witnessBlockHash sbs
   let vmevs = creates ++ rBlocks
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
@@ -189,9 +185,9 @@ blockstanbulSend' msg = do
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-  $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
   $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
   mapM_ markForP2P p2pevs
+  $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
   return vmevs
 
 checkIfIsMissingTX :: SHA -> SHA -> SequencerM ()
@@ -200,7 +196,7 @@ checkIfIsMissingTX th ch = lookupChainHash ch >>= \case
     $logInfoS "checkIfIsMissingTX" "We don't know this transaction's chain Id. Oh well..."
     return ()
   Just (_, cid) -> do
-    $logInfoS "transformPrivateHashTXs" . T.pack $ "We know this transaction's chain Id. It's " ++ format (SHA cid) ++ ". Inserting into MissingTxDB and GetTransactions list"
+    $logInfoS "transformPrivateHashTXs" . T.pack $ "We know the chain Id for transaction " ++ format th ++ ". It's " ++ format (SHA cid) ++ ". Inserting into MissingTxDB and GetTransactions list"
     useChainHash ch cid
     insertMissingTx th
     insertGetTransactionsDB th
@@ -305,10 +301,10 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
     else transformFullTransactions pairs
 
 runBlockWithConsensus :: SequencedBlock -> SequencerM ()
-runBlockWithConsensus sb = mapM_ markForVM =<< runConduit (expandBlock sb .| runConsensus .| hydrateAndEmit .| sinkList)
+runBlockWithConsensus sb = runConduit (expandBlock sb .| runConsensus .| hydrateAndEmit .| mapM_C markForVM)
 
 runBlock :: SequencedBlock -> SequencerM ()
-runBlock sb = mapM_ markForVM =<< runConduit (expandBlock sb .| dropLefts .| mapC OEBlock .| hydrateAndEmit .| sinkList)
+runBlock sb = runConduit (expandBlock sb .| dropLefts .| mapC OEBlock .| hydrateAndEmit .| mapM_C markForVM)
 
 expandBlock :: SequencedBlock -> ConduitM () (Either SequencedBlock OutputBlock) SequencerM ()
 expandBlock sb = do
@@ -398,7 +394,7 @@ transformBlocks = mapM_ $ \ib -> do
         $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
       P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
-      witnessBlockHash (blockHeaderHash $ sbBlockData sb) sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
+      witnessBlockHash sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
       runBlockWithConsensus sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
