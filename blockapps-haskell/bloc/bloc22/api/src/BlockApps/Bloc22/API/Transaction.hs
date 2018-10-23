@@ -75,6 +75,7 @@ instance ToSample PostBlocTransactionRequest where
       [BlocTransfer $ TransferPayload
         (Address 0x12345678)
         (Strung 600)
+        (Just $ Map.fromList [("purpose","groceries")])
       ]
       (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
 
@@ -90,6 +91,7 @@ instance ToSchema PostBlocTransactionRequest where
                  [BlocTransfer $ TransferPayload
                    (Address 0x12345678)
                    (Strung 600)
+                   (Just $ Map.fromList [("purpose","groceries")])
                  ]
                  (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
 
@@ -117,11 +119,13 @@ data ContractPayload = ContractPayload
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
+  , contractpayloadMetadata :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 data TransferPayload = TransferPayload
   { transferpayloadToAddress :: Address
   , transferpayloadValue     :: Strung Natural
+  , transferpayloadMetadata  :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 data FunctionPayload = FunctionPayload
@@ -130,6 +134,7 @@ data FunctionPayload = FunctionPayload
   , functionpayloadMethod          :: Text
   , functionpayloadArgs            :: Map Text ArgValue
   , functionpayloadValue           :: Maybe (Strung Natural)
+  , functionpayloadMetadata        :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ContractPayload where
@@ -158,6 +163,7 @@ instance ToSchema BlocTransactionPayload where
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
+        , contractpayloadMetadata = Nothing
         }
 
 instance ToSchema ContractPayload where
@@ -172,6 +178,7 @@ instance ToSchema ContractPayload where
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
+        , contractpayloadMetadata = Nothing
         }
 
 instance ToSchema TransferPayload where
@@ -184,6 +191,7 @@ instance ToSchema TransferPayload where
       ex = TransferPayload
         { transferpayloadToAddress = Address (0xdeadbeef)
         , transferpayloadValue = Strung 1000000
+        , transferpayloadMetadata = Nothing
         }
 
 instance ToSchema FunctionPayload where
@@ -199,4 +207,5 @@ instance ToSchema FunctionPayload where
         , functionpayloadMethod          = "set"
         , functionpayloadArgs            = Map.fromList [("_x", ArgInt 5)]
         , functionpayloadValue           = Nothing
+        , functionpayloadMetadata = Nothing
         }
