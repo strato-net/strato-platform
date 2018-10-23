@@ -65,6 +65,8 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe Address
   , _authSenders :: M.Map Address Int
+  -- TODO(tim): Initialize _lastParent with the genesis block and
+  -- make it required
   , _lastParent :: Maybe SHA
 }
 
