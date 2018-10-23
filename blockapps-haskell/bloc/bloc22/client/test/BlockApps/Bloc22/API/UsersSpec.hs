@@ -73,8 +73,8 @@ spec = do
   describe "postUsersSend" $ do
     it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParams
-        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" testTxParams
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParams Nothing
+        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" testTxParams Nothing
       Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress Nothing False postSendParameters) (ClientEnv mgr blocUrl)
       let
         Send postTransaction = fromJust $ blocTransactionData result
@@ -84,7 +84,7 @@ spec = do
 
     it "should send ethers to another address with low nonce" $ \ testConfig@TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParamsLowNonce
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParamsLowNonce Nothing
       Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress Nothing False postSendParameters) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Failure) . blocTransactionStatus
       putStrLn $ show result
@@ -99,6 +99,7 @@ spec = do
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
+          , postuserscontractrequestMetadata = Nothing
           }
       Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress Nothing False postUsersContractRequest) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Success) . blocTransactionStatus
@@ -119,6 +120,7 @@ spec = do
             , uploadlistcontractArgs = Map.empty
             , uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
+            , uploadlistcontractMetadata = Nothing
             }
           ]
         uploadListRequest = UploadListRequest
@@ -144,6 +146,7 @@ spec = do
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = testTxParams
+          , postuserscontractmethodMetadata = Nothing
           }
       Right result <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress Nothing False postUsersContractMethodRequest)
@@ -161,6 +164,7 @@ spec = do
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
               , sendtransactionTxParams = testTxParams
+              , sendtransactionMetadata = Nothing
               }
           }
       eResults <- runClientM
@@ -186,6 +190,7 @@ spec = do
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
               , methodcallTxParams = testTxParams
+              , methodcallMetadata = Nothing
               }
           }
       eResults <- runClientM

@@ -99,6 +99,7 @@ setup = do
       , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing
+      , uploadlistcontractMetadata = Nothing
       }
     uploadListRequest = UploadListRequest
       { uploadlistPassword = pw testConfig
