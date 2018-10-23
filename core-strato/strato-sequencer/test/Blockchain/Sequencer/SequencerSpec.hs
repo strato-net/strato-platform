@@ -29,6 +29,7 @@ import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
@@ -325,7 +326,9 @@ spec = do
 
       it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         let b' = makeBlock 1 1
-            b = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            b = b'{blockBlockData = (blockBlockData b') {
+                    blockDataParentHash = h,
+                    blockDataNumber = 1}}
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         checkForUnseq [iev]
         p2pevs <- drainP2P
@@ -336,21 +339,22 @@ spec = do
 
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let b' = makeBlock 2 1
-            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
-            blk' = addValidators (_validators ctx) blk{
-                      blockBlockData = (blockBlockData blk){blockDataNumber = 1}}
-        pseal <- proposerSeal blk' (_prvkey ctx)
-        let blk'' = addProposerSeal pseal blk'
-        cseal <- commitmentSeal (blockHash blk'') (_prvkey ctx)
-        let blk''' = addCommitmentSeals [cseal] blk''
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk'''
+        let blk0 = makeBlock 2 1
+            blk1 = blk0{blockBlockData = (blockBlockData blk0){
+                          blockDataParentHash = h,
+                          blockDataNumber = 1}}
+            blk2 = addValidators (_validators ctx) blk1
+        pseal <- proposerSeal blk2 (_prvkey ctx)
+        let blk3 = addProposerSeal pseal blk2
+        cseal <- commitmentSeal (blockHash blk3) (_prvkey ctx)
+        let blk4 = addCommitmentSeals [cseal] blk3
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
         checkForUnseq [iev]
         drainP2P `shouldReturn` []
         vmevs <- drainVM
         vmevs `shouldContain` [OECreateBlockCommand]
-        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk''']
+        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk4]
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
@@ -373,7 +377,9 @@ spec = do
           createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
         let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
         let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            blk = b'{blockBlockData = (blockBlockData b') {
+                      blockDataParentHash = h,
+                      blockDataNumber = 1}}
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
         checkForUnseq [chainDetails]
         checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
@@ -399,7 +405,9 @@ spec = do
           createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
         let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
         let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            blk = b'{blockBlockData = (blockBlockData b'){
+                      blockDataParentHash = h,
+                      blockDataNumber = 1}}
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
         checkForUnseq [chainDetails]
         checkForUnseq [iev]
