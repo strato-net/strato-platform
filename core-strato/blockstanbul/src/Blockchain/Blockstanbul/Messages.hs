@@ -111,8 +111,8 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
-              | GapFound {have :: Integer, require :: Integer}
-              | LeadFound {weHave :: Integer, theyHave :: Integer}
+              | GapFound {have :: Integer, require :: Integer, peer :: Address}
+              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where

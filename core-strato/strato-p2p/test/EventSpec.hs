@@ -110,7 +110,7 @@ spec = do
         let addr = blockstanbulSender wm
         -- Without "proof" of which peer this is, assume it could be addr
         shouldSendToPeer addr `L.shouldReturn` True
-        shouldSendToPeer 0x0 `L.shouldReturn` True
+        shouldSendToPeer 0xa `L.shouldReturn` True
         runConduit $ yield (MsgEvt (Blockstanbul wm))
                            .| handleEvents Log testPeer
                            .| sinkList
@@ -119,7 +119,7 @@ spec = do
         atomically (readTMChan ch) `L.shouldReturn` Nothing
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
-        shouldSendToPeer 0x0 `L.shouldReturn` False
+        shouldSendToPeer 0xa `L.shouldReturn` False
 
     it "should broadcast blockstanbul messages" $ property $ \wm ->
       runTestPeer . const $ do
@@ -128,4 +128,4 @@ spec = do
                       .| sinkList
             `L.shouldReturn` [Blockstanbul wm]
         -- We should not mistake internal messages as the peers
-        shouldSendToPeer 0x0 `L.shouldReturn` True
+        shouldSendToPeer 0xa `L.shouldReturn` True
