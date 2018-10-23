@@ -53,6 +53,7 @@ AddressStateRef
     codeHash SHA
     chainId Word256 Maybe
     latestBlockDataRefNumber Integer
+    attemptedNonce Integer Maybe
     deriving Eq Read Show
 
 RawTransaction

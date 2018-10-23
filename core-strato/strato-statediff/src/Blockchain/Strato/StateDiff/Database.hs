@@ -69,7 +69,8 @@ createAccount chainId blockNumber addressDiffs = do
       addressStateRefCode = getField (theError address "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefChainId = chainId
+      addressStateRefChainId = chainId,
+      addressStateRefAttemptedNonce = Nothing
       }
     theError :: Address -> String -> a
     theError address name = error $

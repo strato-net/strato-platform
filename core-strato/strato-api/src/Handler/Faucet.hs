@@ -30,22 +30,38 @@ retrievePrvKey path = do
   let intVal = BN.decode $ BL.fromStrict $ keyBytes :: Integer
   return $ H.makePrvKey intVal
 
+whereMatchingAddr :: E.Esqueleto query E.SqlExpr SqlBackend
+                  => E.SqlExpr (Entity AddressStateRef) -> Address -> query ()
+whereMatchingAddr accStateRef addr =
+  E.where_ ((E.isNothing $ accStateRef E.^. AddressStateRefChainId)
+      E.&&. accStateRef E.^. AddressStateRefAddress E.==. (E.val addr))
 
-lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend) => Address -> HandlerT site IO Integer
+lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend)
+            => Address -> HandlerT site IO (Integer, Integer)
 lookupNonce addr' = do
   addrSt <- runDB $ E.select $
                       E.from $ \(accStateRef) -> do
-                      E.where_ ((E.isNothing $ accStateRef E.^. AddressStateRefChainId) E.&&. accStateRef E.^. AddressStateRefAddress E.==. (E.val addr'))
+                      whereMatchingAddr accStateRef addr'
                       return accStateRef
-  case addrSt of
-    []      -> return 0
-    addrSt' -> return $ addressStateRefNonce $ E.entityVal $ P.head $ addrSt'
+  return $ case addrSt of
+    []      -> (0, 1)
+    ev:_ -> let ref = E.entityVal ev
+                lowNonce = addressStateRefNonce ref
+                highNonce = fromMaybe lowNonce $ addressStateRefAttemptedNonce ref
+            in (lowNonce, highNonce + 1)
+
+setAttemptedNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend)
+                  => Address -> Integer -> HandlerT site IO ()
+setAttemptedNonce addr an = runDB $
+  E.update $ \accStateRef -> do
+    E.set accStateRef [ AddressStateRefAttemptedNonce E.=. E.just (E.val an) ]
+    whereMatchingAddr accStateRef addr
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
     ts <- liftIO $ getCurrentMicrotime
     let ingestTxs = (\t -> IETx ts (IngestTx API t)) <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestTxs) ++ " faucet tx(s) to unseqevents"    
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestTxs) ++ " faucet tx(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
@@ -59,20 +75,23 @@ postFaucetR = do
   key <- liftIO $ retrievePrvKey $ "config" </> "priv"
   key' <- maybe (invalidArgs ["No faucet account is defined"]) return key
   liftIO $ putStrLn $ T.pack $ show key'
-
-  nonce <- lookupNonce $ prvKey2Address key'
+  let addr = prvKey2Address key'
+  (minNonce, maxNonce) <- lookupNonce addr
 
   maybeVal <- lookupPostParam "address"
   liftIO $ putStrLn $ T.pack $ show maybeVal
   case maybeVal of
-    Just val -> putTX key' val nonce
+    Just val -> do
+      setAttemptedNonce addr maxNonce
+      (T.pack . show) <$> mapM (putTX key' val) [minNonce..maxNonce]
     Nothing -> do
+      -- TODO(tim): Determine a multinonce scheme for multiple addresses
       maybeAddrs <- lookupPostParam "addresses"
       liftIO $ putStrLn $ T.pack $ show maybeAddrs
       case maybeAddrs of
         Just addrTLT -> do
           let addrTL = P.read $ T.unpack $ addrTLT
-          faucets <- sequence $ zipWith (putTX key') addrTL $ map (nonce +) [0..]
+          faucets <- sequence $ zipWith (putTX key') addrTL $ map (minNonce +) [0..]
           return $ T.pack $ show $ map T.unpack faucets
         Nothing -> invalidArgs ["Missing 'address' or 'addresses'"]
   where

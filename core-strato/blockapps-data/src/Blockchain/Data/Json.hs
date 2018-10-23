@@ -300,7 +300,7 @@ bdrToBdrPrime = BlockDataRef'
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
 instance ToJSON AddressStateRef' where
-    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum) next) =
+    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum _) next) =
         object $ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
                   "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
                   "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
@@ -321,6 +321,7 @@ instance FromJSON AddressStateRef' where
                 <*> s .: "codeHash"
                 <*> s .:? "chainId"
                 <*> s .: "latestBlockNum"
+                <*> pure Nothing
               )
     parseJSON _ = fail "JSON not an object"
 
