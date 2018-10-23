@@ -2,7 +2,6 @@ module Blockchain.Sequencer.DB.SeenBlockDB where
 
 import           Blockchain.Sequencer.Event    (SequencedBlock(..))
 import           Blockchain.SHA
-import           Blockchain.Strato.Model.Class
 
 import           Control.Monad.Trans.Resource
 
@@ -35,9 +34,8 @@ class (MonadResource m) => HasSeenBlockDB m where
     witnessedBlock :: SHA -> m (Maybe SequencedBlock)
     witnessedBlock sha = (M.lookup sha . seen) <$> getSeenBlockDB
 
-    witnessBlockHash :: SequencedBlock -> m ()
-    witnessBlockHash bd = do
-        let sha = blockHeaderHash $ sbBlockData bd
+    witnessBlockHash :: SHA -> SequencedBlock -> m ()
+    witnessBlockHash sha bd = do
         stxdb     <- getSeenBlockDB
         let withClear = stxdb { operations = operations stxdb + 1
                               , clearQueue = clearQueue stxdb Q.|> sha
