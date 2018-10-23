@@ -61,6 +61,9 @@ data WireMessage = WireMessage {
 } deriving (Eq, Show, Generic)
 makeLenses ''WireMessage
 
+blockstanbulSender :: WireMessage -> Address
+blockstanbulSender (WireMessage a _) = sender a
+
 instance Binary MsgAuth where
 instance Binary View where
 instance Binary TrustedMessage where

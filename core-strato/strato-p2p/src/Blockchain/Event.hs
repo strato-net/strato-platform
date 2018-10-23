@@ -27,6 +27,7 @@ import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Text.Printf
 
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
@@ -247,6 +248,7 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
+      setPeerAddrIfUnset $ blockstanbulSender wm
       SK.emitBlockstanbulMsg wm
 
     -- private chains

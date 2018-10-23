@@ -16,6 +16,7 @@ import qualified Database.Persist.Sqlite               as Lite
 import qualified Database.Redis                        as Redis
 import System.IO.Temp                        (emptySystemTempFile)
 
+import Blockchain.Blockstanbul               (blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.ArbitraryInstances()
 import qualified Blockchain.Data.Blockchain as DataBlock
@@ -59,6 +60,7 @@ testContext = do
                  , vmTrace=[]
                  , connectionTimeout=60
                  , maxReturnedHeaders=1000
+                 , _blockstanbulPeerAddr=Nothing
                  })
 
 testPeer :: DataPeer.PPeer
@@ -105,16 +107,25 @@ spec = do
           `L.shouldReturn` [GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ \wm ->
       runTestPeer $ \ch -> do
+        let addr = blockstanbulSender wm
+        -- Without "proof" of which peer this is, assume it could be addr
+        shouldSendToPeer addr `L.shouldReturn` True
+        shouldSendToPeer 0x0 `L.shouldReturn` True
         runConduit $ yield (MsgEvt (Blockstanbul wm))
                            .| handleEvents Log testPeer
                            .| sinkList
            `L.shouldReturn` []
         atomically (closeTMChan ch >> readTMChan ch) `L.shouldReturn` Just ([IEBlockstanbul wm])
         atomically (readTMChan ch) `L.shouldReturn` Nothing
+        -- Now that the peer is known to be addr, we should only send if they are designated
+        shouldSendToPeer addr `L.shouldReturn` True
+        shouldSendToPeer 0x0 `L.shouldReturn` False
 
     it "should broadcast blockstanbul messages" $ property $ \wm ->
-      runTestPeer . const $
+      runTestPeer . const $ do
         runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
                       .| handleEvents Log testPeer
                       .| sinkList
             `L.shouldReturn` [Blockstanbul wm]
+        -- We should not mistake internal messages as the peers
+        shouldSendToPeer 0x0 `L.shouldReturn` True
