@@ -5,7 +5,6 @@ import           Blockchain.SHA
 
 import           Data.Bimap                   (Bimap)
 import qualified Data.Bimap                   as B
-
 import           Blockchain.Sequencer.DB.PrivateHashDB
 
 getSeenHashDB :: HasPrivateHashDB m => m (Bimap SHA SHA)

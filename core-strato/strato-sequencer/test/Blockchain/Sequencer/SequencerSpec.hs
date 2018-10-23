@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
-
 import           ClassyPrelude                       (atomically)
+import qualified Data.ByteString                     as BS
 import           Data.IORef
-import           Data.Maybe                          (isNothing, fromMaybe)
+import           Data.Maybe                          (fromMaybe, isNothing)
 import           Data.Time.Clock.POSIX
-import           Data.Map                            as M (singleton,lookup)
+import qualified Data.Map                            as M
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
@@ -21,16 +22,18 @@ import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
-
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
-import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock)
+import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
 import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Data.Address
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction         (createChainMessageTX)
+import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Format
 import           Blockchain.Output
@@ -41,7 +44,8 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
-import           Blockchain.Strato.Model.Class       (txChainId, blockHash, blockHeaderDifficulty)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
@@ -55,7 +59,6 @@ import           Test.QuickCheck
 
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
-
 
 fromLeft :: a -> Either a b -> a
 fromLeft _ (Left a) = a
@@ -79,6 +82,12 @@ runPBFTTestM :: SequencerM a -> IO ()
 runPBFTTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB True gb m
+
+runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
+runPBFTTestMWithGenesis m = do
+  gb <- makeGenesisBlock
+  let hash = blockHash . ingestBlockToBlock $ gb
+  void $ withTemporaryDepBlockDB True gb (m hash)
 
 withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB pbft genesisBlock m = do
@@ -314,8 +323,10 @@ spec = do
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [10..19]
 
-      it "should forward new blocks to blockstanbul" . runPBFTTestM $ do
-        let iev = IEBlock . blockToIngestBlock TO.Morphism $ makeBlock 1 1
+      it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
+        let b' = makeBlock 1 1
+            b = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         checkForUnseq [iev]
         p2pevs <- drainP2P
         let pbftEvs = [m | OEBlockstanbul (WireMessage _ m) <- p2pevs]
@@ -323,9 +334,10 @@ spec = do
         vmevs <- drainVM
         vmevs `shouldContain` [OECreateBlockCommand]
 
-      it "should replay old blocks in blockstanbul" . runPBFTTestM $ do
+      it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let blk = makeBlock 2 1
+        let b' = makeBlock 2 1
+            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
             blk' = addValidators (_validators ctx) blk{
                       blockBlockData = (blockBlockData blk){blockDataNumber = 1}}
         pseal <- proposerSeal blk' (_prvkey ctx)
@@ -350,3 +362,58 @@ spec = do
           atomically . writeTMChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
+
+      it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
+        let chainId = 0x12345678
+            cInfo = ChainInfo "my test chain" [] [] M.empty
+            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
+            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
+        tx <- liftIO . HK.withSource HK.devURandom $ do
+          pk <- HK.genPrvKey
+          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
+        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
+        let b' = makeBlockWithTransactions [hashTx]
+            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
+        checkForUnseq [chainDetails]
+        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
+        checkForUnseq [iev]
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 1
+        txType (head txs) `shouldBe` PrivateHash
+        vmevs <- drainVM
+        let otxs = obReceiptTransactions $ head [b | OEBlock b <- vmevs]
+        length otxs `shouldBe` 1
+        txType (head otxs) `shouldBe` Message
+
+      it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
+        let chainId = 0x12345678
+            cInfo = ChainInfo "my test chain" [] [] M.empty
+            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
+            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
+        tx <- liftIO . HK.withSource HK.devURandom $ do
+          pk <- HK.genPrvKey
+          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
+        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
+        let b' = makeBlockWithTransactions [hashTx]
+            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
+        checkForUnseq [chainDetails]
+        checkForUnseq [iev]
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        obs `shouldBe` []
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 1
+        txType (head txs) `shouldBe` PrivateHash
+        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
+        vmevs' <- drainVM
+        let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
+        length otxs' `shouldBe` 1
+        txType (head otxs') `shouldBe` Message
