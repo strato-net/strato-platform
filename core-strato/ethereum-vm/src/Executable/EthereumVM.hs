@@ -18,6 +18,7 @@ import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
+import           Text.Printf
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
@@ -107,6 +108,11 @@ ethereumVM = void . execContextM $ do
               if pbft
                 then reqd && hasTxs
                 else not makeLazyBlocks || hasTxs)
+        $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+            (length poolableNewTxs) (M.size pending)
+        $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
+            "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
+             (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
         when (pbft && shouldOutputBlocks) $
           contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
