@@ -2,7 +2,6 @@
 module Blockchain.Blockstanbul.BenchmarkLib
   ( benchContext
   , makeBlock
-  , makeBlockWithTransactions
   , oneTX
   ) where
 
@@ -52,7 +51,3 @@ benchContext =
 makeBlock :: Int -> Int -> Block
 makeBlock txcount txsize = setBlockNo 41
   genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize)}
-
-makeBlockWithTransactions :: [Transaction] -> Block
-makeBlockWithTransactions txs =
-  genesisBlock{blockReceiptTransactions = txs}
