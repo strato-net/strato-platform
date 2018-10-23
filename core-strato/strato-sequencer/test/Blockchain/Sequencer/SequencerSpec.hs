@@ -1,15 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
+
 import           ClassyPrelude                       (atomically)
-import qualified Data.ByteString                     as BS
 import           Data.IORef
-import           Data.Maybe                          (fromMaybe, isNothing)
+import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
-import qualified Data.Map                            as M
+import           Data.Map                            as M (singleton,lookup)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
@@ -22,19 +21,17 @@ import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
+
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
-import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
+import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock)
 import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
-import           Blockchain.Data.Transaction         (createChainMessageTX)
-import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Format
 import           Blockchain.Output
@@ -60,6 +57,7 @@ import           Test.QuickCheck
 
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
+
 
 fromLeft :: a -> Either a b -> a
 fromLeft _ (Left a) = a
@@ -366,62 +364,3 @@ spec = do
           atomically . writeTMChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
-
-      it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
-        let chainId = 0x12345678
-            cInfo = ChainInfo "my test chain" [] [] M.empty
-            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
-            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
-        tx <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
-        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
-        let b' = makeBlockWithTransactions [hashTx]
-            blk = b'{blockBlockData = (blockBlockData b') {
-                      blockDataParentHash = h,
-                      blockDataNumber = 1}}
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
-        checkForUnseq [chainDetails]
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
-        length bs `shouldBe` 1
-        let txs = blockReceiptTransactions $ head bs
-        length txs `shouldBe` 1
-        txType (head txs) `shouldBe` PrivateHash
-        vmevs <- drainVM
-        let otxs = obReceiptTransactions $ head [b | OEBlock b <- vmevs]
-        length otxs `shouldBe` 1
-        txType (head otxs) `shouldBe` Message
-
-      it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
-        let chainId = 0x12345678
-            cInfo = ChainInfo "my test chain" [] [] M.empty
-            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
-            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
-        tx <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
-        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
-        let b' = makeBlockWithTransactions [hashTx]
-            blk = b'{blockBlockData = (blockBlockData b'){
-                      blockDataParentHash = h,
-                      blockDataNumber = 1}}
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
-        checkForUnseq [chainDetails]
-        checkForUnseq [iev]
-        vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
-        obs `shouldBe` []
-        p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
-        length bs `shouldBe` 1
-        let txs = blockReceiptTransactions $ head bs
-        length txs `shouldBe` 1
-        txType (head txs) `shouldBe` PrivateHash
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
-        vmevs' <- drainVM
-        let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
-        length otxs' `shouldBe` 1
-        txType (head otxs') `shouldBe` Message
