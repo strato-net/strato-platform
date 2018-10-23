@@ -25,22 +25,19 @@ import           Import
 import qualified Data.ByteString.Lazy as BL
 
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
-retrievePrvKey path = do
-  keyBytes <- readFile path
-  let intVal = BN.decode $ BL.fromStrict $ keyBytes :: Integer
-  return $ H.makePrvKey intVal
+retrievePrvKey path = (H.makePrvKey . BN.decode . BL.fromStrict) <$> readFile path
 
 whereMatchingAddr :: E.Esqueleto query E.SqlExpr SqlBackend
                   => E.SqlExpr (Entity AddressStateRef) -> Address -> query ()
 whereMatchingAddr accStateRef addr =
-  E.where_ ((E.isNothing $ accStateRef E.^. AddressStateRefChainId)
-      E.&&. accStateRef E.^. AddressStateRefAddress E.==. (E.val addr))
+  E.where_ (E.isNothing (accStateRef E.^. AddressStateRefChainId)
+      E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
 
 lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend)
             => Address -> HandlerT site IO (Integer, Integer)
 lookupNonce addr' = do
   addrSt <- runDB $ E.select $
-                      E.from $ \(accStateRef) -> do
+                      E.from $ \accStateRef -> do
                       whereMatchingAddr accStateRef addr'
                       return accStateRef
   return $ case addrSt of
@@ -59,13 +56,13 @@ setAttemptedNonce addr an = runDB $
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
-    ts <- liftIO $ getCurrentMicrotime
-    let ingestTxs = (\t -> IETx ts (IngestTx API t)) <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestTxs) ++ " faucet tx(s) to unseqevents"
+    ts <- liftIO getCurrentMicrotime
+    let ingestTxs = (IETx ts . IngestTx API) <$> txs
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length ingestTxs) ++ " faucet tx(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
-        Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
-        Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
+        Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ T.pack (show e)
+        Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ T.pack (show resps)
     return ()
 
 postFaucetR :: Handler Text
@@ -90,15 +87,15 @@ postFaucetR = do
       liftIO $ putStrLn $ T.pack $ show maybeAddrs
       case maybeAddrs of
         Just addrTLT -> do
-          let addrTL = P.read $ T.unpack $ addrTLT
+          let addrTL = P.read $ T.unpack addrTLT
           faucets <- sequence $ zipWith (putTX key') addrTL $ map (minNonce +) [0..]
           return $ T.pack $ show $ map T.unpack faucets
         Nothing -> invalidArgs ["Missing 'address' or 'addresses'"]
   where
     makeTX k a n = do
-      liftIO $ putStrLn $ T.pack $ "nonce: " ++ (show n)
-      tx <- liftIO $ H.withSource H.devURandom (createMessageTX n (50000000000) (100000) a (1000*ether) "" Nothing k)
-      liftIO $ putStrLn $ T.pack $ "tx for faucet: " ++ (show tx)
+      liftIO $ putStrLn $ T.pack $ "nonce: " ++ show n
+      tx <- liftIO $ H.withSource H.devURandom (createMessageTX n 50000000000 100000 a (1000*ether) "" Nothing k)
+      liftIO $ putStrLn $ T.pack $ "tx for faucet: " ++ show tx
       return tx
     putTX k v n = do
       tx <- makeTX k (toAddr v) n
@@ -106,5 +103,3 @@ postFaucetR = do
       emitKafkaTransactions [tx]
 
       return . T.pack . shaToHex . txHash $ tx
-
-
