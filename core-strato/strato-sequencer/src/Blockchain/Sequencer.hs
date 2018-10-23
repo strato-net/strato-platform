@@ -162,13 +162,11 @@ blockstanbulSend' msg = do
   resp' <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp']
   resp <- (resp'++) <$>
-    case blocks of
-      [] -> return []
-      [b] ->
-        -- TODO(tim): Block insertion can potentially fail, so there
-        -- should be feedback here
-        sendAllMessages [CommitResult . Right . blockHash $ b]
-      bs -> error $ "must commit at most one block at a time: " ++ show bs
+      if null blocks
+          then return []
+          -- TODO(tim): Block insertion can potentially fail, so there
+          -- should be feedback here
+          else sendAllMessages [CommitResult (Right ())]
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul

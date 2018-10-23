@@ -2,8 +2,7 @@
 module Blockchain.Data.Block (
   Block(..),
   blockDataLens,
-  extraLens,
-  setBlockNo
+  extraLens
   ) where
 
 import Control.DeepSeq
@@ -27,9 +26,6 @@ makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
 
 extraLens :: Lens' Block BS.ByteString
 extraLens = blockDataLens . extraDataLens
-
-setBlockNo :: Integer -> Block -> Block
-setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
 
 instance Binary Block where
 instance NFData Block
