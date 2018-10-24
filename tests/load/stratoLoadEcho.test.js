@@ -61,13 +61,25 @@ describe('Strato Load Test', function() {
   it('Upload contracts', function * () {
     const startTime = moment();
     let blocTime = 0;
+    const uidt = util.uid();
+    const sArgs = createGasDealFixedArgs(uidt);
+    let byte32array = argsToBytes32(sArgs)
     for(let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
-      factory_createUploadList(batchSize, i);
+      txs = [];
+      for (var j = 0; j < batchSize; j++) {
+        txs.push({
+          contractName: contractName,
+            args: {
+            _echoPermissionManager:'2383914a2cffe7bb97e0b622481b945858e08188',
+            _bytes32Array:byte32array,
+            }
+          });
+      }
       const blocStartTime = moment();
       const results = yield api.bloc.uploadList({
         password: adminPassword,
-        contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
+        contracts: txs,
         resolve: true
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
@@ -174,29 +186,4 @@ function argsToBytes32(sArgs) {
   args[Args.GAS_VOLUME_UNITS] = util.intToBytes32(sArgs.volumeUnits);
   args[Args.STRATEGY] = util.toBytes32(sArgs.strategy);
   return args;
-}
-
-function factory_createUploadList(batchSize, batchIndex) {
- // const dapp = yield dappJs.bind(deployment.admin, deployment.contract);
-  let nonceSave = batchSize * batchIndex
-  for (var i = 0; i < batchSize; i++) {
-    //createGasDealFixedArgs
-    const uidt = util.uid();
-    console.log(uidt);
-    const sArgs = createGasDealFixedArgs(uidt);
-
-    txs.push({
-      contractName: contractName,
-      args: {
-        _echoPermissionManager:'2383914a2cffe7bb97e0b622481b945858e08188',
-        _bytes32Array:argsToBytes32(sArgs),
-      },
-      txParams: {
-        gasLimit: 10000000,
-        gasPrice: 1,
-        nonce: nonceSave + i
-      }
-    });
-  }
-  return txs;
 }
