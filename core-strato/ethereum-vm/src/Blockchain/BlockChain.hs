@@ -38,7 +38,7 @@ import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
-import           Data.Text.Encoding                      (decodeUtf8)
+-- import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -542,8 +542,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                      _smorgOwner
                      addressStateCodeHash
                      (if _smorgStorageDiff == M.empty then Nothing else Just _smorgStorageDiff)
-                     (decodeUtf8 _smorgInputData)
-                     (decodeUtf8 $ fromMaybe B.empty _smorgReturn)
+                     (T.pack . BC.unpack . B16.encode $ _smorgInputData) -- it doesn't make sense to decodeUtf8 here
+                     (T.pack . BC.unpack . B16.encode $ fromMaybe B.empty _smorgReturn)
                      (transactionMetadata t)
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
