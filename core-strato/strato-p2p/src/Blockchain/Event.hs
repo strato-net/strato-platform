@@ -27,6 +27,7 @@ import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Text.Printf
 
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
@@ -247,6 +248,7 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
+      setPeerAddrIfUnset $ blockstanbulSender wm
       SK.emitBlockstanbulMsg wm
 
     -- private chains
@@ -344,19 +346,23 @@ handleEvents mode peer = awaitForever $ \case
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yield outbound
-      OEAskForBlocks start end -> do
-        let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
-        $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-        yield outbound
-      OEPushBlocks start end -> do
-        chain <- RBDB.withRedisBlockDB $
-          RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
-        when (null chain) $
-          $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
-            "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-        let outbound = BlockHeaders . map snd $ chain
-        $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-        yield outbound
+      OEAskForBlocks start end p -> do
+        ss <- shouldSendToPeer p
+        when ss $ do
+          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          yield outbound
+      OEPushBlocks start end p -> do
+        ss <- shouldSendToPeer p
+        when ss $ do
+          chain <- RBDB.withRedisBlockDB $
+            RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
+          when (null chain) $
+            $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
+              "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
+          let outbound = BlockHeaders . map snd $ chain
+          $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
 

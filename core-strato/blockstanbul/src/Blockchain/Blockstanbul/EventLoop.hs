@@ -324,9 +324,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
               let intSeq = fromIntegral . _sequence
               when (_sequence v < _sequence v') $
-                yield $ GapFound (intSeq v) (intSeq v')
+                yield $ GapFound (intSeq v) (intSeq v') (sender auth)
               when (_sequence v > _sequence v') $
-                yield $ LeadFound (intSeq v) (intSeq v')
+                yield $ LeadFound (intSeq v) (intSeq v') (sender auth)
               roundChange
            | isJust mBlockLock && Just pp /= mBlockLock -> do
               $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
