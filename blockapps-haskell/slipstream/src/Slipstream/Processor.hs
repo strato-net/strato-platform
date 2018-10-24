@@ -138,6 +138,13 @@ getFunctionDetailsFromSelector cmId sel' = do
   contract' <- getContractContractByMetadataId cmId
   return $ functionDetailsFromContract contract' sel'
 
+convertEnumTypeToInt :: Type -> Type
+convertEnumTypeToInt = \case
+  TypeEnum _ -> SimpleType $ TypeInt False $ Just 32
+  TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
+  TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
+  ty -> ty
+
 convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
@@ -146,7 +153,11 @@ getFunctionCallValues cmId input output = do
   let sel = B.take 4 input
       data' = B.drop 4 input
   (fname,(itypes,otypes)) <- getFunctionDetailsFromSelector cmId sel
-  let typemap bs = uncurry zip . fmap (fromMaybe (repeat (SolidityValueAsString "")) . convertByteStringToVals bs) . unzip
+  let typemap bs = uncurry zip
+                   . fmap ( fromMaybe (repeat (SolidityValueAsString ""))
+                     . convertByteStringToVals bs
+                     . map convertEnumTypeToInt
+                   ) . unzip
       imap = typemap data' itypes
       omap = zipWith
                (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
