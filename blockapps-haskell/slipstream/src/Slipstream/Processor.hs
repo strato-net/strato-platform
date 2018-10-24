@@ -119,20 +119,21 @@ groupSimilarActions as = go as [] []
 withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
 withNothing m f = maybe f (pure . Just) m
 
-functionDetailsFromContract :: Contract -> ByteString -> ([(Text, Type)],[(Maybe Text, Type)])
+functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
 functionDetailsFromContract contract selector' =
   let selector = B.take 4 selector'
       isSelector = \case
         TypeFunction s a r | s == selector -> Just (a,r)
         _                                  -> Nothing
-   in fromMaybe ([],[])
+   in fromMaybe ("",([],[]))
       . listToMaybe
-      . catMaybes
-      . map (isSelector . snd . snd)
+      . map (fmap fromJust)
+      . filter (isJust . snd)
+      . map (fmap (isSelector . snd))
       $ OMap.assocs
         (fields $ mainStruct contract)
 
-getFunctionDetailsFromSelector :: Int32 -> ByteString -> Bloc ([(Text,Type)],[(Maybe Text, Type)])
+getFunctionDetailsFromSelector :: Int32 -> ByteString -> Bloc (Text, ([(Text,Type)],[(Maybe Text, Type)]))
 getFunctionDetailsFromSelector cmId sel' = do
   contract' <- getContractContractByMetadataId cmId
   return $ functionDetailsFromContract contract' sel'
@@ -140,18 +141,18 @@ getFunctionDetailsFromSelector cmId sel' = do
 convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-getFunctionCallValues :: Int32 -> ByteString -> ByteString -> Bloc ([(Text, SolidityValue)],[(Text, SolidityValue)])
+getFunctionCallValues :: Int32 -> ByteString -> ByteString -> Bloc (Text, [(Text, SolidityValue)], [(Text, SolidityValue)])
 getFunctionCallValues cmId input output = do
   let sel = B.take 4 input
       data' = B.drop 4 input
-  (itypes,otypes) <- getFunctionDetailsFromSelector cmId sel
+  (fname,(itypes,otypes)) <- getFunctionDetailsFromSelector cmId sel
   let typemap bs = uncurry zip . fmap (fromMaybe (repeat (SolidityValueAsString "")) . convertByteStringToVals bs) . unzip
       imap = typemap data' itypes
       omap = zipWith
                (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
                ([0..] :: [Integer])
                (typemap output otypes)
-  return (imap,omap)
+  return (fname,imap,omap)
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
@@ -248,7 +249,7 @@ processTheMessages messages conn g = do
                 obytes = fst . B16.decode $ encodeUtf8 actionOutput
             setContractState g actionAddress actionTxChainId newState
 
-            (i,o) <- getFunctionCallValues cmId ibytes obytes
+            (f,i,o) <- getFunctionCallValues cmId ibytes obytes
 
             pure . Right . Just $ ProcessedContract
               { address = actionAddress
@@ -262,6 +263,7 @@ processTheMessages messages conn g = do
               , blockNumber = actionBlockNumber
               , transactionHash = actionTxHash
               , transactionSender = actionTxSender
+              , transactionFuncName = f
               , transactionInput = decodeUtf8 . BL.toStrict $ JSON.encode i
               , transactionOutput = decodeUtf8 . BL.toStrict $ JSON.encode o
               }
