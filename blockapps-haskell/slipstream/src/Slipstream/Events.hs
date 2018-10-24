@@ -29,5 +29,7 @@ data ProcessedContract = ProcessedContract {
   , blockNumber         :: Integer
   , transactionHash     :: Keccak256
   , transactionSender   :: Address
+  , transactionInput    :: Text
+  , transactionOutput   :: Text
   , contractData        :: Map Text V.Value
 } deriving (Show)

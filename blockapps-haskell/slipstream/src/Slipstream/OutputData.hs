@@ -17,6 +17,7 @@ import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
+import           Data.Monoid                     ((<>))
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
@@ -131,6 +132,7 @@ createInserts globalsIORef = do
     globals <- readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
     let tableName = contractName firstContract
+        historyName = "history@" <> tableName
     history <- isHistoric globalsIORef hashVal
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
@@ -138,7 +140,7 @@ createInserts globalsIORef = do
         then ""
         else ", "
 
-    let keySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender", comma, listToKeyStatement ", " list, ")"]
+    let keySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender, transaction_input, transaction_output", comma, listToKeyStatement ", " list, ")"]
 
     liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
@@ -153,7 +155,7 @@ createInserts globalsIORef = do
         let createSt = T.concat
                 [ "create table if not exists \""
                 , tableName
-                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_input text, transaction_output text"
                 , comma
                 , tableColumns list
                 , ", CONSTRAINT \""
@@ -164,8 +166,8 @@ createInserts globalsIORef = do
         when history $ do
           let histSt = T.concat
                 [ "create table if not exists \""
-                , tableName
-                , "_history\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+                , historyName
+                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_input text, transaction_output text"
                 , comma
                 , tableColumns list
                 , ");" ]
@@ -189,6 +191,10 @@ createInserts globalsIORef = do
                 , T.pack $ keccak256String $ transactionHash row
                 ,"', '"
                 , tshow $ transactionSender row
+                ,"', '"
+                , transactionInput row
+                ,"', '"
+                , transactionOutput row
                 , "'"
                 , comma
                 , listToValueStatement ", " rowList
@@ -196,7 +202,7 @@ createInserts globalsIORef = do
     let inserts = T.intercalate ", " vals
 
     when history $ do
-      let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
+      let hist = T.concat ["insert into \"", historyName, "\" ", keySt, " values ", inserts, ";"]
       yield hist
 
     index <- shouldIndex globalsIORef hashVal
@@ -210,7 +216,8 @@ createInserts globalsIORef = do
             , inserts
             , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
             , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
-            , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender"
+            , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
+            , "transaction_input = excluded.transaction_input, transaction_output = excluded.transaction_output"
             , comma
             , (tableUpsert list)
             , ";" ]
