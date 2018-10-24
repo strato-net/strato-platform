@@ -1,13 +1,14 @@
 {-# LANGUAGE
-      OverloadedStrings
-    , RecordWildCards
+      DataKinds
     , DeriveGeneric
-    , QuasiQuotes
-    , ScopedTypeVariables
-    , DataKinds
-    , TemplateHaskell
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
+    , LambdaCase
+    , OverloadedStrings
+    , QuasiQuotes
+    , RecordWildCards
+    , ScopedTypeVariables
+    , TemplateHaskell
 #-}
 
 module Slipstream.Processor where
@@ -17,7 +18,9 @@ import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
 import Data.Int (Int32)
@@ -25,13 +28,15 @@ import Data.IORef
 import Data.Foldable (for_)
 import Data.Function
 import Data.Map (Map)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Pool
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text (Text)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -44,6 +49,10 @@ import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
+import BlockApps.Solidity.Type
+import BlockApps.Solidity.SolidityValue
+import BlockApps.Solidity.Struct
+import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
@@ -109,6 +118,40 @@ groupSimilarActions as = go as [] []
 
 withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
 withNothing m f = maybe f (pure . Just) m
+
+functionDetailsFromContract :: Contract -> ByteString -> ([(Text, Type)],[(Maybe Text, Type)])
+functionDetailsFromContract contract selector' =
+  let selector = B.take 4 selector'
+      isSelector = \case
+        TypeFunction s a r | s == selector -> Just (a,r)
+        _                                  -> Nothing
+   in fromMaybe ([],[])
+      . listToMaybe
+      . catMaybes
+      . map (isSelector . snd . snd)
+      $ OMap.assocs
+        (fields $ mainStruct contract)
+
+getFunctionDetailsFromSelector :: Int32 -> ByteString -> Bloc ([(Text,Type)],[(Maybe Text, Type)])
+getFunctionDetailsFromSelector cmId sel' = do
+  contract' <- getContractContractByMetadataId cmId
+  return $ functionDetailsFromContract contract' sel'
+
+convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
+convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
+
+getFunctionCallValues :: Int32 -> ByteString -> ByteString -> Bloc ([(Text, SolidityValue)],[(Text, SolidityValue)])
+getFunctionCallValues cmId input output = do
+  let sel = B.take 4 input
+      data' = B.drop 4 input
+  (itypes,otypes) <- getFunctionDetailsFromSelector cmId sel
+  let typemap bs = uncurry zip . fmap (fromMaybe (repeat (SolidityValueAsString "")) . convertByteStringToVals bs) . unzip
+      imap = typemap data' itypes
+      omap = zipWith
+               (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
+               ([0..] :: [Integer])
+               (typemap output otypes)
+  return (imap,omap)
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
@@ -201,7 +244,11 @@ processTheMessages messages conn g = do
                           <$> getContractState g actionAddress actionTxChainId
             let newState = decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
+                ibytes = fst . B16.decode $ encodeUtf8 actionInput
+                obytes = fst . B16.decode $ encodeUtf8 actionOutput
             setContractState g actionAddress actionTxChainId newState
+
+            (i,o) <- getFunctionCallValues cmId ibytes obytes
 
             pure . Right . Just $ ProcessedContract
               { address = actionAddress
@@ -215,8 +262,8 @@ processTheMessages messages conn g = do
               , blockNumber = actionBlockNumber
               , transactionHash = actionTxHash
               , transactionSender = actionTxSender
-              , transactionInput = actionInput
-              , transactionOutput = actionOutput
+              , transactionInput = decodeUtf8 . BL.toStrict $ JSON.encode i
+              , transactionOutput = decodeUtf8 . BL.toStrict $ JSON.encode o
               }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
