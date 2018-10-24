@@ -27,6 +27,7 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 import           UnliftIO.IORef
+import           Debug.Trace
 
 import           BlockApps.Ethereum
 
@@ -76,10 +77,10 @@ arrayToString [] = ""
 arrayToString [x] =  arrayContent x
 arrayToString (x:es) = T.concat [arrayContent x, ", ", arrayToString es]
 
-listToValueStatement :: Text -> [(a, SolidityValue)] -> Text
+listToValueStatement :: Text -> [SolidityValue] -> Text
 listToValueStatement _ [] = ""
-listToValueStatement _ [(_, y)] = solidityValueToText "\'" y
-listToValueStatement s ((_, y):es) = T.concat [solidityValueToText "\'" y, s, (listToValueStatement s es)]
+listToValueStatement _ [y] = solidityValueToText "\'" y
+listToValueStatement s (y:ys) = T.concat [solidityValueToText "\'" y, s, (listToValueStatement s ys)]
 
 tableColumns :: [(Text, SolidityValue)] -> Text
 tableColumns [] = ""
@@ -121,7 +122,7 @@ convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
 convertRet metadata conn globalsIORef = runConduit $
      yield metadata
   .| createInserts globalsIORef
-  .| catchC (mapM_C (dbInsert conn)) handlePostgresError
+  .| catchC (mapM_C (\t -> dbInsert conn $ traceShowId t)) handlePostgresError
 
 createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
 createInserts globalsIORef = do
@@ -132,15 +133,23 @@ createInserts globalsIORef = do
     globals <- readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
     let tableName = contractName firstContract
-        historyName = "history@" <> tableName
+        functionTableName = tableName <> "." <> transactionFuncName firstContract
+        toHistory = (<>) "history@"
+        historyName = toHistory tableName
+        functionHistoryName = toHistory functionTableName
     history <- isHistoric globalsIORef hashVal
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
+        funcList = transactionInput firstContract ++ transactionOutput firstContract
     let comma = if null list
-        then ""
-        else ", "
+                  then ""
+                  else ", "
+    let fcomma = if null funcList
+                   then ""
+                   else ", "
 
-    let keySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender, transaction_input, transaction_output", comma, listToKeyStatement ", " list, ")"]
+    let keySt  = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender, transaction_function_name", comma, listToKeyStatement ", " list, ")"]
+        fKeySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender", fcomma, listToKeyStatement ", " funcList, ")"]
 
     liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
 
@@ -152,28 +161,49 @@ createInserts globalsIORef = do
         let conVals = T.concat ["('", T.pack $ keccak256String $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
         let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
         yield conIns
-        let createSt = T.concat
-                [ "create table if not exists \""
-                , tableName
-                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_input text, transaction_output text"
-                , comma
-                , tableColumns list
-                , ", CONSTRAINT \""
-                , tableName
-                , "_pkey\" PRIMARY KEY (address, \"chainId\") );" ]
-        yield createSt
+        yield $ T.concat
+          [ "create table if not exists \""
+          , tableName
+          , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
+          , comma
+          , tableColumns list
+          , ", CONSTRAINT \""
+          , tableName
+          , "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+          ]
 
         when history $ do
-          let histSt = T.concat
-                [ "create table if not exists \""
-                , historyName
-                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_input text, transaction_output text"
-                , comma
-                , tableColumns list
-                , ");" ]
-          yield histSt
-        _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-        return ()
+          yield $ T.concat
+            [ "create table if not exists \""
+            , historyName
+            , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
+            , comma
+            , tableColumns list
+            , ");"
+            ]
+        void $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+
+    yield $ T.concat
+      [ "create table if not exists \""
+      , functionTableName
+      , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+      , fcomma
+      , tableColumns funcList
+      , ", CONSTRAINT \""
+      , functionTableName
+      , "_pkey\" PRIMARY KEY (address, \"chainId\") );"
+      ]
+
+    when history $ do
+      yield $ T.concat
+        [ "create table if not exists \""
+        , functionHistoryName
+        , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+        , fcomma
+        , tableColumns funcList
+        , ");"
+        ]
+
     let vals = flip map metadata $ \row ->
           let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
           in T.concat
@@ -192,33 +222,69 @@ createInserts globalsIORef = do
                 ,"', '"
                 , tshow $ transactionSender row
                 ,"', '"
-                , transactionInput row
-                ,"', '"
-                , transactionOutput row
+                , transactionFuncName row
                 , "'"
                 , comma
-                , listToValueStatement ", " rowList
+                , listToValueStatement ", " (map snd rowList)
                 , ")" ]
     let inserts = T.intercalate ", " vals
 
+    let fvals = flip map metadata $ \row ->
+          let rowList = map snd $ transactionInput row ++ transactionOutput row
+          in T.concat
+                [ "('"
+                , tshow $ address row
+                , "', '"
+                , chain row
+                , "', '"
+                , T.pack $ keccak256String $ blockHash row
+                , "', '"
+                , tshow $ blockTimestamp row
+                , "', '"
+                , tshow $ blockNumber row
+                , "', '"
+                , T.pack $ keccak256String $ transactionHash row
+                ,"', '"
+                , tshow $ transactionSender row
+                , "'"
+                , fcomma
+                , listToValueStatement ", " rowList
+                , ")" ]
+    let finserts = T.intercalate ", " fvals
+
     when history $ do
-      let hist = T.concat ["insert into \"", historyName, "\" ", keySt, " values ", inserts, ";"]
-      yield hist
+      yield $ T.concat ["insert into \"", historyName, "\" ", keySt, " values ", inserts, ";"]
+      yield $ T.concat ["insert into \"", functionHistoryName, "\" ", fKeySt, " values ", finserts, ";"]
 
     index <- shouldIndex globalsIORef hashVal
     when index $ do
-      let ins = T.concat
-            [ "insert into \""
-            , tableName
-            , "\" "
-            , keySt
-            , " values "
-            , inserts
-            , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
-            , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
-            , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
-            , "transaction_input = excluded.transaction_input, transaction_output = excluded.transaction_output"
-            , comma
-            , (tableUpsert list)
-            , ";" ]
-      yield ins
+      yield $ T.concat
+        [ "insert into \""
+        , tableName
+        , "\" "
+        , keySt
+        , " values "
+        , inserts
+        , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
+        , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
+        , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
+        , "transaction_function_name = excluded.transaction_function_name"
+        , comma
+        , (tableUpsert list)
+        , ";"
+        ]
+
+      yield $ T.concat
+        [ "insert into \""
+        , functionTableName
+        , "\" "
+        , fKeySt
+        , " values "
+        , finserts
+        , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
+        , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
+        , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender"
+        , fcomma
+        , (tableUpsert funcList)
+        , ";"
+        ]
