@@ -50,20 +50,20 @@ import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
-import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
-import BlockApps.SolidityVarReader
+import qualified BlockApps.SolidityVarReader as SVR
 
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.OutputData
+import Slipstream.SolidityValue
 
 toAction :: BL.ByteString -> Action
 toAction x =
@@ -241,9 +241,9 @@ processTheMessages messages conn g = do
               contractInstancesByCodeHash actionCodeHash actionAddress actionTxChainId
             when (isNothing mInstance) . void $ insertContractInstance cmId actionAddress actionTxChainId
             fetchLimit <- asks stateFetchLimit
-            oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
+            oldState <- fromMaybe (SVR.decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
                           <$> getContractState g actionAddress actionTxChainId
-            let newState = decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
+            let newState = SVR.decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
                 ibytes = fst . B16.decode $ encodeUtf8 actionInput
                 obytes = fst . B16.decode $ encodeUtf8 actionOutput
@@ -264,8 +264,8 @@ processTheMessages messages conn g = do
               , transactionHash = actionTxHash
               , transactionSender = actionTxSender
               , transactionFuncName = f
-              , transactionInput = decodeUtf8 . BL.toStrict $ JSON.encode i
-              , transactionOutput = decodeUtf8 . BL.toStrict $ JSON.encode o
+              , transactionInput = i
+              , transactionOutput = o
               }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack

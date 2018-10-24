@@ -60,8 +60,8 @@ main = hspec $ do
             transactionHash = keccak256 "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             transactionFuncName = "",
-            transactionInput = "",
-            transactionOutput = "",
+            transactionInput = [],
+            transactionOutput = [],
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
@@ -91,8 +91,8 @@ main = hspec $ do
              transactionHash = keccak256 "<TRANSACTIONHASH>",
              transactionSender = testAdd,
              transactionFuncName = "",
-             transactionInput = "",
-             transactionOutput = "",
+             transactionInput = [],
+             transactionOutput = [],
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
