@@ -28,6 +28,7 @@ import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 -- import           Data.Aeson.Encode.Pretty                (encodePretty)
+import Debug.Trace
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
@@ -385,7 +386,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erSmorgs             = _smorgs newVMState'
+                                       , erSmorgs             = traceShowId $ _smorgs newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do

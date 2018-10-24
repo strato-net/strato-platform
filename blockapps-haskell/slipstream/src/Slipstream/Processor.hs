@@ -215,6 +215,8 @@ processTheMessages messages conn g = do
               , blockNumber = actionBlockNumber
               , transactionHash = actionTxHash
               , transactionSender = actionTxSender
+              , transactionInput = actionInput
+              , transactionOutput = actionOutput
               }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack

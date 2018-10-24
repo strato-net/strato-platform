@@ -59,6 +59,8 @@ main = hspec $ do
             blockNumber = 123,
             transactionHash = keccak256 "<TRANSACTIONHASH>",
             transactionSender = testAdd,
+            transactionInput = "",
+            transactionOutput = "",
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
@@ -87,6 +89,8 @@ main = hspec $ do
              blockNumber = 123,
              transactionHash = keccak256 "<TRANSACTIONHASH>",
              transactionSender = testAdd,
+             transactionInput = "",
+             transactionOutput = "",
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
