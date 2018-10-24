@@ -41,7 +41,21 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
+    , appFaucetNonce :: IORef Integer -- The last maximum nonce given out
     }
+
+acquireNewMaxNonce :: (MonadIO m, MonadReader App m) => Integer -> m Integer
+acquireNewMaxNonce minNonce = do
+  let findNext :: Integer -> (Integer, Integer)
+      -- If this is the first nonce after startup, use the nonce from postgres
+      -- Another node may have jumped ahead of our faucet stream, so
+      findNext maxNonce =
+        let next = if maxNonce == -1
+                     then minNonce
+                     else max minNonce $ 1 + maxNonce
+        in (next, next)
+  nref <- asks appFaucetNonce
+  liftIO $ atomicModifyIORef' nref findNext
 
 instance HasHttpManager App where
     getHttpManager = appHttpManager
@@ -49,6 +63,8 @@ instance HasHttpManager App where
 -- This is where we define all of the routes in our application. For a full
 -- explanation of the syntax, please see:
 -- http://www.yesodweb.com/book/routing-and-handlers
+--
+--
 --
 -- Note that this is really half the story; in Application.hs, mkYesodDispatch
 -- generates the rest of the code. Please see the linked documentation for an
