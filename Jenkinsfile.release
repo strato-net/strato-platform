@@ -18,7 +18,7 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             if [ "$BUILD_TYPE" == "full" ]; then
-              git worktree remove --force strato-worktree
+              git worktree remove --force strato-worktree || true
               git worktree add strato-worktree develop
               cd strato-worktree
               git checkout ${REFSPEC}
