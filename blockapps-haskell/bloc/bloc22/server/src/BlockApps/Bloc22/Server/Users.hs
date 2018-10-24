@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Users where
 
 import           ClassyPrelude                     ((<>))
 import           Control.Concurrent
+import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
 import           Control.Monad
@@ -140,15 +141,15 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
-  hash <- blocStrato $ postFaucet addr
+  hashes <- blocStrato $ postFaucet addr
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
-    , constant hash
+    , constant h
     , constant (0 :: Int32)
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
-    )]
-  getBlocTransactionResult' Nothing hash resolve
+    ) | h <- hashes]
+  getBlocTransactionResult' Nothing hashes resolve
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr chainId resolve
@@ -184,7 +185,7 @@ postUsersSend' TransferParameters{..} sign = do
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
-    getBlocTransactionResult' chainId hash resolve
+    getBlocTransactionResult' chainId [hash] resolve
 
 postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr chainId resolve
@@ -240,7 +241,7 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' chainId hash resolve
+  getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts _resolve) = do
@@ -505,7 +506,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
       , constant (2 :: Int32)
       , constant funcName
       )]
-    getBlocTransactionResult' chainId hash resolve
+    getBlocTransactionResult' chainId [hash] resolve
 
 data TRD = TRD -- transaction resolution data
        { trdStatus :: BlocTransactionStatus
@@ -534,11 +535,14 @@ data BatchState = BatchState
 emptyBatchState :: BatchState
 emptyBatchState = BatchState [] Map.empty Map.empty Map.empty Map.empty
 
-getBlocTransactionResult' :: Maybe ChainId -> Keccak256 -> Bool -> Bloc BlocTransactionResult
-getBlocTransactionResult' chainId hash resolve =
+getBlocTransactionResult' :: Maybe ChainId -> [Keccak256] -> Bool -> Bloc BlocTransactionResult
+getBlocTransactionResult' _ [] _ = throwError $ AnError "getBlockTransactionResult': no TX hashes"
+getBlocTransactionResult' chainId hashes@(txh:_) resolve =
   if resolve
-    then (getBlocTransactionResult hash chainId True)
-    else return (BlocTransactionResult Pending hash Nothing Nothing)
+    then do
+      promises <- forM hashes $ \h -> async (getBlocTransactionResult h chainId True)
+      snd <$> waitAny promises
+    else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash chainId resolve = fmap head $ postBlocTransactionResults chainId resolve [hash]
