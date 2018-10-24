@@ -36,6 +36,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
+import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -1009,7 +1010,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas create'
       else return (Left InsufficientFunds, vmState)
 
-
   case ret of
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
@@ -1022,8 +1022,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
     _ -> do
 
       return ret
-
-
 
 create' :: VMM Code
 create' = do
@@ -1052,10 +1050,12 @@ create' = do
         $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
       lift $ put vmState{returnVal=Nothing}
       assignCode "" owner
+      assignSmorgs
       return $ Code ""
     else do
       useGas $ gCREATEDATA * toInteger (B.length codeBytes')
       assignCode codeBytes' owner
+      assignSmorgs
       return $ Code codeBytes'
 
   where
@@ -1064,6 +1064,19 @@ create' = do
       addCode codeBytes'
       newAddressState <- getAddressState address'
       putAddressState address' newAddressState{addressStateCodeHash=hash codeBytes'}
+    assignSmorgs = do
+      vmState' <- lift get
+      let owner = envOwner $ environment vmState'
+      lift $ smorgs %= ((:) $ VMSmorgasburg
+                              { _smorgMsgSender   = envSender $ environment vmState'
+                              , _smorgOwner       = owner
+                              , _smorgOrigin      = envOrigin $ environment vmState'
+                              , _smorgGasPrice    = envGasPrice $ environment vmState'
+                              , _smorgInputData   = envInputData $ environment vmState'
+                              , _smorgValue       = envValue $ environment vmState'
+                              , _smorgReturn      = returnVal vmState'
+                              , _smorgStorageDiff = fromMaybe M.empty $ M.lookup owner (_storageDiffs vmState')
+                              })
 
 call :: Bool
      -> Bool
@@ -1124,6 +1137,17 @@ call' noValueTransfer = do
   --    --putStrLn $ "Result: " ++ format result
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
+  let owner = envOwner $ environment vmState
+  lift $ smorgs %= ((:) $ VMSmorgasburg
+                          { _smorgMsgSender   = sender
+                          , _smorgOwner       = receiveAddress
+                          , _smorgOrigin      = envOrigin $ environment vmState
+                          , _smorgGasPrice    = envGasPrice $ environment vmState
+                          , _smorgInputData   = envInputData $ environment vmState
+                          , _smorgValue       = value'
+                          , _smorgReturn      = returnVal vmState
+                          , _smorgStorageDiff = fromMaybe M.empty $ M.lookup owner (_storageDiffs vmState)
+                          })
 
   return (fromMaybe B.empty $ returnVal vmState)
 

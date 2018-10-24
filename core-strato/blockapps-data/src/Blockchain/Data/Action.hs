@@ -29,6 +29,8 @@ data Action = Action
   , actionAddress        :: Address
   , actionCodeHash       :: SHA
   , actionStorage        :: Maybe (Map Word256 Word256)
+  , actionInput          :: Text
+  , actionOutput         :: Text
   , actionMetadata       :: Maybe (Map Text Text)
   } deriving (Show, Generic)
 

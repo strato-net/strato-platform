@@ -27,11 +27,11 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
-import           Data.Aeson.Encode.Pretty                (encodePretty)
+-- import           Data.Aeson.Encode.Pretty                (encodePretty)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
-import qualified Data.ByteString.Lazy                    as BL
+-- import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
@@ -385,7 +385,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erStorageDiffs       = _storageDiffs newVMState'
+                                       , erSmorgs             = _smorgs newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -404,7 +404,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erStorageDiffs       = _storageDiffs newVMState'
+                                       , erSmorgs             = _smorgs newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -418,7 +418,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erStorageDiffs = M.empty
+                               , erSmorgs = []
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -473,7 +473,7 @@ outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
                         -> TxRunResult
                         -> ContextM [Action]
-outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap) = do
   let (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
@@ -496,7 +496,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
-          sDiffs = either (const M.empty) erStorageDiffs result
+          smorgs' = either (const []) erSmorgs result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
           (response, theTrace', theLogs) =
             case result of
@@ -520,7 +520,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
+                               , transactionResultStateDiff        = "" --T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
@@ -529,8 +529,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                }
       if not flags_diffPublish
         then return []
-        else forM (M.toList sDiffs) $ \(a,s) -> do
-          AddressState{..} <- getAddressState a
+        else forM smorgs' $ \VMSmorgasburg{..} -> do
+          AddressState{..} <- getAddressState _smorgOwner
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
@@ -538,10 +538,12 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                      (blockDataNumber b)
                      theHash
                      chainId
-                     signer
-                     a
+                     _smorgMsgSender
+                     _smorgOwner
                      addressStateCodeHash
-                     (Just s)
+                     (if _smorgStorageDiff == M.empty then Nothing else Just _smorgStorageDiff)
+                     (decodeUtf8 _smorgInputData)
+                     (decodeUtf8 $ fromMaybe B.empty _smorgReturn)
                      (transactionMetadata t)
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
