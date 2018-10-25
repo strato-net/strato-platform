@@ -22,21 +22,21 @@ data ExecResults =
     erTrace              :: [String],
     erLogs               :: [Log],
     erNewContractAddress :: Maybe Address,
-    erSmorgs             :: [VMSmorgasburg],
+    erDetails             :: [VMDetails],
     erException          :: Maybe VMException
     } deriving (Show, Generic)
 
-data VMSmorgasburg = VMSmorgasburg
-  { _smorgMsgSender   :: Address
-  , _smorgOwner       :: Address
-  , _smorgOrigin      :: Address
-  , _smorgGasPrice    :: Integer
-  , _smorgInputData   :: B.ByteString
-  , _smorgValue       :: Integer
-  , _smorgReturn      :: Maybe B.ByteString
-  , _smorgStorageDiff :: M.Map Word256 Word256
+data VMDetails = VMDetails
+  { _detailMsgSender   :: Address
+  , _detailOwner       :: Address
+  , _detailOrigin      :: Address
+  , _detailGasPrice    :: Integer
+  , _detailInputData   :: B.ByteString
+  , _detailValue       :: Integer
+  , _detailReturn      :: Maybe B.ByteString
+  , _detailStorageDiff :: M.Map Word256 Word256
   } deriving (Show, Generic)
-makeLenses ''VMSmorgasburg
+makeLenses ''VMDetails
 
 instance NFData ExecResults
-instance NFData VMSmorgasburg
+instance NFData VMDetails
