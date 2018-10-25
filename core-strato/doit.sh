@@ -19,9 +19,8 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  if [ -n "${connectionTimeout}" ]; then
-    ctFlag="--connectionTimeout=${connectionTimeout}"
-  fi
+
+  ctFlag="--connectionTimeout=${actualTimeout}"
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -42,7 +41,19 @@ function newnode {
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runBackgroundProcess strato-p2p-client $ctFlag --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-client 2>&1
+       actualTimeout="${connectionTimeout:-300}"
+       if [ -n "${blockstanbulRoundPeriodS}" ]; then
+         withCushion=$(( 2 * blockstanbulRoundPeriodS ))
+         actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
+       fi
+       runBackgroundProcess strato-p2p-client \
+          --connectionTimeout=$actualTimeout \
+          --cNetworkID=$networkID \
+          --maxConn=$maxConn \
+          --sqlPeers=true \
+          --debugFail=${debugFail:-true}  \
+          --maxReturnedHeaders=$maxReturnedHeaders \
+          >> logs/strato-p2p-client 2>&1
   fi
 
   evmMinLogLevel=LevelInfo
@@ -60,9 +71,6 @@ function newnode {
   fi
   if [ -n "${blockstanbulBlockPeriodMs}" ]; then
     bpFlag="--blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs}"
-  fi
-  if [ -n "${blockstanbulRoundPeriodS}" ]; then
-    rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
   fi
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
