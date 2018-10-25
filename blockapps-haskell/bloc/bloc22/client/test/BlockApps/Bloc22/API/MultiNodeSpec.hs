@@ -321,6 +321,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
       , postuserscontractrequestArgs = args
       , postuserscontractrequestTxParams = testTxParams
       , postuserscontractrequestValue = Just $ Strung 0
+      , postuserscontractrequestMetadata = Just $ Map.fromList [("src",src),("name",cn)]
       }
   result <- fromEither =<< (getResolvedTxMulti config $ runClientM (postUsersContract userName addr Nothing False postUsersContractRequest) blocclient)
   result `shouldSatisfy` (== Success) . blocTransactionStatus
@@ -344,6 +345,7 @@ callMethodLocal method cAddr contractName methodArgs config@TestConfig{..} =
         , postuserscontractmethodArgs = methodArgs
         , postuserscontractmethodValue = Just $ Strung 0
         , postuserscontractmethodTxParams = testTxParams
+        , postuserscontractmethodMetadata = Nothing
         }
   in fromEither =<<
      ( getResolvedTx config $
@@ -380,6 +382,7 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
             , methodcallArgs = args
             , methodcallValue = Strung 0
             , methodcallTxParams = testTxParams
+            , methodcallMetadata = Nothing
             }
         }
   in getResolvedBatchTx config $

@@ -35,7 +35,7 @@ function newnode {
 
   if $serveBlocks
   then echo "Starting strato-p2p-server"
-       runBackgroundProcess strato-p2p-server $ctFlag --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
+       runBackgroundProcess strato-p2p-server --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
        echo "Starting ethereum-discover"
        runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
   fi
