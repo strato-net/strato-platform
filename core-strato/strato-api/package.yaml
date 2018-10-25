@@ -121,3 +121,13 @@ tests:
       - hspec-expectations
       - case-insensitive
       - QuickCheck
+
+  unittests:
+    main: Spec.hs
+    source-dirs: unittest
+    dependencies:
+      - strato-api
+      - hspec-core
+      - hspec-expectations-lifted
+      - lifted-async
+      - classy-prelude
