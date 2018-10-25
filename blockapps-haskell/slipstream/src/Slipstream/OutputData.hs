@@ -27,7 +27,6 @@ import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
 import           UnliftIO.IORef
-import           Debug.Trace
 
 import           BlockApps.Ethereum
 
@@ -122,7 +121,7 @@ convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
 convertRet metadata conn globalsIORef = runConduit $
      yield metadata
   .| createInserts globalsIORef
-  .| catchC (mapM_C (\t -> dbInsert conn $ traceShowId t)) handlePostgresError
+  .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
 createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
 createInserts globalsIORef = do
