@@ -30,9 +30,13 @@ let priceType;
 // Allows the possibility of sharing the faucet node with all other test
 // instances, so that nonces are allocated cooperatively.
 async function faucet(addr) {
+  let root = config.nodes[0].stratoUrl;
+  if (process.env.FAUCET_STRATO) {
+    root = `http://${process.env.FAUCET_STRATO}`
+  }
   const options = {
     method: 'POST',
-    uri: `http://${process.env.FAUCET_STRATO || config.stratoUrl}/eth/v1.2/faucet`,
+    uri: `${root}/eth/v1.2/faucet`,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
