@@ -20,7 +20,6 @@ module BlockApps.Strato.Types
   , ChainId (..)
   , Keccak256 (..)
   , WithNext (..)
-  , FaucetResponse(..)
   , TransactionType (..)
   , Transaction (..)
   , TransactionResult (..)
@@ -46,7 +45,6 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
-import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
@@ -59,7 +57,6 @@ import qualified Data.Swagger                 as Sw
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import qualified Data.Text.Encoding           as Text
 import           Data.Time
 import           Data.Word
 import qualified Generic.Random               as GR
@@ -78,8 +75,6 @@ import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (
                                                AccountInfo(..), CodeInfo(..),
                                                stringChainId)
 import           BlockApps.Strato.TypeLits
-
-newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece
@@ -114,11 +109,6 @@ instance ToSchema x => ToSchema (Strung x) where
 
 instance ToSchema x => ToSchema (NonEmpty x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
-
-instance ToSchema FaucetResponse where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "A faucet response url"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
 
 instance ToSchema Transaction where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
@@ -403,19 +393,6 @@ instance FromJSON Storage where
 
 instance ToJSON Storage where
   toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON FaucetResponse where
-  parseJSON = fmap FaucetResponse . parseJSON
-instance ToJSON FaucetResponse where
-  toJSON (FaucetResponse x) = toJSON x
-
-instance MimeUnrender PlainText FaucetResponse where
-  mimeUnrender _ =
-    return . FaucetResponse . Text.decodeUtf8 . Lazy.toStrict
-
-instance MimeRender PlainText FaucetResponse where
-  mimeRender _ (FaucetResponse x) =
-    Lazy.fromStrict $ Text.encodeUtf8 x
 
 data AbiBin = AbiBin
   { abi        :: Text

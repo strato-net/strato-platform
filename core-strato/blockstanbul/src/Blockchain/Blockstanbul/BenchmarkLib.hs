@@ -49,5 +49,5 @@ benchContext =
   in  newContext (View 200 40) [prvKey2Address pk] [] pk
 
 makeBlock :: Int -> Int -> Block
-makeBlock txcount txsize =
+makeBlock txcount txsize = setBlockNo 41
   genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize)}

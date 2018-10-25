@@ -119,7 +119,7 @@ spec = do
       let vals = S.singleton 0xdeadbeef
           blk = addValidators vals testBlock
           got = replayHistoricBlock S.empty 300 blk
-      got `shouldBe` Left "unexpected block number"
+      got `shouldBe` Left "unexpected block number: have 40, wanted 301"
 
     it "Rejects a block with the wrong validator list" $ do
       let vals = S.map prvKey2Address . S.singleton $ private
@@ -131,7 +131,7 @@ spec = do
       let vals = S.singleton 0xdeadbeef
           blk = addValidators vals testBlock
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "no verifiable proposer seal"
+      got `shouldBe` Left "invalid proposer seal"
 
     it "Rejects a block with a bad proposer's signature" $ do
       let vals = S.singleton 0xdeadbeef
@@ -139,7 +139,7 @@ spec = do
       seal <- proposerSeal blk' private
       let blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "no verifiable proposer seal"
+      got `shouldBe` Left "proposer 80976e7d04c8ae9b3a1c08278a5c385e5b0ff446 not a validator"
 
     it "Rejects a block without commit seals" $ do
       let vals = S.fromList $ map prvKey2Address [private]
@@ -147,7 +147,7 @@ spec = do
       seal <- proposerSeal blk' private
       let blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "not enough commit seals"
+      got `shouldBe` Left "not enough commit seals (have 0 out of 1)"
 
     it "Rejects a block with an unknown seal" $ do
       let vals = S.fromList $ map prvKey2Address [private]
@@ -157,7 +157,7 @@ spec = do
       cSeal <- commitmentSeal (blockHash blk') (head keys)
       let blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "unknown signers"
+      got `shouldBe` Left "unknown signers: 807da1d7f5286530d0a71a2e87df146b8fefec96"
 
     it "Accepts a block with 1 validator" $ do
       let vals = S.fromList $ map prvKey2Address [private]

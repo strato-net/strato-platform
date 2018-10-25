@@ -39,6 +39,7 @@ dependencies:
   - iproute
   - json-rpc-server
   - json-rpc-client
+  - lens
   - lifted-base
   - monad-control
   - monad-logger

@@ -43,6 +43,7 @@ dependencies:
   - postgresql-simple
   - postgresql-typed
   - resource-pool
+  - retry
   - scientific
   - semigroups
   - servant-client
