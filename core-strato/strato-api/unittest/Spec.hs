@@ -12,7 +12,7 @@ main = hspec spec
 
 runTestM :: ReaderT App IO () -> IO ()
 runTestM mv = do
-  ref <- newIORef (-1)
+  ref <- initialMaxNonce
   runReaderT mv App{appFaucetNonce = ref}
 
 spec :: Spec

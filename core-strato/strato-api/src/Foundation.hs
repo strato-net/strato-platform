@@ -44,15 +44,16 @@ data App = App
     , appFaucetNonce :: IORef Integer -- The last maximum nonce given out
     }
 
+initialMaxNonce :: MonadIO m => m (IORef Integer)
+initialMaxNonce = liftIO $ newIORef (-1)
+
 acquireNewMaxNonce :: (MonadIO m, MonadReader App m) => Integer -> m Integer
 acquireNewMaxNonce minNonce = do
   let findNext :: Integer -> (Integer, Integer)
-      -- If this is the first nonce after startup, use the nonce from postgres
-      -- Another node may have jumped ahead of our faucet stream, so
+      -- Another node may have jumped ahead of our faucet stream or we may
+      -- just be starting up, so always give at least the minNonce.
       findNext maxNonce =
-        let next = if maxNonce == -1
-                     then minNonce
-                     else max minNonce $ 1 + maxNonce
+        let next = max minNonce $ 1 + maxNonce
         in (next, next)
   nref <- asks appFaucetNonce
   liftIO $ atomicModifyIORef' nref findNext
