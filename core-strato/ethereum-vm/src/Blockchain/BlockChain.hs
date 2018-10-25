@@ -386,7 +386,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erSmorgs             = traceShowId $ _smorgs newVMState'
+                                       , erDetails             = traceShowId $ _details newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -405,7 +405,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erSmorgs             = _smorgs newVMState'
+                                       , erDetails             = _details newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -419,7 +419,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erSmorgs = []
+                               , erDetails = []
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -497,7 +497,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
-          smorgs' = either (const []) erSmorgs result
+          details' = either (const []) erDetails result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
           (response, theTrace', theLogs) =
             case result of
@@ -530,8 +530,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                }
       if not flags_diffPublish
         then return []
-        else forM smorgs' $ \VMSmorgasburg{..} -> do
-          AddressState{..} <- getAddressState _smorgOwner
+        else forM details' $ \VMDetails{..} -> do
+          AddressState{..} <- getAddressState _detailOwner
           return $ Action
                      Blockchain.Data.Action.Update
                      ranBlockHash
@@ -539,12 +539,12 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                      (blockDataNumber b)
                      theHash
                      chainId
-                     _smorgMsgSender
-                     _smorgOwner
+                     _detailMsgSender
+                     _detailOwner
                      addressStateCodeHash
-                     (if _smorgStorageDiff == M.empty then Nothing else Just _smorgStorageDiff)
-                     (T.pack . BC.unpack . B16.encode $ _smorgInputData) -- it doesn't make sense to decodeUtf8 here
-                     (T.pack . BC.unpack . B16.encode $ fromMaybe B.empty _smorgReturn)
+                     (if _detailStorageDiff == M.empty then Nothing else Just _detailStorageDiff)
+                     (T.pack . BC.unpack . B16.encode $ _detailInputData) -- it doesn't make sense to decodeUtf8 here
+                     (T.pack . BC.unpack . B16.encode $ fromMaybe B.empty _detailReturn)
                      (transactionMetadata t)
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
