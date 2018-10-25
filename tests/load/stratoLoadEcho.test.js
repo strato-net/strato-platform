@@ -70,7 +70,8 @@ describe('Strato Load Test', function() {
     console.log(contractFilename)
     let balance = new BigNumber(0);
     let retryCounter = 0
-    yield promiseTimeout(20000)
+    console.log(`Fauceting...`)
+    yield promiseTimeout(80000)
     while (balance.isZero()) {
       yield promiseTimeout(500);
       balance = yield rest.getBalance(admin.address);
