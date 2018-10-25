@@ -11,6 +11,8 @@ const util = common.util;
 const api = common.api;
 const moment = require('moment');
 const path = require('path')
+const process = require('process');
+const rp = require('request-promise');
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
@@ -25,6 +27,25 @@ let txs = [];
 let txResults = [];
 let priceType;
 
+// Allows the possibility of sharing the faucet node with all other test
+// instances, so that nonces are allocated cooperatively.
+async function faucet(addr) {
+  const options = {
+    method: 'POST',
+    uri: `http://${process.env.FAUCET_STRATO || config.stratoUrl}/eth/v1.2/faucet`,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: `address=${addr}`,
+    // TODO(tim): Modify to work with secured networks
+    auth: {
+      'user': 'admin',
+      'pass': 'admin',
+    }
+  };
+  await rp(options);
+}
+
 describe('Strato Load Test', function() {
   this.timeout(9999 * 1000);
 
@@ -37,8 +58,10 @@ describe('Strato Load Test', function() {
 
   before(function * () {
     console.log(`Creating admin user and contract`);
-    admin = yield rest.createUser(adminName, adminPassword);
+    // Create a user with no balance
+    admin = yield rest.createUser(adminName, adminPassword, true);
     console.log(`User: ${admin.name} @ ${admin.address}`);
+    yield faucet(admin.address);
     yield rest.compileSearch([contractName], contractName, contractFilename);
     console.log(contractFilename)
     let balance = new BigNumber(0);
@@ -53,7 +76,7 @@ describe('Strato Load Test', function() {
         // so for now we are more forgiving about address funding.
         // strato-api should be enhanced to accept concurrent faucets
         // per block
-        yield rest.fill(admin);
+        yield faucet(admin.address);
       }
     }
   });
