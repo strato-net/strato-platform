@@ -139,7 +139,8 @@ udpHandshakeServer prv sock _ = do
     let portNum = 30303 -- TODO(tim): Reenable port selection
     _ <- addPeersIfNeeded prv sock
     _ <- attemptBond prv sock portNum
-    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280
+    -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
+    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 80000
     _ <- case maybePacketData of
       Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
       Just (msg, addr) -> do

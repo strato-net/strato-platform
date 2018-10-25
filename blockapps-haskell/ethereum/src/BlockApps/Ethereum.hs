@@ -54,6 +54,7 @@ module BlockApps.Ethereum
   , AccountInfo (..)
   ) where
 
+import           ClassyPrelude ((<>))
 import           Control.Lens.Operators
 import           Control.DeepSeq (NFData, rnf)
 import           Crypto.Hash
@@ -70,12 +71,13 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
 import           Data.LargeWord
-import qualified Data.Map.Strict        as Map
+import           Data.Map.Strict        (Map)
+import qualified Data.Map.Strict        as M
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Proxy
 import           Data.RLP
 import           Data.Swagger
+import           Data.Text              (Text)
 import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
@@ -411,9 +413,18 @@ data Transaction = Transaction
   , transactionV          :: Word8
   , transactionR          :: Word256
   , transactionS          :: Word256
+  , transactionMetadata   :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance NFData Transaction
+
+instance RLPEncodable Text where
+  rlpEncode = rlpEncode . Text.unpack
+  rlpDecode = fmap Text.pack . rlpDecode
+
+instance (Ord k, RLPEncodable k, RLPEncodable v) => RLPEncodable (Map k v) where
+  rlpEncode = rlpEncode . M.toList
+  rlpDecode = fmap M.fromList <$> rlpDecode
 
 instance RLPEncodable Transaction where
   rlpEncode Transaction{..} = Array $
@@ -426,22 +437,31 @@ instance RLPEncodable Transaction where
     , rlpEncode transactionV
     , rlpEncode transactionR
     , rlpEncode transactionS
-    ] ++ (maybeToList $ fmap rlpEncode transactionChainId)
+    ] ++ (case transactionChainId of
+            Nothing -> []
+            Just cid -> [rlpEncode cid])
+      ++ (case transactionMetadata of
+            Nothing -> []
+            Just md -> [rlpEncode md])
   rlpDecode (Array (n:gp:gl:to':va:iod:v':r':s':rest)) =
-    Transaction
-      <$> rlpDecode n
-      <*> rlpDecode gp
-      <*> rlpDecode gl
-      <*> rlpDecode to'
-      <*> rlpDecode va
-      <*> rlpDecode iod
-      <*> (case rest of
-             [] -> pure Nothing
-             [cid] -> Just <$> rlpDecode cid
-             x -> Left $ "rlpDecode Transaction: Too many entries, got: " ++ show x)
-      <*> rlpDecode v'
-      <*> rlpDecode r'
-      <*> rlpDecode s'
+    let (cid,md) = case rest of
+          [] -> (Right Nothing, Right Nothing)
+          [c] -> case c of
+            a@(Array _) -> (Right Nothing, Just <$> rlpDecode a)
+            cid' -> (Just <$> rlpDecode cid', Right Nothing)
+          (c:m:_) -> (Just <$> rlpDecode c, Just <$> rlpDecode m)
+     in Transaction
+          <$> rlpDecode n
+          <*> rlpDecode gp
+          <*> rlpDecode gl
+          <*> rlpDecode to'
+          <*> rlpDecode va
+          <*> rlpDecode iod
+          <*> cid
+          <*> rlpDecode v'
+          <*> rlpDecode r'
+          <*> rlpDecode s'
+          <*> md
   rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
 
 data UnsignedTransaction = UnsignedTransaction
@@ -495,18 +515,26 @@ rlpHash
   . rlpEncode
 
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
-signTransaction sk u@UnsignedTransaction{..} = Transaction
-  { transactionNonce = unsignedTransactionNonce
-  , transactionGasPrice = unsignedTransactionGasPrice
-  , transactionGasLimit = unsignedTransactionGasLimit
-  , transactionTo = unsignedTransactionTo
-  , transactionValue = unsignedTransactionValue
-  , transactionV = testV + 0x1b
-  , transactionR = r
-  , transactionS = s
-  , transactionInitOrData = unsignedTransactionInitOrData
-  , transactionChainId = unsignedTransactionChainId
-  }
+signTransaction = signTransactionWithMetadata Nothing
+
+signTransactionWithMetadata :: Maybe (Map Text Text)
+                            -> SecKey
+                            -> UnsignedTransaction
+                            -> Transaction
+signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
+  Transaction
+    { transactionNonce = unsignedTransactionNonce
+    , transactionGasPrice = unsignedTransactionGasPrice
+    , transactionGasLimit = unsignedTransactionGasLimit
+    , transactionTo = unsignedTransactionTo
+    , transactionValue = unsignedTransactionValue
+    , transactionV = testV + 0x1b
+    , transactionR = r
+    , transactionS = s
+    , transactionInitOrData = unsignedTransactionInitOrData
+    , transactionChainId = unsignedTransactionChainId
+    , transactionMetadata = md
+    }
   where
     CompactRecSig r s testV =
       exportCompactRecSig
@@ -666,9 +694,9 @@ newtype BloomFilter = BloomFilter
   ) deriving (Eq,Show,Generic)
 
 data CodeInfo = CodeInfo
-  { codeInfoCode   :: Text.Text
-  , codeInfoSource :: Text.Text
-  , codeInfoName   :: Text.Text
+  { codeInfoCode   :: Text
+  , codeInfoSource :: Text
+  , codeInfoName   :: Text
   } deriving (Show, Read, Eq, Generic)
 
 instance FromJSON CodeInfo where
@@ -696,7 +724,7 @@ instance ToSchema CodeInfo where
 
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer Keccak256
-                 | ContractWithStorage Address Integer Keccak256 (Map.Map Word256 Word256)
+                 | ContractWithStorage Address Integer Keccak256 (Map Word256 Word256)
    deriving (Show, Eq, Generic)
 
 instance ToJSON AccountInfo where
@@ -713,7 +741,7 @@ instance ToJSON AccountInfo where
     [ "address" Aeson..= a
     , "balance" Aeson..= b
     , "codeHash" Aeson..= c
-    , "storage" Aeson..= (map (\(w1,w2) -> (show256 w1, show256 w2)) $ Map.toList s) -- TODO(dustin): This Hex newtype doesn't seem to work for tuples :/
+    , "storage" Aeson..= (map (\(w1,w2) -> (show256 w1, show256 w2)) $ M.toList s) -- TODO(dustin): This Hex newtype doesn't seem to work for tuples :/
     ]
 
 instance FromJSON AccountInfo where
@@ -728,7 +756,7 @@ instance FromJSON AccountInfo where
         case ms of
           Nothing -> return $ ContractNoStorage a b c
           Just s' -> do
-            let s = Map.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
+            let s = M.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
             return $ ContractWithStorage a b c s
   parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
 

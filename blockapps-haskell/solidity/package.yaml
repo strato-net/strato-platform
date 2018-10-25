@@ -22,6 +22,7 @@ dependencies:
   - bimap
   - binary
   - bytestring
+  - classy-prelude
   - containers
   - cryptonite
   - generic-random

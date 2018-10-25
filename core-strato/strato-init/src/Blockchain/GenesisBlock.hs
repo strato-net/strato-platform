@@ -18,10 +18,11 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import           Data.Either                                  (isLeft)
+import           Data.Map.Strict                              (Map)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
+import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
-import           Data.Text.Encoding                           (encodeUtf8)
 import           System.Directory
 
 import           Blockchain.BackupBlocks
@@ -145,10 +146,6 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "State diff has been generated"
 
     let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
-        writeSource (account, CodeInfo _ src name) = case account of
-            NonContract _ _ -> return ()
-            ContractNoStorage addr _ _ -> updateSource genesisChainId addr name src
-            ContractWithStorage addr _ _ _ -> updateSource genesisChainId addr name src
     $logInfoS "initgen" "Beginning to write to redis"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
@@ -157,19 +154,16 @@ initializeGenesisBlock backupType genesisBlockName = do
     $logInfoS "initgen" "best block info inserted"
     liftIO (bootstrapIndexer genBId obGB)
     $logInfoS "initgen" "indexer has been bootstrapped"
-    let rewrite (_, CodeInfo bin src name) =
-          (superProprietaryStratoSHAHash bin, (superProprietaryStratoSHAHash $ encodeUtf8 src, name))
-        sourceCodeHashes = Map.fromList . map rewrite $ srcInfo
-        findSourceHash = flip Map.lookup sourceCodeHashes
-    populateStorageDBs findSourceHash genesisBlock genesisChainId
+    let rewrite (_, CodeInfo bin src name) = (superProprietaryStratoSHAHash bin, Map.fromList [("src", src),("name",name)])
+        metadatas = Map.fromList . map rewrite $ srcInfo
+        findMetadata = flip Map.lookup metadatas
+    populateStorageDBs findMetadata genesisBlock genesisChainId
     $logInfoS "initgen" "populateStorageDBs is done"
-    forM_ srcInfo writeSource
-    $logInfoS "initgen" "SourceInfo has been written; End of initgen"
 
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    (SHA -> Maybe (SHA, T.Text)) -> Block -> Maybe Word256 -> m ()
-populateStorageDBs getSourceHash genesisBlock genesisChainId = do
+                    (SHA -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
+populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     accountDB <- getStateDB
     res <- liftIO . runKafkaConfigured "strato-init" $ do
@@ -204,8 +198,8 @@ populateStorageDBs getSourceHash genesisBlock genesisChainId = do
             , A.actionTxSender = Ad.Address 0
             , A.actionAddress = a
             , A.actionCodeHash = codeHash d
-            , A.actionSourcePtr = uncurry A.SourcePtr <$> getSourceHash (codeHash d)
             , A.actionStorage = Just . Map.map fromDiff $ storage d
+            , A.actionMetadata = getMetadata (codeHash d)
             }
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
@@ -224,7 +218,7 @@ populateStorageDBs getSourceHash genesisBlock genesisChainId = do
             updatedAccounts     = Map.empty
             }
 
-      commitSqlDiffs (statediff fullAccountDiffs) (const "") (const "")
+      commitSqlDiffs (statediff fullAccountDiffs)
       mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
       case filterResponse <$> mErr of
        Right [] -> return ()

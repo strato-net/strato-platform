@@ -43,6 +43,7 @@ dependencies:
   - postgresql-simple
   - postgresql-typed
   - resource-pool
+  - retry
   - scientific
   - semigroups
   - servant-client
@@ -52,6 +53,7 @@ dependencies:
   - time
   - transformers-base
   - transformers
+  - unliftio
   - unordered-containers
   - vector
 

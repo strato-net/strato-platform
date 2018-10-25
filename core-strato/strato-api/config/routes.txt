@@ -1,0 +1,18 @@
+/eth/v1.2/chain ChainR GET POST
+/eth/v1.2/faucet FaucetR POST
+/eth/v1.2/stats/difficulty StatDiffR GET
+/eth/v1.2/stats/totaltx StatTxR GET
+/eth/v1.2/uuid UUIDInfoR GET
+/eth/v1.2/block BlockInfoR GET
+/eth/v1.2/block/last/#Integer BlkLastR GET
+/eth/v1.2/log LogInfoR GET
+/eth/v1.2/account AccountInfoR GET
+/eth/v1.2/transaction TransactionR GET OPTIONS POST
+!/eth/v1.2/transaction/last/#Integer TxLastR GET
+!/eth/v1.2/transaction/last/queued QueuedTransactionsR GET
+/eth/v1.2/transactionList TransactionListR POST
+!/eth/v1.2/transactionResult/batch BatchTransactionResultR POST
+!/eth/v1.2/transactionResult/#SHA TransactionResultR GET
+/eth/v1.2/storage StorageInfoR GET
+/eth/v1.2/coinbase CoinbaseR GET
+/eth/v1.2/peers PeersR GET

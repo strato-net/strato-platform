@@ -29,5 +29,5 @@ insertTX = do
   Just prvKey <- retrievePrvKey $ "config" </> "priv"
   theTime <- getCurrentTime
   db <- runNoLoggingT $ createPostgresqlPool' connStr 20
-  tx <- H.withSource H.devURandom $ createContractCreationTX 0 1 1000000 0 (Code $ B.pack [0x60, 0, 0x56]) prvKey
+  tx <- H.withSource H.devURandom $ createContractCreationTX 0 1 1000000 0 (Code $ B.pack [0x60, 0, 0x56]) Nothing prvKey
   runResourceT $ flip SQL.runSqlPool db $ void $ SQL.insert (txAndTime2RawTX Direct tx (-1) theTime)

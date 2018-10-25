@@ -31,20 +31,6 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Block
   describe "Account" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Account
-    it "should be backwords compatible without contractName" $
-      let input = "{   \
-            \ \"contractRoot\": \"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\",\
-            \ \"next\": \"/eth/v1.2/account?address=50e2752ac29be7777aff0c40850d96cbfc01eaa4&index=5\", \
-            \ \"kind\": \"AddressStateRef\",\
-            \ \"balance\": \"999999999999931774202\",\
-            \ \"address\": \"50e2752ac29be7777aff0c40850d96cbfc01eaa4\",\
-            \ \"latestBlockNum\": 21,\
-            \ \"codeHash\": \"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470\",\
-            \ \"code\": \"\",\
-            \ \"source\": \"\",\
-            \ \"nonce\": 19 }"
-          acc = eitherDecode input :: Either String Account
-      in fmap accountContractName acc `shouldBe` Right Nothing
   describe "Difficulty" $
     prop "has inverse JSON decode/encode" $ jsonProp @ Difficulty
   describe "TxCount" $

@@ -137,7 +137,7 @@ insertNewChains events = do
     case mGSR of
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> do
-        initializeChainDBs cId sr -- only needed to update Postgres with chain info for API calls
+        initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
         putGenesisStateRoot cId sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains

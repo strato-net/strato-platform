@@ -22,11 +22,11 @@ import           Database.Persist.Quasi
 import           Database.Persist.Sql
 import           Database.Persist.TH
 
+import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
@@ -56,12 +56,14 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS block_transaction DROP COLUMN IF EXISTS block_id;"
   exec "ALTER TABLE IF EXISTS block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
   exec "ALTER TABLE IF EXISTS block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
+  exec "ALTER TABLE IF EXISTS address_state_ref DROP COLUMN IF EXISTS source;"
   migrateAuto
 
 -- todo newtype me
 type Difficulty = Integer
 
 type MapPair = (Word256, Word256)
+type TextPair = (Text, Text)
 
 makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
 
