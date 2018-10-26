@@ -71,7 +71,7 @@ describe('Strato Load Test', function() {
     let balance = new BigNumber(0);
     let retryCounter = 0
     console.log(`Fauceting...`)
-    yield promiseTimeout(80000)
+    yield promiseTimeout(20000);
     while (balance.isZero()) {
       yield promiseTimeout(500);
       balance = yield rest.getBalance(admin.address);
@@ -90,16 +90,13 @@ describe('Strato Load Test', function() {
   it('Upload contracts', function * () {
     const startTime = moment();
     let blocTime = 0;
-    const uidt = util.uid();
-    const sArgs = createGasDealFixedArgs(uidt);
-    let byte32array = argsToBytes32(sArgs)
     for(let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createUploadList(batchSize, i);
       const blocStartTime = moment();
       const results = yield api.bloc.uploadList({
         password: adminPassword,
-        contracts: txs,
+        contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
         resolve: true
       }, admin.name, admin.address, false);
       const blocEndTime = moment();
@@ -211,13 +208,13 @@ function argsToBytes32(sArgs) {
 function factory_createUploadList(batchSize, batchIndex) {
  // const dapp = yield dappJs.bind(deployment.admin, deployment.contract);
   let nonceSave = batchSize * batchIndex
-  txs = [];
   for (var i = 0; i < batchSize; i++) {
     //createGasDealFixedArgs
     const uidt = util.uid();
     console.log(uidt);
     const sArgs = createGasDealFixedArgs(uidt);
-     txs.push({
+
+    txs.push({
       contractName: contractName,
       args: {
         _echoPermissionManager:'2383914a2cffe7bb97e0b622481b945858e08188',
