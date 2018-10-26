@@ -20,8 +20,6 @@ function newnode {
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
 
-  ctFlag="--connectionTimeout=${actualTimeout}"
-
   if $mineBlocks
   then echo "Starting strato-adit"
       aMiner=$miningAlgorithm
