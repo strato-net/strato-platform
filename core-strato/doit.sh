@@ -74,6 +74,9 @@ function newnode {
   if [ -n "${blockstanbulBlockPeriodMs}" ]; then
     bpFlag="--blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs}"
   fi
+  if [ -n "${blockstanbulRoundPeriodS}" ]; then
+    rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
+  fi
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
