@@ -95,6 +95,5 @@ postFaucetR = do
       return tx
     putTX maxN k a n = do
       tx <- makeTX maxN k a n
-      _ <- insertTXIfNew API Nothing [tx]
       emitKafkaTransactions [tx]
       return $ txHash tx
