@@ -46,6 +46,10 @@ function newnode {
          withCushion=$(( 2 * blockstanbulRoundPeriodS ))
          actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
        fi
+       if [ -n "${validators}" ]; then
+         numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
+         maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
+       fi
        runBackgroundProcess strato-p2p-client \
           --connectionTimeout=$actualTimeout \
           --cNetworkID=$networkID \
