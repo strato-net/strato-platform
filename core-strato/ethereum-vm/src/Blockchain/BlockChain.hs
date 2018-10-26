@@ -533,7 +533,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
         else forM details' $ \VMDetails{..} -> do
           AddressState{..} <- getAddressState _detailOwner
           return $ Action
-                     Blockchain.Data.Action.Update
+                     _detailActionType
                      ranBlockHash
                      (blockDataTimestamp b)
                      (blockDataNumber b)

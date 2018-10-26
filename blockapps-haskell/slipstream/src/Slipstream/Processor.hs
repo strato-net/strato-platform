@@ -260,7 +260,12 @@ processTheMessages messages conn g = do
                 obytes = fst . B16.decode $ encodeUtf8 actionOutput
             setContractState g actionAddress actionTxChainId newState
 
-            (f,i,o) <- getFunctionCallValues cmId ibytes obytes
+            (f',i,o) <- getFunctionCallValues cmId ibytes obytes
+            let f = if T.null f'
+                      then if actionType == Create
+                             then "constructor"
+                             else "fallback"
+                      else f'
 
             pure . Right . Just $ ProcessedContract
               { address = actionAddress

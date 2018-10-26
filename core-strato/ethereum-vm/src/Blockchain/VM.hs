@@ -32,6 +32,7 @@ import           Numeric
 import           Text.Printf
 
 import qualified Blockchain.Colors                  as CL
+import           Blockchain.Data.Action             (ActionType(..))
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -1078,6 +1079,7 @@ create' = do
                             , _detailValue       = envValue
                             , _detailReturn      = returnVal vmState
                             , _detailStorageDiff = fromMaybe M.empty $ M.lookup owner (_storageDiffs vmState)
+                            , _detailActionType  = Create
                             }
 
 call :: Bool
@@ -1149,6 +1151,7 @@ call' noValueTransfer = do
                         , _detailValue       = value'
                         , _detailReturn      = returnVal vmState
                         , _detailStorageDiff = fromMaybe M.empty $ M.lookup receiveAddress (_storageDiffs vmState)
+                        , _detailActionType  = Update
                         }
 
   return (fromMaybe B.empty $ returnVal vmState)

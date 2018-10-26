@@ -10,6 +10,7 @@ import qualified Data.Map.Strict         as M
 import           GHC.Generics
 
 import           Blockchain.VM.VMException
+import           Blockchain.Data.Action    (ActionType(..))
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.ExtWord        (Word256)
@@ -35,6 +36,7 @@ data VMDetails = VMDetails
   , _detailValue       :: Integer
   , _detailReturn      :: Maybe B.ByteString
   , _detailStorageDiff :: M.Map Word256 Word256
+  , _detailActionType  :: ActionType
   } deriving (Show, Generic)
 makeLenses ''VMDetails
 

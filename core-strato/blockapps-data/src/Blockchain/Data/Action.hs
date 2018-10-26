@@ -7,6 +7,7 @@ module Blockchain.Data.Action where
 import           Blockchain.Data.Address
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.SHA
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Map.Strict              (Map)
 import           Data.Text                    (Text)
@@ -17,6 +18,7 @@ data ActionType = Create | Delete | Update deriving (Eq, Show, Generic)
 
 instance ToJSON ActionType where
 instance FromJSON ActionType where
+instance NFData ActionType where
 
 data Action = Action
   { actionType           :: ActionType
