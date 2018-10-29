@@ -79,10 +79,10 @@ emptyHash = keccak256 B.empty
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
 
-storageToList :: BA.Storage -> (Hex Word256, Hex Word256)
-storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
+storageToList :: BA.Storage -> (Word256, Word256)
+storageToList BA.Storage {BA.storageKey=Hex k, BA.storageValue=Hex v} = (k, v)
 
-addStorageIfNeeded::Action -> Bloc (Map (Hex Word256) (Hex Word256))
+addStorageIfNeeded::Action -> Bloc (Map Word256 Word256)
 addStorageIfNeeded Action{..} | actionType /= Update = return $ fromMaybe Map.empty actionStorage
                               | otherwise = do
   storage' <- blocStrato $ getStorage storageFilterParams { qsAddress = Just actionAddress
@@ -181,7 +181,7 @@ processTheMessages messages conn g = do
                 strName = T.replace "\"" "" $ contractdetailsName details
                 cont = either error id . xAbiToContract $ contractdetailsXabi details
                 chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
-                cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
+                cache = maybe (const Nothing) (\s -> flip Map.lookup s) actionStorage
                 updateGlobal m (k,f) = for_ (Map.lookup k =<< actionMetadata) $ \v -> do
                   let contracts = filter (not . T.null) $ T.splitOn "," v
                   forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
