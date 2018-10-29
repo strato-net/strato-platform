@@ -271,7 +271,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
             Just (b, src, cm) -> return (b, src, cm, names)
             Nothing -> do
               (b16,src,cm) <- lift $ blocQuery1 $ proc () -> do
-                (bin16,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
+                (bin16,_,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
                 returnA -< (bin16,src,cmId')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
@@ -406,7 +406,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
             Just cmId -> return (cmId, names)
             Nothing -> do
               (mapKey' :: Int32) <- lift $ blocQuery1 $ proc () -> do
-                (_,_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
+                (_,_,_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< cmId
               return (mapKey', Map.insert methodcallContractName mapKey' names)
           (contract', cmIds') <- case Map.lookup mapKey cmIds of
@@ -663,7 +663,7 @@ contractResult hash mtxr cmId name index = do
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
       xs::[Int32] <- lift $ blocQuery $ proc () -> do
-        (cmId',_,_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
+        (cmId',_,_,_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
         returnA -< cmId'
       if (isNothing $ listToMaybe xs)
         then do
