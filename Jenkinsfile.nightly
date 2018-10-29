@@ -13,9 +13,9 @@ pipeline {
           docker rmi -f $(docker images -aq) || true
           docker images -a
           rm -rf ~/.stack
-          git worktree remove --force strato-worktree
-          git wortkree add strato-worktree develop
-          git workree list
+          git worktree remove --force strato-worktree || true
+          git worktree add strato-worktree develop
+          git worktree list
         '''
       }
     }
