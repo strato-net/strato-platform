@@ -55,7 +55,8 @@ contractsSourceTable = [sql|
 CREATE TABLE IF NOT EXISTS contracts_source(
   id serial PRIMARY KEY,
   src_hash bytea NOT NULL,
-  src text NOT NULL
+  src text NOT NULL,
+  deployed boolean NOT NULL
 );
 |]
 

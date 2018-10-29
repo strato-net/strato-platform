@@ -163,8 +163,8 @@ contractsJoinTable = joinF
     (\ (_,n) (cmId,_,b,br,ch,xch,src) -> (cmId,n,src,b,br,ch,xch))
     (\ (cid,_) (_,contractId,_,_,_,_,_) -> cid .== contractId)
     (queryTable contractsTable) $ joinF
-      (\ (cmId,cid,b,br,ch,xch,_) (_,_,src) -> (cmId,cid,b,br,ch,xch,src))
-      (\ (_,_,_,_,_,_,sh) (_,sh',_) -> sh .== sh')
+      (\ (cmId,cid,b,br,ch,xch,_) (_,_,src,_) -> (cmId,cid,b,br,ch,xch,src))
+      (\ (_,_,_,_,_,_,sh) (_,sh',_,_) -> sh .== sh')
       (queryTable contractsMetaDataTable)
       (queryTable contractsSourceTable)
 
@@ -182,8 +182,8 @@ contractDetailsJoinTable = joinF
   (\ (_,name) (cmId,_,b,br,ch,xch,sh,src) -> (b,br,ch,xch,sh,name,src,cmId))
   (\ (cId,_) (_,contractId,_,_,_,_,_,_) -> cId .== contractId)
   (queryTable contractsTable) $ joinF
-    (\ (cmId,cid,b,br,ch,xch,sh) (_,_,src) -> (cmId,cid,b,br,ch,xch,sh,src))
-    (\ (_,_,_,_,_,_,sh) (_,sh',_) -> sh .== sh')
+    (\ (cmId,cid,b,br,ch,xch,sh) (_,_,src,_) -> (cmId,cid,b,br,ch,xch,sh,src))
+    (\ (_,_,_,_,_,_,sh) (_,sh',_,_) -> sh .== sh')
     (queryTable contractsMetaDataTable)
     (queryTable contractsSourceTable)
 
@@ -309,8 +309,8 @@ linkedContractsJoinTable = joinF
         (\ (_,name) (cmId,_,b,br,ch,xch,src) -> (name,src,cmId,b,br,ch,xch))
         (\ (cid,_) (_,contractId,_,_,_,_,_) -> cid .== contractId)
         (queryTable contractsTable) $ joinF
-          (\ (cmId,cid,b,br,ch,xch,_) (_,_,src)-> (cmId,cid,b,br,ch,xch,src))
-          (\ (_,_,_,_,_,_,sh) (_,sh',_)-> sh .== sh')
+          (\ (cmId,cid,b,br,ch,xch,_) (_,_,src,_)-> (cmId,cid,b,br,ch,xch,src))
+          (\ (_,_,_,_,_,_,sh) (_,sh',_,_)-> sh .== sh')
           (queryTable contractsMetaDataTable)
           (queryTable contractsSourceTable)
 
@@ -996,6 +996,19 @@ createContractQuery contractName = do
       [(Nothing, constant contractName)]
       fst
 
+isDeployedQuery :: Text -> Query (Column PGBool)
+isDeployedQuery src = proc () -> do
+  let srcHash = (keccak256 $ Text.encodeUtf8 src)
+  (_,sh,_,deployed) <- queryTable contractsSourceTable -< ()
+  restrict -< sh .== constant srcHash
+  returnA -< deployed
+
+setDeployedQuery :: Keccak256 -> Bloc Int64
+setDeployedQuery srcHash = blocModify $ \conn ->
+  runUpdateEasy conn contractsSourceTable
+    (\(sid,sh,src,_) -> (sid,sh,src, constant True))
+    (\(_,sh,_,_) -> sh .== constant srcHash)
+
 insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
@@ -1006,8 +1019,9 @@ insertContractSourceQuery src = do
       ( Nothing
       , constant srcHash
       , constant src
+      , constant False
       )]
-      (\ (csId,sh,_) -> (csId,sh))
+      (\ (csId,sh,_,_) -> (csId,sh))
 
 {- |
 Insert metadata into contract metadata table if metadata table does not contain codehash

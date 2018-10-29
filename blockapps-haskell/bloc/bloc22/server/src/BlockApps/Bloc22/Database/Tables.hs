@@ -94,15 +94,18 @@ contractsSourceTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGBytea
   , Column PGText
+  , Column PGBool
   )
   ( Column PGInt4
   , Column PGBytea
   , Column PGText
+  , Column PGBool
   )
-contractsSourceTable = Table "contracts_source" $ p3
+contractsSourceTable = Table "contracts_source" $ p4
   ( optional "id"
   , required "src_hash"
   , required "src"
+  , required "deployed"
   )
 
 contractsMetaDataTable :: Table
