@@ -69,7 +69,7 @@ formatAction Action{..} = T.concat
   , tshow actionCodeHash
   , "\n"
   , "    storage   = "
-  , tshow actionStorage
+  , tshow $ fmap M.size actionStorage
   , "\n"
   , "    metadata  = "
   , tshow actionMetadata
