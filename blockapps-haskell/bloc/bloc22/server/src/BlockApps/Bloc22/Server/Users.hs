@@ -217,9 +217,13 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
          [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
+  isDeployed <- fromMaybe False <$> blocQueryMaybe (isDeployedQuery src)
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
+    metadata' = Just . Map.union (fromMaybe Map.empty metadata) $
+                  if isDeployed
+                    then Map.empty
+                    else Map.fromList [("src", src),("name", cName)]
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   mFunctionId <- getConstructorId cmId
   argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
@@ -285,7 +289,11 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          let metadata' = Just $ fromMaybe Map.empty md `Map.union`Map.fromList [("src",src),("name",name)]
+          isDeployed <- lift . fmap (fromMaybe False) . blocQueryMaybe $ isDeployedQuery src
+          let metadata' = Just . Map.union (fromMaybe Map.empty md) $
+                            if isDeployed
+                              then Map.empty
+                              else Map.fromList [("src",src),("name",name)]
           tx <- lift . signAndPrepare sign fromAddr metadata' $
               TransactionHeader
                 Nothing

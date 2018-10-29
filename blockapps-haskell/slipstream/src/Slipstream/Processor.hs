@@ -186,6 +186,7 @@ processTheMessages messages conn g = do
                   let contracts = filter (not . T.null) $ T.splitOn "," v
                   forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
 
+            void . setDeployedQuery $ contractdetailsSrc details
             detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
             mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
                                               ,("nohistory", removeFromHistoryList)

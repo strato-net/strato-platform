@@ -996,18 +996,18 @@ createContractQuery contractName = do
       [(Nothing, constant contractName)]
       fst
 
-isDeployedQuery :: Text -> Query (Column PGBool)
-isDeployedQuery src = proc () -> do
-  let srcHash = (keccak256 $ Text.encodeUtf8 src)
-  (_,sh,_,deployed) <- queryTable contractsSourceTable -< ()
-  restrict -< sh .== constant srcHash
+isDeployedQuery :: Text -> Query (Column PGBool) -- TODO: is it more efficient to
+isDeployedQuery contractSrc = proc () -> do      --       compare source hash?
+  (_,_,src,deployed) <- queryTable contractsSourceTable -< ()
+  restrict -< src .== constant contractSrc
   returnA -< deployed
 
-setDeployedQuery :: Keccak256 -> Bloc Int64
-setDeployedQuery srcHash = blocModify $ \conn ->
-  runUpdateEasy conn contractsSourceTable
-    (\(sid,sh,src,_) -> (sid,sh,src, constant True))
-    (\(_,sh,_,_) -> sh .== constant srcHash)
+setDeployedQuery :: Text -> Bloc Int64
+setDeployedQuery contractSrc = do
+  blocModify $ \conn ->
+    runUpdateEasy conn contractsSourceTable
+      (\(sid,sh,src,_) -> (sid,sh,src, constant True))
+      (\(_,_,src,_) -> src .== constant contractSrc)
 
 insertContractSourceQuery
   :: Text
