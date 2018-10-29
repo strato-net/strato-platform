@@ -16,6 +16,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.List
 import           Data.Map                              (toList)
@@ -38,8 +40,6 @@ import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.DB.SQLDB
-import           Blockchain.DBM
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
@@ -57,8 +57,13 @@ import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Debug.Trace                           (trace)
 
--- MonadBaseControl IO m, MonadIO m
-setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
+setTitleAndProduceBlocks :: ( MonadLogger m
+                            , MonadBaseControl IO m
+                            , MonadIO m
+                            , RBDB.HasRedisBlockDB m
+                            , MonadState Context m
+                            , HasVMEventsSink m
+                            ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
     let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
@@ -87,9 +92,15 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
-             =>  DebugMode -> PPeer -> ConduitM Event Message m ()
-handleEvents mode peer = awaitForever $ \case
+handleEvents :: ( MonadBaseControl IO m
+                , MonadIO m
+                , MonadResource m
+                , RBDB.HasRedisBlockDB m
+                , SK.HasUnseqSink m
+                , MonadState Context m
+                , MonadLogger m
+                ) => PPeer -> ConduitM Event Message m ()
+handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
     MsgEvt Ping     -> yield Pong
@@ -97,9 +108,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (Transactions txs) -> do
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        _ <- lift $ insertTX mode txo Nothing txs
         SK.emitKafkaTransactions txo txs
-        return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp

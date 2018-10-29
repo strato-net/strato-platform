@@ -22,7 +22,6 @@ import           System.Clock
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.DBM
 import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
@@ -54,7 +53,6 @@ postTransactionR = do
        (Success (RawTransaction' raw "")) -> do
           let tx' = rawTX2TX raw
               h = toJSON $ transactionHash tx'
-          void $ insertTX Log API Nothing [tx']
           emitKafkaTransactions [tx']
           case h of
             (String h') -> do
@@ -84,18 +82,13 @@ postTransactionListR = do
           $logDebug $ (T.pack $ show $ num) Import.++ " incoming transactions..."
           let num' = P.length $ P.filter (not . success) $ P.zip hs txs
           $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
-          insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
-        --   ecRecoverTime <- do
-        --     a <- insertTX Log API Nothing (fmap snd txr)
-        --     return a
           $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map toNanoSecs $
                         [ parserStart - handlerStart
                         , txHashStart - parserStart
-                        , insertTXStart - txHashStart
-                        , sendResponseStart - insertTXStart
+                        , sendResponseStart  - txHashStart
                         ]
                       ) --P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)

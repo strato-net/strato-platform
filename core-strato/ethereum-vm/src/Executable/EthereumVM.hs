@@ -77,7 +77,12 @@ ethereumVM = void . execContextM $ do
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allTxs = [OETx ts t | OETx ts t <- seqEvents]
+        let txPairs = [(ts,t) | OETx ts t <- seqEvents]
+            allTxs = map (uncurry OETx) txPairs
+        when (not $ null txPairs) . void
+                                  . K.withKafkaViolently
+                                  . writeIndexEvents
+                                  $ map (uncurry IndexTransaction) txPairs
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
