@@ -47,8 +47,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         putIndexerBestBlockInfo bbi
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-        let txs = [(ts, tx) | IndexTransaction ts tx <- idxEvents]
-        forM_ txs $ \(_, OutputTx{..}) -> insertTX Log otOrigin Nothing [otBaseTx]
+        let txs = [tx | IndexTransaction _ tx <- idxEvents]
+        forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
         forM_ chainInfos $ uncurry putChainInfo
         let blocks = [b | RanBlock b <- idxEvents]
