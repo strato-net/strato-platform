@@ -17,6 +17,7 @@ module Blockchain.Blockstanbul
   , blockstanbulRunning
   , isHistoricBlock
   , blockstanbulSender
+  , shortFormat
 ) where
 
 import Blockchain.Blockstanbul.EventLoop
