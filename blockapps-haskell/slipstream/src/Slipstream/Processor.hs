@@ -169,14 +169,14 @@ processTheMessages messages conn g = do
           fmap join . for (Map.lookup "src" md) $ \src -> do
             detailsMap <- compileContract src
             fmap join . for (Map.lookup "name" md) $ \name -> do
-              traverse pure $ Map.lookup name detailsMap
+              traverse pure $ traverse (Map.lookup name) detailsMap
 
         if isNothing mDetails
           then return . Left $ "No details found for code hash "
                             <> (T.pack $ show actionCodeHash)
                             <> " and no 'src' field found in actionMetadata"
           else do
-            let Just (cmId,details) = mDetails
+            let Just (srcHash,(cmId,details)) = mDetails
                 strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
                 strName = T.replace "\"" "" $ contractdetailsName details
                 cont = either error id . xAbiToContract $ contractdetailsXabi details
@@ -186,8 +186,8 @@ processTheMessages messages conn g = do
                   let contracts = filter (not . T.null) $ T.splitOn "," v
                   forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
 
-            void . setDeployedQuery $ contractdetailsSrc details
-            detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
+            void $ setDeployedQuery srcHash
+            detailsMap <- detailsFromSourceHash srcHash
             mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
                                               ,("nohistory", removeFromHistoryList)
                                               ,("noindex", addToNoIndexList)

@@ -37,9 +37,9 @@ postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
-  idsAndDetails <- if (Text.null src)
+  idsAndDetails <- if Text.null src
                      then return Map.empty
-                     else compileContract src
+                     else snd <$> compileContract src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x

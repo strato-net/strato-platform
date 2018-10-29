@@ -207,7 +207,7 @@ postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContract' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- compileContract src
+  (srcHash,idsAndDetails) <- compileContract src
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
@@ -217,7 +217,7 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
          [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
-  isDeployed <- fromMaybe False <$> blocQueryMaybe (isDeployedQuery src)
+  isDeployed <- fromMaybe False <$> blocQueryMaybe (isDeployedQuery srcHash)
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     metadata' = Just . Map.union (fromMaybe Map.empty metadata) $
@@ -266,16 +266,16 @@ postUsersUploadList' ContractListParameters{..} sign = do
       params <- getAccountTxParams fromAddr chainId mtp
       (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty, Set.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value md,nonceIncr) -> do
-          (names, cmIds, fIds, srcs) <- get
-          (bin, src, cmId, names') <- case Map.lookup name names of
-            Just (b, src, cm) -> return (b, src, cm, names)
+          (names, cmIds, fIds, srcHashes) <- get
+          (bin, src, srcHash, cmId, names') <- case Map.lookup name names of
+            Just (b, src, sh, cm) -> return (b, src, sh, cm, names)
             Nothing -> do
-              (b16,src,cm) <- lift $ blocQuery1 $ proc () -> do
-                (bin16,_,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,src,cmId')
+              (b16,src,sh,cm) <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,sh,_,src,cmId') <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,src,sh,cmId')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              return (b, src, cm, Map.insert name (b, src, cm) names)
+              return (b, src, sh, cm, Map.insert name (b, src, sh, cm) names)
           (mFunctionId, cmIds') <- case Map.lookup cmId cmIds of
             Just fId -> return (fId, cmIds)
             Nothing -> do
@@ -289,11 +289,11 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          (isDeployed, srcs') <- if src `Set.member` srcs
-                          then return (True, srcs)
+          (isDeployed, srcHashes') <- if srcHash `Set.member` srcHashes
+                          then return (True, srcHashes)
                           else do
-                            isDep' <- lift . fmap (fromMaybe False) . blocQueryMaybe $ isDeployedQuery src
-                            return (isDep', Set.insert src srcs)
+                            isDep' <- lift . fmap (fromMaybe False) . blocQueryMaybe $ isDeployedQuery srcHash
+                            return (isDep', Set.insert srcHash srcHashes)
           let metadata' = Just . Map.union (fromMaybe Map.empty md) $
                             if isDeployed
                               then Map.empty
@@ -307,7 +307,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 (bin <> argsBin)
                 nonceIncr
                 chainId
-          put (names', cmIds', fIds', srcs')
+          put (names', cmIds', fIds', srcHashes')
           return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs

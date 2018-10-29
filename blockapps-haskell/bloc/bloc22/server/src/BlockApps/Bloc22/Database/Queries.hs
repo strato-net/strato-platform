@@ -964,12 +964,12 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) chainId tuple
 
-getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Keccak256,(Int32, ContractDetails)))
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
-    for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
+    for mDetails $ \(bin,binr,ch,_ :: ByteString,srcHash,name,src,cmId) -> do
       xabi <- getContractXabiByMetadataId cmId
-      return (cmId, ContractDetails
+      return (srcHash,(cmId, ContractDetails
         { contractdetailsBin = Text.decodeUtf8 bin
         , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = Text.decodeUtf8 binr
@@ -978,7 +978,7 @@ getContractDetailsByCodeHash codeHash = do
         , contractdetailsSrc = src
         , contractdetailsXabi = xabi
         , contractdetailsChainId = Nothing
-        })
+        }))
 
 {- |
 WITH contract_id AS (
@@ -1003,18 +1003,18 @@ createContractQuery contractName = do
       [(Nothing, constant contractName)]
       fst
 
-isDeployedQuery :: Text -> Query (Column PGBool) -- TODO: is it more efficient to
-isDeployedQuery contractSrc = proc () -> do      --       compare source hash?
-  (_,_,src,deployed) <- queryTable contractsSourceTable -< ()
-  restrict -< src .== constant contractSrc
+isDeployedQuery :: Keccak256 -> Query (Column PGBool)
+isDeployedQuery srcHash = proc () -> do
+  (_,sh,_,deployed) <- queryTable contractsSourceTable -< ()
+  restrict -< sh .== constant srcHash
   returnA -< deployed
 
-setDeployedQuery :: Text -> Bloc Int64
-setDeployedQuery contractSrc = do
+setDeployedQuery :: Keccak256 -> Bloc Int64
+setDeployedQuery srcHash = do
   blocModify $ \conn ->
     runUpdateEasy conn contractsSourceTable
       (\(sid,sh,src,_) -> (sid,sh,src, constant True))
-      (\(_,_,src,_) -> src .== constant contractSrc)
+      (\(_,sh,_,_) -> sh .== constant srcHash)
 
 insertContractSourceQuery
   :: Text
@@ -1262,24 +1262,30 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
-compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContract :: Text -> Bloc (Keccak256, Map Text (Int32, ContractDetails))
 compileContract source = do
-  details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
-  if null details
-    then compileContractFromScratch source
-    else fmap Map.fromList . forM details $
-      \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
-        xabi <- getContractXabiByMetadataId cmId
-        return (name,(cmId, ContractDetails
-          { contractdetailsBin = Text.decodeUtf8 bin
-          , contractdetailsAddress = Nothing
-          , contractdetailsBinRuntime = Text.decodeUtf8 binr
-          , contractdetailsCodeHash = ch
-          , contractdetailsName = name
-          , contractdetailsSrc = src
-          , contractdetailsXabi = xabi
-          , contractdetailsChainId = Nothing
-          }))
+  let srcHash = keccak256 $ Text.encodeUtf8 source
+  details <- detailsFromSourceHash srcHash
+  (srcHash,) <$> if Map.null details
+                   then compileContractFromScratch source
+                   else return details
+
+detailsFromSourceHash :: Keccak256 -> Bloc (Map Text (Int32, ContractDetails))
+detailsFromSourceHash srcHash = do
+  details <- blocQuery $ contractBySourceHash srcHash
+  fmap Map.fromList . forM details $
+    \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
+      xabi <- getContractXabiByMetadataId cmId
+      return (name,(cmId, ContractDetails
+        { contractdetailsBin = Text.decodeUtf8 bin
+        , contractdetailsAddress = Nothing
+        , contractdetailsBinRuntime = Text.decodeUtf8 binr
+        , contractdetailsCodeHash = ch
+        , contractdetailsName = name
+        , contractdetailsSrc = src
+        , contractdetailsXabi = xabi
+        , contractdetailsChainId = Nothing
+        }))
 
 compileContractFromScratch :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContractFromScratch source = do
