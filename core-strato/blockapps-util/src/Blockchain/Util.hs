@@ -26,12 +26,16 @@ buildState s (a:as) run =
    in buildState s' as run
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = M.toList . buildState M.empty as $ \a -> do
-  s <- get
-  let k = f a
-  case M.lookup k s of
-    Nothing -> put (M.insert k [a] s)
-    Just _  -> put (M.update (Just . (++ [a])) k s)
+partitionWith f as =
+  map (fmap reverse)
+  . M.toList
+  . buildState M.empty as
+  $ \a -> do
+    s <- get
+    let k = f a
+    case M.lookup k s of
+      Nothing -> put (M.insert k [a] s)
+      Just _  -> put (M.update (Just . (a:)) k s)
 
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput

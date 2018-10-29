@@ -33,7 +33,7 @@ import qualified Data.Map.Strict                   as Map
 import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
 import           Data.RLP
-import           Data.Set                          (isSubsetOf)
+import qualified Data.Set                          as Set
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
@@ -264,9 +264,9 @@ postUsersUploadList' ContractListParameters{..} sign = do
     else do
       let UploadListContract _ _ mtp _ _ = head contracts
       params <- getAccountTxParams fromAddr chainId mtp
-      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
+      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty, Set.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value md,nonceIncr) -> do
-          (names, cmIds, fIds) <- get
+          (names, cmIds, fIds, srcs) <- get
           (bin, src, cmId, names') <- case Map.lookup name names of
             Just (b, src, cm) -> return (b, src, cm, names)
             Nothing -> do
@@ -289,7 +289,11 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
                 return (xabiArgs', Map.insert functionId xabiArgs' fIds)
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          isDeployed <- lift . fmap (fromMaybe False) . blocQueryMaybe $ isDeployedQuery src
+          (isDeployed, srcs') <- if src `Set.member` srcs
+                          then return (True, srcs)
+                          else do
+                            isDep' <- lift . fmap (fromMaybe False) . blocQueryMaybe $ isDeployedQuery src
+                            return (isDep', Set.insert src srcs)
           let metadata' = Just . Map.union (fromMaybe Map.empty md) $
                             if isDeployed
                               then Map.empty
@@ -303,7 +307,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 (bin <> argsBin)
                 nonceIncr
                 chainId
-          put (names', cmIds', fIds')
+          put (names', cmIds', fIds', srcs')
           return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs
@@ -788,7 +792,7 @@ constructArgValues args argNamesTypes = do
           then return ByteString.empty
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
-        argsVals <- if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
+        argsVals <- if not (Map.keysSet argNamesTypes `Set.isSubsetOf` Map.keysSet argsMap)
           then do
             let
               argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"

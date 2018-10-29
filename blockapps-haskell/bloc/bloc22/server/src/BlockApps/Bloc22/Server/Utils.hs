@@ -96,9 +96,13 @@ buildState s (a:as) run =
    in buildState s' as run
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = Map.toList . buildState Map.empty as $ \a -> do
-  s <- get
-  let k = f a
-  case Map.lookup k s of
-    Nothing -> put (Map.insert k [a] s)
-    Just _  -> put (Map.update (Just . (++ [a])) k s)
+partitionWith f as =
+  map (fmap reverse)
+  . Map.toList
+  . buildState Map.empty as
+  $ \a -> do
+    s <- get
+    let k = f a
+    case Map.lookup k s of
+      Nothing -> put (Map.insert k [a] s)
+      Just _  -> put (Map.update (Just . (++ [a])) k s)
