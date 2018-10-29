@@ -10,12 +10,14 @@ import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
 import Data.Binary
+import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import MonadUtils (liftIO1)
 import Test.QuickCheck
+import Text.Printf
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
@@ -155,15 +157,18 @@ replayHistoricBlock realValidators seqNo blk = do
               $ _commitment
       blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
   unless (seqNo + 1 == blockNo) $
-    Left "unexpected block number"
+    Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == S.fromList _validatorList) $
     Left "mismatched validators"
-  unless (mProp `S.member` S.map Just realValidators) $
-    Left "no verifiable proposer seal"
-  unless (signers `S.isSubsetOf` realValidators) $
-    Left "unknown signers"
+  case mProp of
+    Nothing -> Left "invalid proposer seal"
+    Just prop -> unless (prop `S.member` realValidators) $
+      Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+  unless (signers `S.isSubsetOf` realValidators) $ do
+    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ realValidators
+    Left $ "unknown signers: " ++ unexplained
   unless (3 * S.size signers > 2 * S.size realValidators) $
-    Left "not enough commit seals"
+    Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
   Right . fromIntegral $ seqNo + 1
 
 isHistoricBlock :: Block -> Bool

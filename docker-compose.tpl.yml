@@ -77,7 +77,6 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - historyList=${historyList}
     - loglevel=${loglevel}
     - kafkaHost=kafka
     - kafkaPort=9092
@@ -126,6 +125,7 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - maxConn=${maxConn}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}

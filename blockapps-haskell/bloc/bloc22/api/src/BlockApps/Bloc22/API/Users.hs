@@ -253,6 +253,7 @@ data PostSendParameters = PostSendParameters
   , sendValue     :: Strung Natural
   , sendPassword  :: Password
   , sendTxParams  :: Maybe TxParams
+  , sendMetadata  :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostSendParameters where arbitrary = GR.genericArbitrary GR.uniform
@@ -269,6 +270,7 @@ instance ToSample PostSendParameters where
     , sendValue = Strung 10
     , sendPassword = "securePassword"
     , sendTxParams = Nothing
+    , sendMetadata = Nothing
     }
 
 instance ToSchema PostSendParameters where
@@ -282,6 +284,7 @@ instance ToSchema PostSendParameters where
         , sendValue = Strung 100000000
         , sendPassword = "securePassword"
         , sendTxParams = Nothing
+        , sendMetadata = Nothing
         }
 
 data TransferParameters = TransferParameters
@@ -289,6 +292,7 @@ data TransferParameters = TransferParameters
   , toAddress   :: Address
   , value       :: Strung Natural
   , txParams    :: Maybe TxParams
+  , metadata    :: Maybe (Map Text Text)
   , chainId     :: Maybe ChainId
   , resolve     :: Bool
   } deriving (Eq, Show, Generic)
@@ -311,6 +315,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
   , postuserscontractrequestValue    :: Maybe (Strung Natural)
+  , postuserscontractrequestMetadata :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = GR.genericArbitrary GR.uniform
@@ -332,6 +337,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
     , postuserscontractrequestValue = Just $ Strung 10
+    , postuserscontractrequestMetadata = Nothing
     }
 
 instance ToSchema PostUsersContractRequest where
@@ -341,6 +347,7 @@ instance ToSchema PostUsersContractRequest where
     contractNameSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Text))
     argsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text ArgValue)))
     txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
+    metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Request")
       ( mempty
         & type_ .~ SwaggerObject
@@ -351,6 +358,7 @@ instance ToSchema PostUsersContractRequest where
             , ("args", argsSchema)
             , ("txParams", txParamsSchema)
             , ("value", textSchema & mapped.description ?~ "Contract value in Eth")
+            , ("metadata", metadataSchema)
             ]
         & required .~ [ "src"
                       , "password"
@@ -366,6 +374,7 @@ instance ToSchema PostUsersContractRequest where
             , postuserscontractrequestArgs = Nothing
             , postuserscontractrequestTxParams = Nothing
             , postuserscontractrequestValue = Nothing
+            , postuserscontractrequestMetadata = Nothing
             }
       )
 
@@ -376,6 +385,7 @@ data ContractParameters = ContractParameters
   , args     :: Maybe (Map Text ArgValue)
   , value    :: Maybe (Strung Natural)
   , txParams :: Maybe TxParams
+  , metadata :: Maybe (Map Text Text)
   , chainId  :: Maybe ChainId
   , resolve  :: Bool
   }
@@ -418,6 +428,7 @@ instance ToSchema UploadListRequest where
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
+        , uploadlistcontractMetadata = Nothing
         }
       ex :: UploadListRequest
       ex = UploadListRequest "SecretPassword" [exContract1] True
@@ -427,6 +438,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractArgs         :: Map Text ArgValue
   , uploadlistcontractTxParams     :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
+  , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary UploadListContract where arbitrary = GR.genericArbitrary GR.uniform
@@ -448,6 +460,7 @@ instance ToSchema UploadListContract where
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
+        , uploadlistcontractMetadata = Nothing
         }
 
 newtype PostUsersUploadListResponse = PostUsersUploadListResponse
@@ -500,6 +513,7 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   , postuserscontractmethodArgs     :: Map Text ArgValue
   , postuserscontractmethodValue    :: Maybe (Strung Natural)
   , postuserscontractmethodTxParams :: Maybe TxParams
+  , postuserscontractmethodMetadata :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractMethodRequest where arbitrary = GR.genericArbitrary GR.uniform
@@ -527,6 +541,7 @@ instance ToSchema PostUsersContractMethodRequest where
     pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
     argsSchema <- declareSchemaRef (Proxy :: Proxy (Map Text ArgValue))
     txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
+    metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Method Request")
       ( mempty
         & type_ .~ SwaggerObject
@@ -536,6 +551,7 @@ instance ToSchema PostUsersContractMethodRequest where
             , ("args", argsSchema)
             , ("value", textSchema & mapped.description ?~ "Method value in Eth")
             , ("txParams", txParamsSchema)
+            , ("metadata", metadataSchema)
             ]
         & required .~ [ "password", "method", "args" ]
         & description ?~ "Post Users Contract Method Request"
@@ -545,6 +561,7 @@ instance ToSchema PostUsersContractMethodRequest where
             , postuserscontractmethodArgs = Map.empty
             , postuserscontractmethodValue = Just $ Strung 0
             , postuserscontractmethodTxParams = Nothing
+            , postuserscontractmethodMetadata = Nothing
             }
       )
 
@@ -571,6 +588,7 @@ data FunctionParameters = FunctionParameters
   , args         :: Map Text ArgValue
   , value        :: Maybe (Strung Natural)
   , txParams     :: Maybe TxParams
+  , metadata     :: Maybe (Map Text Text)
   , chainId      :: Maybe ChainId
   , resolve      :: Bool
   }
@@ -621,12 +639,14 @@ instance ToSchema PostSendListRequest where
         , sendtransactionValue = Strung 1000000000000000
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
   , sendtransactionTxParams  :: Maybe TxParams
+  , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary SendTransaction where arbitrary = GR.genericArbitrary GR.uniform
@@ -677,6 +697,7 @@ instance ToSchema SendTransaction where
         , sendtransactionValue = Strung 100000000000000
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
 data TransferListParameters = TransferListParameters
@@ -784,7 +805,8 @@ methodErroredExample =
        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
-       , methodcallContractName = "HorroscopeApp"
+       , methodcallContractName = "HoroscopeApp"
+       , methodcallMetadata = Nothing
        }
 
 
@@ -833,7 +855,8 @@ instance ToSchema PostMethodListRequest where
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
-        , methodcallContractName = "HorroscopeApp"
+        , methodcallContractName = "HoroscopeApp"
+        , methodcallMetadata = Nothing
         }
 
 data MethodCall = MethodCall
@@ -843,6 +866,7 @@ data MethodCall = MethodCall
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
   , methodcallTxParams        :: Maybe TxParams
+  , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
@@ -867,6 +891,7 @@ instance ToSchema MethodCall where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , methodcallMetadata = Nothing
         }
 
 data FunctionListParameters = FunctionListParameters

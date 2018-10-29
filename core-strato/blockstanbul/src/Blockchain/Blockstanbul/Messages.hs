@@ -61,6 +61,9 @@ data WireMessage = WireMessage {
 } deriving (Eq, Show, Generic)
 makeLenses ''WireMessage
 
+blockstanbulSender :: WireMessage -> Address
+blockstanbulSender (WireMessage a _) = sender a
+
 instance Binary MsgAuth where
 instance Binary View where
 instance Binary TrustedMessage where
@@ -91,7 +94,7 @@ roundchangeCode = 3
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
-             | CommitResult (Either Text ())
+             | CommitResult (Either Text SHA)
              | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
@@ -108,7 +111,8 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- Announce that the global consensus is ahead of us by
                 -- some number of blocks, and hope that a higher power
                 -- will erase the gap with PreviousBlocks.
-              | GapFound {have :: Integer, require :: Integer}
+              | GapFound {have :: Integer, require :: Integer, peer :: Address}
+              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where

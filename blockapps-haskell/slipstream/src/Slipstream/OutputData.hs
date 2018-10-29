@@ -131,7 +131,7 @@ createInserts globalsIORef = do
     globals <- readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
     let tableName = contractName firstContract
-    history <- isHistoric globalsIORef tableName
+    history <- isHistoric globalsIORef hashVal
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
     let comma = if null list
@@ -199,7 +199,7 @@ createInserts globalsIORef = do
       let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
       yield hist
 
-    index <- shouldIndex globalsIORef tableName
+    index <- shouldIndex globalsIORef hashVal
     when index $ do
       let ins = T.concat
             [ "insert into \""
