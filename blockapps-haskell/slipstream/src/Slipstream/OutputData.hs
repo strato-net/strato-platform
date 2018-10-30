@@ -180,18 +180,8 @@ createInserts globalsIORef = do
             , tableColumns list
             , ");"
             ]
-        void $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
 
-    yield $ T.concat
-      [ "create table if not exists \""
-      , functionTableName
-      , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
-      , fcomma
-      , tableColumns funcList
-      , ", CONSTRAINT \""
-      , functionTableName
-      , "_pkey\" PRIMARY KEY (address, \"chainId\") );"
-      ]
+        void $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
 
     when history $ do
       yield $ T.concat
@@ -270,20 +260,5 @@ createInserts globalsIORef = do
         , "transaction_function_name = excluded.transaction_function_name"
         , comma
         , (tableUpsert list)
-        , ";"
-        ]
-
-      yield $ T.concat
-        [ "insert into \""
-        , functionTableName
-        , "\" "
-        , fKeySt
-        , " values "
-        , finserts
-        , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
-        , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
-        , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender"
-        , fcomma
-        , (tableUpsert funcList)
         , ";"
         ]
