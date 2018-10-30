@@ -1,4 +1,4 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.ChainHashDB where
 
 import           Blockchain.ExtWord           (Word256)
@@ -10,6 +10,7 @@ import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Sequence                as Q
+import           Data.String
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
@@ -27,7 +28,7 @@ lookupChainHash h = M.lookup h <$> getChainHashMap
 
 insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 insertChainHash h cid = do
-  liftIO $ withLabel "chain_hash" incCounter chainMetrics
+  liftIO $ withLabel chainMetrics "chain_hash" incCounter
   getChainHashMap >>= putChainHashMap . M.insert h (False, cid)
 
 useChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
@@ -56,7 +57,7 @@ insertChainBufferEntry cid h = do
              else case Q.viewl q of
                     Q.EmptyL -> CircularBuffer cap 1 (q Q.|> h)
                     (_ Q.:< q') -> CircularBuffer cap sz (q' Q.|> h)
-  liftIO $ withLabel (show cid) (setGauge (fromIntegral sz)) chainBuffer
+  liftIO $ withLabel chainBuffer (fromString (show cid)) (flip setGauge (fromIntegral sz))
   insertChainBuffer cid cb
 
 getChainHash :: HasPrivateHashDB m => Word256 -> m SHA

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.TxBlockDB where
 
 import           Blockchain.SHA
@@ -21,10 +22,10 @@ lookupTxBlocks tHash = M.lookup tHash <$> getTxBlockDB
 
 insertTxBlock :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertTxBlock tHash bHash = do
-  liftIO $ withLabel "tx_blocks" incCounter txMetrics
+  liftIO $ withLabel txMetrics "tx_blocks" incCounter
   getTxBlockDB >>= putTxBlockDB . M.insert tHash bHash
 
 removeTxBlock :: HasPrivateHashDB m => SHA -> m ()
 removeTxBlock tHash = do
-  liftIO $ withLabel "tx_blocks_removed" incCounter txMetrics
+  liftIO $ withLabel txMetrics "tx_blocks_removed" incCounter
   getTxBlockDB >>= putTxBlockDB . M.delete tHash

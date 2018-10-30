@@ -1,9 +1,8 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.DependentTxDB where
 
 import           Blockchain.SHA
 
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -25,7 +24,7 @@ lookupDependentTxs bHash = fromMaybe S.empty . M.lookup bHash <$> getDependentTx
 
 insertDependentTx :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertDependentTx bHash tHash = do
-  liftIO $ withLabel "dependent_tx" incCounter txMetrics
+  liftIO $ withLabel txMetrics "dependent_tx" incCounter
   m <- getDependentTxDB
   case M.lookup bHash m of
     Nothing -> putDependentTxDB (M.insert bHash (S.singleton tHash) m)
@@ -33,11 +32,10 @@ insertDependentTx bHash tHash = do
 
 insertDependentTxs :: HasPrivateHashDB m => SHA -> S.Set SHA -> m ()
 insertDependentTxs bHash ths = do
-  let num = fromIntegral . S.size $ ths
-  liftIO $ withLabel "dependent_tx" (void . addCounter num) txMetrics
+  liftIO $ withLabel txMetrics "dependent_tx" (flip unsafeAddCounter . fromIntegral . S.size $ ths)
   getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
 
 clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
 clearDependentTxs bHash = do
-  liftIO $ withLabel "dependent_tx_removed" incCounter txMetrics
+  liftIO $ withLabel txMetrics "dependent_tx_removed" incCounter
   getDependentTxDB >>= putDependentTxDB . M.delete bHash

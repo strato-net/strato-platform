@@ -1,4 +1,4 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.PrivateTxDB where
 
 import           Blockchain.Data.RLP
@@ -30,7 +30,7 @@ insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m (SHA, SHA)
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
-    liftIO $ withLabel "private_hash" incCounter txMetrics
+    liftIO $ withLabel txMetrics "private_hash" incCounter
     let r = txSigR tx
         s = txSigS tx
         h = txHash tx

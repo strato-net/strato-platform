@@ -1,4 +1,4 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.SeenHashDB where
 
 import           Blockchain.SHA
@@ -33,5 +33,5 @@ lookupSeenChainHash ch = do
 
 insertSeenTxHash :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertSeenTxHash th ch = do
-  liftIO $ withLabel "seen_tx_hash" incCounter txMetrics
+  liftIO $ withLabel txMetrics "seen_tx_hash" incCounter
   getSeenHashDB >>= putSeenHashDB . B.insert th ch

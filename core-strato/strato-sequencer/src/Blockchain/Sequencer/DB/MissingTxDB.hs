@@ -1,4 +1,4 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.MissingTxDB where
 
 import           Blockchain.SHA
@@ -21,10 +21,10 @@ isMissingTX tx = S.member tx <$> getMissingTxsDB
 
 insertMissingTx :: HasPrivateHashDB m => SHA -> m ()
 insertMissingTx tx = do
-  liftIO $ withLabel "missing_tx" incCounter txMetrics
+  liftIO $ withLabel txMetrics "missing_tx" incCounter
   getMissingTxsDB >>= putMissingTxsDB . S.insert tx
 
 removeMissingTx :: HasPrivateHashDB m => SHA -> m ()
 removeMissingTx tx = do
-  liftIO $ withLabel "missing_tx_removed" incCounter txMetrics
+  liftIO $ withLabel txMetrics "missing_tx_removed" incCounter
   getMissingTxsDB >>= putMissingTxsDB . S.delete tx
