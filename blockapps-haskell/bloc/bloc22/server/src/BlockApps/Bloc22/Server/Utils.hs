@@ -105,4 +105,4 @@ partitionWith f as =
     let k = f a
     case Map.lookup k s of
       Nothing -> put (Map.insert k [a] s)
-      Just _  -> put (Map.update (Just . (++ [a])) k s)
+      Just _  -> put (Map.update (Just . (a:)) k s)
