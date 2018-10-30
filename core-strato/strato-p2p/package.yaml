@@ -69,6 +69,7 @@ dependencies:
   - hedis
   - lifted-async
   - blockstanbul
+  - unliftio
 
 ghc-options: -Wall -threaded
 
@@ -119,3 +120,11 @@ tests:
       - stm-conduit
       - strato-p2p
       - temporary
+
+  unittests:
+    main: Spec.hs
+    source-dirs: unittests
+    dependencies:
+      - strato-p2p
+      - hspec
+      - hspec-expectations-lifted
