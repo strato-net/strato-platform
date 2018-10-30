@@ -76,7 +76,7 @@ mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSources
         .| CL.map MsgEvt
     , seqEventNotificationSource
         .| CL.map NewSeqEvent
-    ] ++ extra) (2 + length extra)
+    ] ++ extra) 4096 -- 🙏
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
