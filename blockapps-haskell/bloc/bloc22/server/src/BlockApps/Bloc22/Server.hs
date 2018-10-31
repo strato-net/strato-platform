@@ -24,7 +24,7 @@ import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
-bloc = (return gitInfo)
+bloc = return gitInfo
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser

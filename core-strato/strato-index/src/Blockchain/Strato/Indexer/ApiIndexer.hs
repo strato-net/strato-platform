@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
@@ -22,6 +23,8 @@ import           System.Clock
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ChainInfoDB        (putChainInfo)
+import           Blockchain.Data.Transaction         (insertTX)
+import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
@@ -44,6 +47,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         putIndexerBestBlockInfo bbi
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+        let txs = [tx | IndexTransaction _ tx <- idxEvents]
+        forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
         forM_ chainInfos $ uncurry putChainInfo
         let blocks = [b | RanBlock b <- idxEvents]

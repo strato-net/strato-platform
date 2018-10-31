@@ -38,7 +38,9 @@ oneTX size = ContractCreationTX {
   transactionChainId = Nothing,
   transactionR = 1 `shiftL` 200,
   transactionS = 1 `shiftL` 133,
-  transactionV = 27}
+  transactionV = 27,
+  transactionMetadata = Nothing
+  }
 
 benchContext :: BlockstanbulContext
 benchContext =
@@ -47,5 +49,5 @@ benchContext =
   in  newContext (View 200 40) [prvKey2Address pk] [] pk
 
 makeBlock :: Int -> Int -> Block
-makeBlock txcount txsize =
+makeBlock txcount txsize = setBlockNo 41
   genesisBlock{blockReceiptTransactions = replicate txcount (oneTX txsize)}

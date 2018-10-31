@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS contracts(
 );
 |]
 
+contractsSourceTable :: Query
+contractsSourceTable = [sql|
+CREATE TABLE IF NOT EXISTS contracts_source(
+  id serial PRIMARY KEY,
+  src_hash bytea NOT NULL,
+  src text NOT NULL
+);
+|]
+
 contractsMetaDataTable :: Query
 contractsMetaDataTable = [sql|
 CREATE TABLE IF NOT EXISTS contracts_metadata(
@@ -59,6 +68,7 @@ CREATE TABLE IF NOT EXISTS contracts_metadata(
   bin_runtime bytea NOT NULL,
   code_hash bytea NOT NULL,
   xcode_hash bytea NOT NULL,
+  src_hash bytea NOT NULL,
   FOREIGN KEY (contract_id) REFERENCES contracts(id)
 );
 |]
@@ -213,6 +223,7 @@ createTables = mconcat
   , usersTable
   , keyStoreTable
   , contractsTable
+  , contractsSourceTable
   , contractsMetaDataTable
   , hashNameTable
   , contractsInstanceTable

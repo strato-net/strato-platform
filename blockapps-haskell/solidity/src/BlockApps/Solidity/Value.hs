@@ -4,6 +4,7 @@
 module BlockApps.Solidity.Value where
 
 
+import           ClassyPrelude           ((<>))
 import           Control.Monad           (sequence)
 import qualified Data.Bimap              as Bimap
 import qualified Data.Binary             as Binary
@@ -15,7 +16,6 @@ import qualified Data.ByteString.Lazy    as ByteString.Lazy
 import           Data.LargeWord          (Word256)
 import           Data.List               (intersperse)
 import           Data.Maybe              (fromMaybe)
-import           Data.Monoid
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
 import qualified Data.Text               as Text

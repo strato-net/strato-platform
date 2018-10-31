@@ -235,6 +235,7 @@ runTest test = do
                     (getNumber $ tGasLimit' transaction)
                     (getNumber $ tValue' transaction)
                     (Code $ theData $ tData' transaction)
+                    Nothing
                     (tSecretKey' transaction)
                 Just a ->
                   createMessageTX
@@ -244,6 +245,7 @@ runTest test = do
                     a
                     (getNumber $ tValue' transaction)
                     (theData $ tData' transaction)
+                    Nothing
                     (tSecretKey' transaction)
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
