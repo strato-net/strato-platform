@@ -87,7 +87,6 @@
   {{ end }}
 {{ end }}
 
-</ul>
 {{ template "_menuItem" (args . "seq-gregor-overview.html" "Gregor") }}
 {{ if match "^seq_gregor" .Path }}
   {{ if .Params.instance }}
