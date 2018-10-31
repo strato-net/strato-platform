@@ -190,6 +190,22 @@ class CreateContract extends Component {
     </div>);
   };
 
+  renderHistory = () => {
+    return (<div className="pt-select">
+      <Field
+        className="pt-input"
+        component="select"
+        name="history"
+        validate={required}
+        required
+        // disabled={isPublicMode}
+      >
+        <option key={"off"} value={"off"}>Off</option>
+        <option key={"on"} value={"on"}>On</option>
+      </Field>
+    </div>);
+  }
+
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
@@ -370,6 +386,16 @@ class CreateContract extends Component {
                   </div>
                 </div>
               </div>}
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    History
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.renderHistory()}
+                </div>
+              </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
