@@ -122,6 +122,8 @@ class CreateContract extends Component {
     });
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
+    const options = values.history === "on" ? {enableHistory: true} : {enableHistory: false};
+
     const payload = {
       contract: contractname,
       username: values.username,
@@ -130,6 +132,7 @@ class CreateContract extends Component {
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
+      options: options,
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
