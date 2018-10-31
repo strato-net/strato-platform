@@ -122,7 +122,14 @@ class CreateContract extends Component {
     });
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
-    const options = values.history === "on" ? {enableHistory: true} : {enableHistory: false};
+    const metadata = {};
+    if (values.history === "on") {
+      metadata["history"] = contractname;
+    }
+    else {
+      metadata["nohistory"] = contractname;
+    }
+    console.log("metadata: " + metadata);
 
     const payload = {
       contract: contractname,
@@ -132,7 +139,7 @@ class CreateContract extends Component {
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
-      options: options,
+      metadata: metadata,
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
@@ -199,7 +206,7 @@ class CreateContract extends Component {
         className="pt-input"
         component="select"
         name="history"
-        validate={required}
+        // validate={required}
         required
         // disabled={isPublicMode}
       >
