@@ -23,7 +23,7 @@ data ExecResults =
     erTrace              :: [String],
     erLogs               :: [Log],
     erNewContractAddress :: Maybe Address,
-    erDetails             :: [VMDetails],
+    erDetails            :: [VMDetails],
     erException          :: Maybe VMException
     } deriving (Show, Generic)
 
