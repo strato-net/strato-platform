@@ -27,19 +27,16 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
--- import           Data.Aeson.Encode.Pretty                (encodePretty)
 import Debug.Trace
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
--- import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
--- import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -521,7 +518,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = "" --T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
+                               , transactionResultStateDiff        = ""
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
