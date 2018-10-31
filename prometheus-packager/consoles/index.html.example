@@ -33,6 +33,10 @@
   <td>Private Chain</td>
   <td><code>privatechain</code></td>
 </tr>
+<tr>
+  <td>Gregor</td>
+  <td><code>seq_gregor</code></td>
+</tr>
 </table>
 
 {{ template "prom_content_tail" . }}
