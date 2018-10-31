@@ -129,7 +129,6 @@ class CreateContract extends Component {
     else {
       metadata["nohistory"] = contractname;
     }
-    console.log("metadata: " + metadata);
 
     const payload = {
       contract: contractname,
@@ -199,22 +198,6 @@ class CreateContract extends Component {
       </Field>
     </div>);
   };
-
-  renderHistory = () => {
-    return (<div className="pt-select">
-      <Field
-        className="pt-input"
-        component="select"
-        name="history"
-        // validate={required}
-        required
-        // disabled={isPublicMode}
-      >
-        <option key={"off"} value={"off"}>Off</option>
-        <option key={"on"} value={"on"}>On</option>
-      </Field>
-    </div>);
-  }
 
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
@@ -403,7 +386,18 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderHistory()}
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="history"
+                      // validate={required}
+                      // required
+                    >
+                      <option key="off" value="off">Off</option>
+                      <option key="on" value="on">On</option>
+                    </Field>
+                  </div>
                 </div>
               </div>
               <div className="row">
