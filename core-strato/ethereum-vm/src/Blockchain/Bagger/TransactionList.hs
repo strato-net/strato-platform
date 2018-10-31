@@ -35,7 +35,7 @@ insertTransaction t tl =
         oldTx  = M.lookup nonce' tl in
             case oldTx of
                 Nothing -> (Nothing, M.insert nonce' t tl)
-                Just existing -> if gasPrice existing >= gasPrice t
+                Just existing -> if gasPrice existing < gasPrice t
                     then (oldTx, M.insert nonce' t tl)
                     else (Just t, tl)
 

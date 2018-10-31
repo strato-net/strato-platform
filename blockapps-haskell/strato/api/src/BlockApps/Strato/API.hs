@@ -100,7 +100,7 @@ type API =
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
-    :> Post '[PlainText] Keccak256
+    :> Post '[JSON] [Keccak256]
   :<|> "chain"
     :> ReqBody '[JSON] ChainInfo
     :> Post '[JSON] ChainId

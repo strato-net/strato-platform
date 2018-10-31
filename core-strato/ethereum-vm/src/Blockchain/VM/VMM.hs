@@ -65,12 +65,18 @@ type VMM = ExceptT VMException (StateT VMState (ResourceT (LoggingT IO)))
 --type VMM2 = ExceptT VMException (StateT VMState (ResourceT IO))
 
 instance HasMemAddressStateDB VMM where
-  getAddressStateDBMap = do
+  getAddressStateTxDBMap = do
       cxt <- lift get
-      return $ contextAddressStateDBMap $ dbs cxt
-  putAddressStateDBMap theMap = do
+      return $ contextAddressStateTxDBMap $ dbs cxt
+  putAddressStateTxDBMap theMap = do
       cxt <- lift get
-      lift $ put cxt{dbs=(dbs cxt){contextAddressStateDBMap=theMap}}
+      lift $ put cxt{dbs=(dbs cxt){contextAddressStateTxDBMap=theMap}}
+  getAddressStateBlockDBMap = do
+      cxt <- lift get
+      return $ contextAddressStateBlockDBMap $ dbs cxt
+  putAddressStateBlockDBMap theMap = do
+      cxt <- lift get
+      lift $ put cxt{dbs=(dbs cxt){contextAddressStateBlockDBMap=theMap}}
 
 instance HasHashDB VMM where
     getHashDB = lift $ fmap (contextHashDB . dbs) get
@@ -100,13 +106,20 @@ instance HasChainDB VMM where
     lift $ put vmState{dbs=(dbs vmState){contextCurrentChainId = cid}}
 
 instance HasStorageDB VMM where
-    getStorageDB = do
+    getStorageTxDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
-              contextStorageMap $ dbs cxt)
-    putStorageMap theMap = do
+              contextStorageTxMap $ dbs cxt)
+    putStorageTxMap theMap = do
       cxt <- lift get
-      lift $ put cxt{dbs=(dbs cxt){contextStorageMap=theMap}}
+      lift $ put cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
+    getStorageBlockDB = do
+      cxt <- lift get
+      return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
+              contextStorageBlockMap $ dbs cxt)
+    putStorageBlockMap theMap = do
+      cxt <- lift get
+      lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
 
 instance HasCodeDB VMM where

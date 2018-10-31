@@ -19,7 +19,7 @@ import           Data.Proxy
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Generic.Random.Generic
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -71,7 +71,7 @@ instance FromJSON Xabi where
          <*> v .:? "kind" .!= ContractKind
          <*> v .:? "using" .!= Map.empty
 
-instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
+instance Arbitrary Xabi where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Xabi where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -136,7 +136,7 @@ instance FromJSON StateMutability where
 
 
 instance Arbitrary StateMutability where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema StateMutability where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "State Mutability"
@@ -193,7 +193,7 @@ instance FromJSON Func where
           mut <- fallbackConstantPayable val
           return func{funcStateMutability = mut}
 
-instance Arbitrary Func where arbitrary = genericArbitrary uniform
+instance Arbitrary Func where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Func where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -219,7 +219,7 @@ data Visibility = Private
 
 instance ToJSON Visibility
 instance FromJSON Visibility
-instance Arbitrary Visibility where arbitrary = genericArbitrary uniform
+instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Visibility of a Function"
@@ -242,7 +242,7 @@ instance ToJSON Modifier where
 instance FromJSON Modifier where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-instance Arbitrary Modifier where arbitrary = genericArbitrary uniform
+instance Arbitrary Modifier where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Modifier where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -275,7 +275,7 @@ instance FromJSON Event where
                      <*> (o .: "logs")
   parseJSON o = typeMismatch "Xabi.Event: Expected Object" o
 
-instance Arbitrary Event where arbitrary = genericArbitrary uniform
+instance Arbitrary Event where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Event where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -319,6 +319,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
+  , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
   , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic)
@@ -330,6 +331,7 @@ instance ToJSON ContractDetails where
     , "bin-runtime" .= contractdetailsBinRuntime
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
+    , "src" .= contractdetailsSrc
     , "xabi" .= contractdetailsXabi
     , "chainId" .= contractdetailsChainId
     ]
@@ -342,13 +344,14 @@ instance FromJSON ContractDetails where
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
+      <*> obj .: "src"
       <*> obj .: "xabi"
       <*> obj .:? "chainId"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
 
 instance Arbitrary ContractDetails where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema ContractDetails where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -363,6 +366,7 @@ instance ToSchema ContractDetails where
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = keccak256 "digest"
         , contractdetailsName = "DetailsName"
+        , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
         , contractdetailsChainId = Nothing
         }

@@ -16,6 +16,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.List
 import           Data.Map                              (toList)
@@ -25,7 +27,9 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           Text.Printf
 
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
@@ -36,8 +40,6 @@ import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.DB.SQLDB
-import           Blockchain.DBM
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
@@ -55,8 +57,13 @@ import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Debug.Trace                           (trace)
 
--- MonadBaseControl IO m, MonadIO m
-setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, HasVMEventsSink m) => [Block] -> m Int
+setTitleAndProduceBlocks :: ( MonadLogger m
+                            , MonadBaseControl IO m
+                            , MonadIO m
+                            , RBDB.HasRedisBlockDB m
+                            , MonadState Context m
+                            , HasVMEventsSink m
+                            ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
     let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
@@ -85,9 +92,15 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, SK.HasUnseqSink m, MonadState Context m, MonadLogger m)
-             =>  DebugMode -> PPeer -> Conduit Event m Message
-handleEvents mode peer = awaitForever $ \case
+handleEvents :: ( MonadBaseControl IO m
+                , MonadIO m
+                , MonadResource m
+                , RBDB.HasRedisBlockDB m
+                , SK.HasUnseqSink m
+                , MonadState Context m
+                , MonadLogger m
+                ) => PPeer -> ConduitM Event Message m ()
+handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
     MsgEvt Ping     -> yield Pong
@@ -95,9 +108,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (Transactions txs) -> do
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        _ <- lift $ insertTX mode txo Nothing txs
         SK.emitKafkaTransactions txo txs
-        return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp
@@ -246,6 +257,7 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
+      setPeerAddrIfUnset $ blockstanbulSender wm
       SK.emitBlockstanbulMsg wm
 
     -- private chains
@@ -343,6 +355,23 @@ handleEvents mode peer = awaitForever $ \case
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yield outbound
+      OEAskForBlocks start end p -> do
+        ss <- shouldSendToPeer p
+        when ss $ do
+          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          yield outbound
+      OEPushBlocks start end p -> do
+        ss <- shouldSendToPeer p
+        when ss $ do
+          chain <- RBDB.withRedisBlockDB $
+            RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
+          when (null chain) $
+            $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
+              "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
+          let outbound = BlockHeaders . map snd $ chain
+          $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
 
@@ -375,7 +404,7 @@ numFromRedis = \case
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
 syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
-          => Direction -> Integer -> Conduit Event m Message
+          => Direction -> Integer -> ConduitM Event Message m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do

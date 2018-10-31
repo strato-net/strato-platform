@@ -20,7 +20,6 @@ module BlockApps.Strato.Types
   , ChainId (..)
   , Keccak256 (..)
   , WithNext (..)
-  , FaucetResponse(..)
   , TransactionType (..)
   , Transaction (..)
   , TransactionResult (..)
@@ -46,7 +45,6 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
-import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
@@ -59,10 +57,9 @@ import qualified Data.Swagger                 as Sw
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import qualified Data.Text.Encoding           as Text
 import           Data.Time
 import           Data.Word
-import           Generic.Random.Generic
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Numeric
 import           Numeric.Natural
@@ -79,10 +76,8 @@ import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (
                                                stringChainId)
 import           BlockApps.Strato.TypeLits
 
-newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
-
 instance (ToHttpApiData a) => ToHttpApiData [a] where
-  toUrlPiece = Text.pack . show . map toUrlPiece 
+  toUrlPiece = Text.pack . show . map toUrlPiece
 
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
@@ -115,11 +110,6 @@ instance ToSchema x => ToSchema (Strung x) where
 instance ToSchema x => ToSchema (NonEmpty x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
-instance ToSchema FaucetResponse where
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
-    & mapped.schema.description ?~ "A faucet response url"
-    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
-
 instance ToSchema Transaction where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "A transaction"
@@ -144,6 +134,7 @@ instance ToSchema Transaction where
           , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
           , transactionOrigin          = "API"
           , transactionChainId         = Nothing
+          , transactionMetadata        = Nothing
           }
 
 instance ToSchema TransactionType
@@ -165,8 +156,6 @@ instance ToSchema Account where
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountChainId        = Nothing
           , accountLatestBlockNum = 23
-          , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
-          , accountContractName   = Just "SimpleStorage"
           }
 
 instance ToSchema Difficulty
@@ -196,7 +185,7 @@ instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
 
 instance Arbitrary x => Arbitrary (Strung x) where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 data WithNext x = WithNext
   { withoutNext :: x
@@ -235,6 +224,7 @@ data Transaction = Transaction
   , transactionR               :: Hex Natural
   , transactionS               :: Hex Natural
   , transactionV               :: Hex Word8
+  , transactionMetadata        :: Maybe (Map Text Text)
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
   , transactionOrigin          :: Text
@@ -260,6 +250,7 @@ data PostTransaction = PostTransaction
   , posttransactionV          :: Hex Word8
   , posttransactionNonce      :: Natural
   , posttransactionChainId    :: Maybe ChainId
+  , posttransactionMetadata   :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -269,23 +260,10 @@ instance ToJSON PostTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance Arbitrary PostTransaction where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample PostTransaction where
-  toSamples _ = singleSample PostTransaction
-    { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-    , posttransactionGasLimit = 21000
-    , posttransactionCodeOrData = ""
-    , posttransactionGasPrice = 50000000000
-    , posttransactionTo = Just $ Address 0xdeadbeef
-    , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
-    , posttransactionValue = Strung 10000000000000000000
-    , posttransactionR = Hex 1 -- make valid examples
-    , posttransactionS = Hex 1 -- make valid examples
-    , posttransactionV = Hex 0x1c
-    , posttransactionNonce = 0
-    , posttransactionChainId = Nothing
-    }
+  toSamples _ = singleSample defaultPostTx
 
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
 defaultPostTx = PostTransaction
@@ -301,29 +279,13 @@ defaultPostTx = PostTransaction
     , posttransactionV = Hex 0x1c
     , posttransactionNonce = 0
     , posttransactionChainId = Nothing
+    , posttransactionMetadata = Nothing
     }
 
 instance ToSchema PostTransaction where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "Post Transaction"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostTransaction
-      ex = PostTransaction
-        { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-        , posttransactionGasLimit = 21000
-        , posttransactionCodeOrData = ""
-        , posttransactionGasPrice = 50000000000
-        , posttransactionTo = Just $ Address 0xdeadbeef
-        , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
-        , posttransactionValue = Strung 10000000000000000000
-        , posttransactionR = Hex 1 -- make valid examples
-        , posttransactionS = Hex 1 -- make valid examples
-        , posttransactionV = Hex 0x1c
-        , posttransactionNonce = 0
-        , posttransactionChainId = Nothing
-        }
-
+    & mapped.schema.example ?~ toJSON defaultPostTx
 
 toPostTx :: Transaction -> PostTransaction
 toPostTx Transaction{..} = PostTransaction
@@ -339,6 +301,7 @@ toPostTx Transaction{..} = PostTransaction
   , posttransactionV = transactionV
   , posttransactionNonce = unStrung transactionNonce
   , posttransactionChainId = transactionChainId
+  , posttransactionMetadata = transactionMetadata
   }
 
 
@@ -390,8 +353,6 @@ data Account = Account
   , accountCodeHash       :: Keccak256
   , accountChainId        :: Maybe ChainId
   , accountLatestBlockNum :: Natural
-  , accountSource         :: Text
-  , accountContractName   :: Maybe Text
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Account where
@@ -433,19 +394,6 @@ instance FromJSON Storage where
 instance ToJSON Storage where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
-instance FromJSON FaucetResponse where
-  parseJSON = fmap FaucetResponse . parseJSON
-instance ToJSON FaucetResponse where
-  toJSON (FaucetResponse x) = toJSON x
-
-instance MimeUnrender PlainText FaucetResponse where
-  mimeUnrender _ =
-    return . FaucetResponse . Text.decodeUtf8 . Lazy.toStrict
-
-instance MimeRender PlainText FaucetResponse where
-  mimeRender _ (FaucetResponse x) =
-    Lazy.fromStrict $ Text.encodeUtf8 x
-
 data AbiBin = AbiBin
   { abi        :: Text
   , bin        :: Text
@@ -483,7 +431,7 @@ data TransactionResult = TransactionResult
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON TransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -536,12 +484,9 @@ data ChainInfo = ChainInfo
   } deriving (Eq, Show, Generic)
 
 
-instance KnownSymbol "address" where
-instance KnownSymbol "enode" where
-
-instance ToSchema (NamedTuple "address" Address "enode" Text) where 
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
-    & mapped.schema.description ?~ "address and enode pair" 
+instance ToSchema (NamedTuple "address" Address "enode" Text) where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "address and enode pair"
     & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)) :: NamedTuple "address" Address "enode" Text)
 
 exampleChainInfo :: ChainInfo
@@ -581,10 +526,8 @@ instance ToJSON ChainInfo where
     ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
 
-instance ToSchema ChainIdChainInfo where 
-  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy 
-    & mapped.schema.description ?~ "chainid and chaininfo pair" 
-    & mapped.schema.example ?~ toJSON ((NamedTuple (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781", exampleChainInfo)) :: ChainIdChainInfo) 
+instance ToSchema ChainIdChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "chainid and chaininfo pair"
+    & mapped.schema.example ?~ toJSON ((NamedTuple (fromJust $ stringChainId "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781", exampleChainInfo)) :: ChainIdChainInfo)

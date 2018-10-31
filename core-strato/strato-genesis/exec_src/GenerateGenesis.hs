@@ -11,6 +11,7 @@ import Data.Aeson.Extra (eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
+import qualified Data.Text as T
 import Numeric
 
 import Blockchain.Data.ChainInfo
@@ -78,7 +79,7 @@ main = do
                   return $ if flags_hash_maps
                              then insertContractsJSONHashMaps json
                              else insertContractsJSON json
-  let output = insert name src bytes (fromInteger flags_start) genesis
+  let output = insert (T.pack name) (T.pack src) bytes (fromInteger flags_start) genesis
   let outputText = encode output{genesisInfoAccountInfo=[]}
   withFile flags_output_file WriteMode (flip L.hPut $ outputText)
   writeFile flags_output_account_info_file $ unlines $ map showAccountInfo $ genesisInfoAccountInfo output

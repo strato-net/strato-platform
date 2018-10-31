@@ -8,87 +8,26 @@
 
 module Slipstream.Events where
 
-import qualified BlockApps.Ethereum       as Eth
-import qualified BlockApps.Solidity.Value as V
-import           Data.Aeson
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           GHC.Generics
-
-type Word256 = Integer
-type Word160 = Integer
+import qualified BlockApps.Solidity.Value as V
+import           BlockApps.Ethereum (Keccak256, Address)
+import           Data.Time
 
 type StateRoot = Text
 
-newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
-
-newtype Address = Address Word160 deriving (Show, Eq, Generic, Ord)
-
--- | Not a type, but a data kind
 data Detail = Incremental | Eventual
 
-data StateDiff =
-  StateDiff {
-    -- blockNumber  :: Integer,
-    -- blockHash    :: SHA,
-    -- | The 'Eventual value is the initial state of the contract
-    createdAccounts :: Maybe (Map Text AccountDiff),
-    -- | The 'Eventual value is the pre-deletion state of the contract
-    deletedAccounts :: Maybe (Map Text AccountDiff),
-    updatedAccounts :: Maybe (Map Text AccountDiff),
-    chainId :: Maybe Eth.ChainId
-    }
-    deriving (Show, Generic)
-
-instance FromJSON StateDiff
-instance FromJSON Address
-instance FromJSONKey Address
-instance FromJSON SHA
-instance FromJSON AccountDiff
-
-data Diff a = Diff (Maybe a) (Maybe a) deriving (Show, Generic)
-
-instance (FromJSON a) => FromJSON (Diff a) where
-         parseJSON (Object x) = do
-           old <- x .:? "oldValue"
-           new <- x .:? "newValue"
-           return $ Diff old new
-         --parseJSON x = typeMismatch "Not an object" x
-         parseJSON x = do
-           y <- parseJSON x
-           return $ Diff Nothing y
-
-data AccountDiff =
-  AccountDiff {
-    -- | The nonce may not change
-    nonce        :: Maybe (Diff Integer),
-    -- | The balance may not change
-    balance      :: Maybe (Diff Integer),
-    -- | Only present for newly created contracts, since the code can never
-    -- change
-    code         :: Maybe Text,
-    -- | Since we want to always be able to identify account-type
-    --codeHash :: SHA,
-    codeHash     :: Text,
-    sourceCodeHash     :: Maybe (Text, Text),
-    -- | This is necessary for when we commit an AddressStateRef to SQL.
-    -- It changes if and only if the storage changes at all
-    contractRoot :: Maybe (Diff StateRoot),
-    -- | Only the storage keys that change are present in this map.
-    --storage :: Map Word256 (Diff Word256)
-    storage      :: Map Text (Diff Text)
-    }
-    deriving (Generic, Show)
-
--- data family Diff a (v :: Detail)
-
 data ProcessedContract = ProcessedContract {
-  address :: Text,
-  codehash :: Text,
-  abi :: Text,
-  contractName :: Text,
-  chain :: Text,
-  contractData :: Map T.Text V.Value
-}
-
+  address               :: Address
+  , codehash            :: Keccak256
+  , abi                 :: Text
+  , contractName        :: Text
+  , chain               :: Text
+  , blockHash           :: Keccak256
+  , blockTimestamp      :: UTCTime
+  , blockNumber         :: Integer
+  , transactionHash     :: Keccak256
+  , transactionSender   :: Address
+  , contractData        :: Map Text V.Value
+} deriving (Show)

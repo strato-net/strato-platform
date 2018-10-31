@@ -12,6 +12,7 @@ getTxLastR ::  Integer -> Handler Value
 getTxLastR  num = do
   chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
+  fetchLimit <- myFetchLimit
   tx <- runDB $ E.select $
         E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
           E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)

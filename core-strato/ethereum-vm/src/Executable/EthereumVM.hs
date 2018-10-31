@@ -18,6 +18,7 @@ import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
+import           Text.Printf
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
@@ -46,7 +47,7 @@ import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-
+import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
 ethereumVM :: LoggingT IO ()
@@ -76,7 +77,12 @@ ethereumVM = void . execContextM $ do
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allTxs = [OETx ts t | OETx ts t <- seqEvents]
+        let txPairs = [(ts,t) | OETx ts t <- seqEvents]
+            allTxs = map (uncurry OETx) txPairs
+        when (not $ null txPairs) . void
+                                  . K.withKafkaViolently
+                                  . writeIndexEvents
+                                  $ map (uncurry IndexTransaction) txPairs
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
@@ -92,7 +98,7 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             writeBlockSummary b
-        addBlocks blocks
+        actions <- addBlocks blocks
 
         contextBlockRequested ||= (OECreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -107,6 +113,11 @@ ethereumVM = void . execContextM $ do
               if pbft
                 then reqd && hasTxs
                 else not makeLazyBlocks || hasTxs)
+        $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+            (length poolableNewTxs) (M.size pending)
+        $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
+            "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
+             (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
         when (pbft && shouldOutputBlocks) $
           contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
@@ -120,6 +131,7 @@ ethereumVM = void . execContextM $ do
         -- todo: is this the best place to put this?
         flushLogEntries
         flushTransactionResults
+        void . K.withKafkaViolently $ writeActionJSONToKafka actions
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -136,7 +148,7 @@ insertNewChains events = do
     case mGSR of
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> do
-        initializeChainDBs cId sr -- only needed to update Postgres with chain info for API calls
+        initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
         putGenesisStateRoot cId sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains

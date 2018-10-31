@@ -31,4 +31,4 @@ defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of adm
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 
 defineFlag "seq_max_events_per_iter" (20 :: Int) "How many elements to wait for in each sequencer iteration"
-defineFlag "seq_max_us_per_iter" (10000 :: Int) "How many μs to spend waiting for elements"
+defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"

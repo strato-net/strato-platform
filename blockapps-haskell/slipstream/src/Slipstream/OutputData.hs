@@ -15,7 +15,6 @@ import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
-import           Data.IORef.Lifted
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Set                        as Set
@@ -26,6 +25,9 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
+import           UnliftIO.IORef
+
+import           BlockApps.Ethereum
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -42,7 +44,7 @@ typeText :: SolidityValue -> Text
 typeText (SolidityValueAsString _) = "text"
 typeText (SolidityNum _) = "bigint"
 typeText (SolidityBool _) = "bool"
-typeText (_) = "json"
+typeText (_) = "jsonb"
 
 listToKeyStatement :: Text -> [(Text, b)] -> Text
 listToKeyStatement _ [] = ""
@@ -120,59 +122,96 @@ convertRet metadata conn globalsIORef = runConduit $
   .| createInserts globalsIORef
   .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
-createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> Conduit [ProcessedContract] m Text
+createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
 createInserts globalsIORef = do
   metadata <- fromMaybe (error "createInserts called without contracts") <$> await
-  let firstContract = head metadata
-  let hashVal = codehash firstContract
-  globals <- readIORef globalsIORef
-  let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
+  unless (null metadata) $ do
+    let firstContract = head metadata
+    let hashVal = codehash firstContract
+    globals <- readIORef globalsIORef
+    let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
+    let tableName = contractName firstContract
+    history <- isHistoric globalsIORef hashVal
 
-  liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
-
-  if (length metadata > 1)
-    then do
-      when (not $ contractAlreadyCreated) $ do
-          let conVals = T.concat ["('", (codehash $ head metadata), "', '", (contractName $ head metadata), "', '", (abi $ head metadata), "', '", (chain $ head metadata), "')"]
-          let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
-          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          yield conIns
-
-      let fstContract = contractData $ head metadata
-      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fstContract
-      let comma = if (length list == 0)
-          then ""
-          else ", "
-      let createSt = T.concat ["create table if not exists \"", (contractName $ head metadata), "\" (address text, \"chainId\" text", comma, tableColumns list, ", CONSTRAINT \"", (contractName $ head metadata), "_pkey\" PRIMARY KEY (address, \"chainId\") );"]
-      yield createSt
-
-      let keySt = T.concat ["(", "address, \"chainId\"", comma, listToKeyStatement ", " list, ")"]
-
-      vals <- forM metadata $ \row -> do
-            let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-            let rowSt = T.concat ["(", "'", address row, "', '", chain row, "'", comma, listToValueStatement ", " rowList, ")"]
-            return rowSt
-
-      let inserts = T.intercalate ", " vals
-      let ins = T.concat ["insert into \"", (contractName $ head metadata), "\" ", keySt, " values ", inserts, " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"", comma, (tableUpsert list), ";"]
-
-      yield ins
-  else do
-    let row = head metadata
-
-    when(not contractAlreadyCreated) $ do
-          let conVals = T.concat ["('", codehash row, "', '", contractName row, "', '", abi row, "', '", chain row, "')"]
-          let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
-          _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
-          yield conIns
-    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-    let comma = if (length list == 0)
+    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
+    let comma = if null list
         then ""
         else ", "
-    let createSt = T.concat ["create table if not exists \"", contractName row, "\" (address text, \"chainId\" text", comma, tableColumns list, ", CONSTRAINT \"", contractName row,"_pkey\" PRIMARY KEY (address, \"chainId\") );"]
-    yield createSt
 
-    let keySt = T.concat ["(", "address, \"chainId\"", comma, listToKeyStatement ", " list, ")"]
-    let vals = T.concat ["(", "'", address row, "', '", chain row, "'", comma , listToValueStatement ", " list, ")"]
-    let ins = T.concat ["insert into \"", contractName row, "\" ", keySt, " values ", vals, " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\"", comma, (tableUpsert list), ";"]
-    yield ins
+    let keySt = T.concat ["(", "address, \"chainId\", block_hash, block_timestamp, block_number, transaction_hash, transaction_sender", comma, listToKeyStatement ", " list, ")"]
+
+    liftIO . debugM "createInserts" . show $ T.concat ["In convertRet, ", tshow hashVal, " contractAlreadyCreated = ", tshow contractAlreadyCreated]
+
+    historicContracts <- getHistoryList globalsIORef
+    liftIO . debugM "historicContracts" $ show historicContracts
+
+    --When contract hasn't been written to "contract" table and indexing table doesn't exist
+    when (not $ contractAlreadyCreated) $ do
+        let conVals = T.concat ["('", T.pack $ keccak256String $ codehash firstContract, "', '", contractName firstContract, "', '", abi firstContract, "', '", chain firstContract, "')"]
+        let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
+        yield conIns
+        let createSt = T.concat
+                [ "create table if not exists \""
+                , tableName
+                , "\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+                , comma
+                , tableColumns list
+                , ", CONSTRAINT \""
+                , tableName
+                , "_pkey\" PRIMARY KEY (address, \"chainId\") );" ]
+        yield createSt
+
+        when history $ do
+          let histSt = T.concat
+                [ "create table if not exists \""
+                , tableName
+                , "_history\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
+                , comma
+                , tableColumns list
+                , ");" ]
+          yield histSt
+        _ <- writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+        return ()
+    let vals = flip map metadata $ \row ->
+          let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+          in T.concat
+                [ "('"
+                , tshow $ address row
+                , "', '"
+                , chain row
+                , "', '"
+                , T.pack $ keccak256String $ blockHash row
+                , "', '"
+                , tshow $ blockTimestamp row
+                , "', '"
+                , tshow $ blockNumber row
+                , "', '"
+                , T.pack $ keccak256String $ transactionHash row
+                ,"', '"
+                , tshow $ transactionSender row
+                , "'"
+                , comma
+                , listToValueStatement ", " rowList
+                , ")" ]
+    let inserts = T.intercalate ", " vals
+
+    when history $ do
+      let hist = T.concat ["insert into \"", tableName, "_history\" ", keySt, " values ", inserts, ";"]
+      yield hist
+
+    index <- shouldIndex globalsIORef hashVal
+    when index $ do
+      let ins = T.concat
+            [ "insert into \""
+            , tableName
+            , "\" "
+            , keySt
+            , " values "
+            , inserts
+            , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
+            , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
+            , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender"
+            , comma
+            , (tableUpsert list)
+            , ";" ]
+      yield ins

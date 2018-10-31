@@ -33,6 +33,7 @@ import           Data.Aeson
 import           Data.Function
 import           Data.Maybe
 import           Data.String
+import           Data.Text                                   (Text)
 
 import           Data.ByteString                             (ByteString)
 
@@ -74,7 +75,7 @@ data AccountDiff (v :: Detail) =
     code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
     codeHash     :: SHA, -- Maybe
-    sourceCodeHash     :: Maybe (SHA, String),
+    sourceCodeHash     :: Maybe (SHA, Text),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),

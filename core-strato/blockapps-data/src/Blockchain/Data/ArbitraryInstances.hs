@@ -10,6 +10,7 @@ import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Internal           as IB
 import qualified Data.Map                           as M    hiding (map, filter)
+import qualified Data.Text                          as T
 import           Data.Time
 
 import           System.IO.Unsafe                   (unsafePerformIO)
@@ -62,6 +63,9 @@ instance Arbitrary Address where
     arbitrary = do
         random160Bit <- fastRandBs 20
         return . Address . fromIntegral . byteString2Integer $ random160Bit
+
+instance Arbitrary T.Text where
+  arbitrary = T.pack <$> arbitrary
 
 instance Arbitrary BlockData where
     arbitrary = do
@@ -121,18 +125,19 @@ instance Arbitrary Transaction where
         prvKey    <- unboxPK <$> arbitrary
         isMessage <- arbitrary :: Gen Bool
         chainId   <- arbitrary
+        md        <- arbitrary
         case isMessage of
             True  -> do
                 to     <- arbitrary
                 txData <- arbitrary
                 return . unsafePerformIO .
                     H.withSource H.devURandom $
-                        createChainMessageTX nonce gasPrice gasLimit to value txData chainId prvKey
+                        createChainMessageTX nonce gasPrice gasLimit to value txData chainId md prvKey
             False -> do
                 contractCode <- arbitrary
                 return . unsafePerformIO .
                     H.withSource H.devURandom $
-                        createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId prvKey
+                        createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
 
 instance Arbitrary Code where
     -- PrecompiledCode can't be serialized!
@@ -163,10 +168,10 @@ instance Arbitrary Enode where
           <*> (arbitrary `suchThat` maybe True (>=0))
 
 instance Arbitrary CodeInfo where
-  arbitrary = CodeInfo 
+  arbitrary = CodeInfo
       <$> arbitrary
-      <*> arbitrary
-      <*> arbitrary
+      <*> (T.pack <$> arbitrary)
+      <*> (T.pack <$> arbitrary)
 
 instance Arbitrary AccountInfo where
   arbitrary = NonContract
@@ -174,9 +179,9 @@ instance Arbitrary AccountInfo where
       <*> arbitrary `suchThat` (>=0)
 
 instance Arbitrary ChainInfo where
-  arbitrary = do 
+  arbitrary = do
     cl <- arbitrary :: Gen String
     ai <- arbitrary :: Gen [AccountInfo]
     ci <- arbitrary :: Gen [CodeInfo]
-    mb <- arbitrary :: Gen (M.Map Address Enode) 
+    mb <- arbitrary :: Gen (M.Map Address Enode)
     return (ChainInfo cl ai ci mb)

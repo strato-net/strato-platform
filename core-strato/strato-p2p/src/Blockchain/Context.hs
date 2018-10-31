@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
@@ -22,21 +23,27 @@ module Blockchain.Context
     , clearActionTimestamp
     , addPeer
     , getPeerByIP
+    , setPeerAddrIfUnset
+    , shouldSendToPeer
     ) where
 
 
 import           Conduit
+import           Control.Applicative
+import           Control.Lens                          hiding (Context)
 import           Control.Monad.Logger
 import           Control.Monad.State
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Data.Void
 
+import           Blockchain.Data.Address
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.Metrics
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
@@ -55,13 +62,16 @@ data Context =
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
-        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => Conduit [IngestEvent] m Void,
-        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => Conduit [VMEvent] m Void,
+        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => ConduitM [IngestEvent] Void m (),
+        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => ConduitM [VMEvent] Void m (),
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
         connectionTimeout   :: Int,
-        maxReturnedHeaders  :: Int
+        maxReturnedHeaders  :: Int,
+        _blockstanbulPeerAddr :: Maybe Address
     }
+
+makeLenses ''Context
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
@@ -118,11 +128,11 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-runContextM :: (MonadBaseControl IO m )
+runContextM :: (MonadBaseControl IO m, MonadThrow m, MonadIO m)
             => s
             -> StateT s (ResourceT m) a
             -> m ()
-runContextM s f = void . runResourceT $ runStateT f s
+runContextM s f = void . runResourceT $ recordProcessStart >> runStateT f s
 
 initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
             => Int -> m Context
@@ -139,6 +149,7 @@ initContext maxHeaders = do
                  , vmTrace=[]
                  , connectionTimeout=flags_connectionTimeout
                  , maxReturnedHeaders = maxHeaders
+                 , _blockstanbulPeerAddr = Nothing
                  }
 
 
@@ -161,9 +172,17 @@ getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m
             -> m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
     db <- getSQLDB
-    (SQL.runSqlPool actions db) >>= \case
+    SQL.runSqlPool actions db >>= \case
         [] -> return Nothing
         lst -> return . Just $ head lst
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
+setPeerAddrIfUnset :: MonadState Context m => Address -> m ()
+setPeerAddrIfUnset addr = blockstanbulPeerAddr %= (<|> Just addr)
+
+shouldSendToPeer :: MonadState Context m => Address -> m Bool
+shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
+        -- TODO(tim): 0x0 may come from a Legacy kafka message, remove
+        -- in a future release
+  where zeroOrArg addr' = addr' == 0x0 || addr' == addr

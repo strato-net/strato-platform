@@ -86,8 +86,10 @@ data SetupDBs =
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: Redis.Connection,
-    localStorage :: Map.Map (Address, Word256) Word256,
-    localAddressState :: Map.Map Address AddressStateModification
+    localStorageTx :: Map.Map (Address, Word256) Word256,
+    localStorageBlock :: Map.Map (Address, Word256) Word256,
+    localAddressStateTx :: Map.Map Address AddressStateModification,
+    localAddressStateBlock :: Map.Map Address AddressStateModification
     }
 
 type SetupDBM = StateT SetupDBs (LoggingT (ResourceT IO))
@@ -100,18 +102,28 @@ instance HasStateDB SetupDBM where
     put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
 
 instance HasStorageDB SetupDBM where
-  getStorageDB = do
+  getStorageTxDB = do
     cxt <- get --storage and states use the same database!
-    return (MP.ldb . stateDB $ cxt, localStorage cxt)
-  putStorageMap theMap = do
+    return (MP.ldb . stateDB $ cxt, localStorageTx cxt)
+  putStorageTxMap theMap = do
     cxt <- get
-    put cxt{localStorage=theMap}
+    put cxt{localStorageTx=theMap}
+  getStorageBlockDB = do
+    cxt <- get --storage and states use the same database!
+    return (MP.ldb . stateDB $ cxt, localStorageBlock cxt)
+  putStorageBlockMap theMap = do
+    cxt <- get
+    put cxt{localStorageBlock=theMap}
 
 instance HasMemAddressStateDB SetupDBM where
-  getAddressStateDBMap = localAddressState <$> get
-  putAddressStateDBMap theMap = do
+  getAddressStateTxDBMap = localAddressStateTx <$> get
+  putAddressStateTxDBMap theMap = do
     cxt <- get
-    put cxt{localAddressState=theMap}
+    put cxt{localAddressStateTx=theMap}
+  getAddressStateBlockDBMap = localAddressStateBlock <$> get
+  putAddressStateBlockDBMap theMap = do
+    cxt <- get
+    put cxt{localAddressStateBlock=theMap}
 
 instance HasHashDB SetupDBM where
   getHashDB = fmap hashDB get
@@ -354,7 +366,6 @@ oneTimeSetup genesisBlockName = do
                  }
 
       inflateDir stratoAPICerts
-      inflateDir stratoAPIStaticDir
       inflateDir stratoAPIConfigDir
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
@@ -438,7 +449,7 @@ oneTimeSetup genesisBlockName = do
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
+         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty Map.empty Map.empty) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

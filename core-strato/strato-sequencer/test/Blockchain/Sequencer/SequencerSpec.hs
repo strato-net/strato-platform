@@ -5,6 +5,7 @@ module Blockchain.Sequencer.SequencerSpec where
 
 
 import           ClassyPrelude                       (atomically)
+import           Data.IORef
 import           Data.Maybe                          (isNothing, fromMaybe)
 import           Data.Time.Clock.POSIX
 import           Data.Map                            as M (singleton,lookup)
@@ -19,6 +20,7 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
+import           Control.Monad.State.Class
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
@@ -27,6 +29,7 @@ import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
@@ -39,7 +42,8 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
-import           Blockchain.Strato.Model.Class       (txChainId, blockHash, blockHeaderDifficulty)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
@@ -77,6 +81,12 @@ runPBFTTestM :: SequencerM a -> IO ()
 runPBFTTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB True gb m
+
+runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
+runPBFTTestMWithGenesis m = do
+  gb <- makeGenesisBlock
+  let hash = blockHash . ingestBlockToBlock $ gb
+  void $ withTemporaryDepBlockDB True gb (m hash)
 
 withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB pbft genesisBlock m = do
@@ -214,13 +224,17 @@ spec = do
         drainP2P `shouldReturn` evs2
         drainP2P `shouldReturn` []
 
-      it "queues timeouts" $ runTestM $ do
+      it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
-        local (\cfg -> cfg{blockstanbulRoundPeriod=0}) $
+        local (\cfg -> cfg{blockstanbulRoundPeriod=0.00005}) $
           mapM_ createNewTimer input
-        liftIO $ threadDelay 200 -- Who are you to judge?
+        liftIO $ threadDelay 10000 -- Who are you to judge?
+        rnref <- gets _latestRoundNumber
+        liftIO $ atomicWriteIORef rnref 200
         out <- drainTimeouts
-        out `shouldMatchList` input
+        filter (==20) out `shouldBe` [20]
+        filter (==30) out `shouldBe` [30]
+        filter (==45) out `shouldContain` [45, 45, 45]
 
       it "checks for votes" $ runPBFTTestM $ do
         bc <- getBlockstanbulContext
@@ -308,8 +322,12 @@ spec = do
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [10..19]
 
-      it "should forward new blocks to blockstanbul" . runPBFTTestM $ do
-        let iev = IEBlock . blockToIngestBlock TO.Morphism $ makeBlock 1 1
+      it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
+        let b' = makeBlock 1 1
+            b = b'{blockBlockData = (blockBlockData b') {
+                    blockDataParentHash = h,
+                    blockDataNumber = 1}}
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         checkForUnseq [iev]
         p2pevs <- drainP2P
         let pbftEvs = [m | OEBlockstanbul (WireMessage _ m) <- p2pevs]
@@ -317,22 +335,24 @@ spec = do
         vmevs <- drainVM
         vmevs `shouldContain` [OECreateBlockCommand]
 
-      it "should replay old blocks in blockstanbul" . runPBFTTestM $ do
+      it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let blk = makeBlock 2 1
-            blk' = addValidators (_validators ctx) blk{
-                      blockBlockData = (blockBlockData blk){blockDataNumber = 1}}
-        pseal <- proposerSeal blk' (_prvkey ctx)
-        let blk'' = addProposerSeal pseal blk'
-        cseal <- commitmentSeal (blockHash blk'') (_prvkey ctx)
-        let blk''' = addCommitmentSeals [cseal] blk''
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk'''
+        let blk0 = makeBlock 2 1
+            blk1 = blk0{blockBlockData = (blockBlockData blk0){
+                          blockDataParentHash = h,
+                          blockDataNumber = 1}}
+            blk2 = addValidators (_validators ctx) blk1
+        pseal <- proposerSeal blk2 (_prvkey ctx)
+        let blk3 = addProposerSeal pseal blk2
+        cseal <- commitmentSeal (blockHash blk3) (_prvkey ctx)
+        let blk4 = addCommitmentSeals [cseal] blk3
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
         checkForUnseq [iev]
         drainP2P `shouldReturn` []
         vmevs <- drainVM
         vmevs `shouldContain` [OECreateBlockCommand]
-        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk''']
+        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk4]
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 

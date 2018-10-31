@@ -40,11 +40,11 @@ import           Control.Monad.Trans.Resource
 import           Conduit
 import           Data.Conduit.TMChan
 import           Data.Foldable                             (toList)
+import           Data.IORef
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
-import           Prometheus
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -75,6 +75,7 @@ data SequencerContext = SequencerContext
                       , _p2pEvents           :: Q.Seq OutputEvent
                       , _blockstanbulContext :: Maybe BlockstanbulContext
                       , _loopTimeout         :: TMChan ()
+                      , _latestRoundNumber   :: IORef RoundNumber
                       }
 makeLenses ''SequencerContext
 
@@ -124,9 +125,6 @@ instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
     putBlockstanbulContext = assign (blockstanbulContext . _Just)
 
-instance MonadMonitor SequencerM where
-    doIO = liftIO
-
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -136,6 +134,7 @@ runSequencerM c mbc m = do
         stxSize  <- asks seenTransactionDBSize
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         loopCh <- atomically newTMChan
+        latestRound <- liftIO $ newIORef 0
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
@@ -147,7 +146,8 @@ runSequencerM c mbc m = do
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
             , _blockstanbulContext = mbc
-            , _loopTimeout = loopCh
+            , _loopTimeout         = loopCh
+            , _latestRoundNumber   = latestRound
             }
     return $ fst a
 
@@ -173,11 +173,21 @@ createFirstTimer = do
 
 createNewTimer :: RoundNumber -> SequencerM ()
 createNewTimer rn = do
+  rnref <- use latestRoundNumber
+  liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
   ch <- asks blockstanbulTimeouts
-  let act :: AlarmClock UTCTime -> IO ()
-      act _ = atomically $ writeTMChan ch rn
-  alarm <- liftIO $ newAlarmClock act
   dt <- asks blockstanbulRoundPeriod
+  let act :: AlarmClock UTCTime -> IO ()
+      act this = do
+        atomically $ writeTMChan ch rn
+        globalRN <- readIORef rnref
+        -- The first RoundChange for this message may have not
+        -- been seen, so we keep firing at the same interval
+        -- until an alarm lands and the round changes
+        unless (globalRN > rn) $ do
+          next <- addUTCTime dt <$> getCurrentTime
+          setAlarm this next
+  alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
 
@@ -204,17 +214,18 @@ addLdbBatchOps ops = do
   let newOps = foldl (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
-fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
+fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
   votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
-  mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
-               , sourceTMChan votes .| mapC VoteMade
-               , sourceTMChan timers .| mapC TimerFire
-               , sourceTMChan loop .| mapC (const WaitTerminated)]
-               4096 -- 🙏
+  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
+  debugLog <$> mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
+                            , sourceTMChan votes .| mapC VoteMade
+                            , sourceTMChan timers .| mapC TimerFire
+                            , sourceTMChan loop .| mapC (const WaitTerminated)]
+                            4096 -- 🙏
 
 createWaitTimer :: Int -> SequencerM ()
 createWaitTimer dt = do

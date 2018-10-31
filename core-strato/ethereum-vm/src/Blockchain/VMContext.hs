@@ -28,7 +28,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
+import qualified Data.Sequence                      as Q
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as SQL
 import qualified Database.Redis                     as Redis
@@ -45,7 +47,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -69,60 +70,43 @@ import           Executable.EVMFlags
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
 
-data Context = Context { contextStateDB             :: MP.MPDB
-                       , contextHashDB              :: HashDB
-                       , contextCodeDB              :: CodeDB
-                       , contextBlockSummaryDB      :: BlockSummaryDB
-                       , contextSQLDB               :: SQLDB
-                       , contextAddressStateDBMap   :: M.Map Address AddressStateModification
-                       , contextStorageMap          :: M.Map (Address, Word256) Word256
-                       , contextBlockHashRoot       :: MP.StateRoot
-                       , contextGenesisRoot         :: MP.StateRoot
-                       , contextCurrentBlockHash    :: SHA
-                       , contextCurrentChainId      :: Maybe Word256
-                       , contextBaggerState         :: !BaggerState
-                       , contextKafkaState          :: K.KafkaState
-                       , contextBestBlockInfo       :: ContextBestBlockInfo
-                       , contextRedisPool           :: Redis.Connection
-                       , contextInsertTxResultQueue :: [TransactionResult]
-                       , contextUpdateTxResultQueue :: [(SHA,SHA,SHA,MiningStatus)]
-                       , contextLogDBQueue          :: [LogDB]
-                       , contextHasBlockstanbul     :: Bool
-                       , _contextBlockRequested      :: Bool
+data Context = Context { contextStateDB                :: MP.MPDB
+                       , contextHashDB                 :: HashDB
+                       , contextCodeDB                 :: CodeDB
+                       , contextBlockSummaryDB         :: BlockSummaryDB
+                       , contextSQLDB                  :: SQLDB
+                       , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
+                       , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
+                       , contextStorageTxMap           :: M.Map (Address, Word256) Word256
+                       , contextStorageBlockMap        :: M.Map (Address, Word256) Word256
+                       , contextBlockHashRoot          :: MP.StateRoot
+                       , contextGenesisRoot            :: MP.StateRoot
+                       , contextCurrentBlockHash       :: SHA
+                       , contextCurrentChainId         :: Maybe Word256
+                       , contextBaggerState            :: !BaggerState
+                       , contextKafkaState             :: K.KafkaState
+                       , contextBestBlockInfo          :: ContextBestBlockInfo
+                       , contextRedisPool              :: Redis.Connection
+                       , contextTxResultQueue          :: Q.Seq TransactionResult
+                       , contextLogDBQueue             :: [LogDB]
+                       , contextHasBlockstanbul        :: Bool
+                       , _contextBlockRequested        :: Bool
                        }
 makeLenses ''Context
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
 instance HasMemTXResultDB ContextM where
-  enqueueInsertTransactionResults txrs = do
+  enqueueTransactionResults txrs = do
     ctx <- get
-    let q = contextInsertTxResultQueue ctx
-    put $ ctx { contextInsertTxResultQueue = (q ++ txrs) }
-
-  flushInsertTransactionResults = do
-    ctx <- get
-    let toWrite = contextInsertTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.InsertTxResult <$> toWrite)
-    put $ ctx { contextInsertTxResultQueue = [] }
-
-  enqueueUpdateTransactionResults sss = do
-    ctx <- get
-    let q = contextUpdateTxResultQueue ctx
-    put $ ctx { contextUpdateTxResultQueue = (q ++ sss) }
-
-  flushUpdateTransactionResults = do
-    ctx <- get
-    let toWrite = contextUpdateTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.UpdateTxResult <$> toWrite)
-    put $ ctx { contextUpdateTxResultQueue = [] }
+    let q = contextTxResultQueue ctx
+    put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
 
   flushTransactionResults = do
     ctx <- get
-    let toInsert = IM.InsertTxResult <$> contextInsertTxResultQueue ctx
-        toUpdate = IM.UpdateTxResult <$> contextUpdateTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (toInsert ++ toUpdate)
-    put $ ctx { contextInsertTxResultQueue = [], contextUpdateTxResultQueue = [] }
+    let toWrite = contextTxResultQueue ctx
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toList toWrite)
+    put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
   enqueueLogEntries ls = do
@@ -168,19 +152,30 @@ instance K.HasKafkaState ContextM where
         put $ ctx {contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateDBMap = contextAddressStateDBMap <$> get
-  putAddressStateDBMap theMap = do
+  getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
+  putAddressStateTxDBMap theMap = do
     cxt <- get
-    put $ cxt{contextAddressStateDBMap=theMap}
+    put $ cxt{contextAddressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = contextAddressStateBlockDBMap <$> get
+  putAddressStateBlockDBMap theMap = do
+    cxt <- get
+    put $ cxt{contextAddressStateBlockDBMap=theMap}
 
 instance HasStorageDB ContextM where
-  getStorageDB = do
+  getStorageTxDB = do
     cxt <- get
     return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageMap cxt)
-  putStorageMap theMap = do
+            contextStorageTxMap cxt)
+  putStorageTxMap theMap = do
     cxt <- get
-    put cxt{contextStorageMap=theMap}
+    put cxt{contextStorageTxMap=theMap}
+  getStorageBlockDB = do
+    cxt <- get
+    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
+            contextStorageBlockMap cxt)
+  putStorageBlockMap theMap = do
+    cxt <- get
+    put cxt{contextStorageBlockMap=theMap}
 
 instance HasHashDB ContextM where
   getHashDB = contextHashDB <$> get
@@ -197,7 +192,7 @@ instance HasSQLDB ContextM where
 instance RBDB.HasRedisBlockDB ContextM where
     getRedisBlockDB = contextRedisPool <$> get
 
-instance MonadMonitor ContextM where
+instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
@@ -225,6 +220,8 @@ runContextM f = do
                         conn
                         M.empty
                         M.empty
+                        M.empty
+                        M.empty
                         MP.emptyTriePtr
                         MP.emptyTriePtr
                         (SHA 0)
@@ -233,7 +230,8 @@ runContextM f = do
                         initialKafkaState
                         Unspecified
                         redisPool
-                        [] [] []
+                        Q.empty
+                        []
                         flags_blockstanbul
                         False)
 
@@ -259,8 +257,8 @@ getNewAddress address = do
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getStorageDB
-  putStorageMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
+  (_, storageMap) <- getStorageTxDB
+  putStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

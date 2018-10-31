@@ -19,9 +19,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  if [ -n "${connectionTimeout}" ]; then
-    ctFlag="--connectionTimeout=${connectionTimeout}"
-  fi
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -35,14 +32,30 @@ function newnode {
 
   if $serveBlocks
   then echo "Starting strato-p2p-server"
-       runBackgroundProcess strato-p2p-server $ctFlag --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
+       runBackgroundProcess strato-p2p-server --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
        echo "Starting ethereum-discover"
        runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
   fi
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runBackgroundProcess strato-p2p-client $ctFlag --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-client 2>&1
+       actualTimeout="${connectionTimeout:-300}"
+       if [ -n "${blockstanbulRoundPeriodS}" ]; then
+         withCushion=$(( 2 * blockstanbulRoundPeriodS ))
+         actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
+       fi
+       if [ -n "${validators}" ]; then
+         numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
+         maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
+       fi
+       runBackgroundProcess strato-p2p-client \
+          --connectionTimeout=$actualTimeout \
+          --cNetworkID=$networkID \
+          --maxConn=$maxConn \
+          --sqlPeers=true \
+          --debugFail=${debugFail:-true}  \
+          --maxReturnedHeaders=$maxReturnedHeaders \
+          >> logs/strato-p2p-client 2>&1
   fi
 
   evmMinLogLevel=LevelInfo
@@ -75,7 +88,7 @@ function newnode {
   fi
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+    --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -143,7 +156,6 @@ function cleanupDB {
 }
 
 function doInit {
-  cp -r /var/lib/node_modules /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
@@ -167,8 +179,6 @@ function doInit {
   fi
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
-
-  cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
 
   echo "Creating a random coinbase"
   mkCoinbase

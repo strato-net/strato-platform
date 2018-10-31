@@ -47,6 +47,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                         (transferpayloadToAddress p)
                         (transferpayloadValue p)
                         txParams
+                        (transferpayloadMetadata p)
                         chainId
                         resolve
             fmap (:[]) $ postUsersSend' btp (callSignature userName userId)
@@ -54,7 +55,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
                         addr
-                        (map (\(TransferPayload t v) -> SendTransaction t v txParams) p)
+                        (map (\(TransferPayload t v m) -> SendTransaction t v txParams m) p)
                         chainId
                         resolve
             postUsersSendList' btlp (callSignature userName userId)
@@ -69,6 +70,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
                         txParams
+                        (contractpayloadMetadata p)
                         chainId
                         resolve
             fmap (:[]) $ postUsersContract' bcp (callSignature userName userId)
@@ -76,7 +78,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
             p <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\(ContractPayload _ c a v) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v) p)
+                        (map (\(ContractPayload _ c a v m) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v m) p)
                         chainId
                         resolve
             postUsersUploadList' bclp (callSignature userName userId)
@@ -92,6 +94,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                         (functionpayloadArgs p)
                         (functionpayloadValue p)
                         txParams
+                        (functionpayloadMetadata p)
                         chainId
                         resolve
             fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName userId)
@@ -99,7 +102,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams) p)
+                        (map (\(FunctionPayload (ContractName n) a m r v md) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams md) p)
                         chainId
                         resolve
             postUsersContractMethodList' bflp (callSignature userName userId)
@@ -128,3 +131,4 @@ callSignature userName userId unsigned@UnsignedTransaction{..} = do
     (unHex v)
     (unHex r)
     (unHex s)
+    Nothing

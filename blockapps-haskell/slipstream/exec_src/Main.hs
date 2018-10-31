@@ -19,7 +19,7 @@ import System.IO
 import System.Log.Logger
 
 import Slipstream.MessageConsumer
-import Slipstream.Options ()
+import Slipstream.Options()
 import Slipstream.OutputData
 
 
@@ -40,7 +40,7 @@ main = do
   dbInsert conn conAlter
 
   let offset = 0 :: K.Offset
-  let kafkaID = "queryStrato" :: KafkaClientId
+  let kafkaID = "slipstream" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
   cachedContractsIORef <- newIORef def

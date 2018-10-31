@@ -18,7 +18,7 @@ import Blockchain.Strato.Model.SHA
 start :: GenesisInfo
 start = defaultGenesisInfo
 
-emptySource :: String
+emptySource :: T.Text
 emptySource = "contract x {}"
 
 emptyContractB16 :: BS.ByteString
@@ -29,7 +29,7 @@ emptyContract = "```@R[`\NUL\128\253\NUL\161ebzzr0X \155\151\184a\NAK\249\223\20
 
 vehicleContractB16 :: BS.ByteString
 
-vehicleSource :: String
+vehicleSource :: T.Text
 vehicleSource = "contract Vehicle {\
 \  uint timestamp;\
 \  string public vin;\

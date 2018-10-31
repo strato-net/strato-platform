@@ -117,7 +117,7 @@ readEventsInBufferedWindow src = do
 
 checkForVotes :: [CandidateReceived] -> SequencerM ()
 checkForVotes crs = do
-  withLabel "vote" (unsafeAddCounter . fromIntegral . length $ crs) seqLoopEvents
+  withLabel seqLoopEvents "vote" (flip unsafeAddCounter . fromIntegral . length $ crs)
   blockstanbulSend . map translate $ crs
   where translate :: CandidateReceived -> InEvent
         translate br =
@@ -130,17 +130,17 @@ checkForVotes crs = do
 
 checkForTimeouts :: [RoundNumber] -> SequencerM ()
 checkForTimeouts rns = do
-  withLabel "timeout" (unsafeAddCounter . fromIntegral . length $ rns) seqLoopEvents
+  withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
   blockstanbulSend . map Timeout $ rns
 
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
-    withLabel "unseq" (unsafeAddCounter . fromIntegral . length $ inEvents) seqLoopEvents
+    withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
     timeAction seqSplitEventsTiming $ splitEvents inEvents
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
     P.incCounter seqLdbBatchWrites
-    P.setGauge (fromIntegral (length pendingLDBWrites)) seqLdbBatchSize
+    P.setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
     $logInfoS "sequencer" "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
     unless (S.null chainIds) $
@@ -159,11 +159,12 @@ blockstanbulSend msgs = do
     resp' <- sendAllMessages msgs
     let blocks = [b | ToCommit b <- resp']
     resp <- (resp'++) <$>
-        if null blocks
-            then return []
-            -- TODO(tim): Block insertion can potentially fail, so there
-            -- should be feedback here
-            else sendAllMessages [CommitResult (Right ())]
+        case blocks of
+          [] -> return []
+          -- TODO(tim): Block insertion can potentially fail, so there
+          -- should be feedback here
+          [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
+          bs -> error $ "can send at most 1 block at a time: " ++ show bs
     mapM_ createNewTimer [rn | ResetTimer rn <- resp]
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap (OEBlock . flip sequencedBlockToOutputBlock 1)
@@ -172,6 +173,10 @@ blockstanbulSend msgs = do
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
         vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+              ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
+              ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
+
+
     unless (null blocks) $ do
       let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
       dt <- asks blockstanbulBlockPeriod
@@ -305,7 +310,7 @@ hydrateAndEmit sb = do
                                                then [sequencedBlockToBlock sb]
                                                else map outputBlockToBlock wetBlocks
  where
- hydrateAndEmit' :: Conduit () SequencerM OutputBlock
+ hydrateAndEmit' :: ConduitM () OutputBlock SequencerM ()
  hydrateAndEmit' = do
   let logHydrate = $logInfoS "hydrateAndEmit" . T.pack
   readiness <- lift $ enqueueIfParentNotEmitted sb
