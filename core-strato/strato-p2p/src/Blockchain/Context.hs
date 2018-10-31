@@ -43,6 +43,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.Metrics
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
@@ -127,11 +128,11 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-runContextM :: (MonadBaseControl IO m )
+runContextM :: (MonadBaseControl IO m, MonadThrow m, MonadIO m)
             => s
             -> StateT s (ResourceT m) a
             -> m ()
-runContextM s f = void . runResourceT $ runStateT f s
+runContextM s f = void . runResourceT $ recordProcessStart >> runStateT f s
 
 initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
             => Int -> m Context
