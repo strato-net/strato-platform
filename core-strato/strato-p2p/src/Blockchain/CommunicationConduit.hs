@@ -36,7 +36,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire
 import           Blockchain.DB.DetailsDB               hiding (getBestBlockHash)
 import           Blockchain.DB.SQLDB
-import           Blockchain.DBM
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
@@ -77,7 +76,7 @@ mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSources
         .| CL.map MsgEvt
     , seqEventNotificationSource
         .| CL.map NewSeqEvent
-    ] ++ extra) (2 + length extra)
+    ] ++ extra) 4096 -- 🙏
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
@@ -89,7 +88,7 @@ mkEthP2PEventConduit str outCtx =
   .| messageToBytes
   .| ethEncrypt outCtx
 
-handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
+handleMsgClientConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
                        -> PPeer
                        -> ConduitM Event Message m ()
@@ -129,11 +128,11 @@ handleMsgClientConduit myId peer = do
                 yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
-    handleEvents (if flags_debugFail then Fail else Log) peer
+    handleEvents peer
 
       where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
-handleMsgServerConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
+handleMsgServerConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
                  => Point
                  -> PPeer
                  -> ConduitM Event Message m ()
@@ -168,7 +167,7 @@ handleMsgServerConduit myPubkey peer = do
                         genesisHash=genHash
                     }
         other -> assertHandshake other
-    handleEvents (if flags_debugFail then Fail else Log) peer
+    handleEvents peer
 
 awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case

@@ -438,9 +438,12 @@ sendMessages wms = do
     Just ctx -> do
       let base = yieldMany wms
               .| iterMC recordInEvent
+              .| iterMC (inShortLog "blockstanbul/InShortLog")
               .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
               .| eventLoop ctx
-              `fuseUpstream` (iterMC recordOutEvent .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
+              `fuseUpstream` (iterMC recordOutEvent
+                           .| iterMC (outShortLog "blockstanbul/OutShortLog")
+                           .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
       return evs

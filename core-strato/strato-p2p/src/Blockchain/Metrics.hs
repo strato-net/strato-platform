@@ -2,9 +2,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Metrics ( recordEvent
-                          , recordMessage) where
+                          , recordMessage
+                          , recordProcessStart) where
 
+import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Resource
 import Data.Text
 import Prometheus
 
@@ -31,6 +34,11 @@ p2pEvents = unsafeRegister
           . vector "event_type"
           . counter
           $ Info "p2p_event" "Count of p2p events"
+
+numProcs :: Gauge
+numProcs = unsafeRegister
+         . gauge
+         $ Info "p2p_num_procs" "Number of processes running at any given time"
 
 recordEvent :: (MonadIO m) => Event -> m ()
 recordEvent = \case
@@ -61,11 +69,16 @@ recordMessage' msgVect msg = do
                 NewBlock _ _ -> "new_block"
                 Blockstanbul wm ->
                   case PBFT._message wm of
-                    PBFT.Preprepare _ _ -> "preprepare"
-                    PBFT.Prepare _ _ -> "prepare"
-                    PBFT.Commit _ _ _ -> "commit"
-                    PBFT.RoundChange _ -> "round_change"
+                    PBFT.Preprepare{} -> "preprepare"
+                    PBFT.Prepare{} -> "prepare"
+                    PBFT.Commit{} -> "commit"
+                    PBFT.RoundChange{} -> "round_change"
                 GetChainDetails _ -> "get_chain_details"
                 ChainDetails _ -> "chain_details"
                 GetTransactions _ -> "get_transactions"
   liftIO $ withLabel msgVect label incCounter
+
+recordProcessStart :: MonadResource m => m ()
+recordProcessStart = void $ allocate inc dec
+  where inc = addGauge numProcs 1
+        dec = const $ subGauge numProcs 1
