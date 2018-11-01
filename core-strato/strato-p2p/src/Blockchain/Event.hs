@@ -357,7 +357,7 @@ handleEvents peer = awaitForever $ \case
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yield outbound
-      OEAskForBlocks start end p -> do
+      OEAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
           $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Calling syncFetch Forward " ++ show start
