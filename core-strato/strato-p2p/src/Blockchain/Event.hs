@@ -360,7 +360,7 @@ handleEvents peer = awaitForever $ \case
       OEAskForBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Calling syncFetch Forward " ++ start
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Calling syncFetch Forward " ++ show start
           syncFetch Forward start
       OEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
