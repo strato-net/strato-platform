@@ -360,9 +360,8 @@ handleEvents peer = awaitForever $ \case
       OEAskForBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yield outbound
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Calling syncFetch Forward " ++ start
+          syncFetch Forward start
       OEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do

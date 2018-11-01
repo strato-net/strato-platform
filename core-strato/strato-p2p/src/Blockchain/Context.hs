@@ -35,6 +35,7 @@ import           Control.Lens                          hiding (Context)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Maybe                            (listToMaybe)
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 
@@ -168,9 +169,7 @@ getPeerByIP :: ( WrapsSQLDB t m
             -> (t m) (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = runWithSQL $ do
     db <- getSQLDB
-    SQL.runSqlPool actions db >>= \case
-        [] -> return Nothing
-        lst -> return . Just $ head lst
+    listToMaybe <$> SQL.runSqlPool actions db
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
