@@ -92,4 +92,4 @@ main = do
                                  , API.votingdir= not (optRemove opt)
                                  , API.nonce= fromright (optNonce opt)}
   putStrLn $ show vote
-  API.uploadVote 80 (fromright (optNode opt)) vote
+  API.uploadVote 80 ("admin:admin@"++(fromright (optNode opt))) vote
