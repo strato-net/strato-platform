@@ -37,8 +37,6 @@ data Action = Action
   , actionAddress         :: Address
   , actionCodeHash        :: Keccak256
   , actionStorage         :: Maybe (Map (Hex Word256) (Hex Word256))
-  , actionInput           :: Text
-  , actionOutput          :: Text
   , actionMetadata        :: Maybe (Map Text Text)
   } deriving (Show, Generic)
 

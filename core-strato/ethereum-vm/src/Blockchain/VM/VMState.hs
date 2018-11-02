@@ -3,7 +3,6 @@
 module Blockchain.VM.VMState (
   VMState(..),
   storageDiffs,
-  details,
   Memory(..),
   startingState,
   DebugCallCreate(..),
@@ -20,7 +19,6 @@ import           Data.Word
 
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.ExtWord
 import           Blockchain.Format
@@ -74,7 +72,6 @@ data VMState =
 
     writable         :: Bool, -- Whether to throw on attempted changes to storage
 
-    _details          :: [VMDetails],
     _storageDiffs    :: M.Map Address (M.Map Word256 Word256),
 
     --These last two variable are only used for the Ethereum tests.
@@ -113,7 +110,6 @@ startingState isRunningTests' isHomestead env dbs' = do
                logs=[],
                environment=env,
                suicideList=S.empty,
-               _details = [],
                _storageDiffs = M.empty,
 
                --only used for running ethereum tests

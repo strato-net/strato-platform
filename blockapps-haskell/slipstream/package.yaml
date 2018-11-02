@@ -40,7 +40,6 @@ dependencies:
   - monad-control
   - mtl
   - network
-  - ordered-containers
   - postgresql-simple
   - postgresql-typed
   - resource-pool
