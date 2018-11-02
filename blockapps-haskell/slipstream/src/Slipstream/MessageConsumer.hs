@@ -97,7 +97,7 @@ getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset ->
 getAndProcessMessages conn cache offset = do
   eMessages <- try $ getTheMessages offset
   case eMessages of
-    Left e -> throw (e :: SomeException)
+    Left e -> error $ show (e :: SomeException)
     Right messages -> do
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
