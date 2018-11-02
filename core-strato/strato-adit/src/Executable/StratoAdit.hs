@@ -12,6 +12,7 @@ module Executable.StratoAdit (
 
 import           Control.Concurrent.Lifted      hiding (yield, takeMVar, putMVar, newEmptyMVar)
 import           Control.Concurrent.STM
+import           Control.Exception.Lifted       (try, SomeException)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Logger
@@ -93,26 +94,32 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
 
 doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
-    $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
+  $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
+  ePeersBlocks <- try $ do
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
-    numPeers <- liftIO $ getActivePeers >>= return . length
+    eNumPeers <- liftIO . fmap length $ getActivePeers
+    return (eNumPeers, reverse blocks)
 
-    case reverse blocks of
-     [] -> --meh, kafka just timed out or something, no blocks, no big deal
-       doConsume (offset + fromIntegral (length blocks)) c
+  case ePeersBlocks of
+    Left err -> do
+      $logErrorS "doConsume" . T.pack . show $ (err :: SomeException)
+      recordException
+      doConsume offset c
 
-     (b:_) -> do --b is the last block, because of the reverse above
-       let quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
+    --meh, kafka just timed out or something, no blocks, no big deal
+    Right (_, []) -> doConsume offset c
+    Right (numPeers, blocks@(b:_)) -> do --b is the last block, because of the reverse above
+      let quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
 
-       if quorumSizeCriteria
-         then do
-           liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
-           $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
-             ++ (show . blockDataNumber $ blockBlockData b)
-          else $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
-            ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
+      if quorumSizeCriteria
+        then do
+          liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
+          $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
+            ++ (show . blockDataNumber $ blockBlockData b)
+         else $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
+           ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
 
-       doConsume (offset + fromIntegral (length blocks)) c
+      doConsume (offset + fromIntegral (length blocks)) c
 
 stratoAdit :: LoggingT IO ()
 stratoAdit = runAditT $ do
