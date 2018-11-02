@@ -129,6 +129,12 @@ class CreateContract extends Component {
     else {
       metadata["nohistory"] = contractname;
     }
+    if (values.index === "on") {
+      metadata["index"] = contractname;
+    }
+    else {
+      metadata["noindex"] = contractname;
+    }
 
     const payload = {
       contract: contractname,
@@ -391,11 +397,32 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="history"
-                      // validate={required}
-                      // required
+                      validate={required}
+                      required
                     >
                       <option key="off" value="off">Off</option>
                       <option key="on" value="on">On</option>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Indexing
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="index"
+                      validate={required}
+                      required
+                    >
+                      <option key="on" value="on">On</option>
+                      <option key="off" value="off">Off</option>
                     </Field>
                   </div>
                 </div>
