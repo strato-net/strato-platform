@@ -7,6 +7,7 @@
 
 module Slipstream.MessageConsumer where
 
+import Control.Exception.Lifted
 import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson hiding (Error)
@@ -94,8 +95,11 @@ getTheMessages offset = do
 
 getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
 getAndProcessMessages conn cache offset = do
-  messages <- tryKafka $ getTheMessages offset
-  liftIO $ processTheMessages messages conn cache
-  when (null messages) $
-    liftIO $ threadDelay 1000000
-  getAndProcessMessages conn cache $ offset + fromIntegral (length messages)
+  eMessages <- try $ getTheMessages offset
+  case eMessages of
+    Left e -> throw (e :: SomeException)
+    Right messages -> do
+      liftIO $ processTheMessages messages conn cache
+      when (null messages) $
+        liftIO $ threadDelay 1000000
+      getAndProcessMessages conn cache $ offset + fromIntegral (length messages)
