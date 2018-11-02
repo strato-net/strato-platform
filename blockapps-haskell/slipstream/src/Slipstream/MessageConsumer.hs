@@ -94,7 +94,7 @@ getTheMessages offset = do
 
 getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
 getAndProcessMessages conn cache offset = do
-  messages <- getTheMessages offset
+  messages <- tryKafka $ getTheMessages offset
   liftIO $ processTheMessages messages conn cache
   when (null messages) $
     liftIO $ threadDelay 1000000

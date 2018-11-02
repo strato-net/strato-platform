@@ -8,7 +8,6 @@
     , TemplateHaskell
     , FlexibleContexts
 #-}
-import Control.Exception
 import Data.Default
 import Data.IORef
 import Database.PostgreSQL.Typed
@@ -45,9 +44,9 @@ main = do
 
   cachedContractsIORef <- newIORef def
 
-  msg <- try . runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
   messages <- case msg of
-        Left e -> throw (e :: SomeException)
+        Left e -> error $ show e
         Right y -> return y
   print messages
   return ()
