@@ -13,7 +13,6 @@ import           Data.Text                (Text)
 import qualified BlockApps.Solidity.Value as V
 import           BlockApps.Ethereum (Keccak256, Address)
 import           Data.Time
-import           Slipstream.SolidityValue
 
 type StateRoot = Text
 
@@ -30,8 +29,5 @@ data ProcessedContract = ProcessedContract {
   , blockNumber         :: Integer
   , transactionHash     :: Keccak256
   , transactionSender   :: Address
-  , transactionFuncName :: Text
-  , transactionInput    :: [(Text,SolidityValue)]
-  , transactionOutput   :: [(Text,SolidityValue)]
   , contractData        :: Map Text V.Value
 } deriving (Show)
