@@ -9,6 +9,7 @@
 
 module Blockchain.Strato.Discovery.Data.Peer where
 
+import           Control.Exception
 import           Crypto.Types.PubKey.ECC
 import qualified Data.Text                    as T
 import           Data.Time
@@ -97,42 +98,43 @@ parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName u
 parsePort :: URIAuth -> Int
 parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
 
-getAvailablePeers::IO [PPeer]
-getAvailablePeers = withGlobalSQLPool $ \sqldb -> do
+
+getAvailablePeers::IO (Either SomeException [PPeer])
+getAvailablePeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
-setPeerActiveState::T.Text->Int->Int->IO ()
-setPeerActiveState ip _ state = withGlobalSQLPool $ \sqldb -> do
+setPeerActiveState::T.Text->Int->Int->IO (Either SomeException ())
+setPeerActiveState ip _ state = try $ withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let port' = 30303
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port'] [PPeerActiveState SQL.=. state]
   return ()
 
-getActivePeers::IO [PPeer]
-getActivePeers = withGlobalSQLPool $ \sqldb -> do
+getActivePeers::IO (Either SomeException [PPeer])
+getActivePeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerActiveState SQL.==. 1, PPeerEnableTime SQL.<. currentTime] []
 
-setPeerBondingState::String->Int->Int->IO ()
-setPeerBondingState ip _ state = withGlobalSQLPool $ \sqldb -> do
+setPeerBondingState::String->Int->Int->IO (Either SomeException ())
+setPeerBondingState ip _ state = try . withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let port' = 30303
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
 
-getBondedPeers::IO [PPeer]
-getBondedPeers = withGlobalSQLPool $ \sqldb -> do
+getBondedPeers::IO (Either SomeException [PPeer])
+getBondedPeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
-getBondedPeersForUDP::IO [PPeer]
-getBondedPeersForUDP = withGlobalSQLPool $ \sqldb -> do
+getBondedPeersForUDP::IO (Either SomeException [PPeer])
+getBondedPeersForUDP = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
@@ -161,8 +163,8 @@ defaultPeer = PPeer{
   pPeerVersion=""
   }
 
-disablePeerForSeconds::PPeer->Int->IO ()
-disablePeerForSeconds peer' seconds = withGlobalSQLPool $ \sqldb -> do
+disablePeerForSeconds::PPeer->Int->IO (Either SomeException ())
+disablePeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let peer = peer'{pPeerTcpPort = 30303, pPeerUdpPort=30303}
   currentTime <- getCurrentTime
@@ -170,8 +172,8 @@ disablePeerForSeconds peer' seconds = withGlobalSQLPool $ \sqldb -> do
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
 
-disableUDPPeerForSeconds::PPeer->Int->IO ()
-disableUDPPeerForSeconds peer' seconds = withGlobalSQLPool $ \sqldb -> do
+disableUDPPeerForSeconds::PPeer->Int->IO (Either SomeException ())
+disableUDPPeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime

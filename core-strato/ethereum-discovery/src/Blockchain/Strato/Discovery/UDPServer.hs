@@ -78,19 +78,23 @@ addPeersIfNeeded :: (MonadIO m, MonadLogger m)
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
   let minPeers = minAvailablePeers (discoveryConfig ethConf)
-  $logInfoS "addPeersIfNeeded" $ T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
+  $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
   when (numAvailablePeers < minPeers) $ do
-    bondedPeers <- liftIO getBondedPeersForUDP
-    if length bondedPeers /= 0
-      then do
+    eBondedPeers <- liftIO getBondedPeersForUDP
+    case eBondedPeers of
+      Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
+      Right [] -> $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
+      Right bondedPeers -> do
         peerNumber <- liftIO $ randomRIO (0, length bondedPeers - 1)
         let thePeer = bondedPeers !! peerNumber
         (peeraddr:_) <- liftIO $ getAddrInfo Nothing (Just $ T.unpack $ pPeerIp thePeer) (Just $ show $ pPeerUdpPort thePeer)
         time <- liftIO $ round `fmap` getPOSIXTime
         randomBytes <- liftIO $ getEntropy 64
         sendPacket sock prv (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
-        liftIO $ disableUDPPeerForSeconds thePeer 10
-      else $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
+        eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
+        case eErr of
+          Right () -> return ()
+          Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: (MonadIO m, MonadLogger m)
             => H.PrvKey
@@ -185,7 +189,12 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
 
     Pong{} -> do
         addPeer'
-        liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+        eErr <- liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+        case eErr of
+          Right () -> return ()
+          Left err -> do
+            $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+            throwM err
 
     (FindNeighbors targetPubkey _) -> do
         time <- liftIO $ round `fmap` getPOSIXTime

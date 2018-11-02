@@ -70,7 +70,9 @@ dependencies:
   - template-haskell
   - text                          >= 0.11
   - time
+  - utf8-string
   - wai
+
   - wai-extra                     >= 3.0
   - warp                          >= 3.0
   - warp-tls
