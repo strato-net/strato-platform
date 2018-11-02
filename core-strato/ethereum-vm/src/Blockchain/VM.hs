@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.VM
@@ -31,11 +32,13 @@ import           Numeric
 import           Text.Printf
 
 import qualified Blockchain.Colors                  as CL
+import           Blockchain.Data.Action             (ActionType(..))
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
+import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -1009,7 +1012,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas create'
       else return (Left InsufficientFunds, vmState)
 
-
   case ret of
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
@@ -1022,8 +1024,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
     _ -> do
 
       return ret
-
-
 
 create' :: VMM Code
 create' = do
@@ -1052,10 +1052,12 @@ create' = do
         $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
       lift $ put vmState{returnVal=Nothing}
       assignCode "" owner
+      assignDetails
       return $ Code ""
     else do
       useGas $ gCREATEDATA * toInteger (B.length codeBytes')
       assignCode codeBytes' owner
+      assignDetails
       return $ Code codeBytes'
 
   where
@@ -1064,6 +1066,21 @@ create' = do
       addCode codeBytes'
       newAddressState <- getAddressState address'
       putAddressState address' newAddressState{addressStateCodeHash=hash codeBytes'}
+    assignDetails = do
+      vmState <- lift get
+      let Environment{..} = environment vmState
+          owner = envOwner
+      lift $ details %= (:) VMDetails
+                            { _detailMsgSender   = envSender
+                            , _detailOwner       = owner
+                            , _detailOrigin      = envOrigin
+                            , _detailGasPrice    = envGasPrice
+                            , _detailInputData   = envInputData
+                            , _detailValue       = envValue
+                            , _detailReturn      = returnVal vmState
+                            , _detailStorageDiff = fromMaybe M.empty $ M.lookup owner (_storageDiffs vmState)
+                            , _detailActionType  = Create
+                            }
 
 call :: Bool
      -> Bool
@@ -1124,6 +1141,18 @@ call' noValueTransfer = do
   --    --putStrLn $ "Result: " ++ format result
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
+  let Environment{..} = environment vmState
+  lift $ details %= (:) VMDetails
+                        { _detailMsgSender   = sender
+                        , _detailOwner       = receiveAddress
+                        , _detailOrigin      = envOrigin
+                        , _detailGasPrice    = envGasPrice
+                        , _detailInputData   = envInputData
+                        , _detailValue       = value'
+                        , _detailReturn      = returnVal vmState
+                        , _detailStorageDiff = fromMaybe M.empty $ M.lookup receiveAddress (_storageDiffs vmState)
+                        , _detailActionType  = Update
+                        }
 
   return (fromMaybe B.empty $ returnVal vmState)
 
@@ -1173,6 +1202,7 @@ create_debugWrapper block owner value initCodeBytes = do
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
           storageDiffs %= M.unionWith M.union (_storageDiffs finalVMState)
+          details %= (++ _details finalVMState)
           addToRefund (refund finalVMState)
 
           return $ Just newAddress
@@ -1208,6 +1238,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
           storageDiffs %= M.unionWith M.union (_storageDiffs finalVMState)
+          details %= (++ _details finalVMState)
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
           useGas (- vmGasRemaining finalVMState)

@@ -232,6 +232,8 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
         , A.actionAddress = a
         , A.actionCodeHash = codeHash d
         , A.actionStorage = Just . Map.map fromDiff $ storage d
+        , A.actionInput = ""
+        , A.actionOutput = ""
         , A.actionMetadata = getMetadata (codeHash d)
         }
       fromDiff (Value v) = v

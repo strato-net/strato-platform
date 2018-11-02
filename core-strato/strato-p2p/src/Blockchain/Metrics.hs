@@ -44,13 +44,13 @@ recordEvent :: (MonadIO m) => Event -> m ()
 recordEvent = \case
   MsgEvt msg -> do
     liftIO $ withLabel p2pEvents "message" incCounter
-    recordMessage' sentMessages msg
+    recordMessage' receivedMessages msg
   NewSeqEvent _ -> liftIO $ withLabel p2pEvents "new_seq_event" incCounter
   TimerEvt -> liftIO $ withLabel p2pEvents "timer_event" incCounter
   AbortEvt _ -> liftIO $  withLabel p2pEvents "abort_event" incCounter
 
 recordMessage :: (MonadIO m) => Message -> m ()
-recordMessage = recordMessage' receivedMessages
+recordMessage = recordMessage' sentMessages
 
 recordMessage' :: (MonadIO m) => Vector Text Counter -> Message -> m ()
 recordMessage' msgVect msg = do
