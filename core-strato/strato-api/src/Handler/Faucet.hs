@@ -23,7 +23,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util                (getCurrentMicrotime)
-import           Data.List                      (nub)
 import           Handler.Common
 import           Handler.Filters
 import           Import
@@ -75,7 +74,7 @@ postFaucetR = do
     Just target -> do
       maxNonce <- acquireNewMaxNonce minNonce
       $logInfoS "postFaucetR" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
-      mapM (putTX maxNonce key target) $ nub [maxNonce, minNonce]
+      mapM (putTX maxNonce key target) [maxNonce, minNonce]
     Nothing -> do
       maybeAddrs <- lookupPostParam "addresses"
       liftIO $ putStrLn $ T.pack $ show maybeAddrs
