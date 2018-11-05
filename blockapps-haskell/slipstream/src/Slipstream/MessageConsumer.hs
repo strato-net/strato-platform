@@ -3,11 +3,14 @@
     , DeriveGeneric
     , FlexibleContexts
     , LambdaCase
+    , TemplateHaskell
 #-}
 
 module Slipstream.MessageConsumer where
 
+import Control.Concurrent     (threadDelay)
 import Control.Exception.Lifted
+import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson hiding (Error)
@@ -32,6 +35,9 @@ import Slipstream.Processor
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
+
+errorCounter :: Int
+errorCounter = 0
 
 data KafkaConf =
   KafkaConf {
@@ -92,12 +98,17 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-
 getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
 getAndProcessMessages conn cache offset = do
-  eMessages <- try $ getTheMessages offset
+  eMessages <- try . liftIO $ getTheMessages offset :: a (Either KafkaClientError [B.ByteString])
   case eMessages of
-    Left e -> error $ show (e :: SomeException)
+    Left e -> do
+     -- if errorCounter >= 20
+           --then liftIO . errorM "getTheMessages: " . T.pack " More than 20 errors on fetchings." ++ show (e :: SomeException)
+       --    else liftIO . errorM "getTheMessages: " . show (e :: SomeException)
+      liftIO . errorM "getTheMessages: " . show $ e -- :: SomeException
+      liftIO $ threadDelay 1000000
+      getAndProcessMessages conn cache offset
     Right messages -> do
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
