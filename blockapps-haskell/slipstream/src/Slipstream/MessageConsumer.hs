@@ -34,9 +34,6 @@ import Slipstream.Processor
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
 
-errorCounter :: Int
-errorCounter = 0
-
 data KafkaConf =
   KafkaConf {
       kafkaHost :: String,
@@ -96,19 +93,18 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
-getAndProcessMessages conn cache offset = do
+getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
+getAndProcessMessages conn cache offset errorCounter = do
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
-     -- if errorCounter >= 20
-           --then liftIO . errorM "getTheMessages: " . T.pack " More than 20 errors on fetchings." ++ show (e :: SomeException)
-       --    else liftIO . errorM "getTheMessages: " . show (e :: SomeException)
-      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
       liftIO $ threadDelay 1000000
-      getAndProcessMessages conn cache offset
+      getAndProcessMessages conn cache offset (errorCounter + 1)
+      if (errorCounter `mod` 20 == 0)
+           then liftIO . errorM "getTheMessages: " $ (show errorCounter) ++ " errors on fetchings: " ++ show (e :: KafkaClientError)
+           else liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
     Right messages -> do
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
         liftIO $ threadDelay 1000000
-      getAndProcessMessages conn cache $ offset + fromIntegral (length messages)
+      getAndProcessMessages conn cache (offset + fromIntegral (length messages)) errorCounter
