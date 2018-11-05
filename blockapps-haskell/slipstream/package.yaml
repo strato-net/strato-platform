@@ -38,7 +38,6 @@ dependencies:
   - milena
   - MissingH
   - monad-control
-  - monad-logger
   - mtl
   - network
   - ordered-containers
