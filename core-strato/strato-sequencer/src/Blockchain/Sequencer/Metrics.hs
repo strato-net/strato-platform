@@ -48,6 +48,12 @@ gregorKafkaCheckpointWrites :: Counter
 gregorKafkaCheckpointWrites = unsafeRegister . counter
                             $ Info "gregor_kafka_checkpoint_writes" "Sequencer counter for kafka checkpoint writes"
 
+eventsplitMetrics :: Vector Text Counter
+eventsplitMetrics = unsafeRegister
+                   . vector "seq_event_type"
+                   . counter
+                   $ Info "seq_event_splitted" "Counts for splitted events in sequencer"
+
 gregorKafkaCheckpointReads :: Counter
 gregorKafkaCheckpointReads = unsafeRegister . counter
                            $ Info "gregor_kafka_checkpoint_reads" "Sequencer counter for kafka checkpoint reads"
