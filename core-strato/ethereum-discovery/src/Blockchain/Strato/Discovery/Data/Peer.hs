@@ -124,7 +124,7 @@ getActivePeers::IO (Either SomeException [PPeer])
 getActivePeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
-    SQL.selectList [PPeerActiveState SQL.==. 1, PPeerEnableTime SQL.<. currentTime] []
+    SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO (Either SomeException ())
 setPeerBondingState ip _ state = try . withGlobalSQLPool $ \sqldb -> do
