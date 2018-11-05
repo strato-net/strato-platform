@@ -142,7 +142,8 @@ instance Bagger.MonadBagger ContextM where
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
-            void . lift $ putTransactionResult
+            $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
+            void $ putTransactionResult
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
@@ -649,6 +650,7 @@ calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
     chainDiffs <- chainDiff newNumber oldHash newHash
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allDiffs = diffs:chainDiffs
+    let allDiffs = (diffs : chainDiffs)
 
-    forM_ allDiffs $ lift . commitSqlDiffs
+    forM_ allDiffs $ \diff -> do
+      when flags_sqlDiff $ commitSqlDiffs diff

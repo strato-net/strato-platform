@@ -12,10 +12,10 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - bytestring
-  - classy-prelude
   - cpu
   - cryptohash
   - crypto-pubkey-types
+  - either
   - entropy
   - errors
   - ethereum-encryption
@@ -29,6 +29,7 @@ dependencies:
   - network-uri
   - persistent-postgresql
   - persistent-template
+  - prometheus-client
   - random
   - resourcet
   - split
@@ -36,9 +37,6 @@ dependencies:
   - strato-model
   - text
   - time
-  - transformers-base
-  - unliftio
-  - unliftio-core
   - monad-control
 
 ghc-options: -Wall -O2

@@ -13,9 +13,9 @@ pipeline {
           docker rmi -f $(docker images -aq) || true
           docker images -a
           rm -rf ~/.stack
-          git worktree remove -f strato-worktree
-          git wortkree add strato-worktree develop
-          git workree list
+          git worktree remove --force strato-worktree || true
+          git worktree add strato-worktree develop
+          git worktree list
         '''
       }
     }
@@ -38,7 +38,7 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=cd10.eastus.cloudapp.azure.com
+          NODE_HOST=localhost
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           # Few quick tests

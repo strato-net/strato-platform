@@ -4,13 +4,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
-{-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
 
 module Blockchain.VMContext
     ( Context(..)
-    , Config(..)
     , ContextBestBlockInfo(..)
     , ContextM
     , runContextM
@@ -27,11 +25,8 @@ module Blockchain.VMContext
 
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
@@ -75,11 +70,11 @@ import           Executable.EVMFlags
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
 
-newtype Config = Config { configSQLDB :: SQLDB }
 data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHashDB                 :: HashDB
                        , contextCodeDB                 :: CodeDB
                        , contextBlockSummaryDB         :: BlockSummaryDB
+                       , contextSQLDB                  :: SQLDB
                        , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
                        , contextStorageTxMap           :: M.Map (Address, Word256) Word256
@@ -99,7 +94,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        }
 makeLenses ''Context
 
-type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+type ContextM = StateT Context (ResourceT (LoggingT IO))
 
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
@@ -191,11 +186,8 @@ instance HasCodeDB ContextM where
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = contextBlockSummaryDB <$> get
 
-instance (MonadReader Config m, MonadIO m, MonadUnliftIO m, MonadBaseControl IO m) => HasSQLDB m where
-  getSQLDB = asks configSQLDB
-
-instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
-  runWithSQL = lift
+instance HasSQLDB ContextM where
+  getSQLDB = contextSQLDB <$> get
 
 instance RBDB.HasRedisBlockDB ContextM where
     getRedisBlockDB = contextRedisPool <$> get
@@ -204,50 +196,50 @@ instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+                StateT Context  (ResourceT m) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
+        let ldbOptions = DB.defaultOptions {
+            DB.createIfMissing = True,
+            DB.cacheSize       = flags_ldbCacheSize,
+            DB.blockSize       = flags_ldbBlockSize
+        }
+        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
         conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
-        flip runReaderT (Config conn) $ do
-          let ldbOptions = DB.defaultOptions {
-              DB.createIfMissing = True,
-              DB.cacheSize       = flags_ldbCacheSize,
-              DB.blockSize       = flags_ldbBlockSize
-          }
-          sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-          hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-          cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-          blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-          redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-          let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-          runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
-                       hdb
-                       cdb
-                       blksumdb
-                       M.empty
-                       M.empty
-                       M.empty
-                       M.empty
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
-                       (SHA 0)
-                       Nothing
-                       defaultBaggerState
-                       initialKafkaState
-                       Unspecified
-                       redisPool
-                       Q.empty
-                       []
-                       flags_blockstanbul
-                       False)
+        redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
+        let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
+        runStateT f (Context
+                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                        hdb
+                        cdb
+                        blksumdb
+                        conn
+                        M.empty
+                        M.empty
+                        M.empty
+                        M.empty
+                        MP.emptyTriePtr
+                        MP.emptyTriePtr
+                        (SHA 0)
+                        Nothing
+                        defaultBaggerState
+                        initialKafkaState
+                        Unspecified
+                        redisPool
+                        Q.empty
+                        []
+                        flags_blockstanbul
+                        False)
 
 
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()

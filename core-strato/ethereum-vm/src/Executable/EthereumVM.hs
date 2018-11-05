@@ -18,6 +18,7 @@ import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
+import           Text.Printf
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
@@ -76,7 +77,12 @@ ethereumVM = void . execContextM $ do
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let allTxs = [OETx ts t | OETx ts t <- seqEvents]
+        let txPairs = [(ts,t) | OETx ts t <- seqEvents]
+            allTxs = map (uncurry OETx) txPairs
+        when (not $ null txPairs) . void
+                                  . K.withKafkaViolently
+                                  . writeIndexEvents
+                                  $ map (uncurry IndexTransaction) txPairs
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
@@ -107,6 +113,11 @@ ethereumVM = void . execContextM $ do
               if pbft
                 then reqd && hasTxs
                 else not makeLazyBlocks || hasTxs)
+        $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+            (length poolableNewTxs) (M.size pending)
+        $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
+            "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
+             (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
         when (pbft && shouldOutputBlocks) $
           contextBlockRequested .= False
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)

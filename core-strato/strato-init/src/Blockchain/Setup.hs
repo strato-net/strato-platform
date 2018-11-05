@@ -14,11 +14,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C
 import           Data.FileEmbed
-import           Data.IORef
 import           Data.List.Split                    (splitWhen)
 import qualified Data.Map                           as Map
 import           Data.Maybe
@@ -81,63 +81,61 @@ defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
 
 data SetupDBs =
   SetupDBs {
-    stateDB :: IORef StateDB,
+    stateDB :: StateDB,
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: Redis.Connection,
-    localStorageTx :: IORef (Map.Map (Address, Word256) Word256),
-    localStorageBlock :: IORef (Map.Map (Address, Word256) Word256),
-    localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (Map.Map Address AddressStateModification)
+    localStorageTx :: Map.Map (Address, Word256) Word256,
+    localStorageBlock :: Map.Map (Address, Word256) Word256,
+    localAddressStateTx :: Map.Map Address AddressStateModification,
+    localAddressStateBlock :: Map.Map Address AddressStateModification
     }
 
-type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
+type SetupDBM = StateT SetupDBs (LoggingT (ResourceT IO))
 instance HasStateDB SetupDBM where
-  getStateDB = (liftIO . readIORef) =<< asks stateDB
+  getStateDB = do
+    cxt <- get
+    return $ stateDB cxt
   setStateDBStateRoot sr = do
-    dbref <- asks stateDB
-    liftIO $ atomicModifyIORef' dbref (\s -> (s{MP.stateRoot=sr}, ()))
+    cxt <- get
+    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
 
 instance HasStorageDB SetupDBM where
   getStorageTxDB = do
-    cxt <- ask --storage and states use the same database!
-    db <- liftIO . readIORef . stateDB $ cxt
-    lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (MP.ldb db, lst)
+    cxt <- get --storage and states use the same database!
+    return (MP.ldb . stateDB $ cxt, localStorageTx cxt)
   putStorageTxMap theMap = do
-    lstref <- asks localStorageTx
-    liftIO $ atomicWriteIORef lstref theMap
+    cxt <- get
+    put cxt{localStorageTx=theMap}
   getStorageBlockDB = do
-    cxt <- ask
-    db <- liftIO . readIORef . stateDB $ cxt
-    lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (MP.ldb db, lsb)
+    cxt <- get --storage and states use the same database!
+    return (MP.ldb . stateDB $ cxt, localStorageBlock cxt)
   putStorageBlockMap theMap = do
-    lsbref <- asks localStorageBlock
-    liftIO $ atomicWriteIORef lsbref theMap
+    cxt <- get
+    put cxt{localStorageBlock=theMap}
 
 instance HasMemAddressStateDB SetupDBM where
-  getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
+  getAddressStateTxDBMap = localAddressStateTx <$> get
   putAddressStateTxDBMap theMap = do
-    lastref <- asks localAddressStateTx
-    liftIO $ atomicWriteIORef lastref theMap
-  getAddressStateBlockDBMap = liftIO . readIORef =<< asks localAddressStateBlock
+    cxt <- get
+    put cxt{localAddressStateTx=theMap}
+  getAddressStateBlockDBMap = localAddressStateBlock <$> get
   putAddressStateBlockDBMap theMap = do
-    lasbref <- asks localAddressStateBlock
-    liftIO $ atomicWriteIORef lasbref theMap
+    cxt <- get
+    put cxt{localAddressStateBlock=theMap}
 
 instance HasHashDB SetupDBM where
-  getHashDB = asks hashDB
+  getHashDB = fmap hashDB get
 
 instance HasCodeDB SetupDBM where
-  getCodeDB = asks codeDB
+  getCodeDB = fmap codeDB get
 
 instance HasSQLDB SetupDBM where
-  getSQLDB = asks sqlDB
+  getSQLDB = fmap sqlDB get
 
 instance RBDB.HasRedisBlockDB SetupDBM where
-  getRedisBlockDB = asks redisDB
+  getRedisBlockDB = fmap redisDB get
 
 {-
 connStr :: ConnectionString
@@ -388,7 +386,7 @@ oneTimeSetup genesisBlockName = do
 
       let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
 
-      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []))
+      runNoLoggingT $ withPostgresqlConn pgConn' $ runReaderT $ rawExecute query []
 
       {- CONFIG: create kafka topics -}
 
@@ -445,15 +443,13 @@ oneTimeSetup genesisBlockName = do
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          cdb <- DB.open (dbDir "h" ++ codeDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         [m1, m2] <- liftIO . replicateM 2 . newIORef $ Map.empty
-         [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
-         smpdb <- liftIO . newIORef $ MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
+         let smpdb = MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
 
          pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
+         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty Map.empty Map.empty) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

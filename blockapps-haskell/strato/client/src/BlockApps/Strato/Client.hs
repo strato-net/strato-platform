@@ -128,7 +128,7 @@ getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: StorageFilterParams -> ClientM [Storage]
-postFaucet :: Address -> ClientM Keccak256
+postFaucet :: Address -> ClientM [Keccak256]
 postChain :: ChainInfo -> ClientM ChainId
 getChain :: [ChainId] -> ClientM [ChainIdChainInfo]
 getTxsFilter
@@ -175,7 +175,7 @@ getTxsFilter
       :<|> getTotalTx'
       :<|> getStorage'
       :<|> postFaucet'
-      :<|> postChain' 
+      :<|> postChain'
       :<|> getChain' =
         client (Proxy @ API)
     uncurryTxsFilterParams f TxsFilterParams{..} = f

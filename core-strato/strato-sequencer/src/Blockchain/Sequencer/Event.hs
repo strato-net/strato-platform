@@ -107,7 +107,9 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEGetTx [SHA]
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
-                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer}
+                 -- Ask and push for inclusive ranges of blocks
+                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
+                 | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -299,7 +301,7 @@ instance Binary JsonRpcCommand where
             x -> error $ "unknown JsonRpcCommand tag " ++ show x
 
 instance Binary OutputEvent where
-    -- put (OETx t) = putWord8 0 >> put t -- old OETx without timestamp
+    -- Reserved tags: 0, 9, 10
     put (OETx ts t)          = putWord8 3 >> put ts >> put t
     put (OEBlock b)          = putWord8 1 >> put b
     put (OEJsonRpcCommand c) = putWord8 2 >> put c
@@ -308,7 +310,8 @@ instance Binary OutputEvent where
     put (OEGetTx tx)         = putWord8 6 >> put tx
     put (OEBlockstanbul m)   = putWord8 7 >> put m
     put (OECreateBlockCommand) = putWord8 8
-    put (OEAskForBlocks s e) = putWord8 9 >> put s >> put e
+    put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
+    put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
     get = do
         tag <- getWord8
         case tag of
@@ -321,7 +324,10 @@ instance Binary OutputEvent where
             6 -> OEGetTx <$> get
             7 -> OEBlockstanbul <$> get
             8 -> pure OECreateBlockCommand
-            9 -> OEAskForBlocks <$> get <*> get
+            9 -> OEAskForBlocks <$> get <*> get <*> pure 0x0 -- legacy OEAFB
+            10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
+            11 -> OEAskForBlocks <$> get <*> get <*> get
+            12 -> OEPushBlocks <$> get <*> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

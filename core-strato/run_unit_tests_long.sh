@@ -10,6 +10,7 @@ TESTS=(
   ethereum-discovery
   ethereum-vm
   merkle-patricia-db
+  strato-api:unittests
   strato-genesis
   strato-init
   strato-p2p

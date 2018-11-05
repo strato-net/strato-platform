@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Metrics ( recordEvent
-                          , recordMessage) where
+                          , recordMessage
+                          ) where
 
 import Control.Monad.IO.Class
 import Data.Text
@@ -36,13 +37,13 @@ recordEvent :: (MonadIO m) => Event -> m ()
 recordEvent = \case
   MsgEvt msg -> do
     liftIO $ withLabel p2pEvents "message" incCounter
-    recordMessage' sentMessages msg
+    recordMessage' receivedMessages msg
   NewSeqEvent _ -> liftIO $ withLabel p2pEvents "new_seq_event" incCounter
   TimerEvt -> liftIO $ withLabel p2pEvents "timer_event" incCounter
   AbortEvt _ -> liftIO $  withLabel p2pEvents "abort_event" incCounter
 
 recordMessage :: (MonadIO m) => Message -> m ()
-recordMessage = recordMessage' receivedMessages
+recordMessage = recordMessage' sentMessages
 
 recordMessage' :: (MonadIO m) => Vector Text Counter -> Message -> m ()
 recordMessage' msgVect msg = do
@@ -61,10 +62,10 @@ recordMessage' msgVect msg = do
                 NewBlock _ _ -> "new_block"
                 Blockstanbul wm ->
                   case PBFT._message wm of
-                    PBFT.Preprepare _ _ -> "preprepare"
-                    PBFT.Prepare _ _ -> "prepare"
-                    PBFT.Commit _ _ _ -> "commit"
-                    PBFT.RoundChange _ -> "round_change"
+                    PBFT.Preprepare{} -> "preprepare"
+                    PBFT.Prepare{} -> "prepare"
+                    PBFT.Commit{} -> "commit"
+                    PBFT.RoundChange{} -> "round_change"
                 GetChainDetails _ -> "get_chain_details"
                 ChainDetails _ -> "chain_details"
                 GetTransactions _ -> "get_transactions"

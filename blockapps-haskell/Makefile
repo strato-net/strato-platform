@@ -8,7 +8,7 @@ LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
 
-SOLC_VERSION=0.4.24
+SOLC_VERSION=0.4.25
 
 all: build_docker clean
 

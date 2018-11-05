@@ -9,19 +9,18 @@ module Blockchain.Strato.Discovery.UDPServer
      , connectMe
      ) where
 
-import           ClassyPrelude                           ((<>))
-import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import           Data.Either.Combinators
 import           Data.Maybe                              (fromJust)
+import           Data.Monoid
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
@@ -48,10 +47,8 @@ import qualified Network.Haskoin.Internals               as H
 runEthUDPServer :: ( MonadIO m
                    , MonadCatch m
                    , MonadThrow m
+                   , MonadBaseControl IO m
                    , MonadLogger m
-                   , MonadUnliftIO m
-                   , MonadBaseControl IO m -- TODO(tim): Remove
-                   , MonadBase IO m -- TODO(tim): Remove
                    )
                 => ContextLite
                 -> H.PrvKey
@@ -59,7 +56,7 @@ runEthUDPServer :: ( MonadIO m
                 -> Socket
                 -> m ()
 runEthUDPServer ctx myPriv _ sock =
-  void . runResourceT $ runReaderT (udpHandshakeServer myPriv sock portNum) ctx
+  void . runResourceT $ runStateT (udpHandshakeServer myPriv sock portNum) ctx
      where portNum = 30303 -- TODO(tim): Reenable port selection
 
 connectMe :: (MonadIO m, MonadLogger m)
@@ -82,19 +79,21 @@ addPeersIfNeeded :: (MonadIO m, MonadLogger m)
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
   let minPeers = minAvailablePeers (discoveryConfig ethConf)
-  $logInfoS "addPeersIfNeeded" $ T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
+  $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
   when (numAvailablePeers < minPeers) $ do
-    bondedPeers <- liftIO getBondedPeersForUDP
-    if length bondedPeers /= 0
-      then do
+    eBondedPeers <- liftIO getBondedPeersForUDP
+    case eBondedPeers of
+      Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
+      Right [] -> $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
+      Right bondedPeers -> do
         peerNumber <- liftIO $ randomRIO (0, length bondedPeers - 1)
         let thePeer = bondedPeers !! peerNumber
         (peeraddr:_) <- liftIO $ getAddrInfo Nothing (Just $ T.unpack $ pPeerIp thePeer) (Just $ show $ pPeerUdpPort thePeer)
         time <- liftIO $ round `fmap` getPOSIXTime
         randomBytes <- liftIO $ getEntropy 64
         sendPacket sock prv (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
-        liftIO $ disableUDPPeerForSeconds thePeer 10
-      else $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
+        eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
+        whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: (MonadIO m, MonadLogger m)
             => H.PrvKey
@@ -130,6 +129,7 @@ attemptBond prv sock _ = do
 
 udpHandshakeServer :: ( HasSQLDB m
                       , MonadResource m
+                      , MonadBaseControl IO m
                       , MonadCatch m
                       , MonadThrow m
                       , MonadLogger m
@@ -142,7 +142,8 @@ udpHandshakeServer prv sock _ = do
     let portNum = 30303 -- TODO(tim): Reenable port selection
     _ <- addPeersIfNeeded prv sock
     _ <- attemptBond prv sock portNum
-    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280
+    -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
+    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 80000
     _ <- case maybePacketData of
       Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
       Just (msg, addr) -> do
@@ -165,10 +166,10 @@ udpHandshakeServer prv sock _ = do
 
 handleValidPacket :: ( HasSQLDB m
                      , MonadResource m
+                     , MonadBaseControl IO m
                      , MonadCatch m
                      , MonadThrow m
                      , MonadLogger m
-                     , MonadUnliftIO m -- TODO(tim): Remove when redundant with HasSQLDB
                      )
                   => H.PrvKey
                   -> Socket
@@ -187,7 +188,10 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
 
     Pong{} -> do
         addPeer'
-        liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+        eErr <- liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+        whenLeft eErr $ \ err -> do
+            $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+            throwM err
 
     (FindNeighbors targetPubkey _) -> do
         time <- liftIO $ round `fmap` getPOSIXTime

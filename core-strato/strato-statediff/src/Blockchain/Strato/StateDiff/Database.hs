@@ -31,13 +31,13 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m, MonadBaseControl IO m)=>
            Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs
 
-commitSqlDiffs :: (HasSQLDB m, MonadResource m)=>
+commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
                   StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   pool <- getSQLDB
@@ -82,14 +82,14 @@ getField def field =
     Just (Value x) -> x
     Nothing        -> def
 
-deleteAccount :: MonadResource m =>
+deleteAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
                  Maybe Word256 -> Address -> SQL.SqlPersistT m ()
 deleteAccount chainId address = do
   addrID <- getAddressStateSQL chainId address "delete"
   SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
   SQL.delete addrID
 
-updateAccount :: MonadResource m =>
+updateAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
                  Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount chainId blockNumber address diff = do
   addrID <- getAddressStateSQL chainId address "update"
@@ -105,8 +105,9 @@ updateAccount chainId blockNumber address diff = do
     takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
 
-commitStorage :: MonadResource m =>
+commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
+
 commitStorage addrID key Create{newValue} =
   SQL.insert_ $ Storage addrID key newValue
 
@@ -118,7 +119,7 @@ commitStorage addrID key Update{newValue} = do
   storageID <- getStorageKeySQL addrID key "update"
   SQL.update storageID [ StorageValue =. newValue ]
 
-getAddressStateSQL :: MonadResource m
+getAddressStateSQL :: (HasStateDB m, HasHashDB m, MonadResource m)
                    => Maybe Word256
                    -> Address
                    -> String
@@ -130,7 +131,7 @@ getAddressStateSQL chainId addr' s = do
     then error $ s ++ ": Address not found in SQL db: " ++ formatAddressWithoutColor addr' ++ " with chain Id " ++ show chainId
     else return $ head addrIDs
 
-getStorageKeySQL :: MonadResource m
+getStorageKeySQL :: (HasStateDB m, HasHashDB m, MonadResource m)
                  => SQL.Key AddressStateRef
                  -> Word256
                  -> String

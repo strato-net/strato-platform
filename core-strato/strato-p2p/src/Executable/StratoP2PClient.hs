@@ -10,22 +10,25 @@
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
+import           Blockchain.PrivateKeyConf
+import           Blockchain.RLPx
+import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
-import           Control.Exception                     (ErrorCall(..))
+import           Control.Exception.Lifted
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
 import           Data.Conduit.Network
+import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Network.Haskoin.Internals             as H
-import           UnliftIO.Concurrent                    hiding (yield)
-import           UnliftIO.Exception
 
 import qualified Blockchain.Colors                     as C
 import           Blockchain.CommunicationConduit
@@ -36,79 +39,83 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Format
 import           Blockchain.Options
+import           Blockchain.Output                     (printLogMsg)
 import           Blockchain.P2PRPC
-import           Blockchain.RLPx
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
 
-runPeer :: PPeer
+runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+        => PPeer
         -> PrivateNumber
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
-        -> ContextM ()
-runPeer peer myPriv _ _ = do
-  let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
-      myPublic    = calculatePublic theCurve myPriv
+        -> m ()
+runPeer peer myPriv _ _ = runResourceT $ do
+  ctx <- initContext flags_maxReturnedHeaders
+  runContextM ctx $ do
+    let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
+        myPublic    = calculatePublic theCurve myPriv
 
-  $logInfoS "runPeer" . T.pack . C.blue  $ "Welcome to strato-p2p-client"
-  $logInfoS "runPeer" . T.pack . C.blue  $ "============================"
-  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
-  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
+    $logInfoS "runPeer" . T.pack . C.blue  $ "Welcome to strato-p2p-client"
+    $logInfoS "runPeer" . T.pack . C.blue  $ "============================"
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
 
-  let peerPort    = pPeerTcpPort peer
-      peerAddress = BC.pack . T.unpack $ pPeerIp peer
+    let peerPort    = pPeerTcpPort peer
+        peerAddress = BC.pack . T.unpack $ pPeerIp peer
 
-  runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-      void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 1
+    runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Active
 
-      (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
+        (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
-      !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
-      let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-      (attempt :: Either SomeException ()) <- try . runConduit $
-              eventSource
-           .| handleMsgClientConduit myPublic peer
-           .| eventSink
-           .| appSink app
+        !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
+        let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+        (attempt :: Either SomeException ()) <- try . runConduit $
+                eventSource
+             .| handleMsgClientConduit myPublic peer
+             .| eventSink
+             .| appSink app
 
-      void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 0
-      case attempt of
-        Right () -> $logDebugS "runPeer" "Peer ran successfully!"
-        Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Unactive
+        case attempt of
+          Right () -> $logDebugS "runPeer" "Peer ran successfully!"
+          Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
-getPubKeyRunPeer :: PPeer
+getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+                 => PPeer
                  -> BC.ByteString
                  -> CommPort
-                 -> ContextM ()
+                 -> m ()
 getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
   let PrivKey myPriv = privKey ethConf
-  case pPeerPubkey peer of
+
+  case (pPeerPubkey peer) of
     Nothing -> do
-      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer
-          ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
-      let myPrvKey = fromMaybe (error "invalid private number in main") . H.makePrvKey . fromIntegral $ myPriv
-          ip = T.unpack $ pPeerIp peer
-          port = fromIntegral $ pPeerTcpPort peer
-      eitherOtherPubKey <- liftIO $ getServerPubKey myPrvKey ip port
+      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
+      eitherOtherPubKey <- liftIO $ getServerPubKey (fromMaybe (error "invalid private number in main") $ H.makePrvKey $ fromIntegral myPriv) (T.unpack $ pPeerIp peer) (fromIntegral $ pPeerTcpPort peer)
       case eitherOtherPubKey of
-          Right otherPubKey -> do
-            $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
-            runPeer peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
-          Left e -> $logInfoS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
+            Right otherPubKey -> do
+              $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
+              runPeer peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
+            Left e -> $logInfoS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
     Just _ -> runPeer peer myPriv otherServiceCommHost otherServiceCommPort
 
 
-runPeerInList :: Int
-              -> PPeer
+runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+              => PPeer
               -> BC.ByteString
               -> CommPort
-              -> LoggingT IO ()
-runPeerInList maxHeaders thePeer otherServiceHost otherServicePort = runContextM maxHeaders $ do
-  -- Don't connect to a peer more than once per minute, out of politeness.
-  liftIO $ disablePeerForSeconds thePeer 10
+              -> m ()
+runPeerInList thePeer otherServiceHost otherServicePort = do
+  eErr <- liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
+  whenLeft eErr $ \err -> do
+      $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
+      $logErrorS "runPeerInList" "Simulating disable..."
+      liftIO $ threadDelay $ 10 * 1000 * 1000
   getPubKeyRunPeer thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()
@@ -118,27 +125,37 @@ stratoP2PClient = do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    peers <- liftIO getAvailablePeers
-    multiThreadedClient peers activePeersSem
-    $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
-    liftIO $ threadDelay 5000000
+    ePeers <- liftIO getAvailablePeers
+    case ePeers of
+      Left err -> do
+        $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
+        liftIO $ threadDelay 1000000
+      Right peers -> do
+        multiThreadedClient peers activePeersSem
+        $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
+        liftIO $ threadDelay 5000000
     where
       multiThreadedClient :: [PPeer] -> SSem -> LoggingT IO ()
       multiThreadedClient [] _ = do
         $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
         liftIO $ threadDelay 10000000
-      multiThreadedClient peers sem = void . for peers $ \p -> do
+      multiThreadedClient peers sem = liftIO . void . for peers $ \p -> do
         let isRunning = pPeerActiveState p == 1
-        unless isRunning $
-          liftIO (SSem.tryWait sem) >>= \case
+        unless isRunning $ do
+          (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO $ do
-              result <- try $ runPeerInList flags_maxReturnedHeaders p osch oscp
+            Just _  -> void . forkIO . flip runLoggingT printLogMsg $ do
+              result <- try $ runPeerInList p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 
-      disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
-      disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
+      disablePeerForHours :: (MonadIO m, MonadLogger m) => PPeer -> Int -> m ()
+      disablePeerForHours thePeer s = do
+        eErr <- liftIO . disablePeerForSeconds thePeer . (60*60*) $ s
+        whenLeft eErr $ \err -> do
+            $logErrorS "stratoP2PClient/disablePeerForHours" . T.pack $
+                        "Unable to disable peer: " ++ show err
+            $logErrorS "stratoP2PClient/disablePeerForHours" "Will disable next time they misbehave"
 
       handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case

@@ -19,9 +19,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  if [ -n "${connectionTimeout}" ]; then
-    ctFlag="--connectionTimeout=${connectionTimeout}"
-  fi
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -33,17 +30,27 @@ function newnode {
       runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
   fi
 
-  if $serveBlocks
-  then echo "Starting strato-p2p-server"
-       runBackgroundProcess strato-p2p-server $ctFlag --runUDPServer=false --networkID=$networkID --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-server 2>&1
-       echo "Starting ethereum-discover"
-       runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
-  fi
+  echo "Starting ethereum-discover"
+  runBackgroundProcess ethereum-discover &>> logs/ethereum-discover
 
-  if $receiveBlocks
-  then echo "Starting strato-p2p-client"
-       runBackgroundProcess strato-p2p-client $ctFlag --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} --maxReturnedHeaders=$maxReturnedHeaders >> logs/strato-p2p-client 2>&1
+  actualTimeout="${connectionTimeout:-300}"
+  if [ -n "${blockstanbulRoundPeriodS}" ]; then
+    withCushion=$(( 2 * blockstanbulRoundPeriodS ))
+    actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
   fi
+  if [ -n "${validators}" ]; then
+    numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
+    maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
+  fi
+  echo "Starting strato-p2p"
+  runBackgroundProcess strato-p2p \
+     --connectionTimeout=$actualTimeout \
+     --sqlPeers=true \
+     --debugFail=${debugFail:-true}  \
+     --maxConn=$maxConn \
+     --maxReturnedHeaders=$maxReturnedHeaders \
+     --networkID=$networkID \
+     &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -225,8 +232,6 @@ setEnv mineBlocks true
 setEnv verifyBlocks false
 setEnv instantMining true
 setEnv lazyBlocks true
-setEnv serveBlocks true
-setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv numMinPeers 0
 setEnv useSyncMode false

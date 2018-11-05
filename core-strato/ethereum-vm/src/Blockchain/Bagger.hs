@@ -10,7 +10,8 @@ import           Control.Arrow                      ((&&&))
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.State.Lazy           (get, put)
+import           Control.Monad.State.Lazy           (get, put, lift)
+import           Control.Monad.Trans.Except
 import qualified Data.Map                           as M
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
@@ -333,24 +334,21 @@ wasSeen OutputTx{otHash=sha} = do
     return ret
 
 isValidForPool :: MonadBagger m => OutputTx -> m (Either TxRejection ())
-isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
+isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
-    state <- getBaggerState
+    state <- lift getBaggerState
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-    let txgl         = TD.transactionGasLimit bt
-    let txn          = TD.transactionNonce bt
-    let txFee        = B.calculateIntrinsicTxFee state t
-    if intrinsicGas > txgl
-        then return . Left $ GasLimitTooLow Validation Incoming intrinsicGas t
-        else do
-            (addressNonce, addressBalance) <- getAddressNonceAndBalance address
-            --liftIO $ putStrLn $ "V4P: " ++ (show tup) ++ " vs (" ++ show txn ++ ", " ++ show txFee ++ ")"
-            if addressNonce > txn then
-                return . Left $ NonceTooLow Validation Incoming addressNonce t
-              else if addressBalance < txFee then
-                return . Left $ BalanceTooLow Validation Incoming txFee addressBalance t
-                else
-                  return $ Right ()
+        txgl         = TD.transactionGasLimit bt
+        txn          = TD.transactionNonce bt
+        txFee        = B.calculateIntrinsicTxFee state t
+    when (intrinsicGas > txgl) .
+       throwE $ GasLimitTooLow Validation Incoming intrinsicGas t
+    (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
+    when (addressNonce > txn) .
+       throwE $ NonceTooLow Validation Incoming addressNonce t
+    when (addressBalance < txFee) .
+       throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
+    return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
 addToSeen t = updateBaggerState (B.addToSeen t)

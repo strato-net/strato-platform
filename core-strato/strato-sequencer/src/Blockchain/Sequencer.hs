@@ -159,11 +159,12 @@ blockstanbulSend msgs = do
     resp' <- sendAllMessages msgs
     let blocks = [b | ToCommit b <- resp']
     resp <- (resp'++) <$>
-        if null blocks
-            then return []
-            -- TODO(tim): Block insertion can potentially fail, so there
-            -- should be feedback here
-            else sendAllMessages [CommitResult (Right ())]
+        case blocks of
+          [] -> return []
+          -- TODO(tim): Block insertion can potentially fail, so there
+          -- should be feedback here
+          [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
+          bs -> error $ "can send at most 1 block at a time: " ++ show bs
     mapM_ createNewTimer [rn | ResetTimer rn <- resp]
     $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
     let rewriteBlock = fmap (OEBlock . flip sequencedBlockToOutputBlock 1)
@@ -172,7 +173,8 @@ blockstanbulSend msgs = do
         creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
         vmevs = creates ++ mapMaybe rewriteBlock blocks
         p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-              ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
+              ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
+              ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
 
 
     unless (null blocks) $ do
@@ -444,15 +446,19 @@ splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
   case eventType of
     IETTransaction -> do
+      liftIO $ withLabel eventsplitMetrics "inevent_type_transaction" (flip unsafeAddCounter . fromIntegral . length $ es)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestTransactions"
       transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
     IETBlock -> do
+      liftIO $ withLabel eventsplitMetrics "inevent_type_block" (flip unsafeAddCounter . fromIntegral . length $ es)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlocks"
       transformBlocks $ map (\(IEBlock ob) -> ob) events
     IETGenesis -> do
+      liftIO $ withLabel eventsplitMetrics "inevent_type_genesis" (flip unsafeAddCounter . fromIntegral . length $ es)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
     IETBlockstanbul -> do
+      liftIO $ withLabel eventsplitMetrics "inevent_type_blockstanbul" (flip unsafeAddCounter . fromIntegral . length $ es)
       $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
 

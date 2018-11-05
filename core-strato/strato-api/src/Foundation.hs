@@ -6,7 +6,7 @@ module Foundation where
 
 import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
 import           Import.NoFoundation
-import           Control.Monad.IO.Unlift
+import           Blockchain.SHA
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as T
@@ -14,11 +14,9 @@ import qualified Data.Text.Encoding.Error as T
 import           Data.Time
 import qualified Network.Wai              as W
 import qualified Prelude                  as P
-import           Yesod.Core.Types         (Logger, unHandlerT, HandlerT(..))
+import           Yesod.Core.Types         (Logger)
 import qualified Yesod.Core.Unsafe        as Unsafe
-import           Yesod.Raml.Routes
 
-import           Blockchain.SHA
 import           Blockchain.DB.SQLDB
 
 timeFormat :: String
@@ -43,7 +41,22 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
+    , appFaucetNonce :: IORef Integer -- The last maximum nonce given out
     }
+
+initialMaxNonce :: MonadIO m => m (IORef Integer)
+initialMaxNonce = liftIO $ newIORef (-1)
+
+acquireNewMaxNonce :: (MonadIO m, MonadReader App m) => Integer -> m Integer
+acquireNewMaxNonce minNonce = do
+  let findNext :: Integer -> (Integer, Integer)
+      -- Another node may have jumped ahead of our faucet stream or we may
+      -- just be starting up, so always give at least the minNonce.
+      findNext maxNonce =
+        let next = max minNonce $ 1 + maxNonce
+        in (next, next)
+  nref <- asks appFaucetNonce
+  liftIO $ atomicModifyIORef' nref findNext
 
 instance HasHttpManager App where
     getHttpManager = appHttpManager
@@ -52,11 +65,13 @@ instance HasHttpManager App where
 -- explanation of the syntax, please see:
 -- http://www.yesodweb.com/book/routing-and-handlers
 --
+--
+--
 -- Note that this is really half the story; in Application.hs, mkYesodDispatch
 -- generates the rest of the code. Please see the linked documentation for an
 -- explanation for this split.
 
-mkYesodData "App" $(parseRamlRoutesFile "config/routes.raml")
+mkYesodData "App" $(parseRoutesFile "config/routes.txt")
 
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
@@ -95,11 +110,6 @@ instance Yesod App where
 -- How to run database actions.
 instance HasSQLDB Foundation.Handler where
     getSQLDB = appConnPool <$> getYesod
-
-instance MonadUnliftIO Foundation.Handler where
-  {-# INLINE askUnliftIO #-}
-  askUnliftIO = HandlerT $ \r ->
-                return (UnliftIO (flip unHandlerT r))
 
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend

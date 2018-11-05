@@ -6,13 +6,13 @@
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
-import Control.Applicative ((<|>))
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Monoid ((<>))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
@@ -65,6 +65,9 @@ data BlockstanbulContext = BlockstanbulContext {
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe Address
   , _authSenders :: M.Map Address Int
+  -- TODO(tim): Initialize _lastParent with the genesis block and
+  -- make it required
+  , _lastParent :: Maybe SHA
 }
 
 makeLenses ''BlockstanbulContext
@@ -108,6 +111,7 @@ newContext v as senderlist pk =
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
+     , _lastParent = Nothing
      }
 
 selfAddr :: (StateMachineM m) => m Address
@@ -143,7 +147,6 @@ isAuthorized iev = do
   unless authenticated $
     warn $ "Rejecting inevent; message failed authentication: " ++ show iev
   authorized <- authorize iev
-  mLockSender <- use lockSender
   specificAuth <-
     case iev of
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
@@ -160,20 +163,20 @@ isAuthorized iev = do
             return False
       -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
       -- but with incorrect extraData.
-      IMsg (MsgAuth addr _) (Preprepare _ pp) -> do
+      IMsg _ (Preprepare _ pp) -> do
         vals <- use validators
         let payloadVals = S.fromList (getValidatorList pp)
             validatorsMatch = vals == payloadVals
             signatory = verifyProposerSeal pp =<< getProposerSeal pp
-            signerMatches = (mLockSender <|> Just addr) == signatory
-        unless signerMatches $
+            signerExists = signatory `S.member` S.map Just vals
+        unless signerExists $
           warn $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
-              ++ " is not sender " ++ format addr
+              ++ " is not a known validator"
         unless validatorsMatch $
           warn $ "Rejecting Preprepare; payload validators "
               ++ show (S.map format payloadVals) ++ " are not expected validators "
               ++ show (S.map format vals)
-        return $ signerMatches && validatorsMatch
+        return $ signerExists && validatorsMatch
       IMsg (MsgAuth addr _) (Commit _ di seal) -> do
         let ret = Just addr == verifyCommitmentSeal di seal
         unless ret . warn $ "Rejecting Commit; bad seal"
@@ -183,6 +186,17 @@ isAuthorized iev = do
               then authorized && authenticated && specificAuth
               else authorized
 
+assertChainConsistency :: HK.Word256 -> Maybe SHA -> Block -> Either T.Text ()
+assertChainConsistency seqNo wantParent blk = do
+  let blkData = blockBlockData blk
+      blkNo = fromIntegral . blockDataNumber $ blkData
+      gotParent = blockDataParentHash blkData
+  unless (seqNo + 1 == blkNo) .
+    Left . T.pack $ printf "Rejecting block; block #%d is not required #%d" blkNo (seqNo +1)
+  when (isJust wantParent && wantParent /= Just gotParent) .
+    Left . T.pack $ "Rejecting block; parent hash " ++ format gotParent ++ " is not required " ++
+                    format (fromMaybe (error "assertChainConsistency") wantParent)
+  Right ()
 
 generateNonceMap :: [Address] -> M.Map Address Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
@@ -253,10 +267,13 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
+          blockNo = blockDataNumber . blockBlockData $ blk
       case eNextSeqNo of
-        Left err -> $logWarnS "blockstanbul" . T.pack $ "Rejecting historical block: " ++ err
+        Left err -> $logWarnS "blockstanbul" . T.pack
+                    . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right _ -> do
           -- TODO(tim): Does it have a vote to record?
+          $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
@@ -279,8 +296,20 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
-        proposal .= Just realSealed
-        yield =<< signMessage pk (Preprepare v realSealed)
+        wantParent <- use lastParent
+        seqNo <- use (view . sequence)
+        case assertChainConsistency seqNo wantParent realSealed of
+          Left err -> do
+            $logWarnS "blockstanbul" $ "Retrying to build block: " <> err
+            when (isJust mLocked) $ do
+              -- TODO(tim): It may make sense to crash here, but it's also possible that
+              -- peers will be able to commit the lock and historic replay of it
+              -- could absolve us.
+              $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
+            yield MakeBlockCommand
+          Right () -> do
+            proposal .= Just realSealed
+            yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -288,33 +317,41 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         () | sender auth /= pr ->
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: proposer %x is not %x" (sender auth) pr
-           | isJust mBlockLock && Just pp /= mBlockLock -> do
-              $logWarnS "blockstanbul/ppl" . T.pack $
-                printf "Rejecting proposal: block does not match lock"
-              $logInfoS "blockstanbul/roundchange" "lock mismatch"
-              roundChange
            | v /= v' -> do
               $logInfoS "blockstanbul/roundchange" . T.pack $
                  "view mismatch (us, sender): " ++ format (v, v')
               $logWarnS "blockstanbul/ppl" . T.pack $
                 printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
-              when (_sequence v < _sequence v') $ do
-                let intSeq = fromIntegral . _sequence
-                yield $ GapFound (intSeq v) (intSeq v')
+              let intSeq = fromIntegral . _sequence
+              when (_sequence v < _sequence v') $
+                yield $ GapFound (intSeq v) (intSeq v') (sender auth)
+              when (_sequence v > _sequence v') $
+                yield $ LeadFound (intSeq v) (intSeq v') (sender auth)
+              roundChange
+           | isJust mBlockLock && Just pp /= mBlockLock -> do
+              $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
+              $logInfoS "blockstanbul/roundchange" "lock mismatch"
               roundChange
            | otherwise -> do
-               blockcount += 1
-               proposal .= Just pp
-               pk <- use prvkey
-               case extractBeneficiary pp of
-                 Nothing -> return()
-                 Just (bnef,vot) -> do
-                   -- insert the vote into map
-                   val <- uses voted $M.lookup bnef
-                   let unwrapVal = fromMaybe M.empty val
-                   let nval = M.insert pr vot unwrapVal
-                   voted %= M.insert bnef nval
-               yield =<< signMessage pk (Prepare v (blockHash pp))
+              wantParent <- use lastParent
+              case assertChainConsistency (_sequence v) wantParent pp of
+                Left err -> do
+                  $logWarnS "blockstanbul/ppl" $ "Rejecting proposal: " <> err
+                  $logInfoS "blockstanbul/roundchange" "chain inconsistency"
+                  roundChange
+                Right () -> do
+                  blockcount += 1
+                  proposal .= Just pp
+                  pk <- use prvkey
+                  case extractBeneficiary pp of
+                    Nothing -> return()
+                    Just (bnef,vot) -> do
+                      -- insert the vote into map
+                      val <- uses voted $M.lookup bnef
+                      let unwrapVal = fromMaybe M.empty val
+                      let nval = M.insert pr vot unwrapVal
+                      voted %= M.insert bnef nval
+                  yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
@@ -355,10 +392,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         yield =<< signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
-        when (_sequence v < _sequence vn) $ do
-          -- Assume that we have missed the commit of the locked block, because
-          -- the rest of the nodes have moved on.
-          clearLock
         case next of
           Nothing -> error "TODO(tim): a round was voted on without existing"
           Just r -> nextRound (Round r)
@@ -378,12 +411,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul/roundchange" "commit failure (how...)"
       clearLock
       roundChange
-    CommitResult (Right ()) -> do
-      $logInfoS "blockstanbul" "Successful block commit"
-      s <- use $ view . sequence
+    CommitResult (Right hsh) -> do
+      $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
+      lastParent .= Just hsh
       clearLock
-      -- TODO(tim): More guards should be put in place to see that not just the view but
-      -- also the block numbers are in ascending order.
+      s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
 class (Monad m) => HasBlockstanbulContext m where
@@ -406,9 +438,12 @@ sendMessages wms = do
     Just ctx -> do
       let base = yieldMany wms
               .| iterMC recordInEvent
+              .| iterMC (inShortLog "blockstanbul/InShortLog")
               .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
               .| eventLoop ctx
-              `fuseUpstream` (iterMC recordOutEvent .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
+              `fuseUpstream` (iterMC recordOutEvent
+                           .| iterMC (outShortLog "blockstanbul/OutShortLog")
+                           .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
       return evs
@@ -451,3 +486,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     MakeBlockCommand -> inc "make_block_command"
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
+    LeadFound{} -> inc "lead_found"
