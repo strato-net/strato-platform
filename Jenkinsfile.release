@@ -68,7 +68,7 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=localhost
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0
