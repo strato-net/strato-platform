@@ -10,7 +10,7 @@ import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
 import           Data.Text                 (Text)
-import           Generic.Random.Generic
+import qualified Generic.Random            as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
@@ -36,7 +36,7 @@ instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}
 instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions{omitNothingFields = True}
-instance Arbitrary Type where arbitrary = genericArbitrary uniform
+instance Arbitrary Type where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Type where
   declareNamedSchema proxy = genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
     & mapped.name ?~ "Solidity type"
@@ -62,7 +62,7 @@ instance ToJSON IndexedType where
      HashMap.insert "index" (toJSON indexedTypeIndex)
      theMap
 
-instance Arbitrary IndexedType where arbitrary = genericArbitrary uniform
+instance Arbitrary IndexedType where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema IndexedType where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
@@ -109,7 +109,7 @@ instance ToSchema VarType where
     & mapped.schema.example ?~ toJSON (VarType 16 (Just True) (Just False) (Just "6120418de8a7a0ce3c3a0e3fe907e1351ceb4fe7") Address)
 
 
-instance Arbitrary VarType where arbitrary = genericArbitrary uniform
+instance Arbitrary VarType where arbitrary = GR.genericArbitrary GR.uniform
 
 data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
                deriving (Eq, Show, Generic)
@@ -128,7 +128,7 @@ instance ToJSON FieldType where
     in
       Object $ HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
 
-instance Arbitrary FieldType where arbitrary = genericArbitrary uniform
+instance Arbitrary FieldType where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema FieldType  where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy

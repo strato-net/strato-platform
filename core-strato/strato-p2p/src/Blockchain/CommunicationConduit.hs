@@ -36,7 +36,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire
 import           Blockchain.DB.DetailsDB               hiding (getBestBlockHash)
 import           Blockchain.DB.SQLDB
-import           Blockchain.DBM
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
@@ -45,7 +44,6 @@ import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.SeqEventNotify
-import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -67,8 +65,8 @@ mkEthP2PEventSource :: ( Monad m
                        )
                     => AppData
                     -> EthCryptState
-                    -> [Source m Event]
-                    -> m (Source m Event)
+                    -> [ConduitM () Event m ()]
+                    -> m (ConduitM () Event m ())
 mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSourcesCloseForAny (
     [ appSource app
         .| ethDecrypt inCtx
@@ -77,22 +75,22 @@ mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSources
         .| CL.map MsgEvt
     , seqEventNotificationSource
         .| CL.map NewSeqEvent
-    ] ++ extra) (2 + length extra)
+    ] ++ extra) 4096 -- 🙏
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
-                     -> Conduit Message m BC.ByteString
+                     -> ConduitM Message BC.ByteString m ()
 mkEthP2PEventConduit str outCtx =
      CL.iterM recordMessage
   .| CL.iterM (displayMessage Outbound str)
   .| messageToBytes
   .| ethEncrypt outCtx
 
-handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
+handleMsgClientConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
                        -> PPeer
-                       -> Conduit Event m Message
+                       -> ConduitM Event Message m ()
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
@@ -112,7 +110,7 @@ handleMsgClientConduit myId peer = do
                     genHash <- lift getGenesisBlockHash
                     yield Status {
                         protocolVersion = fromIntegral ethVersion,
-                        networkID       = ourNetworkID,
+                        networkID       = computeNetworkID,
                         totalDifficulty = fromIntegral tdiff,
                         latestHash      = hash,
                         genesisHash     = genHash
@@ -129,14 +127,12 @@ handleMsgClientConduit myId peer = do
                 yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
                 stampActionTimestamp
         other -> assertHandshake other
-    handleEvents (if flags_debugFail then Fail else Log) peer
+    handleEvents peer
 
-      where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
-
-handleMsgServerConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
+handleMsgServerConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
                  => Point
                  -> PPeer
-                 -> Conduit Event m Message
+                 -> ConduitM Event Message m ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
@@ -162,13 +158,13 @@ handleMsgServerConduit myPubkey peer = do
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                     yield Status {
                         protocolVersion=fromIntegral ethVersion,
-                        networkID=flags_networkID,
+                        networkID=computeNetworkID,
                         totalDifficulty= fromIntegral tdiff,
                         latestHash=hash,
                         genesisHash=genHash
                     }
         other -> assertHandshake other
-    handleEvents (if flags_debugFail then Fail else Log) peer
+    handleEvents peer
 
 awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
@@ -189,7 +185,7 @@ cbSafeTake' :: forall o m. Monad m
             -> ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake' i = fromMaybe (error "cb\"Safe\"Take: not enough data") <$> cbSafeTake i
 
-getRLPData :: Monad m => Consumer B.ByteString m B.ByteString
+getRLPData :: Monad m => forall void . ConduitM B.ByteString void m B.ByteString
 getRLPData = (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
    x | x < 128                 -> return $ B.singleton x
    x | x >= 192 && x <= 192+55 -> do
@@ -202,14 +198,14 @@ getRLPData = (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
    x                             -> error $ "missing case in getRLPData: " ++ show x
 
 
-bytesToMessages :: Monad m => Conduit B.ByteString m Message
+bytesToMessages :: Monad m => ConduitM B.ByteString Message m ()
 bytesToMessages = forever $ do
     msgTypeData <- cbSafeTake' 1
     let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData :: Integer)
     objBytes <- getRLPData
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
-messageToBytes :: Monad m => Conduit Message m B.ByteString
+messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = do
     maybeMsg <- await
     case maybeMsg of

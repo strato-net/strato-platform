@@ -45,7 +45,6 @@ import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
-import           Prometheus
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -125,9 +124,6 @@ instance HasSeenTransactionDB SequencerM where
 instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
     putBlockstanbulContext = assign (blockstanbulContext . _Just)
-
-instance MonadMonitor SequencerM where
-    doIO = liftIO
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -218,7 +214,7 @@ addLdbBatchOps ops = do
   let newOps = foldl (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
-fuseChannels ::SequencerM (Source SequencerM SeqLoopEvent)
+fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
   unseq <- asks $ unseqEvents . cablePackage
   votes <- asks blockstanbulBeneficiary

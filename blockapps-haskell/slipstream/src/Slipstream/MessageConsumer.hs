@@ -2,13 +2,17 @@
       OverloadedStrings
     , DeriveGeneric
     , FlexibleContexts
+    , LambdaCase
+    , TemplateHaskell
 #-}
 
 module Slipstream.MessageConsumer where
 
+import Control.Concurrent     (threadDelay)
+import Control.Exception.Lifted
 import Control.Monad.Reader
+import Control.Retry
 import Data.Aeson hiding (Error)
-import qualified Data.ByteString.Char8 as BC
 import GHC.Generics
 import qualified Data.Map as M
 import qualified Data.ByteString as B
@@ -19,11 +23,9 @@ import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
 import Data.List
-import Control.Concurrent
 import Database.PostgreSQL.Typed
 import Data.IORef
 import System.Log.Logger
-import Text.Printf
 
 import Slipstream.Globals
 import Slipstream.Options
@@ -31,6 +33,9 @@ import Slipstream.Processor
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
+
+exceptionMaxCount :: Int
+exceptionMaxCount = 20
 
 data KafkaConf =
   KafkaConf {
@@ -70,23 +75,39 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
-getTheMessages :: Kafka a => K.Offset -> a [B.ByteString]
-getTheMessages offset@(K.Offset o) = do
-  fetched <- fetch offset 0 lookupTopic
-  let errorStatuses = concatMap (^.. _2 . folded . _2) (fetched ^. K.fetchResponseFields)
-  case find (/= K.NoError) errorStatuses of
-   Just e -> do
-    liftIO . debugM "getTheMessages/kafka_response" . show $ fetched
-    let topic = BC.unpack (lookupTopic ^. K.tName ^. K.kString)
-    error $ printf "There was a critical Kafka error while fetching messages: %s\ntopic = %s, offset = %d" (show e) topic o
-   Nothing -> return ()
-  let ret = (map tamPayload . fetchMessages) fetched
-  return ret
+getTheMessages :: Kafka k => K.Offset -> k [B.ByteString]
+getTheMessages offset = do
+  let extract :: K.FetchResponse -> Either String [B.ByteString]
+      extract fr =
+        let errorStatuses = concatMap (^.. _2 . folded . _2) (fr ^. K.fetchResponseFields)
+        in case find (/= K.NoError) errorStatuses of
+          Just e -> Left . show $ e
+          Nothing -> Right . map tamPayload . fetchMessages $ fr
+      shouldRetry :: (MonadIO m) => RetryStatus -> Either String [B.ByteString] -> m Bool
+      shouldRetry _ = \case
+                         Left e -> do
+                           liftIO . criticalM "getTheMessages/kafka_response" . show $ e
+                           return True
+                         Right _ -> return False
+      policy :: RetryPolicy
+      policy = limitRetriesByCumulativeDelay 20000000 . exponentialBackoff $ 40000
+  fetched <- retrying policy shouldRetry . const $ extract <$> fetch offset 0 lookupTopic
+  return $ case fetched of
+              Left e -> error $ "getTheMessages: " ++ e
+              Right bs -> bs
 
-getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals ->  K.Offset -> a ()
-getAndProcessMessages conn cache offset = do
-  messages <- getTheMessages offset
-  liftIO $ processTheMessages messages conn cache
-  when (null messages) $
-    liftIO $ threadDelay 1000000
-  getAndProcessMessages conn cache $ offset + fromIntegral (length messages)
+getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
+getAndProcessMessages conn cache offset errorCounter = do
+  eMessages <- try $ getTheMessages offset
+  case eMessages of
+    Left e -> do
+      liftIO $ threadDelay 1000000
+      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
+      if (errorCounter > exceptionMaxCount )
+           then error $ "Slipstream reached exceptionMaxCount."
+           else getAndProcessMessages conn cache offset (errorCounter + 1)
+    Right messages -> do
+      liftIO $ processTheMessages messages conn cache
+      when (null messages) $
+        liftIO $ threadDelay 1000000
+      getAndProcessMessages conn cache (offset + fromIntegral (length messages)) errorCounter

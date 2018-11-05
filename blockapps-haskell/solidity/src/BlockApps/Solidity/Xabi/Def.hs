@@ -8,7 +8,7 @@ import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Swagger
 import           Data.Text                    (Text)
-import           Generic.Random.Generic
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -24,7 +24,7 @@ data Def = Enum { names::[Text], bytes::Word }
          | Contract { bytes::Word }
          deriving (Eq, Show, Generic)
 
-instance Arbitrary Def where arbitrary = genericArbitrary uniform
+instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON Def where
   toJSON = genericToJSON defAesonOptions
 instance FromJSON Def where

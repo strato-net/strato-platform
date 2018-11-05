@@ -10,38 +10,45 @@ license: Apache-2.0
 description:
               Tool to query the ethereum databases
 
+dependencies:
+  - base >= 4 && < 5
+  - ansi-wl-pprint
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-util
+  - bytestring
+  - cmdargs
+  - data-default
+  - ethereum-rlp
+  - filepath
+  - blockapps-haskoin
+  - leveldb-haskell
+  - merkle-patricia-db
+  - blockapps-milena
+  - monad-logger
+  - monad-loops
+  - nibblestring
+  - persistent-postgresql
+  - resourcet
+  - time
+  - strato-conf
+  - strato-sequencer
+  - strato-index
+  - strato-redis-blockdb
+  - strato-model
+  - hedis
+
+library:
+  source-dirs: src/
+
 executables:
   queryStrato:
     source-dirs: exec_src/
     main: Main.hs
+    other-modules: []
     dependencies:
-      - base >= 4 && < 5
-      - ansi-wl-pprint
-      - base16-bytestring
-      - binary
-      - blockapps-data
-      - blockapps-util
-      - bytestring
-      - cmdargs
-      - data-default
-      - ethereum-rlp
-      - filepath
-      - blockapps-haskoin
-      - leveldb-haskell
-      - merkle-patricia-db
-      - blockapps-milena
-      - monad-logger
-      - monad-loops
-      - nibblestring
-      - persistent-postgresql
-      - resourcet
-      - time
-      - strato-conf
-      - strato-sequencer
-      - strato-index
-      - strato-redis-blockdb
-      - strato-model
-      - hedis
+      - blockapps-tools
 
   b16decode:
     source-dirs: exec_src/
@@ -50,6 +57,7 @@ executables:
       - base >= 4 && < 5
       - base16-bytestring
       - bytestring
+    other-modules: []
 
   modifyDate:
     source-dirs: exec_src/
@@ -60,3 +68,4 @@ executables:
       - bytestring
       - hflags
       - time
+    other-modules: []

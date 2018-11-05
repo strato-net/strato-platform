@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 
 module Handler.Peers where
 
-import           Import                     hiding (readFile, (</>))
+import           Import                     hiding (readFile, (</>), fromString)
 
 import           Blockchain.Strato.Discovery.Data.Peer
 
 getPeersR :: Handler Value
 getPeersR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  activePeers <- liftIO getActivePeers
-  kvs <- forM activePeers $ \p -> return $ (pPeerIp p) .= (pPeerTcpPort p)
-  return $ object kvs
+  eActivePeers <- liftIO getActivePeers
+  case eActivePeers of
+    Left err -> sendResponseStatus status500 . toJSON . show $ err
+    Right ps -> return . object . map (\p -> pPeerIp p .= pPeerTcpPort p) $ ps

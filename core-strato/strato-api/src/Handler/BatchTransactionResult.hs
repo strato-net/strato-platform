@@ -14,9 +14,6 @@ import           Import
 import           Numeric             (readHex)
 import qualified Prelude             as P
 
-import           Blockchain.Data.MiningStatus
-import qualified Blockchain.Data.TransactionResultStatus as TRS
-
 data StrungSHA = StrungSHA { unStrungSHA :: SHA }
     deriving (Eq, Ord, Read, Show)
 
@@ -42,13 +39,10 @@ postBatchTransactionResultR = do
     Success hashes -> do
         txrs <- runDB . E.select . E.from $ \txr -> do
           let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList (unStrungSHA <$> hashes)
-              miningStatus = (txr E.^. TransactionResultMiningStatus) E.==. (E.val Mined)
               matchChainId = case chainId of
                 Nothing -> (E.isNothing $ txr E.^. TransactionResultChainId)
                 Just cid -> (txr E.^. TransactionResultChainId) E.==. (E.just $ E.val cid)
-              failStatus = (E.not_ . E.isNothing  $ txr E.^. TransactionResultStatus)
-                     E.&&. ((txr E.^. TransactionResultStatus) E.!=. (E.just $ E.val TRS.Success))
-          E.where_ (matchHashes E.&&. matchChainId E.&&. (miningStatus E.||. failStatus))
+          E.where_ (matchHashes E.&&. matchChainId)
           return txr
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m

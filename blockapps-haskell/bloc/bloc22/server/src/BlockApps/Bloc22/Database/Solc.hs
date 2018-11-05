@@ -8,7 +8,6 @@ import           Control.Monad              hiding (mapM_)
 import           Control.Monad.IO.Class     (MonadIO(..))
 import           Control.Monad.Trans.Except
 import           Data.Aeson hiding (String)
-import Data.Monoid ((<>))
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
@@ -28,11 +27,6 @@ import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
 import BlockApps.Bloc22.Monad
-import BlockApps.Solidity.Xabi              (Xabi(..))
-import BlockApps.Solidity.Parse.Parser
-import BlockApps.Solidity.Parse.ParserTypes
-import BlockApps.Solidity.Parse.UnParser
-import BlockApps.Solidity.Xabi
 
 
 -- Query parameters allowed:
@@ -187,30 +181,3 @@ aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ 
 
 getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
 getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
-
-addToSource :: Text -> [(SourceUnit -> SourceUnit)] -> Either String Text
-addToSource src funcs = do
-  File units <- parseXabiNoInheritanceMerge "" (unpack src)
-  return . pack . unparse . File $ go units funcs
-  where
-    go us [] = us
-    go us (f:fs) = go (List.map f us) fs
-
-addGetSource :: Text -> SourceUnit -> SourceUnit
-addGetSource src (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getSource__" src xabi, ts)
-addGetSource _ prag = prag
-
-addGetName :: SourceUnit -> SourceUnit
-addGetName (NamedXabi name (xabi@Xabi{xabiKind=ContractKind}, ts)) = NamedXabi name (addF "__getContractName__" name xabi, ts)
-addGetName prag = prag
-
-addF :: Text -> Text -> Xabi -> Xabi
-addF fName fBody = addFunction (fName, "return \"" <> unpack fBody <> "\";")
-
-formatSrc :: Text -> Text
-formatSrc = replace "\"" "\\\""
-          . replace "\n" "\\n"
-          . replace "'" "\\'"
-
-stripLines :: Text -> Text
-stripLines = Text.concat . Text.lines

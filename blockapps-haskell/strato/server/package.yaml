@@ -28,6 +28,7 @@ dependencies:
   - largeword
   - lens
   - quickcheck-instances
+  - prettyprinter
   - servant
   - servant-client
   - servant-docs

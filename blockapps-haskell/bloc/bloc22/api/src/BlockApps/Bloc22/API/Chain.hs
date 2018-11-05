@@ -23,7 +23,7 @@ import           Data.Map.Strict                    (Map)
 import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
-import           Generic.Random.Generic
+import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -46,10 +46,6 @@ data ChainInput  = ChainInput
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
 
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
-instance KnownSymbol "enode" where
-
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "address and balance pair"
@@ -61,7 +57,7 @@ instance ToSchema (NamedTuple "address" Address "enode" Text) where
     & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)) :: NamedTuple "address" Address "enode" Text)
 
 instance Arbitrary ChainInput where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON ChainInput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
@@ -116,7 +112,7 @@ data ChainOutput = ChainOutput
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainOutput where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON ChainOutput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
@@ -147,14 +143,12 @@ instance ToSchema ChainOutput where
 
 
 type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
 
-exChainIdChainOutput :: ChainIdChainOutput 
+exChainIdChainOutput :: ChainIdChainOutput
 exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 instance ToSample ChainIdChainOutput where
-  toSamples _ = singleSample exChainIdChainOutput 
+  toSamples _ = singleSample exChainIdChainOutput
 
 instance ToSchema ChainIdChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy

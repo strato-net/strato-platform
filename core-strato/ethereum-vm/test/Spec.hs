@@ -20,6 +20,7 @@ import qualified Data.ByteString.Base16  as B16
 import qualified Data.Default            (def)
 import qualified Data.Map                as M
 import           Data.Maybe
+import qualified Data.Sequence           as Q
 import qualified Data.Set                as S
 import           Data.Either
 import qualified Data.Text.Encoding      as Text
@@ -87,7 +88,8 @@ runContextM' f = do
                         (error "Kafka not initialized") --initialKafkaState
                         Unspecified
                         (error "Redis not initialized") --redisPool
-                        [] [] []
+                        Q.empty
+                        []
                         False False)
 
 

@@ -8,12 +8,8 @@
     , TemplateHaskell
     , FlexibleContexts
 #-}
-
 import Data.Default
 import Data.IORef
-import Data.List.Split ( splitOn )
-import qualified Data.Set as Set
-import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import HFlags
 import Network.Kafka
@@ -21,9 +17,8 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 import System.IO
 import System.Log.Logger
 
-import Slipstream.Globals
 import Slipstream.MessageConsumer
-import Slipstream.Options
+import Slipstream.Options()
 import Slipstream.OutputData
 
 
@@ -46,12 +41,10 @@ main = do
   let offset = 0 :: K.Offset
   let kafkaID = "slipstream" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
-  let histories = Set.fromList . map T.pack . filter (not . null) $ splitOn "," flags_historyList
 
-  cachedContractsIORef <- newIORef def{historyList = histories}
+  cachedContractsIORef <- newIORef def
 
-  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
-
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset 0)
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
