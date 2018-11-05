@@ -95,24 +95,27 @@ doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
-    numPeers <- liftIO $ getActivePeers >>= return . length
 
-    case reverse blocks of
-     [] -> --meh, kafka just timed out or something, no blocks, no big deal
-       doConsume (offset + fromIntegral (length blocks)) c
+    ePeers <- liftIO getActivePeers
+    case (length <$> ePeers, reverse blocks) of
+      (Left err, _) -> do
+        $logErrorS "doConsume" . T.pack $ "Could not get active peers: " ++ show err
+        recordException
+        doConsume offset c
+      --meh, kafka just timed out or something, no blocks, no big deal
+      (_, []) -> doConsume offset c
+      (Right numPeers, b:_) -> do --b is the last block, because of the reverse above
+        let quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
 
-     (b:_) -> do --b is the last block, because of the reverse above
-       let quorumSizeCriteria = not flags_useSyncMode || numPeers >= flags_minQuorumSize
+        if quorumSizeCriteria
+          then do
+            liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
+            $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
+              ++ (show . blockDataNumber $ blockBlockData b)
+           else $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
+             ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
 
-       if quorumSizeCriteria
-         then do
-           liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
-           $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #"
-             ++ (show . blockDataNumber $ blockBlockData b)
-          else $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ show numPeers
-            ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
-
-       doConsume (offset + fromIntegral (length blocks)) c
+        doConsume (offset + fromIntegral (length blocks)) c
 
 stratoAdit :: LoggingT IO ()
 stratoAdit = runAditT $ do
