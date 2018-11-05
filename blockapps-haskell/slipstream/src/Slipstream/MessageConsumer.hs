@@ -34,6 +34,9 @@ import Slipstream.Processor
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
 
+exceptionMaxCount :: Int
+exceptionMaxCount = 20
+
 data KafkaConf =
   KafkaConf {
       kafkaHost :: String,
@@ -99,10 +102,10 @@ getAndProcessMessages conn cache offset errorCounter = do
   case eMessages of
     Left e -> do
       liftIO $ threadDelay 1000000
-      getAndProcessMessages conn cache offset (errorCounter + 1)
-      if (errorCounter `mod` 20 == 0)
-           then liftIO . errorM "getTheMessages: " $ (show errorCounter) ++ " errors on fetchings: " ++ show (e :: KafkaClientError)
-           else liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
+      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
+      if (errorCounter > exceptionMaxCount )
+           then error $ "Slipstream reached exceptionMaxCount."
+           else getAndProcessMessages conn cache offset (errorCounter + 1)
     Right messages -> do
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
