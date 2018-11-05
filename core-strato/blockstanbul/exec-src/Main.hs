@@ -84,7 +84,7 @@ main = do
   pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
       sender = prvKey2Address pk
-  esign <- signBenfInfo pk (fromright (optRecipient opt), (optRemove opt))
+  esign <- signBenfInfo pk (fromright (optRecipient opt), (optRemove opt), fromright (optNonce opt))
   let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
       vote = API.CandidateReceived{API.sender=sender
                                  , API.signature=esignStr

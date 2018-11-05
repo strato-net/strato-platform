@@ -247,7 +247,7 @@ spec = do
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
             -- create the extendedsignature for (beneficiary, nonce)
-            esign <- signBenfInfo pvk (testAddr, True)
+            esign <- signBenfInfo pvk (testAddr, True, 1)
             --rlp serialize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
@@ -265,7 +265,7 @@ spec = do
                 val = M.lookup testAddr pv
             val `shouldBe` Just True
             pv `shouldBe` M.singleton testAddr True
-            esign' <- signBenfInfo pvk (testAddr, False)
+            esign' <- signBenfInfo pvk (testAddr, False, 1)
             let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
                                             , API.signature=esignStr'
