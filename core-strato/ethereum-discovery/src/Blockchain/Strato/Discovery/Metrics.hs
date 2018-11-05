@@ -3,7 +3,7 @@
 module Blockchain.Strato.Discovery.Metrics
   ( recordStateChange
   , ActivityState(..)
-  , getNumPeers
+  , getSameTypeNumPeers
   ) where
 
 import Control.Monad.IO.Class
@@ -21,5 +21,8 @@ recordStateChange = \case
   Unactive -> subGauge numPeers 1
   Active -> addGauge numPeers 1
 
-getNumPeers :: MonadIO m => m Int
-getNumPeers = floor <$> getGauge numPeers
+-- This will accurately report the number of other client peers if
+-- this is a client thread, or the number of server peers if
+-- this is a server thread. It will not count across types.
+getSameTypeNumPeers :: MonadIO m => m Int
+getSameTypeNumPeers = floor <$> getGauge numPeers

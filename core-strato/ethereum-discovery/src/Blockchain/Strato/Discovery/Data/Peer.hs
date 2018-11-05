@@ -7,7 +7,10 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-module Blockchain.Strato.Discovery.Data.Peer where
+module Blockchain.Strato.Discovery.Data.Peer
+  ( module Blockchain.Strato.Discovery.Metrics
+  , module Blockchain.Strato.Discovery.Data.Peer
+  ) where
 
 import           Control.Exception
 import           Crypto.Types.PubKey.ECC

@@ -3,11 +3,9 @@
 
 module Blockchain.Metrics ( recordEvent
                           , recordMessage
-                          , recordProcessStart) where
+                          ) where
 
-import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Resource
 import Data.Text
 import Prometheus
 
@@ -34,11 +32,6 @@ p2pEvents = unsafeRegister
           . vector "event_type"
           . counter
           $ Info "p2p_event" "Count of p2p events"
-
-numProcs :: Gauge
-numProcs = unsafeRegister
-         . gauge
-         $ Info "p2p_num_procs" "Number of processes running at any given time"
 
 recordEvent :: (MonadIO m) => Event -> m ()
 recordEvent = \case
