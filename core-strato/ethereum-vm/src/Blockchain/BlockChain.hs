@@ -27,16 +27,18 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
-import Debug.Trace
+import           Data.Aeson.Encode.Pretty                (encodePretty)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
+import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -383,7 +385,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erDetails             = traceShowId $ _details newVMState'
+                                       , erStorageDiffs       = _storageDiffs newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -402,7 +404,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erDetails             = _details newVMState'
+                                       , erStorageDiffs       = _storageDiffs newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -416,7 +418,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erDetails = []
+                               , erStorageDiffs = M.empty
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -471,7 +473,7 @@ outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
                         -> TxRunResult
                         -> ContextM [Action]
-outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
   let (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
@@ -494,7 +496,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
-          details' = either (const []) erDetails result
+          sDiffs = either (const M.empty) erStorageDiffs result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
           (response, theTrace', theLogs) =
             case result of
@@ -518,7 +520,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = ""
+                               , transactionResultStateDiff        = T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
@@ -527,21 +529,19 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                }
       if not flags_diffPublish
         then return []
-        else forM details' $ \VMDetails{..} -> do
-          AddressState{..} <- getAddressState _detailOwner
+        else forM (M.toList sDiffs) $ \(a,s) -> do
+          AddressState{..} <- getAddressState a
           return $ Action
-                     _detailActionType
+                     Blockchain.Data.Action.Update
                      ranBlockHash
                      (blockDataTimestamp b)
                      (blockDataNumber b)
                      theHash
                      chainId
-                     _detailMsgSender
-                     _detailOwner
+                     signer
+                     a
                      addressStateCodeHash
-                     (if _detailStorageDiff == M.empty then Nothing else Just _detailStorageDiff)
-                     (T.pack . BC.unpack . B16.encode $ _detailInputData) -- it doesn't make sense to decodeUtf8 here
-                     (T.pack . BC.unpack . B16.encode $ fromMaybe B.empty _detailReturn)
+                     (Just s)
                      (transactionMetadata t)
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()

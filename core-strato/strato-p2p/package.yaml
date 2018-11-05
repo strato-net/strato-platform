@@ -30,6 +30,7 @@ dependencies:
   - crypto-pubkey
   - crypto-pubkey-types
   - dns
+  - either
   - esqueleto
   - ethereum-discovery
   - ethereum-encryption
