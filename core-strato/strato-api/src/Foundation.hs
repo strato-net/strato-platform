@@ -6,7 +6,7 @@ module Foundation where
 
 import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
 import           Import.NoFoundation
-import           Blockchain.SHA
+import           Control.Monad.IO.Unlift
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as T
@@ -14,10 +14,11 @@ import qualified Data.Text.Encoding.Error as T
 import           Data.Time
 import qualified Network.Wai              as W
 import qualified Prelude                  as P
-import           Yesod.Core.Types         (Logger)
+import           Yesod.Core.Types         (Logger, HandlerT(..))
 
 import           Network.Haskoin.Crypto   as HK
 import           Blockchain.DB.SQLDB
+import           Blockchain.SHA
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
@@ -114,6 +115,11 @@ instance Yesod App where
 -- How to run database actions.
 instance HasSQLDB Foundation.Handler where
     getSQLDB = appConnPool <$> getYesod
+
+instance MonadUnliftIO Foundation.Handler where
+  {-# INLINE askUnliftIO #-}
+  askUnliftIO = HandlerT $ \r ->
+                return (UnliftIO (flip unHandlerT r))
 
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend

@@ -15,6 +15,7 @@ module Blockchain.Database.KeyVal (
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatriciaMem
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 
@@ -51,17 +52,17 @@ instance (
 
     getKV key = do
         db <- get
-        runResourceT $ getKeyVal db key
+        liftIO . runResourceT $ getKeyVal db key
 
     putKV kvPair = do
         db <- get
-        runResourceT $ putKeyVal db (fst kvPair) (snd kvPair)
+        liftIO . runResourceT $ putKeyVal db (fst kvPair) (snd kvPair)
 
     deleteKV key = do
         db <- get
-        runResourceT $ deleteKey db key
+        liftIO . runResourceT $ deleteKey db key
 
-    emptyKV path = liftIO $ runResourceT $ openMPDB path  -- fix
+    emptyKV path = liftIO . runResourceT $ openMPDB path  -- fix
 
 instance (
            Monad m

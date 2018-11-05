@@ -3,18 +3,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module EventSpec where
 
-import ClassyPrelude (atomically)
+import ClassyPrelude (atomically, void)
 import Conduit
 import Control.Concurrent.STM.TMChan
-import Control.Monad.State.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
-import Data.Conduit.TMChan
 import Database.Persist.Sql
-import qualified Data.Text                             as T
-import qualified Database.Persist.Sqlite               as Lite
-import qualified Database.Redis                        as Redis
+import qualified Data.Text                   as T
+import qualified Database.Persist.Sqlite     as Lite
+import qualified Database.Redis              as Redis
 import System.IO.Temp                        (emptySystemTempFile)
+import UnliftIO.IORef
 
 import Blockchain.Blockstanbul               (blockstanbulSender)
 import Blockchain.Context
@@ -48,19 +47,24 @@ testContext = do
   -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
   file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
   conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
-  ch <- atomically $ newTMChan
-  return (ch, Context { actionTimestamp = Nothing
-                 , contextRedisBlockDB = redisBDBPool
-                 , contextKafkaState = error "no kafka state available"
-                 , contextSQLDB = conn
-                 , blockHeaders=[]
-                 , unseqSink=sinkTMChan ch False
-                 , vmEventsSink=sinkNull
-                 , vmTrace=[]
-                 , connectionTimeout=60
-                 , maxReturnedHeaders=1000
-                 , _blockstanbulPeerAddr=Nothing
-                 })
+  ch <- atomically newTMChan
+  at <- newIORef Nothing
+  bhs <- newIORef []
+  vmt <- newIORef []
+  peer <- newIORef Nothing
+
+  return (ch, Context { actionTimestamp = at
+                      , contextRedisBlockDB = redisBDBPool
+                      , contextKafkaState = error "no kafka state available"
+                      , contextSQLDB = conn
+                      , blockHeaders = bhs
+                      , unseqSink = atomically . writeTMChan ch
+                      , vmEventsSink = const (return ())
+                      , vmTrace = vmt
+                      , connectionTimeout = 60
+                      , maxReturnedHeaders = 1000
+                      , blockstanbulPeerAddr = peer
+                      })
 
 testPeer :: DataPeer.PPeer
 testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
@@ -80,30 +84,30 @@ runTestPeer mv = do
   (ch, ctx) <- testContext
   let pool = contextSQLDB ctx
   liftSqlPersistMPool migrateAll pool
-  runLoggingT (runContextM ctx (mv ch)) printLogMsg
+  void
+    . flip runLoggingT printLogMsg
+    . runResourceT
+    . flip runReaderT ctx
+    $ mv ch
 
 spec :: Spec
 spec = do
   describe "environment sanity checks" $ do
-    it "has a PPeer table" $ do
-      runTestPeer . const $ do
-        pool <- gets contextSQLDB
-        liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool `L.shouldReturn` 0
+    it "has a PPeer table" . runTestPeer . const $ do
+      pool <- asks contextSQLDB
+      liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool `L.shouldReturn` 0
     it "can pretend to write to kafka" $ do
       quickCheck . once $ \ori txs -> runTestPeer . const $ emitKafkaTransactions ori txs
       quickCheck . once $ \ori blk -> runTestPeer . const $ emitKafkaBlock ori blk
-    it "has a redis instance" $ do
-      runTestPeer . const $ do
-        RBDB.withRedisBlockDB RBDB.getBestBlockInfo `L.shouldReturn` (Nothing :: Maybe RedisBestBlock)
+    it "has a redis instance" . runTestPeer . const $
+      RBDB.withRedisBlockDB RBDB.getBestBlockInfo `L.shouldReturn` (Nothing :: Maybe RedisBestBlock)
 
   describe "handleEvents" $ do
-    it "should pong a ping" $
-      runTestPeer . const $ do
-        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Pong]
-    it "should return empty BlockBodies to empty BlockHeaders" $
-      runTestPeer . const $ do
-        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
-          `L.shouldReturn` [GetBlockBodies []]
+    it "should pong a ping" . runTestPeer . const $
+      runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Pong]
+    it "should return empty BlockBodies to empty BlockHeaders" . runTestPeer . const $
+      runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
+        `L.shouldReturn` [GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ \wm ->
       runTestPeer $ \ch -> do
         let addr = blockstanbulSender wm
@@ -114,7 +118,7 @@ spec = do
                            .| handleEvents testPeer
                            .| sinkList
            `L.shouldReturn` []
-        atomically (closeTMChan ch >> readTMChan ch) `L.shouldReturn` Just ([IEBlockstanbul wm])
+        atomically (closeTMChan ch >> readTMChan ch) `L.shouldReturn` Just [IEBlockstanbul wm]
         atomically (readTMChan ch) `L.shouldReturn` Nothing
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
