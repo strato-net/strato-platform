@@ -68,7 +68,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
 
     runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 1
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Active
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
@@ -80,7 +80,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
              .| eventSink
              .| appSink app
 
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 0
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Unactive
         case attempt of
           Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err

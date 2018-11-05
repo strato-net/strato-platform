@@ -49,7 +49,7 @@ runEthServer myPriv listenPort = do
             $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ show theSockAddr  ++ ". rejecting violently."
             liftIO (appCloseConnection app)
           Just otherPubKey -> do
-            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) 1
+            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) Active
             (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
             !eventSource <- mkEthP2PEventSource app inCtx []
             let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
@@ -59,7 +59,7 @@ runEthServer myPriv listenPort = do
                 .| eventSink
                 .| appSink app
 
-            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) 0
+            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) Unactive
             case attempt of
               Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
               Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -68,7 +68,7 @@ stratoP2PServer :: LoggingT IO ()
 stratoP2PServer = do
   let PrivKey myPriv = privKey ethConf
 
-  $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ (flags_address)
-  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ (show flags_listen)
+  $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
+  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
   void . runResourceT $ runEthServer myPriv flags_listen
