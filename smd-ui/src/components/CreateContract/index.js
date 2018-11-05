@@ -400,8 +400,9 @@ class CreateContract extends Component {
                       validate={required}
                       required
                     >
-                      <option key="off" value="off">Off</option>
+                      <option value={null}></option>
                       <option key="on" value="on">On</option>
+                      <option key="off" value="off">Off</option>
                     </Field>
                   </div>
                 </div>
@@ -421,6 +422,7 @@ class CreateContract extends Component {
                       validate={required}
                       required
                     >
+                      <option value={null}></option>
                       <option key="on" value="on">On</option>
                       <option key="off" value="off">Off</option>
                     </Field>
