@@ -18,6 +18,7 @@ import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import           Data.Either.Combinators
 import           Data.Maybe                              (fromJust)
 import           Data.Monoid
 import qualified Data.Text                               as T
@@ -92,9 +93,7 @@ addPeersIfNeeded prv sock= do
         randomBytes <- liftIO $ getEntropy 64
         sendPacket sock prv (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
         eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
-        case eErr of
-          Right () -> return ()
-          Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
+        whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: (MonadIO m, MonadLogger m)
             => H.PrvKey
@@ -190,9 +189,7 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
     Pong{} -> do
         addPeer'
         eErr <- liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
-        case eErr of
-          Right () -> return ()
-          Left err -> do
+        whenLeft eErr $ \ err -> do
             $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
             throwM err
 
