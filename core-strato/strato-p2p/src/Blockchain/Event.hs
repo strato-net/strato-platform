@@ -435,7 +435,7 @@ shouldSendGossip peer txo =
             Origin.PeerString{} -> do
               rangeEnd <- getNumPeersMem
               rng <- liftIO $ randomRIO (1, rangeEnd)
-              return $ rng <= 3
+              return $ rangeEnd <= 3 || rng <= 3
             _ -> return True
 
 -- check that the peer is authorized to receive these chain details, by verifying that their
