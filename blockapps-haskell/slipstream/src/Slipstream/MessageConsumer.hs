@@ -10,7 +10,6 @@ module Slipstream.MessageConsumer where
 
 import Control.Concurrent     (threadDelay)
 import Control.Exception.Lifted
-import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson hiding (Error)
@@ -24,7 +23,6 @@ import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
 import Data.List
-import Control.Concurrent
 import Database.PostgreSQL.Typed
 import Data.IORef
 import System.Log.Logger
@@ -100,13 +98,13 @@ getTheMessages offset = do
 
 getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
 getAndProcessMessages conn cache offset = do
-  eMessages <- try . liftIO $ getTheMessages offset :: a (Either KafkaClientError [B.ByteString])
+  eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
      -- if errorCounter >= 20
            --then liftIO . errorM "getTheMessages: " . T.pack " More than 20 errors on fetchings." ++ show (e :: SomeException)
        --    else liftIO . errorM "getTheMessages: " . show (e :: SomeException)
-      liftIO . errorM "getTheMessages: " . show $ e -- :: SomeException
+      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
       liftIO $ threadDelay 1000000
       getAndProcessMessages conn cache offset
     Right messages -> do
