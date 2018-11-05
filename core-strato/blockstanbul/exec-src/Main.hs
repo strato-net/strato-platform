@@ -8,7 +8,7 @@ import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
-import           Servant.Common.BaseUrl
+import           Servant.Client
 import           System.Console.GetOpt
 import           System.Environment
 import           System.Exit

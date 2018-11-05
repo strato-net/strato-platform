@@ -89,7 +89,7 @@ deleteAccount chainId address = do
   SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
   SQL.delete addrID
 
-updateAccount :: (MonadResource m, MonadBaseControl IO m) =>
+updateAccount :: MonadResource m =>
                  Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount chainId blockNumber address diff = do
   addrID <- getAddressStateSQL chainId address "update"

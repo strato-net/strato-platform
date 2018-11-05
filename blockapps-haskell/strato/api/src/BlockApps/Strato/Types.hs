@@ -50,7 +50,6 @@ import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
-import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe
@@ -110,9 +109,6 @@ instance ToSchema x => ToSchema (WithNext x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
 instance ToSchema x => ToSchema (Strung x) where
-  declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
-
-instance ToSchema x => ToSchema (NonEmpty x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
 instance ToSchema Transaction where

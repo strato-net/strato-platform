@@ -33,7 +33,6 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
@@ -190,7 +189,7 @@ instance HasCodeDB ContextM where
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = contextBlockSummaryDB <$> get
 
-instance (MonadReader Config m, MonadIO m, MonadUnliftIO m, MonadBaseControl IO m) => HasSQLDB m where
+instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
@@ -202,7 +201,7 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
@@ -219,7 +218,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
         hdb <- openDB hashDBPath
         cdb <- openDB codeDBPath
         blksumdb <- openDB blockSummaryCacheDBPath
-        redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+        redisPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
           Redis.connectHost = "localhost",
           Redis.connectPort = Redis.PortNumber 2023,
           Redis.connectDatabase = 0
@@ -243,8 +242,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      Q.empty []
                      False
                      False)
-
-runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -283,10 +281,10 @@ runContextM f = do
                        False)
 
 
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()

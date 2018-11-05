@@ -7,7 +7,7 @@ import           Import                     hiding (readFile, (</>), fromString)
 
 import           Blockchain.Strato.Discovery.Data.Peer
 
-getPeersR :: Handler Value
+getPeersR :: MonadHandler m => m Value
 getPeersR = do
   addHeader "Access-Control-Allow-Origin" "*"
   eActivePeers <- liftIO getActivePeers

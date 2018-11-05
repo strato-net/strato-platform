@@ -1,7 +1,9 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Handler.ChainInfo where
 
@@ -34,11 +36,11 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: Handler Value
+postChainR :: forall m . MonadHandler m => m Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  ci <- parseJsonBody :: Handler (Result ChainInfo)
+  ci <- parseJsonBody :: m (Result ChainInfo)
   case ci of
     Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ _) _) -> do
     -- add more checks?
@@ -58,7 +60,7 @@ postChainR = do
             return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
-getChainR :: Handler Value
+getChainR :: HandlerFor App Value
 getChainR = do
   chainIds <- lookupGetParams "chainid"
   addHeader "Access-Control-Allow-Origin" "*"

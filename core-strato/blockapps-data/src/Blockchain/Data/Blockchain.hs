@@ -25,7 +25,7 @@ import           Database.Persist.TH
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger        (runNoLoggingT)
+import           Control.Monad.Logger        (runNoLoggingT, NoLoggingT)
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 
@@ -46,7 +46,7 @@ createDB :: ConnectionString -> IO ()
 createDB pgConn = do
     putStrLn $ CL.yellow ">>>> Creating global database"
     let create = "CREATE DATABASE blockchain;"
-    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []))
+    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlWriteBackend -> NoLoggingT IO ())
 
 migrateDB :: (MonadBaseControl IO m, MonadIO m, MonadUnliftIO m) => ConnectionString -> m ()
 migrateDB pgConn = runNoLoggingT . runPostgresConn pgConn $ runMigration migrateAll

@@ -23,12 +23,12 @@ data Stats = Stats
 
 instance ToJSON Stats
 
-getStatDiffR :: Handler Value
+getStatDiffR :: HandlerFor App Value
 getStatDiffR  = do
   bestBlock <- getBestBlock
   return $ object ["difficulty" .= blockDataRefTotalDifficulty bestBlock]
 
-getStatTxR :: Handler Value
+getStatTxR :: HandlerFor App Value
 getStatTxR  = do
                    addHeader "Access-Control-Allow-Origin" "*"
                    tx <- runDB $ E.select $ E.from $ \(_ :: E.SqlExpr (Entity RawTransaction)) -> return E.countRows

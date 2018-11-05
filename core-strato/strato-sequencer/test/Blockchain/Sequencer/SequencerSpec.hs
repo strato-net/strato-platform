@@ -54,7 +54,7 @@ import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
-import           Servant.Common.BaseUrl
+import           Servant.Client
 import           System.Entropy
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
@@ -299,7 +299,7 @@ spec = do
         atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
         atomically . writeTMChan vch $ vote
-        src0 <- newResumableSource <$> fuseChannels
+        src0 <- sealConduitT <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
         (src2, ev2) <- src1 $$++ headC
         (_, ev3) <- src2 $$++ headC
@@ -309,7 +309,7 @@ spec = do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTQueue uch $ iev
-        src <- newResumableSource <$> fuseChannels
+        src <- sealConduitT <$> fuseChannels
         void $ oneSequencerIter src
 
       it "should not only return 1 event if multiple are pending" . runTestM $ do
@@ -318,13 +318,13 @@ spec = do
           writeTMChan tch 20
           writeTMChan tch 34
           writeTMChan tch 92
-        src <- newResumableSource <$> fuseChannels
+        src <- sealConduitT <$> fuseChannels
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [20, 34, 92]
 
       it "should not return more than the fetchlimit" . runTestM $ do
         tch <- asks blockstanbulTimeouts
-        src <- newResumableSource <$> fuseChannels
+        src <- sealConduitT <$> fuseChannels
         atomically $ mapM_ (writeTMChan tch) [10..30]
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [10..19]
@@ -365,7 +365,7 @@ spec = do
         _view ctx' `shouldBe` View 0 1
 
       it "should be able to fetch if the write is after the read begins" . runTestM $ do
-        src <- newResumableSource <$> fuseChannels
+        src <- sealConduitT <$> fuseChannels
         uch <- asks blockstanbulTimeouts
         void . liftIO . forkIO $ do
           threadDelay 5000

@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Blockchain.MilenaTools where
 
 
 import           Control.Concurrent     (threadDelay)
-import           Control.Monad.Except   (throwError)
 import           Control.Lens
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), runExceptT)
+import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
+import qualified Control.Monad.Trans.State.Strict as Str
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
@@ -64,6 +65,14 @@ getConsumerGroupCoordinator group = do
 class HasKafkaState m where
     getKafkaState :: m KafkaState
     putKafkaState :: KafkaState -> m ()
+
+instance (Monad m) => HasKafkaState (StateT KafkaState m) where
+    getKafkaState = get
+    putKafkaState = put
+
+instance (Monad m) => HasKafkaState (Str.StateT KafkaState m) where
+    getKafkaState = Str.get
+    putKafkaState = Str.put
 
 withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaViolently k = do

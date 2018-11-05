@@ -57,8 +57,14 @@ ghc-options: -Wall -Werror -threaded
 
 tests:
   vm-tests:
-    source-dirs: test
+    source-dirs:
+      - test/
+      - src/
     main: TestMain.hs
+    other-modules:
+      - Blockchain.VM.TestDescriptions
+      - Blockchain.VM.TestEthereum
+      - Blockchain.VM.TestFiles
 
   unittests:
     source-dirs: test
@@ -69,3 +75,4 @@ tests:
   test-suite:
     source-dirs: test
     main: Spec.hs
+    other-modules: []

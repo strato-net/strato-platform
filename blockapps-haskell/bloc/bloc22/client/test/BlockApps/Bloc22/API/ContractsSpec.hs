@@ -25,7 +25,7 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just simpleStorageContractName)
           simpleStorageSrc
-      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
+      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       contracts `shouldSatisfy` any
         (\ (PostCompileResponse name _) -> name == simpleStorageContractName)
     it "compiles a Solidity file with two contracts in it" $ \ TestConfig {..} -> do
@@ -33,18 +33,18 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just twoContractsContractName)
           twoContractsSrc
-      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
+      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       liftIO . putStrLn $ show contracts
       contracts `shouldSatisfy` (== 2) . length
   describe "getContracts" $
     it "gets a list of contracts" $ \ TestConfig {..} -> do
-      Right (GetContractsResponse contracts) <- runClientM (getContracts Nothing) (ClientEnv mgr blocUrl)
+      Right (GetContractsResponse contracts) <- runClientM (getContracts Nothing) (ClientEnv mgr blocUrl Nothing)
       let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
       addressesCreatedAt1 `shouldSatisfy` any
         (\ (AddressCreatedAt _ addr Nothing) -> addr == Unnamed simpleStorageContractAddress)
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
-      Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl)
+      Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl Nothing)
       addrs `shouldContain` [Unnamed simpleStorageContractAddress]
   describe "getContractsContract" $ do
     it "get xabi data for an uploaded contracted at a specific address" $ \ TestConfig {..} -> do
@@ -54,7 +54,7 @@ spec = do
           (Unnamed simpleStorageContractAddress)
           Nothing
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractsEither `shouldSatisfy` isRight
     it "should also work when mappings are involved" $ \ TestConfig {..} -> do
       pendingWith "Mappings not implemented for Contract Metadata"
@@ -66,7 +66,7 @@ spec = do
           (Unnamed simpleStorageContractAddress)
           Nothing
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       mapM_ (\v -> elem v functionNames `shouldBe` True)
             [ FunctionName "__getSource__"
             , FunctionName "get"
@@ -80,7 +80,7 @@ spec = do
           (Unnamed simpleStorageContractAddress)
           Nothing
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       symbols `shouldBe` [SymbolName "storedData"]
   describe "getContractsState" $
     it "get contract state for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
@@ -94,7 +94,7 @@ spec = do
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contracts `shouldBe` Map.fromList
           [ ("__getContractName__",SolidityValueAsString "function () returns (String)")
           , ("__getSource__",SolidityValueAsString "function () returns (String)")

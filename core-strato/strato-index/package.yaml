@@ -38,15 +38,18 @@ executables:
     source-dirs: exec_src
     dependencies:
       - strato-index
+    other-modules: []
 
   strato-p2p-indexer:
     main: P2PIndexerMain.hs
     source-dirs: exec_src
     dependencies:
       - strato-index
+    other-modules: []
 
   strato-txr-indexer:
     main: TxrIndexerMain.hs
     source-dirs: exec_src/
     dependencies:
       - strato-index
+    other-modules: []

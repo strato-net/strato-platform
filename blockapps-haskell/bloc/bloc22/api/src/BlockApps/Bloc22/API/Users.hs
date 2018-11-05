@@ -212,7 +212,10 @@ type PostUsersKeyStore = "users"
 data PostUsersKeyStoreRequest = PostUsersKeyStoreRequest
   { postuserskeystorerequestPassword :: Password
   , postuserskeystorerequestKeyStore :: KeyStore
-  } deriving (Generic)
+  } deriving (Eq, Show, Generic)
+
+instance Arbitrary PostUsersKeyStoreRequest where
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostUsersKeyStoreRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)

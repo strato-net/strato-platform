@@ -32,7 +32,6 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Lens                          hiding (Context)
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -86,7 +85,7 @@ instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m, MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
+instance (MonadResource m, MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
@@ -133,7 +132,7 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-runContextM :: (MonadBaseControl IO m, MonadThrow m, MonadIO m)
+runContextM :: (MonadIO m, MonadUnliftIO m)
             => (r, s)
             -> StateT s (ReaderT r (ResourceT m)) a
             -> m ()
@@ -141,13 +140,12 @@ runContextM (r, s) = void . runResourceT . flip runReaderT r . flip runStateT s
 
 initContext :: ( MonadResource m
                , MonadIO m
-               , MonadBaseControl IO m
                , MonadLogger m
                , MonadUnliftIO m
                )
             => Int -> m (Config, Context)
 initContext maxHeaders = do
-  dbs <- openDBs
+  let dbs = error "TODO(tim): unlift io here, or provide as argument"
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return (Config (sqlDB' dbs),
          Context { actionTimestamp = Nothing
@@ -165,8 +163,7 @@ initContext maxHeaders = do
 
 getPeerByIP :: ( WrapsSQLDB t m
                , MonadResource m
-               , MonadBaseControl IO m
-               , MonadThrow m)
+               )
             => String
             -> (t m) (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = runWithSQL $ do
