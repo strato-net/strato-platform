@@ -44,7 +44,6 @@ import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.SeqEventNotify
-import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -111,7 +110,7 @@ handleMsgClientConduit myId peer = do
                     genHash <- lift getGenesisBlockHash
                     yield Status {
                         protocolVersion = fromIntegral ethVersion,
-                        networkID       = ourNetworkID,
+                        networkID       = computeNetworkID,
                         totalDifficulty = fromIntegral tdiff,
                         latestHash      = hash,
                         genesisHash     = genHash
@@ -129,8 +128,6 @@ handleMsgClientConduit myId peer = do
                 stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer
-
-      where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
 handleMsgServerConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
                  => Point
@@ -161,7 +158,7 @@ handleMsgServerConduit myPubkey peer = do
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                     yield Status {
                         protocolVersion=fromIntegral ethVersion,
-                        networkID=flags_networkID,
+                        networkID=computeNetworkID,
                         totalDifficulty= fromIntegral tdiff,
                         latestHash=hash,
                         genesisHash=genHash
