@@ -25,6 +25,7 @@ import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
 import           Blockchain.SHA
+import           Blockchain.Strato.Discovery.Metrics
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
@@ -105,13 +106,16 @@ getAvailablePeers = try . withGlobalSQLPool $ \sqldb -> do
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
-setPeerActiveState::T.Text->Int->Int->IO (Either SomeException ())
-setPeerActiveState ip _ state = try $ withGlobalSQLPool $ \sqldb -> do
+setPeerActiveState::T.Text->Int->ActivityState->IO (Either SomeException ())
+setPeerActiveState ip _ state = do
+  recordStateChange state
   -- TODO(tim): Reenable port selection
   let port' = 30303
-  flip SQL.runSqlPool sqldb $
-    SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port'] [PPeerActiveState SQL.=. state]
-  return ()
+  try $ withGlobalSQLPool $ \sqldb -> do
+    flip SQL.runSqlPool sqldb $
+      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port']
+                      [PPeerActiveState SQL.=. fromEnum state]
+
 
 getActivePeers::IO (Either SomeException [PPeer])
 getActivePeers = try . withGlobalSQLPool $ \sqldb -> do

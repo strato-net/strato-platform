@@ -77,8 +77,3 @@ recordMessage' msgVect msg = do
                 ChainDetails _ -> "chain_details"
                 GetTransactions _ -> "get_transactions"
   liftIO $ withLabel msgVect label incCounter
-
-recordProcessStart :: MonadResource m => m ()
-recordProcessStart = void $ allocate inc dec
-  where inc = addGauge numProcs 1
-        dec = const $ subGauge numProcs 1
