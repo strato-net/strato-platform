@@ -25,8 +25,8 @@ import qualified Database.Persist.Types                as SQL
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf
+import           Blockchain.Options
 import           Blockchain.P2PUtil
-import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
