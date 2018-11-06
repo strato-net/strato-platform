@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    opm get zmartzone/lua-resty-openidc
+    opm get zmartzone/lua-resty-openidc=1.7.0
 
 COPY nginx.tpl.conf auth.htpasswd openid-auth.tpl.lua openid-auth-jwt.tpl.lua /tmp/
 
