@@ -199,7 +199,10 @@ runTest test = do
                 envSender = caller exec,
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
-                envJumpDests = getValidJUMPDESTs $ code exec
+                envJumpDests = getValidJUMPDESTs $ code exec,
+                envTxHash = SHA 0,
+                envChainId = Nothing,
+                envMetadata = Nothing
                 }
 
         cxt <- get
