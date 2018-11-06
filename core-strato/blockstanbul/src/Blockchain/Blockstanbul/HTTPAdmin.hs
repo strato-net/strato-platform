@@ -73,6 +73,6 @@ uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
   vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "/blockstanbul"))
   case vot of
-    Left err -> putStrLn $ "Error??/: " ++ show err
+    Left err -> putStrLn $ "HTTP Request failed to send: " ++ show err
     Right cr'-> do
-      print cr'
+      print $ "HTTP Request successively sent for Object: " ++ show cr'

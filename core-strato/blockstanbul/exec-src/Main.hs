@@ -75,12 +75,11 @@ parseArgs = do
 
 fromright :: Either IOError a -> a
 fromright (Right x) = x
-fromright (Left _) = error ("See errors above." ++ "\n" ++ helpMessage)
+fromright (Left err) = error ("Input error: " ++ (show err) ++ "\n" ++ helpMessage)
 
 main :: IO()
 main = do
   opt <- parseArgs
-  putStrLn $ show opt
   pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
       sender = prvKey2Address pk
@@ -91,5 +90,4 @@ main = do
                                  , API.recipient= fromright (optRecipient opt)
                                  , API.votingdir= not (optRemove opt)
                                  , API.nonce= fromright (optNonce opt)}
-  putStrLn $ show vote
   API.uploadVote 80 ("admin:admin@"++(fromright (optNode opt))) vote
