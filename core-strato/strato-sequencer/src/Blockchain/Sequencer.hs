@@ -163,11 +163,12 @@ blockstanbulSend' msg = do
   resp' <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp']
   resp <- (resp'++) <$>
-      if null blocks
-          then return []
-          -- TODO(tim): Block insertion can potentially fail, so there
-          -- should be feedback here
-          else sendAllMessages [CommitResult (Right ())]
+      case blocks of
+        [] -> return []
+        -- TODO(tim): Block insertion can potentially fail, so there
+        -- should be feedback here
+        [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
+        bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
@@ -180,7 +181,7 @@ blockstanbulSend' msg = do
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
   let vmevs = creates ++ rBlocks
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-            ++ [OEAskForBlocks (h+1) n | GapFound h n <- resp]
+            ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
 
   unless (null blocks) $ do
@@ -318,6 +319,7 @@ expandBlock sb = do
     NotReadyToEmit -> do
       $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
       lift $ P.incCounter seqBlocksEnqueued
+      yield $ Left sb
     (ReadyToEmit totalPastDifficulty) -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
       (ldbOps, dryChain) <- lift . fmap unzip $ buildEmissionChain sb totalPastDifficulty
@@ -399,7 +401,7 @@ transformBlocks = mapM_ $ \ib -> do
         $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
       P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
-      witnessBlockHash (blockHeaderHash $ sbBlockData sb) sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
+      witnessBlockHash (sbHash sb) sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
       runBlockWithConsensus sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()

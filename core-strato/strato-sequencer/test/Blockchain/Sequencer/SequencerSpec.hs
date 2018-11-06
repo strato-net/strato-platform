@@ -338,7 +338,7 @@ spec = do
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
         let blk0 = makeBlock 2 1
-            blk1= Block (blockBlockData b0){blockDataParentHash = h} (blockReceiptTransactions b0) (blockBlockUncles b0)
+            blk1= Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
                       blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
         pseal <- proposerSeal blk2 (_prvkey ctx)
