@@ -26,6 +26,7 @@ import Test.QuickCheck
 
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances()
+import Blockchain.Format
 
 -- API
 
@@ -75,4 +76,7 @@ uploadVote prt ipaddr cr = do
   case vot of
     Left err -> putStrLn $ "HTTP Request failed to send: " ++ show err
     Right cr'-> do
-      print $ "HTTP Request successively sent for Object: " ++ show cr'
+      putStrLn $ "HTTP Request successfully sent: \n" ++ format cr'
+
+instance Format CandidateReceived where
+  format (CandidateReceived sdr sign rcp vdir nc) = "Sender address: " ++ format sdr ++ "\nSender signature: " ++ sign ++ "\nRecipient address: " ++ format rcp ++ "\nVoting to add/delete: " ++ (if vdir then "Add" else "Delete") ++ "\nNonce: " ++ show nc
