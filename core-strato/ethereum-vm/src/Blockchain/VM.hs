@@ -1076,16 +1076,16 @@ create' = do
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
-      lift $ (action . actionData . at envOwner . mapped . callData)
-                %= (:) CallData
-                         { _callType    = Create
-                         , _sender      = envSender
-                         , _owner       = envOwner
-                         , _gasPrice    = envGasPrice
-                         , _value       = envValue
-                         , _input       = envInputData
-                         , _output      = returnVal vmState
-                         }
+      action . actionData . at envOwner. mapped . callData %=
+        (:) CallData
+              { _callType    = Create
+              , _sender      = envSender
+              , _owner       = envOwner
+              , _gasPrice    = envGasPrice
+              , _value       = envValue
+              , _input       = envInputData
+              , _output      = returnVal vmState
+              }
 
 call :: Bool
      -> Bool
@@ -1138,6 +1138,8 @@ call' noValueTransfer = do
   value' <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender' <- getEnvVar envSender
+  ch <- addressStateCodeHash <$> getAddressState receiveAddress
+  action . actionData %= M.insert receiveAddress (ActionData ch M.empty [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1154,18 +1156,16 @@ call' noValueTransfer = do
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
   let Environment{..} = environment vmState
-      sDiff = maybe M.empty _storageDiffs . M.lookup envOwner . _actionData $ _action vmState
-  lift $ (action . actionData . at envOwner . mapped . storageDiffs) %= M.union sDiff
-  lift $ (action . actionData . at envOwner . mapped . callData)
-            %= (:) CallData
-                     { _callType    = Update
-                     , _sender      = envSender
-                     , _owner       = envOwner
-                     , _gasPrice    = envGasPrice
-                     , _value       = envValue
-                     , _input       = envInputData
-                     , _output      = returnVal vmState
-                     }
+  action . actionData . at envOwner. mapped . callData %=
+    (:) CallData
+          { _callType    = Update
+          , _sender      = envSender
+          , _owner       = envOwner
+          , _gasPrice    = envGasPrice
+          , _value       = envValue
+          , _input       = envInputData
+          , _output      = returnVal vmState
+          }
 
   return (fromMaybe B.empty $ returnVal vmState)
 
