@@ -119,7 +119,7 @@ instance FromJSON Action where
     <*> (o .: "blockTimestamp")
     <*> (o .: "blockNumber")
     <*> (o .: "transactionHash")
-    <*> (o .: "chainId")
+    <*> (o .:? "chainId")
     <*> (o .: "sender")
     <*> (o .: "data")
     <*> (o .: "metadata")
