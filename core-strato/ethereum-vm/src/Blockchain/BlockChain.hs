@@ -27,7 +27,6 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
-import Debug.Trace
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
@@ -46,7 +45,7 @@ import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
-import           Blockchain.Data.Action
+import           Blockchain.Data.Action                  hiding (codeHash, blockHash)
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -156,7 +155,7 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultNewStorage       = ""
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
-                                       , transactionResultChainId          = transactionChainId . otBaseTx $ rejectedTx rejection
+                                       , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
                                        }
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, BaggerStage, BaggerTxQueue, SHA) -- pretty, queue, txHash
@@ -221,7 +220,7 @@ addBlocks blocks' = do
     timerToUse = Just vmBlockInsertionMined
 
 setTitle :: String -> IO()
-setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
+setTitle value' = putStr $ "\ESC]0;" ++ value' ++ "\007"
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot b@OutputBlock{..} = do
@@ -287,7 +286,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
 addTransactions bd bg ts = go bd bg ts []
   where
-    go _ _ [] as = return as
+    go _ _ [] as = return . reverse $ catMaybes as
     go b blockGas (t:rest) as = do
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
@@ -298,14 +297,14 @@ addTransactions bd bg ts = go bd bg ts []
       printTransactionMessage t result deltaT
       P.setGauge vmTxMined (realToFrac deltaT)
 
-      actions <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
+      mAction <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
 
       let remainingBlockGas =
             case result of
             Left _           -> blockGas
             Right execResult -> erRemainingBlockGas execResult
 
-      go b remainingBlockGas rest (as ++ actions)
+      go b remainingBlockGas rest (mAction : as)
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -383,7 +382,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erDetails             = traceShowId $ _details newVMState'
+                                       , erAction             = Just $ _action newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -402,7 +401,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erDetails             = _details newVMState'
+                                       , erAction             = Just $ _action newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -416,7 +415,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erDetails = []
+                               , erAction = Nothing
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -432,16 +431,44 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
   !(result, vmState) <-
-    create isRunningTests' isHomestead S.empty b 0 tAddr tAddr (transactionValue ut) (transactionGasPrice ut) availableGas newAddress (transactionInit ut)
+    create isRunningTests'
+           isHomestead
+           S.empty
+           b
+           0
+           tAddr
+           tAddr
+           (transactionValue ut)
+           (transactionGasPrice ut)
+           availableGas
+           newAddress
+           (transactionInit ut)
+           (txHash ut)
+           (txChainId ut)
+           (txMetadata ut)
 
   return (const B.empty <$> result, vmState)
 
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner' OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
-  call isRunningTests' isHomestead False S.empty b 0 owner owner tAddr
-          (fromIntegral $ transactionValue ut) (fromIntegral $ transactionGasPrice ut)
-          (transactionData ut) (fromIntegral availableGas) tAddr
+  call isRunningTests'
+       isHomestead
+       False
+       S.empty
+       b
+       0
+       owner'
+       owner'
+       tAddr
+       (fromInteger $ transactionValue ut)
+       (fromInteger $ transactionGasPrice ut)
+       (transactionData ut)
+       (fromIntegral availableGas)
+       tAddr
+       (txHash ut)
+       (txChainId ut)
+       (txMetadata ut)
 
 ----------------
 
@@ -470,7 +497,7 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
                         -> TxRunResult
-                        -> ContextM [Action]
+                        -> ContextM (Maybe Action)
 outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap) = do
   let (txrStatus, message, gasRemaining) =
         case result of
@@ -482,9 +509,9 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   if not flags_createTransactionResults
-    then return []
+    then return Nothing
     else do
-      let chainId = transactionChainId t
+      let chainId = txChainId t
           beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
           afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
@@ -494,7 +521,6 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
-          details' = either (const []) erDetails result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
           (response, theTrace', theLogs) =
             case result of
@@ -526,23 +552,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultChainId          = chainId
                                }
       if not flags_diffPublish
-        then return []
-        else forM details' $ \VMDetails{..} -> do
-          AddressState{..} <- getAddressState _detailOwner
-          return $ Action
-                     _detailActionType
-                     ranBlockHash
-                     (blockDataTimestamp b)
-                     (blockDataNumber b)
-                     theHash
-                     chainId
-                     _detailMsgSender
-                     _detailOwner
-                     addressStateCodeHash
-                     (if _detailStorageDiff == M.empty then Nothing else Just _detailStorageDiff)
-                     (T.pack . BC.unpack . B16.encode $ _detailInputData) -- it doesn't make sense to decodeUtf8 here
-                     (T.pack . BC.unpack . B16.encode $ fromMaybe B.empty _detailReturn)
-                     (transactionMetadata t)
+        then return Nothing
+        else return $ either (const Nothing) erAction result
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
