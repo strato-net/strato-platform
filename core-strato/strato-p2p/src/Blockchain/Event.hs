@@ -45,6 +45,7 @@ import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
+import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
@@ -426,17 +427,13 @@ shouldSend peer txo = case txo of
     Origin.Blockstanbul -> False
 
 shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
-shouldSendGossip peer txo =
-  if not (shouldSend peer txo)
-    then return False
-    else case txo of
-            -- On average, we expect to send to 3 peers if this came
-            -- from a peer.
-            Origin.PeerString{} -> do
-              rangeEnd <- getNumPeersMem
-              rng <- liftIO $ randomRIO (1, rangeEnd)
-              return $ rangeEnd <= 3 || rng <= 3
-            _ -> return True
+shouldSendGossip peer txo = (shouldSend peer txo &&) . (flags_txGossipFanout /= -1 ||) <$>
+  case txo of
+    Origin.PeerString{} -> do
+      rangeEnd <- getNumPeersMem
+      rng <- liftIO $ randomRIO (1, rangeEnd)
+      return $ rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
+    _ -> return True
 
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
