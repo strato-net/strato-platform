@@ -911,7 +911,8 @@ getXabiVariableNamesQuery metadataId = proc () -> do
 getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
 getContractDetailsByMetadataId cmId addr chainId = do
   xabi <- getContractXabiByMetadataId cmId
-  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32) <- blocQuery1 $ contractByMetadataId cmId
+  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32) <-
+    blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
   return ContractDetails
     { contractdetailsBin = Text.decodeUtf8 bin
     , contractdetailsAddress = Just addr
@@ -940,20 +941,20 @@ getContractDetails contract@(ContractName contractName) contractId chainId = do
           }
     case contractId of
       Named "Latest" -> do
-        tuple <- blocQuery1 $
+        tuple <- blocQuery1 "getContractDetails/latest" $
           getContractsContractLatestQuery contractName
         return $ detailsWith Nothing chainId tuple
       Unnamed addr -> do
-        (addr',cid,tuple) <- blocQuery1 $
+        (addr',cid,tuple) <- blocQuery1 "getContractDetails/unnamed" $
           getContractsContractByAddressQuery contractName addr chainId
         return $ detailsWith (Just (Unnamed addr')) cid tuple
       Named name -> if contractName == name
         then do
-          tuple <- blocQuery1 $
+          tuple <- blocQuery1 "getContractDetails/named" $
             getContractsContractBySameNameQuery name
           return $ detailsWith (Just (Named name)) chainId tuple
         else do
-          tuple <- blocQuery1 $
+          tuple <- blocQuery1 "getContractDetails/otherNamed" $
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) chainId tuple
 
@@ -1515,7 +1516,7 @@ getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
 getXabiType typeId = do
   (xtty,xttd,xtdy,xtsi,xtby,xtlen,xtetid,xtvtid,xtktid)
-    <- blocQuery1 $ proc () -> do
+    <- blocQuery1 "getXabiType" $ proc () -> do
       (xtid,xtty,xttd,xtdy,xtsi,xtby,xtlen,xtet,xtvt,xtkt)
         <- queryTable xabiTypesTable -< ()
       restrict -< xtid .== constant typeId
@@ -1682,18 +1683,17 @@ getContractContractByMetadataId metadataId = getContractRetry 0
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId chainId = do
-  -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+    Named _ -> blocQuery1 "getContractXabi" $ getContractsMetaDataId contractName contractId chainId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   getContractXabiByMetadataId metadataId
 
 getContractXabiAndMetadataId :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Int32, Xabi)
 getContractXabiAndMetadataId (ContractName contractName) contractId chainId = do
-  -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+    Named _ -> blocQuery1 "getContractXabiAndMetadataId" $
+      getContractsMetaDataId contractName contractId chainId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
@@ -1722,7 +1722,7 @@ getConstructorId cmId = do
   return $ listToMaybe functionIds
 
 getFunctionId :: Int32 -> Text -> Bloc Int32
-getFunctionId cmId funcName = blocQuery1 $ proc () -> do
+getFunctionId cmId funcName = blocQuery1 "getFunctionId" $ proc () -> do
   (xfId,contractMetaDataId,isConstr,name,_)
     <- queryTable xabiFunctionsTable -< ()
   restrict -< contractMetaDataId .== constant cmId

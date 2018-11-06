@@ -303,12 +303,14 @@ blocQueryMaybe q = blocQuery q >>= \case
 
 blocQuery1
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Query x
+  => Text
+  -> Query x
   -> Bloc y
-blocQuery1 q = blocQuery q >>= \case
-    [] -> blocError $ DBError "No result, expected one row"
+blocQuery1 loc q = blocQuery q >>= \case
+    [] -> blocError . DBError . Text.concat $ ["blocQuery1: ", loc, ": No result, expected one row"]
     [y] -> return y
-    _:_:_ -> throwError $ DBError "blocQuery1: Multiple results, expected one row"
+    _:_:_ -> throwError . DBError . Text.concat $
+       ["blocQuery1: ", loc, ": Multiple results, expected one row"]
 
 blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do
