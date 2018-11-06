@@ -20,14 +20,12 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Foldable (for_)
 import Data.Function
-import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -36,7 +34,7 @@ import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
@@ -53,7 +51,6 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Client
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
@@ -65,7 +62,7 @@ import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
-toAction :: BL.ByteString -> Action
+toAction :: BL.ByteString -> Action'
 toAction x =
  case JSON.eitherDecode x of
   Left e -> error $ show e
@@ -88,16 +85,8 @@ emptyHash = keccak256 B.empty
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
 
-storageToList :: BA.Storage -> (Hex Word256, Hex Word256)
-storageToList BA.Storage {BA.storageKey=k, BA.storageValue=v} = (k, v)
-
-addStorageIfNeeded::Action -> Bloc (Map (Hex Word256) (Hex Word256))
-addStorageIfNeeded Action{..} | actionType /= Update = return $ fromMaybe Map.empty actionStorage
-                              | otherwise = do
-  storage' <- blocStrato $ getStorage storageFilterParams { qsAddress = Just actionAddress
-                                                          , qsChainId = actionTxChainId
-                                                          }
-  return . Map.fromList $ map storageToList storage'
+storageToList :: BA.Storage -> (Word256, Word256)
+storageToList BA.Storage {BA.storageKey=(Hex k), BA.storageValue=(Hex v)} = (k, v)
 
 on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
 on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
@@ -149,9 +138,9 @@ convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 getFunctionCallValues :: Int32 -> ByteString -> ByteString -> Bloc (Text, [(Text, SolidityValue)], [(Text, SolidityValue)])
-getFunctionCallValues cmId input output = do
-  let sel = B.take 4 input
-      data' = B.drop 4 input
+getFunctionCallValues cmId input' output' = do
+  let sel = B.take 4 input'
+      data' = B.drop 4 input'
   (fname,(itypes,otypes)) <- getFunctionDetailsFromSelector cmId sel
   let typemap bs = uncurry zip
                    . fmap ( fromMaybe (repeat (SolidityValueAsString ""))
@@ -162,13 +151,13 @@ getFunctionCallValues cmId input output = do
       omap = zipWith
                (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
                ([0..] :: [Integer])
-               (typemap output otypes)
+               (typemap output' otypes)
   return (fname,imap,omap)
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
 
-  let changes = groupSimilarActions $ map (toAction . BL.fromStrict) messages
+  let changes = groupSimilarActions . join $ map (flatten . toAction . BL.fromStrict) messages
 
   unless (null messages) $
     debugM "processTheMessages" . unlines . map show $ messages
@@ -236,7 +225,7 @@ processTheMessages messages conn g = do
                 strName = T.replace "\"" "" $ contractdetailsName details
                 cont = either error id . xAbiToContract $ contractdetailsXabi details
                 chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
-                cache = maybe (const Nothing) (\s -> fmap unHex . flip Map.lookup s . Hex) actionStorage
+                cache = flip Map.lookup actionStorage
                 updateGlobal m (k,f) = for_ (Map.lookup k =<< actionMetadata) $ \v -> do
                   let contracts = filter (not . T.null) $ T.splitOn "," v
                   forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
@@ -256,8 +245,9 @@ processTheMessages messages conn g = do
                           <$> getContractState g actionAddress actionTxChainId
             let newState = SVR.decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
-                ibytes = fst . B16.decode $ encodeUtf8 actionInput
-                obytes = fst . B16.decode $ encodeUtf8 actionOutput
+                fstCall = listToMaybe actionCallData
+                ibytes = maybe (B.empty) _input fstCall
+                obytes = maybe (B.empty) (fromMaybe B.empty . _output) fstCall
             setContractState g actionAddress actionTxChainId newState
 
             (f',i,o) <- getFunctionCallValues cmId ibytes obytes
