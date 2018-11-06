@@ -205,6 +205,9 @@ formatAction Action{..} = T.concat
   , "\n"
   , "    metadata  = "
   , tshow actionMetadata
+  , "\n"
+  , "    metadata  = "
+  , tshow actionCallData
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
