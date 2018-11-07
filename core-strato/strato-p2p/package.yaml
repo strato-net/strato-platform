@@ -30,6 +30,7 @@ dependencies:
   - crypto-pubkey
   - crypto-pubkey-types
   - dns
+  - either
   - esqueleto
   - ethereum-discovery
   - ethereum-encryption
@@ -73,37 +74,15 @@ dependencies:
 ghc-options: -Wall -threaded
 
 executables:
-  strato-p2p-client:
+  strato-p2p:
     source-dirs: exec_src/
-    main: StratoP2PClientMain.hs
-    dependencies:
-      - strato-p2p
-
-  strato-p2p-server:
-    source-dirs: exec_src/
-    main: StratoP2PServerMain.hs
+    main: StratoP2PMain.hs
     dependencies:
       - strato-p2p
 
 library:
   source-dirs: src
-  exposed-modules:
-    - Blockchain.Context
-    - Blockchain.Data.Wire
-    - Blockchain.Display
-    - Blockchain.EventException
-    - Blockchain.Event
-    - Blockchain.ExtMergeSources
-    - Blockchain.Options
-    - Blockchain.SeqEventNotify
-    - Blockchain.DeLoopNotify
-    - Blockchain.TCPClientWithTimeout
-    - Blockchain.ServOptions
-    - Blockchain.P2PRPC
-    - Executable.StratoP2PClient
-    - Executable.StratoP2PServer
   ghc-options: -Wall -O2
-
 
 tests:
   strato-p2p-client-test:

@@ -30,12 +30,14 @@ import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
+import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -133,7 +135,7 @@ instance Bagger.MonadBagger ContextM where
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
-        let (message, _, _, theHash) = baggerRejectionToTransactionResultBits rejection
+        let (message, theHash) = baggerRejectionToTransactionResultBits rejection
         -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
         -- new best block we just mined came in
         let isRecentlyRan = theHash `elem` bestBlockShas
@@ -158,16 +160,16 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
                                        }
 
-baggerRejectionToTransactionResultBits :: TxRejection -> (String, BaggerStage, BaggerTxQueue, SHA) -- pretty, queue, txHash
+baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
     NonceTooLow    s q expected OutputTx{otHash=hash, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", s, q, hash)
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hash)
     BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
-        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hash)
     GasLimitTooLow s q _ OutputTx{otHash=hash} ->
-        (p' s q ++ "tx gas limit", s, q, hash)
+        (p' s q ++ "tx gas limit", hash)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", s, q, hashWorse)
+        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -544,7 +546,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = ""
+                               , transactionResultStateDiff        = T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""

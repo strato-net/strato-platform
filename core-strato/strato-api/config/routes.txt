@@ -1,4 +1,5 @@
 /eth/v1.2/chain ChainR GET POST
+/eth/v1.2/dataFaucet DataFaucetR POST
 /eth/v1.2/faucet FaucetR POST
 /eth/v1.2/stats/difficulty StatDiffR GET
 /eth/v1.2/stats/totaltx StatTxR GET

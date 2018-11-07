@@ -29,15 +29,15 @@ singletonTransactionList t = M.singleton (transactionNonce $ otBaseTx t) t
 
 -- should replace TXs with identical nonces but different gas cost to one with higher gas cost
 -- returns (Maybe <txThatWasReplaced/txToDropFromSeen>, newTransactionList)
-insertTransaction :: OutputTx -> TransactionList -> (Maybe OutputTx, TransactionList)
+insertTransaction :: OutputTx -> TransactionList -> (Maybe OutputTx, OutputTx, TransactionList)
 insertTransaction t tl =
     let nonce' = nonce t
         oldTx  = M.lookup nonce' tl in
             case oldTx of
-                Nothing -> (Nothing, M.insert nonce' t tl)
+                Nothing -> (Nothing, t, M.insert nonce' t tl)
                 Just existing -> if gasPrice existing < gasPrice t
-                    then (oldTx, M.insert nonce' t tl)
-                    else (Just t, tl)
+                    then (oldTx, t, M.insert nonce' t tl)
+                    else (Just t, existing, tl)
 
 trimBelowNonce :: Integer -> TransactionList -> ([OutputTx], TransactionList)
 trimBelowNonce nonce' tl = let (lt, gte) = M.partitionWithKey (\k _ -> k < nonce') tl in (M.elems lt, gte)

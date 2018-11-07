@@ -266,7 +266,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
           (bin, src, cmId, names') <- case Map.lookup name names of
             Just (b, src, cm) -> return (b, src, cm, names)
             Nothing -> do
-              (b16,src,cm) <- lift $ blocQuery1 $ proc () -> do
+              (b16,src,cm) <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
                 (bin16,_,_,_,_,src,cmId') <- getContractsContractLatestQuery name -< ()
                 returnA -< (bin16,src,cmId')
               let (b, leftOver) = Base16.decode b16
@@ -393,7 +393,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
           (mapKey, names') <- case Map.lookup methodcallContractName names of
             Just cmId -> return (cmId, names)
             Nothing -> do
-              (mapKey' :: Int32) <- lift $ blocQuery1 $ proc () -> do
+              (mapKey' :: Int32) <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
                 (_,_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< cmId
               return (mapKey', Map.insert methodcallContractName mapKey' names)
@@ -603,7 +603,7 @@ evalAndReturn list = do
         Pending -> return . Just $ (BlocTransactionResult Pending hash Nothing Nothing, index)
         Failure -> return . Just $ (BlocTransactionResult Failure hash mtxr Nothing, index)
         Success -> do
-          (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 $ contractByTxHash hash
+          (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 "evalAndReturn" $ contractByTxHash hash
           case ttype of
             0 -> return . Just $ (BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata), index)
             1 -> contractResult hash mtxr cmId tdata index

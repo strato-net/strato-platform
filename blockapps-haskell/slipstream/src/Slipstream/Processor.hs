@@ -1,14 +1,13 @@
 {-# LANGUAGE
-      DataKinds
+      OverloadedStrings
+    , RecordWildCards
     , DeriveGeneric
+    , QuasiQuotes
+    , ScopedTypeVariables
+    , DataKinds
+    , TemplateHaskell
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
-    , LambdaCase
-    , OverloadedStrings
-    , QuasiQuotes
-    , RecordWildCards
-    , ScopedTypeVariables
-    , TemplateHaskell
 #-}
 
 module Slipstream.Processor where
@@ -18,7 +17,6 @@ import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts,rights)
@@ -47,20 +45,16 @@ import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.Struct
-import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
-import qualified BlockApps.SolidityVarReader as SVR
+import BlockApps.SolidityVarReader
 
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Options
 import Slipstream.OutputData
-import Slipstream.SolidityValue
 
 toAction :: BL.ByteString -> Action'
 toAction x =
@@ -241,9 +235,9 @@ processTheMessages messages conn g = do
               contractInstancesByCodeHash actionCodeHash actionAddress actionTxChainId
             when (isNothing mInstance) . void $ insertContractInstance cmId actionAddress actionTxChainId
             fetchLimit <- asks stateFetchLimit
-            oldState <- fromMaybe (SVR.decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
+            oldState <- fromMaybe (decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
                           <$> getContractState g actionAddress actionTxChainId
-            let newState = SVR.decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
+            let newState = decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
             setContractState g actionAddress actionTxChainId newState
 

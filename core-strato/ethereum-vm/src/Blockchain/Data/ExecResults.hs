@@ -1,7 +1,7 @@
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE TemplateHaskell #-}
-
-module Blockchain.Data.ExecResults where
+{-# LANGUAGE DeriveGeneric #-}
+module Blockchain.Data.ExecResults (
+  ExecResults(..)
+  ) where
 
 import           Control.DeepSeq
 import qualified Data.ByteString         as B

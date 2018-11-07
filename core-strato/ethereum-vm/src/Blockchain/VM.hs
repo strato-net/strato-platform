@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.VM
@@ -1018,6 +1017,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' o
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas create'
       else return (Left InsufficientFunds, vmState)
 
+
   case ret of
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
@@ -1030,6 +1030,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' o
     _ -> do
 
       return ret
+
+
 
 create' :: VMM Code
 create' = do

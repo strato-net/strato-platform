@@ -1,14 +1,17 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.MissingChainDB where
 
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.SHA
 
+import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromMaybe)
+import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
+import           Blockchain.Sequencer.DB.Metrics
 
 getMissingChainsDB :: HasPrivateHashDB m => m (Map Word256 [SHA])
 getMissingChainsDB = missingChainDB <$> getPrivateHashDB
@@ -21,13 +24,18 @@ lookupMissingChainTxs chainId = fromMaybe [] . M.lookup chainId <$> getMissingCh
 
 insertMissingChainTx :: HasPrivateHashDB m => Word256 -> SHA -> m ()
 insertMissingChainTx chainId th = do
+  liftIO $ withLabel chainMetrics "missing_chain_tx" incCounter
   m <- getMissingChainsDB
   case M.lookup chainId m of
     Nothing -> putMissingChainsDB (M.insert chainId [th] m)
     Just ths -> putMissingChainsDB (M.insert chainId (th:ths) m)
 
 insertMissingChainTxs :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
-insertMissingChainTxs chainId ths = getMissingChainsDB >>= putMissingChainsDB . M.insert chainId ths
+insertMissingChainTxs chainId ths = do
+  liftIO $ withLabel chainMetrics "missing_chain_tx" (flip unsafeAddCounter . fromIntegral . length $ ths)
+  getMissingChainsDB >>= putMissingChainsDB . M.insert chainId ths
 
 clearMissingChainTxs :: HasPrivateHashDB m => Word256 -> m ()
-clearMissingChainTxs chainId = getMissingChainsDB >>= putMissingChainsDB . M.delete chainId
+clearMissingChainTxs chainId = do
+  liftIO $ withLabel chainMetrics "missing_chain_tx_removed" incCounter
+  getMissingChainsDB >>= putMissingChainsDB . M.delete chainId
