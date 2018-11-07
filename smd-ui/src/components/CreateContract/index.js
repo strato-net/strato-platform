@@ -134,14 +134,16 @@ class CreateContract extends Component {
           metadata["history"] = contract;
         }
       }
+      if (values[`noindex@${contract}`]) {
+        if (metadata["noindex"]) {
+          const curNoIndex = metadata["noindex"];
+          metadata["noindex"] = curNoIndex + ',' + contract;
+        }
+        else {
+          metadata["noindex"] = contract;
+        }
+      }
     });
-
-    if (values.index === "on") {
-      metadata["index"] = contractname;
-    }
-    else {
-      metadata["noindex"] = contractname;
-    }
 
     const payload = {
       contract: contractname,
@@ -419,28 +421,33 @@ class CreateContract extends Component {
                   }
                 </div>
               </div>}
-              <div className="row">
+              {contracts && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Indexing
+                    No Index
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="index"
-                      validate={required}
-                      required
-                    >
-                      <option value={null}></option>
-                      <option key="on" value="on">On</option>
-                      <option key="off" value="off">Off</option>
-                    </Field>
-                  </div>
+                    { contracts.map((value, index) => {
+                      return (
+                        <label className="pt-control pt-checkbox">
+                          <Field
+                            id={value}
+                            className="form-width"
+                            name={"noindex@" + value}
+                            type="checkbox"
+                            component="input"
+                            dir="auto"
+                            title="NoIndex"
+                          />
+                          <span className="pt-control-indicator"></span>
+                          {value}
+                        </label>
+                      )
+                    })
+                  }
                 </div>
-              </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
