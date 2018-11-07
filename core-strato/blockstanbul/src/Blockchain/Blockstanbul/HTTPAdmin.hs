@@ -69,14 +69,18 @@ createWebServer ch = serve adminAPI (admin ch)
 getVote :: CandidateReceived -> ClientM CandidateReceived
 getVote = client (Proxy @ AdminAPI)
 
-uploadVote ::  Int -> String -> CandidateReceived -> IO ()
+uploadVote ::  Int -> String -> CandidateReceived -> IO (Either String ())
 uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
   vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "/blockstanbul"))
-  case vot of
-    Left err -> putStrLn $ "HTTP Request failed to send: " ++ show err
-    Right cr'-> do
-      putStrLn $ "HTTP Request successfully sent: \n" ++ format cr'
+  return $ case vot of
+    Left err -> Left $ "HTTP Request failed to send: " ++ show err
+    Right cr'-> Left $ "HTTP Request successfully sent: \n" ++ format cr'
 
 instance Format CandidateReceived where
-  format (CandidateReceived sdr sign rcp vdir nc) = "Sender address: " ++ format sdr ++ "\nSender signature: " ++ sign ++ "\nRecipient address: " ++ format rcp ++ "\nVoting to add/delete: " ++ (if vdir then "Add" else "Delete") ++ "\nNonce: " ++ show nc
+  format (CandidateReceived sdr sign rcp vdir nc) = unlines ["Sender address: " ++ format sdr,
+    "Sender signature: " ++ sign,
+    "Recipient address: " ++ format rcp,
+    "Voting to add/delete: " ++ (if vdir then "Add" else "Delete"),
+    "Nonce: " ++ show nc
+    ]
