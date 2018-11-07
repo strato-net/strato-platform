@@ -119,6 +119,8 @@ makeSendTX maxN k a n = do
     createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
 
 
+-- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
+-- than these that have empty bin-runtimes.
 makeSizedTX :: MonadIO m => Integer -> Int -> H.PrvKey -> m Transaction
 makeSizedTX nonce size pk =
   let code = Code $ BS.replicate size 0x0
