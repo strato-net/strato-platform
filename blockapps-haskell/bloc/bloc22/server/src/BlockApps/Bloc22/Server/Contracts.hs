@@ -95,8 +95,9 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> do
-      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
-      blocQuery1 $ proc () -> do
+      metadataId <- blocQuery1 "getContractsState/metadataid" $
+        getContractsMetaDataId contractName contractId chainId
+      blocQuery1 "getContractsState/instances" $ proc () -> do
         (_,cmId',addr,_,_) <-
           (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
             (queryTable contractsInstanceTable) -< ()
@@ -161,13 +162,13 @@ getContractsDetails contractAddress chainId = do
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsFunctions" $ getContractsMetaDataId contractName contractId chainId
   funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
   return $ map FunctionName funcs
 
 getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
 getContractsSymbols (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsSymbols" $ getContractsMetaDataId contractName contractId chainId
   vars <- blocQuery $ getXabiVariableNamesQuery metadataId
   return $ map SymbolName vars
 
@@ -175,7 +176,7 @@ getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe Chai
 getContractsEnum (ContractName contractName) contractId (EnumName enumName) chainId =
   blocTransaction $ do
     metadataId <- case contractId of
-      Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+      Named _ -> blocQuery1 "getContractsEnum" $ getContractsMetaDataId contractName contractId chainId
       Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
     map (EnumValue . fst) <$> getEnumValues metadataId enumName
 
@@ -192,11 +193,12 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsStateMapping/metadata" $
+    getContractsMetaDataId contractName contractId chainId
 
   address <- case contractId of
               Unnamed addr -> return addr
-              Named "Latest" -> blocQuery1 $ proc () -> do
+              Named "Latest" -> blocQuery1 "getContractsStateMapping/instances" $ proc () -> do
                 (_,cmId,addr,_,_) <-
                   (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
                     (queryTable contractsInstanceTable) -< ()

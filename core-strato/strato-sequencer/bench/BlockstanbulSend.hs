@@ -21,28 +21,30 @@ noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 noLog _ _ _ _ = return ()
 
 runFakeSequencerM :: SequencerConfig -> SequencerContext -> SequencerM a -> IO a
-runFakeSequencerM cfg ctx mv = do
+runFakeSequencerM cfg ctx mv =
     flip runLoggingT noLog
   . runResourceT
   . flip runReaderT cfg
   $ evalStateT mv ctx
 
-benchConfig :: SequencerConfig
-benchConfig = SequencerConfig {blockstanbulBlockPeriod = 0, blockstanbulRoundPeriod = 1000000}
-
-benchContext :: IO SequencerContext
-benchContext = do
+benchConfig :: IO SequencerConfig
+benchConfig = do
   ch <- atomically newTMChan
-  return SequencerContext { _vmEvents = Q.empty
-                          , _p2pEvents = Q.empty
-                          , _blockstanbulContext = Just PBFT.benchContext
-                          , _blockstanbulTimeouts = ch
-                          }
+  return SequencerConfig { blockstanbulBlockPeriod = 0
+                         , blockstanbulRoundPeriod = 1000000
+                         , blockstanbulTimeouts = ch
+                         }
+
+benchContext :: SequencerContext
+benchContext = SequencerContext { _vmEvents = Q.empty
+                                , _p2pEvents = Q.empty
+                                , _blockstanbulContext = Just PBFT.benchContext
+                                }
 
 blockstanbulSendBench :: Int -> Int -> IO ()
 blockstanbulSendBench txcount txsize = do
-  ctx <- benchContext
-  runFakeSequencerM benchConfig ctx
+  cfg <- benchConfig
+  runFakeSequencerM cfg benchContext
                       . blockstanbulSend
                       $ [UnannouncedBlock $ PBFT.makeBlock txcount txsize]
 
