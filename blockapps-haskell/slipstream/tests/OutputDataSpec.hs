@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Main where
+module OutputDataSpec where
 
 import Test.Hspec
 import Slipstream.OutputData
@@ -33,7 +33,7 @@ Test: when db writes fail, error message is correct and is logged correctly
 Test: indexes are accurate
 -}
 
-dbSelect :: String -> IO(String)
+dbSelect :: String -> IO String
 dbSelect insrt = do
   conn <- pgConnect dbConnect
   let qry = rawPGSimpleQuery $ BC.pack insrt
@@ -42,8 +42,8 @@ dbSelect insrt = do
   --p <- ins
   return $ show $ snd p
 
-main :: IO ()
-main = hspec $ do
+spec :: Spec
+spec = do
 
   describe "Array serialization" $ do
     it "should create JSON entries" $ do

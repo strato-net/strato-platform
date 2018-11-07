@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -22,6 +23,7 @@ import qualified Data.Text               as Text
 import qualified Data.Text.Encoding      as Text
 import           Data.Traversable        (for)
 import           Data.Word               (Word8)
+import           GHC.Generics
 import           Text.Read
 
 import           BlockApps.Ethereum
@@ -54,7 +56,7 @@ data Value
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | ValueMapping (Map SimpleValue Value)
   | ValueStruct [(Text, Value)]
-  deriving (Show)
+  deriving (Eq, Show, Generic)
 
 data SimpleValue
   = ValueBool Bool
@@ -67,7 +69,10 @@ data SimpleValue
   | ValueBytes { bytesSize :: Maybe Integer
                , bytesVal  :: ByteString
                }
-    deriving (Show)
+    deriving (Eq, Show, Generic)
+
+instance Binary.Binary Value
+instance Binary.Binary SimpleValue
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
@@ -202,7 +207,6 @@ valueToText = \case
   ValueEnum{}        -> undefined -- TODO
   ValueFunction{}    -> undefined -- TODO
   ValueStruct{}      -> undefined
-
 
 simpleValueToText :: SimpleValue -> Maybe Text
 simpleValueToText sv = Just $ case sv of
