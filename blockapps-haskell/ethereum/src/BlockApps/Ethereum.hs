@@ -69,6 +69,7 @@ import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
+import           Data.Either.Extra      (maybeToEither)
 import           Data.LargeWord
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
@@ -80,6 +81,7 @@ import           Data.Text              (Text)
 import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
+import           Database.Persist.Sql
 import           Generic.Random
 import           GHC.Generics
 import           Numeric
@@ -124,9 +126,21 @@ instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
 newtype Address = Address { unAddress :: Word160 }
-  deriving (Eq, Ord, Generic, Bounded, NFData)
+  deriving (Eq, Ord, Generic, Bounded, NFData, Binary.Binary)
 
 instance Show Address where show = addressString
+
+instance PersistField Address where
+  toPersistValue = PersistText . Text.pack . addressString
+  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
+                                   . stringAddress
+                                   . Text.unpack $ t
+  fromPersistValue x = Left . Text.pack
+                     $ "PersistField Address: expected PersistText: " ++ show x
+
+
+instance PersistFieldSql Address where
+  sqlType _ = SqlOther "text"
 
 instance ToJSONKey Address where
   toJSONKey = ToJSONKeyText f g
@@ -226,7 +240,7 @@ deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 --------------------------------------------------------------------------------
 
 newtype ChainId = ChainId { unChainId :: Word256 }
-  deriving (Eq, Ord, Generic, Bounded, NFData)
+  deriving (Eq, Ord, Generic, Bounded, NFData, Binary.Binary)
 
 instance Show ChainId where show = chainIdString
 
@@ -234,6 +248,17 @@ instance ToJSONKey ChainId where
   toJSONKey = ToJSONKeyText f g
     where f x = Text.pack $ chainIdString x
           g x = AesonEnc.text . Text.pack $ chainIdString x
+
+instance PersistField ChainId where
+  toPersistValue = PersistText . Text.pack . chainIdString
+  fromPersistValue (PersistText t) = maybeToEither "could not decode chainid"
+                                   . stringChainId
+                                   . Text.unpack $ t
+  fromPersistValue x = Left . Text.pack
+                     $ "PersistField ChainId: expected PersistText: " ++ show x
+
+instance PersistFieldSql ChainId where
+  sqlType _ = SqlOther "text"
 
 chainIdString :: ChainId -> String
 chainIdString = show256 . unChainId

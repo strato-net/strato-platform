@@ -11,7 +11,7 @@ category: Web
 library:
   source-dirs: src/
 
-ghc-options: -Wall -Werror
+ghc-options: -Wall -Werror -ddump-to-file -ddump-splices
 
 default-extensions:
   - DeriveGeneric
@@ -23,6 +23,7 @@ dependencies:
   - aeson
   - base16-bytestring
   - lifted-base
+  - binary
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-ethereum
@@ -30,6 +31,7 @@ dependencies:
   - blockapps-strato-client
   - blockapps-strato-api
   - bytestring
+  - classy-prelude
   - conduit
   - conduit-combinators
   - containers
@@ -47,10 +49,13 @@ dependencies:
   - mtl
   - network
   - ordered-containers
+  - persistent
+  - persistent-template
   - postgresql-simple
   - postgresql-typed
   - prometheus-client
   - resource-pool
+  - resourcet
   - retry
   - scientific
   - semigroups
@@ -62,6 +67,7 @@ dependencies:
   - transformers-base
   - transformers
   - unliftio
+  - unliftio-core
   - unordered-containers
   - vector
   - warp
@@ -82,7 +88,7 @@ executables:
 
 tests:
   slipstream-test:
-    main: Test.hs
+    main: Spec.hs
     source-dirs: tests/
     dependencies:
       - base >=4 && < 5
@@ -92,8 +98,11 @@ tests:
       - containers
       - hflags
       - hspec
+      - hspec-expectations-lifted
+      - monad-logger
       - largeword
       - parsec
+      - persistent-sqlite
       - QuickCheck
       - raw-strings-qq
       - slipstream
