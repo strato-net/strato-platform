@@ -91,11 +91,12 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , startTimestamp        = posixSecondsToUTCTime 0
                                   }
 
-addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
+addToATL :: OutputTx -> ATL -> (Maybe OutputTx, OutputTx, ATL)
 addToATL t atl =
     case M.lookup signer atl of
-        Nothing  -> (Nothing, M.insert signer (singletonTransactionList t) atl)
-        Just txs -> let (oldTx, newTL) = insertTransaction t txs in (oldTx, M.insert signer newTL atl)
+        Nothing  -> (Nothing, t, M.insert signer (singletonTransactionList t) atl)
+        Just txs -> let (oldTx, newTx, newTL) = insertTransaction t txs
+                    in  (oldTx, newTx, M.insert signer newTL atl)
     where signer = otSigner t
 
 modifyATL :: Alternative a => (TransactionList -> (a OutputTx, TransactionList)) -> Address -> ATL -> (a OutputTx, ATL)
@@ -119,11 +120,15 @@ calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache { bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
     cig (DD.blockDataNumber bh + 1)
 
-addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToPending t s@BaggerState{pending = p} = let (oldTx, newATL) = addToATL t p in (oldTx, s { pending = newATL })
+addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, OutputTx, BaggerState)
+addToPending t s@BaggerState{pending = p} =
+   let (oldTx, newTx, newATL) = addToATL t p
+   in  (oldTx, newTx, s { pending = newATL })
 
 addToQueued :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToQueued t s@BaggerState{queued = q} = let (oldTx, newATL) = addToATL t q in (oldTx, s { queued = newATL })
+addToQueued t s@BaggerState{queued = q} =
+  let (oldTx, _, newATL) = addToATL t q
+  in (oldTx, s { queued = newATL })
 
 addToSeen :: OutputTx -> BaggerState -> BaggerState
 addToSeen t@OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.insert sha t seen' }
