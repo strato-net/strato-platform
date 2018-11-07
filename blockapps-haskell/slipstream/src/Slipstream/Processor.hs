@@ -245,34 +245,38 @@ processTheMessages messages conn g = do
                           <$> getContractState g actionAddress actionTxChainId
             let newState = SVR.decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
                 ret = Map.fromList newState
-                fstCall = listToMaybe actionCallData
-                ibytes = maybe (B.empty) _input fstCall
-                obytes = maybe (B.empty) (fromMaybe B.empty . _output) fstCall
             setContractState g actionAddress actionTxChainId newState
 
-            (f',i,o) <- getFunctionCallValues cmId ibytes obytes
-            let f = if T.null f'
-                      then if actionType == Create
-                             then "constructor"
-                             else "fallback"
-                      else f'
+            hist <- isHistoric g actionCodeHash
+            let cData = if hist
+                          then actionCallData
+                          else maybeToList $ listToMaybe actionCallData
+            fmap sequence . forM cData $ \CallData{..} -> do
+              let ibytes = _input
+                  obytes = fromMaybe B.empty _output
+              (f',i,o) <- getFunctionCallValues cmId ibytes obytes
+              let f = if T.null f'
+                        then if actionType == Create
+                              then "constructor"
+                              else "fallback"
+                        else f'
 
-            pure . Right . Just $ ProcessedContract
-              { address = actionAddress
-              , codehash = actionCodeHash
-              , abi = strAbi
-              , contractName = strName
-              , chain = chain
-              , contractData = ret
-              , blockHash = actionBlockHash
-              , blockTimestamp = actionBlockTimestamp
-              , blockNumber = actionBlockNumber
-              , transactionHash = actionTxHash
-              , transactionSender = actionTxSender
-              , transactionFuncName = f
-              , transactionInput = i
-              , transactionOutput = o
-              }
+              pure . pure $ ProcessedContract -- the purest
+                { address = actionAddress
+                , codehash = actionCodeHash
+                , abi = strAbi
+                , contractName = strName
+                , chain = chain
+                , contractData = ret
+                , blockHash = actionBlockHash
+                , blockTimestamp = actionBlockTimestamp
+                , blockNumber = actionBlockNumber
+                , transactionHash = actionTxHash
+                , transactionSender = actionTxSender
+                , transactionFuncName = f
+                , transactionInput = i
+                , transactionOutput = o
+                }
 
       forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
-      when (not $ null processedList) . liftIO $ convertRet (catMaybes $ rights processedList) conn g
+      when (not $ null processedList) . liftIO $ convertRet (join $ rights processedList) conn g
