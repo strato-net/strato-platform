@@ -113,6 +113,7 @@ pipeline {
               cd strato-worktree/core-strato
               ./run_unit_tests_long.sh
             '''
+            archiveArtifacts artifacts: "strato-worktree/core-strato/*.html"
           },
 
           'Bloch tests': {
