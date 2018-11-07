@@ -326,7 +326,11 @@ spec = do
 
       it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         let b' = makeBlock 1 1
-            b = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            b = Block (blockBlockData b'){ blockDataParentHash = h
+                                         , blockDataNumber = 1
+                                         }
+                      (blockReceiptTransactions b')
+                      (blockBlockUncles b')
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         checkForUnseq [iev]
         p2pevs <- drainP2P
@@ -374,7 +378,10 @@ spec = do
           createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
         let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
         let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            blk = Block (blockBlockData b'){ blockDataParentHash = h
+                                           , blockDataNumber = 1}
+                        (blockReceiptTransactions b')
+                        (blockBlockUncles b')
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
         checkForUnseq [chainDetails]
         checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
@@ -400,7 +407,11 @@ spec = do
           createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
         let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
         let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){blockDataParentHash = h} (blockReceiptTransactions b') (blockBlockUncles b')
+            blk = Block (blockBlockData b'){ blockDataParentHash = h
+                                           , blockDataNumber = 1
+                                           }
+                        (blockReceiptTransactions b')
+                        (blockBlockUncles b')
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
         checkForUnseq [chainDetails]
         checkForUnseq [iev]
