@@ -8,4 +8,10 @@ Object {
 }
 `;
 
-exports[`AddMember: validate when form has values 1`] = `Object {}`;
+exports[`AddMember: validate when form has values (with address) 1`] = `
+Object {
+  "username": "required",
+}
+`;
+
+exports[`AddMember: validate when form has values (with user) 1`] = `Object {}`;

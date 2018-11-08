@@ -161,9 +161,22 @@ Object {
   "enode": "enode://",
   "errors": null,
   "form": Object {
+    "userSelected": false,
+  },
+  "username": null,
+}
+`;
+
+exports[`CreateChain: index render component (enterprise mode) form fields 3`] = `
+Object {
+  "address": "d2263b71c14010ff03d8f786670aba691b22b158",
+  "balance": "500",
+  "enode": "enode://",
+  "errors": null,
+  "form": Object {
     "userSelected": true,
   },
-  "username": "Supplier1",
+  "username": "Admin_1085_64667",
 }
 `;
 
@@ -174,37 +187,48 @@ exports[`CreateChain: index render component (enterprise mode) with empty values
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
+          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
-                <option />
-                <option value=\\"length\\">
-                  length
-                </option>
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
+             User
+            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
+             Address
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
+                  <option />
+                  <option value=\\"length\\">
+                    length
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
           </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
-                <option value={{...}} />
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
+                  <option value={{...}} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
         </div>
@@ -253,109 +277,120 @@ exports[`CreateChain: index render component (enterprise mode) with values 1`] =
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
+          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
-                <option />
-                <option value=\\"Admin_1085_64667\\">
-                  Admin_1085_64667
-                </option>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-                <option value=\\"Supplier2\\">
-                  Supplier2
-                </option>
-                <option value=\\"Buyer1\\">
-                  Buyer1
-                </option>
-                <option value=\\"Buyer2\\">
-                  Buyer2
-                </option>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-                <option value=\\"Admin_1177_39206\\">
-                  Admin_1177_39206
-                </option>
-                <option value=\\"Admin_1177_31203\\">
-                  Admin_1177_31203
-                </option>
-                <option value=\\"User_1177_14462\\">
-                  User_1177_14462
-                </option>
-                <option value=\\"123456789012345678901234567890123\\">
-                  123456789012345678901234567890123
-                </option>
-                <option value=\\"User_1177_26292\\">
-                  User_1177_26292
-                </option>
-                <option value=\\"User_1177_69645 ?#%!@*\\">
-                  User_1177_69645 ?#%!@*
-                </option>
-                <option value=\\"User_1177_59578\\">
-                  User_1177_59578
-                </option>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"User_1177_59359\\">
-                  User_1177_59359
-                </option>
-                <option value=\\"User_1177_42489\\">
-                  User_1177_42489
-                </option>
-                <option value=\\"User_1177_37717\\">
-                  User_1177_37717
-                </option>
-                <option value=\\"User_1177_52307\\">
-                  User_1177_52307
-                </option>
-                <option value=\\"Buyer1177_18955\\">
-                  Buyer1177_18955
-                </option>
-                <option value=\\"Supplier1177_62701\\">
-                  Supplier1177_62701
-                </option>
-                <option value=\\"Admin_1301_86023\\">
-                  Admin_1301_86023
-                </option>
-                <option value=\\"Admin_1301_62816\\">
-                  Admin_1301_62816
-                </option>
-                <option value=\\"Supplier0_1301_46441\\">
-                  Supplier0_1301_46441
-                </option>
-                <option value=\\"Supplier1_1301_46441\\">
-                  Supplier1_1301_46441
-                </option>
-                <option value=\\"Supplier2_1301_46441\\">
-                  Supplier2_1301_46441
-                </option>
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"User\\" checked={true} onClick={[Function: onClick]} />
+             User
+            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Address\\" checked={false} onClick={[Function: onClick]} />
+             Address
           </div>
         </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
+                  <option />
+                  <option value=\\"Admin_1085_64667\\">
+                    Admin_1085_64667
+                  </option>
+                  <option value=\\"Supplier1\\">
+                    Supplier1
+                  </option>
+                  <option value=\\"Supplier2\\">
+                    Supplier2
+                  </option>
+                  <option value=\\"Buyer1\\">
+                    Buyer1
+                  </option>
+                  <option value=\\"Buyer2\\">
+                    Buyer2
+                  </option>
+                  <option value=\\"Admin_1177_49507\\">
+                    Admin_1177_49507
+                  </option>
+                  <option value=\\"Admin_1177_39206\\">
+                    Admin_1177_39206
+                  </option>
+                  <option value=\\"Admin_1177_31203\\">
+                    Admin_1177_31203
+                  </option>
+                  <option value=\\"User_1177_14462\\">
+                    User_1177_14462
+                  </option>
+                  <option value=\\"123456789012345678901234567890123\\">
+                    123456789012345678901234567890123
+                  </option>
+                  <option value=\\"User_1177_26292\\">
+                    User_1177_26292
+                  </option>
+                  <option value=\\"User_1177_69645 ?#%!@*\\">
+                    User_1177_69645 ?#%!@*
+                  </option>
+                  <option value=\\"User_1177_59578\\">
+                    User_1177_59578
+                  </option>
+                  <option value=\\"User_1177_79118\\">
+                    User_1177_79118
+                  </option>
+                  <option value=\\"User_1177_59359\\">
+                    User_1177_59359
+                  </option>
+                  <option value=\\"User_1177_42489\\">
+                    User_1177_42489
+                  </option>
+                  <option value=\\"User_1177_37717\\">
+                    User_1177_37717
+                  </option>
+                  <option value=\\"User_1177_52307\\">
+                    User_1177_52307
+                  </option>
+                  <option value=\\"Buyer1177_18955\\">
+                    Buyer1177_18955
+                  </option>
+                  <option value=\\"Supplier1177_62701\\">
+                    Supplier1177_62701
+                  </option>
+                  <option value=\\"Admin_1301_86023\\">
+                    Admin_1301_86023
+                  </option>
+                  <option value=\\"Admin_1301_62816\\">
+                    Admin_1301_62816
+                  </option>
+                  <option value=\\"Supplier0_1301_46441\\">
+                    Supplier0_1301_46441
+                  </option>
+                  <option value=\\"Supplier1_1301_46441\\">
+                    Supplier1_1301_46441
+                  </option>
+                  <option value=\\"Supplier2_1301_46441\\">
+                    Supplier2_1301_46441
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
           </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
-                <option value={{...}} />
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
+                  <option value={{...}} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
         </div>
@@ -429,35 +464,37 @@ exports[`CreateChain: index render component (public mode) with empty values 1`]
   <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value={[undefined]} />
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value={[undefined]} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value={{...}} />
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value={{...}} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
         </div>
@@ -505,39 +542,41 @@ exports[`CreateChain: index render component (public mode) with values 1`] = `
   <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value=\\"Supplier1\\">
+                    Supplier1
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\">
-                  370adf114257cb0e0025eedf0a96261b51af23e3
-                </option>
-              </Field>
-              <br />
-              <span className=\\"error-text\\" />
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\">
+                    370adf114257cb0e0025eedf0a96261b51af23e3
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
             </div>
           </div>
         </div>

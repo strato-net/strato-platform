@@ -77,12 +77,14 @@ class CreateChain extends Component {
   }
 
   updateMembers(state) {
-    const curMembers = this.state.members.slice(0);
-    const usernames = [];
-    curMembers.forEach(function (member, index) {
-      usernames.push(member.username);
+    const curMembers = this.state.members;
+    const addresses = [];
+
+    curMembers.forEach(function (member) {
+      addresses.push(member.address);
     });
-    if (!usernames.includes(state.username)) {
+
+    if (!addresses.includes(state.address)) {
       this.setState({
         members: curMembers.concat({
           username: state.username,
@@ -111,7 +113,7 @@ class CreateChain extends Component {
           <div className="row smd-margin-8 member smd-vertical-center" key={index}>
             <div className="col-sm-1"></div>
             <div className="col-sm-9">
-              <span>{member.username}</span>
+              <span>{member.username ? member.username + ' (' + member.address + ')' : member.address}</span>
             </div>
             <div className="col-sm-2">
               <Button

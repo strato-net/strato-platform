@@ -74,14 +74,23 @@ describe('CreateChain: index', () => {
       ).dive().dive().dive();
 
       expect(wrapper.state()).toMatchSnapshot();
-      wrapper.find('Field').first().simulate('change', { target: { value: 'Supplier1' } });
-      expect(props.fetchUserAddresses).toHaveBeenCalled();
-      wrapper.find('Field').at(1).simulate('change', { target: { value: '370adf114257cb0e0025eedf0a96261b51af23e3' } });
-      wrapper.find('Field').at(2).simulate('change', { target: { value: 'enode://' } });
-      wrapper.find('Field').at(3).simulate('change', { target: { value: '500' } });
+
+      // on address radio selection
+      wrapper.find('Field').first().simulate('click');
+      wrapper.find('Field').at(2).simulate('change', { target: { value: '370adf114257cb0e0025eedf0a96261b51af23e3' } });
+      wrapper.find('Field').at(3).simulate('change', { target: { value: 'enode://' } });
+      wrapper.find('Field').at(4).simulate('change', { target: { value: '500' } });
       expect(wrapper.state()).toMatchSnapshot();
 
-      // console.log(wrapper.find('Button'))
+      // on user radio selection
+      wrapper.find('Field').at(1).simulate('click');
+      wrapper.find('Field').at(2).simulate('change', { target: { value: 'Admin_1085_64667' } });
+      wrapper.find('Field').at(3).simulate('change', { target: { value: 'd2263b71c14010ff03d8f786670aba691b22b158' } });
+      wrapper.find('Field').at(4).simulate('change', { target: { value: 'enode://' } });
+      wrapper.find('Field').at(5).simulate('change', { target: { value: '500' } });
+      // console.log(wrapper.state());
+      expect(wrapper.state()).toMatchSnapshot();
+
       wrapper.find('Button').last().simulate('click');
       expect(props.handler).toHaveBeenCalled();
       expect(props.handler).toHaveBeenCalledTimes(1);

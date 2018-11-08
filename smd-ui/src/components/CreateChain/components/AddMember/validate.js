@@ -1,7 +1,7 @@
-export function validate(values) {
+export function validate(values, userSelected) {
   const errors = {};
 
-  if (!values.username) {
+  if (userSelected && !values.username) {
     errors.username = 'required';
   }
 
