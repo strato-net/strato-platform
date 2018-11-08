@@ -85,8 +85,8 @@ emptyHash = keccak256 B.empty
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
 
-storageToList :: BA.Storage -> (Word256, Word256)
-storageToList BA.Storage {BA.storageKey=(Hex k), BA.storageValue=(Hex v)} = (k, v)
+matters :: Action -> Bool
+matters Action{..} = (actionType == Create) || (not . Map.null $ actionStorage)
 
 on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
 on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
@@ -204,7 +204,7 @@ processTheMessages messages conn g = do
 
   enterBloc2 env $ do
     forM_ (map (filter hasContract) changes) $ \change -> do
-      processedList <- forM change $ \row@Action{..} -> do
+      processedList <- forM (filter matters change) $ \row@Action{..} -> do
         liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
 
         let md = fromMaybe Map.empty actionMetadata

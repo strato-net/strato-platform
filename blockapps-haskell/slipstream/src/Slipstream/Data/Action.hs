@@ -199,12 +199,6 @@ formatAction Action{..} = T.concat
   , " items\n"
   , "    codeHash = "
   , tshow actionCodeHash
-  , "\n"
-  , "    storage   = "
-  , tshow actionStorage
-  , "\n"
-  , "    metadata  = "
-  , tshow actionMetadata
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
