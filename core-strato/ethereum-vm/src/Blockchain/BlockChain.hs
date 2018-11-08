@@ -27,18 +27,15 @@ import           Control.Monad.Logger
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
-import           Data.Aeson.Encode.Pretty                (encodePretty)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
-import qualified Data.ByteString.Lazy                    as BL
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
-import           Data.Text.Encoding                      (decodeUtf8)
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
@@ -136,7 +133,7 @@ instance Bagger.MonadBagger ContextM where
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
-        let (message, _, _, theHash) = baggerRejectionToTransactionResultBits rejection
+        let (message, theHash) = baggerRejectionToTransactionResultBits rejection
         -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
         -- new best block we just mined came in
         let isRecentlyRan = theHash `elem` bestBlockShas
@@ -158,19 +155,19 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultNewStorage       = ""
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
-                                       , transactionResultChainId          = transactionChainId . otBaseTx $ rejectedTx rejection
+                                       , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
                                        }
 
-baggerRejectionToTransactionResultBits :: TxRejection -> (String, BaggerStage, BaggerTxQueue, SHA) -- pretty, queue, txHash
+baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
     NonceTooLow    s q expected OutputTx{otHash=hash, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", s, q, hash)
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hash)
     BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
-        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hash)
     GasLimitTooLow s q _ OutputTx{otHash=hash} ->
-        (p' s q ++ "tx gas limit", s, q, hash)
+        (p' s q ++ "tx gas limit", hash)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", s, q, hashWorse)
+        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -289,7 +286,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
 addTransactions bd bg ts = go bd bg ts []
   where
-    go _ _ [] as = return as
+    go _ _ [] as = return . reverse $ catMaybes as
     go b blockGas (t:rest) as = do
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
@@ -300,14 +297,14 @@ addTransactions bd bg ts = go bd bg ts []
       printTransactionMessage t result deltaT
       P.setGauge vmTxMined (realToFrac deltaT)
 
-      actions <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
+      mAction <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
 
       let remainingBlockGas =
             case result of
             Left _           -> blockGas
             Right execResult -> erRemainingBlockGas execResult
 
-      go b remainingBlockGas rest (as ++ actions)
+      go b remainingBlockGas rest (mAction : as)
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -385,7 +382,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erStorageDiffs       = _storageDiffs newVMState'
+                                       , erAction             = Just $ _action newVMState'
                                        , erException          = Just e
                                        }
                 Right _ -> do
@@ -404,7 +401,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erStorageDiffs       = _storageDiffs newVMState'
+                                       , erAction             = Just $ _action newVMState'
                                        , erException          = Nothing
                                        }
         else do
@@ -418,7 +415,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
-                               , erStorageDiffs = M.empty
+                               , erAction = Nothing
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
 
@@ -434,16 +431,44 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
   !(result, vmState) <-
-    create isRunningTests' isHomestead S.empty b 0 tAddr tAddr (transactionValue ut) (transactionGasPrice ut) availableGas newAddress (transactionInit ut)
+    create isRunningTests'
+           isHomestead
+           S.empty
+           b
+           0
+           tAddr
+           tAddr
+           (transactionValue ut)
+           (transactionGasPrice ut)
+           availableGas
+           newAddress
+           (transactionInit ut)
+           (txHash ut)
+           (txChainId ut)
+           (txMetadata ut)
 
   return (const B.empty <$> result, vmState)
 
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
-  call isRunningTests' isHomestead False S.empty b 0 owner owner tAddr
-          (fromIntegral $ transactionValue ut) (fromIntegral $ transactionGasPrice ut)
-          (transactionData ut) (fromIntegral availableGas) tAddr
+  call isRunningTests'
+       isHomestead
+       False
+       S.empty
+       b
+       0
+       owner
+       owner
+       tAddr
+       (fromInteger $ transactionValue ut)
+       (fromInteger $ transactionGasPrice ut)
+       (transactionData ut)
+       (fromIntegral availableGas)
+       tAddr
+       (txHash ut)
+       (txChainId ut)
+       (txMetadata ut)
 
 ----------------
 
@@ -472,8 +497,8 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
                         -> TxRunResult
-                        -> ContextM [Action]
-outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=signer} result deltaT beforeMap afterMap) = do
+                        -> ContextM (Maybe Action)
+outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap) = do
   let (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
@@ -484,9 +509,9 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   if not flags_createTransactionResults
-    then return []
+    then return Nothing
     else do
-      let chainId = transactionChainId t
+      let chainId = txChainId t
           beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
           afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
@@ -496,7 +521,6 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
-          sDiffs = either (const M.empty) erStorageDiffs result
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
           (response, theTrace', theLogs) =
             case result of
@@ -520,7 +544,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultEtherUsed        = etherUsed
                                , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
                                , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
-                               , transactionResultStateDiff        = T.unpack . decodeUtf8 . BL.toStrict $ encodePretty sDiffs
+                               , transactionResultStateDiff        = ""
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
@@ -528,21 +552,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultChainId          = chainId
                                }
       if not flags_diffPublish
-        then return []
-        else forM (M.toList sDiffs) $ \(a,s) -> do
-          AddressState{..} <- getAddressState a
-          return $ Action
-                     Blockchain.Data.Action.Update
-                     ranBlockHash
-                     (blockDataTimestamp b)
-                     (blockDataNumber b)
-                     theHash
-                     chainId
-                     signer
-                     a
-                     addressStateCodeHash
-                     (Just s)
-                     (transactionMetadata t)
+        then return Nothing
+        else return $ either (const Nothing) erAction result
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do

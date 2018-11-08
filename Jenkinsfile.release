@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "strato-integration"
+    label "test1"
   }
   options { disableConcurrentBuilds() }
   parameters {
@@ -17,8 +17,20 @@ pipeline {
         ]) {
           sh '''#!/bin/bash -le
             set -x
+            
+            # Install prerequisites if required (assuming VM has docker, docker-compose, git and npm + nodeJS v.6+ by default
+            if [ ! $(command -v github-release) ]; then 
+              if [ ! $(command -v go) ]; then 
+                wget -qO- https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+                echo "export GOPATH=\$HOME/go" >> ~/.profile
+                echo "export PATH=\$PATH:/usr/local/go/bin:\$GOPATH/bin" >> ~/.profile
+                . ~/.profile # to reload profile
+              fi
+              go get github.com/aktau/github-release
+            fi
+            
             if [ "$BUILD_TYPE" == "full" ]; then
-              git worktree remove --force strato-worktree
+              git worktree remove --force strato-worktree || true
               git worktree add strato-worktree develop
               cd strato-worktree
               git checkout ${REFSPEC}
@@ -56,7 +68,7 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
-          NODE_HOST=strato-int.centralus.cloudapp.azure.com
+          NODE_HOST=localhost
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
           docker ps
           counter=0

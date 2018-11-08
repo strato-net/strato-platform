@@ -3,10 +3,13 @@
     , DeriveGeneric
     , FlexibleContexts
     , LambdaCase
+    , TemplateHaskell
 #-}
 
 module Slipstream.MessageConsumer where
 
+import Control.Concurrent     (threadDelay)
+import Control.Exception.Lifted
 import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson hiding (Error)
@@ -20,17 +23,20 @@ import qualified Data.List.NonEmpty as NE
 import Data.String
 import Control.Lens
 import Data.List
-import Control.Concurrent
 import Database.PostgreSQL.Typed
 import Data.IORef
 import System.Log.Logger
 
 import Slipstream.Globals
+import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.Processor
 
 defaultMaxB :: K.MaxBytes
 defaultMaxB = 32 * 1024 * 1024
+
+exceptionMaxCount :: Int
+exceptionMaxCount = 20
 
 data KafkaConf =
   KafkaConf {
@@ -91,11 +97,19 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-
-getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> a ()
-getAndProcessMessages conn cache offset = do
-  messages <- getTheMessages offset
-  liftIO $ processTheMessages messages conn cache
-  when (null messages) $
-    liftIO $ threadDelay 1000000
-  getAndProcessMessages conn cache $ offset + fromIntegral (length messages)
+getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
+getAndProcessMessages conn cache offset errorCounter = do
+  eMessages <- try $ getTheMessages offset
+  case eMessages of
+    Left e -> do
+      liftIO $ threadDelay 1000000
+      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
+      if (errorCounter > exceptionMaxCount )
+           then error $ "Slipstream reached exceptionMaxCount."
+           else getAndProcessMessages conn cache offset (errorCounter + 1)
+    Right messages -> do
+      recordKafkaMessages messages
+      liftIO $ processTheMessages messages conn cache
+      when (null messages) $
+        liftIO $ threadDelay 1000000
+      getAndProcessMessages conn cache (offset + fromIntegral (length messages)) errorCounter

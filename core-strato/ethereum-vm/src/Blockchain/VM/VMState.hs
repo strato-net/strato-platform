@@ -1,8 +1,9 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.VM.VMState (
   VMState(..),
-  storageDiffs,
+  action,
   Memory(..),
   startingState,
   DebugCallCreate(..),
@@ -18,10 +19,12 @@ import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 
 
+import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -72,7 +75,7 @@ data VMState =
 
     writable         :: Bool, -- Whether to throw on attempted changes to storage
 
-    _storageDiffs    :: M.Map Address (M.Map Word256 Word256),
+    _action          :: Action,
 
     --These last two variable are only used for the Ethereum tests.
     isRunningTests   :: Bool,
@@ -89,7 +92,19 @@ instance Format VMState where
     "gasRemaining: " ++ show (vmGasRemaining state) ++ "\n" ++
     "stack: " ++ show (stack state) ++ "\n"
 
-startingState :: Bool->Bool->Environment->Context->IO VMState
+startingAction :: Environment -> Action
+startingAction Environment{..} = Action
+  { _actionBlockHash          = blockHeaderHash envBlockHeader
+  , _actionBlockTimestamp     = blockHeaderTimestamp envBlockHeader
+  , _actionBlockNumber        = blockHeaderBlockNumber envBlockHeader
+  , _actionTransactionHash    = envTxHash
+  , _actionTransactionChainId = envChainId
+  , _actionTransactionSender  = envSender
+  , _actionData               = M.empty
+  , _actionMetadata           = envMetadata
+  }
+
+startingState :: Bool -> Bool -> Environment -> Context -> IO VMState
 startingState isRunningTests' isHomestead env dbs' = do
   m <- newMemory
   return VMState
@@ -110,7 +125,7 @@ startingState isRunningTests' isHomestead env dbs' = do
                logs=[],
                environment=env,
                suicideList=S.empty,
-               _storageDiffs = M.empty,
+               _action = startingAction env,
 
                --only used for running ethereum tests
                isRunningTests=isRunningTests',

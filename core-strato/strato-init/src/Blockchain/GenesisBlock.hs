@@ -189,17 +189,18 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
           fullAddrStates = [(address, fullAddressState)]
           filteredAddrStates = [(address, filteredAddressState)]
           toAction a d = A.Action
-            { A.actionType = A.Create
-            , A.actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
-            , A.actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
-            , A.actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A.actionTxHash = SHA $ fromMaybe 0 genesisChainId
-            , A.actionTxChainId = genesisChainId
-            , A.actionTxSender = Ad.Address 0
-            , A.actionAddress = a
-            , A.actionCodeHash = codeHash d
-            , A.actionStorage = Just . Map.map fromDiff $ storage d
-            , A.actionMetadata = getMetadata (codeHash d)
+            { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
+            , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
+            , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
+            , A._actionTransactionHash = SHA $ fromMaybe 0 genesisChainId
+            , A._actionTransactionChainId = genesisChainId
+            , A._actionTransactionSender = Ad.Address 0
+            , A._actionData = Map.singleton a $
+                                A.ActionData
+                                  (codeHash d)
+                                  (Map.map fromDiff $ storage d)
+                                  []
+            , A._actionMetadata = getMetadata (codeHash d)
             }
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v

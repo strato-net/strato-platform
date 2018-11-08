@@ -1,0 +1,49 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>BlockApps P2P Overview - {{ .Params.instance }}</h1>
+
+  <h3>Received Messages</h3>
+  <div id="receivedMessagesGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#receivedMessagesGraph"),
+    expr: "p2p_recv",
+    name: '[[message_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Messages",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Sent Messages</h3>
+  <div id="sentMessagesGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#sentMessagesGraph"),
+    expr: "p2p_sent",
+    name: '[[message_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Messages",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>P2P Events</h3>
+  <div id="p2pEventsGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#p2pEventsGraph"),
+    expr: "p2p_event",
+    name: '[[event_type]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Events",
+    yUnits: "count",
+  })
+  </script>
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

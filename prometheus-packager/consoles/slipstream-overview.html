@@ -1,0 +1,69 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>Slipstream Overview - {{ .Params.instance }}</h1>
+
+  <h3>Kafka usage</h3>
+  <div id="slipkafka"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipkafka"),
+      expr: [
+        "slipstream_kafka_read",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Messages read",
+      yUnits: "count",
+   })
+  </script>
+
+
+  <h3>Globals cache size</h3>
+  <div id="slipglobals"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipglobals"),
+      expr: [
+        "slipstream_globals_size",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Number of cache entries",
+      yUnits: "count",
+   })
+  </script>
+
+  <h3>Actions processed</h3>
+  <div id="slipactions"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipactions"),
+      expr: [
+        "slipstream_action_count",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Number of actions, by type",
+      yUnits: "count",
+   })
+  </script>
+
+  <h3>Tables created</h3>
+  <div id="sliptables"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#sliptables"),
+      expr: [
+        "slipstream_tables_created",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Number of actions, by type",
+      yUnits: "count",
+   })
+  </script>
+
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

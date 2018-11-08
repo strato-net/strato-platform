@@ -1,0 +1,48 @@
+{{ template "head" . }}
+
+{{ template "prom_right_table_head" }}
+{{ template "prom_right_table_tail" }}
+
+{{ template "prom_content_head" . }}
+<h1>STRATO Overview</h1>
+<p>These are Prometheus consoles for BlockApps Strato.</p>
+
+<p>These consoles expect exporters to have the following job labels:</p>
+<table class="table table-condensed table-striped table-bordered" style="width: 0%">
+<tr>
+  <th>Exporter</th>
+  <th>Job label</th>
+</tr>
+<tr>
+  <td>Sequencer</td>
+  <td><code>seq</code></td>
+</tr>
+<tr>
+  <td>P2P</td>
+  <td><code>p2p</code></td>
+</tr>
+<tr>
+  <td>Ethereum-vm</td>
+  <td><code>evm</code></td>
+</tr>
+<tr>
+  <td>PBFT</td>
+  <td><code>pbft</code></td>
+</tr>
+<tr>
+  <td>Private Chain</td>
+  <td><code>privatechain</code></td>
+</tr>
+<tr>
+  <td>Gregor</td>
+  <td><code>seq_gregor</code></td>
+</tr>
+<tr>
+  <td>Slipstream</td>
+  <td><code>slipstream</code></td>
+</tr>
+</table>
+
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

@@ -40,8 +40,10 @@ dependencies:
   - monad-control
   - mtl
   - network
+  - ordered-containers
   - postgresql-simple
   - postgresql-typed
+  - prometheus-client
   - resource-pool
   - retry
   - scientific
@@ -56,6 +58,8 @@ dependencies:
   - unliftio
   - unordered-containers
   - vector
+  - warp
+  - wai-middleware-prometheus
 
 executables:
   slipstream:

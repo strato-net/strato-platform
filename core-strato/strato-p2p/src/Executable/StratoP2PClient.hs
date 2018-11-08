@@ -24,6 +24,7 @@ import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
 import           Data.Conduit.Network
+import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
@@ -67,7 +68,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
 
     runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 1
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Active
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
@@ -79,7 +80,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
              .| eventSink
              .| appSink app
 
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) 0
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Unactive
         case attempt of
           Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -110,7 +111,11 @@ runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
               -> CommPort
               -> m ()
 runPeerInList thePeer otherServiceHost otherServicePort = do
-  liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
+  eErr <- liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
+  whenLeft eErr $ \err -> do
+      $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
+      $logErrorS "runPeerInList" "Simulating disable..."
+      liftIO $ threadDelay $ 10 * 1000 * 1000
   getPubKeyRunPeer thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()
@@ -120,10 +125,15 @@ stratoP2PClient = do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    peers <- liftIO getAvailablePeers
-    multiThreadedClient peers activePeersSem
-    $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
-    liftIO $ threadDelay 5000000
+    ePeers <- liftIO getAvailablePeers
+    case ePeers of
+      Left err -> do
+        $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
+        liftIO $ threadDelay 1000000
+      Right peers -> do
+        multiThreadedClient peers activePeersSem
+        $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
+        liftIO $ threadDelay 5000000
     where
       multiThreadedClient :: [PPeer] -> SSem -> LoggingT IO ()
       multiThreadedClient [] _ = do
@@ -139,8 +149,13 @@ stratoP2PClient = do
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 
-      disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
-      disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
+      disablePeerForHours :: (MonadIO m, MonadLogger m) => PPeer -> Int -> m ()
+      disablePeerForHours thePeer s = do
+        eErr <- liftIO . disablePeerForSeconds thePeer . (60*60*) $ s
+        whenLeft eErr $ \err -> do
+            $logErrorS "stratoP2PClient/disablePeerForHours" . T.pack $
+                        "Unable to disable peer: " ++ show err
+            $logErrorS "stratoP2PClient/disablePeerForHours" "Will disable next time they misbehave"
 
       handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case

@@ -271,12 +271,12 @@ promoteTx tx@OutputTx{otSigner=signer} = do
     state <- getBaggerState
     $logInfoS "Bagger.promoteTx" "pulling from mempool"
     let txShas = B.bestBlockTxHashes (B.miningCache state)
-        !(evicted, state') = B.addToPending tx state
+        !(evicted, kept, state') = B.addToPending tx state
     putBaggerState state'
     forM_ evicted $ \e -> do
         removeFromSeen e
         logDiscard' "promoteTx" signer e
-        txsDroppedCallback [LessLucrative Promotion Pending tx e] txShas
+        txsDroppedCallback [LessLucrative Promotion Pending kept e] txShas
     addToPromotionCache tx
 
 demoteUnexecutables :: MonadBagger m => m ()

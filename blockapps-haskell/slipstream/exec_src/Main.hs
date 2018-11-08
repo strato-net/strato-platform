@@ -9,12 +9,16 @@
     , FlexibleContexts
 #-}
 
+import Control.Concurrent
+import Control.Monad
 import Data.Default
 import Data.IORef
 import Database.PostgreSQL.Typed
 import HFlags
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
+import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.Prometheus
 import System.IO
 import System.Log.Logger
 
@@ -31,6 +35,8 @@ main = do
   hSetBuffering stdin LineBuffering
 
   putStrLn "Welcome to Slipstream!!!!"
+  void . forkIO . run 10777 $ metricsApp
+  putStrLn "Serving metrics on port 10777"
 
   conn <- pgConnect dbConnect
 
@@ -45,8 +51,7 @@ main = do
 
   cachedContractsIORef <- newIORef def
 
-  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
-
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset 0)
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
