@@ -43,6 +43,7 @@ dependencies:
   - ordered-containers
   - postgresql-simple
   - postgresql-typed
+  - prometheus-client
   - resource-pool
   - retry
   - scientific
