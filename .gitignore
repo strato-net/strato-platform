@@ -1,6 +1,7 @@
 .idea
 .basil-work
 .stack-work
+.stack-work-profile
 docker-compose.push.yml
 docker-compose.yml
 *.cabal

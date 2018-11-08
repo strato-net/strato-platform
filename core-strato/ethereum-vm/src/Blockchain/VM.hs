@@ -5,8 +5,6 @@ module Blockchain.VM
     ( runCodeFromStart
     , call
     , create
-    , getSource
-    , getContractName
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
@@ -22,7 +20,6 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
-import qualified Data.ByteString.Base16             as B16
 import           Data.Char
 import           Data.Function
 import qualified Data.Map.Strict                    as M
@@ -358,7 +355,7 @@ runOperation BLOCKHASH = do
   case (inRange, isRunningTests vmState) of
    (False, _) -> push (0::Word256)
    (True, False) -> do
-          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') $ blockHeaderHash currentBlock
+          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') (blockDataParentHash currentBlock)
           case maybeBlockHash of
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
@@ -955,59 +952,11 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           return (Left e, vmState'{logs=[]})
       (_, stateAfter) -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ stateAfter
-          putStorageMap $ contextStorageMap $ dbs stateAfter
-          putAddressStateDBMap $ contextAddressStateDBMap $ dbs stateAfter
+          putStorageTxMap $ contextStorageTxMap $ dbs stateAfter
+          putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs stateAfter
 
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
-
-getSource :: Bool -> MP.StateRoot -> SHA -> ContextM String
-getSource = getFromSelector "ec630643" -- First 4 bytes of keccak256("__getSource__()")
-
-getContractName :: Bool -> MP.StateRoot -> SHA -> ContextM String
-getContractName = getFromSelector "d652a0f0" -- First 4 bytes of keccak256("__getContractName__()")
-
-getFromSelector :: BC.ByteString -> Bool -> MP.StateRoot -> SHA -> ContextM String
-getFromSelector sel isRunningTests' sr codeHash = do
-  theCode <- Code . fromMaybe B.empty <$> getCode codeHash
-
-  stateRoot <- getStateRoot
-  setStateDBStateRoot sr
-  let env =
-        Environment{ -- this is all dummy information....  getSource should be a very simple function that unconditionally returns a single string
-          envGasPrice=1,
-          envBlockHeader=BlockData{
-            blockDataParentHash = SHA 0,
-            blockDataUnclesHash = SHA 0,
-            blockDataCoinbase = Address 0,
-            blockDataStateRoot = MP.emptyTriePtr,
-            blockDataTransactionsRoot = MP.emptyTriePtr,
-            blockDataReceiptsRoot = MP.emptyTriePtr,
-            blockDataLogBloom = "",
-            blockDataDifficulty = 0,
-            blockDataNumber = 0,
-            blockDataGasLimit = 10000000000000000000,
-            blockDataGasUsed = 0,
-            blockDataTimestamp = posixSecondsToUTCTime 0,
-            blockDataExtraData = "",
-            blockDataNonce = 0,
-            blockDataMixHash = SHA 0
-            },
-          envOwner = Address 0,
-          envOrigin = Address 0,
-          envInputData = fst $ B16.decode sel,
-          envSender = Address 0,
-          envValue = 0,
-          envCode = theCode,
-          envJumpDests = getValidJUMPDESTs theCode
-          }
-  (eRes, _) <-
-    runVMM isRunningTests' True S.empty 0 env 1000000000000000000 $ call' True
-
-  setStateDBStateRoot stateRoot
-  case eRes of
-    Left _ -> return ""
-    Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
 
 create :: Bool
        -> Bool
@@ -1079,11 +1028,12 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
 create' :: VMM Code
 create' = do
 
+  owner <- getEnvVar envOwner
+  storageDiffs %= M.alter (Just . fromMaybe M.empty) owner
+
   runCodeFromStart
 
   vmState <- lift get
-
-  owner <- getEnvVar envOwner
 
   let codeBytes' = fromMaybe B.empty $ returnVal vmState
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes'
@@ -1208,8 +1158,8 @@ create_debugWrapper block owner value initCodeBytes = do
       ((result, finalVMState), finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-      putStorageMap $ contextStorageMap finalDBs
-      putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+      putStorageTxMap $ contextStorageTxMap finalDBs
+      putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
       setGasRemaining $ vmGasRemaining finalVMState
 
@@ -1248,8 +1198,8 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-  putStorageMap $ contextStorageMap finalDBs
-  putAddressStateDBMap $ contextAddressStateDBMap finalDBs
+  putStorageTxMap $ contextStorageTxMap finalDBs
+  putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 
   case result of

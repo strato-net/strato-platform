@@ -15,6 +15,7 @@ dependencies:
   - cpu
   - cryptohash
   - crypto-pubkey-types
+  - either
   - entropy
   - errors
   - ethereum-encryption
@@ -28,6 +29,7 @@ dependencies:
   - network-uri
   - persistent-postgresql
   - persistent-template
+  - prometheus-client
   - random
   - resourcet
   - split

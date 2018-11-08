@@ -9,6 +9,7 @@ module Blockchain.Database.MerklePatricia.StateRoot (
   unboxStateRoot
   ) where
 
+import           Control.DeepSeq
 import           Control.Monad
 import           Data.Aeson
 import           Data.Binary
@@ -38,6 +39,8 @@ newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generi
 instance Format StateRoot where
   format x             | x == emptyTriePtr = CL.yellow "<empty>"
   format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode x
+
+instance NFData StateRoot
 
 instance FromJSON StateRoot
 instance ToJSON StateRoot

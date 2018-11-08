@@ -299,11 +299,11 @@ getBlockNum :: Block -> Integer
 getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num
 
 getTxNum :: RawTransaction -> Int
-getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ _ bn _ _) = bn
+getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ _ _ bn _ _) = bn
 
 -- probably need to pad here
 getAccNum :: AddressStateRef -> String
-getAccNum (AddressStateRef (Address x) _ _ _ _ _ _ _ _ _) = (showHex x "")
+getAccNum (AddressStateRef (Address x) _ _ _ _ _ _ _) = (showHex x "")
 
 if' :: Bool -> a -> b -> Either a b
 if' x a b = if x == True then Left a else Right b

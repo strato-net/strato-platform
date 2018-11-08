@@ -4,8 +4,10 @@ module BlockApps.Solidity.Parse.UnParserSpec where
 
 import           Test.Hspec
 import qualified Data.Map.Strict as Map
--- import           Text.Parsec                          hiding (parse)
-import BlockApps.Solidity.Parse.UnParser (unparseFunc)
+import           Data.List (isInfixOf)
+
+import BlockApps.Solidity.Parse.UnParser (unparseFunc, unparseUsing, unparseSourceUnit)
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi.Type
 import BlockApps.Solidity.Xabi
 
@@ -23,7 +25,7 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("test", func)
-          expected = "function test() returns (int, uint) {\n        \n    }"
+          expected = "function test() returns (int, uint) {\n        }"
       ret `shouldBe` expected
     it "should unparse a function that returns a pair 'returns (ErrorCodes, uint)'" $ do
       let func = Func Map.empty
@@ -33,7 +35,7 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("test2", func)
-          expected = "function test2() returns (ErrorCodes, uint) {\n        \n    }"
+          expected = "function test2() returns (ErrorCodes, uint) {\n        }"
       ret `shouldBe` expected
     it "should unparse a function that returns a pair 'returns (ErrorCodes, ProjectState)'" $ do
       let func = Func Map.empty
@@ -43,8 +45,21 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("fsm", func)
-          expected = "function fsm() returns (ErrorCodes, ProjectState) {\n        \n    }"
+          expected = "function fsm() returns (ErrorCodes, ProjectState) {\n        }"
       ret `shouldBe` expected
+
+  describe "Unparser - library" $ do
+    it "should unparse a library" $ do
+      let xabi = xabiEmpty{xabiKind=LibraryKind}
+      unparseSourceUnit (NamedXabi "SafeMath" (xabi, [])) `shouldSatisfy` isInfixOf "library SafeMath"
+  describe "Unparser - interface" $ do
+    it "should unparse an interface" $ do
+      let xabi = xabiEmpty{xabiKind=InterfaceKind}
+      unparseSourceUnit (NamedXabi "Stringer" (xabi, [])) `shouldSatisfy` isInfixOf "interface Stringer"
+  describe "UnParser - unparseUsing" $ do
+    it "should unparse using" $ do
+      unparseUsing ("SafeMath", Using "for uint256") `shouldBe` "using SafeMath for uint256;\n"
+
 
 
 expectedFunc :: String

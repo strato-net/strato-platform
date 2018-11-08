@@ -47,7 +47,7 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
   parentXabiOrError <-
     lookup parent xabisWithInheritedDeclarations
     `orError`
-    ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
+    ("Contract was inherited from a non existent contract: " ++ Text.unpack parent)
   parentXabi <- parentXabiOrError
   !mergedXabis <- addInheritedDeclarations xabisWithInheritedDeclarations (xabi, rest)
   return (xabiMerge mergedXabis parentXabi)
@@ -60,7 +60,11 @@ xabiMerge x y =
     xabiVars= fmap (bumpAtBytes bumper) (xabiVars x) `Map.union` xabiVars y,
     xabiTypes=xabiTypes x `Map.union` xabiTypes y,
     xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y,
-    xabiEvents = xabiEvents x `Map.union` xabiEvents y
+    xabiEvents = xabiEvents x `Map.union` xabiEvents y,
+    -- This doesn't make any sense, I broke the type ¯\_(ツ)_/¯
+    -- Please don't try to merge libraries or interfaces
+    xabiKind = xabiKind x,
+    xabiUsing = xabiUsing x `Map.union` xabiUsing y
     }
   where
     bumper = if null (variables $ xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32

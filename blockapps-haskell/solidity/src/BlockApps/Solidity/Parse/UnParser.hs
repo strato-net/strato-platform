@@ -30,19 +30,23 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
-     "contract "
+     (case xabiKind contract of
+        ContractKind -> "contract "
+        InterfaceKind -> "interface "
+        LibraryKind -> "library ")
   <> Text.unpack name
   <> (case inherited of
         [] -> ""
         xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
-  <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
-  <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
-  <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
-  <> List.concat (List.map (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract))
-  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
-  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
+  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
+  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
+  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 
 unparseVar :: (Text, VarType) -> String
@@ -86,11 +90,14 @@ unparseVarType (Contract contractName) = Text.unpack contractName
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
-unparseFunc (name, Func{..}) =
-  Text.unpack $
-    "function "
-    <> name
-    <> "("
+unparseFunc (name, f) = Text.unpack $ "function " <> name <> unparseFuncWithoutName f
+
+unparseCtor :: Func -> String
+unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+
+unparseFuncWithoutName :: Func -> Text
+unparseFuncWithoutName Func{..} =
+       "("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
     <> case funcStateMutability of
@@ -116,7 +123,7 @@ unparseFunc (name, Func{..}) =
     <> case funcContents of
         Just contents -> contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
-    <> "\n    }"
+    <> "}"
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
@@ -128,7 +135,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> case modifierContents of
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
-  <> "\n    }"
+  <> "}"
 
 unparseEvent :: (Text, Event) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
@@ -139,6 +146,9 @@ unparseEvent (name, Event{..}) = Text.unpack $
   <> ")"
   <> (if eventAnonymous then "anonymous" else "")
   <> ";"
+
+unparseUsing :: (Text, Using) -> String
+unparseUsing (name, Using body) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
 unparseTypes :: (Text, Xabi.Def) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) =
@@ -175,16 +185,3 @@ unparseVals (name, theType) =
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
-
-addFunction :: (Text, String) -> Xabi -> Xabi
-addFunction (name, contents) c =
-  let func = Func { funcArgs = Map.empty
-                  , funcVals = Map.singleton "#0" IndexedType{ indexedTypeType=String (Just True)
-                                                             , indexedTypeIndex=0
-                                                             }
-                  , funcContents = Just $ Text.pack contents
-                  , funcStateMutability = Just View
-                  , funcVisibility = Just Public
-                  , funcModifiers = Nothing
-                  }
-  in c{xabiFuncs=Map.insert name (func) $ xabiFuncs c}

@@ -13,4 +13,4 @@ data TypeDefs =
   TypeDefs {
     enumDefs::Map Text EnumSet,
     structDefs::Map Text Struct
-    } deriving (Show)  
+    } deriving (Show)

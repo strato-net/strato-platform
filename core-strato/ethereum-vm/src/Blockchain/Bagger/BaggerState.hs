@@ -1,13 +1,20 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Bagger.BaggerState where
 
 import           Control.Applicative                (Alternative, empty)
+import           Control.DeepSeq
 
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
+
+import           GHC.Generics
 
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Bagger.TransactionList
@@ -23,17 +30,21 @@ import           Blockchain.SHA
 
 type ATL = M.Map Address TransactionList
 
+instance (NFData a, NFData b) => NFData (OMap a b) where
+  rnf m = OMap.assocs m `deepseq` ()
+
 data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
                                , bestBlockTxHashes     :: [SHA]
                                , lastExecutedStateRoot :: StateRoot
-                               , lastRewardedStateRoot :: StateRoot
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
                                , privateHashes         :: OMap SHA OutputTx
                                , startTimestamp        :: UTCTime
-                               } deriving (Show)
+                               } deriving (Show, Generic)
+
+instance NFData MiningCache
 
 data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
@@ -42,7 +53,9 @@ data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
-                               }
+                               } deriving (Generic)
+
+instance NFData BaggerState
 
 instance Show BaggerState where
     show b =    "BBBBB\n"
@@ -57,27 +70,33 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   , pending               = M.empty
                                   , queued                = M.empty
                                   , seen                  = M.empty
-                                  , calculateIntrinsicGas = error "reached defaultBaggerState"
+                                  , calculateIntrinsicGas = \_ _ -> 0xaaaaa
                                   }
 
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
-                                  , bestBlockHeader       = error "reached defaultMiningCache"
+                                  , bestBlockHeader       = (DD.BlockData
+                                      (SHA 0) (SHA 0) (Address 0x7777)
+                                      blankStateRoot blankStateRoot blankStateRoot
+                                      "" 100 100 100 100
+                                      (posixSecondsToUTCTime 0)
+                                      "" 137 (SHA 30))
+
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot
-                                  , lastRewardedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
                                   , privateHashes         = OMap.empty
-                                  , startTimestamp        = error "reached defaultMiningCache"
+                                  , startTimestamp        = posixSecondsToUTCTime 0
                                   }
 
-addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
+addToATL :: OutputTx -> ATL -> (Maybe OutputTx, OutputTx, ATL)
 addToATL t atl =
     case M.lookup signer atl of
-        Nothing  -> (Nothing, M.insert signer (singletonTransactionList t) atl)
-        Just txs -> let (oldTx, newTL) = insertTransaction t txs in (oldTx, M.insert signer newTL atl)
+        Nothing  -> (Nothing, t, M.insert signer (singletonTransactionList t) atl)
+        Just txs -> let (oldTx, newTx, newTL) = insertTransaction t txs
+                    in  (oldTx, newTx, M.insert signer newTL atl)
     where signer = otSigner t
 
 modifyATL :: Alternative a => (TransactionList -> (a OutputTx, TransactionList)) -> Address -> ATL -> (a OutputTx, ATL)
@@ -101,11 +120,15 @@ calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache { bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
     cig (DD.blockDataNumber bh + 1)
 
-addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToPending t s@BaggerState{pending = p} = let (oldTx, newATL) = addToATL t p in (oldTx, s { pending = newATL })
+addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, OutputTx, BaggerState)
+addToPending t s@BaggerState{pending = p} =
+   let (oldTx, newTx, newATL) = addToATL t p
+   in  (oldTx, newTx, s { pending = newATL })
 
 addToQueued :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToQueued t s@BaggerState{queued = q} = let (oldTx, newATL) = addToATL t q in (oldTx, s { queued = newATL })
+addToQueued t s@BaggerState{queued = q} =
+  let (oldTx, _, newATL) = addToATL t q
+  in (oldTx, s { queued = newATL })
 
 addToSeen :: OutputTx -> BaggerState -> BaggerState
 addToSeen t@OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.insert sha t seen' }

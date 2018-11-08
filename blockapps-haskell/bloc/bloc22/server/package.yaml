@@ -21,11 +21,11 @@ dependencies:
   - blockapps-ethereum
   - blockapps-solidity
   - blockapps-bloc22-api
-  - blockapps-cirrus-client
   - blockapps-strato-api
   - blockapps-strato-client
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - classy-prelude
   - clock
   - containers
   - contravariant
@@ -55,6 +55,7 @@ dependencies:
   - opaleye
   - ordered-containers
   - postgresql-simple
+  - prettyprinter
   - process
   - product-profunctors
   - profunctors

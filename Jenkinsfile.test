@@ -20,15 +20,15 @@ pipeline {
           sh '''#!/bin/bash -le
             set -x
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-            if [ -d "strato-platform" ]; then
-              cd strato-platform
-              git fetch origin
-              git reset --hard HEAD^
-              git checkout origin/${PLATFORM_BRANCH_NAME}
+            if [ -d "strato-worktree" ]; then
+              cd strato-worktree
+              git checkout ${PLATFORM_BRANCH_NAME}
+              git reset --hard remotes/origin/${PLATFORM_BRANCH_NAME}
               cd ..
             else
-              git clone https://github.com/blockapps/strato-platform -b ${PLATFORM_BRANCH_NAME}
+              git worktree add strato-worktree remotes/origin/${PLATFORM_BRANCH_NAME}
             fi
+            git worktree list
           '''
         }
       }
@@ -38,7 +38,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          cd strato-platform
+          cd strato-worktree
           REPO=private make all
         '''
       }
@@ -50,7 +50,7 @@ pipeline {
           set -x
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started
-          cp strato-platform/docker-compose.yml strato-getting-started/
+          cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=$(</host)
           NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
@@ -87,11 +87,11 @@ pipeline {
             withCredentials([
               usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
             ]) {
-              archiveArtifacts artifacts: "strato-platform/docker-compose.yml"
+              archiveArtifacts artifacts: "strato-worktree/docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                cd strato-platform
+                cd strato-worktree
                 docker-compose -f docker-compose.push.yml push
               '''
             }
@@ -124,7 +124,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running core-strato unit tests"
-              cd strato-platform/core-strato
+              cd strato-worktree/core-strato
               ./run_unit_tests.sh
             '''
           },
@@ -133,7 +133,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps Haskell tests'
-              cd strato-platform/blockapps-haskell
+              cd strato-worktree/blockapps-haskell
               ./run_unit_tests.sh
             '''
           },
@@ -142,7 +142,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
-              cd strato-platform/smd-ui
+              cd strato-worktree/smd-ui
               docker build -f Dockerfile.test .
             '''
           },
@@ -150,7 +150,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running local integration tests'
-              cd strato-platform/tests
+              cd strato-worktree/tests
               npm install
               npm run test:truchainz
             '''

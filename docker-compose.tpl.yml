@@ -4,12 +4,15 @@ volumes:
     driver: local
   pgdata:
     driver: local
+  prometheusdata:
+    driver: local
 services:
   smd:
     depends_on:
     - apex
     - bloc
     - postgrest
+    - prometheus
     - strato
     environment:
     - APEX_URL=${APEX_URL}
@@ -70,9 +73,9 @@ services:
     restart: always
   bloc:
     depends_on:
+    - postgres
     - strato
     - vault-wrapper
-    - postgres
     environment:
     - loglevel=${loglevel}
     - kafkaHost=kafka
@@ -85,7 +88,7 @@ services:
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
-#    - stateDiffTopic=${stateDiffTopic}
+    #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
@@ -122,6 +125,8 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - maxConn=${maxConn}
+    - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
@@ -129,6 +134,7 @@ services:
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
     - mineBlocks=${mineBlocks:-true}
@@ -144,12 +150,8 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
-    - statsEnable=${statsEnable}
-    - statsFlush=${statsFlush}
-    - statsHost=${statsHost}
-    - statsPort=${statsPort}
-    - statsPrefix=${statsPrefix}
-    - statsSuffix=${statsSuffix}
+    - seqMaxEventsPerIter=${seqMaxEventsPerIter}
+    - seqMaxUsPerIter=${seqMaxUsPerIter}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
     - zkHost=zookeeper
@@ -182,11 +184,12 @@ services:
     restart: always
   nginx:
     depends_on:
+    - apex
     - bloc
     - postgrest
+    - prometheus
     - smd
     - strato
-    - apex
     - vault-wrapper
     environment:
     - authBasic=${authBasic}
@@ -207,8 +210,8 @@ services:
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
-    - 80:80
-    - 443:443
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: always
@@ -235,8 +238,10 @@ services:
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/run/docker.sock
   prometheus:
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     build: .
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    volumes:
+    - prometheusdata:/prometheus
     restart: always

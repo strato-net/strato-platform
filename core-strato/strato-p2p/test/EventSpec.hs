@@ -16,12 +16,12 @@ import qualified Database.Persist.Sqlite               as Lite
 import qualified Database.Redis                        as Redis
 import System.IO.Temp                        (emptySystemTempFile)
 
+import Blockchain.Blockstanbul               (blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.ArbitraryInstances()
 import qualified Blockchain.Data.Blockchain as DataBlock
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.Wire
-import Blockchain.DBM
 import Blockchain.Event
 import Blockchain.Output
 import Blockchain.Sequencer.Event
@@ -57,6 +57,9 @@ testContext = do
                  , unseqSink=sinkTMChan ch False
                  , vmEventsSink=sinkNull
                  , vmTrace=[]
+                 , connectionTimeout=60
+                 , maxReturnedHeaders=1000
+                 , _blockstanbulPeerAddr=Nothing
                  })
 
 testPeer :: DataPeer.PPeer
@@ -96,23 +99,32 @@ spec = do
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer . const $ do
-        runConduit $ yield (MsgEvt Ping) .| handleEvents Log testPeer .| sinkList `L.shouldReturn` [Pong]
+        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Pong]
     it "should return empty BlockBodies to empty BlockHeaders" $
       runTestPeer . const $ do
-        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents Log testPeer .| sinkList
+        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
           `L.shouldReturn` [GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ \wm ->
       runTestPeer $ \ch -> do
+        let addr = blockstanbulSender wm
+        -- Without "proof" of which peer this is, assume it could be addr
+        shouldSendToPeer addr `L.shouldReturn` True
+        shouldSendToPeer 0xa `L.shouldReturn` True
         runConduit $ yield (MsgEvt (Blockstanbul wm))
-                           .| handleEvents Log testPeer
+                           .| handleEvents testPeer
                            .| sinkList
            `L.shouldReturn` []
         atomically (closeTMChan ch >> readTMChan ch) `L.shouldReturn` Just ([IEBlockstanbul wm])
         atomically (readTMChan ch) `L.shouldReturn` Nothing
+        -- Now that the peer is known to be addr, we should only send if they are designated
+        shouldSendToPeer addr `L.shouldReturn` True
+        shouldSendToPeer 0xa `L.shouldReturn` False
 
     it "should broadcast blockstanbul messages" $ property $ \wm ->
-      runTestPeer . const $
+      runTestPeer . const $ do
         runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
-                      .| handleEvents Log testPeer
+                      .| handleEvents testPeer
                       .| sinkList
             `L.shouldReturn` [Blockstanbul wm]
+        -- We should not mistake internal messages as the peers
+        shouldSendToPeer 0xa `L.shouldReturn` True

@@ -23,7 +23,7 @@ import           Data.Map.Strict                    (Map)
 import qualified Data.Map.Strict                    as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
-import           Generic.Random.Generic
+import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -39,15 +39,12 @@ import           BlockApps.Strato.TypeLits
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
   { chaininputSrc      :: Text
+  , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
   , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   } deriving (Eq, Show, Generic)
-
-instance KnownSymbol "address" where
-instance KnownSymbol "balance" where
-instance KnownSymbol "enode" where
 
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -60,13 +57,13 @@ instance ToSchema (NamedTuple "address" Address "enode" Text) where
     & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)) :: NamedTuple "address" Address "enode" Text)
 
 instance Arbitrary ChainInput where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON ChainInput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToJSON ChainInput where
-  toJSON = genericToJSON (aesonPrefix camelCase) 
+  toJSON = genericToJSON (aesonPrefix camelCase)
 
 exampleSrc :: Text
 exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
@@ -80,6 +77,7 @@ exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 exChainInput :: ChainInput
 exChainInput = ChainInput
     { chaininputSrc = exampleSrc
+    , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map fromTuple [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
@@ -114,7 +112,7 @@ data ChainOutput = ChainOutput
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainOutput where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON ChainOutput where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
@@ -145,14 +143,12 @@ instance ToSchema ChainOutput where
 
 
 type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
-instance KnownSymbol "id" where
-instance KnownSymbol "info" where
 
-exChainIdChainOutput :: ChainIdChainOutput 
+exChainIdChainOutput :: ChainIdChainOutput
 exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 instance ToSample ChainIdChainOutput where
-  toSamples _ = singleSample exChainIdChainOutput 
+  toSamples _ = singleSample exChainIdChainOutput
 
 instance ToSchema ChainIdChainOutput where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy

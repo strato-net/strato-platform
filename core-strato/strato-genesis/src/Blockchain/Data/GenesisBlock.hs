@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
 module Blockchain.Data.GenesisBlock (
@@ -18,10 +19,12 @@ import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
+import           Data.Time.Clock.POSIX
 import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
+import qualified Blockchain.Data.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
@@ -29,21 +32,21 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.EthConf                   (runKafkaConfigured)
 import           Blockchain.Format
 import           Blockchain.SHA
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs)
+import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, filterResponse)
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
@@ -197,46 +200,45 @@ initializeChainDBs :: ( MonadResource m
                       , HasStorageDB m
                       )
                    => Ext.Word256
+                   -> ChainInfo
                    -> StateRoot
                    -> m ()
-initializeChainDBs chainId sRoot = emitInitialStateDiff [] (SHA 0) (Just chainId) sRoot
-
-emitInitialStateDiff :: ( MonadResource m
-                        , HasCodeDB m
-                        , HasHashDB m
-                        , Mem.HasMemAddressStateDB m
-                        , RBDB.HasRedisBlockDB m
-                        , HasSQLDB m
-                        , HasStateDB m
-                        , HasStorageDB m
-                        )
-                     => [(AccountInfo, CodeInfo)]
-                     -> SHA
-                     -> Maybe Ext.Word256
-                     -> StateRoot
-                     -> m ()
-emitInitialStateDiff srcInfo bHash chainId sRoot = do
+initializeChainDBs chainId ChainInfo{..} sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
-      StateDiff.chainId   = chainId,
+      StateDiff.chainId   = Just chainId,
       blockNumber         = 0,
-      StateDiff.blockHash = bHash,
+      StateDiff.blockHash = SHA 0,
       StateDiff.stateRoot = sRoot,
       createdAccounts     = accountDiffs,
       deletedAccounts     = Map.empty,
       updatedAccounts     = Map.empty
   }
-  commitSqlDiffs diff (const "") (const "")
-  let writeSource (account, CodeInfo _ src name) = case account of
-          NonContract _ _ -> return ()
-          ContractNoStorage addr _ _ -> updateSource chainId addr name src
-          ContractWithStorage addr _ _ _ -> updateSource chainId addr name src
-
-  forM_ srcInfo writeSource
-  mErr <- liftIO . runKafkaConfigured "strato-init" $ do
-    splitWriteStateDiffs [diff]
+  commitSqlDiffs diff
+  let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
+        let cHash = hash $ codeInfoCode ci
+            md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
+         in (cHash, md)
+      getMetadata = flip Map.lookup metadatas
+      toAction a d = A.Action
+        { A.actionType = A.Create
+        , A.actionBlockHash = SHA 0
+        , A.actionBlockTimestamp = posixSecondsToUTCTime 0
+        , A.actionBlockNumber = 0
+        , A.actionTxHash = SHA chainId
+        , A.actionTxChainId = Just chainId
+        , A.actionTxSender = Ad.Address 0
+        , A.actionAddress = a
+        , A.actionCodeHash = codeHash d
+        , A.actionStorage = Just . Map.map fromDiff $ storage d
+        , A.actionMetadata = getMetadata (codeHash d)
+        }
+      fromDiff (Value v) = v
+      squashMap f = map (uncurry f) . Map.toList
+      actions = squashMap toAction accountDiffs
+  mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
   case filterResponse <$> mErr of
-     Right [] -> return ()
-     Right errs -> error . show $ errs
-     Left err -> error . show $ err
+    Right [] -> return ()
+    Right errs -> error . show $ errs
+    Left err -> error . show $ err

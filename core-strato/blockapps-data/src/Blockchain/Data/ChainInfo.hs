@@ -39,8 +39,8 @@ import qualified GHC.Generics                         as GHCG
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
-  , codeInfoSource :: String --TODO(dustin): Text
-  , codeInfoName   :: String --TODO(dustin): Text
+  , codeInfoSource :: T.Text
+  , codeInfoName   :: T.Text
   } deriving (Show, Read, Eq, GHCG.Generic)
 
 instance FromJSON CodeInfo where
@@ -68,8 +68,8 @@ instance ToJSON CodeInfo where
 
 instance RLPSerializable CodeInfo where
   rlpEncode (CodeInfo a b c) =
-    RLPArray [rlpEncode a, rlpEncode . encodeUtf8 $ T.pack b, rlpEncode . encodeUtf8 $ T.pack c]
-  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (T.unpack . decodeUtf8 $ rlpDecode b) (T.unpack . decodeUtf8 $ rlpDecode c)
+    RLPArray [rlpEncode a, rlpEncode $ encodeUtf8 b, rlpEncode $ encodeUtf8 c]
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (decodeUtf8 $ rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
 data AccountInfo = NonContract Address Integer

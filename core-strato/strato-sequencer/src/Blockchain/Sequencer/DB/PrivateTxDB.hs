@@ -1,12 +1,15 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.PrivateTxDB where
 
 import           Blockchain.Data.RLP
 import           Blockchain.SHA
+import           Control.Monad.IO.Class
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
+import           Prometheus
 
 import           Blockchain.Sequencer.DB.ChainHashDB
+import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
@@ -27,12 +30,12 @@ insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m (SHA, SHA)
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
+    liftIO $ withLabel txMetrics "private_hash" incCounter
     let r = txSigR tx
         s = txSigS tx
         h = txHash tx
         rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
         sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-    insertTransaction tx
     insertChainHash rs chainId
     insertChainHash sr chainId
     chainHash <- getChainHash chainId

@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.Event where
 
+import           Control.DeepSeq
 import           Data.Binary
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
@@ -28,12 +29,19 @@ import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
+import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
 
 import           Blockchain.Sequencer.DB.Witnessable
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+
+data SeqLoopEvent = TimerFire PBFT.RoundNumber
+                  | VoteMade PBFT.CandidateReceived
+                  | UnseqEvent IngestEvent
+                  | WaitTerminated
+                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
@@ -99,6 +107,9 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEGetTx [SHA]
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
+                 -- Ask and push for inclusive ranges of blocks
+                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
+                 | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -114,6 +125,7 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otSigner :: A.Address
                          , otBaseTx :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic)
+instance NFData OutputTx
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
@@ -156,6 +168,13 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              , obReceiptTransactions = sbReceiptTransactions sb
                                                              , obBlockUncles         = sbBlockUncles sb
                                                              }
+
+sequencedBlockToBlock :: SequencedBlock -> Block
+sequencedBlockToBlock sb = BDB.Block
+                         { BDB.blockBlockData = sbBlockData sb
+                         , BDB.blockReceiptTransactions = map otBaseTx $ sbReceiptTransactions sb
+                         , BDB.blockBlockUncles = sbBlockUncles sb
+                         }
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
@@ -282,7 +301,7 @@ instance Binary JsonRpcCommand where
             x -> error $ "unknown JsonRpcCommand tag " ++ show x
 
 instance Binary OutputEvent where
-    -- put (OETx t) = putWord8 0 >> put t -- old OETx without timestamp
+    -- Reserved tags: 0, 9, 10
     put (OETx ts t)          = putWord8 3 >> put ts >> put t
     put (OEBlock b)          = putWord8 1 >> put b
     put (OEJsonRpcCommand c) = putWord8 2 >> put c
@@ -291,6 +310,8 @@ instance Binary OutputEvent where
     put (OEGetTx tx)         = putWord8 6 >> put tx
     put (OEBlockstanbul m)   = putWord8 7 >> put m
     put (OECreateBlockCommand) = putWord8 8
+    put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
+    put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
     get = do
         tag <- getWord8
         case tag of
@@ -302,7 +323,11 @@ instance Binary OutputEvent where
             5 -> OEGetChain <$> get
             6 -> OEGetTx <$> get
             7 -> OEBlockstanbul <$> get
-            8 -> return OECreateBlockCommand
+            8 -> pure OECreateBlockCommand
+            9 -> OEAskForBlocks <$> get <*> get <*> pure 0x0 -- legacy OEAFB
+            10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
+            11 -> OEAskForBlocks <$> get <*> get <*> get
+            12 -> OEPushBlocks <$> get <*> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where
@@ -372,6 +397,7 @@ instance TransactionLike OutputTx where
     txCode        = txCode . otBaseTx
     txData        = txData . otBaseTx
     txChainId     = txChainId . otBaseTx
+    txMetadata    = txMetadata . otBaseTx
 
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t

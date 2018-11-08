@@ -53,8 +53,6 @@ AddressStateRef
     codeHash SHA
     chainId Word256 Maybe
     latestBlockDataRefNumber Integer
-    source String
-    contractName String
     deriving Eq Read Show
 
 RawTransaction
@@ -70,6 +68,7 @@ RawTransaction
     r Integer
     s Integer
     v Word8
+    metadata [TextPair] Maybe
     blockNumber Int
     txHash SHA
     origin TXOrigin
@@ -97,7 +96,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    miningStatus MiningStatus
     chainId Word256 Maybe
     deriving Eq Read Show Generic
 

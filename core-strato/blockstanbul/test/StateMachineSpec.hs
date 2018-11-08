@@ -15,10 +15,12 @@ import Control.Monad hiding (sequence)
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.State
+import Crypto.Random.Entropy
 import qualified Data.ByteString as BS
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
@@ -35,7 +37,10 @@ testContext :: BlockstanbulContext
 testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
-runTest = runNoLoggingT . flip evalStateT testContext . (disableAuth >>)
+runTest = runAuthTest . (disableAuth >>)
+
+runAuthTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
+runAuthTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
@@ -48,7 +53,7 @@ setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
 setupRound blk' as = do
   let blk = truncateExtra blk'
   proposal .= Just blk
-  validators .= as
+  validators .= S.fromList as
   v <- use view
   let di = blockHash blk
   return (v, di)
@@ -64,19 +69,19 @@ spec = parallel $ do
         got <- sendMessages [Timeout 20, CommitResult (Left  "invalid hash")]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
 
-    it "ignores stale timeouts" $ do
-      runTest $ do
-        sendMessages [Timeout 10] `shouldReturn` []
+    it "ignores stale timeouts" .  runTest $
+      sendMessages [Timeout 10] `shouldReturn` []
     it "sets the pending round after a timeout" $ property $ \a1 a2 ->
       runTest $ do
-      validators .= [a1, a2]
+      validators .= S.fromList [a1, a2]
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk' blk2' as' seal ->
+    it "can handle several rounds in succession" $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
         let as = sortOn sender as'
-        let (blk, blk2) = over both (addProposerSeal seal . truncateExtra) (blk', blk2')
+        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra) (blk'', blk2'')
+            blk = setBlockNo 19 blk'
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
@@ -93,13 +98,15 @@ spec = parallel $ do
         length xsp `shouldBe` 1
         xsp `shouldBe` [ToCommit blk]
         -- Pretend that in this interval, the block was committed
-        sendMessages [CommitResult (Right ())] `shouldReturn` []
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
         v2 <- use view
         v2 `shouldBe` over sequence (+1) v
-        -- TODO(tim): blk2 should probably have blk as a parent
+        let blk2 = blk2'{blockBlockData = (blockBlockData blk2'){
+                          blockDataNumber = 20,
+                          blockDataParentHash = hsh}}
         let hsh2 = blockHash blk2
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
         map oMessage omsgs3 `shouldMatchList`
@@ -134,16 +141,16 @@ spec = parallel $ do
         void $ sendMessages $ [IMsg ppr $ Preprepare v blk]
                            ++ [IMsg a $ Prepare v hsh | a <- as]
                            ++ [IMsg a $ Commit v hsh seal | a <- as]
-                           ++ [CommitResult (Right ())]
+                           ++ [CommitResult (Right (blockHash blk))]
         use view `shouldReturn` over sequence (+1) v
         use proposal `shouldReturn` Nothing
 
   describe "A preprepare message" $ do
     it "sets the current proposal in response a preprepare message" $ property $ \auth blk' ->
       runTest $ do
-        let blk = truncateExtra blk'
+        let blk = truncateExtra . setBlockNo 19 $ blk'
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         pk <- use prvkey
         pseal <- proposerSeal blk pk
         let sealedBlk = addProposerSeal pseal blk
@@ -157,7 +164,7 @@ spec = parallel $ do
       runTest $ do
         productionAuth .= True
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -165,7 +172,7 @@ spec = parallel $ do
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
       runTest $ do
         proposer .= addr
-        validators .= [sender auth, addr]
+        validators .= S.fromList [sender auth, addr]
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -173,7 +180,7 @@ spec = parallel $ do
     it "rejects a preprepare from a non-validator" $ property $ \auth blk ->
       runTest $ do
         proposer .= sender auth
-        validators .= []
+        validators .= S.empty
         curView <- use view
         sendMessages [IMsg auth $ Preprepare curView blk] `shouldReturn` []
         use proposal `shouldReturn` Nothing
@@ -181,10 +188,31 @@ spec = parallel $ do
     it "round-changes an old preprepare" $ property $ \auth blk ->
       runTest $ do
         proposer .= sender auth
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         got <- sendMessages [IMsg auth $ Preprepare curView{_round = 3} blk]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21]
+
+    it "round-changes and finds a gap from a future preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= sender auth
+        validators .= S.fromList [sender auth]
+        got <- sendMessages [IMsg auth $ Preprepare (View 347 400000) blk]
+        let omsgs = [o | o@(OMsg _ _) <- got]
+            other = got \\ omsgs
+        map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
+        other `shouldMatchList` [GapFound 18 400000 (sender auth)]
+
+    it "round-changes and announces a lead from a past preprepare" $ property $ \auth blk ->
+      runTest $ do
+        proposer .= sender auth
+        validators .= S.fromList [sender auth]
+        got <- sendMessages [IMsg auth $ Preprepare (View 347 2) blk]
+        let omsgs = [o | o@OMsg{} <- got]
+            other = got \\ omsgs
+        map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
+        other `shouldMatchList` [LeadFound 18 2 (sender auth)]
+
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->
@@ -200,7 +228,7 @@ spec = parallel $ do
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "does not send a commit without a proposal" $ property $ \auth di ->
       runTest $ do
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
@@ -227,8 +255,8 @@ spec = parallel $ do
   describe "A commit message" $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
       runTest $ do
-        let blk = addProposerSeal seal . addValidators [sender auth] $ blk'
-        validators .= [sender auth]
+        let blk = addProposerSeal seal . addValidators (S.fromList [sender auth]) $ blk'
+        validators .= S.fromList [sender auth]
         proposal .= Just blk
         curView <- use view
         let di = blockHash blk
@@ -250,7 +278,7 @@ spec = parallel $ do
         use view `shouldReturn` curView
     it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
-        validators .= [sender auth]
+        validators .= S.fromList [sender auth]
         curView <- use view
         sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
@@ -277,7 +305,7 @@ spec = parallel $ do
         curView <- use view
         let di = blockHash blk
         let count =  2 * length as `div` 3
-            (front, back) = splitAt count as
+            (front, back) = splitAt count . S.toList $ as
             toCommit a = IMsg (MsgAuth a sig) $ Commit curView di seal
             earlyCommits = map toCommit front
             tippingPoint = map toCommit . take 1 $ back
@@ -291,7 +319,7 @@ spec = parallel $ do
           let got = cookRawExtra . L.view extraLens $ b
           _vanity got `shouldBe` (BS.take 32 . L.view extraLens $ blk)
           let Just ist = _istanbul got
-          _validatorList ist `shouldBe` sort as
+          _validatorList ist `shouldBe` S.toList as
           _proposedSig ist `shouldBe` Just seal
           _commitment ist `shouldSatisfy` (== count+1) . length
           finalHash b `shouldBe` di
@@ -327,15 +355,41 @@ spec = parallel $ do
         sendMessages [IMsg a $ RoundChange next] `shouldReturn` []
         use view `shouldReturn` next
 
-  describe "A new block message" $ do
+  describe "An UnannouncedBlock message" $ do
+    let selfElected = do
+          me <- selfAddr
+          proposer .= me
+          validators .= S.singleton me
+
+    it "requires a matching block number" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32) . setBlockNo 17 $ blk'
+        selfElected
+        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
+
+    it "requires a matching hash if known" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk'
+        selfElected
+        lastParent .= Just (SHA 0x999992)
+        sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
+
+    it "accepts a block if the parent hash matches" $ property $ \blk' ->
+      runTest $ do
+        let blk = over extraLens (BS.take 32)
+                    blk'{blockBlockData = (blockBlockData blk'){
+                      blockDataNumber = 19,
+                      blockDataParentHash = SHA 0x999992}}
+        selfElected
+        lastParent .= Just (SHA 0x999992)
+        sendMessages [UnannouncedBlock blk] `shouldNotReturn` [MakeBlockCommand]
+
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32) blk''
-        me <- selfAddr
-        validators .= [me]
-        proposer .= me
+        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk''
+        selfElected
         v <- use view
-        omsgs <- sendMessages [NewBlock blk]
+        omsgs <- sendMessages [UnannouncedBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         v' `shouldBe` v
         let initData = L.view extraLens blk
@@ -344,19 +398,21 @@ spec = parallel $ do
         let parsedExtra = cookRawExtra . L.view extraLens $ blk'
         L.view vanity parsedExtra `shouldBe` initData
         let Just ist = _istanbul parsedExtra
+        me <- selfAddr
         L.view validatorList ist `shouldBe` [me]
         L.view commitment ist `shouldBe` []
         L.view proposedSig ist `shouldSatisfy`
           (== Just me) . (>>= verifyProposerSeal blk')
 
   describe "Block locks" $ do
-    it "takes priority over NewBlocks" $ property $ \lock blk ->
+    it "takes priority over UnannouncedBlocks" $ property $ \lock' blk ->
       runTest $ do
+        let lock = setBlockNo 19 lock'
         me <- selfAddr
-        validators .= [me]
+        validators .= S.singleton me
         proposer .= me
         blockLock .= Just lock
-        omsgs <- sendMessages [NewBlock blk]
+        omsgs <- sendMessages [UnannouncedBlock blk]
         let [Preprepare v' blk'] = map oMessage omsgs
         blk' `shouldBe` lock
         v <- use view
@@ -364,7 +420,7 @@ spec = parallel $ do
 
     it "round changes a preprepare that doesn't match the lock" $ property $ \lock blk a ->
       runTest $ do
-        validators .= [sender a]
+        validators .= S.fromList [sender a]
         proposer .= sender a
         blockLock .= Just lock
         v <- use view
@@ -375,14 +431,15 @@ spec = parallel $ do
     it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
       runTest $ do
         me <- selfAddr
-        validators .= me:as
+        validators .= S.fromList (me:as)
         blockLock .= Just blk
         _ <- sendMessages [CommitResult (Left "oops")]
         use blockLock `shouldReturn` Nothing
 
         blockLock .= Just blk
-        _ <- sendMessages [CommitResult (Right ())]
+        _ <- sendMessages [CommitResult (Right (blockHash blk))]
         use blockLock `shouldReturn` Nothing
+        use lastParent `shouldReturn` Just (blockHash blk)
 
     it "Sets a lock after prepare consensus is reached" $ property $ \auth blk ->
       runTest $ do
@@ -392,33 +449,61 @@ spec = parallel $ do
 
     let setBlock blk = do
           me <- selfAddr
-          validators .= [me]
+          validators .= S.singleton me
           proposal .= Just blk
           blockLock .= Just blk
 
     it "requests a new block after success" $ property $ \blk ->
       runTest $ do
         setBlock blk
-        sendMessages [CommitResult (Right ())] `shouldReturn` [MakeBlockCommand]
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` [MakeBlockCommand]
 
     it "re-issues the lock after round change" $ property $ \blk sig ->
       runTest $ do
         setBlock blk
         me <- selfAddr
-        next <- uses view (over round (+1))
-        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
+        roundPlus1 <- uses view (over round (+1))
+        let roundAndSequencePlus1 = over sequence (+1) roundPlus1
+        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange roundAndSequencePlus1]
         let omsgs = [o | o@(OMsg _ _) <- resp]
             other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange next, Preprepare next blk]
-        other `shouldBe` [ResetTimer $ _round next]
+        map oMessage omsgs `shouldBe` [RoundChange roundAndSequencePlus1,
+                                       Preprepare roundPlus1 blk]
+        other `shouldBe` [ResetTimer $ _round roundPlus1]
 
-    it "clears the lock after a future round change" $ property $ \blk sig ->
-      runTest $ do
-        setBlock blk
-        me <- selfAddr
-        next <- uses view (over round (+1) . over sequence (+1))
-        resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange next]
-        let omsgs = [o | o@(OMsg _ _) <- resp]
-            other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange next]
-        other `shouldMatchList` [ResetTimer $ _round next, MakeBlockCommand]
+    describe "Authentication" $ do
+      let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
+                     -> StateT BlockstanbulContext (NoLoggingT IO) (Block, [OutEvent])
+          resendLock blk theirPK pk = do
+            v <- use view
+            me <- selfAddr
+            let them = prvKey2Address theirPK
+                vals = S.fromList [me, them]
+                blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
+            validators .= vals
+            proposer .= me
+            pSeal <- proposerSeal blk' pk
+            let lockBlk = addProposerSeal pSeal blk'
+            myKey <- use prvkey
+            OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+
+            lockSender .= Just them
+            blockLock .= Just lockBlk
+            omsgs <- sendMessages [IMsg auth wm]
+
+            return (lockBlk, omsgs)
+
+      it "accepts a block if the signer is the original sender" $ property $ \blk ->
+        runAuthTest $ do
+          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+          v <- use view
+          (lockBlk, omsgs) <- resendLock blk theirPK theirPK
+          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+      it "accepts a block if the signer is not the original sender" $ property $ \blk ->
+        runAuthTest $ do
+          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+          v <- use view
+          myKey <- use prvkey
+          (lockBlk, omsgs) <- resendLock blk theirPK myKey
+          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]

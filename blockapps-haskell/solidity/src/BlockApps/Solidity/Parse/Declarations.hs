@@ -26,12 +26,12 @@ import qualified BlockApps.Solidity.Xabi.Def          as Xabi
 import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
-
-
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  reserved "contract" <|> reserved "library"
+  kind <- (reserved "contract" >> return Xabi.ContractKind)
+        <|> (reserved "interface" >> return Xabi.InterfaceKind)
+        <|> (reserved "library" >> return Xabi.LibraryKind)
   contractName' <- identifier
   setContractName contractName'
   baseConstrs <- option [] $ do
@@ -46,6 +46,7 @@ solidityContract = do
   let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
+  let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -60,6 +61,8 @@ solidityContract = do
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
+             , xabiKind = kind
+             , xabiUsing = Map.fromList using
            },
         map (Text.pack . fst) baseConstrs
       )
@@ -141,26 +144,16 @@ enumDeclaration = do
         }
     )
 
--- | Erroneous; will be removed
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
   reserved "using"
   usingContract' <- identifier
-  reserved "for"
-  string usingContract'
-  dot
---  usingName <- identifier
-  _ <- identifier
+  rest <- many1 (noneOf ";")
   semi
   return
     (
-      undefined,
-      UsingDeclaration Xabi.Using{}
-
---      TypeDef{
---        typeName = usingContract' ++ "." ++ usingName,
---        typeDecl = Using { usingContract = usingContract', usingType = usingName }
---        }
+      usingContract',
+      UsingDeclaration (Xabi.Using rest)
     )
 
 {- Variables -}

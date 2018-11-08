@@ -2,7 +2,6 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
-import qualified Data.Map as Map
 import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
@@ -200,23 +199,33 @@ spec = do
       struct' `shouldBe` struct
 
   describe "Declarations - solidityContract" $ do
-    let xempty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+    let xempty = xabiEmpty
+    let parseContract = runParser solidityContract "" ""
     let nameOf (NamedXabi n _) = n
         nameOf _ = error "unexpected pragma"
     it "should parse an empty contract" $ do
       let contractString = "contract a {}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
+    it "should parse an empty library" $ do
+      parseContract "library l {}" `shouldBe`
+          Right (NamedXabi "l" (xempty{xabiKind=LibraryKind}, []))
+    it "should try 2" $ do
+      parseContract "library Library {}" `shouldBe`
+          Right (NamedXabi "Library" (xempty{xabiKind=LibraryKind}, []))
+    it "should parse an empty interface" $ do
+      parseContract "interface I {}" `shouldBe`
+          Right (NamedXabi "I" (xempty{xabiKind=InterfaceKind}, []))
     it "should parse a basic contract" $ do
       let contractString = "\
             \contract q {\
             \    function r() {}\
             \}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       (nameOf <$> eRes) `shouldBe` Right "q"
     it "should parse a commented contract" $ do
       let contractString = "contract b { // don't dead open inside \n}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "b" (xempty, []))
     it "should parse nested a nested comments contract" $ do
       let contractString = "contract c { \
@@ -224,7 +233,7 @@ spec = do
                            \  function hidden () { \
                            \  // bam! double comment \
                            \ */ }"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "c" (xempty, []))
     it "should parse unbalanced braces inside a string" $ do
       let contractString = "contract d { \
@@ -241,7 +250,7 @@ spec = do
                            \    return \"(\"; \
                            \  } \
                            \}"
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       nameOf <$> eRes `shouldBe` Right "e"
 
     it "should parse unbalanced strings inside a comment" $ do
@@ -250,7 +259,7 @@ spec = do
                                     "    return // \"  ",
                                     "  } ",
                                     "}"]
-          eRes = runParser solidityContract "" "" contractString
+          eRes = parseContract contractString
       nameOf<$> eRes `shouldBe` Right "f"
 
   let isLeft (Right _) = False
@@ -339,6 +348,22 @@ spec = do
       parseVarName "uint constant start = 0xfff;" `shouldBe` Right "start"
     it "should parse initialized public public constants" $
       parseVarName "uint public public constant nothing = 0x0;" `shouldBe` Right "nothing"
+
+  describe "Declarations - usingDeclaration" $ do
+    let parseUsing = runParser usingDeclaration "" ""
+    it "should parse a basic using" $
+      parseUsing "using SafeMath for uint256;" `shouldBe` Right ("SafeMath", UsingDeclaration (Using "for uint256"))
+    it "should fail without the keyword" $
+      parseUsing "unsign SafeMath for uint256;" `shouldSatisfy` isLeft
+    it "should fail without an identifier" $
+      parseUsing "using 888 for uint256;" `shouldSatisfy` isLeft
+    it "should fail without *some* text after the identifier" $
+      parseUsing "using name;" `shouldSatisfy` isLeft
+    it "should require a trailing semicolon" $
+      parseUsing "using name for type" `shouldSatisfy` isLeft
+    it "should not try to detect what is valid" $
+      parseUsing "using name 105927)&(^!#$;" `shouldBe` Right ("name", UsingDeclaration (Using "105927)&(^!#$"))
+
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg

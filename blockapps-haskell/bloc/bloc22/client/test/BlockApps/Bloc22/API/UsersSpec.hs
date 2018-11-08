@@ -60,7 +60,7 @@ spec = do
       let
         Right result1 = postUsersFillEither1
         Right result2 = postUsersFillEither2
-      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) True) (ClientEnv mgr blocUrl)
+      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) Nothing True) (ClientEnv mgr blocUrl)
       eResult1 `shouldSatisfy` isRight
       let
         Right resolved1 = eResult1
@@ -73,19 +73,19 @@ spec = do
   describe "postUsersSend" $ do
     it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParams
-        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" txParams
-      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParams Nothing
+        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" testTxParams Nothing
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress Nothing False postSendParameters) (ClientEnv mgr blocUrl)
       let
         Send postTransaction = fromJust $ blocTransactionData result
       postTransaction `shouldSatisfy` (== Strung 100) . posttransactionValue
-      resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParametersBad) (ClientEnv mgr blocUrl)
+      resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress Nothing False postSendParametersBad) (ClientEnv mgr blocUrl)
       resultBad `shouldSatisfy` isLeft
 
     it "should send ethers to another address with low nonce" $ \ testConfig@TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParamsLowNonce
-      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw testTxParamsLowNonce Nothing
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress Nothing False postSendParameters) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Failure) . blocTransactionStatus
       putStrLn $ show result
   describe "postUsersContract" $
@@ -97,10 +97,11 @@ spec = do
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
-          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
+          , postuserscontractrequestMetadata = Nothing
           }
-      Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress False postUsersContractRequest) (ClientEnv mgr blocUrl)
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress Nothing False postUsersContractRequest) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Success) . blocTransactionStatus
       result `shouldSatisfy` isJust . blocTransactionTxResult
       result `shouldSatisfy` isJust . blocTransactionData
@@ -117,8 +118,9 @@ spec = do
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
             , uploadlistcontractArgs = Map.empty
-            , uploadlistcontractTxParams = txParams
+            , uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
+            , uploadlistcontractMetadata = Nothing
             }
           ]
         uploadListRequest = UploadListRequest
@@ -126,7 +128,7 @@ spec = do
           , uploadlistContracts = uploadListContracts
           , uploadlistResolve = False
           }
-      eResults <- runClientM (postUsersUploadList userName userAddress False uploadListRequest) (ClientEnv mgr blocUrl)
+      eResults <- runClientM (postUsersUploadList userName userAddress Nothing False uploadListRequest) (ClientEnv mgr blocUrl)
       eResults `shouldSatisfy` isRight
       let
         Right unresolved = eResults
@@ -143,10 +145,11 @@ spec = do
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = Just $ Strung 0
-          , postuserscontractmethodTxParams = txParams
+          , postuserscontractmethodTxParams = testTxParams
+          , postuserscontractmethodMetadata = Nothing
           }
       Right result <- getResolvedTx testConfig $ runClientM
-        (postUsersContractMethod userName userAddress contractName contractAddress False postUsersContractMethodRequest)
+        (postUsersContractMethod userName userAddress contractName contractAddress Nothing False postUsersContractMethodRequest)
         (ClientEnv mgr blocUrl)
       fromJust (blocTransactionData result) `shouldBe` Call [SolidityValueAsString "0"]
   describe "postUsersSendList" $
@@ -160,11 +163,12 @@ spec = do
               SendTransaction
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
-              , sendtransactionTxParams = txParams
+              , sendtransactionTxParams = testTxParams
+              , sendtransactionMetadata = Nothing
               }
           }
       eResults <- runClientM
-        (postUsersSendList userName userAddress False postSendListRequest)
+        (postUsersSendList userName userAddress Nothing False postSendListRequest)
         (ClientEnv mgr blocUrl)
       eResults `shouldSatisfy` isRight
       let
@@ -185,11 +189,12 @@ spec = do
               , methodcallMethodName = "get"
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
-              , methodcallTxParams = txParams
+              , methodcallTxParams = testTxParams
+              , methodcallMetadata = Nothing
               }
           }
       eResults <- runClientM
-        (postUsersContractMethodList userName userAddress False postMethodListRequest)
+        (postUsersContractMethodList userName userAddress Nothing False postMethodListRequest)
         (ClientEnv mgr blocUrl)
       eResults `shouldSatisfy` isRight
       let

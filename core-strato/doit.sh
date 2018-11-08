@@ -30,17 +30,27 @@ function newnode {
       runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
   fi
 
-  if $serveBlocks
-  then echo "Starting strato-p2p-server"
-       runBackgroundProcess strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
-       echo "Starting ethereum-discover"
-       runBackgroundProcess ethereum-discover >> logs/ethereum-discover 2>&1
-  fi
+  echo "Starting ethereum-discover"
+  runBackgroundProcess ethereum-discover &>> logs/ethereum-discover
 
-  if $receiveBlocks
-  then echo "Starting strato-p2p-client"
-       runBackgroundProcess strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
+  actualTimeout="${connectionTimeout:-300}"
+  if [ -n "${blockstanbulRoundPeriodS}" ]; then
+    withCushion=$(( 2 * blockstanbulRoundPeriodS ))
+    actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
   fi
+  if [ -n "${validators}" ]; then
+    numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
+    maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
+  fi
+  echo "Starting strato-p2p"
+  runBackgroundProcess strato-p2p \
+     --connectionTimeout=$actualTimeout \
+     --sqlPeers=true \
+     --debugFail=${debugFail:-true}  \
+     --maxConn=$maxConn \
+     --maxReturnedHeaders=$maxReturnedHeaders \
+     --networkID=$networkID \
+     &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -64,7 +74,15 @@ function newnode {
   if [ -n "${validators}" ]; then
     vsFlag="--validators=${validators}"
   fi
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" --minLogLevel=$seqMinLogLevel &> logs/strato-sequencer
+  if [ -n "${seqMaxEventsPerIter}" ]; then
+    evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
+  fi
+  if [ -n "${seqMaxUsPerIter}" ]; then
+    usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
+  fi
+  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
+    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -132,17 +150,13 @@ function cleanupDB {
 }
 
 function doInit {
-  cp -r /var/lib/node_modules /var/lib/strato/.
-  cp  /var/lib/mkCoinbase  /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
-                    --statsEnable=$statsEnable --statsHost=$statsHost --statsPort=$statsPort \
-                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix'"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then
@@ -160,10 +174,8 @@ function doInit {
 
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
-  cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
-
   echo "Creating a random coinbase"
-  ./mkCoinbase
+  mkCoinbase
 }
 
 # Find all logs greater than 10M, then copy and truncate
@@ -214,13 +226,12 @@ setEnv maxTxsPerBlock 500
 setEnv networkID 6
 setEnv genesisBlock ""
 setEnv bootnode ""
+setEnv maxReturnedHeaders 1000
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
 setEnv instantMining true
 setEnv lazyBlocks true
-setEnv serveBlocks true
-setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv numMinPeers 0
 setEnv useSyncMode false
@@ -232,13 +243,6 @@ setEnv sqlDiff true
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
-
-setEnv statsEnable false
-setEnv statsHost telegraf
-setEnv statsPort 8125
-setEnv statsFlush 1000
-setEnv statsPrefix ""
-setEnv statsSuffix ""
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

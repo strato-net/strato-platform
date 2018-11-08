@@ -69,8 +69,8 @@ getContractsState
   -> MaybeNamed Address 
   -> Maybe ChainId
   -> Maybe Text 
-  -> Maybe Int
-  -> Maybe Int
+  -> Maybe Integer
+  -> Maybe Integer
   -> Bool
   -> ClientM (Map Text SolidityValue)
 getContractsState = client (Proxy @ GetContractsState)

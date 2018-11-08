@@ -1,25 +1,29 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Authentication
   ( module Blockchain.Blockstanbul.Authentication
   , module Blockchain.Blockstanbul.Model.Authentication
   ) where
 
-import Control.Monad (liftM2, liftM3)
+import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
-import qualified Data.ByteString as B
-import Data.ByteString.Lazy
-import Data.List (sort)
 import Data.Binary
+import Data.List (intercalate)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
 import MonadUtils (liftIO1)
 import Test.QuickCheck
+import Text.Printf
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.Address
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB()
+import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
@@ -39,10 +43,10 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens $ B.take 32
 
-addValidators :: [Address] -> Block -> Block
+addValidators :: S.Set Address -> Block -> Block
 addValidators vs = over extraLens $
     uncookRawExtra
-  . set istanbul (Just (IstanbulExtra (sort vs) Nothing []))
+  . set istanbul (Just (IstanbulExtra (S.toList vs) Nothing []))
   . cookRawExtra
 
 getValidatorList :: Block -> [Address]
@@ -115,13 +119,13 @@ finalHash = hash
 
 signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool) -> m ExtendedSignature
 signBenfInfo pk bnf =
-  let msg = unSHA . hash . toStrict $ encode (bnf)
+  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
   in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
-  let msg = unSHA . hash . toStrict $ encode (bnf)
+  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
 signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
@@ -138,3 +142,34 @@ authenticate (IMsg (MsgAuth addr sig) tm) =
       mAddress = pubKey2Address <$> mKey
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
+
+replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String Word256
+replayHistoricBlock realValidators seqNo blk = do
+  -- TODO(tim): This needs to be fixed for validator voting, as the current list
+  -- may have diverged from the validators at the time of commit
+  let ExtraData{..} = cookRawExtra . view extraLens $ blk
+  IstanbulExtra{..} <- case _istanbul of
+    Nothing -> Left "no istanbul metadata"
+    Just ist -> Right ist
+  let mProp = verifyProposerSeal blk =<< _proposedSig
+      signers = S.fromList
+              . mapMaybe (verifyCommitmentSeal (blockHash blk))
+              $ _commitment
+      blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
+  unless (seqNo + 1 == blockNo) $
+    Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
+  unless (realValidators == S.fromList _validatorList) $
+    Left "mismatched validators"
+  case mProp of
+    Nothing -> Left "invalid proposer seal"
+    Just prop -> unless (prop `S.member` realValidators) $
+      Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+  unless (signers `S.isSubsetOf` realValidators) $ do
+    let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ realValidators
+    Left $ "unknown signers: " ++ unexplained
+  unless (3 * S.size signers > 2 * S.size realValidators) $
+    Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
+  Right . fromIntegral $ seqNo + 1
+
+isHistoricBlock :: Block -> Bool
+isHistoricBlock = (> 32) . B.length . view extraLens

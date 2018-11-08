@@ -8,7 +8,6 @@
     , TemplateHaskell
     , FlexibleContexts
 #-}
-
 import Data.Default
 import Data.IORef
 import Database.PostgreSQL.Typed
@@ -19,7 +18,7 @@ import System.IO
 import System.Log.Logger
 
 import Slipstream.MessageConsumer
-import Slipstream.Options ()
+import Slipstream.Options()
 import Slipstream.OutputData
 
 
@@ -40,13 +39,12 @@ main = do
   dbInsert conn conAlter
 
   let offset = 0 :: K.Offset
-  let kafkaID = "queryStrato" :: KafkaClientId
+  let kafkaID = "slipstream" :: KafkaClientId
   let state = mkConfiguredKafkaState kafkaID
 
   cachedContractsIORef <- newIORef def
 
-  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset)
-
+  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset 0)
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y

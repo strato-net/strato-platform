@@ -29,38 +29,22 @@ import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPA
 import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
 
 import           Handler.AccountInfo
-import           Handler.AfterSubmission
-import           Handler.ApiDocs
-import           Handler.AppCreate
 import           Handler.BatchTransactionResult
 import           Handler.BlkLast
 import           Handler.BlockInfo
 import           Handler.ChainInfo
 import           Handler.Coinbase
 import           Handler.Common
-import           Handler.Demo
-import           Handler.Developer
 import           Handler.Faucet
-import           Handler.Help
-import           Handler.Home
-import           Handler.Login
 import           Handler.LogInfo
 import           Handler.Peers
-import           Handler.PushTransaction
 import           Handler.QueuedTransactions
-import           Handler.Raml
-import           Handler.RegisterApp
 import           Handler.Stats
 import           Handler.StorageInfo
-import           Handler.Test
-import           Handler.TransactionDemo
 import           Handler.TransactionInfo
 import           Handler.TransactionResult
-import           Handler.Tutorial
 import           Handler.TxLast
 import           Handler.UUIDInfo
-import           Handler.Version
-import           Handler.Wallet
 
 import           Blockchain.EthConf
 
@@ -72,13 +56,11 @@ mkYesodDispatch "App" resourcesApp
 -- migrations handled by Yesod.
 makeFoundation :: AppSettings -> IO App
 makeFoundation appSettings = do
-    -- Some basic initializations: HTTP connection manager, logger, and static
-    -- subsite.
+    -- Some basic initializations: HTTP connection manager and logger
+
     appHttpManager <- newManager
     appLogger <- newStdoutLoggerSet defaultBufSize >>= makeYesodLogger
-    appStatic <-
-        (if appMutableStatic appSettings then staticDevel else static)
-        (appStaticDir appSettings)
+    appFaucetNonce <- initialMaxNonce
 
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a

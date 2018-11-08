@@ -27,7 +27,7 @@ import           BlockApps.Solidity.Xabi
 -- | Routes and Types
 --------------------------------------------------------------------------------
 
-data Greedy a b = One a | Both a b
+data Greedy a b = One a | Both a b deriving (Eq, Show)
 
 instance ToJSON (Greedy (MaybeNamed Address) ChainId) where
   toJSON (One addr) = toJSON addr

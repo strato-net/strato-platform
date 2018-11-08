@@ -6,22 +6,37 @@ module BlockApps.XAbiConverterSpec where
 
 import           Test.Hspec
 import           Data.Aeson
-import qualified Data.ByteString.Lazy as ByteString
---import           Data.List
+import qualified Data.ByteString.Lazy        as ByteString
+import qualified Data.Map.Strict             as M
 import           Data.Maybe
+import qualified BlockApps.Solidity.Struct   as Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Xabi
---import           BlockApps.Solidity.Xabi.Type
 import           BlockApps.XAbiConverter
 
 import Text.RawString.QQ
 
 spec :: Spec
 spec =
-  describe "Xabi" $
+  describe "Xabi" $ do
     it "should convert a first pass xabi to a contract, then to a second pass xabi" $ do
       let firstPass = fromMaybe undefined $ decode firstPassString
           secondPass = fromMaybe undefined $ decode secondPassString::Xabi
       contractToXabi "MyContract" (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass
+    it "should derive the correct size of a struct definition ending with a single-byte type" $ do
+      let tdefs = TypeDefs M.empty M.empty
+          fields = [(("exceptionID"   , SimpleType typeUInt), Nothing)
+                   ,(("exceptionType" , SimpleType typeUInt), Nothing)
+                   ,(("exceptionLevel", SimpleType typeUInt), Nothing)
+                   ,(("stateType"     , SimpleType typeUInt), Nothing)
+                   ,(("state"         , SimpleType typeUInt), Nothing)
+                   ,(("timeoutLength" , SimpleType typeUInt), Nothing)
+                   ,(("minValue"      , SimpleType typeUInt), Nothing)
+                   ,(("maxValue"      , SimpleType typeUInt), Nothing)
+                   ,(("isWarning"     , SimpleType $ TypeBool   ), Nothing)
+                   ]
+      Struct.size (fieldsToStruct tdefs fields) `shouldBe` fromIntegral (32 * length fields)
 
 secondPassString::ByteString.ByteString
 secondPassString =

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA.Model.ExtendedSignature where
 
+import Control.DeepSeq
 import Control.Monad
 import Data.Binary
 import qualified Data.ByteString as B
@@ -29,3 +30,5 @@ instance RLPSerializable ExtendedSignature where
             s = fromIntegral . bytesToWord256 . B.unpack . B.take 32 . B.drop 32 $ bs
             yIsOdd = (==1) . head . B.unpack . B.drop 64 $ bs
   rlpDecode x = error $ "invalid rlp for extendedsignature: " ++ show x
+
+instance NFData ExtendedSignature

@@ -19,6 +19,7 @@ dependencies:
   - base16-bytestring
   - binary
   - bytestring
+  - classy-prelude
   - containers
   - cryptonite
   - deepseq

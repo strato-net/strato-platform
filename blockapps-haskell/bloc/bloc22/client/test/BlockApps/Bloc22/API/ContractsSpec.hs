@@ -41,7 +41,7 @@ spec = do
       Right (GetContractsResponse contracts) <- runClientM getContracts (ClientEnv mgr blocUrl)
       let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
       addressesCreatedAt1 `shouldSatisfy` any
-        (\ (AddressCreatedAt _ addr) -> addr == Unnamed simpleStorageContractAddress)
+        (\ (AddressCreatedAt _ addr Nothing) -> addr == Unnamed simpleStorageContractAddress)
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
       Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl)
@@ -52,6 +52,7 @@ spec = do
         (getContractsContract
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+          Nothing
         )
         (ClientEnv mgr blocUrl)
       contractsEither `shouldSatisfy` isRight
@@ -63,6 +64,7 @@ spec = do
         (getContractsFunctions
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+          Nothing
         )
         (ClientEnv mgr blocUrl)
       mapM_ (\v -> elem v functionNames `shouldBe` True)
@@ -76,6 +78,7 @@ spec = do
         (getContractsSymbols
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+          Nothing
         )
         (ClientEnv mgr blocUrl)
       symbols `shouldBe` [SymbolName "storedData"]
@@ -85,6 +88,7 @@ spec = do
         (getContractsState
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+          Nothing
           Nothing
           Nothing
           Nothing

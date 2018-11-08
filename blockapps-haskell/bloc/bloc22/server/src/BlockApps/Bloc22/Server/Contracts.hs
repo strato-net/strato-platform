@@ -7,15 +7,16 @@
 
 module BlockApps.Bloc22.Server.Contracts where
 
+import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.Reader.Class      (asks)
 import           Data.Foldable
 import           Data.Int
 import           Data.LargeWord                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import           Data.Time.Clock.POSIX
@@ -79,8 +80,8 @@ getContractsState :: ContractName
                   -> MaybeNamed Address
                   -> Maybe ChainId
                   -> Maybe Text
-                  -> Maybe Int
-                  -> Maybe Int
+                  -> Maybe Integer
+                  -> Maybe Integer
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
@@ -94,8 +95,9 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> do
-      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
-      blocQuery1 $ proc () -> do
+      metadataId <- blocQuery1 "getContractsState/metadataid" $
+        getContractsMetaDataId contractName contractId chainId
+      blocQuery1 "getContractsState/instances" $ proc () -> do
         (_,cmId',addr,_,_) <-
           (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
             (queryTable contractsInstanceTable) -< ()
@@ -104,17 +106,23 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
+  fetchLimit <- asks stateFetchLimit
+  let ofs = fromMaybe 0 mOffset
+      cnt = fromMaybe fetchLimit mCount
+
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
-      storageFilterParams{qsAddress = Just address, qsChainId = chainId }
+      storageFilterParams{ qsAddress = Just address
+                         , qsChainId = chainId
+                         }
     Just name ->
       let ranges = decodeStorageKey
                (typeDefs contract')
                (mainStruct contract')
                [name]
                0
-               mOffset
-               mCount
+               ofs
+               cnt
                mLength
       in join <$> mapM (getStorageRange address) ranges
 
@@ -122,11 +130,11 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
 
   ret <- case mName of
     Nothing ->
-      let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+      let vals = decodeValues fetchLimit (typeDefs contract') (mainStruct contract') storage 0
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
     Just name ->
-      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
+      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 ofs cnt mLength [name]
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
 
@@ -154,13 +162,13 @@ getContractsDetails contractAddress chainId = do
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsFunctions" $ getContractsMetaDataId contractName contractId chainId
   funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
   return $ map FunctionName funcs
 
 getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
 getContractsSymbols (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsSymbols" $ getContractsMetaDataId contractName contractId chainId
   vars <- blocQuery $ getXabiVariableNamesQuery metadataId
   return $ map SymbolName vars
 
@@ -168,7 +176,7 @@ getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe Chai
 getContractsEnum (ContractName contractName) contractId (EnumName enumName) chainId =
   blocTransaction $ do
     metadataId <- case contractId of
-      Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+      Named _ -> blocQuery1 "getContractsEnum" $ getContractsMetaDataId contractName contractId chainId
       Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
     map (EnumValue . fst) <$> getEnumValues metadataId enumName
 
@@ -185,11 +193,12 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId chainId
+  metadataId <- blocQuery1 "getContractsStateMapping/metadata" $
+    getContractsMetaDataId contractName contractId chainId
 
   address <- case contractId of
               Unnamed addr -> return addr
-              Named "Latest" -> blocQuery1 $ proc () -> do
+              Named "Latest" -> blocQuery1 "getContractsStateMapping/instances" $ proc () -> do
                 (_,cmId,addr,_,_) <-
                   (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
                     (queryTable contractsInstanceTable) -< ()
@@ -201,9 +210,11 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   storage' <- blocStrato $ getStorage
     storageFilterParams{qsAddress = Just address}
 
+  fetchLimit <- fromInteger <$> asks stateFetchLimit
+
   let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
-      ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
+      ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
@@ -239,7 +250,7 @@ postContractsXabi PostXabiRequest{..} =
          partialXabis <- Map.fromList <$> parseXabi "src" (Text.unpack postxabirequestSrc)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
-        Left msg -> throwError . AnError .
+        Left msg -> throwError . UserError .
             ("contract compilation for xabi failed: " <>) . Text.pack $msg
         Right xs -> return . PostXabiResponse $ xs
 

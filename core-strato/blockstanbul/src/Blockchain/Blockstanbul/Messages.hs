@@ -5,7 +5,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Blockstanbul.Messages where
 
+import Control.DeepSeq
 import Control.Lens
+import Control.Monad.Logger
 import Data.Binary
 import Data.DeriveTH
 import Data.Text
@@ -21,6 +23,7 @@ import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
 import Blockchain.SHA
+import qualified Blockchain.Strato.Model.Colors as CL
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -44,16 +47,33 @@ data TrustedMessage = Preprepare View Block
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic)
 
+data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
+
+categorize :: TrustedMessage -> MessageKind
+categorize = \case
+  Preprepare{} -> PreprepareK
+  Prepare{} -> PrepareK
+  Commit{} -> CommitK
+  RoundChange{} -> RoundChangeK
+
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
 } deriving (Eq, Show, Generic)
 makeLenses ''WireMessage
 
+blockstanbulSender :: WireMessage -> Address
+blockstanbulSender (WireMessage a _) = sender a
+
 instance Binary MsgAuth where
 instance Binary View where
 instance Binary TrustedMessage where
 instance Binary WireMessage where
+
+instance NFData MsgAuth
+instance NFData View
+instance NFData TrustedMessage
+instance NFData WireMessage
 
 derive makeArbitrary ''MsgAuth
 derive makeArbitrary ''View
@@ -61,8 +81,11 @@ derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
 
 instance Format WireMessage where
-  -- TODO(tim): Invest in better formatting.
-  format = show
+  format (WireMessage (MsgAuth s _) (Preprepare v theBlock)) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format s ++ "\n" ++ format theBlock
+  format (WireMessage (MsgAuth s _) (Prepare v theSHA)) = CL.blue "PREPARE " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
+  format (WireMessage (MsgAuth s _) (Commit v theSHA _)) = CL.blue "COMMIT " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
+  format (WireMessage (MsgAuth s _) (RoundChange v)) = CL.blue "ROUNDCHANGE " ++ format v ++ " " ++ format s
+
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -73,17 +96,61 @@ roundchangeCode = 3
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
-             | CommitResult (Either Text ())
-             | NewBlock Block
+             | CommitResult (Either Text SHA)
+             | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
              deriving (Eq, Show)
+
+instance Format InEvent where
+  format (IMsg a m) = format $ WireMessage a m
+  format x = show x
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
               | MakeBlockCommand
               | ResetTimer RoundNumber
-              deriving (Eq, Show)
+                -- Announce that the global consensus is ahead of us by
+                -- some number of blocks, and hope that a higher power
+                -- will erase the gap with PreviousBlocks.
+              | GapFound {have :: Integer, require :: Integer, peer :: Address}
+              | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
+              deriving (Eq, Show, Generic)
+
+blkNum :: Block -> String
+blkNum = show . blockDataNumber . blockBlockData
+
+shortFormat :: WireMessage -> String
+shortFormat (WireMessage (MsgAuth s _) (Preprepare v blk)) =
+    CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format s ++ " #" ++ blkNum blk
+shortFormat wm = format wm
+
+inShortLog :: MonadLogger m => Text -> InEvent -> m ()
+inShortLog loc iev = $logInfoS loc . pack $
+  case iev of
+    IMsg a m -> shortFormat $ WireMessage a m
+    Timeout rn -> CL.blue "TIMEOUT " ++ show rn
+    CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
+    CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
+    UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
+    PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
+    NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
+
+outShortLog :: MonadLogger m => Text -> OutEvent -> m ()
+outShortLog loc oev = $logInfoS loc . pack $
+  case oev of
+    OMsg a m -> shortFormat $ WireMessage a m
+    ToCommit blk -> CL.blue "TO_COMMIT " ++ blkNum blk
+    MakeBlockCommand -> CL.blue "MAKE_BLOCK_COMMAND"
+    ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
+    GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+    LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+
+instance Format OutEvent where
+  format (OMsg a m) = format $ WireMessage a m
+  format x = show x
+
+instance NFData OutEvent
 
 getHash :: TrustedMessage -> Word256
 -- This is wrong, because this means that the prepare and commits
@@ -133,7 +200,7 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
-  rlpDecode (RLPArray [code, (RLPString payload), addr, sig, seals ]) =
+  rlpDecode (RLPArray [code, RLPString payload, addr, sig, seals ]) =
       let auth = MsgAuth (rlpDecode addr) (rlpDecode sig)
           body = rlpDeserialize payload
       in WireMessage auth $

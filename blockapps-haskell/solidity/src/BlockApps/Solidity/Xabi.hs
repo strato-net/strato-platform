@@ -19,7 +19,7 @@ import           Data.Proxy
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
-import           Generic.Random.Generic
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Servant.API
 import           Servant.Docs
@@ -30,6 +30,21 @@ import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
+data XabiKind = ContractKind
+              | InterfaceKind
+              | LibraryKind deriving (Eq, Show, Generic)
+
+instance ToJSON XabiKind where
+instance FromJSON XabiKind where
+instance Arbitrary XabiKind where
+  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+
+instance ToSchema XabiKind where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Xabi Kind Schema"
+    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, or an interface"
+    & mapped.schema.example ?~ toJSON ContractKind
+
 data Xabi = Xabi
   { xabiFuncs     :: Map Text Func
   , xabiConstr    :: Map Text Func
@@ -37,6 +52,8 @@ data Xabi = Xabi
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
   , xabiEvents    :: Map Text Event
+  , xabiKind      :: XabiKind
+  , xabiUsing     :: Map Text Using
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -51,39 +68,46 @@ instance FromJSON Xabi where
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
          <*> v .:? "events" .!= Map.empty
+         <*> v .:? "kind" .!= ContractKind
+         <*> v .:? "using" .!= Map.empty
 
-instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
+instance Arbitrary Xabi where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Xabi where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Xabi schema"
     & mapped.schema.description ?~ "Xabi types"
     & mapped.schema.example ?~ toJSON sampleXabi
-    where
-      sampleXabi :: Xabi
-      sampleXabi = Xabi
-        { xabiFuncs = Map.fromList
-          [ ("get", Func { funcArgs = Map.fromList []
-                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcContents = Just "return x; "
-                         , funcStateMutability  = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcVals = Map.fromList []
-                         , funcContents = Just "return; "
-                         , funcStateMutability  = Just Pure
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          ]
-        , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-        , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-        , xabiEvents = Map.empty
-        }
+
+sampleXabi :: Xabi
+sampleXabi = Xabi
+  { xabiFuncs = Map.fromList
+    [ ("get", Func { funcArgs = Map.fromList []
+                   , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                   , funcContents = Just "return x; "
+                   , funcStateMutability  = Just View
+                   , funcVisibility = Nothing
+                   , funcModifiers = Nothing
+                   })
+    , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                   , funcVals = Map.fromList []
+                   , funcContents = Just "return; "
+                   , funcStateMutability  = Just Pure
+                   , funcVisibility = Nothing
+                   , funcModifiers = Nothing
+                   })
+    ]
+  , xabiConstr = Map.fromList []
+  , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+  , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+  , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
+  , xabiEvents = Map.empty
+  , xabiKind = ContractKind
+  , xabiUsing = Map.singleton "SafeMath" (Using "for uint256")
+  }
+
+xabiEmpty :: Xabi
+xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
@@ -112,7 +136,7 @@ instance FromJSON StateMutability where
 
 
 instance Arbitrary StateMutability where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema StateMutability where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "State Mutability"
@@ -169,7 +193,7 @@ instance FromJSON Func where
           mut <- fallbackConstantPayable val
           return func{funcStateMutability = mut}
 
-instance Arbitrary Func where arbitrary = genericArbitrary uniform
+instance Arbitrary Func where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Func where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -195,7 +219,7 @@ data Visibility = Private
 
 instance ToJSON Visibility
 instance FromJSON Visibility
-instance Arbitrary Visibility where arbitrary = genericArbitrary uniform
+instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Visibility of a Function"
@@ -218,7 +242,7 @@ instance ToJSON Modifier where
 instance FromJSON Modifier where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-instance Arbitrary Modifier where arbitrary = genericArbitrary uniform
+instance Arbitrary Modifier where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Modifier where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -249,9 +273,9 @@ instance FromJSON Event where
   parseJSON (Object o) = Event
                      <$> (o .: "anonymous")
                      <*> (o .: "logs")
-  parseJSON o = error $ "parseJSON Xabi.Event: Expected Object, got: " ++ show o
+  parseJSON o = typeMismatch "Xabi.Event: Expected Object" o
 
-instance Arbitrary Event where arbitrary = genericArbitrary uniform
+instance Arbitrary Event where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Event where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -268,7 +292,25 @@ instance ToSchema Event where
           ]
         }
 
-data Using = Using {} deriving (Eq,Show,Generic)
+newtype Using = Using String deriving (Eq,Show,Generic)
+
+instance ToJSON Using where
+  toJSON (Using dec) = String . Text.pack $ dec
+
+instance FromJSON Using where
+  parseJSON (String t) = pure . Using . Text.unpack $ t
+  parseJSON o = typeMismatch "Xabi.Using" o
+
+instance Arbitrary Using where
+  arbitrary = Using <$> arbitrary
+
+instance ToSchema Using where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+     & mapped.name ?~ "Using schema"
+     & mapped.schema.description ?~ "Xabi of a `using` declaration"
+     & mapped.schema.example ?~ toJSON sampleUsing
+     where sampleUsing :: Using
+           sampleUsing = Using "for uint[]"
 
 
 data ContractDetails = ContractDetails
@@ -277,6 +319,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
+  , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
   , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic)
@@ -288,6 +331,7 @@ instance ToJSON ContractDetails where
     , "bin-runtime" .= contractdetailsBinRuntime
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
+    , "src" .= contractdetailsSrc
     , "xabi" .= contractdetailsXabi
     , "chainId" .= contractdetailsChainId
     ]
@@ -300,13 +344,14 @@ instance FromJSON ContractDetails where
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
+      <*> obj .: "src"
       <*> obj .: "xabi"
       <*> obj .:? "chainId"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
 
 instance Arbitrary ContractDetails where
-  arbitrary = genericArbitrary uniform
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema ContractDetails where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -321,32 +366,9 @@ instance ToSchema ContractDetails where
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = keccak256 "digest"
         , contractdetailsName = "DetailsName"
+        , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
         , contractdetailsChainId = Nothing
-        }
-      sampleXabi :: Xabi
-      sampleXabi = Xabi
-        { xabiFuncs = Map.fromList
-          [ ("get", Func { funcArgs = Map.fromList []
-                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcContents = Just "return x; "
-                         , funcStateMutability = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                         , funcVals = Map.fromList []
-                         , funcContents = Just "return; "
-                         , funcStateMutability = Just View
-                         , funcVisibility = Nothing
-                         , funcModifiers = Nothing
-                         })
-          ]
-        , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-        , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-        , xabiEvents = Map.empty
         }
 
 --------------------------------------------------------------------------------

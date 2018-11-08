@@ -13,6 +13,8 @@ dependencies:
   - conduit
   - conduit-combinators
   - crypto-api
+  - cryptonite
+  - deepseq
   - derive
   - ethereum-encryption
   - ethereum-rlp
@@ -34,6 +36,7 @@ dependencies:
   - wai
   - warp
   - http-client
+  - prometheus-client
 
 library:
   source-dirs: src/
@@ -50,3 +53,11 @@ tests:
       - hspec-expectations-lifted
       - merkle-patricia-db
       - time
+
+benchmarks:
+  one-node:
+    source-dirs: bench/
+    main: OneNode.hs
+    dependencies:
+      - blockstanbul
+      - criterion
