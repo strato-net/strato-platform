@@ -6,6 +6,9 @@ export const CREATE_CHAIN_REQUEST = "CREATE_CHAIN_REQUEST";
 export const CREATE_CHAIN_SUCCESS = "CREATE_CHAIN_SUCCESS";
 export const CREATE_CHAIN_FAILURE = "CREATE_CHAIN_FAILURE";
 export const RESET_ERROR = "RESET_ERROR";
+export const COMPILE_CHAIN_CONTRACT_REQUEST = "COMPILE_CHAIN_CONTRACT_REQUEST";
+export const COMPILE_CHAIN_CONTRACT_SUCCESS = "COMPILE_CHAIN_CONTRACT_SUCCESS";
+export const COMPILE_CHAIN_CONTRACT_FAILURE = "COMPILE_CHAIN_CONTRACT_FAILURE";
 
 export const openCreateChainOverlay = function () {
   return {
@@ -69,5 +72,28 @@ export const createChainFailure = function (error) {
 export const resetError = function () {
   return {
     type: RESET_ERROR
+  }
+}
+
+export const compileChainContract = function (name, contract, searchable) {
+  return {
+    type: COMPILE_CHAIN_CONTRACT_REQUEST,
+    name: name,
+    contract: contract,
+    searchable: searchable
+  }
+}
+
+export const compileChainContractSuccess = function (response) {
+  return {
+    type: COMPILE_CHAIN_CONTRACT_SUCCESS,
+    response
+  }
+}
+
+export const compileChainContractFailure = function (error) {
+  return {
+    type: COMPILE_CHAIN_CONTRACT_FAILURE,
+    error
   }
 }

@@ -21,6 +21,67 @@ Object {
 }
 `;
 
+exports[`CreateChain: action compile chain contract failure 1`] = `
+Object {
+  "error": "error",
+  "type": "COMPILE_CHAIN_CONTRACT_FAILURE",
+}
+`;
+
+exports[`CreateChain: action compile chain contract request 1`] = `
+Object {
+  "contract": "contract Governance { string constant addRule = 'MajorityRules'; string constant removeRule = 'MajorityRules' }",
+  "name": undefined,
+  "searchable": false,
+  "type": "COMPILE_CHAIN_CONTRACT_REQUEST",
+}
+`;
+
+exports[`CreateChain: action compile chain contract success 1`] = `
+Object {
+  "response": Object {
+    "src": Object {
+      "Governance": Object {
+        "constr": Object {},
+        "events": Object {},
+        "funcs": Object {},
+        "isLibrary": false,
+        "modifiers": Object {},
+        "types": Object {},
+        "using": Object {},
+        "vars": Object {
+          "addRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "removeRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "temp": Object {
+            "atBytes": 0,
+            "constant": null,
+            "dynamic": true,
+            "initialValue": null,
+            "public": null,
+            "type": "String",
+          },
+        },
+      },
+    },
+  },
+  "type": "COMPILE_CHAIN_CONTRACT_SUCCESS",
+}
+`;
+
 exports[`CreateChain: action create chain failure 1`] = `
 Object {
   "error": "error",

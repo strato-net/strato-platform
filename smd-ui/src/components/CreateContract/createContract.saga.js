@@ -13,6 +13,7 @@ import { stopSubmit } from 'redux-form'
 import { CREATE_CONTRACT_FORM } from './'
 import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
 import { env } from '../../env';
+import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../CreateChain/createChain.actions';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
@@ -105,11 +106,20 @@ export function* compileContract(action) {
     yield put(compileContractFailure(err));
     yield put(stopSubmit(CREATE_CONTRACT_FORM, { contract: String(err) }))
   }
+}
 
+export function* compileChainContract(action) {
+  try {
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
+    yield put(compileChainContractSuccess(response));
+  } catch (err) {
+    yield put(compileChainContractFailure(err));
+  }
 }
 
 export function* watchCompileContract() {
   yield takeLatest(COMPILE_CONTRACT_REQUEST, compileContract);
+  yield takeLatest(COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContract);
 }
 
 export default function* watchCreateContract() {

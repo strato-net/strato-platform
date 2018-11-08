@@ -3,7 +3,8 @@ import watchCreateContract, {
   createContract,
   compileContract,
   createContractApiCall,
-  compileContractApiCall
+  compileContractApiCall,
+  compileChainContract
 } from '../../components/CreateContract/createContract.saga';
 import {
   takeLatest,
@@ -30,6 +31,7 @@ import { fetchCirrusInstances } from '../../components/Contracts/components/Cont
 import { expectSaga } from 'redux-saga-test-plan';
 import { payload, createContractResponse, payloadCompile, payloadCompileSearchable, compileResponse, compileError, responseError } from './createContractMock';
 import { stopSubmit } from 'redux-form'
+import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../../components/CreateChain/createChain.actions';
 var fs = require('fs');
 
 describe('CreateContract: saga', () => {
@@ -43,6 +45,7 @@ describe('CreateContract: saga', () => {
   test('watch compile contract', () => {
     const gen = watchCompileContract();
     expect(gen.next().value).toEqual(takeLatest(COMPILE_CONTRACT_REQUEST, compileContract));
+    expect(gen.next().value).toEqual(takeLatest(COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContract));
     expect(gen.next().done).toBe(true);
   })
 
@@ -65,6 +68,14 @@ describe('CreateContract: saga', () => {
       expect(gen.next(compileResponse).value).toEqual(put(compileContractSuccess(compileResponse)));
       expect(gen.throw().value).toEqual(put(compileContractFailure()))
       expect(gen.next().value).toEqual(put(stopSubmit('create-contract', { contract: 'undefined' })))
+      expect(gen.next().done).toBe(true);
+    })
+
+    test('inspection', () => {
+      const gen = compileChainContract({ type: COMPILE_CHAIN_CONTRACT_REQUEST, name: payloadCompile.name, contract: payloadCompile.contract, searchable: payloadCompile.searchable });
+      expect(gen.next().value).toEqual(call(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable));
+      expect(gen.next(compileResponse).value).toEqual(put(compileChainContractSuccess(compileResponse)));
+      expect(gen.throw().value).toEqual(put(compileChainContractFailure()));
       expect(gen.next().done).toBe(true);
     })
 

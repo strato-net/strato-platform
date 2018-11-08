@@ -12,6 +12,46 @@ exports[`CreateChain: index isValidFileType 3`] = `"Please add contract source f
 
 exports[`CreateChain: index mapStateToProps with default state 1`] = `
 Object {
+  "abi": Object {
+    "src": Object {
+      "Governance": Object {
+        "constr": Object {},
+        "events": Object {},
+        "funcs": Object {},
+        "isLibrary": false,
+        "modifiers": Object {},
+        "types": Object {},
+        "using": Object {},
+        "vars": Object {
+          "addRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "removeRule": Object {
+            "atBytes": 0,
+            "constant": true,
+            "dynamic": true,
+            "initialValue": "\\"MajorityRules\\"",
+            "public": null,
+            "type": "String",
+          },
+          "temp": Object {
+            "atBytes": 0,
+            "constant": null,
+            "dynamic": true,
+            "initialValue": null,
+            "public": null,
+            "type": "String",
+          },
+        },
+      },
+    },
+  },
+  "contractName": "Governance",
   "createErrorMessage": null,
   "isOpen": true,
   "isSpinning": true,
@@ -62,47 +102,31 @@ exports[`CreateChain: index render component with empty values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Add Rule
+              Compilation
             </label>
           </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"addRule\\">
-                <option />
-                <option value=\\"MajorityRules\\">
-                  Majority Rules
-                </option>
-                <option value=\\"AutoApprove\\">
-                  Auto Approve
-                </option>
-                <option value=\\"TwoIn\\">
-                  Two In
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Remove Rule
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"removeRule\\">
-                <option />
-                <option value=\\"MajorityRules\\">
-                  Majority Rules
-                </option>
-                <option value=\\"AutoApprove\\">
-                  Auto Approve
-                </option>
-                <option value=\\"TwoIn\\">
-                  Two In
-                </option>
-              </Field>
-            </div>
+          <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Arg
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={3}>
+                    <div className=\\"text-center\\">
+                      Upload Contract
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
         <div className=\\"row\\">
@@ -162,47 +186,31 @@ exports[`CreateChain: index render component with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Add Rule
+              Compilation
             </label>
           </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"addRule\\">
-                <option />
-                <option value=\\"MajorityRules\\">
-                  Majority Rules
-                </option>
-                <option value=\\"AutoApprove\\">
-                  Auto Approve
-                </option>
-                <option value=\\"TwoIn\\">
-                  Two In
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Remove Rule
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"removeRule\\">
-                <option />
-                <option value=\\"MajorityRules\\">
-                  Majority Rules
-                </option>
-                <option value=\\"AutoApprove\\">
-                  Auto Approve
-                </option>
-                <option value=\\"TwoIn\\">
-                  Two In
-                </option>
-              </Field>
-            </div>
+          <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">
+            <table className=\\"pt-table pt-condensed pt-striped smd-full-width\\">
+              <thead>
+                <tr>
+                  <th>
+                    Arg
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={3}>
+                    <div className=\\"text-center\\">
+                      Upload Contract
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
         <div className=\\"row\\">

@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -45,6 +45,7 @@ class CreateChain extends Component {
       mixpanelWrapper.track('create_chain_submit_click');
       let members = [];
       let balances = [];
+
       this.state.members.forEach(function (member, index) {
         members.push({
           "address": member.address,
@@ -55,10 +56,19 @@ class CreateChain extends Component {
           "address": member.address
         });
       });
-      let args = {
-        addRule: values.addRule,
-        removeRule: values.removeRule
-      };
+
+      const args = {};
+      const abi = this.props.abi.src;
+      // This will take out all the constants defined in contract and append it to args
+      Object.values(abi).forEach(val => {
+        if (Object.keys(val.vars).length) {
+          Object.getOwnPropertyNames(val.vars).forEach((arg) => {
+            if (val.vars[arg].initialValue !== null)
+              args[arg] = val.vars[arg].initialValue;
+          })
+        }
+      });
+
       this.props.createChain(values.chainName, members, balances, values.governanceContract, args);
       this.setState({
         members: [],
@@ -172,9 +182,48 @@ class CreateChain extends Component {
       const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
       mixpanelWrapper.track("create_contract_file_upload");
       self.setState({ governanceContract: fileContents })
+      self.props.compileChainContract(
+        contract.name.substring(0, contract.name.indexOf('.')),
+        fileContents,
+        false
+      );
     };
     reader.readAsText(contract);
   };
+
+  compilation() {
+    const src = this.props.abi && this.props.abi.src;
+    const contractname = this.props.contractName;
+
+    if (src) {
+      let contract = src[contractname];
+      if (contract && Object.keys(contract['vars']).length) {
+        return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
+          if (contract.vars[arg].initialValue) {
+            return (<tr key={'arg' + i}>
+              <td>{arg}</td>
+              <td>{contract.vars[arg].initialValue}</td>
+            </tr>);
+          } else {
+            return null;
+          }
+        });
+      } else {
+        return (<tr>
+          <td colSpan={3}>
+            <div className="text-center">No variables</div>
+          </td>
+        </tr>)
+      }
+
+    } else {
+      return (<tr>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
+        </td>
+      </tr>);
+    }
+  }
 
   render() {
     return (
@@ -221,7 +270,7 @@ class CreateChain extends Component {
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
                     Contract
-                    </label>
+                  </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <Field
@@ -241,44 +290,21 @@ class CreateChain extends Component {
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Add Rule
+                    Compilation
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="addRule"
-                    >
-                      <option />
-                      <option value="MajorityRules">Majority Rules</option>
-                      <option value="AutoApprove">Auto Approve</option>
-                      <option value="TwoIn">Two In</option>
-                    </Field>
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Remove Rule
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
-                      className="pt-input"
-                      component="select"
-                      name="removeRule"
-                    >
-                      <option />
-                      <option value="MajorityRules">Majority Rules</option>
-                      <option value="AutoApprove">Auto Approve</option>
-                      <option value="TwoIn">Two In</option>
-                    </Field>
-                  </div>
+                <div className="col-sm-9 smd-scrollable smd-pad-4">
+                  <table className="pt-table pt-condensed pt-striped smd-full-width">
+                    <thead>
+                      <tr>
+                        <th>Arg</th>
+                        <th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.compilation()}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -325,6 +351,8 @@ export function mapStateToProps(state) {
     isOpen: state.createChain.isOpen,
     isSpinning: state.createChain.spinning,
     createErrorMessage: state.createChain.error,
+    abi: state.createChain.abi,
+    contractName: state.createChain.contractName
   };
 }
 
@@ -335,7 +363,8 @@ const connected = connect(
     openCreateChainOverlay,
     closeCreateChainOverlay,
     createChain,
-    resetError
+    resetError,
+    compileChainContract
   }
 )(formed);
 
