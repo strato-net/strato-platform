@@ -38,7 +38,7 @@ class ContractCard extends Component {
 
     instances
       .filter((instance) => { return re.test(instance.address) })
-      .forEach(function (instance) {
+      .forEach(function (instance, index) {
         cardData.push(
           <tr
             className={instance.selected ? 'selected' : ''}
@@ -48,7 +48,7 @@ class ContractCard extends Component {
               self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
-            key={'card-data-' + instance.address}
+            key={`card-data-${instance.address}-${index}`}
           >
             <td style={{ border: 'none' }}>
               <HexText value={instance.address} classes="small smd-pad-4" />
