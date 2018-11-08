@@ -26,6 +26,7 @@ import Test.QuickCheck
 
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances()
+import Blockchain.Format
 
 -- API
 
@@ -68,11 +69,18 @@ createWebServer ch = serve adminAPI (admin ch)
 getVote :: CandidateReceived -> ClientM CandidateReceived
 getVote = client (Proxy @ AdminAPI)
 
-uploadVote ::  Int -> CandidateReceived -> IO ()
-uploadVote prt cr = do
+uploadVote ::  Int -> String -> CandidateReceived -> IO (Either String ())
+uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http "localhost" prt ""))
-  case vot of
-    Left err -> putStrLn $ "Error??/: " ++ show err
-    Right cr'-> do
-      print cr'
+  vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "/blockstanbul"))
+  return $ case vot of
+    Left err -> Left $ "uploadVote: " ++ show err
+    Right _ -> Right ()
+
+instance Format CandidateReceived where
+  format (CandidateReceived sdr sign rcp vdir nc) = unlines ["Sender address: " ++ format sdr,
+    "Sender signature: " ++ sign,
+    "Recipient address: " ++ format rcp,
+    "Voting to add/delete: " ++ (if vdir then "Add" else "Delete"),
+    "Nonce: " ++ show nc
+    ]

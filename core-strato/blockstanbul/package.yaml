@@ -41,6 +41,15 @@ dependencies:
 library:
   source-dirs: src/
 
+executables:
+  blockstanbul-vote:
+    source-dirs: exec-src/
+    main: Main.hs
+    dependencies:
+      - blockstanbul
+      - base16-bytestring
+      - hflags
+      - extra
 
 tests:
   blockstanbul-test:

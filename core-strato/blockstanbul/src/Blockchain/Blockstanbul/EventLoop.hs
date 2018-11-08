@@ -153,7 +153,7 @@ isAuthorized iev = do
         -- Check nonce for replay attack
         slist <- use authSenders
         let nonceAuth = M.member addr slist && Just nonc > M.lookup addr slist
-            verifiedSender = verifyBenfInfo (benf,dir) sign
+            verifiedSender = verifyBenfInfo (benf,dir,nonc) sign
         if nonceAuth && Just addr == verifiedSender
           then do
             authSenders %= M.insert addr nonc
