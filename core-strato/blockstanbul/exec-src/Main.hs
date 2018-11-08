@@ -8,6 +8,7 @@ import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
+import           Servant.Common.BaseUrl
 import           System.Console.GetOpt
 import           System.Environment
 import           System.Exit
@@ -108,7 +109,8 @@ main = do
   let urlAuth = concat [fromOptRight (optUsername opt) ++ ":",
        fromOptRight (optPassword opt) ++ "@",
        fromOptRight (optNode opt)]
-  resultUploadVote <- API.uploadVote 80 (urlAuth) vote
+      url = BaseUrl Http urlAuth 80 "/blockstanbul"
+  resultUploadVote <- API.uploadVote url vote
   case resultUploadVote of
     Left str -> die str
     Right () -> exitSuccess

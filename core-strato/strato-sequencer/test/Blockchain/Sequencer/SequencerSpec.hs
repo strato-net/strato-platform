@@ -52,6 +52,7 @@ import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
+import           Servant.Common.BaseUrl
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
 import           Test.Hspec.Contrib.HUnit            ()
@@ -257,7 +258,8 @@ spec = do
                                            , API.recipient=testAddr
                                            , API.votingdir=True
                                            , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort "localhost" vote `shouldReturn` Right ()
+            let url = BaseUrl Http "localhost" testWebserverPort ""
+            liftIO $ API.uploadVote url vote `shouldReturn` Right ()
             voteList <- drainVotes
             voteList `shouldMatchList` [vote]
             checkForVotes voteList
@@ -274,7 +276,7 @@ spec = do
                                             , API.recipient=testAddr
                                             , API.votingdir=False
                                             , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort "localhost" vote' `shouldReturn` Right ()
+            liftIO $ API.uploadVote url vote' `shouldReturn` Right ()
             voteList' <- drainVotes
             voteList' `shouldMatchList` [vote']
             checkForVotes voteList'
