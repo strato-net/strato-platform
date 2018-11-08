@@ -10,6 +10,7 @@ import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
 import           System.Console.GetOpt
 import           System.Environment
+import           System.Exit
 
 import           Blockchain.Blockstanbul.Authentication
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
@@ -107,5 +108,7 @@ main = do
   let urlAuth = concat [fromOptRight (optUsername opt) ++ ":",
        fromOptRight (optPassword opt) ++ "@",
        fromOptRight (optNode opt)]
-  resultStr <- API.uploadVote 80 (urlAuth) vote
-  putStrLn $ fromLeft "No result strings returned." resultStr
+  resultUploadVote <- API.uploadVote 80 (urlAuth) vote
+  case resultUploadVote of
+    Left str -> die str
+    Right () -> exitSuccess

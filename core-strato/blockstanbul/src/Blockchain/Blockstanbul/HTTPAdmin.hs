@@ -74,8 +74,8 @@ uploadVote prt ipaddr cr = do
   manager <- newManager defaultManagerSettings
   vot <- runClientM (getVote cr) (ClientEnv manager (BaseUrl Http ipaddr prt "/blockstanbul"))
   return $ case vot of
-    Left err -> Left $ "HTTP Request failed to send: " ++ show err
-    Right cr'-> Left $ "HTTP Request successfully sent: \n" ++ format cr'
+    Left err -> Left $ "uploadVote: " ++ show err
+    Right _ -> Right ()
 
 instance Format CandidateReceived where
   format (CandidateReceived sdr sign rcp vdir nc) = unlines ["Sender address: " ++ format sdr,
