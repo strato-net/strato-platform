@@ -31,6 +31,7 @@ updateMigrationNumber conn = execute conn updateSchemaVersion (Only $ length mig
 migrations :: [(MigrationErrorBehavior, Query)]
 migrations = [ (Throw, createTables)
              , (Throw, insertSchemaVersion)
+             , (Throw, insertAddress)
              ]
 
 getSchemaVersion :: Query
@@ -41,3 +42,6 @@ insertSchemaVersion = [sql| INSERT INTO vault_wrapper_schema_version VALUES (1,1
 
 updateSchemaVersion :: Query
 updateSchemaVersion = [sql| UPDATE vault_wrapper_schema_version SET schema_version=? WHERE id=1; |]
+
+insertAddress :: Query
+insertAddress = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS address bytea; |]
