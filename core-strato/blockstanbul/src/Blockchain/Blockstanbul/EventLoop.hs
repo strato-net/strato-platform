@@ -266,6 +266,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       -- may have diverged from the validators at the time of commit
       realValidators <- use validators
       seqNo <- use $ view . sequence
+      self <- selfAddr
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
           blockNo = blockDataNumber . blockBlockData $ blk
       case eNextSeqNo of
@@ -274,6 +275,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         Right _ -> do
           -- TODO(tim): Does it have a vote to record?
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
+          unless (S.member self realValidators) $
+            validators %= S.insert self
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
