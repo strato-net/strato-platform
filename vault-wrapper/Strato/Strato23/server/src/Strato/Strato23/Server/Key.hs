@@ -10,8 +10,8 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
 
-getKey :: Text -> Text -> VaultM StatusAndAddress
-getKey userName userId = do
+getKey :: Text -> Text -> Maybe Text -> VaultM StatusAndAddress
+getKey userName userId _ = do
   (salt, nonce, encKey, (_ :: Address)) <- toUserError ("User " <> userName <> " doesn't exist")
                          . vaultQuery1 $ getUserKeyQuery userName
   case decryptSecKey (textPassword userId) salt nonce encKey of
