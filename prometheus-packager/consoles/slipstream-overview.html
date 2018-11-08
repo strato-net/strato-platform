@@ -4,7 +4,7 @@
   <h1>Slipstream Overview - {{ .Params.instance }}</h1>
 
   <h3>Kafka usage</h3>
-  <div id="slipkafka"</div>
+  <div id="slipkafka"></div>
   <script>
     new PromConsole.Graph({
       node: document.querySelector("#slipkafka"),
@@ -20,7 +20,7 @@
 
 
   <h3>Globals cache size</h3>
-  <div id="slipglobals"</div>
+  <div id="slipglobals"></div>
   <script>
     new PromConsole.Graph({
       node: document.querySelector("#slipglobals"),
@@ -35,7 +35,7 @@
   </script>
 
   <h3>Actions processed</h3>
-  <div id="slipactions"</div>
+  <div id="slipactions"></div>
   <script>
     new PromConsole.Graph({
       node: document.querySelector("#slipactions"),
@@ -50,7 +50,7 @@
   </script>
 
   <h3>Tables created</h3>
-  <div id="sliptables"</div>
+  <div id="sliptables"></div>
   <script>
     new PromConsole.Graph({
       node: document.querySelector("#sliptables"),
