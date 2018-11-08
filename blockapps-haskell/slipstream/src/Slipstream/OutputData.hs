@@ -32,6 +32,7 @@ import           BlockApps.Ethereum
 
 import Slipstream.Events
 import Slipstream.Globals
+import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
 
@@ -183,6 +184,7 @@ createInserts globalsIORef = do
 
     --When contract hasn't been written to "contract" table and indexing table doesn't exist
     when (not $ contractAlreadyCreated) $ do
+        incNumTables
         let conVals = wrapAndEscape [T.pack $ keccak256String $ codehash firstContract, contractName firstContract, abi firstContract, chain firstContract]
         let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
         yield conIns
@@ -198,6 +200,7 @@ createInserts globalsIORef = do
           ]
 
         when history $ do
+          incNumHistoryTables
           yield $ T.concat
             [ "create table if not exists "
             , wrapDoubleQuotes historyName
@@ -206,8 +209,7 @@ createInserts globalsIORef = do
             , tableColumns list
             , ");"
             ]
-
-        void $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+        setContractCreated globalsIORef hashVal
 
     when history $ do
       yield $ T.concat

@@ -37,6 +37,10 @@
   <td>Gregor</td>
   <td><code>seq_gregor</code></td>
 </tr>
+<tr>
+  <td>Slipstream</td>
+  <td><code>slipstream</code></td>
+</tr>
 </table>
 
 {{ template "prom_content_tail" . }}
