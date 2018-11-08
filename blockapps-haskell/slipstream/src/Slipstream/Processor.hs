@@ -41,7 +41,6 @@ import Network.HTTP.Client
 import Numeric
 import Servant.Common.BaseUrl
 import System.Log.Logger
-import Data.LargeWord (Word256)
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
@@ -51,7 +50,6 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
-import qualified BlockApps.Strato.Types as BA
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 
