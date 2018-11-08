@@ -56,6 +56,7 @@ import qualified BlockApps.SolidityVarReader as SVR
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
+import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
@@ -203,7 +204,9 @@ processTheMessages messages conn g = do
   enterBloc2 env $ do
     forM_ (map (filter hasContract) changes) $ \change -> do
       processedList <- forM (filter matters change) $ \row@Action{..} -> do
+        recordAction row
         liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+
 
         let md = fromMaybe Map.empty actionMetadata
         mcd <- getContractDetailsByCodeHash actionCodeHash

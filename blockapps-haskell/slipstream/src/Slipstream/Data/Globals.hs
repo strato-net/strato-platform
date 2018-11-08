@@ -5,7 +5,6 @@ import qualified Data.Set as S
 import Data.Default
 import Data.Text
 
-import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Value
 import BlockApps.Ethereum
 
@@ -17,13 +16,3 @@ data Globals = Globals { createdContracts :: S.Set Keccak256 -- list of contacts
 
 instance Default Globals where
   def = Globals S.empty S.empty S.empty M.empty
-
-data ContractAndXabi =
-  ContractAndXabi {
-    contract :: Either String Contract,
-    xabi :: Text,
-    name :: Text,
-    contractStored :: Bool,
-    contractSchema :: Maybe Text
-  } deriving (Show)
-
