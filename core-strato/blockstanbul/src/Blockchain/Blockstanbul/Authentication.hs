@@ -117,13 +117,13 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool) -> m ExtendedSignature
+signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool, Int) -> m ExtendedSignature
 signBenfInfo pk bnf =
   let msg = unSHA . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
   in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
 
-verifyBenfInfo :: (Address, Bool) -> ExtendedSignature -> Maybe Address
+verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
   let msg = unSHA . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg

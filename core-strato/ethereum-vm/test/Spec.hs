@@ -111,12 +111,42 @@ spec = do
           (i,_) = B16.decode "606060405234610000575b5b5b6101748061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063ec6306431461003e575b610000565b346100005761004b6100d4565b604051808060200182810382528381815181526020019150805190602001908083836000831461009a575b80518252602083111561009a57602082019150602081019050602083039250610076565b505050905090810190601f1680156100c65780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6020604051908101604052806000815250606060405190810160405280602f81526020017f636f6e7472616374204c6f7474657279207b0a0a0966756e6374696f6e204c6f81526020017f74746572792829207b0a097d0a0a7d000000000000000000000000000000000081525090505b905600a165627a7a72305820b42b9b4bfc4b8e1dca667748b387dad2822afdf716ae22a127a0150b31ce7a960029"
           txInit = Code i
 
-        _ <- create isRunningTests isHomestead S.empty blockData 0 tAddr tAddr txValue txGasPrice availableGas newAddress txInit
+        _ <- create isRunningTests
+                    isHomestead
+                    S.empty
+                    blockData
+                    0
+                    tAddr
+                    tAddr
+                    txValue
+                    txGasPrice
+                    availableGas
+                    newAddress
+                    txInit
+                    (SHA 0)
+                    Nothing
+                    Nothing
         addressState <- getAddressState newAddress
         liftIO . putStrLn $ show addressState
         code <- fromMaybe C8.empty <$> getCode (addressStateCodeHash addressState)
         liftIO . putStrLn $ show $ B16.encode code
-        call isRunningTests isHomestead True S.empty blockData 0 tAddr newAddress tAddr (fromIntegral txValue) (fromIntegral txGasPrice) (fst $ B16.decode "ec630643") availableGas undefined
+        call isRunningTests
+             isHomestead
+             True
+             S.empty
+             blockData
+             0
+             tAddr
+             newAddress
+             tAddr
+             (fromIntegral txValue)
+             (fromIntegral txGasPrice)
+             (fst $ B16.decode "ec630643")
+             availableGas
+             undefined
+             (SHA 0)
+             Nothing
+             Nothing
       result `shouldSatisfy` isRight
       liftIO . putStrLn . show $ theTrace vmState
       liftIO . putStrLn . show $ vmException vmState
