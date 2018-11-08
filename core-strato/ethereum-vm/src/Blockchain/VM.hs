@@ -100,11 +100,11 @@ logN n = do
   guardStorage
   offset <- pop
   theSize <- pop
-  owner' <- getEnvVar envOwner
+  owner <- getEnvVar envOwner
   topics' <- sequence $ replicate n pop
 
   theData <- mLoadByteString offset theSize
-  addLog Log{address=owner', bloom=0, logData=theData, topics=topics'} -- TODO(dustin): Fix bloom filter
+  addLog Log{address=owner, bloom=0, logData=theData, topics=topics'} -- TODO(dustin): Fix bloom filter
 
 guardStorage :: VMM ()
 guardStorage = do
@@ -167,12 +167,12 @@ safe_rem x y = x `rem` y
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
 accountCreationHack :: Address -> VMM ()
-accountCreationHack address' = do
-  exists <- addressStateExists address'
+accountCreationHack address = do
+  exists <- addressStateExists address
   when (not exists) $ do
     vmState <- lift get
     when (not $ isNothing $ debugCallCreates vmState) $
-      putAddressState address' blankAddressState
+      putAddressState address blankAddressState
 
 
 
@@ -266,14 +266,14 @@ runOperation SHA3 = do
 runOperation ADDRESS = pushEnvVar envOwner
 
 runOperation BALANCE = do
-  address' <- pop
-  exists <- addressStateExists address'
+  address <- pop
+  exists <- addressStateExists address
   if exists
     then do
-    addressState <- getAddressState address'
+    addressState <- getAddressState address
     push $ addressStateBalance addressState
     else do
-    accountCreationHack address' --needed hack to get the tests working
+    accountCreationHack address --needed hack to get the tests working
     push (0::Word256)
 
 runOperation ORIGIN = pushEnvVar envOrigin
@@ -314,20 +314,20 @@ runOperation GASPRICE = pushEnvVar envGasPrice
 
 
 runOperation EXTCODESIZE = do
-  address' <- pop
-  accountCreationHack address' --needed hack to get the tests working
-  addressState <- getAddressState address'
+  address <- pop
+  accountCreationHack address --needed hack to get the tests working
+  addressState <- getAddressState address
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
-  address' <- pop
-  accountCreationHack address' --needed hack to get the tests working
+  address <- pop
+  accountCreationHack address --needed hack to get the tests working
   memOffset <- pop
   codeOffset <- pop
   size <- pop
 
-  addressState <- getAddressState address'
+  addressState <- getAddressState address
   code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
@@ -344,25 +344,25 @@ runOperation RETURNDATACOPY = do
   mStoreByteString memP . safeTake size . safeDrop codeP $ ret
 
 runOperation BLOCKHASH = do
-  number' <- pop::VMM Word256
+  number <- pop::VMM Word256
 
   currentBlock <- getEnvVar envBlockHeader
   let currentBlockNumber = blockDataNumber currentBlock
 
-  let inRange = not $ toInteger number' >= currentBlockNumber ||
-                toInteger number' < currentBlockNumber - 256
+  let inRange = not $ toInteger number >= currentBlockNumber ||
+                toInteger number < currentBlockNumber - 256
 
   vmState <- lift get
 
   case (inRange, isRunningTests vmState) of
    (False, _) -> push (0::Word256)
    (True, False) -> do
-          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') (blockDataParentHash currentBlock)
+          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number) (blockDataParentHash currentBlock)
           case maybeBlockHash of
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
    (True, True) -> do
-          let SHA h = hash $ BC.pack $ show $ toInteger number'
+          let SHA h = hash $ BC.pack $ show $ toInteger number
           push h
 
 runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
@@ -413,8 +413,8 @@ runOperation SSTORE = do
 
   putStorageKeyVal p val --putStorageKeyVal will delete value if val=0
 
-  owner' <- getEnvVar envOwner
-  (action . actionData . at owner' . mapped . storageDiffs) %= M.insert p val
+  owner <- getEnvVar envOwner
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= M.insert p val
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -484,29 +484,29 @@ runOperation SWAP16 = swapn 16
 
 runOperation CREATE = do
   guardStorage
-  value' <- pop::VMM Word256
-  input' <- pop
+  value <- pop::VMM Word256
+  input <- pop
   size <- pop
 
-  owner' <- getEnvVar envOwner
+  owner <- getEnvVar envOwner
   block <- getEnvVar envBlockHeader
 
-  initCodeBytes <- unsafeSliceByteString input' size
+  initCodeBytes <- unsafeSliceByteString input size
 
   vmState <- lift get
 
-  callDepth' <- getCallDepth
+  callDepth <- getCallDepth
 
   result <-
-    case (callDepth' > 1023, debugCallCreates vmState) of
+    case (callDepth > 1023, debugCallCreates vmState) of
       (True, _) -> return Nothing
-      (_, Nothing) -> create_debugWrapper block owner' value' initCodeBytes
+      (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
       (_, Just _) -> do
-        addressState' <- getAddressState owner'
+        addressState <- getAddressState owner
 
-        let newAddress = getNewAddress_unsafe owner' $ addressStateNonce addressState'
+        let newAddress = getNewAddress_unsafe owner $ addressStateNonce addressState
 
-        if addressStateBalance addressState' < fromIntegral value'
+        if addressStateBalance addressState < fromIntegral value
           then return Nothing
           else do
           --addToBalance' owner (-fromIntegral value)
@@ -514,39 +514,39 @@ runOperation CREATE = do
             ccData=initCodeBytes,
             ccDestination=Nothing,
             ccGasLimit=vmGasRemaining vmState,
-            ccValue=fromIntegral value'
+            ccValue=fromIntegral value
             }
           return $ Just newAddress
 
   case result of
-    Just address' -> push address'
+    Just address -> push address
     Nothing       -> push (0::Word256)
 
 runOperation CALL = do
   gas <- pop::VMM Word256
   to <- pop
-  value' <- pop::VMM Word256
-  when (value' /= 0) guardStorage
+  value <- pop::VMM Word256
+  when (value /= 0) guardStorage
   inOffset <- pop
   inSize <- pop
   outOffset <- pop
   outSize <- pop::VMM Word256
 
-  owner' <- getEnvVar envOwner
+  owner <- getEnvVar envOwner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
 
   vmState <- lift get
 
-  let stipend = if value' > 0 then fromIntegral gCALLSTIPEND  else 0
+  let stipend = if value > 0 then fromIntegral gCALLSTIPEND  else 0
 
-  addressState <- getAddressState owner'
+  addressState <- getAddressState owner
 
-  callDepth' <- getCallDepth
+  callDepth <- getCallDepth
 
   (result, maybeBytes) <-
-    case (callDepth' > 1023, fromIntegral value' > addressStateBalance addressState, debugCallCreates vmState) of
+    case (callDepth > 1023, fromIntegral value > addressStateBalance addressState, debugCallCreates vmState) of
       (True, _, _) -> do
         lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Call stack too deep."
         addGas $ fromIntegral stipend
@@ -557,7 +557,7 @@ runOperation CALL = do
         addGas $ fromIntegral $ gas + fromIntegral stipend
         return (0, Nothing)
       (_, _, Nothing) -> do
-        nestedRun_debugWrapper False (fromIntegral gas + stipend) to to owner' value' inputData
+        nestedRun_debugWrapper False (fromIntegral gas + stipend) to to owner value inputData
       (_, _, Just _) -> do
         addGas $ fromIntegral stipend
         --addToBalance' owner (-fromIntegral value)
@@ -566,7 +566,7 @@ runOperation CALL = do
           ccData=inputData,
           ccDestination=Just to,
           ccGasLimit=fromIntegral gas + stipend,
-          ccValue=fromIntegral value'
+          ccValue=fromIntegral value
           }
         return (1, Nothing)
 
@@ -579,20 +579,20 @@ runOperation CALL = do
 runOperation CALLCODE = do
   gas <- pop::VMM Word256
   to <- pop
-  value' <- pop::VMM Word256
+  value <- pop::VMM Word256
   inOffset <- pop
   inSize <- pop
   outOffset <- pop
   outSize <- pop::VMM Word256
 
-  owner' <- getEnvVar envOwner
+  owner <- getEnvVar envOwner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
 
   vmState <- lift get
 
-  let stipend = if value' > 0 then fromIntegral gCALLSTIPEND  else 0
+  let stipend = if value > 0 then fromIntegral gCALLSTIPEND  else 0
 
 --  toAddressExists <- lift $ lift $ lift $ addressStateExists to
 
@@ -600,12 +600,12 @@ runOperation CALLCODE = do
 
 --  useGas $ fromIntegral newAccountCost
 
-  addressState <- getAddressState owner'
+  addressState <- getAddressState owner
 
-  callDepth' <- getCallDepth
+  callDepth <- getCallDepth
 
   (result, maybeBytes) <-
-    case (callDepth' > 1023, fromIntegral value' > addressStateBalance addressState, debugCallCreates vmState) of
+    case (callDepth > 1023, fromIntegral value > addressStateBalance addressState, debugCallCreates vmState) of
       (True, _, _) -> do
         addGas $ fromIntegral gas
         return (0, Nothing)
@@ -615,16 +615,16 @@ runOperation CALLCODE = do
         when flags_debug $ lift $ $logInfoS "runOp/CALLCODE" $ T.pack $ CL.red "Insufficient balance"
         return (0, Nothing)
       (_, _, Nothing) -> do
-        nestedRun_debugWrapper False (fromIntegral gas+stipend) owner' to owner' value' inputData
+        nestedRun_debugWrapper False (fromIntegral gas+stipend) owner to owner value inputData
       (_, _, Just _) -> do
         --addToBalance' owner (-fromIntegral value)
         addGas $ fromIntegral stipend
         addGas $ fromIntegral gas
         addDebugCallCreate DebugCallCreate {
           ccData=inputData,
-          ccDestination=Just owner',
+          ccDestination=Just owner,
           ccGasLimit=fromIntegral gas + stipend,
-          ccValue=fromIntegral value'
+          ccValue=fromIntegral value
           }
         return (1, Nothing)
 
@@ -635,11 +635,11 @@ runOperation CALLCODE = do
   push result
 
 runOperation RETURN = do
-  address' <- pop
+  address <- pop
   size <- pop
 
-  --retVal <- mLoadByteString address' size
-  retVal <- unsafeSliceByteString address' size
+  --retVal <- mLoadByteString address size
+  retVal <- unsafeSliceByteString address size
 
   setDone True
   setReturnVal $ Just retVal
@@ -657,34 +657,34 @@ runOperation DELEGATECALL = do
       outOffset <- pop
       outSize <- pop::VMM Word256
 
-      owner' <- getEnvVar envOwner
-      sender' <- getEnvVar envSender
+      owner <- getEnvVar envOwner
+      sender <- getEnvVar envSender
 
       inputData <- unsafeSliceByteString inOffset inSize
 
-      value' <- getEnvVar envValue
+      value <- getEnvVar envValue
 
       _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
 
       vmState <- lift get
 
-      callDepth' <- getCallDepth
+      callDepth <- getCallDepth
 
       (result, maybeBytes) <-
-          case (callDepth' > 1023, debugCallCreates vmState) of
+          case (callDepth > 1023, debugCallCreates vmState) of
             (True, _) -> do
               addGas $ fromIntegral gas
               return (0, Nothing)
             (_, Nothing) -> do
-              nestedRun_debugWrapper True (fromIntegral gas) owner' to sender' (fromIntegral value') inputData
+              nestedRun_debugWrapper True (fromIntegral gas) owner to sender (fromIntegral value) inputData
             (_, Just _) -> do
               --addToBalance' owner (-fromIntegral value)
               addGas $ fromIntegral gas
               addDebugCallCreate DebugCallCreate {
                                        ccData=inputData,
-                                       ccDestination=Just $  owner',
+                                       ccDestination=Just $ owner,
                                        ccGasLimit=fromIntegral gas,
-                                       ccValue=fromIntegral value'
+                                       ccValue=fromIntegral value
                                      }
               return (1, Nothing)
 
@@ -708,10 +708,10 @@ runOperation STATICCALL = do
   localState (\vms -> vms {writable=False}) $ runOperation CALL
 
 runOperation REVERT = do
-  address' <- pop
+  address <- pop
   size <- pop
 
-  retVal <- unsafeSliceByteString address' size
+  retVal <- unsafeSliceByteString address size
 
   setReturnVal $ Just retVal
   throwE RevertException
@@ -720,17 +720,17 @@ runOperation INVALID = throwE InvalidInstruction
 
 runOperation SUICIDE = do
   guardStorage
-  address' <- pop
-  owner' <- getEnvVar envOwner
-  addressState <- getAddressState owner'
+  address <- pop
+  owner <- getEnvVar envOwner
+  addressState <- getAddressState owner
 
   let allFunds = addressStateBalance addressState
-  pay' "transferring all funds upon suicide" owner' address' allFunds
+  pay' "transferring all funds upon suicide" owner address allFunds
 
-  putAddressState owner' addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
+  putAddressState owner addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
 
 
-  addSuicideList owner'
+  addSuicideList owner
   setDone True
 
 
@@ -838,9 +838,9 @@ opGasPriceAndRefund SSTORE = do
       (x, 0) | x /= 0 -> return (5000, 15000)
       _      -> return (5000, 0)
 opGasPriceAndRefund SUICIDE = do
-    owner' <- getEnvVar envOwner
+    owner <- getEnvVar envOwner
     currentSuicideList <- fmap suicideList $ lift get
-    if owner' `S.member` currentSuicideList
+    if owner `S.member` currentSuicideList
        then return (0, 0)
        else return (0, 24000)
 
@@ -936,13 +936,13 @@ runCodeFromStart = do
    _ -> runCode 0
 
 runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM a -> ContextM (Either VMException a, VMState)
-runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas f = do
+runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
   dbs' <- get
   vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
 
   result <- lift $
       flip runStateT vmState{
-                         callDepth=callDepth',
+                         callDepth=callDepth,
                          vmGasRemaining=availableGas,
                          suicideList=preExistingSuicideList} $
       runExceptT f
@@ -976,22 +976,22 @@ create :: Bool
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> ContextM (Either VMException Code, VMState)
-create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' origin
-       value' gasPrice' availableGas newAddress initCode' txHash' chainId' metadata' = do
+create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
+       value gasPrice availableGas newAddress initCode txHash chainId metadata = do
   let env =
         Environment{
-          envGasPrice = gasPrice',
+          envGasPrice = gasPrice,
           envBlockHeader=b,
           envOwner = newAddress,
           envOrigin = origin,
           envInputData = B.empty,
-          envSender = sender',
-          envValue = value',
-          envCode = initCode',
-          envJumpDests = getValidJUMPDESTs initCode',
-          envTxHash = txHash',
-          envChainId = chainId',
-          envMetadata = metadata'
+          envSender = sender,
+          envValue = value,
+          envCode = initCode,
+          envJumpDests = getValidJUMPDESTs initCode,
+          envTxHash = txHash,
+          envChainId = chainId,
+          envMetadata = metadata
           }
 
   dbs' <- get
@@ -999,7 +999,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' o
   vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
 
   success <-
-    if toInteger value' > 0
+    if toInteger value > 0
     then do
     --it is a statistical impossibility that a new account will be created with the same address as
     --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
@@ -1010,19 +1010,19 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' o
     --This next line will actually create the account addressState data....
     --In the extremely unlikely even that the address already exists, it will preserve
     --the existing balance.
-    pay "transfer value" sender' newAddress $ fromIntegral value'
+    pay "transfer value" sender newAddress $ fromIntegral value
     else return True
 
   ret <-
     if success
-      then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas create'
+      then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas create'
       else return (Left InsufficientFunds, vmState)
 
   case ret of
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
       --have the value, and I can revert without checking for success.
-      _ <- pay "revert value transfer" newAddress sender' (fromIntegral value')
+      _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
 
       purgeStorageMap newAddress
       deleteAddressState newAddress
@@ -1034,57 +1034,57 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender' o
 create' :: VMM Code
 create' = do
 
-  owner' <- getEnvVar envOwner
-  action . actionData %= M.insert owner' (ActionData (SHA 0) M.empty [])
+  owner <- getEnvVar envOwner
+  action . actionData %= M.insert owner (ActionData (SHA 0) M.empty [])
 
   runCodeFromStart
 
   vmState <- lift get
 
-  let codeBytes' = fromMaybe B.empty $ returnVal vmState
-  (action . actionData . at owner' . mapped . codeHash) .= hash codeBytes'
-  when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes'
+  let codeBytes = fromMaybe B.empty $ returnVal vmState
+  (action . actionData . at owner . mapped . actionDataCodeHash) .= hash codeBytes
+  when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   lift $ do
     $logInfoS "create'" "Trying to create contract"
-    $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes'))
+    $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes))
     $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show (vmGasRemaining vmState)
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
-  if (not $ vmIsHomestead vmState) && (vmGasRemaining vmState < gCREATEDATA * toInteger (B.length codeBytes'))
+  if (not $ vmIsHomestead vmState) && (vmGasRemaining vmState < gCREATEDATA * toInteger (B.length codeBytes))
     then do
       lift $ do
         $logInfoS "create'/lowGas" . T.pack $ CL.red "Not enough gas to create contract, contract being thrown away (account was created though)"
-        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes'))
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes))
         $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
       lift $ put vmState{returnVal=Nothing}
-      assignCode "" owner'
+      assignCode "" owner
       assignDetails
       return $ Code ""
     else do
-      useGas $ gCREATEDATA * toInteger (B.length codeBytes')
-      assignCode codeBytes' owner'
+      useGas $ gCREATEDATA * toInteger (B.length codeBytes)
+      assignCode codeBytes owner
       assignDetails
-      return $ Code codeBytes'
+      return $ Code codeBytes
 
   where
     assignCode::B.ByteString->Address->VMM ()
-    assignCode codeBytes' address' = do
-      addCode codeBytes'
-      newAddressState <- getAddressState address'
-      putAddressState address' newAddressState{addressStateCodeHash=hash codeBytes'}
+    assignCode codeBytes address = do
+      addCode codeBytes
+      newAddressState <- getAddressState address
+      putAddressState address newAddressState{addressStateCodeHash=hash codeBytes}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
-      action . actionData . at envOwner. mapped . callData %=
+      action . actionData . at envOwner. mapped . actionDataCallData %=
         (:) CallData
-              { _callType    = Create
-              , _sender      = envSender
-              , _owner       = envOwner
-              , _gasPrice    = envGasPrice
-              , _value       = envValue
-              , _input       = envInputData
-              , _output      = returnVal vmState
+              { _callDataType        = Create
+              , _callDataSender      = envSender
+              , _callDataOwner       = envOwner
+              , _callDataGasPrice    = envGasPrice
+              , _callDataValue       = envValue
+              , _callDataInput       = envInputData
+              , _callDataOutput      = returnVal vmState
               }
 
 call :: Bool
@@ -1105,8 +1105,8 @@ call :: Bool
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> ContextM (Either VMException B.ByteString, VMState)
-call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth' receiveAddress
-     (Address codeAddress) sender' value' gasPrice' theData availableGas origin txHash' chainId' metadata' = do
+call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
+     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
 
   addressState <- getAddressState $ Address codeAddress
 
@@ -1117,33 +1117,33 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
 
   let env =
         Environment{
-          envGasPrice=fromIntegral gasPrice',
+          envGasPrice=fromIntegral gasPrice,
           envBlockHeader=b,
           envOwner = receiveAddress,
           envOrigin = origin,
           envInputData = theData,
-          envSender = sender',
-          envValue = fromIntegral value',
+          envSender = sender,
+          envValue = fromIntegral value,
           envCode = code,
           envJumpDests = getValidJUMPDESTs code,
-          envTxHash = txHash',
-          envChainId = chainId',
-          envMetadata = metadata'
+          envTxHash = txHash,
+          envChainId = chainId,
+          envMetadata = metadata
           }
 
-  runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas $ call' noValueTransfer
+  runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas $ call' noValueTransfer
 
 call' :: Bool -> VMM B.ByteString
 call' noValueTransfer = do
-  value' <- getEnvVar envValue
+  value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
-  sender' <- getEnvVar envSender
+  sender <- getEnvVar envSender
   ch <- addressStateCodeHash <$> getAddressState receiveAddress
   action . actionData %= M.insert receiveAddress (ActionData ch M.empty [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" sender' receiveAddress (fromIntegral value')
+    _ <- pay "call value transfer" sender receiveAddress (fromIntegral value)
     return ()
 
   runCodeFromStart
@@ -1156,36 +1156,36 @@ call' noValueTransfer = do
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
   let Environment{..} = environment vmState
-  action . actionData . at envOwner. mapped . callData %=
+  action . actionData . at envOwner. mapped . actionDataCallData %=
     (:) CallData
-          { _callType    = Update
-          , _sender      = envSender
-          , _owner       = envOwner
-          , _gasPrice    = envGasPrice
-          , _value       = envValue
-          , _input       = envInputData
-          , _output      = returnVal vmState
+          { _callDataType        = Update
+          , _callDataSender      = envSender
+          , _callDataOwner       = envOwner
+          , _callDataGasPrice    = envGasPrice
+          , _callDataValue       = envValue
+          , _callDataInput       = envInputData
+          , _callDataOutput      = returnVal vmState
           }
 
   return (fromMaybe B.empty $ returnVal vmState)
 
 create_debugWrapper :: BlockData -> Address -> Word256 -> B.ByteString -> VMM (Maybe Address)
-create_debugWrapper block owner' value' initCodeBytes = do
+create_debugWrapper block owner value initCodeBytes = do
 
-  addressState <- getAddressState owner'
+  addressState <- getAddressState owner
 
-  if fromIntegral value' > addressStateBalance addressState
+  if fromIntegral value > addressStateBalance addressState
     then return Nothing
     else do
-      newAddress <- getNewAddress owner'
+      newAddress <- getNewAddress owner
 
       let initCode = Code initCodeBytes
 
       origin <- getEnvVar envOrigin
-      gasPrice' <- getEnvVar envGasPrice
-      txHash' <- getEnvVar envTxHash
-      chainId' <- getEnvVar envChainId
-      metadata' <- getEnvVar envMetadata
+      gasPrice <- getEnvVar envGasPrice
+      txHash <- getEnvVar envTxHash
+      chainId <- getEnvVar envChainId
+      metadata <- getEnvVar envMetadata
 
       gasRemaining <- getGasRemaining
 
@@ -1203,16 +1203,16 @@ create_debugWrapper block owner' value' initCodeBytes = do
                           (suicideList currentVMState)
                           block
                           (currentCallDepth+1)
-                          owner'
+                          owner
                           origin
-                          (toInteger value')
-                          gasPrice'
+                          (toInteger value)
+                          gasPrice
                           gasRemaining
                           newAddress
                           initCode
-                          txHash'
-                          chainId'
-                          metadata'
+                          txHash
+                          chainId
+                          metadata
 
       ((result, finalVMState), finalDBs) <- runEm callEm
 
@@ -1237,7 +1237,7 @@ create_debugWrapper block owner' value' initCodeBytes = do
           return $ Just newAddress
 
 nestedRun_debugWrapper :: Bool -> Integer -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe B.ByteString)
-nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sender' value' inputData = do
+nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) sender value inputData = do
 
   currentCallDepth <- getCallDepth
 
@@ -1257,9 +1257,9 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
                     (envBlockHeader env)
                     (currentCallDepth+1)
                     receiveAddress
-                    (Address address')
-                    sender'
-                    value'
+                    (Address address)
+                    sender
+                    value
                     (fromIntegral $ envGasPrice env)
                     inputData
                     gas

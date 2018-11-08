@@ -222,18 +222,18 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
          in (cHash, md)
       getMetadata = flip Map.lookup metadatas
       toAction a d = A.Action
-        { A._blockHash = SHA 0
-        , A._blockTimestamp = posixSecondsToUTCTime 0
-        , A._blockNumber = 0
-        , A._transactionHash = SHA chainId
-        , A._transactionChainId = Just chainId
-        , A._transactionSender = Ad.Address 0
+        { A._actionBlockHash = SHA 0
+        , A._actionBlockTimestamp = posixSecondsToUTCTime 0
+        , A._actionBlockNumber = 0
+        , A._actionTransactionHash = SHA chainId
+        , A._actionTransactionChainId = Just chainId
+        , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $
                            A.ActionData
                              (codeHash d)
                              (Map.map fromDiff $ storage d)
                              []
-        , A._metadata = getMetadata (codeHash d)
+        , A._actionMetadata = getMetadata (codeHash d)
         }
       fromDiff (Value v) = v
       squashMap f = map (uncurry f) . Map.toList

@@ -45,7 +45,7 @@ import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
-import           Blockchain.Data.Action                  hiding (codeHash, blockHash)
+import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -220,7 +220,7 @@ addBlocks blocks' = do
     timerToUse = Just vmBlockInsertionMined
 
 setTitle :: String -> IO()
-setTitle value' = putStr $ "\ESC]0;" ++ value' ++ "\007"
+setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot b@OutputBlock{..} = do
@@ -449,7 +449,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
 
   return (const B.empty <$> result, vmState)
 
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner' OutputTx{otBaseTx=ut} = do --MessageTX
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
   call isRunningTests'
@@ -458,8 +458,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner' Ou
        S.empty
        b
        0
-       owner'
-       owner'
+       owner
+       owner
        tAddr
        (fromInteger $ transactionValue ut)
        (fromInteger $ transactionGasPrice ut)

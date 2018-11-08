@@ -15,6 +15,7 @@ import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))
 import           Data.Aeson
 import           Data.ByteString              (ByteString)
+import           Data.Function                (on)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Text                    (Text)
@@ -30,25 +31,25 @@ instance ToJSON CallType where
 instance FromJSON CallType where
 
 data CallData = CallData
-  { _callType    :: CallType
-  , _sender      :: Address
-  , _owner       :: Address
-  , _gasPrice    :: Integer
-  , _value       :: Integer
-  , _input       :: ByteString
-  , _output      :: Maybe ByteString
+  { _callDataType     :: CallType
+  , _callDataSender   :: Address
+  , _callDataOwner    :: Address
+  , _callDataGasPrice :: Integer
+  , _callDataValue    :: Integer
+  , _callDataInput    :: ByteString
+  , _callDataOutput   :: Maybe ByteString
   } deriving (Show, Generic, NFData)
 makeLenses ''CallData
 
 instance ToJSON CallData where
   toJSON CallData{..} = object
-    [ "type"    .= _callType
-    , "sender"  .= _sender
-    , "owner"   .= _owner
-    , "gasPrice".= _gasPrice
-    , "value"   .= _value
-    , "input"   .= _input
-    , "output"  .= _output
+    [ "type"    .= _callDataType
+    , "sender"  .= _callDataSender
+    , "owner"   .= _callDataOwner
+    , "gasPrice".= _callDataGasPrice
+    , "value"   .= _callDataValue
+    , "input"   .= _callDataInput
+    , "output"  .= _callDataOutput
     ]
 
 instance FromJSON CallData where
@@ -63,23 +64,23 @@ instance FromJSON CallData where
   parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
 
 data ActionData = ActionData
-  { _codeHash     :: SHA
-  , _storageDiffs :: Map Word256 Word256
-  , _callData     :: [CallData]
+  { _actionDataCodeHash     :: SHA
+  , _actionDataStorageDiffs :: Map Word256 Word256
+  , _actionDataCallData     :: [CallData]
   } deriving (Show, Generic, NFData)
 makeLenses ''ActionData
 
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
-  let diffs = M.union (_storageDiffs newData) (_storageDiffs oldData)
-      calls = (_callData oldData) ++ (_callData newData)
-   in ActionData (_codeHash oldData) diffs calls
+  let diffs = (M.union `on` _actionDataStorageDiffs) newData oldData
+      calls = ((++) `on` _actionDataCallData) oldData newData
+   in ActionData (_actionDataCodeHash oldData) diffs calls
 
 instance ToJSON ActionData where
   toJSON ActionData{..} = object
-    [ "codeHash" .= _codeHash
-    , "diff"     .= _storageDiffs
-    , "data"     .= _callData
+    [ "codeHash" .= _actionDataCodeHash
+    , "diff"     .= _actionDataStorageDiffs
+    , "data"     .= _actionDataCallData
     ]
 
 instance FromJSON ActionData where
@@ -90,27 +91,27 @@ instance FromJSON ActionData where
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action = Action
-  { _blockHash          :: SHA
-  , _blockTimestamp     :: UTCTime
-  , _blockNumber        :: Integer
-  , _transactionHash    :: SHA
-  , _transactionChainId :: Maybe Word256
-  , _transactionSender  :: Address
-  , _actionData         :: Map Address ActionData
-  , _metadata           :: Maybe (Map Text Text)
+  { _actionBlockHash          :: SHA
+  , _actionBlockTimestamp     :: UTCTime
+  , _actionBlockNumber        :: Integer
+  , _actionTransactionHash    :: SHA
+  , _actionTransactionChainId :: Maybe Word256
+  , _actionTransactionSender  :: Address
+  , _actionData               :: Map Address ActionData
+  , _actionMetadata           :: Maybe (Map Text Text)
   } deriving (Show, Generic, NFData)
 makeLenses ''Action
 
 instance ToJSON Action where
   toJSON Action{..} = object
-    [ "blockHash"       .= _blockHash
-    , "blockTimestamp"  .= _blockTimestamp
-    , "blockNumber"     .= _blockNumber
-    , "transactionHash" .= _transactionHash
-    , "chainId"         .= _transactionChainId
-    , "sender"          .= _transactionSender
+    [ "blockHash"       .= _actionBlockHash
+    , "blockTimestamp"  .= _actionBlockTimestamp
+    , "blockNumber"     .= _actionBlockNumber
+    , "transactionHash" .= _actionTransactionHash
+    , "chainId"         .= _actionTransactionChainId
+    , "sender"          .= _actionTransactionSender
     , "data"            .= _actionData
-    , "metadata"        .= _metadata
+    , "metadata"        .= _actionMetadata
     ]
 
 instance FromJSON Action where
