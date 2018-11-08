@@ -209,8 +209,7 @@ createInserts globalsIORef = do
             , tableColumns list
             , ");"
             ]
-
-        void $ writeIORef globalsIORef globals{createdContracts=Set.insert hashVal (createdContracts globals)}
+        setContractCreated globalsIORef hashVal
 
     when history $ do
       yield $ T.concat
