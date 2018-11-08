@@ -58,6 +58,8 @@ dependencies:
   - unliftio
   - unordered-containers
   - vector
+  - warp
+  - wai-middleware-prometheus
 
 executables:
   slipstream:
