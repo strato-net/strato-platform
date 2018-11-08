@@ -257,7 +257,7 @@ spec = do
                                            , API.recipient=testAddr
                                            , API.votingdir=True
                                            , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort "localhost" vote
+            liftIO $ API.uploadVote testWebserverPort "localhost" vote `shouldReturn` Right ()
             voteList <- drainVotes
             voteList `shouldMatchList` [vote]
             checkForVotes voteList
@@ -274,7 +274,7 @@ spec = do
                                             , API.recipient=testAddr
                                             , API.votingdir=False
                                             , API.nonce = 1}
-            liftIO $ API.uploadVote testWebserverPort "localhost" vote'
+            liftIO $ API.uploadVote testWebserverPort "localhost" vote' `shouldReturn` Right ()
             voteList' <- drainVotes
             voteList' `shouldMatchList` [vote']
             checkForVotes voteList'
