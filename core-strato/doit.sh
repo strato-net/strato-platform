@@ -42,6 +42,10 @@ function newnode {
     numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
     maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
   fi
+  if [ -n "${blockstanbul}" || -n "${txGossipFanout}" ]; then
+    txgFlag="--txGossipFanout=${txGossipFanout:-3}"
+  fi
+
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
      --connectionTimeout=$actualTimeout \
@@ -50,6 +54,7 @@ function newnode {
      --maxConn=$maxConn \
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
+     ${txgFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
