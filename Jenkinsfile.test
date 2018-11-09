@@ -150,9 +150,13 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running local integration tests'
-              cd strato-worktree/tests
+              pushd strato-worktree/tests
               npm install
               npm run test:truchainz
+              popd
+              pushd strato-worktree/core-strato/strato-init
+              ./check_genesis_ingestion.sh
+              popd
             '''
           }
         )
