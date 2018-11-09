@@ -264,7 +264,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
-      self <- selfAddr
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
           blockNo = blockDataNumber . blockBlockData $ blk
       case eNextSeqNo of
@@ -280,8 +279,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
               let unwrapVal = fromMaybe M.empty val
               let nval = M.insert props vot unwrapVal
               voted %= M.insert bnf nval
-          unless (S.member self realValidators) $
-            validators %= S.insert self
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
