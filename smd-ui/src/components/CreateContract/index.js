@@ -126,21 +126,39 @@ class CreateContract extends Component {
     const metadata = {};
     contracts.forEach(function(contract) {
       if (values[`history@${contract}`]) {
-        if (metadata["history"]) {
-          const curHistory = metadata["history"];
-          metadata["history"] = curHistory + ',' + contract;
+        if (metadata['history']) {
+          const curHistory = metadata['history'];
+          metadata['history'] = curHistory + ',' + contract;
         }
         else {
-          metadata["history"] = contract;
+          metadata['history'] = contract;
+        }
+      }
+      else {
+        if (metadata['nohistory']) {
+          const curNohistory = metadata['nohistory'];
+          metadata['nohistory'] = curNohistory + ',' + contract;
+        }
+        else {
+          metadata['nohistory'] = contract;
         }
       }
       if (values[`noindex@${contract}`]) {
-        if (metadata["noindex"]) {
-          const curNoIndex = metadata["noindex"];
-          metadata["noindex"] = curNoIndex + ',' + contract;
+        if (metadata['noindex']) {
+          const curNoIndex = metadata['noindex'];
+          metadata['noindex'] = curNoIndex + ',' + contract;
         }
         else {
-          metadata["noindex"] = contract;
+          metadata['noindex'] = contract;
+        }
+      }
+      else {
+        if (metadata['index']) {
+          const curIndex = metadata['index'];
+          metadata['index'] = curIndex + ',' + contract;
+        }
+        else {
+          metadata['index'] = contract;
         }
       }
     });
