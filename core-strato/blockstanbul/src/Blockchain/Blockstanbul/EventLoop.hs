@@ -274,7 +274,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           case extractBeneficiary blk of
             Nothing -> return ()
             Just (bnf, vot) -> do
-          --if it is from proposer, updated voted
               val <- uses voted $M.lookup bnf
               let unwrapVal = fromMaybe M.empty val
               let nval = M.insert props vot unwrapVal
