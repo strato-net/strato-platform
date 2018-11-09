@@ -42,7 +42,7 @@ function newnode {
     numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
     maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
   fi
-  if [ -n "${blockstanbul}" || -n "${txGossipFanout}" ]; then
+  if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
 
@@ -157,11 +157,14 @@ function cleanupDB {
 function doInit {
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
+  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
+    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
+  fi
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty $xfFlag"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ $backupblocks ]] ; then

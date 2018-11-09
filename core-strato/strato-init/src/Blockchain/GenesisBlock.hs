@@ -94,15 +94,19 @@ readSupplementaryAccounts genesisBlockName = do
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
                                          HasStateDB m, HasStorageDB m)
                                      => String
+                                     -> [Ad.Address]
                                      -> m ([(AccountInfo, CodeInfo)], Block)
-getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
+getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let genesis = JS.parseLazyByteString genesisParser theJSONString
         theJSON = case genesis of
                       [x] -> x
                       _ -> error $ "invalid genesis: " ++ show genesis
+        faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
+        faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
+        theJSON' = theJSON{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo theJSON)}
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
-    genesisInfoToGenesisBlock theJSON genesisBlockName extraAccounts
+    genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
@@ -118,19 +122,20 @@ initializeGenesisBlock :: ( MonadResource m
                           )
                        => BackupType
                        -> String
+                       -> [Ad.Address]
                        -> m ()
-initializeGenesisBlock backupType genesisBlockName = do
+initializeGenesisBlock backupType genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
     (srcInfo, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 putGenesisHash $ blockHash gb
                 return (si, gb, obGB)
             BlockBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 backupBlocks
