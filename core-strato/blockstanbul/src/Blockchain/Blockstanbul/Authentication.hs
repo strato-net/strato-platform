@@ -13,7 +13,7 @@ import Data.Binary
 import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Set as S
 import MonadUtils (liftIO1)
 import Test.QuickCheck
@@ -143,10 +143,8 @@ authenticate (IMsg (MsgAuth addr sig) tm) =
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
 
-replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String Word256
+replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
 replayHistoricBlock realValidators seqNo blk = do
-  -- TODO(tim): This needs to be fixed for validator voting, as the current list
-  -- may have diverged from the validators at the time of commit
   let ExtraData{..} = cookRawExtra . view extraLens $ blk
   IstanbulExtra{..} <- case _istanbul of
     Nothing -> Left "no istanbul metadata"
@@ -169,7 +167,7 @@ replayHistoricBlock realValidators seqNo blk = do
     Left $ "unknown signers: " ++ unexplained
   unless (3 * S.size signers > 2 * S.size realValidators) $
     Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
-  Right . fromIntegral $ seqNo + 1
+  Right (fromIntegral $ seqNo + 1, fromJust mProp)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = (> 32) . B.length . view extraLens

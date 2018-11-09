@@ -262,8 +262,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary _ (benf,decision,_)  -> do
       pendingvotes %= M.insert benf decision
     PreviousBlock blk -> do
-      -- TODO(tim): This needs to be fixed for validator voting, as the current list
-      -- may have diverged from the validators at the time of commit
       realValidators <- use validators
       seqNo <- use $ view . sequence
       self <- selfAddr
@@ -272,9 +270,16 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       case eNextSeqNo of
         Left err -> $logWarnS "blockstanbul" . T.pack
                     . printf "Rejecting historical block #%d: %s" blockNo $ err
-        Right _ -> do
-          -- TODO(tim): Does it have a vote to record?
+        Right (_, props) -> do
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
+          case extractBeneficiary blk of
+            Nothing -> return ()
+            Just (bnf, vot) -> do
+          --if it is from proposer, updated voted
+              val <- uses voted $M.lookup bnf
+              let unwrapVal = fromMaybe M.empty val
+              let nval = M.insert props vot unwrapVal
+              voted %= M.insert bnf nval
           unless (S.member self realValidators) $
             validators %= S.insert self
           yield . ToCommit $ blk
