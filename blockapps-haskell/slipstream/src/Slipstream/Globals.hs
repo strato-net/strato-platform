@@ -7,6 +7,8 @@ module Slipstream.Globals
 
 
 import           BlockApps.Solidity.Value
+import           Control.DeepSeq
+
 import           Control.Monad.IO.Class
 import qualified Data.Map.Strict             as M
 import           Data.Set                    (Set)
@@ -78,3 +80,6 @@ setContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> [(
 setContractState gref address chainId values = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractStates = M.insert (address, chainId) values contractStates}
+
+forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
+forceGlobalEval gref = liftIO $ modifyIORef' gref force

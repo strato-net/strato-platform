@@ -1,7 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
     , RecordWildCards
-    , DeriveGeneric
     , QuasiQuotes
     , ScopedTypeVariables
     , DataKinds
@@ -15,6 +14,7 @@
 module Slipstream.Data.Action where
 
 import           BlockApps.Ethereum
+import           Control.DeepSeq
 import           Control.Lens            hiding ((.=))
 import qualified Data.Aeson.Encoding     as AesonEnc
 import           Data.ByteString         (ByteString)
@@ -48,10 +48,7 @@ instance FromJSONKey Address where
 instance FromJSONKey (Hex Word256) where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
-data CallType = Create | Delete | Update deriving (Eq, Show, Generic)
-
-instance ToJSON CallType where
-instance FromJSON CallType where
+data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 data CallData = CallData
   { _callType    :: CallType
@@ -61,7 +58,7 @@ data CallData = CallData
   , _value       :: Integer
   , _input       :: ByteString
   , _output      :: Maybe ByteString
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''CallData
 
 instance ToJSON CallData where
@@ -90,7 +87,7 @@ data ActionData = ActionData
   { _codeHash     :: Keccak256
   , _storageDiffs :: Map Word256 Word256
   , _callData     :: [CallData]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''ActionData
 
 instance ToJSON ActionData where
@@ -116,7 +113,7 @@ data Action' = Action'
   , _transactionSender  :: Address
   , _actionData         :: Map Address ActionData
   , _metadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''Action'
 
 instance ToJSON Action' where
@@ -156,7 +153,7 @@ data Action = Action
   , actionType               :: CallType
   , actionCallData           :: [CallData]
   , actionMetadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 
 flatten :: Action' -> [Action]
 flatten Action'{..} = flip map (M.toList _actionData) $

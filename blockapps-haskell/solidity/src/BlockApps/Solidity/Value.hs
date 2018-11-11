@@ -1,10 +1,10 @@
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Solidity.Value where
 
 
 import           ClassyPrelude           ((<>))
+import           Control.DeepSeq
 import           Control.Monad           (sequence)
 import qualified Data.Bimap              as Bimap
 import qualified Data.Binary             as Binary
@@ -22,6 +22,7 @@ import qualified Data.Text               as Text
 import qualified Data.Text.Encoding      as Text
 import           Data.Traversable        (for)
 import           Data.Word               (Word8)
+import           GHC.Generics
 import           Text.Read
 
 import           BlockApps.Ethereum
@@ -54,7 +55,7 @@ data Value
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | ValueMapping (Map SimpleValue Value)
   | ValueStruct [(Text, Value)]
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 data SimpleValue
   = ValueBool Bool
@@ -67,7 +68,7 @@ data SimpleValue
   | ValueBytes { bytesSize :: Maybe Integer
                , bytesVal  :: ByteString
                }
-    deriving (Show)
+    deriving (Show, Generic, NFData)
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
