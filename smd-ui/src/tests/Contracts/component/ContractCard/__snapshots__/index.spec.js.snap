@@ -772,7 +772,7 @@ ShallowWrapper {
                         "rendered": Array [
                           Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                             "nodeType": "host",
                             "props": Object {
                               "children": Array [
@@ -1622,7 +1622,7 @@ ShallowWrapper {
                           "rendered": Array [
                             Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                               "nodeType": "host",
                               "props": Object {
                                 "children": Array [
@@ -2675,7 +2675,7 @@ ShallowWrapper {
                         "rendered": Array [
                           Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                             "nodeType": "host",
                             "props": Object {
                               "children": Array [
@@ -4995,7 +4995,7 @@ ShallowWrapper {
                           "rendered": Array [
                             Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                               "nodeType": "host",
                               "props": Object {
                                 "children": Array [
@@ -8651,7 +8651,7 @@ ShallowWrapper {
                         "rendered": Array [
                           Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                             "nodeType": "host",
                             "props": Object {
                               "children": Array [
@@ -9697,7 +9697,7 @@ ShallowWrapper {
                           "rendered": Array [
                             Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b",
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
                               "nodeType": "host",
                               "props": Object {
                                 "children": Array [

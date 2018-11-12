@@ -30,17 +30,15 @@ describe('MenuBar: index', () => {
           { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
           { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
+        fetchChainIds: jest.fn(),
         location: {
           search: '?developer'
-        }
+        },
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
@@ -259,17 +257,15 @@ describe('MenuBar: index', () => {
           { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
           { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
+        fetchChainIds: jest.fn(),
         location: {
           search: '?developer'
-        }
+        },
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
@@ -284,15 +280,13 @@ describe('MenuBar: index', () => {
           { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
           { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
-        location: {}
+        fetchChainIds: jest.fn(),
+        location: {},
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
