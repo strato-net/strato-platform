@@ -45,6 +45,7 @@ dependencies:
   - largeword
   - lens
   - logging-effect
+  - lrucache
   - milena
   - MissingH
   - monad-control
