@@ -35,6 +35,7 @@ dependencies:
   - ethereum-discovery
   - ethereum-encryption
   - ethereum-rlp
+  - ghc
   - blockapps-haskoin
   - hflags
   - iproute
@@ -50,6 +51,7 @@ dependencies:
   - network
   - persistent
   - prometheus-client
+  - random
   - resourcet
   - SafeSemaphore
   - stm

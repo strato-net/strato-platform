@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Strato.Strato23.Server.Signature where
 
@@ -19,7 +20,7 @@ postSignature userName userId (UserData (Hex msgHash)) = do
   mpk <- vaultTransaction
         . vaultQueryMaybe
         $ getUserKeyQuery userName
-  (salt,nonce,pKey) <- case mpk of
+  (salt,nonce,pKey,(_ :: Address)) <- case mpk of
     Just pk -> return pk
     Nothing -> do
       _ <- postKey userName userId

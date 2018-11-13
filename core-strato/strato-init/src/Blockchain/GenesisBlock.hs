@@ -14,9 +14,9 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.ByteString.Base16                       as B16
+import qualified Data.ByteString.Char8                        as C8
+import qualified Data.ByteString.Lazy.Char8                   as BLC
 import           Data.Either                                  (isLeft)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
@@ -199,7 +199,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                 A.ActionData
                                   (codeHash d)
                                   (Map.map fromDiff $ storage d)
-                                  []
+                                  [A.emptyCallData]
             , A._actionMetadata = getMetadata (codeHash d)
             }
           fromDiff :: Diff Word256 'Eventual -> Word256

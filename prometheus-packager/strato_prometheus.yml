@@ -33,6 +33,10 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets: ['strato:8000']
+  - job_name: 'slipstream'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['bloc:10777']
 
 #   metric_relabel_configs:
 #   - source_labels: [__name__]

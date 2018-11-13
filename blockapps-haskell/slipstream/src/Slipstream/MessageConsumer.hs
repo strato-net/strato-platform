@@ -28,6 +28,7 @@ import Data.IORef
 import System.Log.Logger
 
 import Slipstream.Globals
+import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.Processor
 
@@ -107,6 +108,8 @@ getAndProcessMessages conn cache offset errorCounter = do
            then error $ "Slipstream reached exceptionMaxCount."
            else getAndProcessMessages conn cache offset (errorCounter + 1)
     Right messages -> do
+      recordKafkaMessages messages
+      forceGlobalEval cache
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
         liftIO $ threadDelay 1000000

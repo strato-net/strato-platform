@@ -27,6 +27,8 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           MonadUtils
+import           System.Random
 import           Text.Printf
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
@@ -43,6 +45,7 @@ import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Format
+import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
@@ -317,7 +320,7 @@ handleEvents peer = awaitForever $ \case
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       OETx _ tx -> do
-        when (shouldSend peer $ otOrigin tx) $ do
+        whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
             Nothing -> return True
@@ -413,7 +416,7 @@ syncFetch d num = do
         stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
-shouldSend peer tx = case tx of
+shouldSend peer txo = case txo of
     Origin.PeerString ps -> ps /= peerString peer
     Origin.API           -> True
     Origin.BlockHash _   -> False
@@ -422,6 +425,15 @@ shouldSend peer tx = case tx of
     Origin.Morphism      -> -- probably means it was converted, see if this is a problem
         trace "NewTx of type Morphism came in. Should this even happen?" True
     Origin.Blockstanbul -> False
+
+shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
+shouldSendGossip peer txo = (shouldSend peer txo &&) . (flags_txGossipFanout /= -1 ||) <$>
+  case txo of
+    Origin.PeerString{} -> do
+      rangeEnd <- getNumPeersMem
+      rng <- liftIO $ randomRIO (1, rangeEnd)
+      return $ rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
+    _ -> return True
 
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list

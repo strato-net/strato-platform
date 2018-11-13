@@ -19,7 +19,7 @@ const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
-export function createContractApiCall(contract, src, username, address, password, args, chainId) {
+export function createContractApiCall(contract, src, username, address, password, args, chainId, metadata) {
   const contractUrl = url.replace(":user", username).replace(":address", address);
   return fetch(
     chainId ? contractUrl.replace(":chainid", `chainid=${chainId}`) : contractUrl.replace("&:chainid", ''), {
@@ -28,7 +28,7 @@ export function createContractApiCall(contract, src, username, address, password
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ contract, value: 0, password, src, args })
+      body: JSON.stringify({ contract, value: 0, password, src, args, metadata })
     }).then(function (response) {
       return response.json();
     }).catch(function (error) {
@@ -88,7 +88,7 @@ export function compileContractApiCall(contractName, source, s) {
 
 export function* createContract(action) {
   try {
-    let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId);
+    let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId, action.payload.metadata);
     yield put(createContractSuccess(response));
     yield put(updateToast());
     yield put(fetchContracts());

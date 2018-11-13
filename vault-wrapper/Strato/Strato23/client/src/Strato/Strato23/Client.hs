@@ -15,7 +15,7 @@ import           Strato.Strato23.API
 getPing :: ClientM String
 getPing = client (Proxy @ GetPing)
 
-getKey :: Text -> Text -> ClientM StatusAndAddress
+getKey :: Text -> Text -> Maybe Text -> ClientM StatusAndAddress
 getKey = client (Proxy @ GetKey)
 
 postKey :: Text -> Text -> ClientM StatusAndAddress

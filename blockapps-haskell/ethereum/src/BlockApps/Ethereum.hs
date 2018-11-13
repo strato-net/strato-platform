@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -125,9 +124,7 @@ instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
 newtype Address = Address { unAddress :: Word160 }
-  deriving (Eq, Ord, Generic, Bounded)
-
-instance NFData Address
+  deriving (Eq, Ord, Generic, Bounded, NFData)
 
 instance Show Address where show = addressString
 
@@ -229,9 +226,7 @@ deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 --------------------------------------------------------------------------------
 
 newtype ChainId = ChainId { unChainId :: Word256 }
-  deriving (Eq, Ord, Generic, Bounded)
-
-instance NFData ChainId
+  deriving (Eq, Ord, Generic, Bounded, NFData)
 
 instance Show ChainId where show = chainIdString
 
@@ -306,7 +301,8 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 --------------------------------------------------------------------------------
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
-  deriving (Eq,Ord,Show,Generic)
+  deriving (Eq,Ord,Show,Generic, NFData)
+
 keccak256ByteString :: Keccak256 -> ByteString
 keccak256ByteString = ByteArray.convert . digestKeccak256
 
@@ -414,9 +410,7 @@ data Transaction = Transaction
   , transactionR          :: Word256
   , transactionS          :: Word256
   , transactionMetadata   :: Maybe (Map Text Text)
-  } deriving (Eq,Show,Generic)
-
-instance NFData Transaction
+  } deriving (Eq,Show,Generic, NFData)
 
 instance RLPEncodable Text where
   rlpEncode = rlpEncode . Text.unpack
@@ -597,8 +591,7 @@ data BlockHeader = BlockHeader
   , blockHeaderChainId          :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
-newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
-instance NFData Nonce
+newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic, NFData)
 
 instance ToJSON Nonce where
   toJSON (Nonce n) = toJSON $ toInteger n
@@ -626,8 +619,7 @@ instance RLPEncodable Nonce where
 incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n+1)
 
-newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
-instance NFData Wei
+newtype Wei = Wei Word256 deriving (Eq,Show,Generic, NFData)
 
 -- --TODO- this might be unsafe, since it could lead to an overflow.  A Word256 * 10^18 certainly can be much higer than a Word256
 -- eth::Word256->Wei
@@ -656,9 +648,7 @@ instance RLPEncodable Wei where
   rlpEncode (Wei n) = rlpEncode $ toInteger n
   rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
-newtype Gas = Gas Integer deriving (Eq,Show,Generic)
-
-instance NFData Gas
+newtype Gas = Gas Integer deriving (Eq,Show,Generic,NFData)
 
 instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 

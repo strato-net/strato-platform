@@ -232,7 +232,7 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
                            A.ActionData
                              (codeHash d)
                              (Map.map fromDiff $ storage d)
-                             []
+                             [A.emptyCallData]
         , A._actionMetadata = getMetadata (codeHash d)
         }
       fromDiff (Value v) = v

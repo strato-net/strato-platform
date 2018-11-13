@@ -123,6 +123,47 @@ class CreateContract extends Component {
     });
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
+    const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
+    const metadata = {};
+    contracts.forEach(function(contract) {
+      if (values[`history@${contract}`]) {
+        if (metadata['history']) {
+          const curHistory = metadata['history'];
+          metadata['history'] = curHistory + ',' + contract;
+        }
+        else {
+          metadata['history'] = contract;
+        }
+      }
+      else {
+        if (metadata['nohistory']) {
+          const curNohistory = metadata['nohistory'];
+          metadata['nohistory'] = curNohistory + ',' + contract;
+        }
+        else {
+          metadata['nohistory'] = contract;
+        }
+      }
+      if (values[`noindex@${contract}`]) {
+        if (metadata['noindex']) {
+          const curNoIndex = metadata['noindex'];
+          metadata['noindex'] = curNoIndex + ',' + contract;
+        }
+        else {
+          metadata['noindex'] = contract;
+        }
+      }
+      else {
+        if (metadata['index']) {
+          const curIndex = metadata['index'];
+          metadata['index'] = curIndex + ',' + contract;
+        }
+        else {
+          metadata['index'] = contract;
+        }
+      }
+    });
+
     const payload = {
       contract: contractname,
       username: values.username,
@@ -131,7 +172,8 @@ class CreateContract extends Component {
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
-      chainId: values.chainId
+      chainId: values.chainId,
+      metadata: metadata
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
@@ -440,6 +482,60 @@ class CreateContract extends Component {
                   </div>
                 </div>
               </div>}
+              {contracts && <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    History
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                    { contracts.map((value, index) => {
+                      return (
+                        <label className="pt-control pt-checkbox">
+                          <Field
+                            id={value}
+                            className="form-width"
+                            name={"history@" + value}
+                            type="checkbox"
+                            component="input"
+                            dir="auto"
+                            title="History"
+                          />
+                          <span className="pt-control-indicator"></span>
+                          {value}
+                        </label>
+                      )
+                    })
+                  }
+                </div>
+              </div>}
+              {contracts && <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    No Index
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                    { contracts.map((value, index) => {
+                      return (
+                        <label className="pt-control pt-checkbox">
+                          <Field
+                            id={value}
+                            className="form-width"
+                            name={"noindex@" + value}
+                            type="checkbox"
+                            component="input"
+                            dir="auto"
+                            title="NoIndex"
+                          />
+                          <span className="pt-control-indicator"></span>
+                          {value}
+                        </label>
+                      )
+                    })
+                  }
+                </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -464,7 +560,6 @@ class CreateContract extends Component {
                 </div>
               </div>
             </div>
-
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {

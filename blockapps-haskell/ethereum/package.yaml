@@ -13,6 +13,11 @@ build-type: Simple
 
 ghc-options: -Wall -Werror
 
+default-extensions:
+  - DeriveAnyClass
+  - DeriveGeneric
+  - LambdaCase
+
 dependencies:
   - base
   - aeson
