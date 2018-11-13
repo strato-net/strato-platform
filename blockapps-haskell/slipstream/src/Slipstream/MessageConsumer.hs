@@ -109,6 +109,7 @@ getAndProcessMessages conn cache offset errorCounter = do
            else getAndProcessMessages conn cache offset (errorCounter + 1)
     Right messages -> do
       recordKafkaMessages messages
+      forceGlobalEval cache
       liftIO $ processTheMessages messages conn cache
       when (null messages) $
         liftIO $ threadDelay 1000000

@@ -1,7 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 module BlockApps.Storage where
 
+import           Control.DeepSeq
 import           Data.LargeWord
+import           GHC.Generics
+
+import           BlockApps.Ethereum ()
 
 type Storage = Word256 -> Word256
 
@@ -10,7 +14,7 @@ type Cache = Word256 -> Maybe Word256
 data Position =
   Position { offset :: Word256
            , byte   :: Int
-           } deriving (Show)
+           } deriving (Show, Generic, NFData)
 
 positionAt :: Word256 -> Position
 positionAt p = Position p 0
