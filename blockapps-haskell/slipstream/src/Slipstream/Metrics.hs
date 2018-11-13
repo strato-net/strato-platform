@@ -5,8 +5,15 @@ module Slipstream.Metrics
   , recordAction
   , incNumTables
   , incNumHistoryTables
+<<<<<<< HEAD
   , incNumBloomWrites
   , recordStackDepth
+=======
+  , recordCacheHit
+  , recordCacheMiss
+  , recordStorageHit
+  , recordStorageMiss
+>>>>>>> 786df2b06... Use cold storage as a backing store for globals
   ) where
 
 import Control.Monad
@@ -84,3 +91,15 @@ incNumBloomWrites = liftIO $ incCounter numBloomWrites
 
 recordStackDepth :: MonadIO m => Int -> m ()
 recordStackDepth = liftIO . setGauge stackDepth . fromIntegral
+
+recordCacheHit :: MonadIO m => m ()
+recordCacheHit = error "todo(tim)"
+
+recordCacheMiss :: MonadIO m => m ()
+recordCacheMiss = error "todo(tim)"
+
+recordStorageHit :: MonadIO m => m ()
+recordStorageHit = error "todo(tim)"
+
+recordStorageMiss :: MonadIO m => T.Text -> m ()
+recordStorageMiss = error "todo(tim)"

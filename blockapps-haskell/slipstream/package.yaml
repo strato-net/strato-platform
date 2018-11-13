@@ -38,6 +38,7 @@ dependencies:
   - containers
   - data-default
   - deepseq
+  - extra
   - hflags
   - hslogger
   - http-client

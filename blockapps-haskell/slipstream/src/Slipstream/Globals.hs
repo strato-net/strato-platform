@@ -10,6 +10,7 @@ import           BlockApps.Solidity.Value
 import           Control.DeepSeq
 
 import           Control.Monad.IO.Class
+import           Data.Either.Extra
 import qualified Data.Map.Strict             as M
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -78,12 +79,19 @@ removeFromNoIndexList g k = do
 getContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
 getContractState globalsIORef address chainId = do
   Globals{..} <- readIORef globalsIORef
-  return $ M.lookup (address,chainId) contractStates
+  case M.lookup (address, chainId) contractStates of
+    jv@Just{} -> do
+      recordCacheHit
+      return jv
+    Nothing -> do
+      recordCacheMiss
+      eitherToMaybe <$> liftIO (readStorage csHandle address chainId)
 
 setContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> [(Text,Value)] -> m ()
 setContractState gref address chainId values = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractStates = M.insert (address, chainId) values contractStates}
+  asyncWriteToStorage csHandle address chainId values
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
