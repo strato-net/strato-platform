@@ -90,16 +90,14 @@ escapeQuotes :: Text -> Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 tableColumns :: [(Text, SolidityValue)] -> Text
-tableColumns = csv . go
-  where go [] = []
-        go ((x,y):xys) = let z = wrapDoubleQuotes $ escapeQuotes x
-                          in (T.concat [z, " ", typeText y]) : go xys
+tableColumns = csv . map go
+  where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
+                    in T.concat [z, " ", typeText y]
 
 tableUpsert :: [Text] -> Text
-tableUpsert = csv . go
-  where go [] = []
-        go (x:xs) = let y = wrapDoubleQuotes $ escapeQuotes x
-                     in (wrap1 y " = excluded.") : go xs
+tableUpsert = csv . map go
+  where go x = let y = wrapDoubleQuotes $ escapeQuotes x
+                in wrap1 y " = excluded."
 
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
