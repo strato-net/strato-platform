@@ -34,6 +34,8 @@ function compare_strings() {
   fi
 }
 
+echo "Testing genesis ingestion"
+echo "Waiting until slipstream has populated postgres..."
 while sleep 1; do
   check_timeout
   COUNT=$(query "select count(*) from \"StringStorage\"");
@@ -65,3 +67,5 @@ WANT_MULTI="77#Hello
 GOT_MULTI=$(query "select x,y from \"MultiStorage\" order by x");
 
 compare_strings 'Multi column records do not match' "${WANT_MULTI}" "${GOT_MULTI}"
+
+echo "Test passed"
