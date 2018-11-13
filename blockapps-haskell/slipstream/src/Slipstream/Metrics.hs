@@ -5,20 +5,17 @@ module Slipstream.Metrics
   , recordAction
   , incNumTables
   , incNumHistoryTables
-<<<<<<< HEAD
   , incNumBloomWrites
   , recordStackDepth
-=======
   , recordCacheHit
   , recordCacheMiss
   , recordStorageHit
   , recordStorageMiss
->>>>>>> 786df2b06... Use cold storage as a backing store for globals
   ) where
 
 import Control.Monad
 import Control.Monad.IO.Class
-import qualified Data.Map.Strict as M
+import qualified Data.Cache.LRU as LRU
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prometheus
@@ -66,7 +63,7 @@ recordGlobals g = liftIO $ do
   rec "created_contracts" (S.size . createdContracts)
   rec "history_list" (S.size . historyList)
   rec "no_index_list" (S.size . noIndexList)
-  rec "contract_states" (M.size . contractStates)
+  rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
@@ -92,14 +89,23 @@ incNumBloomWrites = liftIO $ incCounter numBloomWrites
 recordStackDepth :: MonadIO m => Int -> m ()
 recordStackDepth = liftIO . setGauge stackDepth . fromIntegral
 
+cacheStats :: Vector (T.Text, T.Text) Counter
+cacheStats = unsafeRegister
+           . vector ("kind", "response")
+           . counter
+           $ Info "slipstream_cache_stats" "Number of cache hits and misses for Globals"
+
+recCache :: MonadIO m => (T.Text, T.Text) -> m ()
+recCache ls = liftIO $ withLabel cacheStats ls incCounter
+
 recordCacheHit :: MonadIO m => m ()
-recordCacheHit = error "todo(tim)"
+recordCacheHit = recCache ("cache_hit", "")
 
 recordCacheMiss :: MonadIO m => m ()
-recordCacheMiss = error "todo(tim)"
+recordCacheMiss = recCache ("cache_miss", "")
 
 recordStorageHit :: MonadIO m => m ()
-recordStorageHit = error "todo(tim)"
+recordStorageHit = recCache ("storage_hit", "")
 
 recordStorageMiss :: MonadIO m => T.Text -> m ()
-recordStorageMiss = error "todo(tim)"
+recordStorageMiss reason = recCache ("storage_miss", reason)

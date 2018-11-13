@@ -64,6 +64,21 @@
    })
   </script>
 
+  <h3>Cache Statistics</h3>
+  <div id="slipcache"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipcache"),
+      expr: [
+        "slipstream_cache_stats",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Cache {hits,misses}/Storage {hits,misses}",
+      yUnits: "count",
+   })
+  </script>
+
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}
