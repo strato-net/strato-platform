@@ -13,6 +13,7 @@ module Slipstream.GlobalsColdStorage
   , asyncWriteToStorage
   , syncStorage
   , Handle
+  , fakeHandle
   ) where
 
 import BlockApps.Ethereum
@@ -70,6 +71,13 @@ deserialize (Just (ColdStorage _ _ bvs)) =
 -- API --
 
 data Handle = Handle (TQueue QueueElem) SqlBackend
+            | FakeHandle
+
+instance NFData Handle where
+  rnf = const () -- It doesn't really make sense to force a handle
+
+fakeHandle :: Handle
+fakeHandle = FakeHandle
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
 initStorage :: (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadResource m)
@@ -84,19 +92,22 @@ initStorage = do
 -- | Check postgres for an entry about this account's values
 readStorage :: (MonadUnliftIO m, MonadIO m)
             => Handle -> Address -> Maybe ChainId -> m (Either String [(Text, Value)])
-readStorage (Handle _ sql) addr = flip runReaderT sql
-                                . fmap deserialize
-                                . get
-                                . ColdStorageKey addr
-                                . MChainId
+readStorage FakeHandle _ _ = return $! Left "fake handle"
+readStorage (Handle _ sql) addr mci = flip runReaderT sql
+                                    . fmap deserialize
+                                    . get
+                                    . ColdStorageKey addr
+                                    $ MChainId mci
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.
 asyncWriteToStorage :: MonadIO m => Handle -> Address -> Maybe ChainId -> [(Text, Value)] -> m ()
+asyncWriteToStorage FakeHandle _ _ _ = return ()
 asyncWriteToStorage (Handle q _) a mc vs = atomically . writeTQueue q $ PreStorageEntry a mc vs
 
 -- | Block until all pending writes have been sent.
 syncStorage :: MonadIO m => Handle -> m ()
+syncStorage FakeHandle = return ()
 syncStorage (Handle q _) = do
   atomically . writeTQueue q $ SyncFlush
   void . atomically $ checkSTM =<< isEmptyTQueue q

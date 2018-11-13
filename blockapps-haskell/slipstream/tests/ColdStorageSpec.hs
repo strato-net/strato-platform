@@ -63,3 +63,9 @@ spec = do
       asyncWriteToStorage h addr cid vals
       syncStorage h
       readStorage h addr cid `shouldReturn` Right vals
+
+    it "can pretend to do work" $ do
+      let h = fakeHandle
+      asyncWriteToStorage h (error "addr") (error "cid") (error "vals") `shouldReturn` ()
+      readStorage h (error "addr") (error "cid") `shouldReturn` Left "fake handle"
+      syncStorage h `shouldReturn` () :: IO ()
