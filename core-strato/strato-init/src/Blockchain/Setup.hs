@@ -254,15 +254,23 @@ genesisFiles = $(embedDir "genesisBlocks")
 addStandardGenesisBlockIfNeeded :: String->IO ()
 addStandardGenesisBlockIfNeeded genesisBlockName = do
   let genesisFileName = genesisBlockName ++ "Genesis.json"
+      maybeJSON = lookup genesisFileName genesisFiles
+      accountInfoFileName = genesisBlockName ++ "AccountInfo"
+      maybeInfo = lookup accountInfoFileName genesisFiles
 
-      maybeContents = lookup genesisFileName genesisFiles
+  jsonExists <- doesFileExist genesisFileName
 
-  exists <- doesFileExist genesisFileName
-
-  case (exists, maybeContents) of
+  case (jsonExists, maybeJSON) of
    (True, _) -> return ()
    (_, Just contents) -> B.writeFile genesisFileName contents
    _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
+
+  infoExists <- doesFileExist accountInfoFileName
+  case (infoExists, maybeInfo) of
+    (True, _) -> return ()
+    (_, Just contents) -> B.writeFile accountInfoFileName contents
+    _ -> putStrLn "No account info file found. Will proceed without it\
+                  \ and assume Genesis.json is self contained."
 
 {-
   CONFIG:
