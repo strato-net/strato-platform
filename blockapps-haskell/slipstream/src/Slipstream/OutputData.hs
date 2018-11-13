@@ -77,34 +77,27 @@ solidityValueToText (SolidityValueAsString x) = escapeQuotes x
 solidityValueToText (SolidityBool x)          = tshow x
 solidityValueToText (SolidityNum x )          = tshow x
 solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x)         = decodeUtf8 . BL.toStrict $ encode x
-solidityValueToText (SolidityObject x)        = decodeUtf8 . BL.toStrict $ encode x
+solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+
+escapeSingleQuotes :: Text -> Text
+escapeSingleQuotes = T.replace "\'" "\'\'"
+
+escapeDoubleQuotes :: Text -> Text
+escapeDoubleQuotes = T.replace "\"" "\\\""
 
 escapeQuotes :: Text -> Text
-escapeQuotes = T.replace "\'" "\'\'" . T.replace "\"" "\\\""
-
-arrayContent :: SolidityValue -> Text
-arrayContent (SolidityValueAsString x) = escapeQuotes x
-arrayContent (SolidityBool x) = tshow x
-arrayContent (SolidityNum x ) = tshow x
-arrayContent (SolidityBytes x) = escapeQuotes $ tshow x
-arrayContent (SolidityArray x) = escapeQuotes $ tshow x
-arrayContent (SolidityObject x) = escapeQuotes $ tshow x
-
-arrayToString :: [SolidityValue] -> Text
-arrayToString [] = ""
-arrayToString [x] =  arrayContent x
-arrayToString (x:es) = T.concat [arrayContent x, ", ", arrayToString es]
+escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 tableColumns :: [(Text, SolidityValue)] -> Text
-tableColumns [] = ""
-tableColumns [(x, y)] = T.concat [wrapDoubleQuotes x, " ", typeText y]
-tableColumns ((x, y):es) = T.concat [wrapDoubleQuotes x, " ", typeText y, ", ", tableColumns es]
+tableColumns = csv . map go
+  where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
+                    in T.concat [z, " ", typeText y]
 
-tableUpsert :: [(Text, SolidityValue)] -> Text
-tableUpsert [] = ""
-tableUpsert [(x, _)] = T.concat [wrapDoubleQuotes x, " = excluded.", wrapDoubleQuotes x]
-tableUpsert ((x, _):es) = T.concat [wrapDoubleQuotes x, " = excluded.", wrapDoubleQuotes x,  ", ", tableUpsert es]
+tableUpsert :: [Text] -> Text
+tableUpsert = csv . map go
+  where go x = let y = wrapDoubleQuotes $ escapeQuotes x
+                in wrap1 y " = excluded."
 
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
@@ -158,8 +151,8 @@ createInserts globalsIORef = do
     let hashVal = codehash firstContract
     globals <- readIORef globalsIORef
     let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
-    let tableName = contractName firstContract
-        functionTableName = tableName <> "." <> transactionFuncName firstContract
+    let tableName = escapeQuotes $ contractName firstContract
+        functionTableName = tableName <> "." <> escapeQuotes (transactionFuncName firstContract)
         toHistory = (<>) "history@"
         historyName = toHistory tableName
         functionHistoryName = toHistory functionTableName
@@ -174,8 +167,8 @@ createInserts globalsIORef = do
                    then ""
                    else ", "
 
-    let keySt  = wrapAndEscapeDouble $ baseTableColumns ++ map fst list
-        fKeySt = wrapAndEscapeDouble $ baseColumns ++ map fst funcList
+    let keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+        fKeySt = wrapAndEscapeDouble . map escapeQuotes $ baseColumns ++ map fst funcList
 
     liftIO . debugM "createInserts" . show $ T.intercalate " " ["In convertRet,", tshow hashVal, "contractAlreadyCreated =", tshow contractAlreadyCreated]
 
@@ -185,7 +178,7 @@ createInserts globalsIORef = do
     --When contract hasn't been written to "contract" table and indexing table doesn't exist
     when (not $ contractAlreadyCreated) $ do
         incNumTables
-        let conVals = wrapAndEscape [T.pack $ keccak256String $ codehash firstContract, contractName firstContract, abi firstContract, chain firstContract]
+        let conVals = wrapAndEscape $ map escapeQuotes [T.pack $ keccak256String $ codehash firstContract, contractName firstContract, abi firstContract, chain firstContract]
         let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
         yield conIns
         yield $ T.concat
@@ -229,7 +222,7 @@ createInserts globalsIORef = do
                    , T.pack . keccak256String . transactionHash
                    , tshow . transactionSender
                    ]
-        tableVals = baseVals ++ [transactionFuncName]
+        tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
 
     let vals = flip map metadata $ \row ->
           let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
@@ -259,6 +252,6 @@ createInserts globalsIORef = do
         , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
         , "transaction_function_name = excluded.transaction_function_name"
         , comma
-        , (tableUpsert list)
+        , (tableUpsert $ map fst list)
         , ";"
         ]
