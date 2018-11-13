@@ -39,13 +39,14 @@ echo "Waiting until slipstream has populated postgres..."
 while sleep 1; do
   check_timeout
   COUNT=$(query "select count(*) from \"StringStorage\"");
-  if [[ ${COUNT} -eq "1" ]]; then
-    echo "1 StringStorage found";
+  if [[ ${COUNT} -eq "2" ]]; then
+    echo "2 StringStorage found";
     break
   fi
 done
 
-WANT_STRING='text, text, hot off the press!'
+WANT_STRING="text, text, hot off the press!
+one, measly, quote: ' "
 GOT_STRING=$(query "select payload from \"StringStorage\"");
 
 compare_strings 'Single column records do not match' ${WANT_STRING} ${GOT_STRING}
