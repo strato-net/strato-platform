@@ -3,6 +3,7 @@
 module BlockApps.Solidity.Type where
 
 import           Control.DeepSeq
+import           Data.Binary
 import           Data.ByteString (ByteString)
 import           Data.List
 import           Data.Text       (Text)
@@ -33,7 +34,7 @@ data Type
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
-  deriving (Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 data SimpleType
   = TypeBool
@@ -44,7 +45,7 @@ data SimpleType
             }
   | TypeBytes { bytesSize :: Maybe Integer
               }
-  deriving (Show,Read,Generic, NFData)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 getTypeByteLength :: Type -> Maybe Int
 getTypeByteLength = \case
