@@ -11,8 +11,12 @@
 
 import Control.Concurrent
 import Control.Monad
-import Data.Default
-import Data.IORef
+import Control.Monad.Logger
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Resource
+import qualified Data.ByteString.Char8 as BC
+import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 import HFlags
 import Network.Kafka
@@ -21,11 +25,17 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import System.IO
 import System.Log.Logger
+import Text.Printf
 
 import Slipstream.MessageConsumer
-import Slipstream.Options()
+import Slipstream.Globals
+import Slipstream.GlobalsColdStorage
+import Slipstream.Options
 import Slipstream.OutputData
 
+connStr :: ConnectionString
+connStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
+                           flags_pghost flags_pgport flags_pguser flags_password flags_database
 
 main::IO ()
 main = do
@@ -38,22 +48,23 @@ main = do
   void . forkIO . run 10777 $ metricsApp
   putStrLn "Serving metrics on port 10777"
 
-  conn <- pgConnect dbConnect
+  conn <- liftIO $ pgConnect dbConnect
+  msg <- runResourceT . runNoLoggingT . withPostgresqlConn connStr $ \simpleConn -> do
+    handle <- runReaderT initStorage simpleConn
+    let conCreate = "create table if not exists\
+                     \ contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
+    dbInsert conn conCreate
+    let conAlter =  "alter table contract add column if not exists \"chainId\" text;"
+    dbInsert conn conAlter
 
-  let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
-  dbInsert conn conCreate
-  let conAlter =  "alter table contract add column if not exists \"chainId\" text;"
-  dbInsert conn conAlter
+    let offset = 0 :: K.Offset
+    let kafkaID = "slipstream" :: KafkaClientId
+    let state = mkConfiguredKafkaState kafkaID
 
-  let offset = 0 :: K.Offset
-  let kafkaID = "slipstream" :: KafkaClientId
-  let state = mkConfiguredKafkaState kafkaID
+    cachedContractsIORef <- newGlobals handle
 
-  cachedContractsIORef <- newIORef def
-
-  msg <- runKafka state $ (getAndProcessMessages conn cachedContractsIORef offset 0)
+    liftIO . runKafka state $ getAndProcessMessages conn cachedContractsIORef offset 0
   messages <- case msg of
         Left e -> error $ show e
         Right y -> return y
   print messages
-  return ()

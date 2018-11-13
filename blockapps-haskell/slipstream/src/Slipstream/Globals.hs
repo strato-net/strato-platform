@@ -18,7 +18,11 @@ import           BlockApps.Ethereum
 import           UnliftIO.IORef
 
 import           Slipstream.Data.Globals
+import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
+
+newGlobals :: MonadIO m => Handle -> m (IORef Globals)
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty M.empty
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do

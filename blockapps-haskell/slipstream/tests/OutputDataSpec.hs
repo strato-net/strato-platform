@@ -10,9 +10,6 @@ import Database.PostgreSQL.Typed
 import Database.PostgreSQL.Typed.Query
 import qualified Data.ByteString.Char8 as BC
 import Conduit
-import Data.Default
-import Data.IORef
-import qualified Data.Set as Set
 import Data.Time
 import qualified Data.Map as M
 import qualified BlockApps.Solidity.Value as V
@@ -21,6 +18,7 @@ import Numeric
 
 import Slipstream.Events
 import Slipstream.Globals
+import Slipstream.GlobalsColdStorage (fakeHandle)
 
 {-
 Test: Message conversion to statediff is successful and accurate
@@ -68,7 +66,7 @@ spec = do
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
 
-      g <- newIORef def
+      g <- newGlobals fakeHandle
       runConduit (yield input .| createInserts g .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', 'Vehicle', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
@@ -98,7 +96,8 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
-      g <- newIORef def{historyList = Set.singleton cHash}
+      g <- newGlobals fakeHandle
+      addToHistoryList g cHash
       runConduit (yield input .| createInserts g .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', 'Vehicle', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
@@ -132,7 +131,7 @@ spec = do
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
             }]
 
-      g <- newIORef def
+      g <- newGlobals fakeHandle
       runConduit (yield input .| createInserts g .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', '\\\"Vehicle''''', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",

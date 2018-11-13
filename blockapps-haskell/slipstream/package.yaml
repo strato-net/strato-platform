@@ -47,6 +47,7 @@ dependencies:
   - milena
   - MissingH
   - monad-control
+  - monad-logger
   - mtl
   - network
   - ordered-containers
@@ -84,6 +85,7 @@ executables:
       - milena
       - monad-control
       - mtl
+      - persistent-postgresql
       - slipstream
       - time
 
@@ -100,7 +102,6 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - monad-logger
       - largeword
       - parsec
       - persistent-sqlite
