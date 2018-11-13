@@ -38,7 +38,7 @@ spec = do
       contracts `shouldSatisfy` (== 2) . length
   describe "getContracts" $
     it "gets a list of contracts" $ \ TestConfig {..} -> do
-      Right (GetContractsResponse contracts) <- runClientM getContracts (ClientEnv mgr blocUrl)
+      Right (GetContractsResponse contracts) <- runClientM (getContracts Nothing) (ClientEnv mgr blocUrl)
       let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
       addressesCreatedAt1 `shouldSatisfy` any
         (\ (AddressCreatedAt _ addr Nothing) -> addr == Unnamed simpleStorageContractAddress)
