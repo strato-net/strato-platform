@@ -26,12 +26,11 @@ dependencies:
 
 library:
   source-dirs:      src
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall -Werror -O2
 
 executables:
   strato-redis-viz:
     main: Viz.hs
-    ghc-options: -Wall -O2
     source-dirs:
       - exec_src/
       - test/

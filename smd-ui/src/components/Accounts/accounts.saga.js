@@ -151,6 +151,8 @@ export function* getAccountDetail(action) {
     const response = yield call(getAccountDetailApi, action.address, action.chainId);
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
+    if (action.flag)
+      yield put(faucetSuccess());
   }
   catch (err) {
     yield put(fetchAccountDetailFailure(action.name, action.address, err));
@@ -171,11 +173,12 @@ export function* getCurrentAccountDetail(action) {
 export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
-    yield put(faucetSuccess());
     if (action.name) {
       yield call(delay, 100)
-      yield put(fetchAccountDetail(action.name, action.address));
+      yield put(fetchAccountDetail(action.name, action.address, action.flag));
     }
+    if (!action.flag)
+      yield put(faucetSuccess());
   }
   catch (err) {
     yield put(faucetFailure(err))
