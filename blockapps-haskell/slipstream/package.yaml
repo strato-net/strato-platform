@@ -30,6 +30,7 @@ dependencies:
   - blockapps-solidity
   - blockapps-strato-client
   - blockapps-strato-api
+  - bloomfilter
   - bytestring
   - classy-prelude
   - conduit
