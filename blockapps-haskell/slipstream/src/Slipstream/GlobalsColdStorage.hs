@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -87,11 +88,11 @@ serialize (PreStorageEntry a mc vs) =
   let mci = MChainId mc
   in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
 
-deserialize :: Maybe ColdStorage -> Either String [(Text, Value)]
+deserialize :: Maybe ColdStorage -> Either Text [(Text, Value)]
 deserialize Nothing = Left "storage not found"
 deserialize (Just (ColdStorage _ _ bvs)) =
   case decodeOrFail (fromStrict bvs) of
-    Left (_, _, err) -> Left $ "corrupted binary: " ++ err
+    Left (_, _, err) -> Left $ "corrupted binary: " <> pack err
     Right (_, _, vs) -> Right vs
 
 -- API --
@@ -110,9 +111,9 @@ initStorage cacheSize = do
 
 -- | Check postgres for an entry about this account's values
 readStorage :: (MonadUnliftIO m, MonadIO m)
-            => Handle -> Address -> Maybe ChainId -> m (Either String [(Text, Value)])
-readStorage FakeHandle _ _ = return $! Left "fake handle"
-readStorage (Handle _ sql) addr mci = do
+            => Handle -> Address -> Maybe ChainId -> m (Either Text [(Text, Value)])
+readStorage FakeHandle _ _ = recordStorageResult $! Left "fake handle"
+readStorage (Handle _ sql) addr mci = recordStorageResult =<< do
   seen <- DBF.elem (addr, mci) <$> atomically readFilter
   if not seen
     then return . Left $ "unseen by bloom filter"
@@ -121,6 +122,13 @@ readStorage (Handle _ sql) addr mci = do
        . get
        . ColdStorageKey addr
        $ MChainId mci
+
+recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
+recordStorageResult v = do
+  case v of
+    Right _ -> recordStorageHit
+    Left err -> recordStorageMiss err
+  return $! v
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.
