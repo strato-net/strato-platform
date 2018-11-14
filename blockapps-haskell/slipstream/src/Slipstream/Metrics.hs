@@ -5,6 +5,8 @@ module Slipstream.Metrics
   , recordAction
   , incNumTables
   , incNumHistoryTables
+  , incNumBloomWrites
+  , recordStackDepth
   ) where
 
 import Control.Monad
@@ -40,6 +42,16 @@ tablesCreated = unsafeRegister
               . counter
               $ Info "slipstream_tables_created" "Number of tables created"
 
+numBloomWrites :: Counter
+numBloomWrites = unsafeRegister
+               . counter
+               $ Info "slipstream_bloom_writes" "Number of writes to the delayed bloom filter"
+
+stackDepth :: Gauge
+stackDepth = unsafeRegister
+           . gauge
+           $ Info "slipstream_bloom_stack_depth" "Number of pending items in the delayed bloom filter"
+
 recordGlobals :: MonadIO m => Globals -> m ()
 recordGlobals g = liftIO $ do
   let rec  :: T.Text -> (Globals -> Int) -> IO ()
@@ -66,3 +78,9 @@ incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter
 
 incNumHistoryTables :: MonadIO m => m ()
 incNumHistoryTables = liftIO $ withLabel tablesCreated "history" incCounter
+
+incNumBloomWrites :: MonadIO m => m ()
+incNumBloomWrites = liftIO $ incCounter numBloomWrites
+
+recordStackDepth :: MonadIO m => Int -> m ()
+recordStackDepth = liftIO . setGauge stackDepth . fromIntegral

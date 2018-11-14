@@ -69,3 +69,9 @@ spec = do
       asyncWriteToStorage h (error "addr") (error "cid") (error "vals") `shouldReturn` ()
       readStorage h (error "addr") (error "cid") `shouldReturn` Left "fake handle"
       syncStorage h `shouldReturn` () :: IO ()
+
+    it "will avoid a DB read if the bloom filter catches the keys" $ do
+      let addr = Address 0x64
+          cid = Nothing
+      h <- initStorage
+      readStorage h addr cid `shouldReturn` Left "unseen by bloom filter"

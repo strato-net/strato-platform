@@ -4,13 +4,14 @@ module Slipstream.DelayedBloomFilter
   , newFilter
   , insert
   , elem
-  , length
+  , bitWidth
+  , stackDepth
   ) where
 
 import qualified Data.BloomFilter as BL
 import qualified Data.BloomFilter.Hash as BL
 import qualified Data.BloomFilter.Easy as BL
-import Prelude hiding (length, elem)
+import Prelude hiding (elem)
 
 -- A Delayed Bloom Filter is a combination of a stack with a traditional
 -- bloom filter. The stack is used to buffer pending changes to the bloom filter for
@@ -53,5 +54,5 @@ insert x dbf@DBF{..} =
 elem :: a -> DelayedBloomFilter a -> Bool
 elem x = BL.elem x . bloom
 
-length :: DelayedBloomFilter a -> Int
-length = BL.length . bloom
+bitWidth :: DelayedBloomFilter a -> Int
+bitWidth = BL.length . bloom

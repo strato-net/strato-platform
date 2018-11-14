@@ -14,7 +14,7 @@ spec = describe "DelayedBloomFilter" $ do
 
   it "occupies < 2MB" $ do
     let f = DBF.newFilter 512 :: DBF.DelayedBloomFilter Int
-    DBF.length f `shouldSatisfy` (< 8 * 2000000)
+    DBF.bitWidth f `shouldSatisfy` (< 8 * 2000000)
 
   it "will not answer membership until tipping point is reached" $ do
     let fs = unfoldr (\f -> Just (f, DBF.insert 17 f)) (DBF.newFilter 3)

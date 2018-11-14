@@ -14,11 +14,12 @@ module Slipstream.GlobalsColdStorage
   , syncStorage
   , Handle
   , fakeHandle
+  , cacheSize
   ) where
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
-import ClassyPrelude hiding (Handle)
+import ClassyPrelude hiding (Handle, readIORef, atomicModifyIORef', newIORef)
 import Control.Monad.IO.Unlift
 import Data.Binary hiding (get)
 import Data.LargeWord
@@ -26,8 +27,16 @@ import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
 import qualified Prelude as P ()
-import Slipstream.MChainId
+import System.IO.Unsafe
 import UnliftIO.Resource
+import UnliftIO.IORef
+
+import qualified Slipstream.DelayedBloomFilter as DBF
+import Slipstream.Metrics
+import Slipstream.MChainId
+
+cacheSize :: Int
+cacheSize = 1024
 
 -- Data definitions --
 
@@ -46,12 +55,24 @@ ColdStorage
   deriving Eq Show
 |]
 
+{-# NOINLINE globalBloomFilter #-}
+globalBloomFilter :: IORef (DBF.DelayedBloomFilter (Address, Maybe ChainId))
+globalBloomFilter = unsafePerformIO . newIORef . DBF.newFilter $ cacheSize `div` 2
+
 -- SQL writer daemon --
 
 storageWorker :: (MonadUnliftIO m, MonadIO m) => TQueue QueueElem -> ReaderT SqlBackend m ()
 storageWorker q = forever $ do
   datum <- atomically $ readTQueue q
+  recordKeys datum
   traverse (uncurry repsert) . serialize $ datum
+
+recordKeys :: MonadIO m => QueueElem -> m ()
+recordKeys SyncFlush = return ()
+recordKeys (PreStorageEntry a mc _) = do
+  atomicModifyIORef' globalBloomFilter $ \f -> (DBF.insert (a ,mc) f, ())
+  incNumBloomWrites
+  (recordStackDepth . DBF.stackDepth) =<< readIORef globalBloomFilter
 
 -- Data translation --
 
@@ -93,11 +114,15 @@ initStorage = do
 readStorage :: (MonadUnliftIO m, MonadIO m)
             => Handle -> Address -> Maybe ChainId -> m (Either String [(Text, Value)])
 readStorage FakeHandle _ _ = return $! Left "fake handle"
-readStorage (Handle _ sql) addr mci = flip runReaderT sql
-                                    . fmap deserialize
-                                    . get
-                                    . ColdStorageKey addr
-                                    $ MChainId mci
+readStorage (Handle _ sql) addr mci = do
+  seen <- DBF.elem (addr, mci) <$> readIORef globalBloomFilter
+  if not seen
+    then return . Left $ "unseen by bloom filter"
+    else flip runReaderT sql
+       . fmap deserialize
+       . get
+       . ColdStorageKey addr
+       $ MChainId mci
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.
