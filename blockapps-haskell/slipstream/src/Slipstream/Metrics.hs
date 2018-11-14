@@ -23,34 +23,40 @@ import Prometheus
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
 
+{-# NOINLINE globalsSize #-}
 globalsSize :: Vector T.Text Gauge
 globalsSize = unsafeRegister
             . vector "cache_type"
             . gauge
             $ Info "slipstream_globals_size" "Number of cache entries in Globals"
 
+{-# NOINLINE kafkaCount #-}
 kafkaCount :: Counter
 kafkaCount = unsafeRegister
            . counter
            $ Info "slipstream_kafka_read" "Number of messages read from kafka"
 
+{-# NOINLINE actionCount #-}
 actionCount :: Vector T.Text Counter
 actionCount = unsafeRegister
             . vector "action_type"
             . counter
             $ Info "slipstream_action_count" "Number of actions seen, by type"
 
+{-# NOINLINE tablesCreated #-}
 tablesCreated :: Vector T.Text Counter
 tablesCreated = unsafeRegister
               . vector "tables_created"
               . counter
               $ Info "slipstream_tables_created" "Number of tables created"
 
+{-# NOINLINE numBloomWrites #-}
 numBloomWrites :: Counter
 numBloomWrites = unsafeRegister
                . counter
                $ Info "slipstream_bloom_writes" "Number of writes to the delayed bloom filter"
 
+{-# NOINLINE stackDepth #-}
 stackDepth :: Gauge
 stackDepth = unsafeRegister
            . gauge
@@ -89,6 +95,7 @@ incNumBloomWrites = liftIO $ incCounter numBloomWrites
 recordStackDepth :: MonadIO m => Int -> m ()
 recordStackDepth = liftIO . setGauge stackDepth . fromIntegral
 
+{-# NOINLINE cacheStats #-}
 cacheStats :: Vector (T.Text, T.Text) Counter
 cacheStats = unsafeRegister
            . vector ("kind", "response")
