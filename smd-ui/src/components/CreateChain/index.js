@@ -202,12 +202,12 @@ class CreateChain extends Component {
       if (contract && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
           if (contract.vars[arg].initialValue) {
+              return null;
+          } else {
             return (<tr key={'arg' + i}>
               <td>{arg}</td>
-              <td>{contract.vars[arg].initialValue}</td>
+              <td></td>
             </tr>);
-          } else {
-            return null;
           }
         });
       } else {
