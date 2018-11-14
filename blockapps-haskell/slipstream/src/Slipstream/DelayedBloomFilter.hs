@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Slipstream.DelayedBloomFilter
   ( DelayedBloomFilter
   , newFilter
@@ -8,10 +9,20 @@ module Slipstream.DelayedBloomFilter
   , stackDepth
   ) where
 
-import qualified Data.BloomFilter as BL
-import qualified Data.BloomFilter.Hash as BL
-import qualified Data.BloomFilter.Easy as BL
+import qualified Data.BloomFilter as BF
+import qualified Data.BloomFilter.Hash as BF
+import qualified Data.BloomFilter.Easy as BF
 import Prelude hiding (elem)
+
+import BlockApps.Ethereum
+
+instance BF.Hashable ChainId where
+  hashIO32 (ChainId n) = BF.hashIO32 (toInteger n)
+  hashIO64 (ChainId n) = BF.hashIO64 (toInteger n)
+
+instance BF.Hashable Address where
+  hashIO32 (Address n) = BF.hashIO32 (toInteger n)
+  hashIO64 (Address n) = BF.hashIO64 (toInteger n)
 
 -- A Delayed Bloom Filter is a combination of a stack with a traditional
 -- bloom filter. The stack is used to buffer pending changes to the bloom filter for
@@ -32,12 +43,12 @@ data DelayedBloomFilter a = DBF
   { stackDepth :: !Int
   , maxStack :: !Int
   , stack :: ![a]
-  , bloom :: !(BL.Bloom a)
+  , bloom :: !(BF.Bloom a)
   }
 
-newFilter :: BL.Hashable a => Int -> DelayedBloomFilter a
-newFilter n = let (numBits, numHashes) = BL.suggestSizing 1000000 0.05
-                  bloom = BL.empty (BL.cheapHashes numHashes) numBits
+newFilter :: BF.Hashable a => Int -> DelayedBloomFilter a
+newFilter n = let (numBits, numHashes) = BF.suggestSizing 1000000 0.05
+                  bloom = BF.empty (BF.cheapHashes numHashes) numBits
               in DBF 0 n [] bloom
 
 insert :: a -> DelayedBloomFilter a -> DelayedBloomFilter a
@@ -45,14 +56,14 @@ insert x dbf@DBF{..} =
   if stackDepth >= maxStack
     then dbf{ stackDepth = 0
             , stack = []
-            , bloom = BL.insertList (x:stack) bloom
+            , bloom = BF.insertList (x:stack) bloom
             }
     else dbf{ stackDepth = stackDepth + 1
             , stack = x:stack
             }
 
 elem :: a -> DelayedBloomFilter a -> Bool
-elem x = BL.elem x . bloom
+elem x = BF.elem x . bloom
 
 bitWidth :: DelayedBloomFilter a -> Int
-bitWidth = BL.length . bloom
+bitWidth = BF.length . bloom

@@ -63,7 +63,6 @@ import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import qualified Data.Aeson.Encoding    as AesonEnc
 import qualified Data.Binary            as Binary
-import qualified Data.BloomFilter.Hash  as BF
 import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
@@ -147,10 +146,6 @@ instance ToJSONKey Address where
   toJSONKey = ToJSONKeyText f g
     where f x = Text.pack $ addressString x
           g x = AesonEnc.text . Text.pack $ addressString x
-
-instance BF.Hashable Address where
-  hashIO32 (Address n) = BF.hashIO32 (toInteger n)
-  hashIO64 (Address n) = BF.hashIO64 (toInteger n)
 
 padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
@@ -323,10 +318,6 @@ instance ToSchema ChainId where
         & type_ .~ SwaggerString
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Private chain id, 32 byte hex encoded string" )
-
-instance BF.Hashable ChainId where
-  hashIO32 (ChainId n) = BF.hashIO32 (toInteger n)
-  hashIO64 (ChainId n) = BF.hashIO64 (toInteger n)
 
 newSecKey :: IO SecKey
 newSecKey = fromMaybe err . secKey <$> getEntropy 32

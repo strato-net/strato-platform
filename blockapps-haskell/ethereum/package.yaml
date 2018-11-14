@@ -23,7 +23,6 @@ dependencies:
   - aeson
   - base16-bytestring
   - binary
-  - bloomfilter
   - bytestring
   - classy-prelude
   - containers
