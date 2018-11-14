@@ -34,7 +34,7 @@ import { delay } from 'redux-saga';
 const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
-const faucetUrl = env.STRATO_URL + "/faucet"
+const faucetUrl = env.BLOC_URL + "/users/:user/:address/fill?resolve"
 
 export function getAccountsApi() {
   return fetch(
@@ -93,16 +93,16 @@ export function getAccountDetailApi(address, chainId) {
     });
 }
 
-export function postFaucet(address) {
+export function postFaucet(username, address) {
   return fetch(
-    faucetUrl,
+    faucetUrl.replace(":user", username)
+             .replace(":address", address),
     {
       method: 'POST',
       credentials: "include",
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `address=${address}`
+      }
     }
   )
     .then(function (response) {
@@ -172,11 +172,9 @@ export function* getCurrentAccountDetail(action) {
 
 export function* faucetAccount(action) {
   try {
-    yield call(postFaucet, action.address);
-    if (action.name) {
-      yield call(delay, 100)
-      yield put(fetchAccountDetail(action.name, action.address, action.flag));
-    }
+    yield call(postFaucet, action.name, action.address);
+    yield call(delay, 100)
+    yield put(fetchAccountDetail(action.name, action.address, action.flag));
     if (!action.flag)
       yield put(faucetSuccess());
   }
