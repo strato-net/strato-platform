@@ -9,7 +9,7 @@ import GHC.Generics
 
 import BlockApps.Solidity.Value
 import BlockApps.Ethereum
-import Slipstream.GlobalsColdStorage (Handle)
+import Slipstream.Data.GlobalsColdStorage (Handle)
 
 instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict

@@ -5,7 +5,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Slipstream.GlobalsColdStorage
   ( initStorage
@@ -21,7 +20,6 @@ import BlockApps.Solidity.Value
 import ClassyPrelude hiding (Handle)
 import Control.Monad.IO.Unlift
 import Data.Binary hiding (get)
-import Data.LargeWord
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
@@ -31,15 +29,9 @@ import UnliftIO.Resource
 
 import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics
-import Slipstream.MChainId
+import Slipstream.Data.GlobalsColdStorage
 
 -- Data definitions --
-
-data QueueElem = PreStorageEntry Address (Maybe ChainId) [(Text, Value)]
-               | SyncFlush
-
-deriving instance Read Word160
-deriving instance Read Address
 
 share [mkPersist sqlSettings{mpsEntityJSON=Nothing}, mkMigrate "migrateStore"] [persistLowerCase|
 ColdStorage
@@ -103,15 +95,6 @@ deserialize (Just (ColdStorage _ _ bvs)) =
     Right (_, _, vs) -> Right vs
 
 -- API --
-
-data Handle = Handle (TQueue QueueElem) SqlBackend
-            | FakeHandle
-
-instance NFData Handle where
-  rnf = const () -- It doesn't really make sense to force a handle
-
-fakeHandle :: Handle
-fakeHandle = FakeHandle
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
 initStorage :: (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadResource m)

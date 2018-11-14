@@ -23,6 +23,7 @@ import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
+import System.Exit
 import System.IO
 import System.Log.Logger
 import Text.Printf
@@ -50,7 +51,9 @@ main = do
 
   conn <- liftIO $ pgConnect dbConnect
   msg <- runResourceT . runNoLoggingT . withPostgresqlConn connStr $ \simpleConn -> do
-    handle <- runReaderT initStorage simpleConn
+    (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) simpleConn
+    unless ourBloom . liftIO . die $
+      "storage has been previously initialized! This should not happen"
     let conCreate = "create table if not exists\
                      \ contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
     dbInsert conn conCreate

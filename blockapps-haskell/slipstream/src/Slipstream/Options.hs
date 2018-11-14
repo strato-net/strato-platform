@@ -17,3 +17,5 @@ defineFlag "kafkahost" ("kafka" :: String) "Kafka host"
 defineFlag "kafkaport" (9092 :: Int) "Kafka port"
 defineFlag "stateFetchLimit" (100::Integer) "The maximum number of array entries to return from the state route"
 -- defineFlag "cirrusurl" ("http://postgrest:3001"::String) "URL of the Cirrus server Bloc will connect to"
+defineFlag "globalsStateCount" (1024 :: Int) "The maximum number of states to keep in memory at once.\
+                                             \ overflow is stored in postgres."
