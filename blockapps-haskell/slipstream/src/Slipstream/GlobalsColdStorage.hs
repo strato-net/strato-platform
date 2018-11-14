@@ -14,12 +14,11 @@ module Slipstream.GlobalsColdStorage
   , syncStorage
   , Handle
   , fakeHandle
-  , cacheSize
   ) where
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
-import ClassyPrelude hiding (Handle, readIORef, atomicModifyIORef', newIORef)
+import ClassyPrelude hiding (Handle)
 import Control.Monad.IO.Unlift
 import Data.Binary hiding (get)
 import Data.LargeWord
@@ -29,14 +28,10 @@ import Database.Persist.TH
 import qualified Prelude as P ()
 import System.IO.Unsafe
 import UnliftIO.Resource
-import UnliftIO.IORef
 
 import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics
 import Slipstream.MChainId
-
-cacheSize :: Int
-cacheSize = 1024
 
 -- Data definitions --
 
@@ -55,9 +50,24 @@ ColdStorage
   deriving Eq Show
 |]
 
+-- Filter Management --
+-- The importance of a shared filter between all worker threads is
+-- to prevent a scenario where different cold storage handles have
+-- different opinions about the contents of the database.
+type AddrFilter = DBF.DelayedBloomFilter (Address, Maybe ChainId)
+
 {-# NOINLINE globalBloomFilter #-}
-globalBloomFilter :: IORef (DBF.DelayedBloomFilter (Address, Maybe ChainId))
-globalBloomFilter = unsafePerformIO . newIORef . DBF.newFilter $ cacheSize `div` 2
+globalBloomFilter :: TMVar AddrFilter
+globalBloomFilter = unsafePerformIO newEmptyTMVarIO
+
+readFilter :: STM AddrFilter
+readFilter = readTMVar globalBloomFilter
+
+setFilter :: AddrFilter -> STM ()
+setFilter = void . swapTMVar globalBloomFilter
+
+initFilter :: MonadIO m => Int -> m Bool
+initFilter = atomically . tryPutTMVar globalBloomFilter . DBF.newFilter
 
 -- SQL writer daemon --
 
@@ -70,9 +80,12 @@ storageWorker q = forever $ do
 recordKeys :: MonadIO m => QueueElem -> m ()
 recordKeys SyncFlush = return ()
 recordKeys (PreStorageEntry a mc _) = do
-  atomicModifyIORef' globalBloomFilter $ \f -> (DBF.insert (a ,mc) f, ())
+  depth <- atomically $ do
+    f <- readFilter
+    setFilter $ DBF.insert (a, mc) f
+    return $! DBF.stackDepth f
   incNumBloomWrites
-  (recordStackDepth . DBF.stackDepth) =<< readIORef globalBloomFilter
+  recordStackDepth depth
 
 -- Data translation --
 
@@ -102,20 +115,22 @@ fakeHandle = FakeHandle
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
 initStorage :: (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadResource m)
-            => ReaderT SqlBackend m Handle
-initStorage = do
+            => Int -> ReaderT SqlBackend m (Bool, Handle)
+initStorage cacheSize = do
   void $ runMigrationSilent migrateStore
   queue <- atomically newTQueue
+  ourBloom <- initFilter $ cacheSize `div` 2
   tid <- fork $ storageWorker queue
   void . register . liftIO . killThread $ tid
-  Handle queue <$> ask
+  sql <- ask
+  return $! (ourBloom, Handle queue sql)
 
 -- | Check postgres for an entry about this account's values
 readStorage :: (MonadUnliftIO m, MonadIO m)
             => Handle -> Address -> Maybe ChainId -> m (Either String [(Text, Value)])
 readStorage FakeHandle _ _ = return $! Left "fake handle"
 readStorage (Handle _ sql) addr mci = do
-  seen <- DBF.elem (addr, mci) <$> readIORef globalBloomFilter
+  seen <- DBF.elem (addr, mci) <$> atomically readFilter
   if not seen
     then return . Left $ "unseen by bloom filter"
     else flip runReaderT sql
