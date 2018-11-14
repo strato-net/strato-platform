@@ -63,8 +63,15 @@ class CreateChain extends Component {
       Object.values(abi).forEach(val => {
         if (Object.keys(val.vars).length) {
           Object.getOwnPropertyNames(val.vars).forEach((arg) => {
-            if (val.vars[arg].initialValue !== null)
-              args[arg] = val.vars[arg].initialValue;
+            const v = val.vars[arg];
+            console.log(arg); console.log(v);
+            if (v.initialValue !== null) {
+              args[arg] = v.initialValue;
+            } else if ( v.type !== 'Mapping'
+                     && v.type !== 'Array'
+                     && v.type !== 'Struct') {
+              args[arg] = values[arg];
+            }
           })
         }
       });
@@ -201,12 +208,25 @@ class CreateChain extends Component {
       let contract = src[contractname];
       if (contract && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
-          if (contract.vars[arg].initialValue) {
-              return null;
+          const v = contract.vars[arg];
+          if ( v.initialValue
+            || v.type == 'Mapping'
+            || v.type == 'Array'
+            || v.type == 'Struct') {
+             return null;
           } else {
+            const self = this;
             return (<tr key={'arg' + i}>
-              <td>{arg}</td>
-              <td></td>
+              <td style={{ paddingTop: '10px' }}>{arg}</td>
+              <td>
+              <Field
+                  name={arg}
+                  component="input"
+                  type="text"
+                  placeholder={v.type}
+                  className="pt-input"
+              />
+              </td>
             </tr>);
           }
         });
