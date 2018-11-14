@@ -32,9 +32,6 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.Processor
 
-defaultMaxB :: K.MaxBytes
-defaultMaxB = 32 * 1024 * 1024
-
 exceptionMaxCount :: Int
 exceptionMaxCount = 20
 
@@ -53,13 +50,13 @@ defaultKafkaConfig = KafkaConf {
 instance FromJSON KafkaConf
 instance ToJSON KafkaConf
 
-makeKafkaState :: KafkaClientId -> KafkaAddress -> KafkaState
-makeKafkaState cid addy =
+makeKafkaState :: KafkaClientId -> KafkaAddress -> K.MaxBytes -> KafkaState
+makeKafkaState cid addy maxBytes =
     KafkaState cid
                defaultRequiredAcks
                defaultRequestTimeout
                defaultMinBytes
-               defaultMaxB
+               maxBytes
                defaultMaxWaitTime
                defaultCorrelationId
                M.empty
@@ -67,7 +64,7 @@ makeKafkaState cid addy =
                M.empty
                (addy NE.:| [])
 
-mkConfiguredKafkaState :: KafkaClientId -> KafkaState
+mkConfiguredKafkaState :: KafkaClientId -> K.MaxBytes -> KafkaState
 mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
   where k = defaultKafkaConfig
         kh = fromString $ kafkaHost k

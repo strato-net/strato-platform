@@ -31,9 +31,6 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
 
-defaultMaxB :: Integer
-defaultMaxB = 32 * 1024 * 1024
-
 tshow :: Show a => a -> Text
 tshow = T.pack . show
 
@@ -97,7 +94,7 @@ tableUpsert = csv . map go
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
   { pgDBHost = flags_pghost :: HostName
-  , pgDBPort = PortNumber $ read flags_pgport
+  , pgDBPort = PortNumber . fromIntegral $ flags_pgport
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString

@@ -54,20 +54,18 @@ main = do
     (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) simpleConn
     unless ourBloom . liftIO . die $
       "storage has been previously initialized! This should not happen"
-    let conCreate = "create table if not exists\
-                     \ contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
+    let conCreate = "create table if not exists contract (id serial primary key, \"codeHash\" text, contract text, abi text);"
     dbInsert conn conCreate
     let conAlter =  "alter table contract add column if not exists \"chainId\" text;"
     dbInsert conn conAlter
 
     let offset = 0 :: K.Offset
-    let kafkaID = "slipstream" :: KafkaClientId
-    let state = mkConfiguredKafkaState kafkaID
+        kafkaID = "slipstream" :: KafkaClientId
+        state = mkConfiguredKafkaState kafkaID . fromIntegral $ flags_kafkaMaxBytes
 
     cachedContractsIORef <- newGlobals handle
 
     liftIO . runKafka state $ getAndProcessMessages conn cachedContractsIORef offset 0
-  messages <- case msg of
-        Left e -> error $ show e
-        Right y -> return y
-  print messages
+  case msg of
+    Left e -> error $ show e
+    Right y -> print y

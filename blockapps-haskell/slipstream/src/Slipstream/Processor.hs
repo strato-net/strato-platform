@@ -167,7 +167,7 @@ processTheMessages messages conn g = do
    n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
-  let conPort = read flags_pgport
+  let conPort = fromIntegral flags_pgport
   let conUser = flags_pguser
   let conPass = flags_password
   let conDB = flags_database
