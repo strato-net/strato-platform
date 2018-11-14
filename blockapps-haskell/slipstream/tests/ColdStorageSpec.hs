@@ -20,9 +20,11 @@ spec :: Spec
 spec = do
   describe "ColdStorage" $ do
     it "can initialize workers" . runTest $ do
-      h1 <- initStorage
+      (ourFilt, h1) <- initStorage 0
+      ourFilt `shouldSatisfy` id
       syncStorage h1
-      h2 <- initStorage
+      (theirFilt, h2) <- initStorage 0
+      theirFilt `shouldSatisfy` not
       syncStorage h2
 
     it "can read writes" . runTest $ do
@@ -31,7 +33,7 @@ spec = do
           vals = [ ("owner", ValueContract $ Address 0x888)
                  , ("distance", SimpleValue $ valueUInt 23)]
 
-      h <- initStorage
+      (_, h) <- initStorage 0
       asyncWriteToStorage h addr cid vals
       syncStorage h
       readStorage h addr cid `shouldReturn` Right vals
@@ -39,18 +41,18 @@ spec = do
     it "requires a matching address and chain" . runTest $ do
       let addr = Address 99
           cid = Nothing
-      h <- initStorage
+      (_, h) <- initStorage 0
       asyncWriteToStorage h addr cid []
       syncStorage h
       readStorage h addr cid `shouldReturn` Right []
-      readStorage h (Address 98) cid `shouldReturn` Left "storage not found"
-      readStorage h addr (Just $ ChainId 17) `shouldReturn` Left "storage not found"
+      readStorage h (Address 98) cid `shouldReturn` Left "unseen by bloom filter"
+      readStorage h addr (Just $ ChainId 17) `shouldReturn` Left "unseen by bloom filter"
 
     it "can update contracts" . runTest $ do
       let addr = Address 0x4
           cid = Nothing
           vals n = [("Age", SimpleValue $ valueUInt n)]
-      h <- initStorage
+      (_, h) <- initStorage 0
       forM_ [1..97] $ asyncWriteToStorage h addr cid . vals
       syncStorage h
       readStorage h addr cid `shouldReturn` Right [("Age", SimpleValue $ valueUInt 97)]
@@ -59,7 +61,7 @@ spec = do
       let addr = Address 99
           cid = Nothing
           vals = [("field_" <> tshow n, SimpleValue $ valueUInt n) | n <- [0..400000]]
-      h <- initStorage
+      (_, h) <- initStorage 0
       asyncWriteToStorage h addr cid vals
       syncStorage h
       readStorage h addr cid `shouldReturn` Right vals
@@ -69,3 +71,9 @@ spec = do
       asyncWriteToStorage h (error "addr") (error "cid") (error "vals") `shouldReturn` ()
       readStorage h (error "addr") (error "cid") `shouldReturn` Left "fake handle"
       syncStorage h `shouldReturn` () :: IO ()
+
+    it "will avoid a DB read if the bloom filter catches the keys" . runTest $ do
+      let addr = Address 0x64
+          cid = Nothing
+      (_, h) <- initStorage 0
+      readStorage h addr cid `shouldReturn` Left "unseen by bloom filter"
