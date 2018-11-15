@@ -56,6 +56,7 @@ solcSpec =
         , "Using"
         , "Library"
         , "Interface"
+        , "FivePointOh"
         ]
       it "should unparse AppMetadata code" $ do
         let solPath = "./test/contracts/AppMetadata.sol"
@@ -67,9 +68,10 @@ solcSpec =
         void . fromEither =<< compileSolcIO actualVer (pack unparsedSrc)
         actualVer `shouldBe` expectedVer
         actualXabi `shouldBe` expectedXabi
-        actualXabi `shouldSatisfy` not . M.null . xabiModifiers . snd . (!! 0)
-        actualXabi `shouldSatisfy` (== "onlyOwner") . unpack . fst . (M.elemAt 0) . xabiModifiers . snd . (!! 0)
-        let modifier = snd . (M.elemAt 0) . xabiModifiers . snd $ actualXabi !! 0
+        let firstXabi = snd . head $ actualXabi
+        firstXabi `shouldNotSatisfy` M.null . xabiModifiers
+        firstXabi `shouldSatisfy` (== "onlyOwner") . unpack . fst . M.elemAt 0 . xabiModifiers
+        let modifier = snd . M.elemAt 0 . xabiModifiers $ firstXabi
         modifier `shouldSatisfy` M.null . modifierArgs
       it "should leave pragmas alone!" $ do
         soliditySrc <- pack <$> readFile "./test/contracts/Pragma.sol"

@@ -20,13 +20,13 @@ prebuild:
 	mkdir -p /tmp/docker-dummy-bloc
 
 
-$(FAKEROOT)/usr/bin/solc-0.4.25: prebuild
-	./pull_solc.sh 0.4.25 $@ $(LICENSE_SOURCE_DIR)/solidity-0.4.25
+$(FAKEROOT)/usr/bin/solc-0.4: prebuild
+	./pull_solc.sh 0.4.25 $@ $(LICENSE_SOURCE_DIR)/solidity-0.4
 
-$(FAKEROOT)/usr/bin/solc-0.5.0: prebuild
-	./pull_solc.sh 0.5.0 $@ $(LICENSE_SOURCE_DIR)/solidity-0.5.0
+$(FAKEROOT)/usr/bin/solc-0.5: prebuild
+	./pull_solc.sh 0.5.0 $@ $(LICENSE_SOURCE_DIR)/solidity-0.5
 
-$(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4.25 $(FAKEROOT)/usr/bin/solc-0.5.0
+$(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4 $(FAKEROOT)/usr/bin/solc-0.5
 	ln -f $< $@
 
 build_haskell: prebuild $(FAKEROOT)/usr/bin/solc
