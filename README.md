@@ -114,7 +114,7 @@ sudo ./b2 install
 
 None library dependencies
 
-#### (Should no longer occur): Known issue with 'happy' lib when building on host (non-docker-enabled stack)
+#### Known issue with 'happy' lib when building on host (non-docker-enabled stack)
 
 Also we need to explicitly install `happy` library on the host:
 ```
