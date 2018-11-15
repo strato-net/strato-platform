@@ -87,7 +87,6 @@ build_buildbase:
 	blockapps-haskell/pull_solc.sh 0.4.24 $(TMPDIR) $(TMPDIR)/license
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
-	stack exec -- stack install happy-1.19.8
 
 test:
 	@echo ${VERSION}
