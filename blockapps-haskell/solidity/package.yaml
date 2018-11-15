@@ -31,6 +31,7 @@ dependencies:
   - containers
   - cryptonite
   - deepseq
+  - extra
   - generic-random
   - http-api-data
   - largeword
@@ -44,6 +45,7 @@ dependencies:
   - QuickCheck
   - quickcheck-instances
   - raw-strings-qq
+  - semver-range
   - servant
   - servant-docs
   - swagger2
