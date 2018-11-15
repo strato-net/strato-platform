@@ -152,15 +152,17 @@ isAuthorized iev = do
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
         -- Check nonce for replay attack
         slist <- use authSenders
-        let nonceAuth = M.member addr slist && Just nonc > M.lookup addr slist
-            verifiedSender = verifyBenfInfo (benf,dir,nonc) sign
-        if nonceAuth && Just addr == verifiedSender
-          then do
-            authSenders %= M.insert addr nonc
-            return True
-          else do
-            warn "Rejecting NewBeneficiary; nonce or signature incorrect"
-            return False
+        let ifAuthMember = M.member addr slist
+            nonceAuth = Just nonc > M.lookup addr slist
+            signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sign
+        unless  ifAuthMember $
+          warn $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
+              ++ " is not a authorized sender" ++ show slist
+        unless nonceAuth $
+          warn $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
+        unless signAuth $
+          warn "Rejecting NewBeneficiary; bad seal"
+        return $ ifAuthMember && nonceAuth && signAuth
       -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
       -- but with incorrect extraData.
       IMsg _ (Preprepare _ pp) -> do
@@ -259,8 +261,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary _ (benf,decision,_)  -> do
-      pendingvotes %= M.insert benf decision
+    NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
+      pendingvotes %= M.insert benf dir
+      authSenders %= M.insert addr nonc
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
