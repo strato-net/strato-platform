@@ -12,6 +12,8 @@ extra-source-files:
   - c-source/secp256k1/*.h
   - c-source/secp256k1/include/*.h
 
+license: Apache-2.0
+
 github: blockapps/strato-platform/core-strato/ecrecover
 
 ghc-options: -O2 -threaded "-with-rtsopts=-N"
