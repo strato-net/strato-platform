@@ -1,10 +1,5 @@
-{-# LANGUAGE
-  OverloadedStrings
-  , TemplateHaskell
-  , BangPatterns
-  , FlexibleContexts
-#-}
-
+{-# LANGUAGE FlexibleContexts,
+             OverloadedStrings #-}
 module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
@@ -36,9 +31,6 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
 
-defaultMaxB :: Integer
-defaultMaxB = 32 * 1024 * 1024
-
 tshow :: Show a => a -> Text
 tshow = T.pack . show
 
@@ -46,7 +38,7 @@ typeText :: SolidityValue -> Text
 typeText (SolidityValueAsString _) = "text"
 typeText (SolidityNum _) = "bigint"
 typeText (SolidityBool _) = "bool"
-typeText (_) = "jsonb"
+typeText _ = "jsonb"
 
 csv :: [Text] -> Text
 csv = T.intercalate ", "
@@ -102,7 +94,7 @@ tableUpsert = csv . map go
 dbConnect :: PGDatabase
 dbConnect =  PGDatabase
   { pgDBHost = flags_pghost :: HostName
-  , pgDBPort = PortNumber $ read flags_pgport
+  , pgDBPort = PortNumber . fromIntegral $ flags_pgport
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString
@@ -111,15 +103,12 @@ dbConnect =  PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: PGConnection -> Text -> IO ()
-dbInsert conn insrt = do
-  let qry = rawPGSimpleQuery $! encodeUtf8 insrt
-  _ <- pgQuery conn qry
-  return ()
+dbInsert :: MonadIO m => PGConnection -> Text -> m ()
+dbInsert conn insrt = liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
 isFunction :: Value -> Bool
-isFunction (ValueFunction _ _ _) = False
-isFunction (_) = True
+isFunction ValueFunction{} = False
+isFunction _ = True
 
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
@@ -176,7 +165,7 @@ createInserts globalsIORef = do
     liftIO . debugM "historicContracts" $ show historicContracts
 
     --When contract hasn't been written to "contract" table and indexing table doesn't exist
-    when (not $ contractAlreadyCreated) $ do
+    unless contractAlreadyCreated $ do
         incNumTables
         let conVals = wrapAndEscape $ map escapeQuotes [T.pack $ keccak256String $ codehash firstContract, contractName firstContract, abi firstContract, chain firstContract]
         let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
@@ -204,7 +193,7 @@ createInserts globalsIORef = do
             ]
         setContractCreated globalsIORef hashVal
 
-    when history $ do
+    when history $
       yield $ T.concat
         [ "create table if not exists "
         , wrapDoubleQuotes functionHistoryName
@@ -239,7 +228,7 @@ createInserts globalsIORef = do
       yield $ T.intercalate " " ["insert into", wrapDoubleQuotes functionHistoryName, fKeySt, "values", finserts, ";"]
 
     index <- shouldIndex globalsIORef hashVal
-    when index $ do
+    when index $
       yield $ T.concat
         [ "insert into "
         , wrapDoubleQuotes tableName
@@ -252,6 +241,6 @@ createInserts globalsIORef = do
         , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
         , "transaction_function_name = excluded.transaction_function_name"
         , comma
-        , (tableUpsert $ map fst list)
+        , tableUpsert $ map fst list
         , ";"
         ]

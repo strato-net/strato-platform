@@ -2,10 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Slipstream.GlobalsColdStorage
   ( initStorage
@@ -21,7 +21,6 @@ import BlockApps.Solidity.Value
 import ClassyPrelude hiding (Handle)
 import Control.Monad.IO.Unlift
 import Data.Binary hiding (get)
-import Data.LargeWord
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
@@ -31,15 +30,9 @@ import UnliftIO.Resource
 
 import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics
-import Slipstream.MChainId
+import Slipstream.Data.GlobalsColdStorage
 
 -- Data definitions --
-
-data QueueElem = PreStorageEntry Address (Maybe ChainId) [(Text, Value)]
-               | SyncFlush
-
-deriving instance Read Word160
-deriving instance Read Address
 
 share [mkPersist sqlSettings{mpsEntityJSON=Nothing}, mkMigrate "migrateStore"] [persistLowerCase|
 ColdStorage
@@ -95,23 +88,14 @@ serialize (PreStorageEntry a mc vs) =
   let mci = MChainId mc
   in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
 
-deserialize :: Maybe ColdStorage -> Either String [(Text, Value)]
+deserialize :: Maybe ColdStorage -> Either Text [(Text, Value)]
 deserialize Nothing = Left "storage not found"
 deserialize (Just (ColdStorage _ _ bvs)) =
   case decodeOrFail (fromStrict bvs) of
-    Left (_, _, err) -> Left $ "corrupted binary: " ++ err
+    Left (_, _, err) -> Left $ "corrupted binary: " <> pack err
     Right (_, _, vs) -> Right vs
 
 -- API --
-
-data Handle = Handle (TQueue QueueElem) SqlBackend
-            | FakeHandle
-
-instance NFData Handle where
-  rnf = const () -- It doesn't really make sense to force a handle
-
-fakeHandle :: Handle
-fakeHandle = FakeHandle
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
 initStorage :: (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadResource m)
@@ -127,9 +111,9 @@ initStorage cacheSize = do
 
 -- | Check postgres for an entry about this account's values
 readStorage :: (MonadUnliftIO m, MonadIO m)
-            => Handle -> Address -> Maybe ChainId -> m (Either String [(Text, Value)])
-readStorage FakeHandle _ _ = return $! Left "fake handle"
-readStorage (Handle _ sql) addr mci = do
+            => Handle -> Address -> Maybe ChainId -> m (Either Text [(Text, Value)])
+readStorage FakeHandle _ _ = recordStorageResult $! Left "fake handle"
+readStorage (Handle _ sql) addr mci = recordStorageResult =<< do
   seen <- DBF.elem (addr, mci) <$> atomically readFilter
   if not seen
     then return . Left $ "unseen by bloom filter"
@@ -138,6 +122,13 @@ readStorage (Handle _ sql) addr mci = do
        . get
        . ColdStorageKey addr
        $ MChainId mci
+
+recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
+recordStorageResult v = do
+  case v of
+    Right _ -> recordStorageHit
+    Left err -> recordStorageMiss err
+  return $! v
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.

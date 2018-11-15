@@ -64,6 +64,52 @@
    })
   </script>
 
+  <h3>Cache Statistics</h3>
+  <div id="slipcache"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipcache"),
+      expr: [
+        "slipstream_cache_stats",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Cache {hits,misses}/Storage {hits,misses}",
+      yUnits: "count",
+   })
+  </script>
+
+  <h3>Bloom filter writes</h3>
+  <div id="slipbloom"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipbloom"),
+      expr: [
+        "slipstream_bloom_writes",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Number of writes to the bloom filter (includes pending)",
+      yUnits: "count",
+   })
+  </script>
+
+  <h3>Bloom filter stack size</h3>
+  <div id="slipstack"></div>
+  <script>
+    new PromConsole.Graph({
+      node: document.querySelector("#slipstack"),
+      expr: [
+        "slipstream_bloom_stack_depth",
+      ],
+      yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+      yTitle: "Pending items waiting to be written to the bloom filter",
+      yUnits: "count",
+   })
+  </script>
+
+
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}

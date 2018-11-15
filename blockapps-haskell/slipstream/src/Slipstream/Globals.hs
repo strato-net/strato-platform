@@ -9,8 +9,10 @@ module Slipstream.Globals
 import           BlockApps.Solidity.Value
 import           Control.DeepSeq
 
+import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Data.Map.Strict             as M
+import qualified Data.Cache.LRU              as LRU
+import           Data.Either.Extra
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
@@ -18,7 +20,11 @@ import           BlockApps.Ethereum
 import           UnliftIO.IORef
 
 import           Slipstream.Data.Globals
+import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
+
+newGlobals :: MonadIO m => Handle -> m (IORef Globals)
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -73,13 +79,25 @@ removeFromNoIndexList g k = do
 
 getContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
 getContractState globalsIORef address chainId = do
-  Globals{..} <- readIORef globalsIORef
-  return $ M.lookup (address,chainId) contractStates
+  g@Globals{..} <- readIORef globalsIORef
+  case LRU.lookup (address, chainId) contractStates of
+    (newCache, jv@Just{}) -> do
+      recordCacheHit
+      writeIORef globalsIORef g{contractStates = newCache }
+      return jv
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle address chainId)
+      forM_ mvs $ \vs ->
+        let newCache' = LRU.insert (address, chainId) vs newCache
+        in writeIORef globalsIORef g{contractStates = newCache' }
+      return mvs
 
 setContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> [(Text,Value)] -> m ()
 setContractState gref address chainId values = do
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractStates = M.insert (address, chainId) values contractStates}
+  updateGlobals gref globals{contractStates = LRU.insert (address, chainId) values contractStates}
+  asyncWriteToStorage csHandle address chainId values
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
