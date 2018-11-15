@@ -12,7 +12,7 @@ module Blockchain.VM.TestEthereum
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Aeson
@@ -206,9 +206,10 @@ runTest test = do
                 }
 
         cxt <- get
-        vmState0 <- liftIO $ startingState True False env' cxt
+        cfg <- ask
+        vmState0 <- liftIO $ startingState True False env' cfg cxt
 
-        (result, vmState1) <- lift $
+        (result, vmState1) <- lift . lift $
           flip runStateT vmState0{vmGasRemaining=getNumber $ gas' exec, debugCallCreates=Just []} $
           runExceptT $ do
             runCodeFromStart
