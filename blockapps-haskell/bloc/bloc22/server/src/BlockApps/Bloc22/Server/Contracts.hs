@@ -247,7 +247,7 @@ postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
-         partialXabis <- Map.fromList <$> parseXabi "src" (Text.unpack postxabirequestSrc)
+         partialXabis <- Map.fromList . snd <$> parseXabi "src" (Text.unpack postxabirequestSrc)
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwError . UserError .

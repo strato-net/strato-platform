@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc22.Database.Solc where
+module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
 
 import           Control.Monad              hiding (mapM_)
 import           Control.Monad.IO.Class     (MonadIO(..))
@@ -26,6 +26,7 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Bloc22.Monad
 
 
@@ -43,8 +44,8 @@ import BlockApps.Bloc22.Monad
 -- This is really hard to understand and highly non-idomatic for json formation or parsing.
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
-compileSolc :: Text -> Bloc Aeson.Value
-compileSolc mainSrc = do
+compileSolc :: SolcVersion -> Text -> Bloc Aeson.Value
+compileSolc _ mainSrc = do -- TODO(tim): Select compiler
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   case eRes of
@@ -56,8 +57,8 @@ compileSolc mainSrc = do
 
 
 -- For solc compiling during testing, outside of Bloc monad
-compileSolcIO :: Text -> IO (Either String Aeson.Value)
-compileSolcIO mainSrc = do
+compileSolcIO :: SolcVersion -> Text -> IO (Either String Aeson.Value)
+compileSolcIO _ mainSrc = do -- TODO(tim): Select compiler
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
   return $ case eRes of
