@@ -5,7 +5,7 @@ module Executable.EthereumDiscovery (
   ethereumDiscovery
   ) where
 
-import           Control.Exception.Lifted
+import           UnliftIO.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
