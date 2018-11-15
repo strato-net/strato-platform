@@ -37,7 +37,7 @@ getSiteAction = do
      ["config/test-settings.yml", "config/settings.yml"]
      []
      ignoreEnv
-  makeFoundation settings
+  makeFoundation settings Nothing
 
 withApp :: SpecWith (TestApp App) -> Spec
 withApp = before $ do
