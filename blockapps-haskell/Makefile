@@ -8,8 +8,6 @@ LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
 
-SOLC_VERSION=0.4.25
-
 all: build_docker clean
 
 prebuild:
@@ -21,10 +19,17 @@ prebuild:
 	mkdir -p $(LICENSE_SOURCE_DIR)
 	mkdir -p /tmp/docker-dummy-bloc
 
-build_solidity: prebuild
-	./pull_solc.sh $(SOLC_VERSION) $(FAKEROOT)/usr/bin $(LICENSE_SOURCE_DIR)/solidity
 
-build_haskell: prebuild build_solidity
+$(FAKEROOT)/usr/bin/solc-0.4.25: prebuild
+	./pull_solc.sh 0.4.25 $@ $(LICENSE_SOURCE_DIR)/solidity-0.4.25
+
+$(FAKEROOT)/usr/bin/solc-0.5.0: prebuild
+	./pull_solc.sh 0.5.0 $@ $(LICENSE_SOURCE_DIR)/solidity-0.5.0
+
+$(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4.25 $(FAKEROOT)/usr/bin/solc-0.5.0
+	ln -f $< $@
+
+build_haskell: prebuild $(FAKEROOT)/usr/bin/solc
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 	stack test --no-run-tests
@@ -35,7 +40,7 @@ build_deploybase: prebuild
 	docker build --tag=$(DEPLOYBASE_NAME):latest -f /tmp/docker-dummy-bloc/Dockerfile.deploybase /tmp/docker-dummy-bloc
 	rm -f /tmp/docker-dummy-bloc/Dockerfile.deploybase
 
-build_docker: build_deploybase build_solidity build_haskell
+build_docker: build_deploybase build_haskell $(FAKEROOT)/usr/bin/solc
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCHOME)
