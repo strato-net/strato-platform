@@ -23,6 +23,7 @@ dependencies:
   - ethereum-rlp
   - blockapps-util
   - leveldb-haskell
+  - monad-control
   - nibblestring
   - resourcet
   - transformers

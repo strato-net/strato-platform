@@ -202,7 +202,7 @@ initializeChainDBs :: ( MonadResource m
                    => Ext.Word256
                    -> ChainInfo
                    -> StateRoot
-                   -> (t m) ()
+                   -> t m ()
 initializeChainDBs chainId ChainInfo{..} sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
