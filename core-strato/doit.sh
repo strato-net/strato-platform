@@ -107,7 +107,8 @@ function newnode {
                          "${tbFlag}" +RTS -N1 >> logs/ethereum-vm 2>&1
 
   echo "Starting strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
+  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=${blockstanbulPrivateKey:-} \
+    runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
   echo "Configuring log maintenance"
   runBackgroundProcess cleanupLogs
