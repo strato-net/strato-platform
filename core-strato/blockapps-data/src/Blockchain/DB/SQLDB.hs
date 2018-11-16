@@ -5,6 +5,7 @@
 
 module Blockchain.DB.SQLDB (
   HasSQLDB(..),
+  WrapsSQLDB(..),
   SQLDB,
   sqlQuery,
   runPostgresConn,
@@ -29,6 +30,9 @@ type SQLDB = SQL.ConnectionPool
 
 class (MonadIO m, MonadBaseControl IO m) => HasSQLDB m where
   getSQLDB :: m SQLDB
+
+class HasSQLDB m => WrapsSQLDB t m where
+  runWithSQL :: m a -> (t m) a
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a->m a
 sqlQuery q = do
