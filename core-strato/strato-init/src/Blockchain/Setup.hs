@@ -15,6 +15,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
+import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C
@@ -78,6 +79,8 @@ defineFlag "minBlockDifficulty" (131072  ::  Integer) "Minimum block difficulty"
 defineFlag "R:redisHost" ("localhost"  ::  String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379  ::  Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
+
+defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize"
 
 data SetupDBs =
   SetupDBs {
@@ -222,6 +225,9 @@ defaultConfig =
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig
     }
+
+decodedFaucets :: [Address]
+decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
 
 defaultPeers :: [(String,Int)]
 defaultPeers =
@@ -461,7 +467,7 @@ oneTimeSetup genesisBlockName = do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
-             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName
+             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets
              (True, True)   -> error "You can't choose --backupmp and --backupblocks at the same time"
-             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName
-             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName
+             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName decodedFaucets
+             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName decodedFaucets
