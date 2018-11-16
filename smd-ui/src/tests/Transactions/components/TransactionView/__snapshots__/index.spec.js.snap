@@ -2,12 +2,14 @@
 
 exports[`TransactionView mapStateToProps with queryEngine as a state 1`] = `
 Object {
+  "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": undefined,
 }
 `;
 
 exports[`TransactionView mapStateToProps with transaction as a state 1`] = `
 Object {
+  "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": Object {
     "blockNumber": 19,
     "codeOrData": "6060604052346000575b6062806100176000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680632a1afcd914603c575b6000565b346000576046605c565b6040518082815260200191505060405180910390f35b6000548156",
@@ -3274,16 +3276,6 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
-                        To
-                      </strong>
-                    </td>
-                    <td>
-                      
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>
                         Block Number
                       </strong>
                     </td>
@@ -3506,16 +3498,6 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
-                        To
-                      </strong>
-                    </td>
-                    <td>
-                      
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>
                         Block Number
                       </strong>
                     </td>
@@ -3616,16 +3598,6 @@ ShallowWrapper {
                     <td>
                       <strong>
                         From
-                      </strong>
-                    </td>
-                    <td>
-                      
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>
-                        To
                       </strong>
                     </td>
                     <td>
@@ -3740,16 +3712,6 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
-                        To
-                      </strong>
-                    </td>
-                    <td>
-                      
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>
                         Block Number
                       </strong>
                     </td>
@@ -3843,16 +3805,6 @@ ShallowWrapper {
                       <td>
                         <strong>
                           From
-                        </strong>
-                      </td>
-                      <td>
-                        
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <strong>
-                          To
                         </strong>
                       </td>
                       <td>
@@ -4009,16 +3961,7 @@ ShallowWrapper {
                           
                         </td>
                       </tr>,
-                      <tr>
-                        <td>
-                          <strong>
-                            To
-                          </strong>
-                        </td>
-                        <td>
-                          
-                        </td>
-                      </tr>,
+                      false,
                       <tr>
                         <td>
                           <strong>
@@ -4193,61 +4136,7 @@ ShallowWrapper {
                       ],
                       "type": "tr",
                     },
-                    Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": Array [
-                          <td>
-                            <strong>
-                              To
-                            </strong>
-                          </td>,
-                          <td>
-                            
-                          </td>,
-                        ],
-                      },
-                      "ref": null,
-                      "rendered": Array [
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <strong>
-                              To
-                            </strong>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "To",
-                            },
-                            "ref": null,
-                            "rendered": "To",
-                            "type": "strong",
-                          },
-                          "type": "td",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": "",
-                          },
-                          "ref": null,
-                          "rendered": "",
-                          "type": "td",
-                        },
-                      ],
-                      "type": "tr",
-                    },
+                    false,
                     Object {
                       "instance": null,
                       "key": undefined,
@@ -4699,16 +4588,6 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
-                          To
-                        </strong>
-                      </td>
-                      <td>
-                        
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <strong>
                           Block Number
                         </strong>
                       </td>
@@ -4931,16 +4810,6 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
-                          To
-                        </strong>
-                      </td>
-                      <td>
-                        
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <strong>
                           Block Number
                         </strong>
                       </td>
@@ -5041,16 +4910,6 @@ ShallowWrapper {
                       <td>
                         <strong>
                           From
-                        </strong>
-                      </td>
-                      <td>
-                        
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <strong>
-                          To
                         </strong>
                       </td>
                       <td>
@@ -5165,16 +5024,6 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
-                          To
-                        </strong>
-                      </td>
-                      <td>
-                        
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <strong>
                           Block Number
                         </strong>
                       </td>
@@ -5268,16 +5117,6 @@ ShallowWrapper {
                         <td>
                           <strong>
                             From
-                          </strong>
-                        </td>
-                        <td>
-                          
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>
-                            To
                           </strong>
                         </td>
                         <td>
@@ -5434,16 +5273,7 @@ ShallowWrapper {
                             
                           </td>
                         </tr>,
-                        <tr>
-                          <td>
-                            <strong>
-                              To
-                            </strong>
-                          </td>
-                          <td>
-                            
-                          </td>
-                        </tr>,
+                        false,
                         <tr>
                           <td>
                             <strong>
@@ -5618,61 +5448,7 @@ ShallowWrapper {
                         ],
                         "type": "tr",
                       },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": Array [
-                            <td>
-                              <strong>
-                                To
-                              </strong>
-                            </td>,
-                            <td>
-                              
-                            </td>,
-                          ],
-                        },
-                        "ref": null,
-                        "rendered": Array [
-                          Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": <strong>
-                                To
-                              </strong>,
-                            },
-                            "ref": null,
-                            "rendered": Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "To",
-                              },
-                              "ref": null,
-                              "rendered": "To",
-                              "type": "strong",
-                            },
-                            "type": "td",
-                          },
-                          Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "",
-                            },
-                            "ref": null,
-                            "rendered": "",
-                            "type": "td",
-                          },
-                        ],
-                        "type": "tr",
-                      },
+                      false,
                       Object {
                         "instance": null,
                         "key": undefined,

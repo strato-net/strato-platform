@@ -18,6 +18,7 @@ Object {
 exports[`ContractMethodCall: action fetch arguments request 1`] = `
 Object {
   "address": "8070db2390462e2b5748085bde1350590e08bb17",
+  "chainId": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
   "name": "Greeter",
   "symbol": "greet",

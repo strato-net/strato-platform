@@ -9,10 +9,13 @@ module Blockchain.Strato.Discovery.UDPServer
      , connectMe
      ) where
 
+import           ClassyPrelude                           ((<>))
+import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.State
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
@@ -20,7 +23,6 @@ import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Either.Combinators
 import           Data.Maybe                              (fromJust)
-import           Data.Monoid
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
@@ -47,8 +49,10 @@ import qualified Network.Haskoin.Internals               as H
 runEthUDPServer :: ( MonadIO m
                    , MonadCatch m
                    , MonadThrow m
-                   , MonadBaseControl IO m
                    , MonadLogger m
+                   , MonadUnliftIO m
+                   , MonadBaseControl IO m -- TODO(tim): Remove
+                   , MonadBase IO m -- TODO(tim): Remove
                    )
                 => ContextLite
                 -> H.PrvKey
@@ -56,7 +60,7 @@ runEthUDPServer :: ( MonadIO m
                 -> Socket
                 -> m ()
 runEthUDPServer ctx myPriv _ sock =
-  void . runResourceT $ runStateT (udpHandshakeServer myPriv sock portNum) ctx
+  void . runResourceT $ runReaderT (udpHandshakeServer myPriv sock portNum) ctx
      where portNum = 30303 -- TODO(tim): Reenable port selection
 
 connectMe :: (MonadIO m, MonadLogger m)
@@ -129,10 +133,10 @@ attemptBond prv sock _ = do
 
 udpHandshakeServer :: ( HasSQLDB m
                       , MonadResource m
-                      , MonadBaseControl IO m
                       , MonadCatch m
                       , MonadThrow m
                       , MonadLogger m
+                      , MonadUnliftIO m -- TODO(tim): Remove
                       )
                    => H.PrvKey
                    -> Socket
@@ -166,10 +170,10 @@ udpHandshakeServer prv sock _ = do
 
 handleValidPacket :: ( HasSQLDB m
                      , MonadResource m
-                     , MonadBaseControl IO m
                      , MonadCatch m
                      , MonadThrow m
                      , MonadLogger m
+                     , MonadUnliftIO m -- TODO(tim): Remove when redundant with HasSQLDB
                      )
                   => H.PrvKey
                   -> Socket

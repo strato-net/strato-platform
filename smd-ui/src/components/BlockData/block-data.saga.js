@@ -13,30 +13,31 @@ import { env } from '../../env';
 
 const url = env.STRATO_URL + "/block/last/15"
 
-export function getBlockData() {
+export function getBlockData(chainId) {
+  const localUrl = chainId ? url + `?chainid=${chainId}` : url;
   return fetch(
-    url,
+    localUrl,
     {
       method: 'GET',
       credentials: "include",
       headers: {
         'Accept': 'application/json'
-    },
-  })
-    .then(function(response) {
+      },
+    })
+    .then(function (response) {
       return response.json()
     })
-    .then(function(res) {
+    .then(function (res) {
       return res;
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
 export function* fetchBlockData(action) {
   try {
-    let response = yield call(getBlockData);
+    let response = yield call(getBlockData, action.chainId);
     yield put(fetchBlockDataSuccess(response));
   }
   catch (err) {

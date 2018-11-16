@@ -13,7 +13,7 @@ import { env } from '../../env';
 
 const url = env.STRATO_URL;
 
-export function query(query, resourceType) {
+export function query(query, resourceType, chainId) {
   let constructedURL = url + resourceType;
   const queryParts = Object.getOwnPropertyNames(query);
   queryParts.forEach(function (part) {
@@ -25,6 +25,10 @@ export function query(query, resourceType) {
   });
   if (queryParts.length === 1 && queryParts.indexOf(TRANSACTION_QUERY_TYPES.last.key) > -1) {
     constructedURL += '/last/' + query.last;
+  }
+  if (chainId) {
+    const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
+    constructedURL += symbol + `chainid=${chainId}`;
   }
   return fetch(
     constructedURL,
@@ -48,7 +52,7 @@ export function query(query, resourceType) {
 
 export function* executeQuery(action) {
   try {
-    let response = yield call(query, action.query, action.resourceType);
+    let response = yield call(query, action.query, action.resourceType, action.chainId);
     yield put(executeQuerySuccess(response));
   }
   catch (err) {

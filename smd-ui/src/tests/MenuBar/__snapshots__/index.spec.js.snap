@@ -2,6 +2,20 @@
 
 exports[`MenuBar: index mapStateToProps 1`] = `
 Object {
+  "chainIds": Array [
+    Object {
+      "id": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+      "label": "airline cartel 1",
+    },
+    Object {
+      "id": "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e",
+      "label": "airline cartel 2",
+    },
+    Object {
+      "id": "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f",
+      "label": "airline cartel 3",
+    },
+  ],
   "currentUser": Object {
     "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
     "id": 6,
@@ -44,6 +58,27 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
+    <span>
+      <span className=\\"pt-navbar-divider\\" />
+      <small className=\\"pt-text-muted\\">
+        <div className=\\"pt-select\\">
+          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+            <option>
+               Main Chain 
+            </option>
+            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
+              airline cartel 1
+            </option>
+            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
+              airline cartel 2
+            </option>
+            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
+              airline cartel 3
+            </option>
+          </Field>
+        </div>
+      </small>
+    </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       SMD v
@@ -102,6 +137,27 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
+    <span>
+      <span className=\\"pt-navbar-divider\\" />
+      <small className=\\"pt-text-muted\\">
+        <div className=\\"pt-select\\">
+          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+            <option>
+               Main Chain 
+            </option>
+            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
+              airline cartel 1
+            </option>
+            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
+              airline cartel 2
+            </option>
+            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
+              airline cartel 3
+            </option>
+          </Field>
+        </div>
+      </small>
+    </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       SMD v
@@ -175,6 +231,27 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
+    <span>
+      <span className=\\"pt-navbar-divider\\" />
+      <small className=\\"pt-text-muted\\">
+        <div className=\\"pt-select\\">
+          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+            <option>
+               Main Chain 
+            </option>
+            <option value=\\"ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9\\">
+              airline cartel 1
+            </option>
+            <option value=\\"558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e\\">
+              airline cartel 2
+            </option>
+            <option value=\\"0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f\\">
+              airline cartel 3
+            </option>
+          </Field>
+        </div>
+      </small>
+    </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       SMD v
@@ -222,33 +299,4 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
 </nav>"
 `;
 
-exports[`MenuBar: index renders public mode component without values 1`] = `
-"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div>
-      <Link to=\\"/home\\" replace={false}>
-        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
-      </Link>
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-left\\">
-    <div className=\\"pt-navbar-heading\\">
-      STRATO Management Dashboard
-    </div>
-  </div>
-  <div className=\\"pt-navbar-group pt-align-right\\">
-    <Blueprint.Button onClick={[Function: onClick]} text=\\"Developer Sign In\\" className=\\"pt-button pt-small pt-intent-primary\\" />
-    <span className=\\"pt-navbar-divider\\" />
-    <small className=\\"pt-text-muted\\">
-      SMD v
-       - 
-      Public
-       
-    </small>
-  </div>
-  <div>
-    <withRouter(Connect(Login)) />
-    <withRouter(Connect(WalkThrough)) />
-  </div>
-</nav>"
-`;
+exports[`MenuBar: index renders public mode component without values 1`] = `"<Connect(Form(MenuBar)) isLoggedIn={false} currentUser={{...}} chainIds={{...}} openWalkThroughOverlay={[Function: mockConstructor]} location={{...}} initialValues={[undefined]} touchOnBlur={true} touchOnChange={false} persistentSubmitErrors={false} destroyOnUnmount={true} shouldAsyncValidate={[Function: defaultShouldAsyncValidate]} shouldValidate={[Function: defaultShouldValidate]} enableReinitialize={false} keepDirtyOnReinitialize={false} getFormState={[Function: getFormState]} pure={true} forceUnregisterOnUnmount={false} form=\\"menu-bar\\" />"`;

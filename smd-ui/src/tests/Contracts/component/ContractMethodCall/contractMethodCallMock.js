@@ -23,7 +23,8 @@ export const modals = {
   result: {
     status: "Success",
     hash: "8f6fcd037e028f84ec2e9462c4e29444cd3456c8bc8705723f0c36d075c14c5d"
-  }
+  },
+  chainId: '1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14'
 }
 
 export const initialState = {

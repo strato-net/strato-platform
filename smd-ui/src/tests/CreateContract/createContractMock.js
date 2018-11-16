@@ -8,7 +8,8 @@ export const payload = {
   password: "123456",
   searchable: undefined,
   username: "abc",
-  greet:''
+  greet:'',
+  chainId: "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86"
 }
 
 export const createContractResponse = {

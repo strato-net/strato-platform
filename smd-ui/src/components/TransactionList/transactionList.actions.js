@@ -18,10 +18,11 @@ export const preloadTx = function (data) {
   }
 }
 
-export const fetchTx = function (last) {
+export const fetchTx = function (last, chainId) {
   return {
     type: FETCH_TX,
     last: last,
+    chainId: chainId
   }
 };
 

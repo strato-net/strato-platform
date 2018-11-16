@@ -11,7 +11,7 @@ category: Web
 library:
   source-dirs: src/
 
-ghc-options: -Wall -Werror -ddump-to-file -ddump-splices
+ghc-options: -Wall -Werror -rtsopts
 
 default-extensions:
   - DeriveGeneric

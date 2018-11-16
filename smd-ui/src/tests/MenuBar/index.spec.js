@@ -25,18 +25,20 @@ describe('MenuBar: index', () => {
       const props = {
         isLoggedIn: true,
         currentUser: { username: 'tanuj44' },
+        chainIds: [
+          { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+          { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+          { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
+        fetchChainIds: jest.fn(),
         location: {
           search: '?developer'
-        }
+        },
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
@@ -46,6 +48,10 @@ describe('MenuBar: index', () => {
       const props = {
         isLoggedIn: false,
         currentUser: { username: '' },
+        chainIds: [
+          { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+          { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+          { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
         location: {}
       }
@@ -67,21 +73,24 @@ describe('MenuBar: index', () => {
         const props = {
           currentUser: { username: 'tanuj44' },
           isLoggedIn: true,
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openOverlay: jest.fn(),
           openLoginOverlay: jest.fn(),
           logout: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: '?developer'
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('button').first().simulate('click');
@@ -92,21 +101,24 @@ describe('MenuBar: index', () => {
         const props = {
           currentUser: { username: 'tanuj44' },
           isLoggedIn: true,
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openOverlay: jest.fn(),
           openLoginOverlay: jest.fn(),
           logout: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: "?developer"
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
@@ -117,21 +129,24 @@ describe('MenuBar: index', () => {
         const props = {
           currentUser: { username: 'tanuj44' },
           isLoggedIn: true,
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openOverlay: jest.fn(),
           openLoginOverlay: jest.fn(),
           logout: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: "?developer"
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('button').at(LOGOUT_OFFSET).simulate('click');
@@ -143,24 +158,84 @@ describe('MenuBar: index', () => {
         const props = {
           currentUser: { username: 'tanuj44' },
           isLoggedIn: false,
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openLoginOverlay: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: "?developer"
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('Button').last().simulate('click');
         expect(wrapper.find('Button').get(1)).toMatchSnapshot();
         expect(props.openWalkThroughOverlay).toHaveBeenCalled();
+      });
+
+      describe('chain', () => {
+
+        test('select value', () => {
+          const props = {
+            currentUser: { username: 'tanuj44' },
+            isLoggedIn: true,
+            chainIds: [
+              { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+              { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+              { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+            selectChain: jest.fn(),
+            fetchChainIds: jest.fn(),
+            openLoginOverlay: jest.fn(),
+            openWalkThroughOverlay: jest.fn(),
+            location: {
+              search: "?developer"
+            },
+            store: store
+          }
+
+          let wrapper = shallow(
+            <MenuBar.WrappedComponent {...props} />
+          ).dive().dive().dive();
+
+          wrapper.find('Field').simulate('change', { target: { value: 'airline cartel 1' } });
+          expect(props.selectChain).toHaveBeenCalled();
+        });
+
+        test('select empty value', () => {
+          const props = {
+            currentUser: { username: 'tanuj44' },
+            isLoggedIn: true,
+            chainIds: [
+              { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+              { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+              { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }
+            ],
+            selectChain: jest.fn(),
+            fetchChainIds: jest.fn(),
+            openLoginOverlay: jest.fn(),
+            openWalkThroughOverlay: jest.fn(),
+            location: {
+              search: "?developer"
+            },
+            store: store
+          }
+
+          let wrapper = shallow(
+            <MenuBar.WrappedComponent {...props} />
+          ).dive().dive().dive();
+
+          wrapper.find('Field').simulate('change', { target: { value: 'Chain Label' } });
+          expect(props.selectChain).toHaveBeenCalled();
+        });
+
       });
 
     });
@@ -177,18 +252,20 @@ describe('MenuBar: index', () => {
       const props = {
         isLoggedIn: true,
         currentUser: { username: 'tanuj44' },
+        chainIds: [
+          { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+          { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+          { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
+        fetchChainIds: jest.fn(),
         location: {
           search: '?developer'
-        }
+        },
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
@@ -198,16 +275,18 @@ describe('MenuBar: index', () => {
       const props = {
         isLoggedIn: false,
         currentUser: { username: null },
+        chainIds: [
+          { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+          { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+          { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
         openWalkThroughOverlay: jest.fn(),
-        location: {}
+        fetchChainIds: jest.fn(),
+        location: {},
+        store: store
       }
 
       let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
+        <MenuBar.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
@@ -219,21 +298,24 @@ describe('MenuBar: index', () => {
         const props = {
           isLoggedIn: false,
           currentUser: { username: null },
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openOverlay: jest.fn(),
           openLoginOverlay: jest.fn(),
           logout: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: '?developer'
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('button').first().simulate('click');
@@ -244,21 +326,24 @@ describe('MenuBar: index', () => {
         const props = {
           isLoggedIn: false,
           currentUser: { username: null },
+          chainIds: [
+            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
+          selectChain: jest.fn(),
+          fetchChainIds: jest.fn(),
           openOverlay: jest.fn(),
           openLoginOverlay: jest.fn(),
           logout: jest.fn(),
           openWalkThroughOverlay: jest.fn(),
           location: {
             search: "?developer"
-          }
+          },
+          store: store
         }
 
         let wrapper = shallow(
-          <Provider store={store}>
-            <MemoryRouter>
-              <MenuBar.WrappedComponent {...props} />
-            </MemoryRouter>
-          </Provider>
+          <MenuBar.WrappedComponent {...props} />
         ).dive().dive().dive();
 
         wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
@@ -282,6 +367,13 @@ describe('MenuBar: index', () => {
         "error": null,
         "isOpen": false,
         "spinning": false
+      },
+      chains: {
+        chainIds: [
+          { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
+          { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
+          { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }
+        ]
       }
     }
 

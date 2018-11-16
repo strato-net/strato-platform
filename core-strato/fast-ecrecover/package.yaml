@@ -9,6 +9,8 @@ copyright:
 build-type:
   Simple
 
+license: Apache-2.0
+
 github: blockapps/strato-platform/core-strato/fast-ecrecover
 
 dependencies:

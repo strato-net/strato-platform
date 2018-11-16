@@ -5,13 +5,15 @@
 
 module Main where
 
-import           Blockchain.Data.Address
-import           Blockchain.Data.AddressStateDB
+import           Prelude hiding (print)
+import           ClassyPrelude (print)
+
 import           Test.Hspec
 import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           System.Directory
@@ -26,6 +28,8 @@ import           Data.Either
 import qualified Data.Text.Encoding      as Text
 import qualified Database.LevelDB        as DB
 
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
@@ -51,10 +55,12 @@ main = do
   hspec spec
 
 runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m (a, Context)
+                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM' f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    runResourceT $ do
+    runResourceT
+      . flip runReaderT (error "Postgres connection no initialized") --conn
+      $ do
         let ldbOptions = DB.defaultOptions {
             DB.createIfMissing = True,
             DB.cacheSize       = flags_ldbCacheSize,
@@ -75,7 +81,6 @@ runContextM' f = do
                         hdb
                         cdb
                         blksumdb
-                        (error "Postgres connection no initialized") --conn
                         M.empty
                         M.empty
                         M.empty
@@ -148,13 +153,13 @@ spec = do
              Nothing
              Nothing
       result `shouldSatisfy` isRight
-      liftIO . putStrLn . show $ theTrace vmState
-      liftIO . putStrLn . show $ vmException vmState
-      liftIO . putStrLn . show $ B16.encode "ec630643"
+      print $ theTrace vmState
+      print $ vmException vmState
+      print $ B16.encode "ec630643"
       case returnVal vmState of
         Nothing -> liftIO $ putStrLn "No return value"
         Just code -> do
-          liftIO . putStrLn $ show code
-          liftIO . putStrLn . show . fst $ B16.decode code
-          liftIO . putStrLn . show $ Text.decodeUtf8 code
-          liftIO . putStrLn . show . C8.takeWhile (/= '\0') . C8.drop 64 $ code
+          print code
+          print . fst . B16.decode $ code
+          print . Text.decodeUtf8 $ code
+          print . C8.takeWhile (/= '\0') . C8.drop 64 $ code

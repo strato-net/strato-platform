@@ -20,11 +20,12 @@ export const removeQuery = function(queryType) {
   }
 }
 
-export const executeQuery = function(resourceType, query) {
+export const executeQuery = function(resourceType, query, chainId) {
   return {
     type: EXECUTE_QUERY_REQUEST,
     resourceType: resourceType,
-    query: query
+    query: query,
+    chainId: chainId
   }
 };
 

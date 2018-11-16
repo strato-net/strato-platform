@@ -5,16 +5,20 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module BlockApps.Solidity.Parse.ParserTypes where
 
-import           Data.Text                            (Text)
+import           Control.Monad
+import           Data.Either.Extra
+import           Data.Maybe
+import           Data.SemVer
+import qualified Data.Text as T
 import           Text.Parsec
 
 import           BlockApps.Solidity.Xabi
 
 data SourceUnit = Pragma Identifier String
-                | NamedXabi Text (Xabi, [Text])
+                | NamedXabi T.Text (Xabi, [T.Text])
                 deriving (Eq, Show)
 
-data File = File {
+newtype File = File {
   unsourceUnits :: [SourceUnit]
 }
 
@@ -44,4 +48,17 @@ getContractName = getState
 -- | Not actually used.
 type SolidityValue = String
 
+data SolcVersion = ZeroPointFour | ZeroPointFive deriving (Eq, Show, Ord, Enum)
 
+decideVersion :: File -> SolcVersion
+decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
+  where go :: SourceUnit -> Maybe SolcVersion
+        go NamedXabi{} = Nothing
+        go (Pragma pragmaName rest) = do
+          guard $ pragmaName == "solidity"
+          rng <- eitherToMaybe . parseSemVerRange . T.strip . T.pack $ rest
+          -- It would be much better to check for a nonempty intersection of ranges,
+          -- but this simple enough that its hard to be wrong.
+          let possibilities = [semver 0 5 n | n <- [0..99]]
+          guard $ any (matchesSimple rng) possibilities
+          return ZeroPointFive

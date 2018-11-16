@@ -9,6 +9,7 @@ export const contract = {
       address: "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
       greeting: ""
     }],
+  chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
 }
 
 export const accounts = [

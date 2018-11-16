@@ -15,7 +15,7 @@ Object {
 exports[`App: index render in enterprise mode 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(ReduxForm)) />
   <SideBar />
   <main id=\\"outer-container\\" style={{...}}>
     ENTERPRISE
@@ -26,7 +26,7 @@ exports[`App: index render in enterprise mode 1`] = `
 exports[`App: index render in public mode when user is logged in 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(ReduxForm)) />
   <SideBar />
   <main id=\\"outer-container\\" style={{...}}>
     PUBLIC
@@ -37,7 +37,7 @@ exports[`App: index render in public mode when user is logged in 1`] = `
 exports[`App: index render in public mode when user is not logged in 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) />
+  <withRouter(Connect(ReduxForm)) />
   <main id=\\"outer-container\\" style={{...}}>
     PUBLIC
   </main>

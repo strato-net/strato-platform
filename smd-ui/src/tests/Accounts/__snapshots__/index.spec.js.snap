@@ -130,12 +130,13 @@ Object {
     },
   },
   "filter": "Search accounts",
+  "selectedChain": "airline cartel 1",
 }
 `;
 
 exports[`Accounts: index render with empty values 1`] = `
 "<div className=\\"container-fluid pt-dark\\">
-  <withRouter(Connect(Tour)) name=\\"accounts\\" steps={{...}} finalStepSelector=\\"#contracts\\" nextPage=\\"contracts\\" />
+  <withRouter(Connect(Tour)) name=\\"accounts\\" steps={{...}} finalStepSelector=\\"#contracts\\" nextPage=\\"chains\\" />
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
@@ -180,7 +181,7 @@ exports[`Accounts: index render with empty values 1`] = `
 
 exports[`Accounts: index render with mocked values 1`] = `
 "<div className=\\"container-fluid pt-dark\\">
-  <withRouter(Connect(Tour)) name=\\"accounts\\" steps={{...}} finalStepSelector=\\"#contracts\\" nextPage=\\"contracts\\" />
+  <withRouter(Connect(Tour)) name=\\"accounts\\" steps={{...}} finalStepSelector=\\"#contracts\\" nextPage=\\"chains\\" />
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>

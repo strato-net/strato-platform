@@ -3,10 +3,10 @@ import ContractMethodCall, { mapStateToProps, validate } from '../../../../compo
 import { reducer as formReducer } from 'redux-form'
 import { createStore, combineReducers } from 'redux'
 import { Provider } from 'react-redux';
-import { modals, initialState } from './contractMethodCallMock';
+import { modals } from './contractMethodCallMock';
 import { indexAccountsMock } from '../../../Accounts/accountsMock'
-import { Dialog } from '@blueprintjs/core';
 import * as checkMode from '../../../../lib/checkMode';
+import { chain } from '../../../Chains/chainsMock';
 
 describe('ContractMethodCall: index', () => {
   let store
@@ -25,6 +25,10 @@ describe('ContractMethodCall: index', () => {
         "username": '',
         "address": ''
       },
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -47,11 +51,15 @@ describe('ContractMethodCall: index', () => {
       modal: {},
       accounts: {},
       modalUsername: 'Buyer1',
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
       currentUser: {
         "id": '',
         "username": 'Supplier1',
         "address": '370adf114257cb0e0025eedf0a96261b51af23e3'
       },
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -73,6 +81,10 @@ describe('ContractMethodCall: index', () => {
     const state = {
       methodCall: {
         modals: undefined
+      },
+      chains: {
+        listChain: chain,
+        listLabelIds: chain["airline cartel 9"]
       },
       user: {
         "username": null,
@@ -101,6 +113,10 @@ describe('ContractMethodCall: index', () => {
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
       },
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -126,6 +142,10 @@ describe('ContractMethodCall: index', () => {
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
       },
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -152,6 +172,10 @@ describe('ContractMethodCall: index', () => {
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
       },
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),

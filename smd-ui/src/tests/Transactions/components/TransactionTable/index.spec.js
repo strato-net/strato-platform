@@ -128,6 +128,9 @@ describe("TransactionTable: index", () => {
       queryEngine: {
         query: { last: 15 },
         queryResults: transactions
+      },
+      chains: {
+        selectedChain: 'airline cartel 1'
       }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
