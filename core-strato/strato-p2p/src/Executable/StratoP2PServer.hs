@@ -49,7 +49,8 @@ runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger 
              -> m ()
 runEthServer myPriv listenPort = runContextM flags_maxReturnedHeaders $ do
   let myPubkey = calculatePublic theCurve myPriv
-  void . runContextM flags_maxReturnedHeaders . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
+  void . runGeneralTCPServer (serverSettings listenPort "*") $ \app ->
+   runContextM flags_maxReturnedHeaders $ do
     let theSockAddr = sockAddrToIP (appSockAddr app)
     getPeerByIP theSockAddr >>= \case
       Nothing -> do
