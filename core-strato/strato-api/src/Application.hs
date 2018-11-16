@@ -1,31 +1,34 @@
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Application
-    ( getApplicationDev
-    , appMain
-    , develMain
+    ( appMain
     , makeFoundation
     , makeLogware
-    -- * for DevelMain
-    , getApplicationRepl
-    , shutdownApp
-    -- * for GHCI
-    , handler
-    , db
     ) where
 
 
+import           Control.Monad.Except
 import           Control.Monad.Logger
+import qualified Data.Binary                          as BN
+import qualified Data.ByteString.Lazy                 as BL
+import qualified Data.ByteString.Base64               as B64
+import qualified Data.ByteString.Char8                as C8
+import           Data.Either.Extra
 import           Database.Persist.Postgresql
 import qualified Database.PostgreSQL.Simple           as PG
 
 import           Import
 import           Language.Haskell.TH.Syntax           (qLocation)
 import           Network.Wai (Middleware)
-import           Network.Wai.Handler.Warp             (Settings, defaultSettings, defaultShouldDisplayException,
-                                                       getPort, setHost, setOnException, setPort)
+import           Network.Wai.Handler.Warp             (Settings, defaultSettings,
+                                                       defaultShouldDisplayException,
+                                                       setHost, setOnException, setPort)
 import           Network.Wai.Handler.WarpTLS
-import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPAddrSource (..), OutputFormat (..),
-                                                       destination, mkRequestLogger, outputFormat)
+import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPAddrSource (..),
+                                                       OutputFormat (..), destination,
+                                                       mkRequestLogger, outputFormat)
+import           System.Environment
+import           System.Exit
 import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
 
 import           Handler.AccountInfo
@@ -47,6 +50,9 @@ import           Handler.TxLast
 import           Handler.UUIDInfo
 
 import           Blockchain.EthConf
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Format
+import qualified Network.Haskoin.Crypto as HK
 
 mkYesodDispatch "App" resourcesApp
 
@@ -54,8 +60,8 @@ mkYesodDispatch "App" resourcesApp
 -- performs initialization and return a foundation datatype value. This is also
 -- the place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
-makeFoundation :: AppSettings -> IO App
-makeFoundation appSettings = do
+makeFoundation :: AppSettings -> Maybe HK.PrvKey -> IO App
+makeFoundation appSettings appFaucetKey = do
     -- Some basic initializations: HTTP connection manager and logger
 
     appHttpManager <- newManager
@@ -139,25 +145,39 @@ warpSettings foundation =
             (toLogStr $ "Exception from Warp: " ++ show e))
       defaultSettings
 
--- | For yesod devel, return the Warp settings and WAI Application.
-getApplicationDev :: IO (Settings, Application)
-getApplicationDev = do
-    settings <- getAppSettings
-    foundation <- makeFoundation settings
-    wsettings <- getDevSettings $ warpSettings foundation
-    app <- makeApplication foundation
-    return (wsettings, app)
+getGlobalKey :: IO (Maybe HK.PrvKey)
+getGlobalKey = fmap (HK.makePrvKey . BN.decode . BL.fromStrict) . readFile $ "config" </> "priv"
 
-getAppSettings :: IO AppSettings
-getAppSettings = loadYamlSettings [configSettingsYml] [] useEnv
+getLocalKey :: IO (Maybe HK.PrvKey)
+getLocalKey = eitherExtractNodeKey >>= \case
+  Left "NODEKEY not set" -> return Nothing
+  Left err -> die err
+  Right prvKey -> return $ Just prvKey
 
--- | main function for use by yesod devel
-develMain :: IO ()
-develMain = develMainHelper getApplicationDev
+eitherExtractNodeKey :: IO (Either String HK.PrvKey)
+eitherExtractNodeKey = runExceptT $ do
+  mKey <- liftEither =<< maybeToEither "NODEKEY not set" <$> liftIO (lookupEnv "NODEKEY")
+  bytes <- liftEither . B64.decode . C8.pack $ mKey
+  key <- liftEither . maybeToEither "Invalid NODEKEY" . HK.decodePrvKey HK.makePrvKey $ bytes
+  return key
+
 
 -- | The @main@ function for an executable running this site.
 appMain :: IO ()
 appMain = do
+    localKey <- getLocalKey
+    globalKey <- getGlobalKey
+    faucetKey <- case (localKey, globalKey) of
+      (Just k, _) -> do
+        putStrLn $ "Using local faucet: " <> pack (format (prvKey2Address k))
+        return localKey
+      (_, Just k) -> do
+        putStrLn $ "Using global faucet: " <> pack (format (prvKey2Address k))
+        return globalKey
+      _ -> do
+        putStrLn "No faucet key found; faucets are disabled"
+        return Nothing
+
     -- Get the settings from all relevant sources
     settings <- loadYamlSettingsArgs
         -- fall back to compile-time values, set to [] to require values at runtime
@@ -175,7 +195,7 @@ appMain = do
                     }
                   }
     -- Generate the foundation from the settings
-    foundation <- makeFoundation settings'
+    foundation <- makeFoundation settings' faucetKey
 
     -- Generate a WAI Application from the foundation
     app <- makeApplication foundation
@@ -185,31 +205,3 @@ appMain = do
     runTLS tls (warpSettings foundation) app
   where
     tls = (tlsSettingsChain "certs/star_blockapps_net.pem" ["certs/TrustedRoot.pem", "certs/DigiCertCA2.pem"] "certs/key.pem"){onInsecure=AllowInsecure}
-
-
---------------------------------------------------------------
--- Functions for DevelMain.hs (a way to run the app from GHCi)
---------------------------------------------------------------
-getApplicationRepl :: IO (Int, App, Application)
-getApplicationRepl = do
-    settings <- getAppSettings
-    foundation <- makeFoundation settings
-    wsettings <- getDevSettings $ warpSettings foundation
-    app1 <- makeApplication foundation
-    return (getPort wsettings, foundation, app1)
-
-shutdownApp :: App -> IO ()
-shutdownApp _ = return ()
-
-
----------------------------------------------
--- Functions for use in development with GHCi
----------------------------------------------
-
--- | Run a handler
-handler :: Handler a -> IO a
-handler h = getAppSettings >>= makeFoundation >>= flip unsafeHandler h
-
--- | Run DB queries
-db :: ReaderT SqlBackend (HandlerT App IO) a -> IO a
-db = handler . runDB

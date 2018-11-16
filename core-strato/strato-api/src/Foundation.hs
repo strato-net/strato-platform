@@ -15,8 +15,8 @@ import           Data.Time
 import qualified Network.Wai              as W
 import qualified Prelude                  as P
 import           Yesod.Core.Types         (Logger)
-import qualified Yesod.Core.Unsafe        as Unsafe
 
+import           Network.Haskoin.Crypto   as HK
 import           Blockchain.DB.SQLDB
 
 timeFormat :: String
@@ -42,7 +42,11 @@ data App = App
     , appHttpManager :: Manager
     , appLogger      :: Logger
     , appFaucetNonce :: IORef Integer -- The last maximum nonce given out
+    , appFaucetKey   :: Maybe HK.PrvKey
     }
+
+getKey :: MonadReader App m => m (Maybe HK.PrvKey)
+getKey = asks appFaucetKey
 
 initialMaxNonce :: MonadIO m => m (IORef Integer)
 initialMaxNonce = liftIO $ newIORef (-1)
@@ -123,6 +127,3 @@ instance YesodPersistRunner App where
 -- achieve customized and internationalized form validation messages.
 instance RenderMessage App FormMessage where
     renderMessage _ _ = defaultFormMessage
-
-unsafeHandler :: App -> Foundation.Handler a -> IO a
-unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
