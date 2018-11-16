@@ -54,7 +54,7 @@ getGitInfo = client (Proxy @ GetGitInfo)
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)
 
-getContracts :: ClientM GetContractsResponse
+getContracts :: Maybe ChainId -> ClientM GetContractsResponse
 getContracts = client (Proxy @ GetContracts)
 
 getContractsData :: ContractName -> ClientM [MaybeNamed Address]

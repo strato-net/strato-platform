@@ -259,6 +259,9 @@ describe('BlockTable: index', () => {
       queryEngine: {
         query: { last: 15 },
         queryResult: blocksMock
+      },
+      chains: {
+        selectedChain: 'airline cartel 1'
       }
     }
 

@@ -1,10 +1,10 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module BlockApps.Bloc22.API.Contracts where
 
@@ -37,12 +37,14 @@ import           BlockApps.Solidity.Xabi
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
-type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
+type GetContracts = "contracts"
+                 :> QueryParam "chainid" ChainId
+                 :> Get '[JSON] GetContractsResponse
 
 data AddressCreatedAt = AddressCreatedAt
   { createdAt  :: Int64
   , address    :: MaybeNamed Address
-  , acaChainId :: Maybe ChainId
+  , chainId :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
 instance ToJSON AddressCreatedAt
@@ -61,7 +63,7 @@ instance ToSchema AddressCreatedAt where
       ex = AddressCreatedAt
         { createdAt = 1494448021000
         , address = Unnamed $ Address 0xdeadbeef
-        , acaChainId = Nothing
+        , chainId = Nothing
         }
 
 newtype GetContractsResponse = GetContractsResponse
@@ -92,12 +94,12 @@ instance ToSample GetContractsResponse where
     [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
-      , acaChainId = Nothing
+      , chainId = Nothing
       }
     , AddressCreatedAt
       { address = Named "Addressed"
       , createdAt = 101
-      , acaChainId = Nothing
+      , chainId = Nothing
       }
     ]
 --------------------------------------------------------------------------------

@@ -1,17 +1,13 @@
 import React from 'react';
 import CreateContract, { mapStateToProps, validate } from '../../components/CreateContract';
 import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
 import { Dialog } from '@blueprintjs/core';
 import { reducer as formReducer } from 'redux-form'
 import { createStore, combineReducers } from 'redux'
-import ReactDOM from 'react-dom';
-import { payload, payloadCompile, compileResponse, source } from './createContractMock'
+import { payload, source } from './createContractMock'
 import { indexAccountsMock } from '../Accounts/accountsMock'
-import { wrap } from 'module';
-import { findDOMNode } from 'react-dom';
-import { ReactWrapper } from 'enzyme';
 import * as checkMode from '../../lib/checkMode';
+import { chain } from '../Chains/chainsMock';
 
 describe('CreateContract: index', () => {
   let store
@@ -63,6 +59,10 @@ describe('CreateContract: index', () => {
         toastsMessage: 'message',
         searchable: false,
         enableCreateContract: true,
+        chainLabel: chain,
+        chainLabelIds: chain["airline cartel 9"],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         contractOpenModal: jest.fn(),
         contractCloseModal: jest.fn(),
         createContract: jest.fn(),
@@ -106,6 +106,10 @@ describe('CreateContract: index', () => {
         toastsMessage: 'message',
         searchable: false,
         enableCreateContract: true,
+        chainLabel: chain,
+        chainLabelIds: chain["airline cartel 9"],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         contractOpenModal: jest.fn(),
         contractCloseModal: jest.fn(),
         createContract: jest.fn(),
@@ -156,6 +160,10 @@ describe('CreateContract: index', () => {
         toastsMessage: 'message',
         searchable: false,
         enableCreateContract: true,
+        chainLabel: chain,
+        chainLabelIds: chain["airline cartel 9"],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         contractOpenModal: jest.fn(),
         contractCloseModal: jest.fn(),
         createContract: jest.fn(),
@@ -199,6 +207,10 @@ describe('CreateContract: index', () => {
         toastsMessage: 'message',
         searchable: false,
         enableCreateContract: true,
+        chainLabel: chain,
+        chainLabelIds: chain["airline cartel 9"],
+        fetchChainIds: jest.fn(),
+        getLabelIds: jest.fn(),
         contractOpenModal: jest.fn(),
         contractCloseModal: jest.fn(),
         createContract: jest.fn(),
@@ -243,6 +255,10 @@ describe('CreateContract: index', () => {
       toastsMessage: 'message',
       searchable: false,
       enableCreateContract: true,
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       contractOpenModal: jest.fn(),
       contractCloseModal: jest.fn(),
       createContract: jest.fn(),
@@ -268,6 +284,7 @@ describe('CreateContract: index', () => {
       </Provider>
     );
     wrapper.find('Button').simulate('click');
+    expect(props.fetchChainIds).toHaveBeenCalled();
     expect(props.contractOpenModal).toHaveBeenCalled();
   });
 
@@ -287,6 +304,10 @@ describe('CreateContract: index', () => {
       toastsMessage: 'message',
       searchable: false,
       enableCreateContract: true,
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       contractOpenModal: jest.fn(),
       contractCloseModal: jest.fn(),
       createContract: jest.fn(),
@@ -332,6 +353,10 @@ describe('CreateContract: index', () => {
       toastsMessage: 'message',
       searchable: false,
       enableCreateContract: true,
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       contractOpenModal: jest.fn(),
       contractCloseModal: jest.fn(),
       createContract: jest.fn(),
@@ -375,6 +400,10 @@ describe('CreateContract: index', () => {
       toastsMessage: 'message',
       searchable: false,
       enableCreateContract: true,
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       contractOpenModal: jest.fn(),
       contractCloseModal: jest.fn(),
       createContract: jest.fn(),
@@ -442,6 +471,10 @@ describe('CreateContract: index', () => {
       toastsMessage: 'message',
       searchable: false,
       enableCreateContract: true,
+      chainLabel: chain,
+      chainLabelIds: chain["airline cartel 9"],
+      fetchChainIds: jest.fn(),
+      getLabelIds: jest.fn(),
       contractOpenModal: jest.fn(),
       contractCloseModal: jest.fn(),
       createContract: jest.fn(),
@@ -470,13 +503,16 @@ describe('CreateContract: index', () => {
 
     const fields = wrapper.find('Field')
 
-    fields.at(0).simulate('change', { target: { value: 'Supplier2' } })
+    fields.at(0).simulate('change', { target: { value: 'airline cartel 9' } })
+    expect(props.getLabelIds).toHaveBeenCalled()
+
+    fields.at(2).simulate('change', { target: { value: 'Supplier2' } })
     expect(props.usernameChange).toHaveBeenCalled()
 
-    fields.at(3).simulate('change', { target: { checked: true } })
+    fields.at(5).simulate('change', { target: { checked: true } })
     expect(props.compileContract).toHaveBeenCalled()
 
-    fields.at(5).simulate('change', { target: { value: 'Supplier2' } })
+    fields.at(7).simulate('change', { target: { value: 'Supplier2' } })
     expect(props.contractNameChange).toHaveBeenCalled()
 
     wrapper.find('Button').at(1).simulate('click')
@@ -506,8 +542,11 @@ describe('CreateContract: index', () => {
           "username": "tanuj41",
           "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
         },
+      },
+      chains: {
+        listChain: chain,
+        listLabelIds: chain["airline cartel 9"]
       }
-
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
   });

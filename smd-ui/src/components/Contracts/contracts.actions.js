@@ -4,9 +4,10 @@ export const FETCH_CONTRACTS_FAILED = 'FETCH_CONTRACTS_FAILED';
 export const CHANGE_CONTRACT_FILTER = 'CHANGE_CONTRACT_FILTER';
 export const TOGGLE_COLLAPSE_TABLE = 'TOGGLE_COLLAPSE_TABLE';
 
-export const fetchContracts = function () {
+export const fetchContracts = function (chainId) {
   return {
     type: FETCH_CONTRACTS,
+    chainId: chainId
   }
 };
 

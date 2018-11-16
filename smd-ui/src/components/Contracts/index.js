@@ -1,20 +1,20 @@
-import React, {Component} from 'react';
-import {fetchContracts, changeContractFilter} from './contracts.actions';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import React, { Component } from 'react';
+import { fetchContracts, changeContractFilter } from './contracts.actions';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 
 const tourSteps = [
-/*  {
-    title: 'Create Contract',
-    text: 'Where queries are to be found.',
-    selector: '#tour-create-contract-button',
-    position: 'bottom', type: 'hover',
-    isFixed: true,
-  }, */
+  /*  {
+      title: 'Create Contract',
+      text: 'Where queries are to be found.',
+      selector: '#tour-create-contract-button',
+      position: 'bottom', type: 'hover',
+      isFixed: true,
+    }, */
   {
     title: 'View Transactions',
     text: 'Scroll through all transactions launched from your Smart Contract.',
@@ -29,7 +29,12 @@ class Contracts extends Component {
   componentWillMount() {
     mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
-    this.props.fetchContracts();
+    this.props.fetchContracts(this.props.selectedChain);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.selectedChain !== this.props.selectedChain)
+      this.props.fetchContracts(nextProps.selectedChain);
   }
 
   updateFilter = (filter) => {
@@ -42,17 +47,17 @@ class Contracts extends Component {
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
 
     const cards = contractNames.length === 0 ? [] : contractNames
-      .filter(function(contract){
-        if(!filter) {
+      .filter(function (contract) {
+        if (!filter) {
           return true;
         }
         return contract.toLowerCase().indexOf(filter) > -1;
       })
-      .map((value,i) => {
+      .map((value, i) => {
         return (
-          <div className="row pt-dark" key={'contract-card-'+i}>
+          <div className="row pt-dark" key={'contract-card-' + i}>
             <div className="col-sm-12">
-              <ContractCard contract={{name: value, contract: contracts[value]}} />
+              <ContractCard contract={{ name: value, contract: contracts[value] }} />
               <br />
             </div>
           </div>
@@ -74,11 +79,11 @@ class Contracts extends Component {
                 type="search"
                 placeholder="Search contracts"
                 onChange={e => this.updateFilter(e.target.value.toLowerCase())}
-                dir="auto"/>
+                dir="auto" />
             </div>
           </div>
           <div className="col-sm-4 text-right smd-pad-8">
-            <CreateContract/>
+            <CreateContract />
           </div>
         </div>
 
@@ -98,8 +103,9 @@ class Contracts extends Component {
 export function mapStateToProps(state) {
   return {
     contracts: state.contracts.contracts,
-    filter: state.contracts.filter
+    filter: state.contracts.filter,
+    selectedChain: state.chains.selectedChain
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter})(Contracts));
+export default withRouter(connect(mapStateToProps, { fetchContracts, changeContractFilter })(Contracts));

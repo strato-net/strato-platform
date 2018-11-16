@@ -13,9 +13,13 @@ import { env } from '../../env';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts() {
+export function getContracts(chainId) {
+  let localContractsUrl = contractsUrl;
+  if (chainId) {
+    localContractsUrl += `?chainid=${chainId}`
+  }
   return fetch(
-    contractsUrl,
+    localContractsUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -23,17 +27,17 @@ export function getContracts() {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json()
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
 export function* fetchContracts(action) {
   try {
-    let response = yield call(getContracts);
+    let response = yield call(getContracts, action.chainId);
     yield put(fetchContractsSuccess(response));
   }
   catch (err) {

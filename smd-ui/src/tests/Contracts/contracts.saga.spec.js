@@ -25,10 +25,13 @@ describe('Contracts: saga', () => {
   })
 
   describe('fetchContracts generator', () => {
+    const data = {
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
+    }
 
     test('inspection', () => {
-      const gen = fetchContracts({ type: "FETCH_CONTRACTS" });
-      expect(gen.next().value).toEqual(call(getContracts));
+      const gen = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId });
+      expect(gen.next().value).toEqual(call(getContracts, data.chainId));
       expect(gen.next(contracts).value).toEqual(put(fetchContractsSuccess(contracts)));
       expect(gen.throw(error).value).toEqual(put(fetchContractsFailure(error)));
       expect(gen.next().done).toBe(true);
@@ -37,14 +40,14 @@ describe('Contracts: saga', () => {
     describe('fetch contracts', () => {
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify(contracts));
-        expectSaga(fetchContracts)
+        expectSaga(fetchContracts, data.chainId)
           .call.fn(getContracts).put.like({ action: { type: FETCH_CONTRACTS_SUCCESSFUL } })
           .run().then((result) => { done() });
       });
 
       test('failure', (done) => {
         fetch.mockReject(JSON.stringify(contracts));
-        expectSaga(fetchContracts)
+        expectSaga(fetchContracts, data.chainId)
           .call.fn(getContracts).put.like({ action: { type: FETCH_CONTRACTS_FAILED } })
           .run().then((result) => { done() });
       });

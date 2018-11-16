@@ -94,6 +94,10 @@ Object {
     "displayName": "Block Number",
     "key": "blocknumber",
   },
+  "chainid": Object {
+    "displayName": "Chain Id",
+    "key": "chainid",
+  },
   "default": Object {
     "displayName": "Query Type",
     "key": "default",

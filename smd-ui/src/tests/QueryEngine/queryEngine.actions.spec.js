@@ -9,7 +9,8 @@ describe('QueryEngine: actions', () => {
     queryType: 'gaslim',
     queryTerm: 144,
     resourceType: '/block',
-    query: { last: 15 }
+    query: { last: 15 },
+    chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
   }
 
   describe('query', () => {
@@ -23,7 +24,7 @@ describe('QueryEngine: actions', () => {
     });
 
     test('request', () => {
-      expect(executeQuery(action.resourceType, action.query)).toMatchSnapshot();
+      expect(executeQuery(action.resourceType, action.query, action.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {

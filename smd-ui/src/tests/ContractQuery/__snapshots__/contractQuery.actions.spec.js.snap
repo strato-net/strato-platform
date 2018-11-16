@@ -24,6 +24,7 @@ Object {
 
 exports[`ContractQuery: action fetch queryCirrus request 1`] = `
 Object {
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
   "contractName": "Bid",
   "queryString": undefined,
   "type": "QUERY_CIRRUS_REQUEST",

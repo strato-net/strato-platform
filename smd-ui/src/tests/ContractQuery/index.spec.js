@@ -29,7 +29,8 @@ describe('ContractQuery: index', () => {
           queryResults: null,
           tags: [],
           vars: null,
-          error: null
+          error: null,
+          selectedChain: null
         },
         ...mockFunc
       };
@@ -66,6 +67,7 @@ describe('ContractQuery: index', () => {
               value: "P"
             }
           ],
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
           vars: queryCirrusVarsMock.xabi.vars,
           error: null
         },
@@ -109,6 +111,7 @@ describe('ContractQuery: index', () => {
               value: "P"
             }
           ],
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
           vars: queryCirrusVarsMock.xabi.vars,
           error: null
         },
@@ -153,6 +156,7 @@ describe('ContractQuery: index', () => {
               value: "P"
             }
           ],
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
           vars: queryCirrusVarsMock.xabi.vars,
           error: null
         }
@@ -243,6 +247,7 @@ describe('ContractQuery: index', () => {
               value: "P"
             }
           ],
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
           vars: queryCirrusVarsMock.xabi.vars,
           error: null
         }
@@ -293,6 +298,7 @@ describe('ContractQuery: index', () => {
               "public": true
             }
           },
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
           error: null
         }
       };
@@ -328,13 +334,15 @@ describe('ContractQuery: index', () => {
             }
           ],
           vars: queryCirrusVarsMock.xabi.vars,
-          error: null
+          error: null,
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
         }
       };
       const newProps = {
         contractQuery: {
           queryString: 'state=eq.1&amount=eq.5678&name=eq.P',
         },
+        selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1ear8",
         ...matchMock
       };
       const wrapper = shallow(
@@ -342,7 +350,7 @@ describe('ContractQuery: index', () => {
       );
       wrapper.instance().componentWillReceiveProps(newProps);
       expect(props.queryCirrus).toHaveBeenCalled();
-      expect(props.queryCirrus.mock.calls.length).toBe(2);
+      expect(props.queryCirrus.mock.calls.length).toBe(3);
       expect(wrapper).toMatchSnapshot();
     });
 
@@ -396,7 +404,10 @@ describe('ContractQuery: index', () => {
           queryResults: queryCirrusMock,
           tags: [],
           vars: queryCirrusVarsMock.xabi.vars,
-          error: null
+          error: null,
+        },
+        chains: {
+          selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
         }
       }
       expect(mapStateToProps(state)).toMatchSnapshot();

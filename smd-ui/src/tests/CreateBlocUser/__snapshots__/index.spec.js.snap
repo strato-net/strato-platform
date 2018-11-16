@@ -19,7 +19,7 @@ exports[`createBlocUser: index render component with values 1`] = `
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"accounts-create-user-button\\" text=\\"Create User\\" />
   <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor]} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
-      <div className=\\"pt-dialog-body\\">
+      <div className=\\"pt-dialog-body bloc-user-form\\">
         <div className=\\"pt-form-group\\">
           <div className=\\"pt-form-group pt-intent-danger\\">
             <label className=\\"pt-label\\" htmlFor=\\"input-a\\">
@@ -77,7 +77,7 @@ exports[`createBlocUser: index render component without values 1`] = `
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"accounts-create-user-button\\" text=\\"Create User\\" />
   <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor]} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
-      <div className=\\"pt-dialog-body\\">
+      <div className=\\"pt-dialog-body bloc-user-form\\">
         <div className=\\"pt-form-group\\">
           <div className=\\"pt-form-group pt-intent-danger\\">
             <label className=\\"pt-label\\" htmlFor=\\"input-a\\">
