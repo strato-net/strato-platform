@@ -29,6 +29,10 @@ build_haskell: prebuild build_solidity
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 	stack test --no-run-tests
 
+build_haskell_profiled: prebuild build_solidity
+	stack setup
+	stack install --profile --work-dir .stack-work-profile --local-bin-path=$(FAKEROOT)/usr/bin
+
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy-bloc
 	cp -fr licenses/* ${LICENSE_DIR}
