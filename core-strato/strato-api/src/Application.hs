@@ -157,9 +157,10 @@ getLocalKey = eitherExtractNodeKey >>= \case
 eitherExtractNodeKey :: IO (Either String HK.PrvKey)
 eitherExtractNodeKey = runExceptT $ do
   mKey <- liftEither =<< maybeToEither "NODEKEY not set" <$> liftIO (lookupEnv "NODEKEY")
+  when (null mKey) $
+    throwError "NODEKEY not set"
   bytes <- liftEither . B64.decode . C8.pack $ mKey
-  key <- liftEither . maybeToEither "Invalid NODEKEY" . HK.decodePrvKey HK.makePrvKey $ bytes
-  return key
+  liftEither . maybeToEither "Invalid NODEKEY" . HK.decodePrvKey HK.makePrvKey $ bytes
 
 
 -- | The @main@ function for an executable running this site.
