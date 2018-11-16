@@ -76,6 +76,7 @@ library:
     - Blockchain.TheDAOFork
     - Blockchain.VMContext
     - Blockchain.VMOptions
+    - Blockchain.Timing
     - Blockchain.Trigger
     - Blockchain.Verifier
     - Blockchain.VM
