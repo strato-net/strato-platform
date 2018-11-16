@@ -84,7 +84,9 @@ docker-compose:
 
 build_buildbase:
 	mkdir -p $(TMPDIR)
-	blockapps-haskell/pull_solc.sh 0.4.24 $(TMPDIR) $(TMPDIR)/license
+	blockapps-haskell/pull_solc.sh 0.4.25 $(TMPDIR)/solc-0.4 $(TMPDIR)/license
+	blockapps-haskell/pull_solc.sh 0.5.0 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
+	ln -f $(TMPDIR)/solc-0.4 $(TMPDIR)/solc
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 

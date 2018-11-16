@@ -10,3 +10,4 @@ RUN apt-get update && \
 
 # package the pre-built solc (e.g. required for 'stack test blockapps-bloc22-server')
 COPY ./solc /usr/local/bin/
+COPY ./solc-0.5 /usr/local/bin
