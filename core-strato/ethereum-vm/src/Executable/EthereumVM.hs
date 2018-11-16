@@ -65,10 +65,10 @@ ethereumVM = void . execContextM $ do
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
-    forever $ timeit "one full loop" Nothing $ do
+    forever $ loopTimeit "one full loop" $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
-        seqEvents <- timeit "waiting for new events " Nothing $ getUnprocessedKafkaEvents cpOffset
+        seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
 
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
@@ -85,7 +85,7 @@ ethereumVM = void . execContextM $ do
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
-                                  
+
         $logInfoS "evm/loop" $ T.pack $ "#### incoming events ==> " ++ show (length allTxs) ++ " TXs, " ++ show (length blocks) ++ " new blocks"
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
@@ -128,14 +128,14 @@ ethereumVM = void . execContextM $ do
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- timeit "Bagger.makeNewBlock" Nothing Bagger.makeNewBlock
+            newBlock <- loopTimeit "Bagger.makeNewBlock" Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
-            timeit "produceUnminedBlocksM" Nothing $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+            loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
         -- todo: is this the best place to put this?
-        timeit "flushLogEntries" Nothing $ flushLogEntries
-        timeit "flushTransactionResults" Nothing $ flushTransactionResults
-        timeit "writeActionJSONToKafka" Nothing $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+        loopTimeit "flushLogEntries" $ flushLogEntries
+        loopTimeit "flushTransactionResults" $ flushTransactionResults
+        loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
