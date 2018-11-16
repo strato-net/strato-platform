@@ -9,7 +9,6 @@ import Control.Concurrent.STM.TMChan
 import Control.Monad.State.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
-import Data.Conduit.TMChan
 import Database.Persist.Sql
 import qualified Data.Text                             as T
 import qualified Database.Persist.Sqlite               as Lite
@@ -48,13 +47,13 @@ testContext = do
   -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
   file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
   conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
-  ch <- atomically $ newTMChan
+  ch <- atomically newTMChan
   return (ch, Context { actionTimestamp = Nothing
                  , contextRedisBlockDB = redisBDBPool
                  , contextKafkaState = error "no kafka state available"
                  , contextSQLDB = conn
                  , blockHeaders=[]
-                 , unseqSink=sinkTMChan ch False
+                 , unseqSink=atomically . writeTMChan ch
                  , vmEventsSink=sinkNull
                  , vmTrace=[]
                  , connectionTimeout=60

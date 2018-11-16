@@ -61,7 +61,7 @@ data Context =
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
-        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => ConduitM [IngestEvent] Void m (),
+        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => [IngestEvent] -> m (),
         vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => ConduitM [VMEvent] Void m (),
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
@@ -143,7 +143,7 @@ initContext maxHeaders = do
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
-                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
+                 , unseqSink=void . K.withKafkaViolently . writeUnseqEvents
                  , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
                  , vmTrace=[]
                  , connectionTimeout=flags_connectionTimeout

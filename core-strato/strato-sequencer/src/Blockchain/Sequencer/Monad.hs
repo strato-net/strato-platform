@@ -26,9 +26,9 @@ module Blockchain.Sequencer.Monad (
   , createWaitTimer
 ) where
 
-import           ClassyPrelude                             (atomically, STM, threadDelay)
+import           ClassyPrelude                             (atomically, STM)
 import           Prelude                                   hiding (round)
-import           Control.Concurrent                        (forkIO)
+import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
@@ -221,11 +221,12 @@ fuseChannels = do
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
-  debugLog <$> mergeSources [ sourceTMChan unseq .| mapC UnseqEvent
-                            , sourceTMChan votes .| mapC VoteMade
-                            , sourceTMChan timers .| mapC TimerFire
-                            , sourceTMChan loop .| mapC (const WaitTerminated)]
-                            4096 -- 🙏
+  (debugLog . transPipe lift) <$> mergeSources
+               [ sourceTMChan unseq .| mapC UnseqEvent
+               , sourceTMChan votes .| mapC VoteMade
+               , sourceTMChan timers .| mapC TimerFire
+               , sourceTMChan loop .| mapC (const WaitTerminated)]
+               4096 -- 🙏
 
 createWaitTimer :: Int -> SequencerM ()
 createWaitTimer dt = do
