@@ -16,6 +16,7 @@ import           Blockchain.RLPx
 import           Conduit
 import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
@@ -29,7 +30,7 @@ import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
 
-runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
+runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
              => PrivateNumber
              -> Int
              -> m ()

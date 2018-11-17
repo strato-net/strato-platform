@@ -17,6 +17,7 @@ import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Lifted
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -46,7 +47,7 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
 
-runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
         => PPeer
         -> PrivateNumber
         -> BC.ByteString -- otherServiceCommHost
@@ -85,7 +86,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
           Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
-getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
                  => PPeer
                  -> BC.ByteString
                  -> CommPort
@@ -105,7 +106,7 @@ getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
     Just _ -> runPeer peer myPriv otherServiceCommHost otherServiceCommPort
 
 
-runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
               => PPeer
               -> BC.ByteString
               -> CommPort

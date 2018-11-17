@@ -74,7 +74,7 @@ setTitleAndProduceBlocks blocks = do
     sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        runConduit $ yield (map ChainBlock newBlocks) .| sink
+        sink . map ChainBlock $ newBlocks
     return $ length newBlocks
 
 -- drop every n-th element from the list
