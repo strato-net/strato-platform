@@ -58,6 +58,8 @@ import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
+import           Blockchain.Metrics
+
 import           Debug.Trace                           (trace)
 
 setTitleAndProduceBlocks :: ( MonadLogger m
@@ -74,7 +76,7 @@ setTitleAndProduceBlocks blocks = do
     sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        runConduit $ yield (map ChainBlock newBlocks) .| sink
+        sink . map ChainBlock $ newBlocks
     return $ length newBlocks
 
 -- drop every n-th element from the list
@@ -427,12 +429,14 @@ shouldSend peer txo = case txo of
     Origin.Blockstanbul -> False
 
 shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
-shouldSendGossip peer txo = (shouldSend peer txo &&) . (flags_txGossipFanout /= -1 ||) <$>
+shouldSendGossip peer txo = recordGossipFinal
+                          . (shouldSend peer txo &&)
+                          . (flags_txGossipFanout == -1 ||) =<<
   case txo of
     Origin.PeerString{} -> do
       rangeEnd <- getNumPeersMem
       rng <- liftIO $ randomRIO (1, rangeEnd)
-      return $ rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
+      recordGossipRNG $! rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
     _ -> return True
 
 -- check that the peer is authorized to receive these chain details, by verifying that their

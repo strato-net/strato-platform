@@ -22,8 +22,8 @@ module Blockchain.Sequencer.Gregor
   ) where
 
 import           ClassyPrelude              (atomically, TMChan, writeTMChan, STM,
-                                             tryReadTMChan, tryPeekTMChan,
-                                             threadDelay)
+                                             tryReadTMChan, tryPeekTMChan)
+import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Lens               hiding (op)
 import           Control.Monad.State
@@ -131,7 +131,8 @@ setNextIngestedOffset newOffset = do
         Right () -> return ()
 
 runTheGregor :: GregorConfig -> IO ()
-runTheGregor cfg = runGregorM cfg $ race_ unseqReader seqWriters
+runTheGregor cfg = race_ (runGregorM cfg unseqReader)
+                         (runGregorM cfg seqWriters)
 
 unseqReader :: GregorM ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
@@ -161,7 +162,7 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
     P.withLabel gregorLoop "seq_p2p_events" P.incCounter
     P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
     writeSeqP2pEvents p2pevs
-  threadDelay 1000 -- 1ms
+  liftIO $ threadDelay 1000 -- 1ms
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do

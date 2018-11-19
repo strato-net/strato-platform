@@ -3,6 +3,8 @@
 
 module Blockchain.Metrics ( recordEvent
                           , recordMessage
+                          , recordGossipRNG
+                          , recordGossipFinal
                           ) where
 
 import Control.Monad.IO.Class
@@ -70,3 +72,19 @@ recordMessage' msgVect msg = do
                 ChainDetails _ -> "chain_details"
                 GetTransactions _ -> "get_transactions"
   liftIO $ withLabel msgVect label incCounter
+
+gossipDecisions :: Vector Text Counter
+gossipDecisions = unsafeRegister
+                . vector "decision"
+                . counter
+                $ Info "p2p_gossip_decisions" "Count of approves and rejects for gossip"
+
+recordGossipRNG :: (MonadIO m) => Bool -> m Bool
+recordGossipRNG dec = liftIO $ do
+  withLabel gossipDecisions (if dec then "approve" else "reject") incCounter
+  return $! dec
+
+recordGossipFinal :: (MonadIO m) => Bool -> m Bool
+recordGossipFinal dec = liftIO $ do
+  withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
+  return $! dec

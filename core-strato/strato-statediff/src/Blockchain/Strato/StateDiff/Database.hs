@@ -31,13 +31,13 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m, MonadBaseControl IO m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m)=>
            Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs
 
-commitSqlDiffs :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
+commitSqlDiffs :: (HasSQLDB m, MonadResource m)=>
                   StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   pool <- getSQLDB
@@ -82,7 +82,7 @@ getField def field =
     Just (Value x) -> x
     Nothing        -> def
 
-deleteAccount :: (MonadResource m, MonadBaseControl IO m) =>
+deleteAccount :: MonadResource m =>
                  Maybe Word256 -> Address -> SQL.SqlPersistT m ()
 deleteAccount chainId address = do
   addrID <- getAddressStateSQL chainId address "delete"
@@ -105,9 +105,8 @@ updateAccount chainId blockNumber address diff = do
     takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
 
-commitStorage :: (MonadResource m) =>
+commitStorage :: MonadResource m =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
-
 commitStorage addrID key Create{newValue} =
   SQL.insert_ $ Storage addrID key newValue
 

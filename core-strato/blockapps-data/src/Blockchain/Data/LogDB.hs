@@ -6,7 +6,6 @@ module Blockchain.Data.LogDB
     , putLogDBs
     ) where
 
-import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
@@ -21,12 +20,8 @@ class (Monad m) => HasMemLogDB m where
   enqueueLogEntry :: LogDB -> m ()
   enqueueLogEntry = enqueueLogEntries . pure
 
-putLogDB :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-         => LogDB
-         -> m (Key LogDB)
+putLogDB :: HasSQLDB m => LogDB -> m (Key LogDB)
 putLogDB = fmap head . putLogDBs . pure
 
-putLogDBs :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-          => [LogDB]
-          -> m [Key LogDB]
+putLogDBs :: HasSQLDB m => [LogDB] -> m [Key LogDB]
 putLogDBs ls = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany ls)

@@ -161,9 +161,6 @@ instance ToJSON ChainInfo where
            , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            ]
 
-instance KnownSymbol "address" where
-instance KnownSymbol "enode" where
-
 instance RLPSerializable ChainInfo where
   rlpEncode ci = RLPArray
     [ rlpEncode . encodeUtf8 . T.pack $ chainLabel ci
