@@ -5,8 +5,6 @@ module EventSpec where
 
 import ClassyPrelude (atomically)
 import Conduit
-import Control.Concurrent.STM.TMChan
-import Control.Monad.State.Class
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Data.Conduit.TMChan
@@ -38,7 +36,7 @@ import Test.QuickCheck
 -- Kafka, postgres, or ethconf. It does need redis, but targets
 -- a test instance.
 testContext :: (MonadIO m, MonadBaseControl IO m)
-            => m (TMChan [IngestEvent], Context)
+            => m (TMChan [IngestEvent], Config, Context)
 testContext = do
   redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
         Redis.connectHost           = "localhost",
@@ -48,19 +46,20 @@ testContext = do
   -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
   file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
   conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
-  ch <- atomically $ newTMChan
-  return (ch, Context { actionTimestamp = Nothing
-                 , contextRedisBlockDB = redisBDBPool
-                 , contextKafkaState = error "no kafka state available"
-                 , contextSQLDB = conn
-                 , blockHeaders=[]
-                 , unseqSink=sinkTMChan ch False
-                 , vmEventsSink=sinkNull
-                 , vmTrace=[]
-                 , connectionTimeout=60
-                 , maxReturnedHeaders=1000
-                 , _blockstanbulPeerAddr=Nothing
-                 })
+  ch <- atomically newTMChan
+  return ( ch
+         , Config conn
+         , Context { actionTimestamp = Nothing
+                   , contextRedisBlockDB = redisBDBPool
+                   , contextKafkaState = error "no kafka state available"
+                   , blockHeaders=[]
+                   , unseqSink=atomically . writeTMChan ch
+                   , vmEventsSink=const (return ())
+                   , vmTrace=[]
+                   , connectionTimeout=60
+                   , maxReturnedHeaders=1000
+                   , _blockstanbulPeerAddr=Nothing
+                   })
 
 testPeer :: DataPeer.PPeer
 testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
@@ -77,17 +76,17 @@ migrateAll = do
 
 runTestPeer :: (TMChan [IngestEvent] -> ContextM a) -> IO ()
 runTestPeer mv = do
-  (ch, ctx) <- testContext
-  let pool = contextSQLDB ctx
+  (ch, cfg, ctx) <- testContext
+  let pool = configSQLDB cfg
   liftSqlPersistMPool migrateAll pool
-  runLoggingT (runContextM ctx (mv ch)) printLogMsg
+  runLoggingT (runContextM (cfg, ctx) (mv ch)) printLogMsg
 
 spec :: Spec
 spec = do
   describe "environment sanity checks" $ do
     it "has a PPeer table" $ do
       runTestPeer . const $ do
-        pool <- gets contextSQLDB
+        pool <- lift $ asks configSQLDB
         liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool `L.shouldReturn` 0
     it "can pretend to write to kafka" $ do
       quickCheck . once $ \ori txs -> runTestPeer . const $ emitKafkaTransactions ori txs
