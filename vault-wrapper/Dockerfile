@@ -11,9 +11,7 @@ RUN apt-get -y update                                          && \
     apt-get autoremove                                         && \
     rm -rf /var/lib/apt/lists/*                                && \
     apt-get clean                                              && \
-    locale-gen en_US.UTF-8                                     && \
-    # fix for libsodium (vault-wrapper looks for another filename):
-    ln -s /usr/lib/x86_64-linux-gnu/libsodium.so.18.0.1 /usr/lib/x86_64-linux-gnu/libsodium.so.23
+    locale-gen en_US.UTF-8
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
