@@ -125,7 +125,6 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
-    - maxConn=${maxConn}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
@@ -134,6 +133,7 @@ services:
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
+    - maxConn=${maxConn}
     - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
