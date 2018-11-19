@@ -145,7 +145,7 @@ initContext :: ( MonadResource m
                )
             => Int -> m (Config, Context)
 initContext maxHeaders = do
-  let dbs = error "TODO(tim): unlift io here, or provide as argument"
+  dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return (Config (sqlDB' dbs),
          Context { actionTimestamp = Nothing

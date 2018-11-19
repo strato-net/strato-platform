@@ -72,7 +72,6 @@ runPeer peer myPriv _ _ = runResourceT $ do
     initState <- get
     lift $ runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
         void . liftIO $ setPeerActiveState (pPeerIp peer) peerPort Active
-        return () :: Monad m => ReaderT Config (ResourceT (ResourceT m)) ()
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
