@@ -67,7 +67,7 @@ spec = do
             }]
 
       g <- newGlobals fakeHandle
-      runConduit (yield input .| createInserts g .| sinkList)
+      runConduit (createInserts g input .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', 'Vehicle', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
           "create table if not exists \"Vehicle\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text, \"owners\" jsonb, CONSTRAINT \"Vehicle_pkey\" PRIMARY KEY (address, \"chainId\") );",
@@ -98,7 +98,7 @@ spec = do
             }]
       g <- newGlobals fakeHandle
       addToHistoryList g cHash
-      runConduit (yield input .| createInserts g .| sinkList)
+      runConduit (createInserts g input .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', 'Vehicle', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
           "create table if not exists \"Vehicle\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text, \"owners\" jsonb, CONSTRAINT \"Vehicle_pkey\" PRIMARY KEY (address, \"chainId\") );",
@@ -132,7 +132,7 @@ spec = do
             }]
 
       g <- newGlobals fakeHandle
-      runConduit (yield input .| createInserts g .| sinkList)
+      runConduit (createInserts g input .| sinkList)
         `shouldReturn` [
           "insert into contract (\"codeHash\", contract, abi, \"chainId\") values ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402', '\\\"Vehicle''''', '<ABI>', '<CHAIN>') ON CONFLICT DO NOTHING;",
             "create table if not exists \"\\\"Vehicle''''\" (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text, \"\\\"owners\\\"\" jsonb, CONSTRAINT \"\\\"Vehicle''''_pkey\" PRIMARY KEY (address, \"chainId\") );",
