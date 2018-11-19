@@ -28,8 +28,13 @@ import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
+import qualified Formatting                         as F
+--import           Formatting.Clock
 import           Numeric
+import           System.Clock
 import           Text.Printf
+
+
 
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Action
@@ -885,7 +890,10 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
 
 runCode :: Int -> VMM ()
 runCode c = do
+  timeBefore <- liftIO $ getTime Monotonic
+
   memBefore <- getSizeInWords
+
   code <- getEnvVar envCode
 
   vmState <- lift get
@@ -911,6 +919,13 @@ runCode c = do
       "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc vmState)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
   when flags_trace $ printTrace (environment result) memBefore memAfter c op vmState result
+
+
+  timeAfter <- liftIO $ getTime Monotonic
+
+  when flags_evmProfile $
+--    liftIO $ putStrLn $ T.unpack $ F.sformat ("OPCODE: " F.% F.string F.% " " F.% timeSpecs) (show op) timeBefore timeAfter
+    lift $ $logInfoS "runCode" $ F.sformat ("OPCODE: " F.% F.string F.% " " F.% F.int F.% "ns") (show op) $ toNanoSecs $ timeAfter `diffTimeSpec` timeBefore
 
   case result of
     VMState{done=True} -> incrementPC len

@@ -24,6 +24,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - classy-prelude
+  - clock
   - containers
   - cryptohash
   - deepseq
@@ -32,6 +33,7 @@ dependencies:
   - ethereum-encryption
   - ethereum-rlp
   - extra
+  - formatting
   - hedis
   - hflags
   - lens
