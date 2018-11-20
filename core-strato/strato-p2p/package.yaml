@@ -78,6 +78,7 @@ dependencies:
   - unliftio
   - hashable
   - unordered-containers
+  - ghc
 
 ghc-options: -Wall -threaded
 

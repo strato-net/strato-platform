@@ -62,3 +62,9 @@ spec = describe "HashLocks" $ do
     length (filter id ts) `shouldBe` length ts
     ts' <- mapConcurrently (tryGrabLock h) [10000..14999]
     length (filter not ts') `shouldBe` length ts'
+
+  it "should be able to grab as many locks as it can carry " . runTestClock $ \h -> do
+    grabManyLocks h [0..2000] `shouldReturn` [0..2000]
+    grabManyLocks h [0..2000] `shouldReturn` []
+    grabManyLocks h [1000..2000] `shouldReturn` []
+    grabManyLocks h [1500..2500] `shouldReturn` [2001..2500]

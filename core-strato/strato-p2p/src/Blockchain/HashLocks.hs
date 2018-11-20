@@ -1,11 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Blockchain.HashLocks
   ( HasClock(..)
   , HashLocks
   , newHashLocks
   , totalSize
   , tryGrabLock
+  , grabManyLocks
   , prunePast
   ) where
 
@@ -15,6 +17,8 @@ import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Hashable
 import Data.HashMap.Strict as M
+import Data.Maybe
+import MonadUtils
 import UnliftIO.STM
 
 -- A module to limit the number of times a blockhash is requested
@@ -46,20 +50,19 @@ totalSize = fmap M.size . atomically . readTVar . deadlines
 
 -- Returns true if we were able to replace the time for this key
 tryGrabLock :: (Eq a, Hashable a, MonadIO m, HasClock m) => HashLocks a -> a -> m Bool
-tryGrabLock HashLocks{..} k = do
+tryGrabLock h@HashLocks{..} a = do
   now <- getNow
   -- In the common case of an existing key, readTVarIO is much faster because
   -- it doesn't require a transaction.
   staleMap <- readTVarIO deadlines
-  case M.lookup k staleMap of
+  case M.lookup a staleMap of
     Just t | t > now -> return False
-    _ -> atomically $ do
-      kvs <- readTVar deadlines
-      case M.lookup k kvs of
-        Just t | t > now -> return False
-        _ -> do
-          writeTVar deadlines $ M.insert k (now + timeout) kvs
-          return True
+    _ -> isJust <$> atomically (attemptSwapSTM h now a)
+
+grabManyLocks :: (Eq a, Hashable a, MonadIO m, HasClock m) => HashLocks a -> [a] -> m [a]
+grabManyLocks h as = do
+  now <- getNow
+  atomically $ grabManySTM h now as
 
 -- Garbage collect entries that have expired
 -- TODO(tim): This would be a good application for Control.Reaper
@@ -67,3 +70,15 @@ prunePast :: (MonadIO m, HasClock m) => HashLocks a -> m ()
 prunePast HashLocks{..} = do
   now <- getNow
   atomically . modifyTVar' deadlines $ M.filter (>now)
+
+grabManySTM :: (Eq a, Hashable a) => HashLocks a -> POSIXTime -> [a] -> STM [a]
+grabManySTM h now = mapMaybeM (attemptSwapSTM h now)
+
+attemptSwapSTM :: (Eq a, Hashable a) => HashLocks a -> POSIXTime -> a -> STM (Maybe a)
+attemptSwapSTM HashLocks{..} now a = do
+  kvs <- readTVar deadlines
+  case M.lookup a kvs of
+    Just t | t > now -> return Nothing
+    _ -> do
+      modifyTVar deadlines $ M.insert a (now + timeout)
+      return $ Just a
