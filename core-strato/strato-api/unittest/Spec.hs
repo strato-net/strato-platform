@@ -18,17 +18,17 @@ runTestM mv = do
 spec :: Spec
 spec = describe "acquireNewMaxNonce" $ do
   it "allocates distinct" . runTestM $
-    replicateM 100 (acquireNewMaxNonce 0) `shouldReturn` [0..99]
+    replicateM 100 (acquireNewMaxNonce 0) `shouldReturn` [1..100]
 
-  it "will give a nonce larger than min nonce" . runTestM $
-    acquireNewMaxNonce 2007 `shouldReturn` 2007
+  it "will give a nonce strictly larger than min nonce" . runTestM $
+    acquireNewMaxNonce 2007 `shouldReturn` 2008
 
   it "is thread safe" . runTestM $ do
-    nonces <- replicateConcurrently 100 (acquireNewMaxNonce 100)
+    nonces <- replicateConcurrently 100 (acquireNewMaxNonce 99)
     nonces `shouldMatchList` [100..199]
 
   it "gives the minimum allowable" . runTestM $ do
-    acquireNewMaxNonce 400 `shouldReturn` 400
-    acquireNewMaxNonce 420 `shouldReturn` 420
+    acquireNewMaxNonce 400 `shouldReturn` 401
     acquireNewMaxNonce 420 `shouldReturn` 421
-    acquireNewMaxNonce 422 `shouldReturn` 422
+    acquireNewMaxNonce 420 `shouldReturn` 422
+    acquireNewMaxNonce 422 `shouldReturn` 423
