@@ -26,6 +26,8 @@ module Blockchain.Context
     , getPeerByIP
     , setPeerAddrIfUnset
     , shouldSendToPeer
+    , acknowledgeSyncContinues
+    , isSinkLive
     ) where
 
 
@@ -57,7 +59,9 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 
-newtype Config = Config { configSQLDB :: SQLDB }
+data Config = Config { configSQLDB :: SQLDB
+                     , syncTimeout :: NominalDiffTime
+                     }
 
 data Context =
     Context {
@@ -70,7 +74,8 @@ data Context =
         actionTimestamp     :: Maybe UTCTime,
         connectionTimeout   :: Int,
         maxReturnedHeaders  :: Int,
-        _blockstanbulPeerAddr :: Maybe Address
+        _blockstanbulPeerAddr :: Maybe Address,
+        syncTimestamp       :: UTCTime
     }
 
 makeLenses ''Context
@@ -133,6 +138,21 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
+acknowledgeSyncContinues :: (MonadReader Config m, MonadState Context m, MonadIO m) => m ()
+acknowledgeSyncContinues = do
+  mTime <- isSinkLive
+  cxt <- get
+  forM_ mTime $ \t -> put cxt{syncTimestamp = t}
+
+isSinkLive :: (MonadReader Config m, MonadState Context m, MonadIO m) => m (Maybe UTCTime)
+isSinkLive = do
+  prevtime <- gets syncTimestamp
+  nowtime <- liftIO getCurrentTime
+  timeout <- asks syncTimeout
+  if diffUTCTime nowtime prevtime < timeout
+    then return $ Just nowtime
+    else return Nothing
+
 runContextM :: (MonadIO m, MonadUnliftIO m)
             => (r, s)
             -> StateT s (ReaderT r (ResourceT m)) a
@@ -148,7 +168,9 @@ initContext :: ( MonadResource m
 initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  return (Config (sqlDB' dbs),
+  let syncWindow = 64
+  initSync <- liftIO getCurrentTime
+  return (Config (sqlDB' dbs) syncWindow,
          Context { actionTimestamp = Nothing
                  , contextRedisBlockDB = redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
@@ -159,6 +181,7 @@ initContext maxHeaders = do
                  , connectionTimeout=flags_connectionTimeout
                  , maxReturnedHeaders = maxHeaders
                  , _blockstanbulPeerAddr = Nothing
+                 , syncTimestamp = initSync
                  })
 
 

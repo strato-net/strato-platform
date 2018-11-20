@@ -205,6 +205,9 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
+            -- TODO(tim): Create a block headers backlog to prevent a peer from making us request thousands of blocks in one go
+            -- + pushbacklog :: [a] -> BackLog a -> Backlog a
+            -- + popbacklog :: Int -> (BackLog a, BackLog a)
             lift $ putBlockHeaders neededHeaders
             $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
             yield . GetBlockBodies $ headerHash <$> neededHeaders
