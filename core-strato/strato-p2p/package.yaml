@@ -73,8 +73,11 @@ dependencies:
   - hedis
   - lifted-async
   - blockstanbul
+  - unliftio
   - unliftio-core
   - unliftio
+  - hashable
+  - unordered-containers
 
 ghc-options: -Wall -threaded
 
@@ -103,3 +106,11 @@ tests:
       - stm-conduit
       - strato-p2p
       - temporary
+
+  unittests:
+    source-dirs: unittest
+    main: Main.hs
+    dependencies:
+      - hspec
+      - hspec-expectations-lifted
+      - strato-p2p
