@@ -26,7 +26,23 @@ currentView = unsafeRegister
             . gauge
             $ Info "pbft_current_view" "Current (Roundno, Seqno) of PBFT"
 
-recordView :: (MonadIO m) => View -> m ()
+replayCounts :: Vector Text Counter
+replayCounts = unsafeRegister
+             . vector "kind"
+             . counter
+             $ Info "pbft_replay_counts" "Number of historic blocks that were accepted and rejected"
+
+recordView :: MonadIO m => View -> m ()
 recordView View{..} = liftIO $ do
   withLabel currentView "round_number" (flip setGauge . fromIntegral $ _round)
   withLabel currentView "sequence_number" (flip setGauge . fromIntegral $ _sequence)
+
+incHistorySuccess :: MonadIO m => m ()
+incHistorySuccess = liftIO $ do
+  withLabel replayCounts "total" incCounter
+  withLabel replayCounts "success" incCounter
+
+incHistoryFailure :: MonadIO m => m ()
+incHistoryFailure = liftIO $ do
+  withLabel replayCounts "total" incCounter
+  withLabel replayCounts "failure" incCounter

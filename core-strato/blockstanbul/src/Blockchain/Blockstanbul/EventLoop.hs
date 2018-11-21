@@ -273,11 +273,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           blockNo = blockDataNumber . blockBlockData $ blk
       recordMaxBlockNumber "pbft_previousblock" blockNo
       case eNextSeqNo of
-        Left err -> $logWarnS "blockstanbul" . T.pack
-                    . printf "Rejecting historical block #%d: %s" blockNo $ err
+        Left err -> do
+          incHistoryFailure
+          $logWarnS "blockstanbul" . T.pack $
+             printf "Rejecting historical block #%d: %s" blockNo err
         Right _ -> do
           -- TODO(tim): Does it have a vote to record?
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
+          incHistorySuccess
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'

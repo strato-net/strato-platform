@@ -45,6 +45,20 @@
   })
   </script>
 
+  <h3>Historic replay</h3>
+  <div id="replayGraph"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#replayGraph"),
+    expr: "pbft_replay_counts",
+    name: '[[kind]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "number",
+    yUnits: "",
+  })
+  </script>
+
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}
