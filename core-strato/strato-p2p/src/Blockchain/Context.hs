@@ -220,5 +220,5 @@ filterHeadersByLock input = do
   allowed <- liftIO . grabManyLocks globalHashLocks $ input
   let success = length allowed
   recordLockGrabAttempt success total
-  recordHashLocksSize . totalSize $ globalHashLocks
+  recordHashLocksSize =<< totalSize globalHashLocks
   return allowed

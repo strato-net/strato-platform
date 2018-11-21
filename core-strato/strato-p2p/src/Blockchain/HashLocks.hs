@@ -46,7 +46,7 @@ newHashLocks dt = HashLocks dt <$> newTVarIO M.empty
 
 -- TotalSize does not take into account expiration of entries
 totalSize :: (MonadIO m) => HashLocks a -> m Int
-totalSize = fmap M.size . atomically . readTVar . deadlines
+totalSize = fmap M.size . readTVarIO . deadlines
 
 -- Returns true if we were able to replace the time for this key
 tryGrabLock :: (Eq a, Hashable a, MonadIO m, HasClock m) => HashLocks a -> a -> m Bool

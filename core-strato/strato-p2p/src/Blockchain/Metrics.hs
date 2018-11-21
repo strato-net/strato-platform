@@ -109,10 +109,8 @@ recordGossipFinal dec = liftIO $ do
   withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
   return $! dec
 
-recordHashLocksSize :: MonadIO m => Int -> m Int
-recordHashLocksSize n = liftIO $ do
-  setGauge hashLocksSize . fromIntegral $ n
-  return n
+recordHashLocksSize :: MonadIO m => Int -> m ()
+recordHashLocksSize = liftIO . setGauge hashLocksSize . fromIntegral
 
 recordLockGrabAttempt :: MonadIO m => Int -> Int -> m ()
 recordLockGrabAttempt success total = liftIO $ do
