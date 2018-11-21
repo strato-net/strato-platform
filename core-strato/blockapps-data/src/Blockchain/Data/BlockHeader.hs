@@ -1,4 +1,6 @@
-
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Data.BlockHeader (
   BlockHeader(..),
   headerHash,
@@ -7,9 +9,11 @@ module Blockchain.Data.BlockHeader (
   ) where
 
 import qualified Data.ByteString                    as B
+import qualified Data.Hashable                      as DH
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
+import           GHC.Generics
 import           Numeric
 
 import qualified Blockchain.Colors                  as CL
@@ -25,6 +29,11 @@ import           Blockchain.SHA
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Class
+
+instance DH.Hashable UTCTime where
+  hashWithSalt salt = DH.hashWithSalt salt
+                    . toRational
+                    . utcTimeToPOSIXSeconds
 
 data BlockHeader =
   BlockHeader {
@@ -43,7 +52,7 @@ data BlockHeader =
     extraData        :: B.ByteString,
     mixHash          :: SHA,
     nonce            :: Word64
-    } deriving (Eq, Read, Show)
+    } deriving (Eq, Read, Show, Generic, DH.Hashable)
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =

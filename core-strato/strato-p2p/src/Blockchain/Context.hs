@@ -211,17 +211,8 @@ shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
 {-# NOINLINE globalHashLocks #-}
-globalHashLocks :: HashLocks SHA
-globalHashLocks = unsafePerformIO $ newHashLocks 60 -- 1 minute exclusive hash lock
+globalHashLocks :: HashLocks BlockHeader
+globalHashLocks = unsafePerformIO $ newHashLocks flags_hashlockWindow -- 1 minute exclusive hash lock
 
 filterHeadersByLock :: (MonadIO m) => [BlockHeader] -> m [BlockHeader]
-filterHeadersByLock bhs = do
-  let hs = map headerHash bhs
-  keptHs <- liftIO . grabManyLocks globalHashLocks $ hs
-  return $! mergeByHash keptHs bhs
- where mergeByHash [] _ = []
-       mergeByHash (h:hs) (bh:bhs') =
-          if headerHash bh == h
-            then bh:mergeByHash hs bhs'
-            else mergeByHash (h:hs) bhs'
-       mergeByHash _ _ = error "miscounted"
+filterHeadersByLock = liftIO . grabManyLocks globalHashLocks

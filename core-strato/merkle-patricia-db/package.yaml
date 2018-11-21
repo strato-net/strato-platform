@@ -16,12 +16,13 @@ dependencies:
   - aeson
   - base16-bytestring
   - binary
+  - blockapps-util
   - bytestring
   - cryptohash
   - data-default
   - deepseq
   - ethereum-rlp
-  - blockapps-util
+  - hashable
   - leveldb-haskell
   - monad-control
   - nibblestring

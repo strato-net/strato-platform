@@ -11,6 +11,7 @@ module Blockchain.Strato.Model.Address
 
 import           Control.DeepSeq
 import           Control.Monad
+import qualified Data.Hashable                        as DH
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
 
@@ -47,7 +48,8 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+newtype Address = Address Word160
+  deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, DH.Hashable)
 
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word

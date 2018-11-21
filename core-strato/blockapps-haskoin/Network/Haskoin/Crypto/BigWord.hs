@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
@@ -57,6 +59,7 @@ import Data.Binary.Put
     , putWord8
     , putByteString
     )
+import qualified Data.Hashable as DH
 import Data.Aeson
     ( Value (String)
     , FromJSON
@@ -68,6 +71,7 @@ import Data.Aeson
 import Data.Ratio (numerator, denominator)
 import qualified Data.ByteString as BS (head, length, reverse)
 import qualified Data.Text as T (pack, unpack)
+import GHC.Generics
 import Text.Printf
 
 import Network.Haskoin.Crypto.Curve
@@ -105,7 +109,7 @@ data ModP
 data ModN
 
 newtype BigWord n = BigWord { getBigWordInteger :: Integer }
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Generic, DH.Hashable)
 
 instance NFData (BigWord n) where
     rnf (BigWord n) = rnf n
