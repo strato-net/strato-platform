@@ -4,7 +4,7 @@ build:
 
 BASE1=genesisBlocks/gettingStartedGenesis.json
 BASE2=build/midGenesis.json
-BASE3=build/vituLargeGenesis.json
+BASE3=build/finalGenesis.json
 
 NAME1=MultiStorage
 NAME2=StringStorage
@@ -65,7 +65,7 @@ build/vituLargeGenesis.json: $(BINARY3) $(DATA3) $(BASE3)
 		--output_account_info=build/vituLargeAccountInfo
 	python -m json.tool $@.ugly > $@
 
-build/$(OUTPUT)AccountInfo: build/finalGenesis.json
+build/$(OUTPUT)AccountInfo: build/vituLargeGenesis.json
 	cat build/midAccountInfo build/lateAccountInfo build/vituLargeAccountInfo>| $@
 	cp $< build/$(OUTPUT)Genesis.json
 
