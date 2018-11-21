@@ -5,8 +5,11 @@ module Blockchain.Metrics ( recordEvent
                           , recordMessage
                           , recordGossipRNG
                           , recordGossipFinal
+                          , recordHashLocksSize
+                          , recordLockGrabAttempt
                           ) where
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.Text
 import Prometheus
@@ -16,6 +19,7 @@ import Blockchain.Data.Wire
 import qualified Blockchain.Blockstanbul as PBFT
 
 -- TODO(tim): Add peer to labels
+{-# NOINLINE receivedMessages #-}
 receivedMessages :: Vector Text Counter
 receivedMessages = unsafeRegister
                  . vector "message_type"
@@ -23,17 +27,32 @@ receivedMessages = unsafeRegister
                  $ Info "p2p_recv" "Count of inbound p2p messages"
 
 -- TODO(tim): Add peer to labels
+{-# NOINLINE sentMessages #-}
 sentMessages :: Vector Text Counter
 sentMessages = unsafeRegister
              . vector "message_type"
              . counter
              $ Info "p2p_sent" "Count of outbound p2p messages"
 
+{-# NOINLINE p2pEvents #-}
 p2pEvents :: Vector Text Counter
 p2pEvents = unsafeRegister
           . vector "event_type"
           . counter
           $ Info "p2p_event" "Count of p2p events"
+
+{-# NOINLINE hashLocksBlocks #-}
+hashLocksBlocks :: Vector Text Counter
+hashLocksBlocks = unsafeRegister
+                . vector "result"
+                . counter
+                $ Info "p2p_hash_locks_blocks" "Results of lock grab attempts"
+
+{-# NOINLINE hashLocksSize #-}
+hashLocksSize :: Gauge
+hashLocksSize = unsafeRegister
+              . gauge
+              $ Info "p2p_hash_locks_size" "Number of unpurged locks (may have expired)"
 
 recordEvent :: (MonadIO m) => Event -> m ()
 recordEvent = \case
@@ -73,6 +92,7 @@ recordMessage' msgVect msg = do
                 GetTransactions _ -> "get_transactions"
   liftIO $ withLabel msgVect label incCounter
 
+{-# NOINLINE gossipDecisions #-}
 gossipDecisions :: Vector Text Counter
 gossipDecisions = unsafeRegister
                 . vector "decision"
@@ -88,3 +108,15 @@ recordGossipFinal :: (MonadIO m) => Bool -> m Bool
 recordGossipFinal dec = liftIO $ do
   withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
   return $! dec
+
+recordHashLocksSize :: MonadIO m => Int -> m Int
+recordHashLocksSize n = liftIO $ do
+  setGauge hashLocksSize . fromIntegral $ n
+  return n
+
+recordLockGrabAttempt :: MonadIO m => Int -> Int -> m ()
+recordLockGrabAttempt success total = liftIO $ do
+  let add l n = withLabel hashLocksBlocks l $ void . flip addCounter (fromIntegral n)
+  add "success" success
+  add "total" total
+  add "blocked" (total - success)

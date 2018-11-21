@@ -48,7 +48,6 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
-import           Blockchain.Options
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
@@ -62,6 +61,8 @@ import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 
 import           Blockchain.HashLocks
+import           Blockchain.Metrics
+import           Blockchain.Options
 
 data Config = Config { configSQLDB :: SQLDB
                      , syncTimeout :: NominalDiffTime
@@ -214,4 +215,9 @@ globalHashLocks :: HashLocks BlockHeader
 globalHashLocks = unsafePerformIO . newHashLocks . fromIntegral $ flags_hashlockWindow -- 1 minute exclusive hash lock
 
 filterHeadersByLock :: (MonadIO m) => [BlockHeader] -> m [BlockHeader]
-filterHeadersByLock = liftIO . grabManyLocks globalHashLocks
+filterHeadersByLock input = do
+  let total = length input
+  allowed <- liftIO . grabManyLocks globalHashLocks $ input
+  let success = length allowed
+  recordLockGrabAttempt success total
+  return allowed

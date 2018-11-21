@@ -58,6 +58,34 @@
     yUnits: "count",
   })
   </script>
+
+  <h3>Locks size</h3>
+  <div id="p2plocks"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#p2plocks"),
+    expr: "p2p_hash_locks_size",
+    name: '[[count]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Result",
+    yUnits: "count",
+  })
+  </script>
+
+  <h3>Hash Locks activity</h3>
+  <div id="p2plock_blocks"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#p2plock_blocks"),
+    expr: "p2p_hash_locks_blocks",
+    name: '[[result]]',
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Result",
+    yUnits: "count",
+  })
+  </script>
 {{ template "prom_content_tail" . }}
 
 {{ template "tail" }}
