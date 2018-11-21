@@ -18,14 +18,13 @@ prebuild:
 	mkdir -p /tmp/docker-dummy-core
 
 build_haskell: prebuild
-	stack setup
-	stack install --local-bin-path=$(FAKEROOT)/usr/bin
-	stack test --no-run-tests test-suite
+	stack build --test --no-run-tests \
+        --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_haskell_profiled: prebuild build_buildbase
-	stack setup
-	stack install --profile --work-dir .stack-work-profile --local-bin-path=$(FAKEROOT)/usr/bin
-	stack test    --profile --work-dir .stack-work-profile --no-run-tests test-suite
+	stack build --profile --work-dir .stack-work-profile \
+        --test --no-run-tests \
+        --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy-core
