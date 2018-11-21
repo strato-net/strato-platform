@@ -131,6 +131,7 @@ services:
     - evmTraceMode=${evmTraceMode}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - hashlockWindow=${hashlockWindow}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}

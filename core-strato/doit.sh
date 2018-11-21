@@ -46,6 +46,9 @@ function newnode {
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
 
+  if [[ -n "${hashlockWindow}" ]]
+    hlwFlag="--hashLockWindow=${hashlockWindow}"
+
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
      --connectionTimeout=$actualTimeout \
@@ -55,6 +58,7 @@ function newnode {
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
      ${txgFlag} \
+     ${hlwFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
