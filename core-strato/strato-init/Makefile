@@ -12,7 +12,7 @@ NAME3=LargeAddressStorage
 
 SOURCE1=contracts/$(NAME1).sol
 SOURCE2=contracts/$(NAME2).sol
-SOURCE2=contracts/$(NAME3).sol
+SOURCE3=contracts/$(NAME3).sol
 
 
 BINARY1=build/$(NAME1).bin-runtime
