@@ -46,8 +46,9 @@ function newnode {
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
 
-  if [[ -n "${hashlockWindow}" ]]
+  if [[ -n "${hashlockWindow}" ]]; then
     hlwFlag="--hashLockWindow=${hashlockWindow}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
