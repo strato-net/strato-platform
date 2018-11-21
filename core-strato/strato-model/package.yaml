@@ -26,6 +26,7 @@ library:
     - time
     - QuickCheck
     - http-api-data
+    - hashable
   source-dirs: src
   default-extensions:
     - MultiParamTypeClasses

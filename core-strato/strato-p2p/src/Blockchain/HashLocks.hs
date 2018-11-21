@@ -41,8 +41,8 @@ data HashLocks a = HashLocks
   , deadlines :: TVar (M.HashMap a POSIXTime)
   }
 
-newHashLocks :: (Monad m, MonadIO m, Eq a) => NominalDiffTime -> m (HashLocks a)
-newHashLocks dt = HashLocks dt <$> atomically (newTVar M.empty)
+newHashLocks :: NominalDiffTime -> IO (HashLocks a)
+newHashLocks dt = HashLocks dt <$> newTVarIO M.empty
 
 -- TotalSize does not take into account expiration of entries
 totalSize :: (MonadIO m) => HashLocks a -> m Int

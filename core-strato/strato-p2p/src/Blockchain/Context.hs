@@ -28,6 +28,7 @@ module Blockchain.Context
     , shouldSendToPeer
     , acknowledgeSyncContinues
     , isSinkLive
+    , filterHeadersByLock
     ) where
 
 
@@ -40,6 +41,7 @@ import           Control.Monad.State
 import           Data.Maybe                            (listToMaybe)
 import qualified Data.Text                             as T
 import           Data.Time.Clock
+import           System.IO.Unsafe
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.BlockHeader
@@ -47,6 +49,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.SHA
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
@@ -58,6 +61,8 @@ import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
+
+import           Blockchain.HashLocks
 
 data Config = Config { configSQLDB :: SQLDB
                      , syncTimeout :: NominalDiffTime
@@ -204,3 +209,19 @@ shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
         -- TODO(tim): 0x0 may come from a Legacy kafka message, remove
         -- in a future release
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
+
+{-# NOINLINE globalHashLocks #-}
+globalHashLocks :: HashLocks SHA
+globalHashLocks = unsafePerformIO $ newHashLocks 60 -- 1 minute exclusive hash lock
+
+filterHeadersByLock :: (MonadIO m) => [BlockHeader] -> m [BlockHeader]
+filterHeadersByLock bhs = do
+  let hs = map headerHash bhs
+  keptHs <- liftIO . grabManyLocks globalHashLocks $ hs
+  return $! mergeByHash keptHs bhs
+ where mergeByHash [] _ = []
+       mergeByHash (h:hs) (bh:bhs') =
+          if headerHash bh == h
+            then bh:mergeByHash hs bhs'
+            else mergeByHash (h:hs) bhs'
+       mergeByHash _ _ = error "miscounted"

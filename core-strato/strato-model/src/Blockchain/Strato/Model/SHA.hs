@@ -16,6 +16,7 @@ import qualified    Data.ByteString                      as B
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
+import qualified    Data.Hashable                        as DH
 import qualified    Data.Text                            as T
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
@@ -47,6 +48,9 @@ instance Ae.FromJSON SHA where
 instance Ae.ToJSONKey SHA where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
       where f = T.pack . shaToHex
+
+instance DH.Hashable SHA where
+  hashWithSalt salt = DH.hashWithSalt salt . toInteger . unSHA
 
 shaToHex :: SHA -> String
 shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex

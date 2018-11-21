@@ -194,6 +194,7 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
+            ableHeaders <- filterHeadersByLock neededHeaders
 
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
@@ -208,9 +209,9 @@ handleEvents peer = awaitForever $ \case
             -- TODO(tim): Create a block headers backlog to prevent a peer from making us request thousands of blocks in one go
             -- + pushbacklog :: [a] -> BackLog a -> Backlog a
             -- + popbacklog :: Int -> (BackLog a, BackLog a)
-            lift $ putBlockHeaders neededHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yield . GetBlockBodies $ headerHash <$> neededHeaders
+            lift $ putBlockHeaders ableHeaders
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length ableHeaders)
+            yield . GetBlockBodies . map headerHash $ ableHeaders
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
