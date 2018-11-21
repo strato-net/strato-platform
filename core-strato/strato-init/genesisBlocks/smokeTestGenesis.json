@@ -10,6 +10,11 @@
             "code": "6080604052600080fd00a165627a7a7230582093544cc02cd0d7d1d33a768f8f71daa2145df9021e950ea32bb26d65d53d768b0029",
             "name": "StringStorage",
             "src": "pragma solidity ^0.4.25;\ncontract StringStorage {\n  string payload;\n}\n"
+        },
+        {
+            "code": "6080604052600080fd00a165627a7a723058205fb6ef4b49cd6c02864fdacbb9355623b0d72cc65f50844b3cf36982265c39910029",
+            "name": "LargeAddressStorage",
+            "src": "pragma solidity ^0.4.25;\ncontract LargeAddressStorage {\n  string y;\n}\n"
         }
     ],
     "coinbase": "0000000000000000000000000000000000000000",

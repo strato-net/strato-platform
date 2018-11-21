@@ -60,7 +60,7 @@ build/vituLargeGenesis.json: $(BINARY3) $(DATA3) $(BASE3)
 		--bytecode_file=$(BINARY3) \
 		--contract_name=$(NAME3) \
 		--records_file=$(DATA3) \
-		--start=7000000000000000000000000000000000000000 \
+		--start=0x7000000000000000000000000000000000000000 \
 		--output_file=$@.ugly \
 		--output_account_info=build/vituLargeAccountInfo
 	python -m json.tool $@.ugly > $@
