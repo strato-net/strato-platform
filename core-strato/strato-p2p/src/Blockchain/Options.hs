@@ -3,7 +3,6 @@
 module Blockchain.Options where
 
 import           HFlags
-import           Data.Time.Clock
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
@@ -21,7 +20,7 @@ defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from 
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."
-defineFlag "hashlockWindow" (120::NominalDiffTime) "Number of seconds to wait before rerequesting for a header"
+defineFlag "hashlockWindow" (120::Int) "Number of seconds to wait before rerequesting for a header"
 
 computeNetworkID :: Int
 computeNetworkID = if flags_networkID == -1

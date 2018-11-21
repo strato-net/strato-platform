@@ -49,7 +49,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
-import           Blockchain.SHA
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
@@ -212,7 +211,7 @@ shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
 
 {-# NOINLINE globalHashLocks #-}
 globalHashLocks :: HashLocks BlockHeader
-globalHashLocks = unsafePerformIO $ newHashLocks flags_hashlockWindow -- 1 minute exclusive hash lock
+globalHashLocks = unsafePerformIO . newHashLocks . fromIntegral $ flags_hashlockWindow -- 1 minute exclusive hash lock
 
 filterHeadersByLock :: (MonadIO m) => [BlockHeader] -> m [BlockHeader]
 filterHeadersByLock = liftIO . grabManyLocks globalHashLocks
