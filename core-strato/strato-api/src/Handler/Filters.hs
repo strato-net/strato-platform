@@ -185,7 +185,7 @@ getTransFilter (rawTx)     ("minvalue", v)     = rawTx E.^. RawTransactionValue 
 getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue E.<=. E.val (toInteger' v)
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
-getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val (fromHexText v)))
+getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. E.val (fromHexText v))
 getTransFilter _           _                   = P.undefined ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
