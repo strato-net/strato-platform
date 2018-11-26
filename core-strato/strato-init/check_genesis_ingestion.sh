@@ -69,4 +69,17 @@ GOT_MULTI=$(query "select x,y from \"MultiStorage\" order by x");
 
 compare_strings 'Multi column records do not match' "${WANT_MULTI}" "${GOT_MULTI}"
 
+while sleep 1; do
+  check_timeout
+  COUNT=$(query "select count(*) from \"LargeAddressStorage\"");
+  if [[ ${COUNT} -eq "1" ]]; then
+    echo "1 LargeAddressStorage found";
+    break
+  fi
+done
+
+WANT_LSTRING=""
+GOT_LSTRING=$(query "select y from \"LargeAddressStorage\"");
+
+compare_strings 'Large column records do not match' ${WANT_LSTRING} ${GOT_LSTRING}
 echo "Test passed"
