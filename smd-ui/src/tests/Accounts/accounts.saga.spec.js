@@ -254,7 +254,7 @@ describe('Accounts: saga', () => {
       const gen = faucetAccount(action);
         expect(gen.next().value).toEqual(call(postFaucet, action.name, action.address));
       expect(gen.next().value).toEqual(call(delay, 100));
-      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address, action.flag)));
+      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address, undefined, action.flag)));
       expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
       expect(gen.next().done).toBe(true);
     });
