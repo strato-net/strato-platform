@@ -146,6 +146,7 @@ createInserts globalsIORef = do
         historyName = toHistory tableName
         functionHistoryName = toHistory functionTableName
     history <- isHistoric globalsIORef hashVal
+    functionHistory <- isFunctionHistoric globalsIORef hashVal
 
     let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
         funcList = transactionInput firstContract ++ transactionOutput firstContract
@@ -163,6 +164,9 @@ createInserts globalsIORef = do
 
     historicContracts <- getHistoryList globalsIORef
     liftIO . debugM "historicContracts" $ show historicContracts
+
+    functionHistoricContracts <- getFunctionHistoryList globalsIORef
+    liftIO . debugM "functionHistoricContracts" $ show functionHistoricContracts
 
     --When contract hasn't been written to "contract" table and indexing table doesn't exist
     unless contractAlreadyCreated $ do
@@ -193,7 +197,7 @@ createInserts globalsIORef = do
             ]
         setContractCreated globalsIORef hashVal
 
-    when history $
+    when functionHistory $
       yield $ T.concat
         [ "create table if not exists "
         , wrapDoubleQuotes functionHistoryName
@@ -225,6 +229,8 @@ createInserts globalsIORef = do
 
     when history $ do
       yield $ T.intercalate " " ["insert into", wrapDoubleQuotes historyName, keySt, "values", inserts, ";"]
+
+    when functionHistory $ do
       yield $ T.intercalate " " ["insert into", wrapDoubleQuotes functionHistoryName, fKeySt, "values", finserts, ";"]
 
     index <- shouldIndex globalsIORef hashVal
