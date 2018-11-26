@@ -24,7 +24,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -47,12 +47,15 @@ isHistoric globalsIORef name = do
   return $ name `Set.member` historyList
 
 isFunctionHistoric :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
-isFunctionHistoris globalsIORef name = do
+isFunctionHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   return $ name `Set.member` functionHistoryList
 
 getHistoryList :: MonadIO m => IORef Globals -> m (Set Keccak256)
 getHistoryList = fmap historyList . readIORef
+
+getFunctionHistoryList :: MonadIO m => IORef Globals -> m (Set Keccak256)
+getFunctionHistoryList = fmap functionHistoryList . readIORef
 
 addToHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
 addToHistoryList g k = do
