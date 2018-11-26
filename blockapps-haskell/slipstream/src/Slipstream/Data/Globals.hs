@@ -18,6 +18,7 @@ instance NFData (LRU key val) where
 data Globals = Globals { createdContracts :: S.Set Keccak256 -- list of contacts with a table
                        , historyList :: S.Set Keccak256
                        , noIndexList :: S.Set Keccak256
+                       , functionHistoryList :: S.Set Keccak256
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

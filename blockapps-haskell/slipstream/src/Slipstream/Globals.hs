@@ -46,6 +46,11 @@ isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   return $ name `Set.member` historyList
 
+isFunctionHistoric :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
+isFunctionHistoris globalsIORef name = do
+  Globals{..} <- readIORef globalsIORef
+  return $ name `Set.member` functionHistoryList
+
 getHistoryList :: MonadIO m => IORef Globals -> m (Set Keccak256)
 getHistoryList = fmap historyList . readIORef
 
@@ -76,6 +81,16 @@ removeFromNoIndexList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
 removeFromNoIndexList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{noIndexList=Set.delete k noIndexList}
+
+addToFunctionHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+addToFunctionHistoryList g k = do
+  globals@Globals{..} <- readIORef g
+  updateGlobals g globals{functionHistoryList=Set.insert k functionHistoryList}
+
+removeFromFunctionHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+removeFromFunctionHistoryList g k = do
+  globals@Globals{..} <- readIORef g
+  updateGlobals g globals{functionHistoryList=Set.delete k functionHistoryList}
 
 getContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
 getContractState globalsIORef address chainId = do

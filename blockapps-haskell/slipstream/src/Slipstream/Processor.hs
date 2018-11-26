@@ -236,6 +236,8 @@ processTheMessages messages conn g = do
                                               ,("nohistory", removeFromHistoryList)
                                               ,("noindex", addToNoIndexList)
                                               ,("index", removeFromNoIndexList)
+                                              ,("functionhistory", addToFunctionHistoryList)
+                                              ,("nofunctionhistory", removeFromFunctionHistoryList)
                                               ]
 
             (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
@@ -249,7 +251,8 @@ processTheMessages messages conn g = do
             setContractState g actionAddress actionTxChainId newState
 
             hist <- isHistoric g actionCodeHash
-            let cData = if hist
+            functionHist <- isFunctionHistoric g actionCodeHash
+            let cData = if hist && functionHist
                           then actionCallData
                           else maybeToList $ listToMaybe actionCallData
             fmap sequence . forM cData $ \CallData{..} -> do
