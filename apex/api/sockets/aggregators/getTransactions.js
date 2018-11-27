@@ -29,7 +29,11 @@ function getTransactions() {
 
 function parseTransactionType(t) {
   if(t.to_address == null) {
-	  return "Contract";
+      if(t.code_or_data.length == 0) {
+	        return "PrivateTX";
+      } else {
+	        return "Contract";
+      }
   }
   else if(t.code_or_data.length == 0) {
 	  return "Transfer";

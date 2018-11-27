@@ -137,17 +137,17 @@ getTransactionR = do
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getTransFilter (rawTx)) $ getParameters ))
 
                                         let criteria = P.map (getTransFilter rawTx) $ getParameters
-                                        let matchChainId cid = ((rawTx E.^. RawTransactionChainId) E.==. (E.just $ E.val $ fromHexText cid))
-                                        let chainCriteria = case chainIds of
-                                              [] -> [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                            matchChainId cid = ((rawTx E.^. RawTransactionChainId) E.==. (E.val $ fromHexText cid))
+                                            chainCriteria = case chainIds of
+                                              [] -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
                                               [cid] -> if (T.unpack cid == "main")
-                                                           then [(E.isNothing $ rawTx E.^. RawTransactionChainId)]
+                                                           then [rawTx E.^. RawTransactionChainId E.==. E.val 0]
                                                            else if (T.unpack cid == "all")
                                                                     then []
-                                                                    else [matchChainId cid]             
-                                              cids -> P.map matchChainId cids 
-                                        let otherCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
-                                        let allCriteria = case chainCriteria of
+                                                                    else [matchChainId cid]
+                                              cids -> P.map matchChainId cids
+                                            otherCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
+                                            allCriteria = case chainCriteria of
                                                 [] -> [otherCriteria]
                                                 _ -> P.map (\cc -> cc : otherCriteria) chainCriteria
                                         -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
