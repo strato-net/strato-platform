@@ -31,8 +31,12 @@ end
 --  ngx.exit(ngx.HTTP_FORBIDDEN)
 --end
 
+local function isEmpty(s) 
+  return s == nil or s == ''
+end
+
 -- some oauth providers return email under `id_token` object, some - under `user`
-local unique_name = res.email -- OR use res.unique_name instead? Currently it's res.email to comply with strato oauth
+local unique_name = if not isEmpty(res.email) then res.email else res.appid end -- OR use res.unique_name instead? Currently it's res.email to comply with strato oauth
 local user_id = res.sub
 
 -- set request header to forward to APIs
