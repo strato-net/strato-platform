@@ -28,7 +28,6 @@ import Data.Int (Int32)
 import Data.IORef
 import Data.Foldable (for_)
 import Data.Function
-import Data.Functor.Identity (runIdentity)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -47,6 +46,7 @@ import System.Log.Logger
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
+import BlockApps.Bloc22.Server.Utils
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
@@ -130,26 +130,6 @@ combineActions (x:xs) = let y = combineActions xs
     merge a b = b { actionStorage  = (Map.union `on` actionStorage) b a
                   , actionMetadata = (Map.union `on` actionMetadata) b a
                   }
-
-accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-accumStateT s as = fmap snd . scanStateT s as
-
-buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
-buildStateT s as = fmap fst . scanStateT s as
-
-scanStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m (s,[b])
-scanStateT s [] _ = pure (s,[])
-scanStateT s (a:as) run = do
-  (b,s') <- runStateT (run a) s
-  fmap (b:) <$> scanStateT s' as run
-
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = runIdentity $ fmap (map (fmap reverse) . Map.toList) . buildStateT Map.empty as $ \a -> do
-  s <- get
-  let k = f a
-  case Map.lookup k s of
-    Nothing -> put (Map.insert k [a] s)
-    Just _  -> put (Map.update (Just . (a:)) k s)
 
 splitActions :: [Action] -> [((Address, Maybe ChainId), [Action])]
 splitActions = partitionWith (actionAddress &&& actionTxChainId)
