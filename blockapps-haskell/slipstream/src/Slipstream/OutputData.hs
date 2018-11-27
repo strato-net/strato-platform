@@ -15,6 +15,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
+import           Data.Maybe                      (fromMaybe)
 import           Data.Monoid                     ((<>))
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
@@ -287,6 +288,7 @@ insertIndexTableQuery contract =
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
       comma = if null list then "" else ", "
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256String . blockHash
@@ -322,6 +324,7 @@ insertHistoryTableQuery contracts@(x:_) =
       historyName = toHistory tableName
       list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256String . blockHash

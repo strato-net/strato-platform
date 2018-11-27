@@ -192,42 +192,64 @@ getFunctionCallValues cmId input' output' = do
                (typemap output' otypes)
   return (fname,imap,omap)
 
-makeInserts :: Int32
-            -> Text
-            -> Text
-            -> Text
-            -> Map.Map Text Value
-            -> ([CallData] -> [CallData])
-            -> Action
-            -> Bloc [ProcessedContract]
-makeInserts cmId abi name chain state filterCallData Action{..} =
-  let cData = filterCallData actionCallData
-   in forM cData $ \CallData{..} -> do
-        let ibytes = _input
-            obytes = fromMaybe B.empty _output
-        (f',i,o) <- getFunctionCallValues cmId ibytes obytes
-        let f = if T.null f'
-                  then if actionType == Create
-                        then "constructor"
-                        else "fallback"
-                  else f'
+processedContract :: Text
+                  -> Text
+                  -> Text
+                  -> Map.Map Text Value
+                  -> Action
+                  -> ProcessedContract
+processedContract abi name chain state Action{..} =
+  ProcessedContract
+    { address = actionAddress
+    , codehash = actionCodeHash
+    , abi = abi
+    , contractName = name
+    , chain = chain
+    , contractData = state
+    , blockHash = actionBlockHash
+    , blockTimestamp = actionBlockTimestamp
+    , blockNumber = actionBlockNumber
+    , transactionHash = actionTxHash
+    , transactionSender = actionTxSender
+    , functionCallData = Nothing
+    }
 
-        pure $ ProcessedContract
-          { address = actionAddress
-          , codehash = actionCodeHash
-          , abi = abi
-          , contractName = name
-          , chain = chain
-          , contractData = state
-          , blockHash = actionBlockHash
-          , blockTimestamp = actionBlockTimestamp
-          , blockNumber = actionBlockNumber
-          , transactionHash = actionTxHash
-          , transactionSender = actionTxSender
-          , transactionFuncName = f
-          , transactionInput = i
-          , transactionOutput = o
+makeFunctionInserts :: Int32
+                    -> Text
+                    -> Text
+                    -> Text
+                    -> Map.Map Text Value
+                    -> Action
+                    -> Bloc [ProcessedContract]
+makeFunctionInserts cmId abi name chain state Action{..} =
+  forM actionCallData $ \CallData{..} -> do
+    let ibytes = _input
+        obytes = fromMaybe B.empty _output
+    (f',i,o) <- getFunctionCallValues cmId ibytes obytes
+    let f = if T.null f'
+              then if actionType == Create
+                    then "constructor"
+                    else "fallback"
+              else f'
+
+    pure $ ProcessedContract
+      { address = actionAddress
+      , codehash = actionCodeHash
+      , abi = abi
+      , contractName = name
+      , chain = chain
+      , contractData = state
+      , blockHash = actionBlockHash
+      , blockTimestamp = actionBlockTimestamp
+      , blockNumber = actionBlockNumber
+      , transactionHash = actionTxHash
+      , transactionSender = actionTxSender
+      , functionCallData = Just $ FunctionCallData
+          { functioncalldataName = f
+          , functioncalldataInput = i
+          , functioncalldataOutput = o
           }
+      }
 
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
@@ -334,10 +356,9 @@ processTheMessages messages conn g = do
                          cache
                          0
                          oldState
-            ret = Map.fromList newState
         setContractState g addr chainId newState
-        indexInserts <- makeInserts cmId strAbi strName chain ret listHead row
-        mapM_ (outputData conn . createInsertIndexTable g) indexInserts
+        let indexContract = processedContract strAbi strName chain (Map.fromList newState) row
+        outputData conn $ createInsertIndexTable g indexContract
 
         hist <- isHistoric g $ actionCodeHash row
         when hist $ do
@@ -351,11 +372,11 @@ processTheMessages messages conn g = do
                          st
                 newMap = Map.fromList newSt
             put newSt
-            hInserts <- lift $ makeInserts cmId strAbi strName chain newMap listHead hRow
+            let hInsert = processedContract strAbi strName chain newMap hRow
             functionHist <- isFunctionHistoric g $ actionCodeHash hRow
             fInserts <- if functionHist
-                          then lift $ makeInserts cmId strAbi strName chain newMap id hRow
+                          then lift $ makeFunctionInserts cmId strAbi strName chain newMap hRow
                           else pure []
-            pure (hInserts, fInserts)
-          outputData conn . createInsertHistoryTable g . join $ map fst hContracts
+            pure (hInsert, fInserts)
+          outputData conn . createInsertHistoryTable g $ map fst hContracts
           outputData conn . createInsertFunctionHistoryTable g . join $ map snd hContracts
