@@ -148,17 +148,19 @@ createInserts globalsIORef contracts = do
     let contract = head contracts
     createIndexTable globalsIORef contract
     createHistoryTable globalsIORef contract
-    insertIndexTable globalsIORef contract
+    insertIndexTable globalsIORef contracts
     insertHistoryTable globalsIORef contracts
 
 createInsertIndexTable
   :: (MonadIO m, MonadBase IO m)
   => IORef Globals
-  -> ProcessedContract
+  -> [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertIndexTable g c = do
-  createIndexTable g c
-  insertIndexTable g c
+createInsertIndexTable g cs = do
+  unless (null cs) $ do
+    let c = head cs
+    createIndexTable g c
+    insertIndexTable g cs
 
 createInsertHistoryTable
   :: (MonadIO m, MonadBase IO m)
@@ -219,12 +221,13 @@ createHistoryTable globalsIORef contract = do
 
 insertIndexTable :: (MonadIO m, MonadBase IO m)
                  => IORef Globals
-                 -> ProcessedContract
+                 -> [ProcessedContract]
                  -> ConduitM () Text m ()
-insertIndexTable globalsIORef contract = do
-  let hashVal = codehash contract
+insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
+insertIndexTable globalsIORef contracts@(x:_) = do
+  let hashVal = codehash x
   index <- shouldIndex globalsIORef hashVal
-  when index . yield $ insertIndexTableQuery contract
+  when index . yield $ insertIndexTableQuery contracts
 
 insertHistoryTable :: (MonadIO m, MonadBase IO m)
                    => IORef Globals
@@ -282,10 +285,11 @@ createHistoryTableQuery contract =
         , ");"
         ]
 
-insertIndexTableQuery :: ProcessedContract -> Text
-insertIndexTableQuery contract =
-  let tableName = escapeQuotes $ contractName contract
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+insertIndexTableQuery :: [ProcessedContract] -> Text
+insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
+insertIndexTableQuery contracts@(x:_) =
+  let tableName = escapeQuotes $ contractName x
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
       comma = if null list then "" else ", "
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
@@ -298,15 +302,17 @@ insertIndexTableQuery contract =
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
-      rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
-      vals = wrapAndEscape $ map ($ contract) tableVals ++ map solidityValueToText (snd <$> rowList)
+      vals = flip map contracts $ \row ->
+        let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
+      inserts = csv vals
    in T.concat
         [ "insert into "
         , wrapDoubleQuotes tableName
         , " "
         , keySt
         , " values "
-        , vals
+        , inserts
         , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
         , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
         , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
