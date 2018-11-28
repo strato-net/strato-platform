@@ -64,15 +64,11 @@ import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
--- apparently `Util` is removed in GHC >= 8.0 ?
-fstOf3 :: (a,b,c) -> a
-fstOf3 (a,_,_) = a
-
-sndOf3 :: (a,b,c) -> b
-sndOf3 (_,b,_) = b
-
-thirdOf3 :: (a,b,c) -> c
-thirdOf3 (_,_,c) = c
+data BatchedInserts = BatchedInserts
+  { indexInsert     :: ProcessedContract
+  , historyInserts  :: [ProcessedContract]
+  , functionInserts :: [ProcessedContract]
+  }
 
 listHead :: [a] -> [a]
 listHead = maybeToList . listToMaybe
@@ -299,7 +295,8 @@ processTheMessages messages conn g = do
   enterBloc2 env $ do
     inserts <- forM changes $ \((addr,chainId),actions) -> do
       let row = combineActions actions
-      recordAction row
+      mapM_ recordAction actions
+      recordCombinedAction row
       liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
 
       let md = actionMetadata row
@@ -369,12 +366,12 @@ processTheMessages messages conn g = do
                             else pure []
               pure (hInsert, fInserts)
             else pure []
-          pure $ Right (indexContract, hs, join fhs)
+          pure . Right . BatchedInserts indexContract hs $ join fhs
 
     forM_ (lefts inserts) $ liftIO . errorM "processTheMessages" . T.unpack
 
-    let insertsByCodeHash = map snd . partitionWith (codehash . fstOf3) $ rights inserts
+    let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
     forM_ insertsByCodeHash $ \ins -> do
-      outputData conn . createInsertIndexTable g $ map fstOf3 ins
-      outputData conn . createInsertHistoryTable g . join $ map sndOf3 ins
-      outputData conn . createInsertFunctionHistoryTable g . join $ map thirdOf3 ins
+      outputData conn . createInsertIndexTable g $ map indexInsert ins
+      outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
+      outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
