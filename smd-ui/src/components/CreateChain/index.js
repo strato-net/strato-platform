@@ -211,7 +211,6 @@ class CreateChain extends Component {
           const v = contract.vars[arg];
           if ( v.initialValue
             || v.type == 'Mapping'
-            || v.type == 'Array'
             || v.type == 'Struct') {
              return null;
           } else {
