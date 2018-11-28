@@ -40,6 +40,7 @@ contract MajorityRules {
         if (__members__[i] == m) {
           __members__[i] = __members__[mlen - 1];
           delete __members__[mlen - 1];
+          __members__.length--;
           emit MemberRemoved(m);
           break;
         }
