@@ -1,3 +1,5 @@
+pragma solidity ^0.4.24;
+
 contract TwoIn {
   event MemberAdded (address member, string enode);
   event MemberRemoved (address member);
