@@ -41,6 +41,10 @@
   <td>Slipstream</td>
   <td><code>slipstream</code></td>
 </tr>
+<tr>
+  <td>Cross monitoring</td>
+  <td><code>crossmon</code></td>
+</tr>
 </table>
 
 {{ template "prom_content_tail" . }}

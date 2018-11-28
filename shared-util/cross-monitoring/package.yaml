@@ -1,0 +1,10 @@
+name: cross-monitoring
+
+dependencies:
+  - base
+  - prometheus-client
+  - text
+
+library:
+  source-dirs:
+    src/

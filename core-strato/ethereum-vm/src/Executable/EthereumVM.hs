@@ -20,6 +20,8 @@ import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
 
+import           Blockapps.Crossmon
+
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
@@ -100,6 +102,7 @@ ethereumVM = void . execContextM $ do
         forM_ blocks $ \b -> do
             let number = blockDataNumber . obBlockData $ b
                 txCount = length . obReceiptTransactions $ b
+            recordMaxBlockNumber "vm_seqevents" number
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             writeBlockSummary b
         actions <- addBlocks blocks

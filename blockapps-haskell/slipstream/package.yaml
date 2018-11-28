@@ -36,6 +36,7 @@ dependencies:
   - conduit
   - conduit-combinators
   - containers
+  - cross-monitoring
   - data-default
   - deepseq
   - extra
