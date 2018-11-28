@@ -44,6 +44,8 @@ import Numeric
 import Servant.Common.BaseUrl
 import System.Log.Logger
 
+import Blockapps.Crossmon
+
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
@@ -218,7 +220,7 @@ makeFunctionInserts cmId abi name chain state Action{..} =
                     then "constructor"
                     else "fallback"
               else f'
-
+    recordMaxBlockNumber "slipstream_processor" actionBlockNumber
     pure $ ProcessedContract
       { address = actionAddress
       , codehash = actionCodeHash

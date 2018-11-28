@@ -19,6 +19,8 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock
 import           Numeric                            (readHex)
 
+import           Blockapps.Crossmon
+
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -388,6 +390,7 @@ buildFromMiningCache = do
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
+    recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff

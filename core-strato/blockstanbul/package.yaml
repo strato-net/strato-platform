@@ -12,6 +12,7 @@ dependencies:
   - containers
   - conduit
   - conduit-combinators
+  - cross-monitoring
   - crypto-api
   - cryptonite
   - deepseq

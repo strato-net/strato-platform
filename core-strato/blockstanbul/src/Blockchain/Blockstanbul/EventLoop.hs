@@ -18,6 +18,9 @@ import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 import Prometheus
 import Text.Printf
+
+import Blockapps.Crossmon
+
 import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
@@ -268,6 +271,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       seqNo <- use $ view . sequence
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
           blockNo = blockDataNumber . blockBlockData $ blk
+      recordMaxBlockNumber "pbft_previousblock" blockNo
       case eNextSeqNo of
         Left err -> $logWarnS "blockstanbul" . T.pack
                     . printf "Rejecting historical block #%d: %s" blockNo $ err
@@ -378,6 +382,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Nothing -> error "TODO(tim): Decide how to handle this"
           Just blk -> do
             let seals = map snd . M.elems $ cs
+            let blockNo = blockDataNumber . blockBlockData $ blk
+            recordMaxBlockNumber "pbft_commit" blockNo
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn

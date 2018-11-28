@@ -21,6 +21,8 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Prometheus
 
+import Blockapps.Crossmon
+
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
 
@@ -77,12 +79,13 @@ recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
 recordActionOn :: MonadIO m => T.Text -> Action -> m ()
-recordActionOn stage act =
+recordActionOn stage act = do
   let kind = case actionType act of
               Create -> "create"
               Delete -> "delete"
               Update -> "update"
-  in liftIO $ withLabel actionCount (stage, kind) incCounter
+  liftIO $ withLabel actionCount (stage, kind) incCounter
+  recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
 
 recordAction :: MonadIO m => Action -> m ()
 recordAction = recordActionOn "raw"
