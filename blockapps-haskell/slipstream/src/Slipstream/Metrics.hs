@@ -3,6 +3,7 @@ module Slipstream.Metrics
   ( recordGlobals
   , recordKafkaMessages
   , recordAction
+  , recordCombinedAction
   , incNumTables
   , incNumHistoryTables
   , incNumBloomWrites
@@ -43,6 +44,13 @@ actionCount = unsafeRegister
             . counter
             $ Info "slipstream_action_count" "Number of actions seen, by type"
 
+{-# NOINLINE combinedActionCount #-}
+combinedActionCount :: Vector T.Text Counter
+combinedActionCount = unsafeRegister
+                    . vector "combined_action_type"
+                    . counter
+                    $ Info "slipstream_combined_action_count" "Number of combined actions seen, by type"
+
 {-# NOINLINE tablesCreated #-}
 tablesCreated :: Vector T.Text Counter
 tablesCreated = unsafeRegister
@@ -68,20 +76,26 @@ recordGlobals g = liftIO $ do
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_contracts" (S.size . createdContracts)
   rec "history_list" (S.size . historyList)
+  rec "function_history_list" (S.size . functionHistoryList)
   rec "no_index_list" (S.size . noIndexList)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
-recordAction :: MonadIO m => Action -> m ()
-recordAction act =
+recordActionOn :: MonadIO m => Vector T.Text Counter -> Action -> m ()
+recordActionOn vec act =
   let lab = case actionType act of
               Create -> "create"
               Delete -> "delete"
               Update -> "update"
-  in liftIO $ withLabel actionCount lab incCounter
+  in liftIO $ withLabel vec lab incCounter
 
+recordAction :: MonadIO m => Action -> m ()
+recordAction = recordActionOn actionCount
+
+recordCombinedAction :: MonadIO m => Action -> m ()
+recordCombinedAction = recordActionOn combinedActionCount
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter

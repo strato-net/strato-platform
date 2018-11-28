@@ -1,5 +1,9 @@
-{-# LANGUAGE FlexibleContexts,
-             OverloadedStrings #-}
+{-# LANGUAGE
+    FlexibleContexts
+  , OverloadedStrings
+  , RecordWildCards
+#-}
+
 module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
@@ -113,11 +117,14 @@ isFunction _ = True
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
 
-convertRet :: [ProcessedContract] -> PGConnection -> IORef Globals -> IO()
-convertRet metadata conn globalsIORef = runConduit $
-     yield metadata
-  .| createInserts globalsIORef
-  .| catchC (mapM_C (dbInsert conn)) handlePostgresError
+outputData :: ( MonadIO m
+              , MonadBase IO m
+              , MonadBaseControl IO m
+              )
+           => PGConnection
+           -> ConduitM () Text m ()
+           -> m ()
+outputData conn c = runConduit $ c .| catchC (mapM_C (dbInsert conn)) handlePostgresError
 
 baseColumns :: [Text]
 baseColumns = [ "address"
@@ -132,104 +139,174 @@ baseColumns = [ "address"
 baseTableColumns :: [Text]
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
-createInserts :: (MonadIO m, MonadBase IO m) => IORef Globals -> ConduitM [ProcessedContract] Text m ()
-createInserts globalsIORef = do
-  metadata <- fromMaybe (error "createInserts called without contracts") <$> await
-  unless (null metadata) $ do
-    let firstContract = head metadata
-    let hashVal = codehash firstContract
-    globals <- readIORef globalsIORef
-    let contractAlreadyCreated = hashVal `Set.member` createdContracts globals
-    let tableName = escapeQuotes $ contractName firstContract
-        functionTableName = tableName <> "." <> escapeQuotes (transactionFuncName firstContract)
-        toHistory = (<>) "history@"
-        historyName = toHistory tableName
-        functionHistoryName = toHistory functionTableName
-    history <- isHistoric globalsIORef hashVal
+createInserts :: (MonadIO m, MonadBase IO m)
+              => IORef Globals
+              -> [ProcessedContract]
+              -> ConduitM () Text m ()
+createInserts globalsIORef contracts = do
+  unless (null contracts) $ do
+    let contract = head contracts
+    createIndexTable globalsIORef contract
+    createHistoryTable globalsIORef contract
+    insertIndexTable globalsIORef contracts
+    insertHistoryTable globalsIORef contracts
 
-    let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData firstContract
-        funcList = transactionInput firstContract ++ transactionOutput firstContract
-    let comma = if null list
-                  then ""
-                  else ", "
-    let fcomma = if null funcList
-                   then ""
-                   else ", "
+createInsertIndexTable
+  :: (MonadIO m, MonadBase IO m)
+  => IORef Globals
+  -> [ProcessedContract]
+  -> ConduitM () Text m ()
+createInsertIndexTable g cs = do
+  unless (null cs) $ do
+    let c = head cs
+    createIndexTable g c
+    insertIndexTable g cs
 
-    let keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-        fKeySt = wrapAndEscapeDouble . map escapeQuotes $ baseColumns ++ map fst funcList
+createInsertHistoryTable
+  :: (MonadIO m, MonadBase IO m)
+  => IORef Globals
+  -> [ProcessedContract]
+  -> ConduitM () Text m ()
+createInsertHistoryTable g cs = do
+  unless (null cs) $ do
+    let c = head cs
+    createHistoryTable g c
+    insertHistoryTable g cs
 
-    liftIO . debugM "createInserts" . show $ T.intercalate " " ["In convertRet,", tshow hashVal, "contractAlreadyCreated =", tshow contractAlreadyCreated]
+createInsertFunctionHistoryTable
+  :: (MonadIO m, MonadBase IO m)
+  => IORef Globals
+  -> [ProcessedContract]
+  -> ConduitM () Text m ()
+createInsertFunctionHistoryTable _ cs = do
+  unless (null cs) $ do
+    -- TODO: implement function history
+    -- let c = head cs
+    -- createFunctionHistoryTable g c
+    -- insertFunctionHistoryTable g cs
+    pure ()
 
-    historicContracts <- getHistoryList globalsIORef
-    liftIO . debugM "historicContracts" $ show historicContracts
+createIndexTable :: (MonadIO m, MonadBase IO m)
+                 => IORef Globals
+                 -> ProcessedContract
+                 -> ConduitM () Text m ()
+createIndexTable globalsIORef contract = do
+  globals <- readIORef globalsIORef
+  let hashVal = codehash contract
+      contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
-    --When contract hasn't been written to "contract" table and indexing table doesn't exist
-    unless contractAlreadyCreated $ do
-        incNumTables
-        let conVals = wrapAndEscape $ map escapeQuotes [T.pack $ keccak256String $ codehash firstContract, contractName firstContract, abi firstContract, chain firstContract]
-        let conIns = T.concat ["insert into contract (\"codeHash\", contract, abi, \"chainId\") values ", conVals, " ON CONFLICT DO NOTHING;"]
-        yield conIns
-        yield $ T.concat
-          [ "create table if not exists "
-          , wrapDoubleQuotes tableName
-          , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
-          , comma
-          , tableColumns list
-          , ", CONSTRAINT "
-          , wrapDoubleQuotes (tableName <> "_pkey")
-          , " PRIMARY KEY (address, \"chainId\") );"
-          ]
+  --When contract hasn't been written to "contract" table and indexing table doesn't exist
+  liftIO . debugM "createIndexTable" . show $
+    T.intercalate " " [ "In createIndexTable,"
+                      , tshow hashVal
+                      , "contractAlreadyCreated ="
+                      , tshow contractAlreadyCreated
+                      ]
+  unless contractAlreadyCreated $ do
+    incNumTables
+    yield $ insertContractTableQuery contract
+    yield $ createIndexTableQuery contract
+    setContractCreated globalsIORef hashVal
 
-        when history $ do
-          incNumHistoryTables
-          yield $ T.concat
-            [ "create table if not exists "
-            , wrapDoubleQuotes historyName
-            , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
-            , comma
-            , tableColumns list
-            , ");"
-            ]
-        setContractCreated globalsIORef hashVal
+createHistoryTable :: (MonadIO m, MonadBase IO m)
+                   => IORef Globals
+                   -> ProcessedContract
+                   -> ConduitM () Text m ()
+createHistoryTable globalsIORef contract = do
+  let hashVal = codehash contract
+  history <- isHistoric globalsIORef hashVal
+  when history $ do
+    incNumHistoryTables
+    yield $ createHistoryTableQuery contract
 
-    when history $
-      yield $ T.concat
+insertIndexTable :: (MonadIO m, MonadBase IO m)
+                 => IORef Globals
+                 -> [ProcessedContract]
+                 -> ConduitM () Text m ()
+insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
+insertIndexTable globalsIORef contracts@(x:_) = do
+  let hashVal = codehash x
+  index <- shouldIndex globalsIORef hashVal
+  when index . yield $ insertIndexTableQuery contracts
+
+insertHistoryTable :: (MonadIO m, MonadBase IO m)
+                   => IORef Globals
+                   -> [ProcessedContract]
+                   -> ConduitM () Text m ()
+insertHistoryTable _ [] = error "insertHistoryTable: unhandled empty list"
+insertHistoryTable globalsIORef contracts@(x:_) = do
+  let hashVal = codehash x
+  history <- isHistoric globalsIORef hashVal
+  when history . yield $ insertHistoryTableQuery contracts
+
+insertContractTableQuery :: ProcessedContract -> Text
+insertContractTableQuery ProcessedContract{..} =
+  let conVals = wrapAndEscape . map escapeQuotes $
+        [ T.pack $ keccak256String codehash
+        , contractName
+        , abi
+        , chain
+        ]
+   in T.concat
+        [ "insert into contract (\"codeHash\", contract, abi, \"chainId\") values "
+        , conVals
+        , " ON CONFLICT DO NOTHING;"
+        ]
+
+createIndexTableQuery :: ProcessedContract -> Text
+createIndexTableQuery contract =
+  let tableName = escapeQuotes $ contractName contract
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+      comma = if null list then "" else ", "
+   in T.concat
         [ "create table if not exists "
-        , wrapDoubleQuotes functionHistoryName
-        , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text"
-        , fcomma
-        , tableColumns funcList
+        , wrapDoubleQuotes tableName
+        , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
+        , comma
+        , tableColumns list
+        , ", CONSTRAINT "
+        , wrapDoubleQuotes (tableName <> "_pkey")
+        , " PRIMARY KEY (address, \"chainId\") );"
+        ]
+
+createHistoryTableQuery :: ProcessedContract -> Text
+createHistoryTableQuery contract =
+  let tableName = escapeQuotes $ contractName contract
+      toHistory = (<>) "history@"
+      historyName = toHistory tableName
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+      comma = if null list then "" else ", "
+   in T.concat
+        [ "create table if not exists "
+        , wrapDoubleQuotes historyName
+        , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
+        , comma
+        , tableColumns list
         , ");"
         ]
 
-    let baseVals = [ tshow . address
-                   , chain
-                   , T.pack . keccak256String . blockHash
-                   , tshow . blockTimestamp
-                   , tshow . blockNumber
-                   , T.pack . keccak256String . transactionHash
-                   , tshow . transactionSender
-                   ]
-        tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
-
-    let vals = flip map metadata $ \row ->
-          let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-          in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
-    let inserts = csv vals
-
-    let fvals = flip map metadata $ \row ->
-          let rowList = map snd $ transactionInput row ++ transactionOutput row
-          in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText rowList
-    let finserts = csv fvals
-
-    when history $ do
-      yield $ T.intercalate " " ["insert into", wrapDoubleQuotes historyName, keySt, "values", inserts, ";"]
-      yield $ T.intercalate " " ["insert into", wrapDoubleQuotes functionHistoryName, fKeySt, "values", finserts, ";"]
-
-    index <- shouldIndex globalsIORef hashVal
-    when index $
-      yield $ T.concat
+insertIndexTableQuery :: [ProcessedContract] -> Text
+insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
+insertIndexTableQuery contracts@(x:_) =
+  let tableName = escapeQuotes $ contractName x
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
+      comma = if null list then "" else ", "
+      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
+      baseVals = [ tshow . address
+                 , chain
+                 , T.pack . keccak256String . blockHash
+                 , tshow . blockTimestamp
+                 , tshow . blockNumber
+                 , T.pack . keccak256String . transactionHash
+                 , tshow . transactionSender
+                 ]
+      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
+      vals = flip map contracts $ \row ->
+        let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
+         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
+      inserts = csv vals
+   in T.concat
         [ "insert into "
         , wrapDoubleQuotes tableName
         , " "
@@ -242,5 +319,36 @@ createInserts globalsIORef = do
         , "transaction_function_name = excluded.transaction_function_name"
         , comma
         , tableUpsert $ map fst list
+        , ";"
+        ]
+
+insertHistoryTableQuery :: [ProcessedContract] -> Text
+insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
+insertHistoryTableQuery contracts@(x:_) =
+  let tableName = escapeQuotes $ contractName x
+      toHistory = (<>) "history@"
+      historyName = toHistory tableName
+      list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
+      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
+      baseVals = [ tshow . address
+                 , chain
+                 , T.pack . keccak256String . blockHash
+                 , tshow . blockTimestamp
+                 , tshow . blockNumber
+                 , T.pack . keccak256String . transactionHash
+                 , tshow . transactionSender
+                 ]
+      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
+      vals = flip map contracts $ \row ->
+        let rowList = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData row
+         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
+      inserts = csv vals
+   in T.intercalate " " $
+        [ "insert into"
+        , wrapDoubleQuotes historyName
+        , keySt
+        , "values"
+        , inserts
         , ";"
         ]
