@@ -38,18 +38,11 @@ kafkaCount = unsafeRegister
            $ Info "slipstream_kafka_read" "Number of messages read from kafka"
 
 {-# NOINLINE actionCount #-}
-actionCount :: Vector T.Text Counter
+actionCount :: Vector (T.Text, T.Text) Counter
 actionCount = unsafeRegister
-            . vector "action_type"
+            . vector ("action_stage", "action_type")
             . counter
             $ Info "slipstream_action_count" "Number of actions seen, by type"
-
-{-# NOINLINE combinedActionCount #-}
-combinedActionCount :: Vector T.Text Counter
-combinedActionCount = unsafeRegister
-                    . vector "combined_action_type"
-                    . counter
-                    $ Info "slipstream_combined_action_count" "Number of combined actions seen, by type"
 
 {-# NOINLINE tablesCreated #-}
 tablesCreated :: Vector T.Text Counter
@@ -83,19 +76,19 @@ recordGlobals g = liftIO $ do
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
-recordActionOn :: MonadIO m => Vector T.Text Counter -> Action -> m ()
-recordActionOn vec act =
-  let lab = case actionType act of
+recordActionOn :: MonadIO m => T.Text -> Action -> m ()
+recordActionOn stage act =
+  let kind = case actionType act of
               Create -> "create"
               Delete -> "delete"
               Update -> "update"
-  in liftIO $ withLabel vec lab incCounter
+  in liftIO $ withLabel actionCount (stage, kind) incCounter
 
 recordAction :: MonadIO m => Action -> m ()
-recordAction = recordActionOn actionCount
+recordAction = recordActionOn "raw"
 
 recordCombinedAction :: MonadIO m => Action -> m ()
-recordCombinedAction = recordActionOn combinedActionCount
+recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter
