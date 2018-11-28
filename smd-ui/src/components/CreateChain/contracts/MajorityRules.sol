@@ -11,9 +11,20 @@ contract MajorityRules {
 
   function voteToAdd(address m, string e) {
     uint votes = addVotes[m] + 1;
-    if (votes > __members__.length / 2) {
-      emit MemberAdded(m,e);
+    uint mlen = __members__.length;
+    if (votes > mlen / 2) {
       addVotes[m] = 0;
+      bool found = false;
+      for (uint i = 0; i < mlen; i++) {
+        if (__members__[i] == m) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        __members__.push(m);
+        emit MemberAdded(m,e);
+      }
     }
     else {
       addVotes[m] = votes;
@@ -22,9 +33,17 @@ contract MajorityRules {
 
   function voteToRemove(address m) {
     uint votes = removeVotes[m] + 1;
-    if (votes > __members__.length / 2) {
-      emit MemberRemoved(m);
+    uint mlen = __members__.length;
+    if (votes > mlen / 2) {
       removeVotes[m] = 0;
+      for (uint i = 0; i < mlen; i++) {
+        if (__members__[i] == m) {
+          __members__[i] = __members__[mlen - 1];
+          delete __members__[mlen - 1];
+          emit MemberRemoved(m);
+          break;
+        }
+      }
     }
     else {
       removeVotes[m] = votes;
