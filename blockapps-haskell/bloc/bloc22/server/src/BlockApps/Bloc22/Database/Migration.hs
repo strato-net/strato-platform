@@ -40,6 +40,7 @@ migrations = [ (Throw, createTables)
              , (Throw, contractsSourceTable)
              , (Throw, addSrcHashColumn)
              , (Throw, alterValueColumn)
+             , (Throw, uniqueSourceHashes)
              ]
 
 getSchemaVersion :: Query
@@ -72,3 +73,6 @@ addSrcHashColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS
 
 alterValueColumn :: Query
 alterValueColumn = [sql| ALTER TABLE xabi_variables ALTER COLUMN value TYPE text; |]
+
+uniqueSourceHashes :: Query
+uniqueSourceHashes = [sql| ALTER TABLE contracts_source ADD UNIQUE (src_hash) |]

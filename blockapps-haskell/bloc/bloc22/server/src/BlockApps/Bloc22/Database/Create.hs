@@ -54,7 +54,7 @@ contractsSourceTable :: Query
 contractsSourceTable = [sql|
 CREATE TABLE IF NOT EXISTS contracts_source(
   id serial PRIMARY KEY,
-  src_hash bytea NOT NULL,
+  src_hash bytea NOT NULL UNIQUE,
   src text NOT NULL
 );
 |]
