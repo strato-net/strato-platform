@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+export const majorityRules = 'pragma solidity ^0.4.24;
 
 contract MajorityRules {
   event MemberAdded (address member, string enode);
@@ -50,4 +50,4 @@ contract MajorityRules {
       removeVotes[m] = votes;
     }
   }
-}
+}'

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+export const adminOnly = 'pragma solidity ^0.4.24;
 
 contract AdminOnly {
 
@@ -19,4 +19,4 @@ contract AdminOnly {
   function voteToRemove(address m) adminOnly {
     emit MemberRemoved(m);
   }
-}
+}'

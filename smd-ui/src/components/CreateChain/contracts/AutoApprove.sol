@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+export const autoApprove = 'pragma solidity ^0.4.24;
 
 contract AutoApprove {
   event MemberAdded (address member, string enode);
@@ -11,4 +11,4 @@ contract AutoApprove {
   function voteToRemove(address m) {
     emit MemberRemoved(m);
   }
-}
+}'

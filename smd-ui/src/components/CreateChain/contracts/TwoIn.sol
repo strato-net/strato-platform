@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+export const twoIn = 'pragma solidity ^0.4.24;
 
 contract TwoIn {
   event MemberAdded (address member, string enode);
@@ -28,4 +28,4 @@ contract TwoIn {
       removeVotes[m] = votes;
     }
   }
-}
+}'
