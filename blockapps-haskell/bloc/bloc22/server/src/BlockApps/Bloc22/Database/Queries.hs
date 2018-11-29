@@ -1000,15 +1000,16 @@ createContractQuery contractName = do
 
 insertContractSourceQuery
   :: Text
-  -> Bloc (Int32, Keccak256)
+  -> Bloc Keccak256
 insertContractSourceQuery src = do
   let srcHash = keccak256 $ Text.encodeUtf8 src
       insertOp = Insert { iTable = contractsSourceTable
                         , iRows = [(Nothing, constant srcHash, constant src)]
-                        , iReturning = rReturning (\(csId,sh,_) -> (csId,sh))
+                        , iReturning = rCount
                         , iOnConflict = Just DoNothing }
 
-  blocModify1 $ flip runInsert_ insertOp
+  void . blocModify $ flip runInsert_ insertOp
+  return srcHash
 
 {- |
 Insert metadata into contract metadata table if metadata table does not contain codehash
@@ -1220,7 +1221,7 @@ insertContract parentContr contr bin binRuntime src xabi = do
     codeHash = binRuntimeToCodeHash binRuntime
     xcodeHash = keccak256 (Text.encodeUtf8 bin)
   contrId <- createContractQuery contr
-  (_,srcHash) <- insertContractSourceQuery src
+  srcHash <- insertContractSourceQuery src
   metadataId <- insertContractMetaDataQuery
     contrId bin binRuntime codeHash xcodeHash srcHash
   insertXabi metadataId parentContr xabi
@@ -1289,7 +1290,7 @@ compileContractFromScratch source = do
         , contractdetailsChainId = Nothing
         }
 
-  (_,srcHash) <- insertContractSourceQuery source
+  srcHash <- insertContractSourceQuery source
   metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
     let
       xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
