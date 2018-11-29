@@ -225,6 +225,8 @@ services:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
   kafka:
+    depends_on:
+    - zookeeper
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ADVERTISED_PORT: 9092
