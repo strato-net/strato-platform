@@ -1002,14 +1002,13 @@ insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
 insertContractSourceQuery src = do
-  let srcHash = (keccak256 $ Text.encodeUtf8 src)
-  blocModify1 $ \ conn ->
-    runInsertManyReturning conn contractsSourceTable [
-      ( Nothing
-      , constant srcHash
-      , constant src
-      )]
-      (\ (csId,sh,_) -> (csId,sh))
+  let srcHash = keccak256 $ Text.encodeUtf8 src
+      insertOp = Insert { iTable = contractsSourceTable
+                        , iRows = [(Nothing, constant srcHash, constant src)]
+                        , iReturning = rReturning (\(csId,sh,_) -> (csId,sh))
+                        , iOnConflict = Just DoNothing }
+
+  blocModify1 $ flip runInsert_ insertOp
 
 {- |
 Insert metadata into contract metadata table if metadata table does not contain codehash
