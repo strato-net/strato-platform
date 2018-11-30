@@ -11,6 +11,7 @@
 
 module BlockApps.Bloc22.Database.Queries where
 
+import Debug.Trace
 
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
@@ -1244,9 +1245,9 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
-compileContract source = do
+compileContract source = traceShowId <$> do
   details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
-  if null details
+  if null (traceShowId details)
     then compileContractFromScratch source
     else fmap Map.fromList . forM details $
       \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId) -> do
