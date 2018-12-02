@@ -174,7 +174,7 @@ export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.name, action.address);
     yield call(delay, 100)
-    yield put(fetchAccountDetail(action.name, action.address, action.flag));
+    yield put(fetchAccountDetail(action.name, action.address, action.chainId, action.flag));
     if (!action.flag)
       yield put(faucetSuccess());
   }

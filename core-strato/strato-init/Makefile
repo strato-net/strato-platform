@@ -4,18 +4,24 @@ build:
 
 BASE1=genesisBlocks/gettingStartedGenesis.json
 BASE2=build/midGenesis.json
+BASE3=build/finalGenesis.json
 
 NAME1=MultiStorage
 NAME2=StringStorage
+NAME3=LargeAddressStorage
 
 SOURCE1=contracts/$(NAME1).sol
 SOURCE2=contracts/$(NAME2).sol
+SOURCE3=contracts/$(NAME3).sol
+
 
 BINARY1=build/$(NAME1).bin-runtime
 BINARY2=build/$(NAME2).bin-runtime
+BINARY3=build/$(NAME3).bin-runtime
 
 DATA1=data/multi_storage.json
 DATA2=data/string_storage.json
+DATA3=data/large_storage.json
 
 OUTPUT=smokeTest
 
@@ -47,8 +53,20 @@ build/finalGenesis.json: $(BINARY2) $(DATA2) $(BASE2)
 		--output_account_info=build/lateAccountInfo
 	python -m json.tool $@.ugly > $@
 
-build/$(OUTPUT)AccountInfo: build/finalGenesis.json
-	cat build/midAccountInfo build/lateAccountInfo >| $@
+build/vituLargeGenesis.json: $(BINARY3) $(DATA3) $(BASE3)
+	stack exec generate-genesis -- \
+		--genesis_file=$(BASE3) \
+		--source_file=$(SOURCE3) \
+		--bytecode_file=$(BINARY3) \
+		--contract_name=$(NAME3) \
+		--records_file=$(DATA3) \
+		--start=0x7000000000000000000000000000000000000000 \
+		--output_file=$@.ugly \
+		--output_account_info=build/vituLargeAccountInfo
+	python -m json.tool $@.ugly > $@
+
+build/$(OUTPUT)AccountInfo: build/vituLargeGenesis.json
+	cat build/midAccountInfo build/lateAccountInfo build/vituLargeAccountInfo>| $@
 	cp $< build/$(OUTPUT)Genesis.json
 
 install:

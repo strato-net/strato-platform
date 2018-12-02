@@ -26,6 +26,7 @@ dependencies:
   - classy-prelude
   - clock
   - containers
+  - cross-monitoring
   - cryptohash
   - deepseq
   - directory

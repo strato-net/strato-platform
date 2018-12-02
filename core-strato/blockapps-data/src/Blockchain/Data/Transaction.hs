@@ -136,21 +136,24 @@ instance TransactionLike Transaction where
               md        = txMetadata t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) = MessageTX nonce' gp gl to' val dat cid r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' Nothing h ch 0 Nothing _ _ _) | init' == B.empty = PrivateHashTX (fromInteger h) (fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) = ContractCreationTX nonce' gp gl val (Code init') cid r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) =
+  MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == B.empty =
+  PrivateHashTX (fromInteger h) (fromInteger ch)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
+  ContractCreationTX nonce' gp gl val (Code init') (toMaybe 0 cid) r s v (M.fromList <$> md)
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-        RawTransaction time signer nonce' gp gl (Just to') val dat cid r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _ _ _) ->
         error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
-        RawTransaction time signer nonce' gp gl Nothing val init' cid r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
-        RawTransaction time signer 0 0 0 Nothing 0 B.empty Nothing (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 

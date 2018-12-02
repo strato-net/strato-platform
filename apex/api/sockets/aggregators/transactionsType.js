@@ -20,13 +20,13 @@ function getTransactionsType() {
       }
   ).then(function (data) {
     if (data.length) {
-      let typesCounter = {"FunctionCall": 0, "Transfer": 0, "Contract": 0};
+      let typesCounter = {"FunctionCall": 0, "Transfer": 0, "Contract": 0, "PrivateTX": 0};
       data.forEach(tx => {
         let txType;
         if (tx.to_address) {
           txType = tx.code_or_data.length ? 'FunctionCall' : 'Transfer';
         } else {
-          txType = 'Contract';
+            txType = tx.code_or_data.length ? 'Contract' : 'PrivateTX';
         }
         typesCounter[txType] += 1;
       });

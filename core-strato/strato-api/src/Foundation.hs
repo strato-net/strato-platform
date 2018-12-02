@@ -58,7 +58,7 @@ acquireNewMaxNonce minNonce = do
       -- Another node may have jumped ahead of our faucet stream or we may
       -- just be starting up, so always give at least the minNonce.
       findNext maxNonce =
-        let next = max minNonce $ 1 + maxNonce
+        let next = 1 + max minNonce maxNonce
         in (next, next)
   nref <- asks appFaucetNonce
   liftIO $ atomicModifyIORef' nref findNext

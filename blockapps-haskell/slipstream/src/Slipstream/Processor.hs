@@ -17,11 +17,13 @@ import Control.Arrow ((&&&))
 import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
+import Control.Monad.Trans.State.Strict hiding (state)
+import Control.Monad.Trans.Class (lift)
 import qualified Data.Aeson as JSON
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Either (lefts,rights)
+import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Foldable (for_)
@@ -42,8 +44,11 @@ import Numeric
 import Servant.Common.BaseUrl
 import System.Log.Logger
 
+import Blockapps.Crossmon
+
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
+import BlockApps.Bloc22.Server.Utils
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
@@ -60,6 +65,15 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+
+data BatchedInserts = BatchedInserts
+  { indexInsert     :: ProcessedContract
+  , historyInserts  :: [ProcessedContract]
+  , functionInserts :: [ProcessedContract]
+  }
+
+listHead :: [a] -> [a]
+listHead = maybeToList . listToMaybe
 
 toAction :: BL.ByteString -> Action'
 toAction x =
@@ -103,6 +117,20 @@ groupSimilarActions as = go as [] []
        in if isSameCreateAs x y
             then go (y:rest) newTmp final
             else go (y:rest) [] (final ++ [newTmp])
+
+-- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
+combineActions :: [Action] -> Action
+combineActions []     = error "combineActions: called with an empty list"
+combineActions [x]    = x
+combineActions (x:xs) = let y = combineActions xs
+                         in merge x y
+  where
+    merge a b = b { actionStorage  = (Map.union `on` actionStorage) b a
+                  , actionMetadata = (Map.union `on` actionMetadata) b a
+                  }
+
+splitActions :: [Action] -> [((Address, Maybe ChainId), [Action])]
+splitActions = partitionWith (actionAddress &&& actionTxChainId)
 
 withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
 withNothing m f = maybe f (pure . Just) m
@@ -153,10 +181,73 @@ getFunctionCallValues cmId input' output' = do
                (typemap output' otypes)
   return (fname,imap,omap)
 
+processedContract :: Text
+                  -> Text
+                  -> Text
+                  -> Map.Map Text Value
+                  -> Action
+                  -> ProcessedContract
+processedContract abi name chain state Action{..} =
+  ProcessedContract
+    { address = actionAddress
+    , codehash = actionCodeHash
+    , abi = abi
+    , contractName = name
+    , chain = chain
+    , contractData = state
+    , blockHash = actionBlockHash
+    , blockTimestamp = actionBlockTimestamp
+    , blockNumber = actionBlockNumber
+    , transactionHash = actionTxHash
+    , transactionSender = actionTxSender
+    , functionCallData = Nothing
+    }
+
+makeFunctionInserts :: Int32
+                    -> Text
+                    -> Text
+                    -> Text
+                    -> Map.Map Text Value
+                    -> Action
+                    -> Bloc [ProcessedContract]
+makeFunctionInserts cmId abi name chain state Action{..} =
+  forM actionCallData $ \CallData{..} -> do
+    let ibytes = _input
+        obytes = fromMaybe B.empty _output
+    (f',i,o) <- getFunctionCallValues cmId ibytes obytes
+    let f = if T.null f'
+              then if actionType == Create
+                    then "constructor"
+                    else "fallback"
+              else f'
+    recordMaxBlockNumber "slipstream_processor" actionBlockNumber
+    pure $ ProcessedContract
+      { address = actionAddress
+      , codehash = actionCodeHash
+      , abi = abi
+      , contractName = name
+      , chain = chain
+      , contractData = state
+      , blockHash = actionBlockHash
+      , blockTimestamp = actionBlockTimestamp
+      , blockNumber = actionBlockNumber
+      , transactionHash = actionTxHash
+      , transactionSender = actionTxSender
+      , functionCallData = Just $ FunctionCallData
+          { functioncalldataName = f
+          , functioncalldataInput = i
+          , functioncalldataOutput = o
+          }
+      }
+
 processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
 processTheMessages messages conn g = do
 
-  let changes = groupSimilarActions . join $ map (flatten . toAction . BL.fromStrict) messages
+  let changes = splitActions
+              . filter matters
+              . filter hasContract
+              . join
+              $ map (flatten . toAction . BL.fromStrict) messages
 
   unless (null messages) $
     debugM "processTheMessages" . unlines . map show $ messages
@@ -167,17 +258,17 @@ processTheMessages messages conn g = do
    n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
   let conHost = flags_pghost
-  let conPort = fromIntegral flags_pgport
-  let conUser = flags_pguser
-  let conPass = flags_password
-  let conDB = flags_database
-
-  let dbConnectInfo = ConnectInfo { connectHost = conHost
-                                 , connectPort = conPort
-                                 , connectUser = conUser
-                                 , connectPassword = conPass
-                                 , connectDatabase = conDB
-                                 }
+      conPort = fromIntegral flags_pgport
+      conUser = flags_pguser
+      conPass = flags_password
+      conDB = flags_database
+      dbConnectInfo = ConnectInfo
+        { connectHost     = conHost
+        , connectPort     = conPort
+        , connectUser     = conUser
+        , connectPassword = conPass
+        , connectDatabase = conDB
+        }
 
   pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   let strato = flags_stratourl
@@ -189,8 +280,7 @@ processTheMessages messages conn g = do
 
   --Set Flag on startup
   let deployFlag = BlockApps.Bloc22.Monad.Public
-
-  let env = BlocEnv
+      env = BlocEnv
             {
               urlStrato=stratoUrl   -- :: BaseUrl
             , urlVaultWrapper = vaultwrapperUrl
@@ -198,86 +288,92 @@ processTheMessages messages conn g = do
             , dbPool=pool     --  :: Pool Connection
             , logLevel=Error
             , deployMode= deployFlag   -- :: Severity
-            , stateFetchLimit = flags_stateFetchLimit
+            , stateFetchLimit = 0 -- not relevant since
+                                  -- Slipstream doesn't
+                                  -- call /storage route
+                                  -- anymore
             }
 
   enterBloc2 env $ do
-    forM_ (map (filter hasContract) changes) $ \change -> do
-      processedList <- forM (filter matters change) $ \row@Action{..} -> do
-        recordAction row
-        liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+    inserts <- forM changes $ \((addr,chainId),actions) -> do
+      let row = combineActions actions
+      mapM_ recordAction actions
+      recordCombinedAction row
+      liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
 
+      let md = actionMetadata row
+      mcd <- getContractDetailsByCodeHash $ actionCodeHash row
+      mDetails <- withNothing mcd $ do
+        fmap join . for (Map.lookup "src" md) $ \src -> do
+          detailsMap <- compileContract src
+          fmap join . for (Map.lookup "name" md) $ \name -> do
+            traverse pure $ Map.lookup name detailsMap
 
-        let md = fromMaybe Map.empty actionMetadata
-        mcd <- getContractDetailsByCodeHash actionCodeHash
-        mDetails <- withNothing mcd $ do
-          fmap join . for (Map.lookup "src" md) $ \src -> do
-            detailsMap <- compileContract src
-            fmap join . for (Map.lookup "name" md) $ \name -> do
-              traverse pure $ Map.lookup name detailsMap
+      if isNothing mDetails
+        then pure . Left $ "No details found for code hash "
+                        <> (T.pack . show $ actionCodeHash row)
+                        <> " and no 'src' field found in actionMetadata"
+        else do
+          let Just (cmId,details) = mDetails
+              strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
+              strName = T.replace "\"" "" $ contractdetailsName details
+              cont = either error id . xAbiToContract $ contractdetailsXabi details
+              chain = maybe "" (T.pack . flip showHex "" . unChainId) $ actionTxChainId row
+              cache = flip Map.lookup $ actionStorage row
+              updateGlobal m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
+                let contracts = filter (not . T.null) $ T.splitOn "," v
+                forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
 
-        if isNothing mDetails
-          then return . Left $ "No details found for code hash "
-                            <> (T.pack $ show actionCodeHash)
-                            <> " and no 'src' field found in actionMetadata"
-          else do
-            let Just (cmId,details) = mDetails
-                strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
-                strName = T.replace "\"" "" $ contractdetailsName details
-                cont = either error id . xAbiToContract $ contractdetailsXabi details
-                chain = maybe "" (T.pack . flip showHex "" . unChainId) actionTxChainId
-                cache = flip Map.lookup actionStorage
-                updateGlobal m (k,f) = for_ (Map.lookup k =<< actionMetadata) $ \v -> do
-                  let contracts = filter (not . T.null) $ T.splitOn "," v
-                  forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
+          detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
+          mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
+                                            ,("nohistory", removeFromHistoryList)
+                                            ,("noindex", addToNoIndexList)
+                                            ,("index", removeFromNoIndexList)
+                                            ,("functionhistory", addToFunctionHistoryList)
+                                            ,("nofunctionhistory", removeFromFunctionHistoryList)
+                                            ]
 
-            detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
-            mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
-                                              ,("nohistory", removeFromHistoryList)
-                                              ,("noindex", addToNoIndexList)
-                                              ,("index", removeFromNoIndexList)
-                                              ]
+          (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
+            contractInstancesByCodeHash (actionCodeHash row) addr chainId
+          when (isNothing mInstance) . void $
+            insertContractInstance cmId addr chainId
+          let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
+              cState = getContractState g addr chainId
+          oldState <- fromMaybe default' <$> cState
+          let newState = SVR.decodeCacheValues
+                          (typeDefs cont)
+                          (mainStruct cont)
+                          cache
+                          0
+                          oldState
+          setContractState g addr chainId newState
+          let indexContract = processedContract strAbi strName chain (Map.fromList newState) row
 
-            (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-              contractInstancesByCodeHash actionCodeHash actionAddress actionTxChainId
-            when (isNothing mInstance) . void $ insertContractInstance cmId actionAddress actionTxChainId
-            fetchLimit <- asks stateFetchLimit
-            oldState <- fromMaybe (SVR.decodeValues fetchLimit (typeDefs cont) (mainStruct cont) (const 0) 0)
-                          <$> getContractState g actionAddress actionTxChainId
-            let newState = SVR.decodeCacheValues (typeDefs cont) (mainStruct cont) cache 0 oldState
-                ret = Map.fromList newState
-            setContractState g actionAddress actionTxChainId newState
+          hist <- isHistoric g $ actionCodeHash row
+          (hs,fhs) <- unzip <$> if hist
+            then accumStateT oldState actions $ \hRow -> do
+              st <- get
+              let newSt = SVR.decodeCacheValues
+                          (typeDefs cont)
+                          (mainStruct cont)
+                          cache
+                          0
+                          st
+                  newMap = Map.fromList newSt
+              put newSt
+              let hInsert = processedContract strAbi strName chain newMap hRow
+              functionHist <- isFunctionHistoric g $ actionCodeHash hRow
+              fInserts <- if functionHist
+                            then lift $ makeFunctionInserts cmId strAbi strName chain newMap hRow
+                            else pure []
+              pure (hInsert, fInserts)
+            else pure []
+          pure . Right . BatchedInserts indexContract hs $ join fhs
 
-            hist <- isHistoric g actionCodeHash
-            let cData = if hist
-                          then actionCallData
-                          else maybeToList $ listToMaybe actionCallData
-            fmap sequence . forM cData $ \CallData{..} -> do
-              let ibytes = _input
-                  obytes = fromMaybe B.empty _output
-              (f',i,o) <- getFunctionCallValues cmId ibytes obytes
-              let f = if T.null f'
-                        then if actionType == Create
-                              then "constructor"
-                              else "fallback"
-                        else f'
+    forM_ (lefts inserts) $ liftIO . errorM "processTheMessages" . T.unpack
 
-              pure . pure $ ProcessedContract -- the purest
-                { address = actionAddress
-                , codehash = actionCodeHash
-                , abi = strAbi
-                , contractName = strName
-                , chain = chain
-                , contractData = ret
-                , blockHash = actionBlockHash
-                , blockTimestamp = actionBlockTimestamp
-                , blockNumber = actionBlockNumber
-                , transactionHash = actionTxHash
-                , transactionSender = actionTxSender
-                , transactionFuncName = f
-                , transactionInput = i
-                , transactionOutput = o
-                }
-
-      forM_ (lefts processedList) $ liftIO . errorM "processTheMessages" . T.unpack
-      when (not $ null processedList) . liftIO $ convertRet (join $ rights processedList) conn g
+    let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
+    forM_ insertsByCodeHash $ \ins -> do
+      outputData conn . createInsertIndexTable g $ map indexInsert ins
+      outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
+      outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins

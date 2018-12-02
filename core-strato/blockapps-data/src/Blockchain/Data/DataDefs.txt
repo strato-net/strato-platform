@@ -64,7 +64,7 @@ RawTransaction
     toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
     codeOrData BS.ByteString
-    chainId Word256 Maybe
+    chainId Word256
     r Integer
     s Integer
     v Word8
@@ -72,7 +72,7 @@ RawTransaction
     blockNumber Int
     txHash SHA
     origin TXOrigin
-    UniqueTXHash txHash
+    UniqueTXHash txHash chainId
     deriving Eq Generic Read Show
 
 Storage json

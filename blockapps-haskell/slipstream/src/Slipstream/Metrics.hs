@@ -3,6 +3,7 @@ module Slipstream.Metrics
   ( recordGlobals
   , recordKafkaMessages
   , recordAction
+  , recordCombinedAction
   , incNumTables
   , incNumHistoryTables
   , incNumBloomWrites
@@ -19,6 +20,8 @@ import qualified Data.Cache.LRU as LRU
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prometheus
+
+import Blockapps.Crossmon
 
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
@@ -37,9 +40,9 @@ kafkaCount = unsafeRegister
            $ Info "slipstream_kafka_read" "Number of messages read from kafka"
 
 {-# NOINLINE actionCount #-}
-actionCount :: Vector T.Text Counter
+actionCount :: Vector (T.Text, T.Text) Counter
 actionCount = unsafeRegister
-            . vector "action_type"
+            . vector ("action_stage", "action_type")
             . counter
             $ Info "slipstream_action_count" "Number of actions seen, by type"
 
@@ -68,20 +71,27 @@ recordGlobals g = liftIO $ do
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_contracts" (S.size . createdContracts)
   rec "history_list" (S.size . historyList)
+  rec "function_history_list" (S.size . functionHistoryList)
   rec "no_index_list" (S.size . noIndexList)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
-recordAction :: MonadIO m => Action -> m ()
-recordAction act =
-  let lab = case actionType act of
+recordActionOn :: MonadIO m => T.Text -> Action -> m ()
+recordActionOn stage act = do
+  let kind = case actionType act of
               Create -> "create"
               Delete -> "delete"
               Update -> "update"
-  in liftIO $ withLabel actionCount lab incCounter
+  liftIO $ withLabel actionCount (stage, kind) incCounter
+  recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
 
+recordAction :: MonadIO m => Action -> m ()
+recordAction = recordActionOn "raw"
+
+recordCombinedAction :: MonadIO m => Action -> m ()
+recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter

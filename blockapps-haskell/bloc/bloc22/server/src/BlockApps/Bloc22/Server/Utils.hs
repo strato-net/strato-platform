@@ -7,15 +7,18 @@
 module BlockApps.Bloc22.Server.Utils where
 
 import           Control.Concurrent
-import           Control.Monad              (forM)
+import           Control.Monad                    (forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
-import           Control.Monad.State.Lazy   (State, execState, get, put)
-import qualified Data.ByteString.Base16     as BS16
-import qualified Data.Map.Strict            as Map
+import           Control.Monad.Trans.State.Strict
+import qualified Data.ByteString.Base16           as BS16
+import           Data.Foldable                    (toList)
+import           Data.Functor.Identity            (runIdentity)
+import qualified Data.Map.Strict                  as Map
 import           Data.Maybe
-import qualified Data.Text                  as Text
-import qualified Data.Text.Encoding         as Text
+import qualified Data.Sequence                    as Q
+import qualified Data.Text                        as Text
+import qualified Data.Text.Encoding               as Text
 import           Servant.Client
 
 import           BlockApps.Bloc22.API.Users
@@ -89,16 +92,19 @@ emptyTxParams = TxParams Nothing Nothing Nothing
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 
-buildState :: s -> [a] -> (a -> State s ()) -> s
-buildState s [] _ = s
-buildState s (a:as) run =
-  let s' = execState (run a) s
-   in buildState s' as run
+accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
+accumStateT _ [] _ = pure []
+accumStateT s (a:as) run = do
+  (b,s') <- runStateT (run a) s
+  (b:) <$> accumStateT s' as run
+
+buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
+buildStateT s [] _ = pure s
+buildStateT s (a:as) run = do
+  s' <- execStateT (run a) s
+  buildStateT s' as run
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = Map.toList . buildState Map.empty as $ \a -> do
-  s <- get
+partitionWith f as = map (fmap toList) . Map.toList . runIdentity $ buildStateT Map.empty as $ \a -> do
   let k = f a
-  case Map.lookup k s of
-    Nothing -> put (Map.insert k [a] s)
-    Just _  -> put (Map.update (Just . (++ [a])) k s)
+  modify $ Map.alter (Just . (Q.|> a) . fromMaybe Q.empty) k

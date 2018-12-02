@@ -19,19 +19,23 @@ type StateRoot = Text
 
 data Detail = Incremental | Eventual
 
-data ProcessedContract = ProcessedContract {
-  address               :: Address
-  , codehash            :: Keccak256
-  , abi                 :: Text
-  , contractName        :: Text
-  , chain               :: Text
-  , blockHash           :: Keccak256
-  , blockTimestamp      :: UTCTime
-  , blockNumber         :: Integer
-  , transactionHash     :: Keccak256
-  , transactionSender   :: Address
-  , transactionFuncName :: Text
-  , transactionInput    :: [(Text,SolidityValue)]
-  , transactionOutput   :: [(Text,SolidityValue)]
-  , contractData        :: Map Text V.Value
-} deriving (Show)
+data FunctionCallData = FunctionCallData
+  { functioncalldataName   :: Text
+  , functioncalldataInput  :: [(Text,SolidityValue)]
+  , functioncalldataOutput :: [(Text,SolidityValue)]
+  } deriving (Show)
+
+data ProcessedContract = ProcessedContract
+  { address           :: Address
+  , codehash          :: Keccak256
+  , abi               :: Text
+  , contractName      :: Text
+  , chain             :: Text
+  , blockHash         :: Keccak256
+  , blockTimestamp    :: UTCTime
+  , blockNumber       :: Integer
+  , transactionHash   :: Keccak256
+  , transactionSender :: Address
+  , functionCallData  :: Maybe FunctionCallData
+  , contractData      :: Map Text V.Value
+  } deriving (Show)

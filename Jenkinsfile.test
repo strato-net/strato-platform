@@ -153,6 +153,7 @@ pipeline {
               pushd strato-worktree/tests
               npm install
               npm run test:truchainz
+              npm run test:multicontract
               popd
               pushd strato-worktree/core-strato/strato-init
               ./check_genesis_ingestion.sh
