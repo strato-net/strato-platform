@@ -60,17 +60,17 @@ insertChainBufferEntry cid h = do
   liftIO $ withLabel chainBuffer (fromString (show cid)) (flip setGauge (fromIntegral sz))
   insertChainBuffer cid cb
 
-getChainHash :: HasPrivateHashDB m => Word256 -> m SHA
-getChainHash cid = do
+getNewChainHash :: HasPrivateHashDB m => Word256 -> m SHA
+getNewChainHash cid = do
   CircularBuffer cap sz q <- lookupChainBuffer cid
   case Q.viewl q of
-    Q.EmptyL -> error $ "getChainHash: Empty chain buffer for chainId " ++ show cid
+    Q.EmptyL -> error $ "getNewChainHash: Empty chain buffer for chainId " ++ show cid
     (h Q.:< q') -> do
       insertChainBuffer cid (CircularBuffer cap (sz - 1) q')
       Just (used, _) <- lookupChainHash h
       if not used
         then useChainHash h cid >> return h
-        else getChainHash cid
+        else getNewChainHash cid
 
 insertChainInfo :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
 insertChainInfo cId cInfo = do

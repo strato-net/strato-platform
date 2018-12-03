@@ -45,6 +45,7 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
+import qualified Blockchain.SHA                      as SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import qualified Data.ByteString.Char8               as C8
@@ -53,6 +54,7 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
 import           Servant.Common.BaseUrl
+import           System.Entropy
 import           Test.Hspec.Core.Spec
 import           Test.Hspec.Expectations.Lifted
 import           Test.Hspec.Contrib.HUnit            ()
@@ -369,6 +371,35 @@ spec = do
           atomically . writeTMChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
+
+      it "should forward a private transaction hash" . runTestM $ do
+        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
+        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        let hashTx = PrivateHashTX th ch
+        checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
+        vmevs <- drainVM
+        let txs = [tx | OETx _ tx <- vmevs]
+        length txs `shouldBe` 1
+        txType (head txs) `shouldBe` PrivateHash
+        p2pevs <- drainP2P
+        let txs' = [tx | OETx _ tx <- p2pevs]
+        length txs' `shouldBe` 1
+        txType (head txs') `shouldBe` PrivateHash
+
+      it "should forward a private transaction hash only once" . runTestM $ do
+        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
+        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        let hashTx = PrivateHashTX th ch
+            ietx = IETx 0 (IngestTx TO.Morphism hashTx)
+        checkForUnseq [ietx,ietx]
+        vmevs <- drainVM
+        let txs = [tx | OETx _ tx <- vmevs]
+        length txs `shouldBe` 1
+        txType (head txs) `shouldBe` PrivateHash
+        p2pevs <- drainP2P
+        let txs' = [tx | OETx _ tx <- p2pevs]
+        length txs' `shouldBe` 1
+        txType (head txs') `shouldBe` PrivateHash
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let chainId = 0x12345678

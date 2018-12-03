@@ -26,19 +26,16 @@ lookupTransaction h = M.lookup h <$> getTxHashMap
 insertTransaction :: HasPrivateHashDB m => OutputTx -> m ()
 insertTransaction tx = getTxHashMap >>= putTxHashMap . M.insert (txHash tx) tx
 
-insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m (SHA, SHA)
+insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
     liftIO $ withLabel txMetrics "private_hash" incCounter
     let r = txSigR tx
         s = txSigS tx
-        h = txHash tx
         rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
         sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
     insertChainHash rs chainId
     insertChainHash sr chainId
-    chainHash <- getChainHash chainId
     insertChainBufferEntry chainId rs
     insertChainBufferEntry chainId sr
-    return (h, chainHash)

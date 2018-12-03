@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class                    (liftIO)
 
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
-import           Data.Foldable                             (toList, traverse_)
+import           Data.Foldable                             (for_, toList, traverse_)
 import           Data.Maybe                                (catMaybes, fromJust, isJust)
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
@@ -211,12 +211,11 @@ runPrivateHashTX :: SHA -> SHA -> SequencerM ()
 runPrivateHashTX th ch = do
   $logInfoS "runPrivateHashTX" . T.pack $ "Transforming transaction " ++ format th ++ " with chain hash " ++ format ch
   lookupSeenTxHash th >>= \case
-    Just _ -> do
+    True -> do
       $logInfoS "runPrivateHashTX" "Transaction hash seen before!"
-      return ()
-    Nothing -> do
+    False -> do
       $logInfoS "runPrivateHashTX" "Transaction hash not seen before! Inserting it into SeenTxHashDB"
-      insertSeenTxHash th ch
+      insertSeenTxHash th
       lookupTransaction th >>= \case
         Just tx -> do
           $logInfoS "runPrivateHashTX" . T.pack $ "We have this transaction's body. It's: " ++ prettyOTx tx
@@ -226,7 +225,22 @@ runPrivateHashTX th ch = do
           checkIfIsMissingTX th ch
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
-transformPrivateHashTXs pairs = forM_ pairs $ \(_, IngestTx _ (TD.PrivateHashTX th' ch')) -> runPrivateHashTX (SHA th') (SHA ch')
+transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
+  for_ (wrapTransaction t) $ \otx -> do
+    let witnessHash = witnessableHash otx
+    wasTransactionHashWitnessed witnessHash >>= \case
+      True -> return ()
+      False -> do
+        let privateWitnessHash = superProprietaryStratoSHAHash
+                               . RL.rlpSerialize
+                               $ RL.RLPArray [RL.rlpEncode th', RL.rlpEncode ch']
+        wasTransactionHashWitnessed privateWitnessHash >>= \case
+          True -> return ()
+          False -> do
+            witnessTransactionHash privateWitnessHash
+            runPrivateHashTX (SHA th') (SHA ch')
+            markForP2P $ OETx ts otx
+            markForVM  $ OETx ts otx
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
@@ -249,11 +263,11 @@ transformFullTransactions pairs = do
   forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) ->
     if not isPrivateChain
       then do
-        $logInfoS "transformFullTransactions" . T.pack $ "Sending " ++ show (length txs) ++ "public transactions to P2P and the VM"
+        $logInfoS "transformFullTransactions" . T.pack $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
         mapM_ (markForVM . pairToOETx) txs
         mapM_ (markForP2P . pairToOETx) txs
       else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \(Just chainId, ptxs) -> do
-        $logInfoS "transformFullTransactions" . T.pack $ "Transforming " ++ show (length txs) ++ "private transactions on chain " ++ format (SHA chainId)
+        $logInfoS "transformFullTransactions" . T.pack $ "Transforming " ++ show (length txs) ++ " private transactions on chain " ++ format (SHA chainId)
         mapM_ (insertTransaction . snd) ptxs
         lookupSeenChain chainId >>= \case
           False -> do
@@ -264,25 +278,23 @@ transformFullTransactions pairs = do
             $logInfoS "transformFullTransactions" . T.pack $ "We know the details for chain " ++ format (SHA chainId) ++ ". Inserting " ++ prettyOTx ptx ++ "into PrivateHashDB"
             let tHash = txHash ptx
             removeMissingTx tHash
-            cHash <- lookupSeenTxHash tHash >>= \case
-              Just ch -> do
-                $logInfoS "transformFullTransactions" . T.pack $ "We have this transaction's chain hash. It's: " ++ format ch
-                return ch
-              Nothing -> do
-                (_, cHash) <- insertPrivateHash ptx
-                insertSeenTxHash tHash cHash -- TODO: this should be part of insertPrivateHash
-                $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash
-                removeMissingTx tHash -- TODO: this should also be part of insertPrivateHash
-                return cHash
-            markForP2P $ pairToOETx (ts, ptx)
+            lookupSeenTxHash tHash >>= \case
+              True -> do
+                $logInfoS "transformFullTransactions" . T.pack $ "We have seen this transaction's PrivateHashTX before."
+              False -> do
+                insertPrivateHash ptx
+                when (otOrigin ptx /= TO.API) $ do
+                  cHash <- getNewChainHash chainId
+                  insertSeenTxHash tHash
+                  $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash
+                  removeMissingTx tHash
+                  let SHA th' = tHash
+                      SHA ch' = cHash
+                      phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                  markForVM $ pairToOETx (ts, phtx)
+                  markForP2P $ pairToOETx (ts, phtx)
             lookupTxBlocks tHash >>= \case
-              Nothing -> do -- if it's not already in a block, send it to the world
-                $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block. Sending it to P2P!"
-                let SHA th' = tHash
-                    SHA ch' = cHash
-                    phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
-                markForVM $ pairToOETx (ts, phtx)
-                markForP2P $ pairToOETx (ts, phtx)
+              Nothing -> $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block."
               Just bHash -> lookupDependentTxs bHash >>= \case
                 depTxs | not (S.member tHash depTxs) ->
                   error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
@@ -425,12 +437,9 @@ transformGenesis chains = forM_ chains $ \ig -> do
           Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show cId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
           Just tx -> do
             $logInfoS "transformGenesis" . T.pack $ "Inserting transaction " ++ prettyOTx tx
-            (tHash, cHash) <- insertPrivateHash tx
-            insertSeenTxHash tHash cHash
+            let tHash = txHash tx
+            insertPrivateHash tx
             removeMissingTx tHash
-            let SHA th' = tHash
-                SHA ch' = cHash
-            markForP2P $ OETx 0 tx{otBaseTx = TD.PrivateHashTX th' ch'}
             lookupTxBlocks tHash >>= \case
               Nothing -> return ()
               Just bHash -> lookupDependentTxs bHash >>= \case

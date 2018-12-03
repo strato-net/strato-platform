@@ -7,8 +7,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Monad.Trans.Resource
 
-import           Data.Bimap                   (Bimap)
-import qualified Data.Bimap                   as B
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Sequence                as Q
@@ -20,7 +18,7 @@ data PrivateHashDB =
                    , chainBuffers   :: Map Word256 (CircularBuffer SHA) -- TODO: Use buffers to remove old entries
                    , seenChains     :: S.Set Word256
                    , missingChainDB :: Map Word256 [SHA]
-                   , seenHashes     :: Bimap SHA SHA                    -- transaction hashes and chain hashes
+                   , seenTXs        :: S.Set SHA                        -- set of seen transaction hashes
                    , missingTxs     :: S.Set SHA                        -- set of transaction hashes for chains we recognize but don't have data for
                    , dependentTxDB  :: Map SHA (S.Set SHA)              -- map from block hash to dependent transaction hashes
                    , txBlockDB      :: Map SHA SHA                      -- map from transaction hash to block hash
@@ -40,7 +38,7 @@ emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
 emptyPrivateHashDB :: PrivateHashDB
 emptyPrivateHashDB  = PrivateHashDB M.empty M.empty M.empty S.empty M.empty
-                                    B.empty S.empty M.empty M.empty
+                                    S.empty S.empty M.empty M.empty
 
 class MonadResource m => HasPrivateHashDB m where
     getPrivateHashDB :: m PrivateHashDB
