@@ -524,7 +524,7 @@ spec = do
         let ietx = IETx 0 . IngestTx TO.Morphism
         checkForUnseq [ietx tx1, ietx tx2]
         vmevs' <- drainVM
-        let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
-        length otxs' `shouldBe` 2
-        txType (otxs' !! 0) `shouldBe` Message
-        txType (otxs' !! 1) `shouldBe` Message
+        let obs' = [b | OEBlock b <- vmevs']
+        length obs' `shouldBe` 3
+        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs'
+        mapM_ ((`shouldBe` Message) . txType . head . obReceiptTransactions) obs'
