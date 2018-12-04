@@ -15,7 +15,8 @@ describe('Contracts: action', () => {
   describe('fetch contracts', () => {
 
     test('request', () => {
-      expect(fetchContracts()).toMatchSnapshot();
+      let chainId = "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9";
+      expect(fetchContracts(chainId)).toMatchSnapshot();
     });
 
     test('success', () => {

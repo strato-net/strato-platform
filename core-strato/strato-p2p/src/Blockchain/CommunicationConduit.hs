@@ -87,10 +87,15 @@ mkEthP2PEventConduit str outCtx =
   .| messageToBytes
   .| ethEncrypt outCtx
 
-handleMsgClientConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
+handleMsgClientConduit :: ( MonadIO (StateT Context m)
+                          , MonadResource m
+                          , RBDB.HasRedisBlockDB (StateT Context m)
+                          , WrapsSQLDB (StateT Context) m
+                          , MonadLogger (StateT Context m)
+                          )
                        => Point
                        -> PPeer
-                       -> ConduitM Event Message m ()
+                       -> ConduitM Event Message (StateT Context m) ()
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
@@ -107,7 +112,7 @@ handleMsgClientConduit myId peer = do
             RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
                 Nothing -> error "we don't have a local BestBlock"
                 Just (RedisBestBlock hash _ tdiff) -> do
-                    genHash <- lift getGenesisBlockHash
+                    genHash <- lift . runWithSQL $ getGenesisBlockHash
                     yield Status {
                         protocolVersion = fromIntegral ethVersion,
                         networkID       = computeNetworkID,
@@ -118,7 +123,7 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-                genHash <- lift getGenesisBlockHash -- fromMaybe (error "we disgust ourselves and are miserable excuses for human beings") <$> lift (RBDB.withRedisBlockDB RBDB.getGenesisHash)
+                genHash <- lift . runWithSQL $ getGenesisBlockHash
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber
@@ -129,10 +134,14 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     handleEvents peer
 
-handleMsgServerConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
+handleMsgServerConduit :: (MonadIO (StateT Context m)
+                         , MonadResource m
+                         , RBDB.HasRedisBlockDB (StateT Context m)
+                         , WrapsSQLDB (StateT Context) m
+                         , MonadLogger (StateT Context m))
                  => Point
                  -> PPeer
-                 -> ConduitM Event Message m ()
+                 -> ConduitM Event Message (StateT Context m) ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
@@ -153,7 +162,7 @@ handleMsgServerConduit myPubkey peer = do
             RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
                 Nothing -> error "we don't have a local BestBlock!"
                 Just (RedisBestBlock hash _ tdiff) -> do
-                    genHash <- lift getGenesisBlockHash
+                    genHash <- lift . runWithSQL $ getGenesisBlockHash
                     when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                     yield Status {

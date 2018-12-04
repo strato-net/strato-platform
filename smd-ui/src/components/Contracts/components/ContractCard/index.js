@@ -38,17 +38,17 @@ class ContractCard extends Component {
 
     instances
       .filter((instance) => { return re.test(instance.address) })
-      .forEach(function (instance) {
+      .forEach(function (instance, index) {
         cardData.push(
           <tr
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
               mixpanelWrapper.track("contract_state_clicked")
-              self.props.fetchState(name, instance.address);
+              self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
-            key={'card-data-' + instance.address}
+            key={`card-data-${instance.address}-${index}`}
           >
             <td style={{ border: 'none' }}>
               <HexText value={instance.address} classes="small smd-pad-4" />
@@ -117,6 +117,7 @@ class ContractCard extends Component {
                       symbolName={symbol}
                       fromCirrus={instance.fromCirrus}
                       fromBloc={instance.fromBloc}
+                      chainId={self.props.selectedChain}
                     />
                     : null
                 }
@@ -175,7 +176,7 @@ class ContractCard extends Component {
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
                       mixpanelWrapper.track("contracts_toggle_collapse_click");
-                      if (this.state.isOpen) 
+                      if(this.state.isOpen)
                         this.props.selectContractInstance(name, null);
                       this.setState({
                         isOpen: !this.state.isOpen
@@ -217,6 +218,7 @@ class ContractCard extends Component {
 
 export function mapStateToProps(state) {
   return {
+    selectedChain: state.chains.selectedChain
   };
 }
 

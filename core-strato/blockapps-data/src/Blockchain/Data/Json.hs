@@ -16,14 +16,15 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Format
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.Util                      (toMaybe)
 
 import           Data.Aeson
-import           Data.Aeson.Types            (Parser)
-import qualified Data.ByteString             as B
-import qualified Data.ByteString.Base16      as B16
-import qualified Data.Map.Strict             as M
+import           Data.Aeson.Types                     (Parser)
+import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Base16               as B16
+import qualified Data.Map.Strict                      as M
 import           Data.Maybe
-import qualified Data.Text.Encoding          as T
+import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -50,7 +51,7 @@ instance ToJSON RawTransaction' where
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= show t,
         "origin" .= format o
-               ] ++ (("chainId" .=) <$> maybeToList cid)
+               ] ++ (("chainId" .=) <$> maybeToList (toMaybe 0 cid))
                  ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod cid r s v md bn h o) next) =
         object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
@@ -63,7 +64,7 @@ instance ToJSON RawTransaction' where
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= show t,
         "origin" .= format o
-               ] ++ (("chainId" .=) <$> maybeToList cid)
+               ] ++ (("chainId" .=) <$> maybeToList (toMaybe 0 cid))
                  ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -104,7 +105,7 @@ instance FromJSON RawTransaction' where
                  (tto :: Maybe Address)
                  (tval :: Integer)
                  (tcd :: B.ByteString)
-                 (cid :: Maybe Word256)
+                 (fromMaybe 0 (cid :: Maybe Word256))
                  (tr :: Integer)
                  (ts :: Integer)
                  (tv :: Word8)

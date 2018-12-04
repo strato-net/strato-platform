@@ -31,10 +31,10 @@ import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
 
-const accountDataUrl = env.STRATO_URL + "/account?address=:address";
+const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
-const faucetUrl = env.STRATO_URL + "/faucet"
+const faucetUrl = env.BLOC_URL + "/users/:user/:address/fill?resolve"
 
 export function getAccountsApi() {
   return fetch(
@@ -73,9 +73,10 @@ export function getUserAddressesApi(username) {
     });
 }
 
-export function getAccountDetailApi(address) {
+export function getAccountDetailApi(address, chainId) {
+  const localAccountDataUrl = chainId ? accountDataUrl.replace(":address", address).replace(":chainid", `chainid=${chainId}`) : accountDataUrl.replace(":address", address).replace("&:chainid", '')
   return fetch(
-    accountDataUrl.replace(":address", address),
+    localAccountDataUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -92,16 +93,16 @@ export function getAccountDetailApi(address) {
     });
 }
 
-export function postFaucet(address) {
+export function postFaucet(username, address) {
   return fetch(
-    faucetUrl,
+    faucetUrl.replace(":user", username)
+             .replace(":address", address),
     {
       method: 'POST',
       credentials: "include",
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `address=${address}`
+      }
     }
   )
     .then(function (response) {
@@ -115,10 +116,11 @@ export function postFaucet(address) {
 export function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
+    // const response = ["sz1152", "sz2699"];
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
     if (action.loadAddresses && response.length > 0) {
-      yield put(fetchUserAddresses(response[0], action.loadBalances));
+      yield put(fetchUserAddresses(response[0], action.loadBalances, action.chainId));
     }
   }
   catch (err) {
@@ -133,9 +135,10 @@ export function* getAccounts(action) {
 export function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
+    // const response = ["999"];
     yield put(fetchUserAddressesSuccess(action.name, response));
     if (action.loadBalances) {
-      yield response.map(address => put(fetchAccountDetail(action.name, address)));
+      yield response.map(address => put(fetchAccountDetail(action.name, address, action.chainId)));
     }
   }
   catch (err) {
@@ -145,9 +148,11 @@ export function* getUserAddresses(action) {
 
 export function* getAccountDetail(action) {
   try {
-    const response = yield call(getAccountDetailApi, action.address);
+    const response = yield call(getAccountDetailApi, action.address, action.chainId);
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
+    if (action.flag)
+      yield put(faucetSuccess());
   }
   catch (err) {
     yield put(fetchAccountDetailFailure(action.name, action.address, err));
@@ -167,12 +172,11 @@ export function* getCurrentAccountDetail(action) {
 
 export function* faucetAccount(action) {
   try {
-    yield call(postFaucet, action.address);
-    yield put(faucetSuccess());
-    if (action.name) {
-      yield call(delay, 100)
-      yield put(fetchAccountDetail(action.name, action.address));
-    }
+    yield call(postFaucet, action.name, action.address);
+    yield call(delay, 100)
+    yield put(fetchAccountDetail(action.name, action.address, action.chainId, action.flag));
+    if (!action.flag)
+      yield put(faucetSuccess());
   }
   catch (err) {
     yield put(faucetFailure(err))

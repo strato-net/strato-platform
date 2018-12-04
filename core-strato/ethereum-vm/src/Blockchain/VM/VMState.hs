@@ -55,6 +55,7 @@ data VMState =
   VMState {
     vmIsHomestead    :: Bool,
     dbs              :: Context,
+    sqldb            :: Config,
     vmGasRemaining   :: Integer,
     pc               :: Word256,
     memory           :: Memory,
@@ -104,13 +105,14 @@ startingAction Environment{..} = Action
   , _actionMetadata           = envMetadata
   }
 
-startingState :: Bool -> Bool -> Environment -> Context -> IO VMState
-startingState isRunningTests' isHomestead env dbs' = do
+startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
+startingState isRunningTests' isHomestead env sqldb' dbs' = do
   m <- newMemory
   return VMState
              {
                vmIsHomestead=isHomestead,
                dbs = dbs',
+               sqldb = sqldb',
                pc = 0,
                done=False,
                returnVal=Nothing,

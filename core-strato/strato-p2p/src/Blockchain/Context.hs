@@ -7,9 +7,11 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
+    , Config(..)
     , ContextM
     , initContext
     , runContextM
@@ -21,7 +23,6 @@ module Blockchain.Context
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
-    , addPeer
     , getPeerByIP
     , setPeerAddrIfUnset
     , shouldSendToPeer
@@ -31,11 +32,12 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Lens                          hiding (Context)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Text                             as T
 import           Data.Time.Clock
-import           Data.Void
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.BlockHeader
@@ -55,14 +57,15 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 
+newtype Config = Config { configSQLDB :: SQLDB }
+
 data Context =
     Context {
-        contextSQLDB        :: SQLDB,
         contextRedisBlockDB :: Redis.Connection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
-        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => ConduitM [IngestEvent] Void m (),
-        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m, HasSQLDB m) => ConduitM [VMEvent] Void m (),
+        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => [IngestEvent] -> m (),
+        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m) => [VMEvent] -> m (),
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
         connectionTimeout   :: Int,
@@ -72,7 +75,7 @@ data Context =
 
 makeLenses ''Context
 
-type ContextM = StateT Context (ResourceT (LoggingT IO))
+type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
 instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
     getKafkaState = contextKafkaState <$> get
@@ -83,13 +86,16 @@ instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
-  getSQLDB = contextSQLDB <$> get
+instance (MonadResource m, MonadBaseControl IO m, MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
+  getSQLDB = asks configSQLDB
+
+instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
+  runWithSQL = lift
 
 instance (MonadState Context m, MonadIO m) => HasUnseqSink m where
   getUnseqSink = gets unseqSink
 
-instance (MonadState Context m, MonadIO m, HasSQLDB m) => HasVMEventsSink m where
+instance (MonadState Context m, MonadIO m) => HasVMEventsSink m where
   getVMEventsSink = gets vmEventsSink
 
 getDebugMsg :: MonadState Context m => m String
@@ -128,48 +134,42 @@ clearActionTimestamp = do
     put cxt{actionTimestamp=Nothing}
 
 runContextM :: (MonadBaseControl IO m, MonadThrow m, MonadIO m)
-            => s
-            -> StateT s (ResourceT m) a
+            => (r, s)
+            -> StateT s (ReaderT r (ResourceT m)) a
             -> m ()
-runContextM s f = void . runResourceT $ runStateT f s
+runContextM (r, s) = void . runResourceT . flip runReaderT r . flip runStateT s
 
-initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-            => Int -> m Context
+initContext :: ( MonadResource m
+               , MonadIO m
+               , MonadBaseControl IO m
+               , MonadLogger m
+               , MonadUnliftIO m
+               )
+            => Int -> m (Config, Context)
 initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  return Context { actionTimestamp = Nothing
+  return (Config (sqlDB' dbs),
+         Context { actionTimestamp = Nothing
                  , contextRedisBlockDB = redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
-                 , unseqSink=mapM_C (void . K.withKafkaViolently . writeUnseqEvents) .| sinkNull
-                 , vmEventsSink=mapM_C (void . produceVMEventsM) .| sinkNull
+                 , unseqSink=void . K.withKafkaViolently . writeUnseqEvents
+                 , vmEventsSink=void . produceVMEventsM
                  , vmTrace=[]
                  , connectionTimeout=flags_connectionTimeout
                  , maxReturnedHeaders = maxHeaders
                  , _blockstanbulPeerAddr = Nothing
-                 }
+                 })
 
 
-
-addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
-        => PPeer
-        -> m (SQL.Key PPeer)
-addPeer peer = do
-  db <- getSQLDB
-  maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
-  SQL.runSqlPool (actions maybePeer) db
-  where actions = \case
-            Nothing    -> SQL.insert peer
-            Just peer' -> do
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
-              return (SQL.entityKey peer')
-
-getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+getPeerByIP :: ( WrapsSQLDB t m
+               , MonadResource m
+               , MonadBaseControl IO m
+               , MonadThrow m)
             => String
-            -> m (Maybe (SQL.Entity PPeer))
-getPeerByIP ip = do
+            -> (t m) (Maybe (SQL.Entity PPeer))
+getPeerByIP ip = runWithSQL $ do
     db <- getSQLDB
     SQL.runSqlPool actions db >>= \case
         [] -> return Nothing

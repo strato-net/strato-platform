@@ -77,9 +77,10 @@ describe('ContractCard: saga', () => {
   })
 
   test('state inspection', () => {
-    const gen = fetchState({ type: "FETCH_STATE_REQUEST", address: '3771b31420eda628bf03cd5b119249da0fb4aa6d', name: 'Greeter' });
-    expect(gen.next().value).toEqual(call(getState, 'Greeter', '3771b31420eda628bf03cd5b119249da0fb4aa6d'));
-    expect(gen.next().value).toEqual(put(fetchStateSuccess('Greeter', '3771b31420eda628bf03cd5b119249da0fb4aa6d')))
+    const data = { type: "FETCH_STATE_REQUEST", address: '3771b31420eda628bf03cd5b119249da0fb4aa6d', name: 'Greeter', chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9" };
+    const gen = fetchState(data);
+    expect(gen.next().value).toEqual(call(getState, data.name, data.address, data.chainId));
+    expect(gen.next().value).toEqual(put(fetchStateSuccess(data.name, data.address)))
   })
 
   describe('fetch states', () => {

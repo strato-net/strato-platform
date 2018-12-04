@@ -4,9 +4,10 @@
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
 import qualified Data.ByteString.Base16                      as B16
 import qualified Data.ByteString.Char8                       as BC
@@ -27,7 +28,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
---import Blockchain.Util
 
 data DBs =
   DBs {
@@ -37,8 +37,8 @@ data DBs =
     sqlDB   :: SQLDB
     }
 
-instance (LDB.MonadResource m, MonadBaseControl IO m)=>HasSQLDB (StateT DBs m) where
-  getSQLDB = fmap sqlDB get
+instance (LDB.MonadResource m, MonadBaseControl IO m, MonadUnliftIO m)=>HasSQLDB (ReaderT DBs m) where
+  getSQLDB = asks sqlDB
 
 main :: IO ()
 main = do
@@ -60,7 +60,7 @@ main = do
     let dbs = DBs{stateDB=MPDB{ldb=stateDB', stateRoot=undefined}, codeDB=codeDB', hashDB=hashDB', sqlDB=pool}
 
     _ <-
-      flip runStateT dbs $ do
+      flip runReaderT dbs $ do
         SHA genesisHash' <- getGenesisHash
         liftIO $ putStrLn $ "g" ++ showHex genesisHash' ""
         let stateRoot' = blockDataStateRoot $ blockBlockData backupBlock

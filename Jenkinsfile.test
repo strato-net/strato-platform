@@ -53,7 +53,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=$(</host)
-          NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
@@ -150,9 +150,14 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running local integration tests'
-              cd strato-worktree/tests
+              pushd strato-worktree/tests
               npm install
               npm run test:truchainz
+              npm run test:multicontract
+              popd
+              pushd strato-worktree/core-strato/strato-init
+              ./check_genesis_ingestion.sh
+              popd
             '''
           }
         )

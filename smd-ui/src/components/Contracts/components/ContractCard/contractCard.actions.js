@@ -9,11 +9,12 @@ export const FETCH_ACCOUNT_REQUEST = 'FETCH_ACCOUNT_REQUEST';
 export const FETCH_ACCOUNT_SUCCESS = 'FETCH_ACCOUNT_SUCCESS';
 export const FETCH_ACCOUNT_FAILURE = 'FETCH_ACCOUNT_FAILURE';
 
-export const fetchState = function (name, address) {
+export const fetchState = function (name, address, chainId) {
   return {
     type: FETCH_STATE_REQUEST,
     name: name,
     address: address,
+    chainId: chainId
   }
 };
 

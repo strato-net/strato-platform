@@ -1,21 +1,26 @@
 import React from 'react';
 import Account, { mapStateToProps } from '../../components/Account/index';
 import { indexAccountsMock } from '../Accounts/accountsMock';
-import { deepClone } from '../helper/testHelper';
 import { accountDetails } from './accountMock';
 import * as checkMode from '../../lib/checkMode';
 
 describe('Account: index', () => {
 
   describe('renders correctly', () => {
+
     beforeAll(() => {
       checkMode.isModePublic = jest.fn().mockReturnValue(false);
     })
+
     test('with empty values', () => {
       const props = {
         account: accountDetails,
         name: '',
         address: '',
+        faucet: {
+          status: false,
+          accountAddress: null
+        },
         faucetRequest: jest.fn()
       };
 
@@ -30,6 +35,10 @@ describe('Account: index', () => {
         account: accountDetails,
         name: '',
         address: '0004537908d44f458acb24b0f2c863ccd2bd3a13',
+        faucet: {
+          status: true,
+          accountAddress: '0004537908d44f458acb24b0f2c863ccd2bd3a13'
+        },
         faucetRequest: jest.fn()
       };
 
@@ -48,6 +57,10 @@ describe('Account: index', () => {
       account: accountDetails,
       name: '',
       address: '',
+      faucet: {
+        status: true,
+        accountAddress: '0004537908d44f458acb24b0f2c863ccd2bd3a13'
+      },
       faucetRequest: jest.fn(),
       preventDefault: jest.fn(),
       stopPropagation: jest.fn()
@@ -68,6 +81,10 @@ describe('Account: index', () => {
       const state = {
         accounts: {
           accounts: indexAccountsMock,
+          faucet: {
+            status: true,
+            accountAddress: '0004537908d44f458acb24b0f2c863ccd2bd3a13'
+          }
         }
       }
       const ownProps = {
@@ -81,6 +98,10 @@ describe('Account: index', () => {
       const state = {
         accounts: {
           accounts: indexAccountsMock,
+          faucet: {
+            status: false,
+            accountAddress: null
+          }
         }
       }
       const ownProps = {

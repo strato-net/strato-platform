@@ -17,7 +17,7 @@ describe('ContractCard: action', () => {
   describe('fetch state', () => {
 
     test('request', () => {
-      expect(fetchState(contract.name, contract.address)).toMatchSnapshot();
+      expect(fetchState(contract.name, contract.address, contract.chainId)).toMatchSnapshot();
     });
 
     test('success', () => {

@@ -193,15 +193,15 @@ putBlocks difficultyBase blocks makeHashOne = do
              toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') makeHashOne
              blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do
-               txID <- updateBlockNumber b $ transactionHash tx
+               txID <- updateBlockNumber b (transactionHash tx) (txChainId tx)
                SQL.insert $ BlockTransaction blkDataRefId txID
              return blkDataRefId
            [bd] -> return $ SQL.entityKey bd
            _ -> error "DB has multiple blocks with the same hash"
 
   where
-    updateBlockNumber b txHash'  = do
-          ret <- SQL.getBy (UniqueTXHash txHash')
+    updateBlockNumber b txHash' cid = do
+          ret <- SQL.getBy (UniqueTXHash txHash' $ fromMaybe 0 cid)
           key <-
             case ret of
              Just x  -> return $ entityKey x

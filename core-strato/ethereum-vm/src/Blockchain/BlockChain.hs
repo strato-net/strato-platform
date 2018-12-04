@@ -37,11 +37,10 @@ import           Data.Maybe
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
-import           Data.Time.Clock.POSIX
 import           Blockchain.MilenaTools                  (withKafkaViolently)
+import           Prometheus                                as P
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
-import           Prometheus                                as P
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
@@ -93,6 +92,7 @@ import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
+import           Blockchain.Timing
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -140,7 +140,7 @@ instance Bagger.MonadBagger ContextM where
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
-            void $ putTransactionResult
+            void . lift $ putTransactionResult
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
@@ -174,20 +174,6 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
 
 -- todo: lovely!
 
-timeIt :: MonadIO m => m a -> m (NominalDiffTime, a)
-timeIt f = do
-    timeBefore <- liftIO getPOSIXTime
-    result <- f
-    timeAfter <- liftIO getPOSIXTime
-    return (timeAfter - timeBefore, result)
-
-timeit :: (MonadIO m, MonadLogger m) => String -> Maybe P.Gauge -> m a -> m a
-timeit message timer f = do
-    (diff, ret) <- timeIt f
-    $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac diff ::Double) ++ "s"
-    liftIO $ forM_ timer (flip P.setGauge (realToFrac diff))
-    return ret
-
 addBlocks :: [OutputBlock] -> ContextM [Action]
 addBlocks [] = return []
 addBlocks blocks' = do
@@ -200,7 +186,7 @@ addBlocks blocks' = do
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef undefined)
-      actions <- forM filtered $ \block -> timeit "Block insertion" timerToUse $ do
+      actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
         actions <- addBlock block
         (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
         when didReplaceThisTime . liftIO $ do
@@ -208,12 +194,12 @@ addBlocks blocks' = do
           writeIORef replacedBest (block, replacedBits)
         return actions
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
-      void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
+      timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
-        void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        calculateAndEmitStateDiffs theBlock oldHeader
+        timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+        timeit "calculateAndEmitStateDiffs " timerToUse $ calculateAndEmitStateDiffs theBlock oldHeader
       return $ concat actions
 
   where
@@ -661,7 +647,6 @@ calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
     chainDiffs <- chainDiff newNumber oldHash newHash
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allDiffs = (diffs : chainDiffs)
+    let allDiffs = diffs:chainDiffs
 
-    forM_ allDiffs $ \diff -> do
-      when flags_sqlDiff $ commitSqlDiffs diff
+    forM_ allDiffs $ lift . commitSqlDiffs

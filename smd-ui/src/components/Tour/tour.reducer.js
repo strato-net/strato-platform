@@ -4,6 +4,7 @@ const skipTour = localStorage.getItem('skip_tour') === 'true';
 
 const initialState = {
   dashboard: {run: !skipTour, autoStart: !skipTour},
+  chains: {run: !skipTour, autoStart: !skipTour},
   transactions: {run: !skipTour, autoStart: !skipTour},
   accounts: {run: !skipTour, autoStart: !skipTour},
   contracts: {run: !skipTour, autoStart: !skipTour},

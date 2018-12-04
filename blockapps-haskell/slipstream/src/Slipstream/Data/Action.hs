@@ -1,7 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
     , RecordWildCards
-    , DeriveGeneric
     , QuasiQuotes
     , ScopedTypeVariables
     , DataKinds
@@ -15,13 +14,14 @@
 module Slipstream.Data.Action where
 
 import           BlockApps.Ethereum
+import           Control.DeepSeq
 import           Control.Lens            hiding ((.=))
 import qualified Data.Aeson.Encoding     as AesonEnc
 import           Data.ByteString         (ByteString)
 import qualified Data.ByteString.Base16  as B16
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
-import           Data.Maybe              (listToMaybe)
+import           Data.Maybe              (fromMaybe,listToMaybe)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Data.Text.Encoding
@@ -48,10 +48,7 @@ instance FromJSONKey Address where
 instance FromJSONKey (Hex Word256) where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
-data CallType = Create | Delete | Update deriving (Eq, Show, Generic)
-
-instance ToJSON CallType where
-instance FromJSON CallType where
+data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 data CallData = CallData
   { _callType    :: CallType
@@ -61,7 +58,7 @@ data CallData = CallData
   , _value       :: Integer
   , _input       :: ByteString
   , _output      :: Maybe ByteString
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''CallData
 
 instance ToJSON CallData where
@@ -90,7 +87,7 @@ data ActionData = ActionData
   { _codeHash     :: Keccak256
   , _storageDiffs :: Map Word256 Word256
   , _callData     :: [CallData]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''ActionData
 
 instance ToJSON ActionData where
@@ -116,7 +113,7 @@ data Action' = Action'
   , _transactionSender  :: Address
   , _actionData         :: Map Address ActionData
   , _metadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 makeLenses ''Action'
 
 instance ToJSON Action' where
@@ -144,19 +141,19 @@ instance FromJSON Action' where
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
 data Action = Action
-  { actionBlockHash          :: Keccak256
-  , actionBlockTimestamp     :: UTCTime
-  , actionBlockNumber        :: Integer
-  , actionTxHash             :: Keccak256
-  , actionTxChainId          :: Maybe ChainId
-  , actionTxSender           :: Address
-  , actionAddress            :: Address
-  , actionCodeHash           :: Keccak256
-  , actionStorage            :: Map Word256 Word256
-  , actionType               :: CallType
-  , actionCallData           :: [CallData]
-  , actionMetadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic)
+  { actionBlockHash      :: Keccak256
+  , actionBlockTimestamp :: UTCTime
+  , actionBlockNumber    :: Integer
+  , actionTxHash         :: Keccak256
+  , actionTxChainId      :: Maybe ChainId
+  , actionTxSender       :: Address
+  , actionAddress        :: Address
+  , actionCodeHash       :: Keccak256
+  , actionStorage        :: Map Word256 Word256
+  , actionType           :: CallType
+  , actionCallData       :: [CallData]
+  , actionMetadata       :: Map Text Text
+  } deriving (Show, Generic, NFData)
 
 flatten :: Action' -> [Action]
 flatten Action'{..} = flip map (M.toList _actionData) $
@@ -174,7 +171,7 @@ flatten Action'{..} = flip map (M.toList _actionData) $
           , actionStorage        = _storageDiffs
           , actionType           = t
           , actionCallData       = _callData
-          , actionMetadata       = _metadata
+          , actionMetadata       = fromMaybe M.empty _metadata
           }
 
 formatAction :: Action -> Text

@@ -11,11 +11,12 @@ import {
 
 import { env } from '../../../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
+const url = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
 
-export function sendTokensAPICall(from, fromAddress, toAddress, value, password) {
+export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainId) {
+  const sendUrl = url.replace(":user", from).replace(":address", fromAddress);
   return fetch(
-    url.replace(":user", from).replace(":address", fromAddress),
+    chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", ''),
     {
       method: 'POST',
       credentials: "include",
@@ -41,7 +42,8 @@ export function* sendTokens(action) {
       action.fromAddress,
       action.toAddress,
       action.value,
-      action.password
+      action.password,
+      action.chainId
     );
     yield put(sendTokensSuccess(response));
   }

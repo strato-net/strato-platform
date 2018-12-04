@@ -14,7 +14,7 @@ import           Blockchain.SHA
 import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))
 import           Data.Aeson
-import           Data.ByteString              (ByteString)
+import           Data.ByteString              (ByteString, empty)
 import           Data.Function                (on)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -62,6 +62,17 @@ instance FromJSON CallData where
     <*> (o .: "input")
     <*> (o .:? "output")
   parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
+
+emptyCallData :: CallData
+emptyCallData = CallData
+  { _callDataType     = Create
+  , _callDataSender   = Address 0
+  , _callDataOwner    = Address 0
+  , _callDataGasPrice = 0
+  , _callDataValue    = 0
+  , _callDataInput    = empty
+  , _callDataOutput   = Nothing
+  }
 
 data ActionData = ActionData
   { _actionDataCodeHash     :: SHA

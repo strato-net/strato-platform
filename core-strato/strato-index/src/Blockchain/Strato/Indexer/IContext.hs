@@ -20,6 +20,7 @@ module Blockchain.Strato.Indexer.IContext
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State
 import           Data.Int                        (Int64)
 import qualified Data.Text                       as T
@@ -37,20 +38,22 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Strato.Indexer.Kafka
 
+newtype IConfig = IConfig { contextSQLDB :: SQLDB }
+
 data IContext = IContext {
-    contextSQLDB        :: SQLDB,
     contextKafkaState   :: KafkaState,
     contextRedisBlockDB :: Redis.Connection,
     contextBestBlock    :: IndexerBestBlockInfo
 }
 
-type IContextM = StateT IContext (ResourceT (LoggingT IO))
+type IConfigM = ReaderT IConfig (ResourceT (LoggingT IO))
+type IContextM = StateT IContext IConfigM
 
 newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
     deriving (Eq, Ord, Read, Show)
 
-instance HasSQLDB IContextM where
-  getSQLDB = contextSQLDB <$> get
+instance HasSQLDB IConfigM where
+  getSQLDB = asks contextSQLDB
 
 instance HasKafkaState IContextM where
     getKafkaState = contextKafkaState <$> get
@@ -87,6 +90,9 @@ runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
     sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr pgPoolSize
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-    (ret, _) <- runResourceT $ runStateT f (IContext sqldb (mkConfiguredKafkaState cid) redis (reIBBI 0))
+    (ret, _) <- runResourceT
+              . flip runReaderT (IConfig sqldb)
+              . flip runStateT (IContext (mkConfiguredKafkaState cid) redis (reIBBI 0))
+              $ f
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

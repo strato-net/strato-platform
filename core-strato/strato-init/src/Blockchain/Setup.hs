@@ -14,11 +14,12 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.State
+import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C
 import           Data.FileEmbed
+import           Data.IORef
 import           Data.List.Split                    (splitWhen)
 import qualified Data.Map                           as Map
 import           Data.Maybe
@@ -79,63 +80,67 @@ defineFlag "R:redisHost" ("localhost"  ::  String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379  ::  Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
 
+defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize"
+
 data SetupDBs =
   SetupDBs {
-    stateDB :: StateDB,
+    stateDB :: IORef StateDB,
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: Redis.Connection,
-    localStorageTx :: Map.Map (Address, Word256) Word256,
-    localStorageBlock :: Map.Map (Address, Word256) Word256,
-    localAddressStateTx :: Map.Map Address AddressStateModification,
-    localAddressStateBlock :: Map.Map Address AddressStateModification
+    localStorageTx :: IORef (Map.Map (Address, Word256) Word256),
+    localStorageBlock :: IORef (Map.Map (Address, Word256) Word256),
+    localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
+    localAddressStateBlock :: IORef (Map.Map Address AddressStateModification)
     }
 
-type SetupDBM = StateT SetupDBs (LoggingT (ResourceT IO))
+type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
 instance HasStateDB SetupDBM where
-  getStateDB = do
-    cxt <- get
-    return $ stateDB cxt
+  getStateDB = (liftIO . readIORef) =<< asks stateDB
   setStateDBStateRoot sr = do
-    cxt <- get
-    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
+    dbref <- asks stateDB
+    liftIO $ atomicModifyIORef' dbref (\s -> (s{MP.stateRoot=sr}, ()))
 
 instance HasStorageDB SetupDBM where
   getStorageTxDB = do
-    cxt <- get --storage and states use the same database!
-    return (MP.ldb . stateDB $ cxt, localStorageTx cxt)
+    cxt <- ask --storage and states use the same database!
+    db <- liftIO . readIORef . stateDB $ cxt
+    lst <- liftIO . readIORef .localStorageTx $ cxt
+    return (MP.ldb db, lst)
   putStorageTxMap theMap = do
-    cxt <- get
-    put cxt{localStorageTx=theMap}
+    lstref <- asks localStorageTx
+    liftIO $ atomicWriteIORef lstref theMap
   getStorageBlockDB = do
-    cxt <- get --storage and states use the same database!
-    return (MP.ldb . stateDB $ cxt, localStorageBlock cxt)
+    cxt <- ask
+    db <- liftIO . readIORef . stateDB $ cxt
+    lsb <- liftIO . readIORef . localStorageBlock $ cxt
+    return (MP.ldb db, lsb)
   putStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{localStorageBlock=theMap}
+    lsbref <- asks localStorageBlock
+    liftIO $ atomicWriteIORef lsbref theMap
 
 instance HasMemAddressStateDB SetupDBM where
-  getAddressStateTxDBMap = localAddressStateTx <$> get
+  getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
   putAddressStateTxDBMap theMap = do
-    cxt <- get
-    put cxt{localAddressStateTx=theMap}
-  getAddressStateBlockDBMap = localAddressStateBlock <$> get
+    lastref <- asks localAddressStateTx
+    liftIO $ atomicWriteIORef lastref theMap
+  getAddressStateBlockDBMap = liftIO . readIORef =<< asks localAddressStateBlock
   putAddressStateBlockDBMap theMap = do
-    cxt <- get
-    put cxt{localAddressStateBlock=theMap}
+    lasbref <- asks localAddressStateBlock
+    liftIO $ atomicWriteIORef lasbref theMap
 
 instance HasHashDB SetupDBM where
-  getHashDB = fmap hashDB get
+  getHashDB = asks hashDB
 
 instance HasCodeDB SetupDBM where
-  getCodeDB = fmap codeDB get
+  getCodeDB = asks codeDB
 
 instance HasSQLDB SetupDBM where
-  getSQLDB = fmap sqlDB get
+  getSQLDB = asks sqlDB
 
 instance RBDB.HasRedisBlockDB SetupDBM where
-  getRedisBlockDB = fmap redisDB get
+  getRedisBlockDB = asks redisDB
 
 {-
 connStr :: ConnectionString
@@ -223,6 +228,9 @@ defaultConfig =
       discoveryConfig    = defaultDiscoveryConfig
     }
 
+decodedFaucets :: [Address]
+decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
+
 defaultPeers :: [(String,Int)]
 defaultPeers =
   [
@@ -254,15 +262,23 @@ genesisFiles = $(embedDir "genesisBlocks")
 addStandardGenesisBlockIfNeeded :: String->IO ()
 addStandardGenesisBlockIfNeeded genesisBlockName = do
   let genesisFileName = genesisBlockName ++ "Genesis.json"
+      maybeJSON = lookup genesisFileName genesisFiles
+      accountInfoFileName = genesisBlockName ++ "AccountInfo"
+      maybeInfo = lookup accountInfoFileName genesisFiles
 
-      maybeContents = lookup genesisFileName genesisFiles
+  jsonExists <- doesFileExist genesisFileName
 
-  exists <- doesFileExist genesisFileName
-
-  case (exists, maybeContents) of
+  case (jsonExists, maybeJSON) of
    (True, _) -> return ()
    (_, Just contents) -> B.writeFile genesisFileName contents
    _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
+
+  infoExists <- doesFileExist accountInfoFileName
+  case (infoExists, maybeInfo) of
+    (True, _) -> return ()
+    (_, Just contents) -> B.writeFile accountInfoFileName contents
+    _ -> putStrLn "No account info file found. Will proceed without it\
+                  \ and assume Genesis.json is self contained."
 
 {-
   CONFIG:
@@ -386,7 +402,7 @@ oneTimeSetup genesisBlockName = do
 
       let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
 
-      runNoLoggingT $ withPostgresqlConn pgConn' $ runReaderT $ rawExecute query []
+      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []))
 
       {- CONFIG: create kafka topics -}
 
@@ -443,17 +459,19 @@ oneTimeSetup genesisBlockName = do
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          cdb <- DB.open (dbDir "h" ++ codeDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         let smpdb = MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
+         [m1, m2] <- liftIO . replicateM 2 . newIORef $ Map.empty
+         [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
+         smpdb <- liftIO . newIORef $ MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
 
          pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void . flip runLoggingT printLogMsg $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty Map.empty Map.empty) $ do
+         void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
-             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName
+             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets
              (True, True)   -> error "You can't choose --backupmp and --backupblocks at the same time"
-             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName
-             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName
+             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName decodedFaucets
+             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName decodedFaucets

@@ -17,9 +17,7 @@ getTxLastR  num = do
         E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
           E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)
           E.on (btx E.^. BlockTransactionTransaction E.==. rawTX E.^. RawTransactionId)
-          E.where_ $ case chainId of
-                Nothing -> (E.isNothing $ rawTX E.^. RawTransactionChainId)
-                Just c -> ((rawTX E.^. RawTransactionChainId) E.==. (E.just $ E.val c))
+          E.where_ (rawTX E.^. RawTransactionChainId E.==. E.val (fromMaybe 0 chainId))
           E.limit $ P.max 1 $ P.min (fromIntegral num :: Int64) fetchLimit
           E.orderBy [E.desc $ b E.^. BlockDataRefId]
           return rawTX

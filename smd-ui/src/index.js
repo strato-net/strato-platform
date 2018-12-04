@@ -39,6 +39,8 @@ import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFil
 import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
 import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
 import downloadReducer from './components/ExternalStorage/Download/download.reducer';
+import chainsReducer from './components/Chains/chains.reducer'
+import createChainReducer from './components/CreateChain/createChain.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -68,6 +70,8 @@ import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
+import watchFetchChains from './components/Chains/chains.saga';
+import watchCreateChain from './components/CreateChain/createChain.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -86,6 +90,7 @@ const rootReducer = combineReducers({
   // YOUR REDUCERS HERE
   accounts: accountsReducer,
   blockData: blockDataReducer,
+  chains: chainsReducer,
   contracts: contractsReducer,
   contractQuery: contractQueryReducer,
   createContract: createContractReducer,
@@ -112,6 +117,7 @@ const rootReducer = combineReducers({
   attest: attestReducer,
   verify: verifyReducer,
   download: downloadReducer,
+  createChain: createChainReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -141,6 +147,8 @@ const rootSaga = function* startForeman() {
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
     fork(watchFetchUpload),
+    fork(watchFetchChains),
+    fork(watchCreateChain)
   ])
 };
 

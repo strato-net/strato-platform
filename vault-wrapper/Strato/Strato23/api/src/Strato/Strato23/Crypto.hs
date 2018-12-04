@@ -14,9 +14,11 @@ import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Crypto.Secp256k1
 import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString                   as BS
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
+import           Strato.Strato23.API
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
@@ -34,6 +36,7 @@ data KeyStore = KeyStore
   { keystoreSalt          :: ByteString
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
+  , keystoreAcctAddress   :: Address
   } deriving (Eq, Show)
 
 decryptSecKey
@@ -52,6 +55,9 @@ decryptSecKey (Password pw) salt nonce encSecKey = do
       , Scrypt.p = 1
       , Scrypt.outputLength = Saltine.secretBoxKey
       }
+
+deriveAddress :: SecKey -> Address
+deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey
 
 newKeyStore :: MonadIO io => Password -> io KeyStore
 newKeyStore (Password pw) = liftIO $ do
@@ -73,10 +79,12 @@ newKeyStore (Password pw) = liftIO $ do
     encKey = fromMaybe err . Saltine.decode $
       Scrypt.generate scryptParams pw salt
     encAcctSk = SecretBox.secretbox encKey acctNonce (getSecKey acctSk)
+    acctAddr = deriveAddress acctSk
   return KeyStore
     { keystoreSalt = salt
     , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
+    , keystoreAcctAddress = acctAddr
     }
 
 newSecKey :: IO SecKey

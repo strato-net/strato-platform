@@ -35,6 +35,7 @@ module Blockchain.Data.Transaction (
   ) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                as B
@@ -135,21 +136,24 @@ instance TransactionLike Transaction where
               md        = txMetadata t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) = MessageTX nonce' gp gl to' val dat cid r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' Nothing h ch 0 Nothing _ _ _) | init' == B.empty = PrivateHashTX (fromInteger h) (fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) = ContractCreationTX nonce' gp gl val (Code init') cid r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) =
+  MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == B.empty =
+  PrivateHashTX (fromInteger h) (fromInteger ch)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
+  ContractCreationTX nonce' gp gl val (Code init') (toMaybe 0 cid) r s v (M.fromList <$> md)
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-        RawTransaction time signer nonce' gp gl (Just to') val dat cid r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _ _ _) ->
         error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
-        RawTransaction time signer nonce' gp gl Nothing val init' cid r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
-        RawTransaction time signer 0 0 0 Nothing 0 B.empty Nothing (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -158,10 +162,10 @@ tx2RawTXAndTime origin tx = do
   time <- liftIO getCurrentTime
   return $ txAndTime2RawTX origin tx (-1) time
 
-insertTXIfNew :: HasSQLDB m=>TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTXIfNew :: HasSQLDB m => TXOrigin -> Maybe Integer -> [Transaction] -> m Integer
 insertTXIfNew = insertTX Fail
 
-insertTX::HasSQLDB m=>DebugMode->TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTX :: HasSQLDB m => DebugMode -> TXOrigin -> Maybe Integer -> [Transaction] -> m Integer
 insertTX mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   beforeECRecover <- liftIO $ getTime Realtime
@@ -171,11 +175,11 @@ insertTX mode origin blockNum txs = do
   insertRawTX mode rawTXs
   return $ toNanoSecs $ afterECRecover - beforeECRecover
 
-insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
+insertTXIfNew' :: (MonadBaseControl IO m, MonadUnliftIO m)=>
                  TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
 insertTXIfNew' = insertTX' Fail
 
-insertTX'::(MonadBaseControl IO m, MonadIO m)=>
+insertTX' :: (MonadBaseControl IO m, MonadUnliftIO m) =>
            DebugMode->TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
 insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime

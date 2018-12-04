@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
   at_bytes int NOT NULL,
   is_public boolean NOT NULL,
   is_constant boolean default FALSE,
-  value varchar(512),
+  value text,
   UNIQUE (contract_metadata_id, name),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
   FOREIGN KEY (type_id) REFERENCES xabi_types(id)

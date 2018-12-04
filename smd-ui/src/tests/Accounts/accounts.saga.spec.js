@@ -78,6 +78,7 @@ describe('Accounts: saga', () => {
     const action = {
       loadAddresses: true,
       loadBalances: true,
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
       type: FETCH_ACCOUNTS
     };
 
@@ -87,7 +88,7 @@ describe('Accounts: saga', () => {
         const gen = getAccounts(action);
         expect(gen.next().value).toEqual(call(getAccountsApi));
         expect(gen.next(accountsMock).value).toEqual(put(fetchAccountsSuccess(accountsMock)));
-        expect(gen.next(true).value).toEqual(put(fetchUserAddresses(accountsMock[0], action.loadBalances)));
+        expect(gen.next(true).value).toEqual(put(fetchUserAddresses(accountsMock[0], action.loadBalances, action.chainId)));
         expect(gen.throw(error).value).toEqual(put(fetchAccountsFailure(error)));
         expect(gen.next().value).toEqual(cancelled());
         expect(gen.next(true).value).toEqual(put(hideLoading()));
@@ -170,13 +171,16 @@ describe('Accounts: saga', () => {
     const action = {
       address: "d2263b71c14010ff03d8f786670aba691b22b158",
       name: "tanuj",
+      chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+      flag: "faucet",
       type: FETCH_ACCOUNT_DETAIL
     };
 
     test('inspection', () => {
       const gen = getAccountDetail(action);
-      expect(gen.next().value).toEqual(call(getAccountDetailApi, action.address));
+      expect(gen.next().value).toEqual(call(getAccountDetailApi, action.address, action.chainId));
       expect(gen.next([accountDetail]).value).toEqual(put(fetchAccountDetailSuccess(action.name, action.address, accountDetail)));
+      expect(gen.next().value).toEqual(put(faucetSuccess()));
       expect(gen.throw(error).value).toEqual(put(fetchAccountDetailFailure(action.name, action.address, error)));
       expect(gen.next().done).toBe(true);
     });
@@ -242,23 +246,36 @@ describe('Accounts: saga', () => {
     const action = {
       name: "tanuj",
       address: "d2263b71c14010ff03d8f786670aba691b22b158",
+      flag: 'faucet',
       type: FAUCET_REQUEST
     }
 
     test('inspection', () => {
       const gen = faucetAccount(action);
-      expect(gen.next().value).toEqual(call(postFaucet, action.address));
-      expect(gen.next().value).toEqual(put(faucetSuccess()));
+        expect(gen.next().value).toEqual(call(postFaucet, action.name, action.address));
       expect(gen.next().value).toEqual(call(delay, 100));
-      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address)));
+      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address, undefined, action.flag)));
       expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 
     describe('post faucet', () => {
 
-      test('success', (done) => {
+      test('success (with flag)', (done) => {
         fetch.mockResponse(JSON.stringify([accountDetail]));
+        expectSaga(faucetAccount, action)
+          .call.fn(postFaucet).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_REQUEST } })
+          .run().then((result) => { done() });
+      });
+
+      test('success (without flag)', (done) => {
+        fetch.mockResponse(JSON.stringify([accountDetail]));
+        const action = {
+          name: "tanuj",
+          address: "d2263b71c14010ff03d8f786670aba691b22b158",
+          type: FAUCET_REQUEST
+        };
+
         expectSaga(faucetAccount, action)
           .call.fn(postFaucet).put.like({ action: { type: FAUCET_SUCCESS } })
           .run().then((result) => { done() });

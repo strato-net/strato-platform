@@ -1,11 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 module BlockApps.Solidity.Contract where
 
+import           Control.DeepSeq
 import qualified Data.Bimap                  as Bimap
 import           Data.Bits
 import           Data.LargeWord
 import qualified Data.Map                    as Map
 import qualified Data.Text                   as T
+import           GHC.Generics
 
 import           BlockApps.Solidity.Struct   (Struct)
 import qualified BlockApps.Solidity.Struct   as Struct
@@ -15,8 +17,7 @@ import qualified BlockApps.Storage           as Storage
 
 data Contract = Contract { mainStruct :: Struct
                          , typeDefs   :: TypeDefs
-                         } deriving (Show)
-
+                         } deriving (Show, Generic, NFData)
 
 getNextAvailablePosition::Storage.Position -> Integer -> Storage.Position
 getNextAvailablePosition p _ | Storage.byte p == 0 = p

@@ -6,6 +6,7 @@ module Blockchain.JsonRpcCommand (
 
 import           Prelude                         hiding (id)
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
 import           Control.Monad.Logger
 import           Data.Binary
 import qualified Data.ByteString                 as B
@@ -42,11 +43,18 @@ produceResponse id theData = do
         Right _ -> return ()
 
 
-runJsonRpcCommand :: (MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m) =>
-                   JsonRpcCommand -> m ()
+runJsonRpcCommand :: ( MonadResource m
+                     , MonadLogger (t m)
+                     , WrapsSQLDB t m
+                     , HasStateDB (t m)
+                     , HasHashDB (t m)
+                     , HasCodeDB (t m)
+                     , HasStorageDB (t m)
+                     , HasMemAddressStateDB (t m)) =>
+                   JsonRpcCommand -> t m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
-  bestBlock <- getBestBlock
+  bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   let response = show $ addressStateBalance addressState
@@ -55,7 +63,7 @@ runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
 
 runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
-  bestBlock <- getBestBlock
+  bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   maybeCode <- getCode $ addressStateCodeHash addressState
@@ -65,7 +73,7 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
 
 runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
-  bestBlock <- getBestBlock
+  bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
   let response = show $ addressStateNonce addressState
@@ -74,7 +82,7 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
 
 runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
-  bestBlock <- getBestBlock
+  bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   value <- getStorageKeyVal' address $ bytesToWord256 $ B.unpack key
   liftIO $ produceResponse id $ B.pack $ word256ToBytes value

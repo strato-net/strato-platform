@@ -5,12 +5,20 @@ Object {
   "account": Object {
     "error": null,
   },
+  "faucet": Object {
+    "accountAddress": "0004537908d44f458acb24b0f2c863ccd2bd3a13",
+    "status": true,
+  },
 }
 `;
 
 exports[`Account: index mapStateToProps without values 1`] = `
 Object {
   "account": Object {},
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
 }
 `;
 
@@ -24,7 +32,7 @@ exports[`Account: index renders correctly with empty values 1`] = `
       </h4>
     </div>
     <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]}>
+      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
         Faucet
       </button>
     </div>
@@ -108,8 +116,8 @@ exports[`Account: index renders correctly with values 1`] = `
       </h4>
     </div>
     <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]}>
-        Faucet
+      <button className=\\"pt-button pt-intent-warning pt-small\\" onClick={[Function: onClick]} disabled={true}>
+        Pending
       </button>
     </div>
   </div>
@@ -192,7 +200,7 @@ exports[`Account: index simulate click 1`] = `
       </h4>
     </div>
     <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]}>
+      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
         Faucet
       </button>
     </div>

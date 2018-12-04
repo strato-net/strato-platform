@@ -13,6 +13,11 @@ build-type: Simple
 
 ghc-options: -Wall -Werror
 
+default-extensions:
+  - DeriveGeneric
+  - DeriveAnyClass
+  - LambdaCase
+
 dependencies:
   - base
   - blockapps-ethereum
@@ -25,6 +30,8 @@ dependencies:
   - classy-prelude
   - containers
   - cryptonite
+  - deepseq
+  - extra
   - generic-random
   - http-api-data
   - largeword
@@ -38,6 +45,7 @@ dependencies:
   - QuickCheck
   - quickcheck-instances
   - raw-strings-qq
+  - semver-range
   - servant
   - servant-docs
   - swagger2

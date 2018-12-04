@@ -13,8 +13,8 @@ import HexText from '../../../HexText';
 class TransactionTable extends Component {
 
   componentDidMount() {
-    this.props.fetchTx();
-    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+    this.props.fetchTx(null, this.props.selectedChain);
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   }
 
   componentWillUnmount() {
@@ -22,8 +22,13 @@ class TransactionTable extends Component {
   }
 
   componentWillReceiveProps(newProps) {
-    if (newProps.query !== this.props.query)
-      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query);
+    if (newProps.query !== this.props.query) {
+      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
+    }
+    if (newProps.selectedChain !== this.props.selectedChain) {
+      this.props.fetchTx(null, newProps.selectedChain);
+      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);
+    }
   }
 
   updateQuery = (values) => {
@@ -39,7 +44,7 @@ class TransactionTable extends Component {
 
   refresh = () => {
     this.props.clearQuery();
-    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   };
 
   render() {
@@ -48,7 +53,7 @@ class TransactionTable extends Component {
 
     function handleClick(hash) {
       mixpanelWrapper.track('transactions_row_click');
-      history.push('/transactions/' + hash);
+      history.push(`/transactions/${hash}`);
     }
 
     let txRows = this.props.queryResults.length && this.props.queryResults[0]['transactionType'] && this.props.queryResults.map(
@@ -210,6 +215,7 @@ export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResults: state.queryEngine.queryResult,
+    selectedChain: state.chains.selectedChain
   };
 }
 const formed = reduxForm({ form: 'transaction-query' })(TransactionTable);

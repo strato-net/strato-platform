@@ -15,7 +15,7 @@ import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -938,9 +938,10 @@ runCodeFromStart = do
 runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM a -> ContextM (Either VMException a, VMState)
 runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
   dbs' <- get
-  vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
+  sqldbs' <- ask
+  vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
 
-  result <- lift $
+  result <- lift . lift $
       flip runStateT vmState{
                          callDepth=callDepth,
                          vmGasRemaining=availableGas,
@@ -995,8 +996,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
           }
 
   dbs' <- get
-
-  vmState <- liftIO $ startingState isRunningTests' isHomestead env dbs'
+  sqldbs' <- ask
+  vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
 
   success <-
     if toInteger value > 0
@@ -1192,11 +1193,12 @@ create_debugWrapper block owner value initCodeBytes = do
       currentCallDepth <- getCallDepth
 
       dbs' <- lift $ dbs <$> get
+      sqldb' <- lift $ gets sqldb
 
       currentVMState <- lift get
 
       let runEm :: ContextM a -> VMM (a, Context)
-          runEm f = lift . lift $ runStateT f dbs'
+          runEm f = lift . lift . flip runReaderT sqldb' . runStateT f $ dbs'
           callEm :: ContextM (Either VMException Code, VMState)
           callEm = create (isRunningTests currentVMState)
                           (vmIsHomestead currentVMState)
@@ -1241,14 +1243,14 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
 
   currentCallDepth <- getCallDepth
 
-  env <- lift $ environment <$> get
-
-  dbs' <- lift $ dbs <$> get
+  env <- lift $ gets environment
+  dbs' <- lift $ gets dbs
+  sqldb' <- lift $ gets sqldb
 
   currentVMState <- lift get
 
   let runEm :: ContextM a -> VMM (a, Context)
-      runEm f = lift . lift $ runStateT f dbs'
+      runEm = lift . lift . flip runReaderT sqldb' . flip runStateT dbs'
       callEm :: ContextM (Either VMException B.ByteString, VMState)
       callEm = call (isRunningTests currentVMState)
                     (vmIsHomestead currentVMState)

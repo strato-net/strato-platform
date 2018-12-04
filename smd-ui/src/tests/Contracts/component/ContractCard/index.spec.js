@@ -76,7 +76,8 @@ describe('ContractCard: index', () => {
     test('instance selection', () => {
       const props = {
         contract: {
-          name: 'Greeter', contract: {
+          name: 'Greeter', 
+          contract: {
             "instances": [
               {
                 "createdAt": 1512481078000,
@@ -93,6 +94,7 @@ describe('ContractCard: index', () => {
             ]
           }
         },
+        selectedChain: '1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14',
         fetchCirrusInstances: jest.fn(),
         fetchAccount: jest.fn(),
         fetchState: jest.fn(),
@@ -128,7 +130,11 @@ describe('ContractCard: index', () => {
   });
 
   test('mapStateToProps with default values', () => {
-    expect(mapStateToProps({})).toMatchSnapshot();
+    expect(mapStateToProps({
+      chains: {
+        selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
+      }
+    })).toMatchSnapshot();
   });
 
   test('simulate show contracts click', () => {

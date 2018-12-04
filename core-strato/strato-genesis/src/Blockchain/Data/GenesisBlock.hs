@@ -191,18 +191,18 @@ genesisInfoToGenesisBlock gi gn as = do
     })
 
 initializeChainDBs :: ( MonadResource m
-                      , HasCodeDB m
-                      , HasHashDB m
-                      , Mem.HasMemAddressStateDB m
-                      , RBDB.HasRedisBlockDB m
-                      , HasSQLDB m
-                      , HasStateDB m
-                      , HasStorageDB m
+                      , HasCodeDB (t m)
+                      , HasHashDB (t m)
+                      , Mem.HasMemAddressStateDB (t m)
+                      , RBDB.HasRedisBlockDB (t m)
+                      , WrapsSQLDB t m
+                      , HasStateDB (t m)
+                      , HasStorageDB (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo
                    -> StateRoot
-                   -> m ()
+                   -> t m ()
 initializeChainDBs chainId ChainInfo{..} sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
@@ -215,7 +215,7 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
       deletedAccounts     = Map.empty,
       updatedAccounts     = Map.empty
   }
-  commitSqlDiffs diff
+  runWithSQL $ commitSqlDiffs diff
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
@@ -232,7 +232,7 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
                            A.ActionData
                              (codeHash d)
                              (Map.map fromDiff $ storage d)
-                             []
+                             [A.emptyCallData]
         , A._actionMetadata = getMetadata (codeHash d)
         }
       fromDiff (Value v) = v

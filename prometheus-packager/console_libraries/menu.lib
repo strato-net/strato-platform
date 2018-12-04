@@ -109,6 +109,17 @@
   {{ end }}
 {{ end }}
 
+{{ template "_menuItem" (args . "crossmon.html" "Cross monitoring") }}
+{{ if match "^crossmon" .Path }}
+  {{ if .Params.instance }}
+  <ul>
+    <li {{ if eq .Path "crossmon.html" }}class="prom_lhs_menu_selected"{{ end }}>
+      <a href="crossmon.html?instance={{ .Params.instance }}">{{.Params.instance }}</a>
+    </li>
+  </ul>
+  {{ end }}
+{{ end }}
+
 </ul>
 </div>
 {{ end }}

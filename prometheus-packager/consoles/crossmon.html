@@ -1,0 +1,23 @@
+{{ template "head" . }}
+
+{{ template "prom_content_head" . }}
+  <h1>Cross monitoring - {{ .Params.instance }}</h1>
+
+  <h3>Max Block Number</h3>
+  <div id="maxblock"></div>
+  <script>
+  new PromConsole.Graph({
+    node: document.querySelector("#maxblock"),
+    expr: [
+      "max_block_number_seen",
+    ],
+    yAxisFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yHoverFormatter: PromConsole.NumberFormatter.humanizeNoSmallPrefix,
+    yTitle: "Block Number",
+    yUnits: "",
+  })
+  </script>
+
+{{ template "prom_content_tail" . }}
+
+{{ template "tail" }}

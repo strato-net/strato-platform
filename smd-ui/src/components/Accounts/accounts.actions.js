@@ -19,11 +19,12 @@ export const FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST = 'FETCH_CURRENT_ACCOUNT_DETAI
 export const FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS = 'FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS';
 export const FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE = 'FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE';
 
-export const fetchAccounts = function (loadAddresses, loadBalances) {
+export const fetchAccounts = function (loadAddresses, loadBalances, chainId) {
   return {
     type: FETCH_ACCOUNTS,
     loadAddresses: loadAddresses,
-    loadBalances: loadBalances
+    loadBalances: loadBalances,
+    chainId: chainId
   }
 };
 
@@ -48,11 +49,12 @@ export const changeAccountFilter = function (filter) {
   }
 };
 
-export const fetchUserAddresses = function (name, loadBalances) {
+export const fetchUserAddresses = function (name, loadBalances, chainId) {
   return {
     type: FETCH_ACCOUNT_ADDRESS_REQUEST,
     name: name,
-    loadBalances: loadBalances
+    loadBalances: loadBalances,
+    chainId: chainId
   }
 };
 
@@ -79,11 +81,13 @@ export const fetchUserAddressesFailure = function (name, error) {
   }
 };
 
-export const fetchAccountDetail = function (name, address) {
+export const fetchAccountDetail = function (name, address, chainId, flag) {
   return {
     type: FETCH_ACCOUNT_DETAIL_REQUEST,
     name: name,
-    address: address
+    address: address,
+    chainId: chainId,
+    flag: flag
   }
 };
 
@@ -105,11 +109,12 @@ export const fetchAccountDetailFailure = function (name, address, error) {
   }
 };
 
-export const faucetRequest = function (address, name) {
+export const faucetRequest = function (address, name, flag) {
   return {
     type: FAUCET_REQUEST,
     address,
     name,
+    flag
   }
 };
 

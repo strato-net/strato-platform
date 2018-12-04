@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Handler.Faucet where
 
 import qualified Control.Monad                  as CM
-import qualified Data.Binary                    as BN
 import qualified Data.Text                      as T
 import qualified Database.Esqueleto             as E
 import qualified Network.Haskoin.Crypto         as H
@@ -23,21 +23,17 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util                (getCurrentMicrotime)
-import           Data.List                      (nub)
 import           Handler.Common
 import           Handler.Filters
 import           Import
 
 import qualified Data.ByteString      as BS
-import qualified Data.ByteString.Lazy as BL
 
-getKey :: Handler H.PrvKey
-getKey = do
-  mKey <- fmap (H.makePrvKey . BN.decode . BL.fromStrict)
-        . liftIO . readFile $ "config" </> "priv"
-  case mKey of
-    Nothing -> invalidArgs ["No faucet account is defined"]
-    Just k -> return k
+getFaucetKey :: Handler H.PrvKey
+getFaucetKey = getKey >>= \case
+  Just k -> return k
+  Nothing -> invalidArgs ["No faucet account is defined"]
+
 
 lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend) => Address -> HandlerT site IO Integer
 lookupNonce addr' = do
@@ -70,7 +66,7 @@ postFaucetR :: Handler Value
 postFaucetR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  key <- getKey
+  key <- getFaucetKey
   minNonce <- lookupNonce $ prvKey2Address key
 
   mAddr <- lookupPostParam "address"
@@ -78,7 +74,7 @@ postFaucetR = do
     Just target -> do
       maxNonce <- acquireNewMaxNonce minNonce
       $logInfoS "postFaucetR" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
-      mapM (putTX maxNonce key target) $ nub [maxNonce, minNonce]
+      mapM (putTX maxNonce key target) [maxNonce, minNonce]
     Nothing -> do
       maybeAddrs <- lookupPostParam "addresses"
       liftIO $ putStrLn $ T.pack $ show maybeAddrs
@@ -97,7 +93,7 @@ readInt defaultVal = fromMaybe defaultVal . fmap (P.read . T.unpack)
 postDataFaucetR :: Handler Value
 postDataFaucetR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  key <- getKey
+  key <- getFaucetKey
   minNonce <- lookupNonce $ prvKey2Address key
   size <- readInt 4096 <$> lookupPostParam "size"
   countOf <- readInt 1 <$> lookupPostParam "count" :: Handler Int

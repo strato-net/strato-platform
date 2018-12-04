@@ -6,7 +6,7 @@ module Foundation where
 
 import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
 import           Import.NoFoundation
-import           Blockchain.SHA
+import           Control.Monad.IO.Unlift
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as T
@@ -14,10 +14,11 @@ import qualified Data.Text.Encoding.Error as T
 import           Data.Time
 import qualified Network.Wai              as W
 import qualified Prelude                  as P
-import           Yesod.Core.Types         (Logger)
-import qualified Yesod.Core.Unsafe        as Unsafe
+import           Yesod.Core.Types         (Logger, HandlerT(..))
 
+import           Network.Haskoin.Crypto   as HK
 import           Blockchain.DB.SQLDB
+import           Blockchain.SHA
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
@@ -42,7 +43,11 @@ data App = App
     , appHttpManager :: Manager
     , appLogger      :: Logger
     , appFaucetNonce :: IORef Integer -- The last maximum nonce given out
+    , appFaucetKey   :: Maybe HK.PrvKey
     }
+
+getKey :: MonadReader App m => m (Maybe HK.PrvKey)
+getKey = asks appFaucetKey
 
 initialMaxNonce :: MonadIO m => m (IORef Integer)
 initialMaxNonce = liftIO $ newIORef (-1)
@@ -53,7 +58,7 @@ acquireNewMaxNonce minNonce = do
       -- Another node may have jumped ahead of our faucet stream or we may
       -- just be starting up, so always give at least the minNonce.
       findNext maxNonce =
-        let next = max minNonce $ 1 + maxNonce
+        let next = 1 + max minNonce maxNonce
         in (next, next)
   nref <- asks appFaucetNonce
   liftIO $ atomicModifyIORef' nref findNext
@@ -111,6 +116,11 @@ instance Yesod App where
 instance HasSQLDB Foundation.Handler where
     getSQLDB = appConnPool <$> getYesod
 
+instance MonadUnliftIO Foundation.Handler where
+  {-# INLINE askUnliftIO #-}
+  askUnliftIO = HandlerT $ \r ->
+                return (UnliftIO (flip unHandlerT r))
+
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend
     runDB action = do
@@ -123,6 +133,3 @@ instance YesodPersistRunner App where
 -- achieve customized and internationalized form validation messages.
 instance RenderMessage App FormMessage where
     renderMessage _ _ = defaultFormMessage
-
-unsafeHandler :: App -> Foundation.Handler a -> IO a
-unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger

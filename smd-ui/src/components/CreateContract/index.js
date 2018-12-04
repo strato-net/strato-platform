@@ -20,6 +20,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isModePublic } from '../../lib/checkMode';
+import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -126,21 +127,39 @@ class CreateContract extends Component {
     const metadata = {};
     contracts.forEach(function(contract) {
       if (values[`history@${contract}`]) {
-        if (metadata["history"]) {
-          const curHistory = metadata["history"];
-          metadata["history"] = curHistory + ',' + contract;
+        if (metadata['history']) {
+          const curHistory = metadata['history'];
+          metadata['history'] = curHistory + ',' + contract;
         }
         else {
-          metadata["history"] = contract;
+          metadata['history'] = contract;
+        }
+      }
+      else {
+        if (metadata['nohistory']) {
+          const curNohistory = metadata['nohistory'];
+          metadata['nohistory'] = curNohistory + ',' + contract;
+        }
+        else {
+          metadata['nohistory'] = contract;
         }
       }
       if (values[`noindex@${contract}`]) {
-        if (metadata["noindex"]) {
-          const curNoIndex = metadata["noindex"];
-          metadata["noindex"] = curNoIndex + ',' + contract;
+        if (metadata['noindex']) {
+          const curNoIndex = metadata['noindex'];
+          metadata['noindex'] = curNoIndex + ',' + contract;
         }
         else {
-          metadata["noindex"] = contract;
+          metadata['noindex'] = contract;
+        }
+      }
+      else {
+        if (metadata['index']) {
+          const curIndex = metadata['index'];
+          metadata['index'] = curIndex + ',' + contract;
+        }
+        else {
+          metadata['index'] = contract;
         }
       }
     });
@@ -153,7 +172,8 @@ class CreateContract extends Component {
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
-      metadata: metadata,
+      chainId: values.chainId,
+      metadata: metadata
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
@@ -262,15 +282,82 @@ class CreateContract extends Component {
     }
   }
 
+  renderChainFields() {
+    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
+
+    if (chainLabel.length) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain
+          </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select">
+                <Field
+                  className="pt-input"
+                  component="select"
+                  name="chainLabel"
+                  onChange={
+                    (e) => this.props.getLabelIds(e.target.value)
+                  }
+                >
+                  <option />
+                  {
+                    chainLabel.map((label, i) => {
+                      return (
+                        <option key={label + i} value={label}>{label}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-sm-3 text-right">
+              <label className="pt-label smd-pad-4">
+                Chain IDs
+          </label>
+            </div>
+            <div className="col-sm-9 smd-pad-4">
+              <div className="pt-select smd-max-width">
+                <Field
+                  className="pt-input smd-max-width"
+                  component="select"
+                  name="chainId"
+                >
+                  <option />
+                  {
+                    Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
+                      return (
+                        <option key={id + i} value={id}>{id}</option>
+                      )
+                    })
+                  }
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  }
+
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const isPublicMode = isModePublic();
+
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
-          this.props.contractOpenModal()
+          this.props.fetchChainIds();
+          this.props.contractOpenModal();
         }}
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
@@ -286,6 +373,7 @@ class CreateContract extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
+              {this.renderChainFields()}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -536,7 +624,9 @@ export function mapStateToProps(state) {
     initialValues: {
       username: state.user.currentUser.username,
       address: state.user.currentUser.accountAddress
-    }
+    },
+    chainLabel: state.chains.listChain,
+    chainLabelIds: state.chains.listLabelIds
   };
 }
 
@@ -552,7 +642,9 @@ const connected = connect(mapStateToProps, {
   fetchUserAddresses,
   usernameChange,
   contractNameChange,
-  resetError
+  resetError,
+  fetchChainIds,
+  getLabelIds
 })(formed);
 
 export default withRouter(connected);

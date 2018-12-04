@@ -1,10 +1,9 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc22.Database.Solc where
+module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
 
-import           Control.Monad              hiding (mapM_)
+import           ClassyPrelude              ((<>))
 import           Control.Monad.IO.Class     (MonadIO(..))
 import           Control.Monad.Trans.Except
 import           Data.Aeson hiding (String)
@@ -26,6 +25,7 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
+import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Bloc22.Monad
 
 
@@ -39,14 +39,13 @@ import BlockApps.Bloc22.Monad
 -- Response:
 --   { <contract name> : { abi : <solidity contract abi>, bin : <hex string> } }
 
-
 -- This is really hard to understand and highly non-idomatic for json formation or parsing.
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
-compileSolc :: Text -> Bloc Aeson.Value
-compileSolc mainSrc = do
+compileSolc :: SolcVersion -> Text -> Bloc Aeson.Value
+compileSolc solcVersion mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc solcVersion postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
     Left (err,_) -> blocError . AnError . Text.pack $ err
@@ -56,27 +55,28 @@ compileSolc mainSrc = do
 
 
 -- For solc compiling during testing, outside of Bloc monad
-compileSolcIO :: Text -> IO (Either String Aeson.Value)
-compileSolcIO mainSrc = do
+compileSolcIO :: SolcVersion -> Text -> IO (Either String Aeson.Value)
+compileSolcIO solcVersion mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runExceptT $ runSolc postParams mainFiles importFiles
+  eRes <- liftIO . runExceptT $ runSolc solcVersion postParams mainFiles importFiles
   return $ case eRes of
     Left (err, ExitFailure 1) -> Left err
     Left (err,_) -> Left err
     Right res ->
-      maybe (Left $ "SolcError : No \"src\" field in json artifact") Right $ Map.lookup "src" res
+      maybe (Left "SolcError : No \"src\" field in json artifact") Right $ Map.lookup "src" res
 
-runSolc :: Map String String
+runSolc :: SolcVersion
+        -> Map String String
         -> Map String String
         -> Map String String
         -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
-runSolc optsObj mainSrc importsSrc =
-  execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
+runSolc solcVersion optsObj = execSolc solcVersion solcCompileOpts solcLinkOpts
   where
     solcCompileOpts = List.concat [
-      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--evm-version=homestead"]
+        solcOParam, solcORunsParam, solcStdParam,
+        ["--combined-json=abi,bin,bin-runtime", "--evm-version=homestead"]
       ]
-    solcLinkOpts = List.concat [solcLinkParam, solcLibsParam]
+    solcLinkOpts = solcLinkParam <> solcLibsParam
 
     solcOParam = optNoArg "optimize" optsObj
     solcORunsParam = optWithArg "optimize-runs" optsObj
@@ -87,26 +87,26 @@ runSolc optsObj mainSrc importsSrc =
 
 
 
-execSolc :: [String] -> [String] -> Map String String -> Map String String
+execSolc :: SolcVersion -> [String] -> [String] -> Map String String -> Map String String
             -> ExceptT (String, ExitCode) IO (Map String Aeson.Value)
-execSolc compileOpts linkOpts mainSrc importsSrc =
+execSolc solcVersion compileOpts linkOpts mainSrc importsSrc =
   doWithExceptT withTempDir $ \dir -> do
     withExceptT (\e -> (e,ExitFailure 0)) $ makeSrcFiles dir $ Map.union mainSrc importsSrc
-    compiledFiles <- Trv.sequence $ Map.mapWithKey (const . solcFile compileOpts linkOpts dir) mainSrc
+    compiledFiles <- Trv.sequence $ Map.mapWithKey (const . solcFile solcVersion compileOpts linkOpts dir) mainSrc
     return $ Map.filter
       (\file -> case file of
           Aeson.Null -> False
           _          -> True)
       compiledFiles
 
-solcFile :: [String] -> [String] -> String -> String -> ExceptT (String, ExitCode) IO Aeson.Value
-solcFile compileOpts linkOpts dir fileName = do
-  solcOutput <- callSolc compileOpts dir fileName
+solcFile :: SolcVersion -> [String] -> [String] -> String -> String -> ExceptT (String, ExitCode) IO Aeson.Value
+solcFile solcVersion compileOpts linkOpts dir fileName = do
+  solcOutput <- callSolc solcVersion compileOpts dir fileName
   solcJSON0 <- ExceptT . return  . aesonDecodeUtf8 . Text.pack $ solcOutput
   let solcJSON1 = Map.lookup ("contracts" :: String) solcJSON0
 
-  let nullOutput n = liftM $ either (maybe (Right n) Left) Right
-  mapExceptT (nullOutput $ Aeson.Null) $ do
+  let nullOutput n = fmap $ either (maybe (Right n) Left) Right
+  mapExceptT (nullOutput Aeson.Null) $ do
     solcJSON :: Map String (Map String Aeson.Value) <-
       case Aeson.fromJSON <$> solcJSON1 of
         Just (Aeson.Error err) -> throwE $ Just (err, ExitFailure 0)
@@ -114,9 +114,9 @@ solcFile compileOpts linkOpts dir fileName = do
         Nothing                -> throwE Nothing
 
     let linkBin binabi bin tag =
-          if (not . List.null $ linkOpts)
+          if not . List.null $ linkOpts
           then do
-            linkedBin <- withExceptT Just $ callSolc linkOpts dir bin
+            linkedBin <- withExceptT Just $ callSolc solcVersion linkOpts dir bin
             return $ Map.insert tag (Aeson.toJSON linkedBin) binabi
           else return binabi
 
@@ -134,9 +134,12 @@ solcFile compileOpts linkOpts dir fileName = do
 
     return $ Aeson.toJSON $ Map.filter (not . Map.null) linkJSON
 
-callSolc :: [String] -> String -> String -> ExceptT (String, ExitCode) IO String
-callSolc opts dir fileName =
-  let solcCmd = (proc "solc" $ opts ++ [fileName]){ cwd = Just dir }
+callSolc :: SolcVersion -> [String] -> String -> String -> ExceptT (String, ExitCode) IO String
+callSolc solcVersion opts dir fileName =
+  let binary = case solcVersion of
+                 ZeroPointFour -> "solc"
+                 ZeroPointFive -> "solc-0.5"
+      solcCmd = (proc binary $ opts ++ [fileName]){ cwd = Just dir }
   in execWithExceptT $ readCreateProcessWithExitCode solcCmd ""
 
 makeSrcFiles :: String -> Map String String -> ExceptT String IO ()
@@ -147,7 +150,7 @@ makeSrcFiles dir filesSrc = do
         else throwE $ "Refusing to handle absolute file path: " List.++ path
   dirs <- mapM ensureRelative $ List.nub $ List.map takeDirectory $ Map.keys filesSrc
   liftIO $ do
-    mapM_ (createDirectoryIfMissing True) $ List.map (dir </>) dirs
+    mapM_ (createDirectoryIfMissing True . (dir </>)) dirs
     Map.foldrWithKey (\k s x -> IO.writeFile (dir </> k) s >> x) (return ()) filesSrc
 
 doWithExceptT :: ((String -> IO (Either c d)) -> IO (Either c e)) -> ((String -> ExceptT c IO d) -> ExceptT c IO e)
@@ -164,7 +167,7 @@ execWithExceptT op = do
     _           -> throwE (stdErr,exitCode)
 
 withTempDir :: (String -> IO a) -> IO a
-withTempDir act = withSystemTempDirectory "solc" act
+withTempDir = withSystemTempDirectory "solc"
 
 optNoArg :: String -> Map String String -> [String]
 optNoArg opt opts =

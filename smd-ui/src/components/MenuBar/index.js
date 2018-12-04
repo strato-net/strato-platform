@@ -12,14 +12,17 @@ import { Button } from '@blueprintjs/core';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import qs from 'query-string';
 import { isModePublic } from '../../lib/checkMode';
+import { Field, reduxForm } from 'redux-form';
+import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
 class MenuBar extends Component {
 
-  componentDidMount(){
+  componentDidMount() {
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if(developerSignIn && isModePublic()) {
+    if (developerSignIn && isModePublic()) {
       this.props.openWalkThroughOverlay(false);
     }
+    this.props.fetchChainIds();
   }
 
   afterLoggedIn() {
@@ -58,6 +61,41 @@ class MenuBar extends Component {
     }
   }
 
+  renderChainDropDown() {
+    if ( this.props.chainIds.length && (this.props.isLoggedIn || !isModePublic())) {
+      return (
+        <span>
+          <span className="pt-navbar-divider" />
+          <small className="pt-text-muted">
+            <div className="pt-select">
+              <Field
+                className="pt-input"
+                component="select"
+                name="chainLabel"
+                onChange={
+                  (e) => {
+                    const data = e.target.value === 'Main Chain' ? null : e.target.value;
+                    this.props.selectChain(data);
+                  }
+                }
+                required
+              >
+                <option> Main Chain </option>
+                {
+                  this.props.chainIds.map((label, i) => {
+                    return (
+                      <option key={label.id} value={label.id}>{label.label}</option>
+                    )
+                  })
+                }
+              </Field>
+            </div>
+          </small>
+        </span>
+      );
+    }
+  }
+
   render() {
     return (
       <nav className="pt-navbar pt-dark smd-menu-bar" >
@@ -78,9 +116,9 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           {this.renderDeveloperButton()}
+          {this.renderChainDropDown()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
-
           {this.afterLoggedIn()}
         </div>
         {isModePublic() && <div><Login />
@@ -94,13 +132,17 @@ export function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn,
     currentUser: state.user.currentUser,
+    chainIds: state.chains.chainIds,
   };
 }
 
+const formed = reduxForm({ form: 'menu-bar' })(MenuBar);
 const connected = connect(mapStateToProps, {
   logout,
   openLoginOverlay,
-  openWalkThroughOverlay
-})(MenuBar);
+  openWalkThroughOverlay,
+  selectChain,
+  fetchChainIds
+})(formed);
 
 export default withRouter(connected);

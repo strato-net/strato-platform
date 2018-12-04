@@ -19,6 +19,9 @@ import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import qualified Data.Binary              as Binary
 
+toMaybe :: Eq a => a -> a -> Maybe a
+toMaybe a b = if a == b then Nothing else Just b
+
 buildState :: s -> [a] -> (a -> State s ()) -> s
 buildState s [] _ = s
 buildState s (a:as) run =

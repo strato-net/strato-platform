@@ -1,13 +1,14 @@
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module BlockApps.Solidity.Type where
 
+import           Control.DeepSeq
+import           Data.Binary
 import           Data.ByteString (ByteString)
 import           Data.List
 import           Data.Text       (Text)
 import qualified Data.Text       as Text
+import           GHC.Generics
 
 typeUInt :: SimpleType
 typeUInt = TypeInt False Nothing
@@ -33,7 +34,7 @@ data Type
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
-  deriving (Show)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 data SimpleType
   = TypeBool
@@ -44,7 +45,7 @@ data SimpleType
             }
   | TypeBytes { bytesSize :: Maybe Integer
               }
-  deriving (Show,Read)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 getTypeByteLength :: Type -> Maybe Int
 getTypeByteLength = \case
