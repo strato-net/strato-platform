@@ -119,4 +119,5 @@ benchmarks:
     dependencies:
       - criterion
       - ethereum-vm
+      - hashable
       - unordered-containers
