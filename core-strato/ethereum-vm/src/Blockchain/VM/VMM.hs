@@ -202,12 +202,12 @@ addLog newLog = do
   state' <- lift get
   lift $ put state'{logs=newLog:logs state'}
 
-setPC::Word256->VMM ()
+setPC::Int->VMM ()
 setPC p = do
   state' <- lift get
   lift $ put state'{pc=p}
 
-incrementPC::Word256->VMM ()
+incrementPC::Int->VMM ()
 incrementPC p = do
   state' <- lift get
   lift $ put state'{pc=pc state' + p}

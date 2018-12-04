@@ -7,10 +7,11 @@ import           Data.Binary
 import qualified Data.ByteString              as B
 import qualified Data.Map                     as M
 import           Data.Maybe
-import           Network.Haskoin.Internals
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Blockchain.Util
+
+type CodePointer = Int
 
 data Operation =
     STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
@@ -194,7 +195,7 @@ opLen::Operation->Int
 opLen (PUSH x) = 1 + length x
 opLen _        = 1
 
-opCode2Op::B.ByteString->(Operation, Word256)
+opCode2Op::B.ByteString->(Operation, CodePointer)
 opCode2Op rom | B.null rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
 opCode2Op rom =
   let opcode = B.head rom in --head OK, null weeded out above

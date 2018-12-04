@@ -57,7 +57,7 @@ data VMState =
     dbs              :: Context,
     sqldb            :: Config,
     vmGasRemaining   :: Integer,
-    pc               :: Word256,
+    pc               :: CodePointer,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
