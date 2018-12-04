@@ -19,4 +19,4 @@ defineFlag "kafkaport" (9092 :: Int) "Kafka port"
 defineFlag "globalsStateCount" (1024 :: Int) "The maximum number of states to keep in memory at once.\
                                              \ overflow is stored in postgres."
 
-defineFlag "kafkaMaxBytes" (1024 * 1024 :: Int) "Number of bytes to read in each batch from kafka"
+defineFlag "kafkaMaxBytes" (1024 * 1024 * 32 :: Int) "Number of bytes to read in each batch from kafka"
