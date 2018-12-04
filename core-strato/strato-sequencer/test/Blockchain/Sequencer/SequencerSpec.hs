@@ -480,3 +480,51 @@ spec = do
         let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
         length otxs' `shouldBe` 1
         txType (head otxs') `shouldBe` Message
+
+      it "should split block up by chain Id" . runPBFTTestMWithGenesis $ \h -> do
+        -- chain 1
+        let chainId1 = 0x12345678
+            cInfo1 = ChainInfo "my test chain 1" [] [] M.empty
+            chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
+            chainHash1 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo1
+        tx1 <- liftIO . HK.withSource HK.devURandom $ do
+          pk <- HK.genPrvKey
+          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
+        let hashTx1 = PrivateHashTX (unSHA $ txHash tx1) chainHash1
+
+        -- chain 2
+        let chainId2 = 0x9abcdef0
+            cInfo2 = ChainInfo "my test chain 2" [] [] M.empty
+            chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
+            chainHash2 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo2
+        tx2 <- liftIO . HK.withSource HK.devURandom $ do
+          pk <- HK.genPrvKey
+          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
+        let hashTx2 = PrivateHashTX (unSHA $ txHash tx2) chainHash2
+
+        let b' = makeBlockWithTransactions [hashTx1, hashTx2]
+            blk = Block (blockBlockData b'){ blockDataParentHash = h
+                                           , blockDataNumber = 1
+                                           }
+                        (blockReceiptTransactions b')
+                        (blockBlockUncles b')
+            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
+        checkForUnseq [chainDetails1, chainDetails2]
+        checkForUnseq [iev]
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        obs `shouldBe` []
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 2
+        txType (txs !! 0) `shouldBe` PrivateHash
+        txType (txs !! 1) `shouldBe` PrivateHash
+        let ietx = IETx 0 . IngestTx TO.Morphism
+        checkForUnseq [ietx tx1, ietx tx2]
+        vmevs' <- drainVM
+        let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
+        length otxs' `shouldBe` 2
+        txType (otxs' !! 0) `shouldBe` Message
+        txType (otxs' !! 1) `shouldBe` Message
