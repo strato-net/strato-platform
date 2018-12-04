@@ -26,7 +26,7 @@ import           HFlags
 defineFlag "debug" False "turn debug info on or off"
 defineFlag "trace" False "turn trace info on or off"
 defineFlag "sqlTrace" False "Flag to insert VM trace in sql, independent of trace flag"
-defineFlag "evmProfile" True "turn on EVM profiling, independent of trace flag (warning....  this will slow the EVM down a lot, and should never be used in production)"
+defineFlag "evmProfile" False "turn on EVM profiling, independent of trace flag (warning....  this will slow the EVM down a lot, and should never be used in production)"
 defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
 defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
