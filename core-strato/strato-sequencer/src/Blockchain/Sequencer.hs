@@ -283,7 +283,7 @@ transformFullTransactions pairs = do
                 $logInfoS "transformFullTransactions" . T.pack $ "We have seen this transaction's PrivateHashTX before."
               False -> do
                 insertPrivateHash ptx
-                when (otOrigin ptx /= TO.API) $ do
+                when (otOrigin ptx == TO.API) $ do
                   cHash <- getNewChainHash chainId
                   insertSeenTxHash tHash
                   $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash

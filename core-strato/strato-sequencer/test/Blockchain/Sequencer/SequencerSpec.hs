@@ -401,6 +401,24 @@ spec = do
         length txs' `shouldBe` 1
         txType (head txs') `shouldBe` PrivateHash
 
+      it "should create a PrivateHashTX for a private transaction" . runTestM $ do
+        let chainId = 0x12345678
+            cInfo = ChainInfo "my test chain" [] [] M.empty
+            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
+        ptx <- liftIO . HK.withSource HK.devURandom $ do
+          pk <- HK.genPrvKey
+          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
+        checkForUnseq [chainDetails]
+        checkForUnseq [IETx 0 (IngestTx TO.API ptx)]
+        vmevs <- drainVM
+        let txs = [tx | OETx _ tx <- vmevs]
+        length txs `shouldBe` 1
+        txType (head txs) `shouldBe` PrivateHash
+        p2pevs <- drainP2P
+        let txs' = [tx | OETx _ tx <- p2pevs]
+        length txs' `shouldBe` 1
+        txType (head txs') `shouldBe` PrivateHash
+
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let chainId = 0x12345678
             cInfo = ChainInfo "my test chain" [] [] M.empty
