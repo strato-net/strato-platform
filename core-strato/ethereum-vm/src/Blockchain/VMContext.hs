@@ -80,7 +80,7 @@ import           Executable.EVMFlags
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
 
-newtype Config = Config { configSQLDB :: SQLDB }
+newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
 data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHashDB                 :: HashDB
                        , contextCodeDB                 :: CodeDB
@@ -213,54 +213,55 @@ instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
 runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
-                   StateT Context (ResourceT m) a -> m (a, Context)
+                   StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
     runResourceT $ do
-      let ldbOptions = DB.defaultOptions {
-        DB.createIfMissing = True,
-        DB.cacheSize = flags_ldbCacheSize,
-        DB.blockSize = flags_ldbBlockSize
-      }
-      let openDB base = DB.open (tmpdir ++ base) ldbOptions
-      sdb <- openDB stateDBPath
-      hdb <- openDB hashDBPath
-      cdb <- openDB codeDBPath
-      blksumdb <- openDB blockSummaryCacheDBPath
       conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack filepath) 20
-      redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
-        Redis.connectHost = "localhost",
-        Redis.connectPort = Redis.PortNumber 2023,
-        Redis.connectDatabase = 0
-      }
-      let initialKafkaState = error "TODO(tim): require sinks"
-      runStateT f (Context
-                   MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
-                   hdb
-                   cdb
-                   blksumdb
-                   conn
-                   M.empty
-                   M.empty
-                   MP.emptyTriePtr
-                   MP.emptyTriePtr
-                   (SHA 0)
-                   Nothing
-                   defaultBaggerState
-                   initialKafkaState
-                   Unspecified
-                   redisPool
-                   [] [] []
-                   False
-                   False)
+      flip runReaderT (Config conn) $ do
+        let ldbOptions = DB.defaultOptions {
+          DB.createIfMissing = True,
+          DB.cacheSize = flags_ldbCacheSize,
+          DB.blockSize = flags_ldbBlockSize
+        }
+        let openDB base = DB.open (tmpdir ++ base) ldbOptions
+        sdb <- openDB stateDBPath
+        hdb <- openDB hashDBPath
+        cdb <- openDB codeDBPath
+        blksumdb <- openDB blockSummaryCacheDBPath
+        redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+          Redis.connectHost = "localhost",
+          Redis.connectPort = Redis.PortNumber 2023,
+          Redis.connectDatabase = 0
+        }
+        let initialKafkaState = error "TODO(tim): require sinks"
+        runStateT f (Context
+                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                     hdb
+                     cdb
+                     blksumdb
+                     M.empty
+                     M.empty
+                     M.empty
+                     M.empty
+                     MP.emptyTriePtr
+                     MP.emptyTriePtr
+                     (SHA 0)
+                     Nothing
+                     defaultBaggerState
+                     initialKafkaState
+                     Unspecified
+                     redisPool
+                     Q.empty []
+                     False
+                     False)
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
-<<<<<<< HEAD
-        conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
+        conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
         flip runReaderT (Config conn) $ do
           let ldbOptions = DB.defaultOptions {
               DB.createIfMissing = True,
@@ -297,42 +298,6 @@ runContextM f = do
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
-=======
-        let ldbOptions = DB.defaultOptions {
-            DB.createIfMissing = True,
-            DB.cacheSize       = flags_ldbCacheSize,
-            DB.blockSize       = flags_ldbBlockSize
-        }
-        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-        conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
-        redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-        let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-        runStateT f (Context
-                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
-                        hdb
-                        cdb
-                        blksumdb
-                        conn
-                        M.empty
-                        M.empty
-                        MP.emptyTriePtr
-                        MP.emptyTriePtr
-                        (SHA 0)
-                        Nothing
-                        defaultBaggerState
-                        initialKafkaState
-                        Unspecified
-                        redisPool
-                        [] [] []
-                        flags_blockstanbul
-                        False)
-
-
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
->>>>>>> 38af1ef2f... Attempt to revive the evm tests
 evalContextM f = fst <$> runContextM f
 
 execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
