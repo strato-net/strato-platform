@@ -111,3 +111,12 @@ tests:
       - ethereum-vm
       - hspec
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+
+benchmarks:
+  microbench:
+    source-dirs: bench/
+    main: Microbench.hs
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - unordered-containers
