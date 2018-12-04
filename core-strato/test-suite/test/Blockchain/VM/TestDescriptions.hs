@@ -41,9 +41,8 @@ data Env =
     currentGasLimit   ::  Integer,
     currentNumber     ::  String,
     currentTimestamp  ::  UTCTime,
-    previousHash      ::  SHA,
-    chainId           :: Maybe Haskoin.Word256
-    } deriving (Generic, Show)
+    previousHash      ::  Maybe SHA
+    } deriving (Generic, Show, Eq)
 
 data AddressState' =
   AddressState' {
@@ -65,7 +64,7 @@ data Exec =
     gasPrice' ::  String,
     origin    ::  Address,
     value'    ::  String
-    } deriving (Generic, Show)
+    } deriving (Generic, Show, Eq)
 
 data Transaction' =
   Transaction' {
@@ -76,9 +75,9 @@ data Transaction' =
     tSecretKey' ::  Haskoin.PrvKey,
     tTo'        ::  Maybe Address,
     tValue'     ::  String
-    } deriving (Show)
+    } deriving (Show, Eq)
 
-data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show)
+data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show, Eq)
 
 
 data Test =
@@ -90,16 +89,9 @@ data Test =
     out          ::  RawData,
     pre          ::  M.Map Address AddressState',
     post         ::  M.Map Address AddressState'
-    } deriving (Generic, Show)
+    } deriving (Generic, Show, Eq)
 
 type Tests = M.Map String Test
-
-convertAddressAndAddressInfo  ::  M.Map String AddressState'->M.Map Address AddressState'
-convertAddressAndAddressInfo = M.fromList . map convertPre' . M.toList
-    where
-      convertPre'  ::  (String, AddressState')->(Address, AddressState')
-      convertPre' (addressString, addressState) = (Address $ fromInteger $ byteString2Integer $ fst $ B16.decode $ BC.pack addressString, addressState)
-
 
 instance FromJSON Test where
   parseJSON (Object v) | H.member "exec" v =
@@ -108,22 +100,22 @@ instance FromJSON Test where
     v .: "env" <*>
     v .: "exec" <*>
     v .:? "gas" <*>
-    v .:? "out" .!= (RawData B.empty) <*>
+    v .:? "out" .!= RawData B.empty <*>
     v .: "pre" <*>
     v .:? "post" .!= M.empty
     where
-       test v1 v2 exec gas v6 v7 v8 = Test v1 v2 (IExec exec) (fmap read gas) v6 (convertAddressAndAddressInfo v7) (convertAddressAndAddressInfo v8)
+       test v1 v2 exec gas = Test v1 v2 (IExec exec) (fmap read gas)
   parseJSON (Object v) | H.member "transaction" v =
     test <$>
     v .:? "callcreates" <*>
     v .: "env" <*>
     v .: "transaction" <*>
     v .:? "gas" <*>
-    v .:? "out" .!= (RawData B.empty) <*>
+    v .:? "out" .!= RawData B.empty <*>
     v .: "pre" <*>
     v .:? "post" .!= M.empty
     where
-       test v1 v2 transaction gas v6 v7 v8 = Test v1 v2 (ITransaction transaction) (fmap read gas) v6 (convertAddressAndAddressInfo v7) (convertAddressAndAddressInfo v8)
+       test v1 v2 transaction gas = Test v1 v2 (ITransaction transaction) (fmap read gas)
   parseJSON x = error $ "Missing case in parseJSON for Test: " ++ show x
 
 
@@ -198,11 +190,10 @@ instance FromJSON Env where
     v .: "currentGasLimit" <*>
     v .: "currentNumber" <*>
     v .: "currentTimestamp" <*>
-    v .:? "previousHash" .!= SHA 0 <*> --error "previousHash not set"
-    v .:? "chainId"
+    v .:? "previousHash"
     where
-      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 v7 =
-        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6 v7
+      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 =
+        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6
   parseJSON x = error $ "Wrong format when trying to parse Env from JSON: " ++ show x
 
 

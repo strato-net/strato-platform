@@ -60,6 +60,12 @@ tests:
     source-dirs: test
     main: TestMain.hs
 
+  unittests:
+    source-dirs: test
+    main: UnitTest.hs
+    dependencies:
+      - interpolatedstring-perl6
+
   test-suite:
     source-dirs: test
     main: Spec.hs
