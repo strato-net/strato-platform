@@ -87,6 +87,8 @@ tests:
       - HUnit
       - QuickCheck
       - derive
+      - entropy
+      - ethereum-rlp
       - hflags
       - hspec
       - hspec-core
