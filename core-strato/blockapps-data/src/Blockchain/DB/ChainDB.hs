@@ -6,13 +6,16 @@ module Blockchain.DB.ChainDB (
   , putBlockHeaderInChainDB
   , getChainRoot
   , getGenesisStateRoot
-  , putGenesisStateRoot
+  , putChainGenesisInfo
   , withBlockchain
   ) where
 
+import           Control.Monad                        (join, when)
 import           Control.Monad.Trans.Resource
 
+import           Data.Maybe                           (isNothing)
 import qualified Data.NibbleString                    as N
+import           Data.Traversable                     (for)
 import           Data.Word                            (Word8)
 
 import qualified Blockchain.Database.MerklePatricia   as MP
@@ -58,14 +61,14 @@ import qualified Database.LevelDB                     as DB
 |                          /\                                                   |
 |                         /  \                                                  |
 |                        /\  /\                                                 |
-|                (block hash, chain root)                                       |
+|         (block hash, (parent hash, chain root))                               |
 | Finally, all known chains that haven't been transacted upon will be stored    |
 | in a trie, keyed by chain id, with value being the chain's genesis state:     |
 |                     genesis root                                              |
 |                          /\                                                   |
 |                         /  \                                                  |
 |                        /\  /\                                                 |
-|             (chain id, genesis state root)                                    |
+|  (chain id, (creation block hash, genesis state root))                        |
 | It's important to note that each block hash may have a unique chain root,     |
 | but the genesis root only gets updated when the VM receives a new             |
 | OEGenesis message.                                                            |
@@ -86,22 +89,6 @@ class Monad m => HasChainDB m where
   putBlockHashRoot    :: MP.StateRoot -> m ()
   getGenesisRoot      :: m MP.StateRoot
   putGenesisRoot      :: MP.StateRoot -> m ()
-  getCurrentBlockHash :: m SHA
-  putCurrentBlockHash :: SHA -> m ()
-  getCurrentChainId   :: m (Maybe Word256)
-  putCurrentChainId   :: Maybe Word256 -> m ()
-
-forJust :: Applicative f => Maybe a -> b -> (a -> f b) -> f b
-forJust m b f =
-  case m of
-    Nothing -> pure b
-    Just a -> f a
-
-forNothing :: Applicative f => Maybe a -> (a -> b) -> f b -> f b
-forNothing m f b =
-  case m of
-    Nothing -> b
-    Just a -> pure (f a)
 
 getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
@@ -119,61 +106,74 @@ putkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> a 
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 
 bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()
-bootstrapChainDB genesisHash = putChainRoot genesisHash MP.emptyTriePtr
+bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
 
 putBlockHeaderInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
 putBlockHeaderInChainDB b = do
   let p = blockHeaderParentHash b
       h = blockHeaderHash b
-  mChainRoot <- getChainRoot p
-  case mChainRoot of
-    Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
-    Just chainRoot -> putChainRoot h chainRoot
+  mExistingChainRoot <- getChainRoot h     -- if we've seen this block before,
+  when (isNothing mExistingChainRoot) $ do -- its chain root will already exist
+    mChainRoot <- getChainRoot p
+    case mChainRoot of
+      Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
+      Just chainRoot -> putChainBlockHashInfo h p chainRoot
 
 getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
-getChainRoot (SHA h) = do
+getChainRoot = fmap (fmap snd) . getChainBlockHashInfo
+
+getChainBlockHashInfo :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe (SHA, MP.StateRoot))
+getChainBlockHashInfo (SHA h) = do
   bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
   getkv bhdb (word256ToMPKey h)
 
-putChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> MP.StateRoot -> m ()
-putChainRoot (SHA h) sr = do
+putChainBlockHashInfo :: (HasStateDB m, HasChainDB m) => SHA -> SHA -> MP.StateRoot -> m ()
+putChainBlockHashInfo (SHA h) parentHash sr = do
   bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
-  newBlockHashRoot <- putkv bhdb (word256ToMPKey h) sr
+  newBlockHashRoot <- putkv bhdb (word256ToMPKey h) (parentHash, sr)
   putBlockHashRoot newBlockHashRoot
 
 getGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe MP.StateRoot)
-getGenesisStateRoot cid = do
+getGenesisStateRoot = fmap (fmap snd) . getChainGenesisInfo
+
+getChainGenesisInfo :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe (SHA, MP.StateRoot))
+getChainGenesisInfo cid = do
   gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
   getkv gdb (word256ToMPKey cid)
 
-putGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> MP.StateRoot -> m ()
-putGenesisStateRoot cid sr = do
+putChainGenesisInfo :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
+putChainGenesisInfo chainId creationBlock stateRoot = do
   gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
-  newGenesisRoot <- putkv gdb (word256ToMPKey cid) sr
+  newGenesisRoot <- putkv gdb (word256ToMPKey chainId) (creationBlock, stateRoot)
   putGenesisRoot newGenesisRoot
 
 getChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> m (Maybe MP.StateRoot)
 getChainStateRoot chainId bHash = do
-  mChainRoot <- getChainRoot bHash
-  (mStateRoot :: Maybe (Word256, MP.StateRoot))
-    <- forJust mChainRoot Nothing $ \chainRoot -> do
-      cdb <- flip MP.MPDB chainRoot <$> getLDB
-      getkv cdb (word256ToMPKey chainId)
-  forNothing mStateRoot (Just . snd) $ do
-    mGenStateRoot <- getGenesisStateRoot chainId
-    forJust mGenStateRoot Nothing $ \genStateRoot -> do
-      putChainStateRoot chainId bHash genStateRoot
-      return $ Just genStateRoot
+  mChainRoot <- getChainBlockHashInfo bHash
+  fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do
+    cdb <- flip MP.MPDB chainRoot <$> getLDB
+    mStateRoot <- getkv cdb (word256ToMPKey chainId)
+    case mStateRoot of
+      Just (_ :: Word256, stateRoot) -> return $ Just stateRoot
+      Nothing -> do
+        mGenStateRoot <- getChainGenesisInfo chainId
+        fmap join . for mGenStateRoot $ \(creationBlock, genStateRoot) -> do
+          mStateRoot' <- if parentHash == creationBlock
+            then return $ Just genStateRoot
+            else getChainStateRoot chainId parentHash
+          for mStateRoot' $ \stateRoot -> do
+            putChainStateRoot chainId bHash stateRoot
+            return stateRoot
 
 putChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
 putChainStateRoot chainId bHash stateRoot = do
-  mChainRoot <- getChainRoot bHash
+  mChainRoot <- getChainBlockHashInfo bHash
   case mChainRoot of
     Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ format bHash ++ ", but it doesn't exist"
-    Just chainRoot -> do
+    Just (parentHash, chainRoot) -> do
       cdb <- flip MP.MPDB chainRoot <$> getLDB
       newChainRoot <- putkv cdb (word256ToMPKey chainId) (chainId, stateRoot)
-      putChainRoot bHash newChainRoot
+      putChainBlockHashInfo bHash parentHash newChainRoot
 
 withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
 withBlockchain bh cid f = do

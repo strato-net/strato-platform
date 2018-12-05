@@ -94,14 +94,6 @@ instance HasChainDB VMM where
   putGenesisRoot sr = do
     vmState <- lift get
     lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
-  getCurrentBlockHash = lift $ fmap (contextCurrentBlockHash . dbs) get
-  putCurrentBlockHash bh = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextCurrentBlockHash = bh}}
-  getCurrentChainId = lift $ fmap (contextCurrentChainId . dbs) get
-  putCurrentChainId cid = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextCurrentChainId = cid}}
 
 instance HasStorageDB VMM where
     getStorageTxDB = do

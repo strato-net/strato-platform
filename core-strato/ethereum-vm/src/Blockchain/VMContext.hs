@@ -86,8 +86,6 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextStorageBlockMap        :: M.Map (Address, Word256) Word256
                        , contextBlockHashRoot          :: MP.StateRoot
                        , contextGenesisRoot            :: MP.StateRoot
-                       , contextCurrentBlockHash       :: SHA
-                       , contextCurrentChainId         :: Maybe Word256
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
@@ -141,14 +139,6 @@ instance HasChainDB ContextM where
   putGenesisRoot sr = do
     cxt <- get
     put cxt{contextGenesisRoot = sr}
-  getCurrentBlockHash = contextCurrentBlockHash <$> get
-  putCurrentBlockHash bh = do
-    cxt <- get
-    put cxt{contextCurrentBlockHash = bh}
-  getCurrentChainId = contextCurrentChainId <$> get
-  putCurrentChainId cid = do
-    cxt <- get
-    put cxt{contextCurrentChainId = cid}
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
@@ -232,8 +222,6 @@ runContextM f = do
                        M.empty
                        MP.emptyTriePtr
                        MP.emptyTriePtr
-                       (SHA 0)
-                       Nothing
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
