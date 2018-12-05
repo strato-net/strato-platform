@@ -6,6 +6,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Declarations where
 
+import           Data.Function                        (on)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
