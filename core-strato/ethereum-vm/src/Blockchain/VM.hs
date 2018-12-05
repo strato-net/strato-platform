@@ -421,7 +421,7 @@ runOperation SSTORE = do
 runOperation JUMP = do
   p <- pop
   jumpDests <- getEnvVar envJumpDests
-  let pInt = fromIntegral $ p .&. (0xffffffffffffffff :: Word256)
+  let pInt = fromIntegral . min p $ (0xffffffffffffffff :: Word256)
   if pInt `I.member` jumpDests
     then setPC $ pInt - 1 -- Subtracting 1 to compensate for the pc-increment that occurs every step.
     else throwE InvalidJump
@@ -430,7 +430,7 @@ runOperation JUMPI = do
   p <- pop
   condition <- pop
   jumpDests <- getEnvVar envJumpDests
-  let pInt = fromIntegral $ p .&. (0xffffffffffffffff :: Word256)
+  let pInt = fromIntegral . min p $ (0xffffffffffffffff :: Word256)
   case (pInt `I.member` jumpDests, (0::Word256) /= condition) of
     (_, False) -> return ()
     (True, _)  -> setPC $ pInt - 1
