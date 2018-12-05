@@ -39,6 +39,7 @@ import           Control.Monad.Trans.Resource
 
 import           Conduit
 import           Data.Conduit.TMChan
+import           Data.Conduit.TQueue
 import           Data.Foldable                             (toList)
 import           Data.IORef
 import qualified Data.Sequence                             as Q
@@ -222,7 +223,7 @@ fuseChannels = do
   loop <- use loopTimeout
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
   (debugLog . transPipe lift) <$> mergeSources
-               [ sourceTMChan unseq .| mapC UnseqEvent
+               [ sourceTQueue unseq .| mapC UnseqEvent
                , sourceTMChan votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]
