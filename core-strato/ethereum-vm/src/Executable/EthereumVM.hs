@@ -149,10 +149,6 @@ ethereumVM = void . execContextM $ do
 insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
-  bbi <- getContextBestBlockInfo
-  let bestSha = case bbi of
-        Unspecified -> SHA 0
-        ContextBestBlockInfo (sha,_,_,_,_) -> sha
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     sr <- chainInfoToGenesisState cInfo
@@ -161,7 +157,7 @@ insertNewChains events = do
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> do
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-        putChainGenesisInfo cId bestSha sr >> return [(cId, cInfo)]
+        putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 
