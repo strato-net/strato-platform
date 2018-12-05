@@ -251,7 +251,7 @@ class CreateContract extends Component {
       </tr>);
     } else {
       let contract = src[contractname];
-      if (contract && contract['constr'] !== undefined) {
+      if (contract && contract['constr'] && contract['constr'] !== undefined) {
         return Object.getOwnPropertyNames(contract['constr']).map((arg, i) => {
           return (
             <tr key={'arg' + i}>
