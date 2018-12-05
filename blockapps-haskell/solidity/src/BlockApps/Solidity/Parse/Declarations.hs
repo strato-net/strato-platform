@@ -47,13 +47,13 @@ solidityContract = do
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-  allCtors <- if length ctorList > 1
+  mCtor <- if length ctorList > 1
                   then fail "multiple constructors defined"
-                  else return . Map.fromList $ ctorList
+                  else return . fmap snd . listToMaybe $ ctorList
 
   return $ NamedXabi (Text.pack contractName') (
         Xabi { xabiFuncs = allFunctions
-             , xabiConstr = allCtors
+             , xabiConstr = mCtor
              , xabiVars = (constants declarations) `Map.union`(variables declarations)
              , xabiTypes =
                Map.fromList $

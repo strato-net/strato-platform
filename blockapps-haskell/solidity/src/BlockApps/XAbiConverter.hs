@@ -178,8 +178,9 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
     return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
+  let constrMap = constructorToFuncMap xabiConstr
   funcs <-
-    for (Map.toList $ Map.union xabiFuncs xabiConstr) $ \(name, func) -> do
+    for (Map.toList $ Map.union xabiFuncs constrMap) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
       return ((name, theFunction), Nothing)
 
@@ -214,11 +215,12 @@ contractToXabi cName Contract{..} =
     isFunction _ = False
     isConstructor k = const (k == cName)
     (constructors, funcs) = Map.partitionWithKey isConstructor functions
+    mCtor = funcMapToConstructor constructors
 
   in
     Xabi{
       xabiFuncs = funcs,
-      xabiConstr = constructors,
+      xabiConstr = mCtor,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
       xabiTypes = Map.empty,
       xabiModifiers = Map.empty,

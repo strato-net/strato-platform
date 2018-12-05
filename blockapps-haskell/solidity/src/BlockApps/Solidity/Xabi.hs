@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 
 module BlockApps.Solidity.Xabi where
 
@@ -15,6 +16,7 @@ import           Data.Aeson.Types
 import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Proxy
 import           Data.Swagger
 import           Data.Text                    (Text)
@@ -47,7 +49,7 @@ instance ToSchema XabiKind where
 
 data Xabi = Xabi
   { xabiFuncs     :: Map Text Func
-  , xabiConstr    :: Map Text Func
+  , xabiConstr    :: Maybe Func
   , xabiVars      :: Map Text Xabi.VarType
   , xabiTypes     :: Map Text Xabi.Def
   , xabiModifiers :: Map Text Modifier
@@ -63,7 +65,7 @@ instance FromJSON Xabi where
   parseJSON =
     withObject "xabi" $ \v ->
     Xabi <$> v .:? "funcs" .!= Map.empty
-         <*> v .:? "constr" .!= Map.empty
+         <*> v .:? "constr" .!= Nothing
          <*> v .:? "vars" .!= Map.empty
          <*> v .:? "types" .!= Map.empty
          <*> v .:? "mods" .!= Map.empty
@@ -97,7 +99,7 @@ sampleXabi = Xabi
                    , funcModifiers = Nothing
                    })
     ]
-  , xabiConstr = Map.fromList []
+  , xabiConstr = Nothing
   , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
   , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
   , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
@@ -107,7 +109,14 @@ sampleXabi = Xabi
   }
 
 xabiEmpty :: Xabi
-xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty
+xabiEmpty = Xabi Map.empty Nothing Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty
+
+constructorToFuncMap :: Maybe Func -> Map Text Func
+constructorToFuncMap = Map.fromList . maybeToList . fmap ("constructor",)
+
+funcMapToConstructor :: Map Text Func -> Maybe Func
+funcMapToConstructor = fmap snd . listToMaybe . Map.toList
+
 --------------------------------------------------------------------------------
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
