@@ -152,7 +152,7 @@ runTest::Test-> ContextM ()
 runTest test = do
   when flags_debugEnabled $
     liftIO . print $ test
-  let cid = chainId $ env test
+  let cid = Nothing
 
   MP.initializeBlank =<< getStateDB
   setStateDBStateRoot emptyTriePtr
@@ -167,7 +167,7 @@ runTest test = do
   let block =
         Block {
           blockBlockData = BlockData {
-             blockDataParentHash = previousHash . env $ test,
+             blockDataParentHash = fromMaybe (SHA 0x0) . previousHash . env $ test,
              blockDataNumber = read . currentNumber . env $ test,
              blockDataCoinbase = currentCoinbase . env $ test,
              blockDataDifficulty = read . currentDifficulty . env $ test,
