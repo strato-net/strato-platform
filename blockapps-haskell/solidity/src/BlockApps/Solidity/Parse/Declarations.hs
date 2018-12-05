@@ -25,7 +25,6 @@ import qualified BlockApps.Solidity.Xabi              as Xabi
 import qualified BlockApps.Solidity.Xabi.Def          as Xabi
 import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
-
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
@@ -205,6 +204,9 @@ simpleVariableDeclaration = do
 
 {- Functions and function-like -}
 
+constructorName :: String
+constructorName = "constructor"
+
 -- | Parses a function definition.
 --
 functionDeclaration :: SolidityParser (String, Declaration)
@@ -212,10 +214,10 @@ functionDeclaration = do
   functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
                   -- Starting with 0.4.22, constructor() <mods> { <body> } is
                   -- the preferred syntax for defining a constructor
-                  (reserved "constructor" >> getContractName)
+                  (reserved constructorName >> return constructorName)
   cName <- getContractName
   xabi <- functionXabi
-  let tipe = if cName == functionName
+  let tipe = if ((||) `on` (== functionName)) cName constructorName
                 then ConstructorDeclaration
                 else FuncDeclaration
   return (functionName, tipe xabi)

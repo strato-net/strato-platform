@@ -213,7 +213,7 @@ contractToXabi cName Contract{..} =
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
     isFunction _ = False
-    isConstructor k = const (k == cName)
+    isConstructor k = const (k == cName || k == "constructor")
     (constructors, funcs) = Map.partitionWithKey isConstructor functions
     mCtor = funcMapToConstructor constructors
 
