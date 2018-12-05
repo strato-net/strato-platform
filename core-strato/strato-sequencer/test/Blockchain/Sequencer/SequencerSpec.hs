@@ -103,8 +103,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     pkg <- atomically newCablePackage
-    vch <- atomically newTChan
-    tch <- atomically newTChan
+    vch <- atomically newTMChan
+    tch <- atomically newTMChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
@@ -294,11 +294,11 @@ spec = do
     describe "fuseChannels" $ do
       it "should multiplex event types" $ withMaxSuccess 5 $ property $ \vote rn iev -> runTestM $ do
         tch <- asks blockstanbulTimeouts
-        atomically . writeTChan tch $ rn
+        atomically . writeTMChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
-        atomically . writeTChan vch $ vote
+        atomically . writeTMChan vch $ vote
         src0 <- newResumableSource <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
         (src2, ev2) <- src1 $$++ headC
@@ -315,9 +315,9 @@ spec = do
       it "should not only return 1 event if multiple are pending" . runTestM $ do
         tch <- asks blockstanbulTimeouts
         atomically $ do
-          writeTChan tch 20
-          writeTChan tch 34
-          writeTChan tch 92
+          writeTMChan tch 20
+          writeTMChan tch 34
+          writeTMChan tch 92
         src <- newResumableSource <$> fuseChannels
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [20, 34, 92]
@@ -369,7 +369,7 @@ spec = do
         uch <- asks blockstanbulTimeouts
         void . liftIO . forkIO $ do
           threadDelay 5000
-          atomically . writeTChan uch $ 987
+          atomically . writeTMChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
 
