@@ -86,8 +86,6 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextStorageBlockMap        :: M.Map (Address, Word256) Word256
                        , contextBlockHashRoot          :: MP.StateRoot
                        , contextGenesisRoot            :: MP.StateRoot
-                       , contextCurrentBlockHash       :: SHA
-                       , contextCurrentChainId         :: Maybe Word256
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
@@ -224,8 +222,6 @@ runContextM f = do
                        M.empty
                        MP.emptyTriePtr
                        MP.emptyTriePtr
-                       (SHA 0)
-                       Nothing
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
