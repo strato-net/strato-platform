@@ -29,7 +29,7 @@ class CodeEditor extends Component {
   }
 
   componentDidUpdate() {
-    this.saveLocalState && this.saveLocalState()
+      this.saveLocalState && this.saveLocalState()
   }
 
   saveToLocalStorage() {

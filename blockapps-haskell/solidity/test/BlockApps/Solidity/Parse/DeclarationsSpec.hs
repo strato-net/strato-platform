@@ -306,7 +306,7 @@ spec = do
     it "should parse a constructor" $ do
       let funcString = "constructor(){}"
           eRes = runParser functionDeclaration "Contract" "" funcString
-      (fst <$> eRes) `shouldBe` Right "Contract"
+      (fst <$> eRes) `shouldBe` Right "constructor"
 
   describe "Declarations - events" $ do
     it "should parse an event" $ do
