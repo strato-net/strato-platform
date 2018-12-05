@@ -151,18 +151,26 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
 seqWriters :: GregorM ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
   vmch <- use gregorSeqVM
-  vmevs <- atomically $ drainTMChan vmch
-  unless (null vmevs) $ do
-    P.withLabel gregorLoop "seq_vm_events" P.incCounter
-    P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
-    writeSeqVmEvents vmevs
   p2pch <- use gregorSeqP2P
-  p2pevs <- atomically $ drainTMChan p2pch
-  unless (null p2pevs) $ do
-    P.withLabel gregorLoop "seq_p2p_events" P.incCounter
-    P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
-    writeSeqP2pEvents p2pevs
-  liftIO $ threadDelay 1000 -- 1ms
+  events <- atomically $
+    fmap Left (blockDrainTMChan vmch) `orElse` fmap Right (blockDrainTMChan p2pch)
+
+  case events of
+    Right vmevs -> do
+      P.withLabel gregorLoop "seq_vm_events" P.incCounter
+      P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
+      writeSeqVmEvents vmevs
+    Left p2pevs -> do
+      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
+      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
+      writeSeqP2pEvents p2pevs
+
+-- Will only read if at least one element is in the channel.
+blockDrainTMChan :: TMChan a -> STM [a]
+blockDrainTMChan ch = do
+  first <- readTMChan ch
+  rest <- drainTMChan ch
+  return (first:rest)
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do
