@@ -117,8 +117,7 @@ putBlockHeaderInChainDB b = do
     mChainRoot <- getChainRoot p
     case mChainRoot of
       Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
-      Just chainRoot -> do
-        putChainBlockHashInfo h p chainRoot
+      Just chainRoot -> putChainBlockHashInfo h p chainRoot
 
 getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
 getChainRoot = fmap (fmap snd) . getChainBlockHashInfo
