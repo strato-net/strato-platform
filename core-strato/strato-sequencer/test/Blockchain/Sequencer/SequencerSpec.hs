@@ -16,6 +16,7 @@ import           Numeric                             (showHex)
 import           Conduit
 import           Control.Concurrent
 import           Control.Concurrent.STM.TMChan
+import           Control.Concurrent.STM.TQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Monad.Logger
@@ -102,8 +103,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     pkg <- atomically newCablePackage
-    vch <- atomically newTMChan
-    tch <- atomically newTMChan
+    vch <- atomically newTChan
+    tch <- atomically newTChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
@@ -293,11 +294,11 @@ spec = do
     describe "fuseChannels" $ do
       it "should multiplex event types" $ withMaxSuccess 5 $ property $ \vote rn iev -> runTestM $ do
         tch <- asks blockstanbulTimeouts
-        atomically . writeTMChan tch $ rn
+        atomically . writeTChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTMChan uch $ iev
+        atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
-        atomically . writeTMChan vch $ vote
+        atomically . writeTChan vch $ vote
         src0 <- newResumableSource <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
         (src2, ev2) <- src1 $$++ headC
@@ -307,16 +308,16 @@ spec = do
     describe "sequencer" $ do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTMChan uch $ iev
+        atomically . writeTQueue uch $ iev
         src <- newResumableSource <$> fuseChannels
         void $ oneSequencerIter src
 
       it "should not only return 1 event if multiple are pending" . runTestM $ do
         tch <- asks blockstanbulTimeouts
         atomically $ do
-          writeTMChan tch 20
-          writeTMChan tch 34
-          writeTMChan tch 92
+          writeTChan tch 20
+          writeTChan tch 34
+          writeTChan tch 92
         src <- newResumableSource <$> fuseChannels
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` map TimerFire [20, 34, 92]
@@ -368,7 +369,7 @@ spec = do
         uch <- asks blockstanbulTimeouts
         void . liftIO . forkIO $ do
           threadDelay 5000
-          atomically . writeTMChan uch $ 987
+          atomically . writeTChan uch $ 987
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
 
