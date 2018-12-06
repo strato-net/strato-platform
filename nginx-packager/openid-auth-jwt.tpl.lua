@@ -1,4 +1,4 @@
-local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
+--local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
 
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
@@ -17,11 +17,11 @@ if err or not res then
     ngx.exit(ngx.HTTP_FORBIDDEN)
 end
 
-if res.aud ~= expected_audience then
-  ngx.status = 403
-  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
-  ngx.exit(ngx.HTTP_FORBIDDEN)
-end
+--if res.aud ~= expected_audience then
+--  ngx.status = 403
+--  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
+--  ngx.exit(ngx.HTTP_FORBIDDEN)
+--end
 
 --if res.scope ~= "edit" then
 --  ngx.exit(ngx.HTTP_FORBIDDEN)
@@ -31,17 +31,17 @@ end
 --  ngx.exit(ngx.HTTP_FORBIDDEN)
 --end
 
-local function isEmpty(s) 
+local function isEmpty(s)
   return s == nil or s == ''
 end
 
 -- some oauth providers return email under `id_token` object, some - under `user`
-local unique_name = '' 
-if not isEmpty(res.email) then 
-  unique_name=res.email 
-else 
-  unique_name=res.appid 
-end 
+local unique_name = ''
+if not isEmpty(res.email) then
+  unique_name=res.email
+else
+  unique_name=res.appid
+end
 
 local user_id = res.sub
 

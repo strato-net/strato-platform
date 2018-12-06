@@ -118,10 +118,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
 
     if [ "$ssl" = true ] ; then
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth.lua   
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-auth.lua   
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-auth.lua
     else
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth.lua   
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth.lua
       sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid-auth.lua
     fi
   fi
@@ -129,14 +129,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ] ; then
     cp /tmp/openid-auth-jwt.tpl.lua /tmp/openid-auth-jwt.lua
     sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-auth-jwt.lua
-    sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-auth-jwt.lua
+#    sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-auth-jwt.lua
 
     if [ "$ssl" = true ] ; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth-jwt.lua
-      sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-auth-jwt.lua
+#      sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-auth-jwt.lua
     else
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth-jwt.lua
-      sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-auth-jwt.lua
+#      sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-auth-jwt.lua
     fi
   fi
 
