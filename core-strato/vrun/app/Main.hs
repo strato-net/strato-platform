@@ -5,6 +5,7 @@
 module Main where
 
 import qualified Data.ByteString                             as B
+import qualified Data.ByteString.Char8                       as BC
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
 import           Control.Monad.IO.Class
@@ -28,7 +29,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()
-
+import           System.Log.FastLogger  (fromLogStr)
 
 main :: IO ()
 main = do
@@ -70,7 +71,7 @@ main = do
   let signedTransaction = txToOutputTx signedTransaction'
 
   
-  (result, _) <- flip runLoggingT noLog $ runTestContextM $ do
+  (result, _) <- flip runLoggingT vrunLogger $ runTestContextM $ do
 
     let addr = Address 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed
     putAddressState addr AddressState{
@@ -90,11 +91,8 @@ main = do
 
 
 
-noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
---noLog _ _ _ _ = error "piggy" -- putStrLn $ show s
-noLog _ _ _ s = putStrLn $ show s
-
---noLog _ _ _ _ = return ()
+vrunLogger :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+vrunLogger _ _ _ s = putStrLn $ BC.unpack $ fromLogStr s
 
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct

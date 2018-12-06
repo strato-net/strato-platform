@@ -25,6 +25,7 @@ dependencies:
 - containers
 - ethereum-vm
 - exceptions
+- fast-logger
 - hedis
 - hflags
 - leveldb-haskell
