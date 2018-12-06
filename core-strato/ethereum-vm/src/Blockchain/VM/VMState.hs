@@ -36,6 +36,8 @@ data Memory =
     mSize   :: IORef Word256
     }
 
+instance Show Memory where
+  show = const "<memory>"
 
 newMemory :: IO Memory
 newMemory = do
@@ -83,7 +85,7 @@ data VMState =
     isRunningTests   :: Bool,
     debugCallCreates :: Maybe [DebugCallCreate]
 
-    }
+    } deriving (Show)
 makeLenses ''VMState
 
 

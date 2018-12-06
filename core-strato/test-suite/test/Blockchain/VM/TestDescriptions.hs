@@ -30,7 +30,6 @@ import           Numeric
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
-import           Blockchain.Data.Log
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.VM.VMState
@@ -41,11 +40,9 @@ data Env =
     currentDifficulty ::  String,
     currentGasLimit   ::  Integer,
     currentNumber     ::  String,
-    --currentTimestamp  ::  String,
     currentTimestamp  ::  UTCTime,
-    previousHash      ::  SHA,
-    chainId           :: Maybe Haskoin.Word256
-    } deriving (Generic, Show)
+    previousHash      ::  Maybe SHA
+    } deriving (Generic, Show, Eq)
 
 data AddressState' =
   AddressState' {
@@ -67,7 +64,7 @@ data Exec =
     gasPrice' ::  String,
     origin    ::  Address,
     value'    ::  String
-    } deriving (Generic, Show)
+    } deriving (Generic, Show, Eq)
 
 data Transaction' =
   Transaction' {
@@ -78,54 +75,23 @@ data Transaction' =
     tSecretKey' ::  Haskoin.PrvKey,
     tTo'        ::  Maybe Address,
     tValue'     ::  String
-    } deriving (Show)
-
-data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show)
-
-{-
-data CallCreate =
-  CallCreate {
-    ccData  ::  String,
-    ccDestination  ::  String,
-    ccGasLimit  ::  String,
-    ccValue  ::  String
     } deriving (Show, Eq)
--}
 
-{-
-data Log =
-  Log {
-    logAddress  ::  String,
-    logBloom'  ::  String,
-    logData  ::  String,
-    logTopics  ::  [String]
-    } deriving (Show, Eq)
--}
+data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show, Eq)
+
 
 data Test =
   Test {
     callcreates  ::  Maybe [DebugCallCreate],
     env          ::  Env,
     theInput     ::  InputWrapper,
-    {-
-    exec  ::  Maybe Exec,
-    transaction  ::  Maybe Transaction,
-    -}
     remainingGas ::  Maybe Integer,
-    logs'        ::  [Log],
     out          ::  RawData,
     pre          ::  M.Map Address AddressState',
     post         ::  M.Map Address AddressState'
-    } deriving (Generic, Show)
+    } deriving (Generic, Show, Eq)
 
 type Tests = M.Map String Test
-
-convertAddressAndAddressInfo  ::  M.Map String AddressState'->M.Map Address AddressState'
-convertAddressAndAddressInfo = M.fromList . map convertPre' . M.toList
-    where
-      convertPre'  ::  (String, AddressState')->(Address, AddressState')
-      convertPre' (addressString, addressState) = (Address $ fromInteger $ byteString2Integer $ fst $ B16.decode $ BC.pack addressString, addressState)
-
 
 instance FromJSON Test where
   parseJSON (Object v) | H.member "exec" v =
@@ -133,29 +99,23 @@ instance FromJSON Test where
     v .:? "callcreates" <*>
     v .: "env" <*>
     v .: "exec" <*>
-{-    v .: "exec" <*>
-    v .: "transaction" <*> -}
     v .:? "gas" <*>
-    v .:? "logs" .!= [] <*>
-    v .:? "out" .!= (RawData B.empty) <*>
+    v .:? "out" .!= RawData B.empty <*>
     v .: "pre" <*>
     v .:? "post" .!= M.empty
     where
-       test v1 v2 exec gas v5 v6 v7 v8 = Test v1 v2 (IExec exec) (fmap read gas) v5 v6 (convertAddressAndAddressInfo v7) (convertAddressAndAddressInfo v8)
+       test v1 v2 exec gas = Test v1 v2 (IExec exec) (fmap read gas)
   parseJSON (Object v) | H.member "transaction" v =
     test <$>
     v .:? "callcreates" <*>
     v .: "env" <*>
     v .: "transaction" <*>
-{-    v .: "exec" <*>
-    v .: "transaction" <*> -}
     v .:? "gas" <*>
-    v .:? "logs" .!= [] <*>
-    v .:? "out" .!= (RawData B.empty) <*>
+    v .:? "out" .!= RawData B.empty <*>
     v .: "pre" <*>
     v .:? "post" .!= M.empty
     where
-       test v1 v2 transaction gas v5 v6 v7 v8 = Test v1 v2 (ITransaction transaction) (fmap read gas) v5 v6 (convertAddressAndAddressInfo v7) (convertAddressAndAddressInfo v8)
+       test v1 v2 transaction gas = Test v1 v2 (ITransaction transaction) (fmap read gas)
   parseJSON x = error $ "Missing case in parseJSON for Test: " ++ show x
 
 
@@ -182,11 +142,6 @@ instance FromJSON Exec where
     v .: "origin" <*>
     v .: "value"
   parseJSON x = error $ "Wrong format when trying to parse Exec from JSON: " ++ show x
-
--- instance FromJSON (Maybe Address) where
---   parseJSON (String "") = pure Nothing
---   parseJSON (String v) = fmap Just $ parseJSON (String v)
---   parseJSON x = error $ "Wrong format when trying to parse 'Maybe Address' from JSON: " ++ show x
 
 sloppyParseHexNumber  ::  T.Text->Integer
 sloppyParseHexNumber x =
@@ -235,27 +190,13 @@ instance FromJSON Env where
     v .: "currentGasLimit" <*>
     v .: "currentNumber" <*>
     v .: "currentTimestamp" <*>
-    v .:? "previousHash" .!= SHA 0 <*> --error "previousHash not set"
-    v .:? "chainId"
+    v .:? "previousHash"
     where
-      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 v7 =
-        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6 v7
+      env' v1 v2 currentGasLimit' v4 currentTimestamp' v6 =
+        Env v1 v2 (read currentGasLimit') v4 (posixSecondsToUTCTime . fromInteger . sloppyInteger2Integer $ currentTimestamp') v6
   parseJSON x = error $ "Wrong format when trying to parse Env from JSON: " ++ show x
 
 
-{-
-instance FromJSON AddressState where
-  parseJSON (Object v) =
-    addressState <$>
-    v .: "nonce" <*>
-    v .: "balance" <*>
-    v .: "storage" <*>
-    v .: "code"
-    where
-      addressState  ::  String->String->Object->SHA->AddressState
-      addressState w x y z = AddressState (read w) (read x) emptyTriePtr z
-  parseJSON x = error $ "Wrong format when trying to parse AddressState from JSON: " ++ show x
--}
 
 instance FromJSON AddressState' where
   parseJSON (Object v) =
@@ -286,41 +227,12 @@ instance FromJSON DebugCallCreate where
       debugCallCreate' d v2 gasLimit val = DebugCallCreate (sloppyParseHexByteString d) v2 (read gasLimit) (read val)
   parseJSON x = error $ "Wrong format when trying to parse CallCreate from JSON: " ++ show x
 
-instance FromJSON Log where
-  parseJSON (Object v) =
-    log' <$>
-    v .: "address" <*>
-    v .: "bloom" <*>
-    v .: "data" <*>
-    v .: "topics"
-    where
-      log' v1 v2 d v4 = Log v1 (fromIntegral $ byteString2Integer $ fst $ B16.decode v2) (sloppyParseHexByteString d) v4
-  parseJSON x = error $ "Wrong format when trying to parse Log from JSON: " ++ show x
-
 b16_decode_optional0x  ::  B.ByteString->(B.ByteString, B.ByteString)
 b16_decode_optional0x x =
   case BC.unpack x of
     ('0':'x':rest) -> B16.decode $ BC.pack rest
     _              -> B16.decode x
 
-
-{- DOIT Readd
-instance FromJSON Address where
-  parseJSON =
-    withText "Address" $
-    pure . Address . fromIntegral . byteString2Integer . fst . b16_decode_optional0x . BC.pack . T.unpack
--}
-
-{- DOIT Readd
-instance FromJSON B.ByteString where
-  parseJSON =
-    withText "Address" $
-    pure . string2ByteString . T.unpack
-    where
-      string2ByteString  ::  String->B.ByteString
-      string2ByteString ('0':'x':rest) = fst . B16.decode . BC.pack $ rest
-      string2ByteString x = fst . B16.decode . BC.pack $ x
--}
 
 instance FromJSON Haskoin.PrvKey where
   parseJSON =
@@ -334,21 +246,3 @@ instance FromJSON RawData where
     where
       string2RawData  ::  String->RawData
       string2RawData x = RawData . fst . b16_decode_optional0x . BC.pack $ x
-
-{- DOIT Readd
-instance FromJSON SHA where
-  parseJSON =
-    withText "SHA" $
-    pure . string2SHA . T.unpack
-    where
-      string2SHA  ::  String->SHA
-      string2SHA ('0':'x':rest) = SHA . fromIntegral . byteString2Integer . fst . B16.decode . BC.pack $ rest
-      string2SHA x = SHA . fromIntegral . byteString2Integer . fst . B16.decode . BC.pack $ x
--}
-
-{- DOIT Readd
-instance FromJSON SHAPtr where
-  parseJSON =
-    withText "SHAPtr" $
-    pure . SHAPtr . fst . B16.decode . BC.pack . T.unpack
--}

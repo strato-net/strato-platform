@@ -95,14 +95,11 @@ instance AS.ToJSONKey Address where
           where f = T.pack . formatAddress
 
 instance AS.FromJSON Address where
--- TODO- put this tighter definition back in again....  I needed to loosten the
--- definition because genesis.json breaks some of the format.
---  parseJSON (String s)
---    | not (all (`elem` ("abcdefABCDEF0123456789"::String)) $ T.unpack s) ||
---      not (T.length s == 40) =
---        error $ "error converting json to Address: " ++ show s
-  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ T.unpack s
-  parseJSON _          = mzero
+  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
+    where drop0x ('0':'x':cs) = cs
+          drop0x ('0':'X':cs) = cs
+          drop0x cs = cs
+  parseJSON x = typeMismatch "Address" x
 
 instance Lei.Pretty Address where
   pretty = Lei.text . CL.yellow . formatAddress

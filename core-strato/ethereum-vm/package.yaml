@@ -32,6 +32,7 @@ dependencies:
   - either
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
   - extra
   - hedis
   - hflags
@@ -43,6 +44,7 @@ dependencies:
   - mtl
   - ordered-containers
   - persistent-postgresql
+  - persistent-sqlite
   - postgresql-simple
   - prometheus-client
   - resourcet
@@ -56,6 +58,7 @@ dependencies:
   - strato-sequencer
   - strato-statediff
   - text
+  - temporary
   - time
   - transformers
   - unliftio-core
