@@ -32,6 +32,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
+import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
@@ -75,7 +76,7 @@ data VMState =
     vmGasRemaining   :: Counter,
     pc               :: Counter,
     memory           :: Memory,
-    stack            :: [Word256],
+    stack            :: MS.MutableStack Word256,
     callDepth        :: Int,
     refund           :: Counter,
 
@@ -127,6 +128,7 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
   pcref <- newCounter 0
   gasref <- newCounter 0
   refundref <- newCounter 0
+  stackHandle <- MS.empty
   return VMState
              {
                vmIsHomestead=isHomestead,
@@ -138,7 +140,7 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
                vmException=Nothing,
                writable=True,
                vmGasRemaining=gasref,
-               stack=[],
+               stack=stackHandle,
                memory=m,
                callDepth=0,
                refund=refundref,

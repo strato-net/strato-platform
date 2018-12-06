@@ -10,6 +10,8 @@ module Blockchain.VM.VMM (
   localState,
   getStackItem,
   push,
+  swapn,
+  dupn,
   addDebugCallCreate,
   addSuicideList,
   getEnvVar,
@@ -47,6 +49,7 @@ import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Set                           as S
+import           MonadUtils
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
@@ -62,6 +65,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.VM.Environment
+import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -149,13 +153,12 @@ instance Word256Storable Integer where
   toWord256 = fromIntegral
 
 pop::Word256Storable a=>VMM a
-pop = do
-  state' <- lift get
-  case state' of
-    VMState{stack=val:rest} -> do
-                lift $ put state'{stack=rest}
-                return $ fromWord256 val
-    _ -> throwE StackTooSmallException
+pop = fromWord256 <$> do
+  stack' <- lift $ gets stack
+  v <- liftIO $ MS.pop stack'
+  case v of
+    Nothing -> throwE StackTooSmallException
+    Just v' -> return v'
 
 localState :: (VMState -> VMState) -> VMM a -> VMM a
 localState f mv = do
@@ -166,17 +169,30 @@ localState f mv = do
   return x
 
 getStackItem::Word256Storable a=>Int->VMM a
-getStackItem i = do
-  state' <- lift get
-  if length (stack state') > fromIntegral i
-    then return $ fromWord256 (stack state' !! i)
-    else throwE StackTooSmallException
+getStackItem i = fromWord256 <$> do
+  stack' <- lift $ gets stack
+  mVal <- liftIO $ MS.get stack' i
+  case mVal of
+    Nothing -> throwE StackTooSmallException
+    Just val -> return val
 
 push::Word256Storable a=>a->VMM ()
 push val = do
-  state' <- lift get
-  when (length (stack state') > 1023) $ throwE StackTooLarge
-  lift $ put state'{stack = toWord256 val:stack state'}
+  stack' <- lift $ gets stack
+  unlessM (liftIO . MS.push stack' . toWord256 $ val) $
+    throwE StackTooLarge
+
+swapn::Int->VMM ()
+swapn n = do
+  stack' <- lift $ gets stack
+  unlessM (liftIO $ MS.swap stack' $ n-1) $
+    throwE StackTooSmallException
+
+dupn::Int->VMM ()
+dupn n = do
+  stack' <- lift $ fmap stack get
+  unlessM (liftIO $ MS.dup stack' $ n-1) $
+    throwE StackTooSmallException
 
 addDebugCallCreate::DebugCallCreate->VMM ()
 addDebugCallCreate callCreate = do

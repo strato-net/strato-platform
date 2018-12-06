@@ -28,6 +28,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
+import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
@@ -106,3 +107,73 @@ spec = do
           print . fst . B16.decode $ code
           print . Text.decodeUtf8 $ code
           print . C8.takeWhile (/= '\0') . C8.drop 64 $ code
+  describe "Mutable Stack" $ do
+    it "can push elements" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.push s 4 `shouldReturn` True
+      MS.push s 7 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 7
+      MS.pop s `shouldReturn` Just 4
+      MS.pop s `shouldReturn` Nothing
+
+    it "has a limit of 1024" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [1..1024] `shouldReturn` replicate 1024 True
+      MS.push s 2048 `shouldReturn` False
+      MS.isEmpty s `shouldReturn` False
+      replicateM 1024 (MS.pop s) `shouldReturn` map Just [1024,1023..1]
+      MS.isEmpty s `shouldReturn` True
+
+    it "dups the correct positions" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [10,9..0] `shouldReturn` replicate 11 True
+      MS.isEmpty s `shouldReturn` False
+      let test k = do
+            MS.dup s k `shouldReturn` True
+            MS.pop s
+      test 0 `shouldReturn` Just 0
+      test 1 `shouldReturn` Just 1
+      test 7 `shouldReturn` Just 7
+      test 10 `shouldReturn` Just 10
+      MS.dup s 11 `shouldReturn` False
+      MS.pop s `shouldReturn` Just 0
+
+    it "swaps the correct positions" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [50,40..0] `shouldReturn` replicate 6 True
+      MS.swap s 0 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 10
+      MS.pop s `shouldReturn` Just 0
+      -- Stack: [50, 40, 30, 20]
+      MS.push s 10 `shouldReturn` True
+      MS.push s 0 `shouldReturn` True
+      -- Stack: [50, 40, 30, 20, 10, 0]
+      MS.swap s 4 `shouldReturn` True
+      -- Stack: [0, 40, 30, 20, 10, 50]
+      MS.pop s `shouldReturn` Just 50
+      MS.pop s `shouldReturn` Just 10
+      -- Stack: [0, 40, 30, 20]
+      MS.swap s 3 `shouldReturn` False
+      -- Stack: [0, 40, 30, 20]
+      replicateM 4 (MS.pop s) `shouldReturn` map Just [20, 30, 40, 0]
+
+    it "does not underflow on a short swap" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.push s 17 `shouldReturn` True
+      MS.push s 99 `shouldReturn` True
+      MS.swap s 0 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 17
+      MS.pop s `shouldReturn` Just 99
+      MS.pop s `shouldReturn` Nothing
+
+    it "can populate a list" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.toList s `shouldReturn` []
+      MS.push s 3 `shouldReturn` True
+      MS.toList s `shouldReturn` [3]
+      MS.push s 4 `shouldReturn` True
+      MS.toList s `shouldReturn` [4, 3]
+      MS.push s 5 `shouldReturn` True
+      MS.toList s `shouldReturn` [5, 4, 3]
+      MS.pop s `shouldReturn` Just 5
+      MS.toList s `shouldReturn` [4, 3]

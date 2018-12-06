@@ -60,6 +60,7 @@ import           Blockchain.Util
 import           Blockchain.VM.Code
 import           Blockchain.VM.Environment
 import           Blockchain.VM.Memory
+import qualified Blockchain.VM.MutableStack        as MS
 import           Blockchain.VM.OpcodePrices
 import           Blockchain.VM.Opcodes
 import           Blockchain.VM.PrecompiledContracts
@@ -113,32 +114,10 @@ guardStorage = do
   w <- lift $ writable <$> get
   when (not w) (throwE WriteProtection)
 
-
-dupN::Int->VMM ()
-dupN n = do
-  stack' <- lift $ fmap stack get
-  if length stack' < n
-    then do
-    throwE StackTooSmallException
-    else push $ stack' !! (n-1)
-
-
 s256ToInteger::Word256->Integer
 --s256ToInteger i | i < 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = toInteger i
 s256ToInteger i | i < 0x8000000000000000000000000000000000000000000000000000000000000000 = toInteger i
 s256ToInteger i = toInteger i - 0x10000000000000000000000000000000000000000000000000000000000000000
-
-
-swapn::Int->VMM ()
-swapn n = do
-  v1 <- pop
-  vmState <- lift get
-  if length (stack vmState) < n
-    then do
-      throwE StackTooSmallException
-    else do
-      let (middle, v2:rest2) = splitAt (n-1) $ stack vmState
-      lift $ put vmState{stack = v2:(middle++(v1:rest2))}
 
 getByte::Word256->Word256->Word256
 getByte whichByte val | whichByte < 32 = val `shiftR` (8*(31 - fromIntegral whichByte)) .&. 0xFF
@@ -450,22 +429,22 @@ runOperation JUMPDEST = return ()
 runOperation (PUSH vals) =
   push $ (fromIntegral (bytes2Integer vals)::Word256)
 
-runOperation DUP1 = dupN 1
-runOperation DUP2 = dupN 2
-runOperation DUP3 = dupN 3
-runOperation DUP4 = dupN 4
-runOperation DUP5 = dupN 5
-runOperation DUP6 = dupN 6
-runOperation DUP7 = dupN 7
-runOperation DUP8 = dupN 8
-runOperation DUP9 = dupN 9
-runOperation DUP10 = dupN 10
-runOperation DUP11 = dupN 11
-runOperation DUP12 = dupN 12
-runOperation DUP13 = dupN 13
-runOperation DUP14 = dupN 14
-runOperation DUP15 = dupN 15
-runOperation DUP16 = dupN 16
+runOperation DUP1 = dupn 1
+runOperation DUP2 = dupn 2
+runOperation DUP3 = dupn 3
+runOperation DUP4 = dupn 4
+runOperation DUP5 = dupn 5
+runOperation DUP6 = dupn 6
+runOperation DUP7 = dupn 7
+runOperation DUP8 = dupn 8
+runOperation DUP9 = dupn 9
+runOperation DUP10 = dupn 10
+runOperation DUP11 = dupn 11
+runOperation DUP12 = dupn 12
+runOperation DUP13 = dupn 13
+runOperation DUP14 = dupn 14
+runOperation DUP15 = dupn 15
+runOperation DUP16 = dupn 16
 
 runOperation SWAP1 = swapn 1
 runOperation SWAP2 = swapn 2
@@ -881,8 +860,9 @@ printTrace op gasBefore pcBefore stateAfter = do
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
   _ <- liftIO $ getMemAsByteString (memory stateAfter)
-  lift $ $logInfoS "printTrace" "    STACK"
-  lift $ $logInfoS "printTrace" . T.pack $ unlines (padZeros 64 <$> flip showHex "" <$> (reverse $ stack stateAfter))
+  $logInfoS "printTrace" "    STACK"
+  stackList <- liftIO . MS.toList . stack $ stateAfter
+  $logInfoS "printTrace" . T.pack $ unlines (padZeros 64 <$> flip showHex "" <$> (reverse $ stackList))
 --  lift $ $logInfoS "printTrace" . T.pack $ "    MEMORY\n" ++ showMem 0 (B.unpack $ memByteString)
 {-
   lift $ $logInfoS "printTrace" "    STORAGE"
