@@ -26,6 +26,7 @@ packages:
 - core-strato/blockapps-util/
 - core-strato/strato-api/
 - core-strato/blockapps-tools/
+- core-strato/vrun/
 - core-strato/strato-genesis/
 - core-strato/strato-adit/
 - core-strato/strato-index/
