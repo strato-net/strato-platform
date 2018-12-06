@@ -13,7 +13,6 @@
       }
     },
     "constr": {
-      "_id": {
         "_comment": "TODO(tim): These values make no sense.",
         "vals": {},
         "args": {},
@@ -21,7 +20,6 @@
         "type": "String",
         "index": 0,
         "name": "_id"
-      }
     },
     "vars": {
       "value": {

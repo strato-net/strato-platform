@@ -13,6 +13,7 @@ module Blockchain.VMContext
     , Config(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , runTestContextM
     , runContextM
     , evalContextM
     , execContextM
@@ -26,6 +27,7 @@ module Blockchain.VMContext
 
 
 import           Control.Lens                       hiding (Context(..))
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
@@ -36,12 +38,15 @@ import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Q
+import qualified Data.Text                          as T
 import qualified Database.LevelDB                   as DB
-import qualified Database.Persist.Postgresql        as SQL
+import qualified Database.Persist.Postgresql        as PSQL
+import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
 import qualified Network.Kafka                      as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
+import           System.IO.Temp
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
@@ -75,7 +80,7 @@ import           Executable.EVMFlags
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
 
-newtype Config = Config { configSQLDB :: SQLDB }
+newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
 data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHashDB                 :: HashDB
                        , contextCodeDB                 :: CodeDB
@@ -97,7 +102,11 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        }
 makeLenses ''Context
 
+
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+
+instance Show Context where
+  show = const "<context>"
 
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
@@ -193,12 +202,56 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
+runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
+                   StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
+  withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
+    runResourceT $ do
+      conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack filepath) 20
+      flip runReaderT (Config conn) $ do
+        let ldbOptions = DB.defaultOptions {
+          DB.createIfMissing = True,
+          DB.cacheSize = flags_ldbCacheSize,
+          DB.blockSize = flags_ldbBlockSize
+        }
+        let openDB base = DB.open (tmpdir ++ base) ldbOptions
+        sdb <- openDB stateDBPath
+        hdb <- openDB hashDBPath
+        cdb <- openDB codeDBPath
+        blksumdb <- openDB blockSummaryCacheDBPath
+        redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+          Redis.connectHost = "localhost",
+          Redis.connectPort = Redis.PortNumber 2023,
+          Redis.connectDatabase = 0
+        }
+        let initialKafkaState = error "TODO(tim): require sinks"
+        runStateT f (Context
+                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                     hdb
+                     cdb
+                     blksumdb
+                     M.empty
+                     M.empty
+                     M.empty
+                     M.empty
+                     MP.emptyTriePtr
+                     MP.emptyTriePtr
+                     (SHA 0)
+                     Nothing
+                     defaultBaggerState
+                     initialKafkaState
+                     Unspecified
+                     redisPool
+                     Q.empty []
+                     False
+                     False)
+
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
-        conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
+        conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
         flip runReaderT (Config conn) $ do
           let ldbOptions = DB.defaultOptions {
               DB.createIfMissing = True,

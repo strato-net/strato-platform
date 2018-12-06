@@ -26,6 +26,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
+import           Blockchain.VM.Opcodes (CodePointer)
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
@@ -35,6 +36,8 @@ data Memory =
     mSize   :: IORef Word256
     }
 
+instance Show Memory where
+  show = const "<memory>"
 
 newMemory :: IO Memory
 newMemory = do
@@ -57,7 +60,7 @@ data VMState =
     dbs              :: Context,
     sqldb            :: Config,
     vmGasRemaining   :: Integer,
-    pc               :: Word256,
+    pc               :: CodePointer,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
@@ -82,7 +85,7 @@ data VMState =
     isRunningTests   :: Bool,
     debugCallCreates :: Maybe [DebugCallCreate]
 
-    }
+    } deriving (Show)
 makeLenses ''VMState
 
 

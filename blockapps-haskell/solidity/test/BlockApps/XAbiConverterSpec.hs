@@ -113,38 +113,36 @@ secondPassString =
          }
       },
       "constr":{
-         "MyContract":{
-            "args":{
-              "_author":{
-                  "type":"Address",
-                  "index":1
-              },
-              "_userOwner":{
-                  "type":"Address",
-                  "index":0
-              },
-              "_hash":{
-                  "type":"Bytes",
-                  "index":2,
-                  "bytes":32
-              },
-              "_contents":{
-                  "dynamic":true,
-                  "type":"String",
-                  "index":4
-              },
-              "_tags":{
-                  "dynamic":true,
-                  "entry":{
-                    "type":"Bytes",
-                    "bytes":32
-                  },
-                  "type":"Array",
-                  "index":3
-              }
-            },
-            "vals":{}
-         }
+         "args":{
+           "_author":{
+               "type":"Address",
+               "index":1
+           },
+           "_userOwner":{
+               "type":"Address",
+               "index":0
+           },
+           "_hash":{
+               "type":"Bytes",
+               "index":2,
+               "bytes":32
+           },
+           "_contents":{
+               "dynamic":true,
+               "type":"String",
+               "index":4
+           },
+           "_tags":{
+               "dynamic":true,
+               "entry":{
+                 "type":"Bytes",
+                 "bytes":32
+               },
+               "type":"Array",
+               "index":3
+           }
+         },
+         "vals":{}
       },
       "vars":{
          "hash":{
@@ -289,38 +287,36 @@ firstPassString =
          }
       },
       "constr":{
-         "MyContract":{
-            "args":{
-              "_author":{
-                  "type":"Address",
-                  "index":1
-              },
-              "_userOwner":{
-                  "type":"Address",
-                  "index":0
-              },
-              "_hash":{
-                  "type":"Bytes",
-                  "index":2,
-                  "bytes":32
-              },
-              "_contents":{
-                  "dynamic":true,
-                  "type":"String",
-                  "index":4
-              },
-              "_tags":{
-                  "dynamic":true,
-                  "entry":{
-                    "type":"Bytes",
-                    "bytes":32
-                  },
-                  "type":"Array",
-                  "index":3
-              }
-            },
-            "vals":{}
-         }
+         "args":{
+           "_author":{
+               "type":"Address",
+               "index":1
+           },
+           "_userOwner":{
+               "type":"Address",
+               "index":0
+           },
+           "_hash":{
+               "type":"Bytes",
+               "index":2,
+               "bytes":32
+           },
+           "_contents":{
+               "dynamic":true,
+               "type":"String",
+               "index":4
+           },
+           "_tags":{
+               "dynamic":true,
+               "entry":{
+                 "type":"Bytes",
+                 "bytes":32
+               },
+               "type":"Array",
+               "index":3
+           }
+         },
+         "vals":{}
       },
       "vars":{
          "hash":{

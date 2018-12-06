@@ -5,7 +5,6 @@ maintainer:          jamshid
 build-type:          Simple
 
 dependencies:
-  - HUnit
   - QuickCheck
   - aeson
   - ansi-wl-pprint
@@ -34,6 +33,7 @@ dependencies:
   - hflags
   - hspec
   - hspec-contrib
+  - hspec-expectations-lifted
   - lens-family
   - lens-family-th
   - leveldb-haskell
@@ -55,17 +55,16 @@ dependencies:
 
 ghc-options: -Wall -Werror -threaded
 
-executables:
-  test-suite-exe:
-    main: Main.hs
-    source-dirs:
-      - src/
-      - test/
-
 tests:
   vm-tests:
     source-dirs: test
     main: TestMain.hs
+
+  unittests:
+    source-dirs: test
+    main: UnitTest.hs
+    dependencies:
+      - interpolatedstring-perl6
 
   test-suite:
     source-dirs: test

@@ -114,8 +114,8 @@ class CreateContract extends Component {
     const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
     const abi = this.props.sourceFromEditor ? this.props.sourceFromEditor : this.props.abi.src;
     Object.values(abi).forEach(val => {
-      if (val.constr !== undefined) {
-        return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
+      if (val.constr && val.constr.args !== undefined) {
+        return Object.getOwnPropertyNames(val.constr.args).forEach((arg) => {
           if (values[`field${arg}`] !== undefined)
             args[arg] = values[`field${arg}`];
         })
@@ -251,12 +251,13 @@ class CreateContract extends Component {
       </tr>);
     } else {
       let contract = src[contractname];
-      if (contract && contract['constr'] !== undefined) {
-        return Object.getOwnPropertyNames(contract['constr']).map((arg, i) => {
+      if (contract && contract['constr'] && contract['constr'].args !== undefined) {
+        const funcArgs = contract['constr'].args
+        return Object.getOwnPropertyNames(funcArgs).map((arg, i) => {
           return (
             <tr key={'arg' + i}>
               <td>{arg}</td>
-              <td>{contract.constr[arg].type}</td>
+              <td>{funcArgs[arg].type}</td>
               <td>
                 <Field
                   id={arg}

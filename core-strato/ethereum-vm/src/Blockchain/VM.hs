@@ -23,6 +23,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Char
 import           Data.Function
+import qualified Data.IntSet                        as I
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
@@ -425,19 +426,19 @@ runOperation SSTORE = do
 runOperation JUMP = do
   p <- pop
   jumpDests <- getEnvVar envJumpDests
-
-  if p `elem` jumpDests
-    then setPC $ fromIntegral p - 1 -- Subtracting 1 to compensate for the pc-increment that occurs every step.
+  let pInt = fromIntegral . min p $ (0xffffffffffffffff :: Word256)
+  if pInt `I.member` jumpDests
+    then setPC $ pInt - 1 -- Subtracting 1 to compensate for the pc-increment that occurs every step.
     else throwE InvalidJump
 
 runOperation JUMPI = do
   p <- pop
   condition <- pop
   jumpDests <- getEnvVar envJumpDests
-
-  case (p `elem` jumpDests, (0::Word256) /= condition) of
+  let pInt = fromIntegral . min p $ (0xffffffffffffffff :: Word256)
+  case (pInt `I.member` jumpDests, (0::Word256) /= condition) of
     (_, False) -> return ()
-    (True, _)  -> setPC $ fromIntegral p - 1
+    (True, _)  -> setPC $ pInt - 1
     _          -> throwE InvalidJump
 
 runOperation PC = pushVMStateVar pc
@@ -916,7 +917,7 @@ runCode c = do
 
   when flags_sqlTrace $
     vmTrace $
-      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc vmState)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
+      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex (pc vmState) "") ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
   when flags_trace $ printTrace (environment result) memBefore memAfter c op vmState result
 

@@ -791,32 +791,28 @@ FROM xabi_functions XF
 WHERE XF.is_constructor = false AND XF.contract_metadata_id = $1;
 -}
 getXabiConstrQuery :: HasCallStack =>
-                         Int32 -> Bloc (Map Text Func)
+                         Int32 -> Bloc (Maybe Func)
 getXabiConstrQuery cmId = do
-  funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+  funcsWithIds <- blocQueryMaybe $ proc () -> do
     (xfId,contractmetadataId,isConstr,name, _) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& isConstr
     returnA -< (name,xfId)
-  if (length funcsWithIds /= 1)
-    then return Map.empty
-    else do
-      let (fname,xfId) = head . Map.toList $ funcsWithIds
-      args <- getXabiFunctionsArgsQuery xfId
-      let
-        valMap valList = Map.fromList
-          [ ( "#" <> Text.pack (show (Xabi.indexedTypeIndex val)), val)
-          | val <- valList
-          ]
-      vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
-      let func = Func { funcArgs = args
-                      , funcVals = vals
-                      , funcStateMutability = Nothing
-                      , funcContents = Nothing
-                      , funcVisibility = Nothing
-                      , funcModifiers = Nothing
-                      }
-      return $ Map.singleton fname func
+  for funcsWithIds $ \(_ :: Text, xfId) -> do
+    args <- getXabiFunctionsArgsQuery xfId
+    let
+      valMap valList = Map.fromList
+        [ ( "#" <> Text.pack (show (Xabi.indexedTypeIndex val)), val)
+        | val <- valList
+        ]
+    vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
+    return $ Func { funcArgs = args
+                  , funcVals = vals
+                  , funcStateMutability = Nothing
+                  , funcContents = Nothing
+                  , funcVisibility = Nothing
+                  , funcModifiers = Nothing
+                  }
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do
@@ -1206,7 +1202,7 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
-  case Map.lookup contractName xabiConstr of
+  case xabiConstr of
     Just constr -> insertXabiConstr metadataId contractName (funcArgs constr)
     Nothing -> return ()
   void $ insertXabiVariables metadataId xabiVars

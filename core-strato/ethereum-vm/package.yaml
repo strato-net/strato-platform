@@ -33,6 +33,7 @@ dependencies:
   - either
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
   - extra
   - formatting
   - hedis
@@ -45,6 +46,7 @@ dependencies:
   - mtl
   - ordered-containers
   - persistent-postgresql
+  - persistent-sqlite
   - postgresql-simple
   - prometheus-client
   - resourcet
@@ -58,6 +60,7 @@ dependencies:
   - strato-sequencer
   - strato-statediff
   - text
+  - temporary
   - time
   - transformers
   - unliftio-core
@@ -113,3 +116,13 @@ tests:
       - ethereum-vm
       - hspec
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+
+benchmarks:
+  microbench:
+    source-dirs: bench/
+    main: Microbench.hs
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - hashable
+      - unordered-containers
