@@ -9,6 +9,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Data.Map.Strict            (Map)
+import qualified Data.IntSet                as I
 import           Data.Text                  (Text)
 
 data Environment =
@@ -20,7 +21,7 @@ data Environment =
       envSender      :: Address,
       envValue       :: Integer,
       envCode        :: Code,
-      envJumpDests   :: [Word256],
+      envJumpDests   :: I.IntSet,
       envBlockHeader :: BlockData,
       envTxHash      :: SHA,
       envChainId     :: Maybe Word256,

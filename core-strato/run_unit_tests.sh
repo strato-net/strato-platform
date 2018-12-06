@@ -20,6 +20,9 @@ TESTS=(
   strato-sequencer
 )
 
+BENCHES=(
+  ethereum-vm
+)
 # There's a good chance that strato-getting-started is also running, so
 # we change redis's port to avoid a conflict.
 REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)
@@ -29,6 +32,6 @@ for tst in ${TESTS[@]}; do
   time stack test $tst
 done
 
-for tst in ${TEST_AND_BENCH[@]}; do
-  time stack test $tst
+for tst in ${BENCHES[@]}; do
+  time stack bench $tst
 done

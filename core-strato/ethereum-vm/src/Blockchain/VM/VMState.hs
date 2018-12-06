@@ -26,6 +26,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
+import           Blockchain.VM.Opcodes (CodePointer)
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
@@ -57,7 +58,7 @@ data VMState =
     dbs              :: Context,
     sqldb            :: Config,
     vmGasRemaining   :: Integer,
-    pc               :: Word256,
+    pc               :: CodePointer,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
