@@ -219,7 +219,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
         hdb <- openDB hashDBPath
         cdb <- openDB codeDBPath
         blksumdb <- openDB blockSummaryCacheDBPath
-        redisPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
+        redisPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
           Redis.connectHost = "localhost",
           Redis.connectPort = Redis.PortNumber 2023,
           Redis.connectDatabase = 0

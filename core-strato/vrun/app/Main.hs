@@ -23,6 +23,7 @@ import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin                    as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
@@ -36,7 +37,7 @@ main = do
   _ <- $initHFlags "The Ethereum Test program"
 
   let secretKey = fromJust . Haskoin.makePrvKey $ 0x1234
-      t = createContractCreationTX 
+      t = createContractCreationTX
             0 --nonce
             1 --gas price
             1000000000000000000 --gas limit
@@ -46,7 +47,7 @@ main = do
 --            (Code $ B.replicate 1 0x5b)
             Nothing
             secretKey
-            
+
   signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
 
   let blockData = BlockData {
@@ -67,11 +68,12 @@ main = do
         blockDataNonce = 0,
         blockDataMixHash=SHA 0
         }
-        
+
   let signedTransaction = txToOutputTx signedTransaction'
 
-  
   (result, _) <- flip runLoggingT vrunLogger $ runTestContextM $ do
+    MP.initializeBlank =<< getStateDB
+    setStateDBStateRoot MP.emptyTriePtr
 
     let addr = Address 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed
     putAddressState addr AddressState{
