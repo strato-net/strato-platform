@@ -24,7 +24,7 @@ $(FAKEROOT)/usr/bin/solc-0.4: prebuild
 	./pull_solc.sh 0.4.25 $@ $(LICENSE_SOURCE_DIR)/solidity-0.4
 
 $(FAKEROOT)/usr/bin/solc-0.5: prebuild
-	./pull_solc.sh 0.5.0 $@ $(LICENSE_SOURCE_DIR)/solidity-0.5
+	./pull_solc.sh 0.5.1 $@ $(LICENSE_SOURCE_DIR)/solidity-0.5
 
 $(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4 $(FAKEROOT)/usr/bin/solc-0.5
 	ln -f $< $@
