@@ -154,6 +154,7 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
+    - blockstanbulAdmins=${blockstanbulAdmins:-}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
