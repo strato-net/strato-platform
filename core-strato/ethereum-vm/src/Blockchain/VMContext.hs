@@ -236,8 +236,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      MP.emptyTriePtr
                      MP.emptyTriePtr
-                     (SHA 0)
-                     Nothing
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
