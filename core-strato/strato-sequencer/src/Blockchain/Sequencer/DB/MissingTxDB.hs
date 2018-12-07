@@ -4,27 +4,22 @@ module Blockchain.Sequencer.DB.MissingTxDB where
 import           Blockchain.SHA
 
 import           Control.Monad.IO.Class
-import qualified Data.Set                     as S
+import           Data.Maybe
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-getMissingTxsDB :: HasPrivateHashDB m => m (S.Set SHA)
-getMissingTxsDB = missingTxs <$> getPrivateHashDB
+isMissingTX :: HasRegistry m => SHA -> m Bool
+isMissingTX tHash = maybe False (isJust . _outputTx) <$> getTxHashEntry tHash
 
-putMissingTxsDB :: HasPrivateHashDB m => S.Set SHA -> m ()
-putMissingTxsDB txs = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingTxs = txs }
-
-isMissingTX :: HasPrivateHashDB m => SHA -> m Bool
-isMissingTX tx = S.member tx <$> getMissingTxsDB
-
-insertMissingTx :: HasPrivateHashDB m => SHA -> m ()
-insertMissingTx tx = do
+insertMissingTx :: HasRegistry m => SHA -> m ()
+insertMissingTx tHash = do
   liftIO $ withLabel txMetrics "missing_tx" incCounter
-  getMissingTxsDB >>= putMissingTxsDB . S.insert tx
+  alterTxHashEntry_ tHash $
+    return . Just . fromMaybe emptyTxHashEntry
 
-removeMissingTx :: HasPrivateHashDB m => SHA -> m ()
-removeMissingTx tx = do
+removeMissingTx :: HasRegistry m => SHA -> m ()
+removeMissingTx tHash = do
   liftIO $ withLabel txMetrics "missing_tx_removed" incCounter
-  getMissingTxsDB >>= putMissingTxsDB . S.delete tx
+  removeTransaction tHash

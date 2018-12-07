@@ -1,25 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.SeenChainDB where
 
+import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord           (Word256)
 
 import           Control.Monad.IO.Class
-import qualified Data.Set                     as S
+import           Data.Maybe                   (isJust)
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.Sequencer.DB.PrivateHashDB
 
-getSeenChainsDB :: HasPrivateHashDB m => m (S.Set Word256)
-getSeenChainsDB = seenChains <$> getPrivateHashDB
+lookupSeenChain :: HasRegistry m => Word256 -> m Bool
+lookupSeenChain = fmap isJust . getChainIdEntry
 
-putSeenChainsDB :: HasPrivateHashDB m => S.Set Word256 -> m ()
-putSeenChainsDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ seenChains = m }
-
-lookupSeenChain :: HasPrivateHashDB m => Word256 -> m Bool
-lookupSeenChain chainId = S.member chainId <$> getSeenChainsDB
-
-insertSeenChain :: HasPrivateHashDB m => Word256 -> m ()
-insertSeenChain chainId = do
+insertSeenChain :: HasRegistry m => Word256 -> ChainInfo -> m ()
+insertSeenChain chainId cInfo = do
   liftIO $ withLabel chainMetrics "seen_chains" incCounter
-  getSeenChainsDB >>= putSeenChainsDB . S.insert chainId
+  insertChainIdEntry chainId $ chainIdEntry cInfo

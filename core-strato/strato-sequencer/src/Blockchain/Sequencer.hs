@@ -19,7 +19,7 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (for_, toList, traverse_)
-import           Data.Maybe                                (catMaybes, fromJust, isJust)
+import           Data.Maybe
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -203,7 +203,7 @@ checkIfIsMissingTX th ch = lookupChainHash ch >>= \case
     return ()
   Just (_, cid) -> do
     $logInfoS "transformPrivateHashTXs" . T.pack $ "We know this transaction's chain Id. It's " ++ format (SHA cid) ++ ". Inserting into MissingTxDB and GetTransactions list"
-    useChainHash ch cid
+    useChainHash ch
     insertMissingTx th
     insertGetTransactionsDB th
 
@@ -219,7 +219,7 @@ runPrivateHashTX th ch = do
       lookupTransaction th >>= \case
         Just tx -> do
           $logInfoS "runPrivateHashTX" . T.pack $ "We have this transaction's body. It's: " ++ prettyOTx tx
-          useChainHash ch (fromJust . TD.transactionChainId $ otBaseTx tx)
+          useChainHash ch
         Nothing -> do
           $logInfoS "runPrivateHashTX" "We don't have this transaction's body. Looking it up by chain hash"
           checkIfIsMissingTX th ch
@@ -296,16 +296,44 @@ transformFullTransactions pairs = do
             lookupTxBlocks tHash >>= \case
               Nothing -> $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block."
               Just bHash -> lookupDependentTxs bHash >>= \case
-                depTxs | not (S.member tHash depTxs) ->
-                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
-                depTxs | depTxs == S.singleton tHash -> do
-                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
+                Nothing ->
+                  error $ concat
+                    [ "lookupDependentTxs: transaction "
+                    , format tHash
+                    , " claims to depend on block "
+                    , format bHash
+                    , ", but the block is not listed in the registry."
+                    ]
+                Just depTxs | not (S.member tHash depTxs) ->
+                  error $ concat
+                    [ "lookupDependentTxs: transaction "
+                    , format tHash
+                    , " claims to depend on block "
+                    , format bHash
+                    , ", but it's missing from the block's dependent transaction set. "
+                    , "Dependent transactions: "
+                    , (show . map format $ S.toList depTxs)
+                    ]
+                Just depTxs | depTxs == S.singleton tHash -> do
+                  $logInfoS "transformFullTransactions" . T.pack $ concat
+                    [ "Transaction "
+                    , format tHash
+                    , " is the only dependent transaction in block "
+                    , format bHash
+                    ]
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
                   traverse_ runBlock mBlock
-                depTxs -> do
-                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
+                Just depTxs -> do
+                  $logInfoS "transformFullTransactions" . T.pack $ concat
+                    [ "Transaction "
+                    , format tHash
+                    , " is a dependent transaction in block "
+                    , format bHash
+                    , ", but there are others. "
+                    , "Inserting them into MissingTxDB and GetTransactions list"
+                    ]
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
                   mapM_ insertMissingTx depTxs'
@@ -392,8 +420,8 @@ hydrateAndEmit = awaitForever $ \case
             lift $ insertDependentTx bHash th
           else
             logHydrate $ "Transaction hash " ++ format th ++ " is not missing"
-    depTXS <- lift . lookupDependentTxs $ bHash
-    if S.null depTXS
+    depTXs <- lift . lookupDependentTxs $ bHash
+    if isNothing depTXs || (S.null $ fromJust depTXs)
       then do
         logHydrate $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
         hydratedBlock <- lift . hydrateBlock $ ob
@@ -401,7 +429,7 @@ hydrateAndEmit = awaitForever $ \case
         yield $ OEBlock hydratedBlock
       else do
         logHydrate $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
-        lift $ mapM_ insertGetTransactionsDB depTXS
+        lift . for_ depTXs $ mapM_ insertGetTransactionsDB
   oe -> yield oe
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
@@ -429,7 +457,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
     False -> do
       $logInfoS "transformGenesis" "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
       insertChainInfo cId cInfo
-      insertSeenChain cId
+      insertSeenChain cId cInfo
       markForVM $ OEGenesis og
       lookupMissingChainTxs cId >>= \case
         [] -> return ()
@@ -443,15 +471,17 @@ transformGenesis chains = forM_ chains $ \ig -> do
             lookupTxBlocks tHash >>= \case
               Nothing -> return ()
               Just bHash -> lookupDependentTxs bHash >>= \case
-                depTxs | not (S.member tHash depTxs) ->
+                Nothing ->
+                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but the block is missing from the registry."
+                Just depTxs | not (S.member tHash depTxs) ->
                   error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
-                depTxs | depTxs == S.singleton tHash -> do
+                Just depTxs | depTxs == S.singleton tHash -> do
                   $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
                   mapM_ runBlock mBlock
-                depTxs -> do
+                Just depTxs -> do
                   $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
