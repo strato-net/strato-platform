@@ -358,7 +358,7 @@ processTheMessages messages conn g = do
                        (mainStruct cont)
                        hCache
                        0
-              newMap <- Map.fromList <$> get
+              newMap <- gets Map.fromList
               let hInsert = processedContract strAbi strName chain newMap hRow
               functionHist <- isFunctionHistoric g $ actionCodeHash hRow
               fInserts <- if functionHist
