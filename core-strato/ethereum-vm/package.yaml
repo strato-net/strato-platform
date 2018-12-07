@@ -123,3 +123,17 @@ benchmarks:
       - ethereum-vm
       - hashable
       - unordered-containers
+    ghc-options: -O2
+
+  monadbench:
+    source-dirs: bench/
+    main: Monadbench.hs
+    dependencies:
+      - criterion
+      - deepseq
+      - transformers
+      - transformers-base
+      - mtl
+      - resourcet
+      - monad-logger
+    ghc-options: -O2
