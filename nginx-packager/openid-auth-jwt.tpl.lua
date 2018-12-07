@@ -1,4 +1,5 @@
-local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
+--'aud' should not necessarily contain the URLs according to openid standard. Could be the unique client ids instead. Skipping check.
+--local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
 
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
@@ -17,11 +18,11 @@ if err or not res then
     ngx.exit(ngx.HTTP_FORBIDDEN)
 end
 
-if res.aud ~= expected_audience then
-  ngx.status = 403
-  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
-  ngx.exit(ngx.HTTP_FORBIDDEN)
-end
+--if res.aud ~= expected_audience then
+--  ngx.status = 403
+--  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
+--  ngx.exit(ngx.HTTP_FORBIDDEN)
+--end
 
 --if res.scope ~= "edit" then
 --  ngx.exit(ngx.HTTP_FORBIDDEN)
