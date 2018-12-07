@@ -356,7 +356,7 @@ processTheMessages messages conn g = do
               modify $ SVR.decodeCacheValues
                        (typeDefs cont)
                        (mainStruct cont)
-                       cache
+                       hCache
                        0
               newMap <- Map.fromList <$> get
               let hInsert = processedContract strAbi strName chain newMap hRow
