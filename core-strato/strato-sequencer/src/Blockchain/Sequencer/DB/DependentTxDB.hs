@@ -4,10 +4,8 @@ module Blockchain.Sequencer.DB.DependentTxDB where
 import           Blockchain.Format
 import           Blockchain.SHA
 
-import           Control.Lens           ((%~), (%=))
-import           Control.Monad          (mapM_)
+import           Control.Lens
 import           Control.Monad.IO.Class
-import           Data.Foldable          (traverse_)
 import           Data.Set               (Set)
 import qualified Data.Set               as S
 import           Prometheus
@@ -34,4 +32,4 @@ lookupDependentTxs bHash = fmap _dependentTXs <$> getBlockHashEntry bHash
 clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
 clearDependentTxs bHash = do
   liftIO $ withLabel txMetrics "dependent_tx_removed" incCounter
-  traverse_ (mapM_ removeTransaction . _dependentTXs) =<< getBlockHashEntry bHash
+  modifyBlockHashEntryState_ bHash $ dependentTXs .= S.empty
