@@ -101,6 +101,42 @@ class MonadResource m => HasPrivateHashDB m where
 ffor :: (Applicative f, Monad t, Traversable t) => t a -> (a -> f (t b)) -> f (t b)
 ffor t = fmap join . for t
 
+{-
+  GUIDE:
+  All the following functions follow this pattern, for key type K and value type V:
+  - alterX takes a K, a function (Maybe V -> m (Maybe V)), and returns m (Maybe V)
+    - similar to Map.alter, which reads a (maybe non-existent) value from the Map,
+      then either inserts, updates, or deletes it.
+    - if the input value is Nothing, the value doesn't exist in the Map.
+    - if the return value is Nothing, the (k,v) pair is deleted from the Map.
+  - updateX takes a K, a function (V -> m (Maybe V)), and returns m (Maybe V)
+    - similar to Map.update, which takes an existing value for the Map, and either
+      updates or deletes it.
+    - if the return value is Nothing, the (k,v) pair is deleted from the Map.
+    - if the (k,v) pair is not in the Map, the function is not applied.
+  - modifyX takes a K, a function (V -> m V), and returns m V.
+    - similar to State.modify
+    - takes an existing v from the Map, and modifies it with f.
+    - cannot be used to insert or delete items from the Map
+    - if the (k,v) pair is not in the Map, the function is not applied.
+  - repsertX takes a K, a function (Maybe V -> m V), and returns m V.
+    - can be used to insert, modify, or overwrite an existing element of the Map.
+    - cannot be used to delete an item from the Map
+  - insertX takes a K, a V, and returns m ()
+  - getX takes a K, returns m (Maybe V)
+  - updateXState takes a K, a StateT V m (Maybe V) action, and returns m (Maybe V)
+    - same as updateX, but run in the StateT monad
+    - allows for nicer lens operations, and implicit state updates
+    - if the return value of the action is Nothing, the item is deleted from the Map
+    - uses evalStateT
+  - modifyXState takes a K, a StateT V m () action, and returns m V.
+    - same as modifyX, but run in the StateT monad
+    - allows for nicer lens operations, and implicit state updates
+    - action has no return value (m ())
+    - uses execStateT
+  - quiet versions of each function had an underscore appended (e.g. alterX_, modifyXState_)
+-}
+
 updateBlockHashEntry :: HasPrivateHashDB m => SHA -> (BlockHashEntry -> m (Maybe BlockHashEntry)) -> m (Maybe BlockHashEntry)
 updateBlockHashEntry bHash = alterBlockHashEntry bHash . flip ffor
 
