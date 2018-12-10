@@ -404,8 +404,6 @@ hydrateAndEmit = awaitForever $ \case
             th = SHA th'
             ch = SHA ch'
         lift $ runPrivateHashTX th ch
-        tr <- gets _txHashRegistry
-        logHydrate $ "TX Hash Registry: " ++ show tr
         logHydrate $ "Looking up transaction hash " ++ format th ++ " in MissingTxDB"
         missing <- lift . isMissingTX $ th
         if missing
