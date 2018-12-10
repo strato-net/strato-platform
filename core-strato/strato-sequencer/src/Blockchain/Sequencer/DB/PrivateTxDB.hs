@@ -19,14 +19,14 @@ lookupTransaction tHash = join . fmap _outputTx <$> getTxHashEntry tHash
 insertTransaction :: HasRegistry m => OutputTx -> m ()
 insertTransaction tx = do
   let tHash = txHash tx
-      otx = Just tx
-  repsertTxHashEntry_ tHash $ return . maybe (TxHashEntry otx Nothing) (outputTx .~ otx)
+  repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithOutputTx tx) (outputTx .~ Just tx)
 
 insertPrivateHash :: HasRegistry m => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
     liftIO $ withLabel txMetrics "private_hash" incCounter
+    insertTxHashEntry (txHash tx) (txHashEntryWithOutputTx tx)
     cHashes <- generateChainHashes tx
     mapM_ (flip insertChainHash chainId) cHashes
     mapM_ (insertChainBufferEntry chainId) cHashes

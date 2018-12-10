@@ -11,7 +11,7 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
 isMissingTX :: HasRegistry m => SHA -> m Bool
-isMissingTX tHash = maybe False (isJust . _outputTx) <$> getTxHashEntry tHash
+isMissingTX tHash = maybe False (isNothing . _outputTx) <$> getTxHashEntry tHash
 
 insertMissingTx :: HasRegistry m => SHA -> m ()
 insertMissingTx tHash = do
@@ -22,4 +22,4 @@ insertMissingTx tHash = do
 removeMissingTx :: HasRegistry m => SHA -> m ()
 removeMissingTx tHash = do
   liftIO $ withLabel txMetrics "missing_tx_removed" incCounter
-  removeTransaction tHash
+  removeMissingTxEntry tHash

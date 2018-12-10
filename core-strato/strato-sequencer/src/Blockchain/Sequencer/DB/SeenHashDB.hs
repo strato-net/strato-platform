@@ -1,20 +1,25 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.Sequencer.DB.SeenHashDB where
 
 
+import           Control.Lens           ((.~))
+import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Data.Maybe             (isJust)
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.SHA
 
-lookupSeenTxHash :: (HasRegistry m, MonadThrow m) => SHA -> m Bool
-lookupSeenTxHash tHash = isJust <$> getTxHashEntry tHash
+lookupSeenTxHash :: (HasRegistry m, MonadThrow m) => SHA -> m (Maybe SHA)
+lookupSeenTxHash tHash = join . fmap _chainHash <$> getTxHashEntry tHash
 
-insertSeenTxHash :: HasRegistry m => SHA -> m ()
-insertSeenTxHash tHash = do
+insertSeenTxHash :: HasRegistry m => SHA -> SHA -> m ()
+insertSeenTxHash tHash cHash = do
   liftIO $ withLabel txMetrics "seen_tx_hash" incCounter
-  insertTxHashEntry tHash emptyTxHashEntry
+  repsertTxHashEntry_ tHash $ \case
+    Nothing -> return $ txHashEntryWithChainHash cHash
+    Just the -> return $ (chainHash .~ Just cHash) the

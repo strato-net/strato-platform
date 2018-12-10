@@ -17,8 +17,7 @@ lookupTxBlocks tHash = join . fmap _inBlock <$> getTxHashEntry tHash
 insertTxBlock :: HasRegistry m => SHA -> SHA -> m ()
 insertTxBlock tHash bHash = do
   liftIO $ withLabel txMetrics "tx_blocks" incCounter
-  let bh = Just bHash
-  repsertTxHashEntry_ tHash $ return . maybe (TxHashEntry Nothing bh) (inBlock .~ bh)
+  repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithBlockHash bHash) (inBlock .~ Just bHash)
 
 removeTxBlock :: HasRegistry m => SHA -> m ()
 removeTxBlock tHash = do

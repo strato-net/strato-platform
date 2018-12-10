@@ -38,6 +38,7 @@ import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.MissingTxDB
+import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
 import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.SeenHashDB
@@ -211,11 +212,11 @@ runPrivateHashTX :: SHA -> SHA -> SequencerM ()
 runPrivateHashTX th ch = do
   $logInfoS "runPrivateHashTX" . T.pack $ "Transforming transaction " ++ format th ++ " with chain hash " ++ format ch
   lookupSeenTxHash th >>= \case
-    True -> do
+    Just _ -> do
       $logInfoS "runPrivateHashTX" "Transaction hash seen before!"
-    False -> do
+    Nothing -> do
       $logInfoS "runPrivateHashTX" "Transaction hash not seen before! Inserting it into SeenTxHashDB"
-      insertSeenTxHash th
+      insertSeenTxHash th ch
       lookupTransaction th >>= \case
         Just tx -> do
           $logInfoS "runPrivateHashTX" . T.pack $ "We have this transaction's body. It's: " ++ prettyOTx tx
@@ -279,15 +280,14 @@ transformFullTransactions pairs = do
             let tHash = txHash ptx
             removeMissingTx tHash
             lookupSeenTxHash tHash >>= \case
-              True -> do
+              Just _ -> do
                 $logInfoS "transformFullTransactions" . T.pack $ "We have seen this transaction's PrivateHashTX before."
-              False -> do
+              Nothing -> do
                 insertPrivateHash ptx
                 when (otOrigin ptx == TO.API) $ do
                   cHash <- getNewChainHash chainId
-                  insertSeenTxHash tHash
+                  insertSeenTxHash tHash cHash
                   $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash
-                  removeMissingTx tHash
                   let SHA th' = tHash
                       SHA ch' = cHash
                       phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
@@ -405,12 +405,15 @@ hydrateAndEmit = awaitForever $ \case
     let bHash = blockHeaderHash $ obBlockData ob
         logHydrate = $logInfoS "hydrateAndEmit" . T.pack
     logHydrate $ prettyOBlock ob
+    lift . repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
     forM_ (obReceiptTransactions ob) $ \tx ->
       when (isPrivateHashTX tx) $ do
         let TD.PrivateHashTX th' ch' = otBaseTx tx
             th = SHA th'
             ch = SHA ch'
         lift $ runPrivateHashTX th ch
+        tr <- gets _txHashRegistry
+        logHydrate $ "TX Hash Registry: " ++ show tr
         logHydrate $ "Looking up transaction hash " ++ format th ++ " in MissingTxDB"
         missing <- lift . isMissingTX $ th
         if missing
@@ -457,7 +460,6 @@ transformGenesis chains = forM_ chains $ \ig -> do
     False -> do
       $logInfoS "transformGenesis" "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
       insertChainInfo cId cInfo
-      insertSeenChain cId cInfo
       markForVM $ OEGenesis og
       lookupMissingChainTxs cId >>= \case
         [] -> return ()

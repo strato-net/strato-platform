@@ -7,7 +7,6 @@
 module Blockchain.Sequencer.DB.PrivateHashDB where
 
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs     (BlockData(..))
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
@@ -41,53 +40,56 @@ maxBufferCapacity = 4096
 emptyCircularBuffer :: CircularBuffer a
 emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
-data BlockHashInfo = BlockHashInfo
-  { _bhiTotalDifficulty :: Integer
-  , _bhiBlockNumber     :: Integer
-  }
-makeLenses ''BlockHashInfo
-
 data BlockHashEntry = BlockHashEntry
-  { _blockData    :: BlockData
+  { _outputBlock  :: OutputBlock
   , _dependentTXs :: Set SHA
   , _txHashMap    :: Map SHA SHA
   , _chainHashMap :: Map SHA (Set SHA)
   }
 makeLenses ''BlockHashEntry
 
-blockHashEntry :: BlockData -> BlockHashEntry
-blockHashEntry bData = BlockHashEntry bData S.empty M.empty M.empty
+blockHashEntry :: OutputBlock -> BlockHashEntry
+blockHashEntry ob = BlockHashEntry ob S.empty M.empty M.empty
 
 data TxHashEntry = TxHashEntry
-  { _outputTx :: Maybe OutputTx
-  , _inBlock  :: Maybe SHA
-  }
+  { _outputTx  :: Maybe OutputTx
+  , _chainHash :: Maybe SHA
+  , _inBlock   :: Maybe SHA
+  } deriving (Show)
 makeLenses ''TxHashEntry
 
 emptyTxHashEntry :: TxHashEntry
-emptyTxHashEntry = TxHashEntry Nothing Nothing
+emptyTxHashEntry = TxHashEntry Nothing Nothing Nothing
+
+txHashEntryWithOutputTx :: OutputTx -> TxHashEntry
+txHashEntryWithOutputTx otx = TxHashEntry (Just otx) Nothing Nothing
+
+txHashEntryWithChainHash :: SHA -> TxHashEntry
+txHashEntryWithChainHash cHash = TxHashEntry Nothing (Just cHash) Nothing
+
+txHashEntryWithBlockHash :: SHA -> TxHashEntry
+txHashEntryWithBlockHash bHash = TxHashEntry Nothing Nothing (Just bHash)
 
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Word256
   , _transactions :: Set SHA
-  , _blocks       :: Map SHA BlockHashInfo
+  , _inBlocks     :: Set SHA
   }
 makeLenses ''ChainHashEntry
 
 chainHashEntry :: Word256 -> ChainHashEntry
-chainHashEntry chainId = ChainHashEntry False chainId S.empty M.empty
+chainHashEntry chainId = ChainHashEntry False chainId S.empty S.empty
 
 data ChainIdEntry = ChainIdEntry
   { _chainInfo   :: ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
-  , _blockHashes :: Map SHA BlockHashInfo
   }
 makeLenses ''ChainIdEntry
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
-chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty M.empty
+chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
 class MonadResource m => HasRegistry m where
   generateChainHashes :: OutputTx -> m [SHA]
@@ -265,6 +267,14 @@ insertHashPairs bHash thchs = repsertBlockHashEntry_ bHash $ \case
         build [] m = m
         build ((th,ch):xs) m = build xs $ M.alter (Just . maybe (S.singleton th) (S.insert th)) ch m
 
+removeMissingTxEntry :: HasRegistry m => SHA -> m ()
+removeMissingTxEntry tHash = do
+  mthe <- getTxHashEntry tHash
+  for_ mthe $ \TxHashEntry{_outputTx = otx} ->
+    for_ otx $ \tx ->
+      modifyChainIdEntryState_ (fromJust $ txChainId tx) $
+        missingTXs %= S.delete tHash
+
 removeTransaction :: HasRegistry m => SHA -> m ()
 removeTransaction tHash = updateTxHashEntryState_ tHash $ do
   body <- use outputTx
@@ -273,10 +283,10 @@ removeTransaction tHash = updateTxHashEntryState_ tHash $ do
       missingTXs %= S.delete tHash
   bh <- use inBlock
   for_ bh $ \bHash ->
-    lift . updateBlockHashEntry bHash . evalStateT $ do
+    lift . updateBlockHashEntryState_ bHash $ do
       depTXs <- dependentTXs <%= S.delete tHash
       mChash <- use (txHashMap . at tHash)
-      mthchs <- for mChash $ \cHash -> do
+      mPairs <- for mChash $ \cHash -> do
         txHashMap %= M.delete tHash
         ths <- chainHashMap . at cHash . _Just <%= S.delete tHash
         chs <- if S.null ths
@@ -284,10 +294,10 @@ removeTransaction tHash = updateTxHashEntryState_ tHash $ do
                 else use chainHashMap
         lift . modifyChainHashEntryState_ cHash $ do
           transactions %= S.delete tHash
-          when (M.null chs) $ blocks %= M.delete bHash
+          when (M.null chs) $ inBlocks %= S.delete bHash
         return (ths,chs)
       if S.null depTXs
-        then ffor mthchs $ \(ths,chs) ->
+        then ffor mPairs $ \(ths,chs) ->
           if S.null ths && M.null chs
             then return Nothing
             else gets Just
