@@ -26,8 +26,8 @@ insertDependentTxs bHash tHashes = do
       Nothing -> error $ "insertDependentTXs: Block hash " ++ format bHash ++ " not found"
       Just b -> return $ (dependentTXs %~ S.union tHashes) b
 
-lookupDependentTxs :: HasPrivateHashDB m => SHA -> m (Maybe (Set SHA))
-lookupDependentTxs bHash = fmap _dependentTXs <$> getBlockHashEntry bHash
+lookupDependentTxs :: HasPrivateHashDB m => SHA -> m (Set SHA)
+lookupDependentTxs bHash = maybe S.empty _dependentTXs <$> getBlockHashEntry bHash
 
 clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
 clearDependentTxs bHash = do
