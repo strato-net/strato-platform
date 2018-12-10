@@ -14,20 +14,20 @@ import           Prometheus
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-lookupMissingChainTxs :: HasRegistry m => Word256 -> m [SHA]
+lookupMissingChainTxs :: HasPrivateHashDB m => Word256 -> m [SHA]
 lookupMissingChainTxs chainId = maybe [] (S.toList . _missingTXs) <$> getChainIdEntry chainId
 
-insertMissingChainTx :: HasRegistry m => Word256 -> SHA -> m ()
+insertMissingChainTx :: HasPrivateHashDB m => Word256 -> SHA -> m ()
 insertMissingChainTx chainId th = do
   liftIO $ withLabel chainMetrics "missing_chain_tx" incCounter
   modifyChainIdEntryState_ chainId $ missingTXs %= S.insert th
 
-insertMissingChainTxs :: HasRegistry m => Word256 -> [SHA] -> m ()
+insertMissingChainTxs :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
 insertMissingChainTxs chainId ths = do
   liftIO $ withLabel chainMetrics "missing_chain_tx" (flip unsafeAddCounter . fromIntegral . length $ ths)
   modifyChainIdEntryState_ chainId $ missingTXs .= S.fromList ths
 
-clearMissingChainTxs :: HasRegistry m => Word256 -> m ()
+clearMissingChainTxs :: HasPrivateHashDB m => Word256 -> m ()
 clearMissingChainTxs chainId = do
   liftIO $ withLabel chainMetrics "missing_chain_tx_removed" incCounter
   traverse_ (mapM_ removeTransaction . _missingTXs) =<< getChainIdEntry chainId

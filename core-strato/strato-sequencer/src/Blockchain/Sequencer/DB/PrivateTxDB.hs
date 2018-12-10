@@ -13,15 +13,15 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 
-lookupTransaction :: HasRegistry m => SHA -> m (Maybe OutputTx)
+lookupTransaction :: HasPrivateHashDB m => SHA -> m (Maybe OutputTx)
 lookupTransaction tHash = join . fmap _outputTx <$> getTxHashEntry tHash
 
-insertTransaction :: HasRegistry m => OutputTx -> m ()
+insertTransaction :: HasPrivateHashDB m => OutputTx -> m ()
 insertTransaction tx = do
   let tHash = txHash tx
   repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithOutputTx tx) (outputTx .~ Just tx)
 
-insertPrivateHash :: HasRegistry m => OutputTx -> m ()
+insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do

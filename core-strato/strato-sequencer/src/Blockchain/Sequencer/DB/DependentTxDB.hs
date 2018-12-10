@@ -15,12 +15,12 @@ import           Prometheus
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-insertDependentTx :: HasRegistry m => SHA -> SHA -> m ()
+insertDependentTx :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertDependentTx bHash tHash = do
   liftIO $ withLabel txMetrics "dependent_tx" incCounter
   modifyBlockHashEntryState_ bHash $ dependentTXs %= S.insert tHash
 
-insertDependentTxs :: HasRegistry m => SHA -> Set SHA -> m ()
+insertDependentTxs :: HasPrivateHashDB m => SHA -> Set SHA -> m ()
 insertDependentTxs bHash tHashes = do
   liftIO $ withLabel txMetrics "dependent_tx" (flip unsafeAddCounter . fromIntegral . S.size $ tHashes)
   repsertBlockHashEntry_ bHash $ \entry -> do
@@ -28,10 +28,10 @@ insertDependentTxs bHash tHashes = do
       Nothing -> error $ "insertDependentTXs: Block hash " ++ format bHash ++ " not found"
       Just b -> return $ (dependentTXs %~ S.union tHashes) b
 
-lookupDependentTxs :: HasRegistry m => SHA -> m (Maybe (Set SHA))
+lookupDependentTxs :: HasPrivateHashDB m => SHA -> m (Maybe (Set SHA))
 lookupDependentTxs bHash = fmap _dependentTXs <$> getBlockHashEntry bHash
 
-clearDependentTxs :: HasRegistry m => SHA -> m ()
+clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
 clearDependentTxs bHash = do
   liftIO $ withLabel txMetrics "dependent_tx_removed" incCounter
   traverse_ (mapM_ removeTransaction . _dependentTXs) =<< getBlockHashEntry bHash

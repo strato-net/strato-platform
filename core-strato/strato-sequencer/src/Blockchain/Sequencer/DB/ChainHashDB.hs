@@ -17,22 +17,22 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.Metrics
 
-lookupChainHash :: HasRegistry m => SHA -> m (Maybe (Bool, Word256))
+lookupChainHash :: HasPrivateHashDB m => SHA -> m (Maybe (Bool, Word256))
 lookupChainHash cHash = fmap (_used &&& _onChainId) <$> getChainHashEntry cHash
 
-insertChainHash :: HasRegistry m => SHA -> Word256 -> m ()
+insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 insertChainHash cHash chainId = insertChainHashEntry cHash $ chainHashEntry chainId
 
-useChainHash :: HasRegistry m => SHA -> m ()
+useChainHash :: HasPrivateHashDB m => SHA -> m ()
 useChainHash cHash = modifyChainHashEntryState_ cHash $ used .= True
 
-getChainBuffer :: HasRegistry m => Word256 -> m (CircularBuffer SHA)
+getChainBuffer :: HasPrivateHashDB m => Word256 -> m (CircularBuffer SHA)
 getChainBuffer chainId = maybe emptyCircularBuffer _chainHashes <$> getChainIdEntry chainId
 
-lookupChainBuffer :: HasRegistry m => Word256 -> m (CircularBuffer SHA)
+lookupChainBuffer :: HasPrivateHashDB m => Word256 -> m (CircularBuffer SHA)
 lookupChainBuffer = getChainBuffer
 
-insertChainBufferEntry :: HasRegistry m => Word256 -> SHA -> m ()
+insertChainBufferEntry :: HasPrivateHashDB m => Word256 -> SHA -> m ()
 insertChainBufferEntry chainId cHash = modifyChainIdEntryState_ chainId $ do
   CircularBuffer cap sz q <- use chainHashes
   liftIO $ withLabel chainBuffer (fromString (show chainId)) (flip setGauge (fromIntegral sz))
@@ -42,7 +42,7 @@ insertChainBufferEntry chainId cHash = modifyChainIdEntryState_ chainId $ do
            Q.EmptyL -> chainHashes .= CircularBuffer cap 1 (q Q.|> cHash)
            (_ Q.:< q') -> chainHashes .= CircularBuffer cap sz (q' Q.|> cHash)
 
-getNewChainHash :: HasRegistry m => Word256 -> m SHA
+getNewChainHash :: HasPrivateHashDB m => Word256 -> m SHA
 getNewChainHash chainId = do
   CircularBuffer cap sz q <- getChainBuffer chainId
   case Q.viewl q of
@@ -54,7 +54,7 @@ getNewChainHash chainId = do
         then useChainHash h >> return h
         else getNewChainHash chainId
 
-insertChainInfo :: HasRegistry m => Word256 -> ChainInfo -> m ()
+insertChainInfo :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
 insertChainInfo chainId cInfo = do
   let h = hash . rlpSerialize $ rlpEncode cInfo
   insertSeenChain chainId cInfo

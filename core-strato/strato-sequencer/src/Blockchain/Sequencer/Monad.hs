@@ -116,7 +116,7 @@ instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
     putGetTransactionsDB = assign getTransactionsDB
 
-instance HasRegistry SequencerM where
+instance HasPrivateHashDB SequencerM where
     generateChainHashes tx =
       let r = txSigR tx
           s = txSigS tx

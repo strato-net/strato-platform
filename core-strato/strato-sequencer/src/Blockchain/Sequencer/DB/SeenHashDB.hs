@@ -14,10 +14,10 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.SHA
 
-lookupSeenTxHash :: (HasRegistry m, MonadThrow m) => SHA -> m (Maybe SHA)
+lookupSeenTxHash :: (HasPrivateHashDB m, MonadThrow m) => SHA -> m (Maybe SHA)
 lookupSeenTxHash tHash = join . fmap _chainHash <$> getTxHashEntry tHash
 
-insertSeenTxHash :: HasRegistry m => SHA -> SHA -> m ()
+insertSeenTxHash :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertSeenTxHash tHash cHash = do
   liftIO $ withLabel txMetrics "seen_tx_hash" incCounter
   repsertTxHashEntry_ tHash $ \case

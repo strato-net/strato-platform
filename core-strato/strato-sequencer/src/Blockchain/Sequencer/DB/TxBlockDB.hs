@@ -11,15 +11,15 @@ import           Prometheus
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-lookupTxBlocks :: HasRegistry m => SHA -> m (Maybe SHA)
+lookupTxBlocks :: HasPrivateHashDB m => SHA -> m (Maybe SHA)
 lookupTxBlocks tHash = join . fmap _inBlock <$> getTxHashEntry tHash
 
-insertTxBlock :: HasRegistry m => SHA -> SHA -> m ()
+insertTxBlock :: HasPrivateHashDB m => SHA -> SHA -> m ()
 insertTxBlock tHash bHash = do
   liftIO $ withLabel txMetrics "tx_blocks" incCounter
   repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithBlockHash bHash) (inBlock .~ Just bHash)
 
-removeTxBlock :: HasRegistry m => SHA -> m ()
+removeTxBlock :: HasPrivateHashDB m => SHA -> m ()
 removeTxBlock tHash = do
   liftIO $ withLabel txMetrics "tx_blocks_removed" incCounter
   modifyTxHashEntryState_ tHash $ inBlock .= Nothing
