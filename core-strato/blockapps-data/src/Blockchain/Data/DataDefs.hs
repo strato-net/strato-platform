@@ -81,3 +81,5 @@ instance BIN.Binary BlockData where
 instance NFData BlockData
 instance NFData TXOrigin
 instance NFData RawTransaction
+instance NFData TransactionResult
+instance NFData LogDB

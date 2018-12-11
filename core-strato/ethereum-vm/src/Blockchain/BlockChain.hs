@@ -277,7 +277,7 @@ addTransactions bd bg ts = go bd bg ts []
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT
@@ -304,7 +304,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     flushMemAddressStateTxToBlockDB
     flushStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
-    (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
+    (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time'
@@ -416,7 +416,7 @@ runCodeForTransaction :: Bool
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  !(result, vmState) <-
+  (result, vmState) <-
     create isRunningTests'
            isHomestead
            S.empty

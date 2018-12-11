@@ -1,9 +1,9 @@
-
 module Blockchain.VM.VMException (
   VMException(..)
   ) where
 
 import Control.DeepSeq
+import GHC.Generics
 
 data VMException =
   OutOfGasException |
@@ -18,7 +18,4 @@ data VMException =
   InvalidJump |
   InvalidInstruction |
   WriteProtection |
-  RevertException deriving (Show, Eq)
-
-instance NFData VMException where
-  rnf = flip seq ()
+  RevertException deriving (Show, Eq, Generic, NFData)

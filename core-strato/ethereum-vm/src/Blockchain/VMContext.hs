@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
 
@@ -26,6 +27,7 @@ module Blockchain.VMContext
     ) where
 
 
+import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -42,6 +44,7 @@ import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as PSQL
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
+import           GHC.Generics
 import qualified Network.Kafka                      as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
@@ -76,10 +79,17 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
+instance NFData Redis.Connection where
+  rnf c = c `seq` ()
+
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
-    deriving (Eq, Read, Show)
+    deriving (Eq, Read, Show, Generic, NFData)
 
 newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
+
+instance NFData Config where
+  rnf = const ()
+
 data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHashDB                 :: HashDB
                        , contextCodeDB                 :: CodeDB
@@ -98,7 +108,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
-                       }
+                       } deriving (Generic, NFData)
 makeLenses ''Context
 
 

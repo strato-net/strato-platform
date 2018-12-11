@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Data.TransactionResultStatus where
 
+import           Control.DeepSeq
 import           Data.Aeson          hiding (Success)
 import           Data.Maybe          (maybe)
 import           Database.Persist.TH
@@ -17,14 +19,14 @@ data TransactionResultStatus = Success
                                        , trfReality     :: Maybe Integer
                                        , trfDetails     :: Maybe String
                                        }
-                             deriving (Eq, Read, Show, Generic)
+                             deriving (Eq, Read, Show, Generic, NFData)
 
 data TransactionFailureType = IncorrectNonce
                             | InsufficientFunds
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
                             | ExecutionFailure String
-                            deriving (Eq, Read, Show, Generic)
+                            deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"
 derivePersistField "TransactionFailureType"

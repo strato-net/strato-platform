@@ -11,6 +11,7 @@ module Blockchain.VM
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
+import           Control.DeepSeq
 import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -927,7 +928,6 @@ runCodeFromStart = do
   when flags_debug $
      lift $ $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
 
-
   case code of
    PrecompiledCode x -> do
      ret <- callPrecompiledContract (fromIntegral x) theData
@@ -936,8 +936,9 @@ runCodeFromStart = do
      return ()
    _ -> runCode 0
 
-runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM a -> ContextM (Either VMException a, VMState)
-runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
+-- | runVMM fully evaluates its results to limit memory leaks.
+runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM a -> ContextM (Either VMException a, VMState)
+runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
@@ -1019,7 +1020,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
     if success
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas create'
       else return (Left InsufficientFunds, vmState)
-
   case ret of
     (Left e, vmState') -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
@@ -1029,9 +1029,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       purgeStorageMap newAddress
       deleteAddressState newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
-    _ -> do
-
-      return ret
+    _ -> return ret
 
 create' :: VMM Code
 create' = do
