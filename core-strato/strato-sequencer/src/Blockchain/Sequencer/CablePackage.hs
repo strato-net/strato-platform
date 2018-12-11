@@ -5,14 +5,14 @@ import Blockchain.Sequencer.Event
 
 
 data CablePackage = CablePackage
-                  { unseqEvents :: TMChan IngestEvent
-                  , seqP2PEvents :: TMChan OutputEvent
-                  , seqVMEvents :: TMChan OutputEvent
+                  { unseqEvents :: TQueue IngestEvent
+                  , seqP2PEvents :: TQueue OutputEvent
+                  , seqVMEvents :: TQueue OutputEvent
                   }
 
 newCablePackage :: STM CablePackage
 newCablePackage = do
-  a <- newTMChan
-  b <- newTMChan
-  c <- newTMChan
+  a <- newTQueue
+  b <- newTQueue
+  c <- newTQueue
   return $ CablePackage a b c

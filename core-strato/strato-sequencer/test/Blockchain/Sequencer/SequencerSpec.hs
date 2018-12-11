@@ -16,6 +16,7 @@ import           Numeric                             (showHex)
 import           Conduit
 import           Control.Concurrent
 import           Control.Concurrent.STM.TMChan
+import           Control.Concurrent.STM.TQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Monad.Logger
@@ -295,7 +296,7 @@ spec = do
         tch <- asks blockstanbulTimeouts
         atomically . writeTMChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTMChan uch $ iev
+        atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
         atomically . writeTMChan vch $ vote
         src0 <- newResumableSource <$> fuseChannels
@@ -307,7 +308,7 @@ spec = do
     describe "sequencer" $ do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTMChan uch $ iev
+        atomically . writeTQueue uch $ iev
         src <- newResumableSource <$> fuseChannels
         void $ oneSequencerIter src
 

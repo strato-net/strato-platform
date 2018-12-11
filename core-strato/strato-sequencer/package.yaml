@@ -55,6 +55,7 @@ dependencies:
   - wai-middleware-prometheus
   - deepseq
   - exceptions
+  - unliftio
 
 ghc-options: -Wall -O2 -threaded
 

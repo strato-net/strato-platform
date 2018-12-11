@@ -10,7 +10,7 @@ module Blockchain.Sequencer where
 import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
-import           Control.Concurrent.STM.TMChan
+import           Control.Concurrent.STM.TQueue
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -99,8 +99,8 @@ readEventsInBufferedWindow src = do
   $logInfoS "sequencer/events" "Reading from fused channels..."
   dt <- asks maxUsPerIter
   uch <- asks $ unseqEvents . cablePackage
-  top <- atomically . tryPeekTMChan $ uch
-  $logDebugS "sequencer/events" . T.pack . show $ "top event is: " ++ show top
+  top <- atomically . tryPeekTQueue $ uch
+  $logDebugS "sequencer/events" . T.pack $ "top event is: " ++ show top
   -- There may be WaitTerminateds left over from the last iteration
   -- This will block indefinitely if there are no real messages to process,
   -- so `src` must be the only source of input to this thread.
@@ -559,9 +559,9 @@ prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin 
 writeSeqVmEvents :: [OutputEvent] -> SequencerM ()
 writeSeqVmEvents events = do
     ch <- asks (seqVMEvents . cablePackage)
-    atomically . mapM_ (writeTMChan ch) $ events
+    atomically . mapM_ (writeTQueue ch) $ events
 
 writeSeqP2pEvents :: [OutputEvent] -> SequencerM ()
 writeSeqP2pEvents events = do
     ch <- asks (seqP2PEvents . cablePackage)
-    atomically . mapM_ (writeTMChan ch) $ events
+    atomically . mapM_ (writeTQueue ch) $ events
