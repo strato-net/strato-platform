@@ -26,7 +26,6 @@ insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
     liftIO $ withLabel txMetrics "private_hash" incCounter
-    insertTxHashEntry (txHash tx) (txHashEntryWithOutputTx tx)
     cHashes <- generateChainHashes tx
     mapM_ (flip insertChainHash chainId) cHashes
     mapM_ (insertChainBufferEntry chainId) cHashes

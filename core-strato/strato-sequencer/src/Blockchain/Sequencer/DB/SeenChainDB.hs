@@ -17,4 +17,4 @@ lookupSeenChain = fmap isJust . getChainIdEntry
 insertSeenChain :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
 insertSeenChain chainId cInfo = do
   liftIO $ withLabel chainMetrics "seen_chains" incCounter
-  insertChainIdEntry chainId $ chainIdEntry cInfo
+  insertChainIdEntry chainId $ chainIdEntryWithChainInfo cInfo

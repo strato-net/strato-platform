@@ -72,24 +72,37 @@ txHashEntryWithBlockHash bHash = TxHashEntry Nothing Nothing (Just bHash)
 
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
-  , _onChainId    :: Word256
+  , _onChainId    :: Maybe Word256
   , _transactions :: Set SHA
   , _inBlocks     :: Set SHA
   }
 makeLenses ''ChainHashEntry
 
-chainHashEntry :: Word256 -> ChainHashEntry
-chainHashEntry chainId = ChainHashEntry False chainId S.empty S.empty
+chainHashEntryWithChainId :: Word256 -> ChainHashEntry
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty S.empty
+
+chainHashEntryWithTxHash :: SHA -> ChainHashEntry
+chainHashEntryWithTxHash tHash = ChainHashEntry False Nothing (S.singleton tHash) S.empty
+
+chainHashEntryWithTxHashInBlock :: SHA -> SHA -> ChainHashEntry
+chainHashEntryWithTxHashInBlock tHash bHash = ChainHashEntry
+                                                False
+                                                Nothing
+                                                (S.singleton tHash)
+                                                (S.singleton bHash)
 
 data ChainIdEntry = ChainIdEntry
-  { _chainInfo   :: ChainInfo
+  { _chainInfo   :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
   }
 makeLenses ''ChainIdEntry
 
-chainIdEntry :: ChainInfo -> ChainIdEntry
-chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
+chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry
+chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty
+
+chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
+chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs
 
 class MonadResource m => HasPrivateHashDB m where
   generateChainHashes :: OutputTx -> m [SHA]
