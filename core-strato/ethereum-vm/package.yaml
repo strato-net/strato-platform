@@ -53,7 +53,6 @@ dependencies:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-p2p
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
