@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.PrivateTxDB where
 
-import           Blockchain.Data.RLP
 import           Blockchain.SHA
+import           Control.Lens           ((.~))
+import           Control.Monad          (join)
 import           Control.Monad.IO.Class
-import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as M
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.ChainHashDB
@@ -14,28 +13,20 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 
-getTxHashMap :: HasPrivateHashDB m => m (Map SHA OutputTx)
-getTxHashMap = txHashMap <$> getPrivateHashDB
-
-putTxHashMap :: HasPrivateHashDB m => Map SHA OutputTx -> m ()
-putTxHashMap m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ txHashMap = m }
-
 lookupTransaction :: HasPrivateHashDB m => SHA -> m (Maybe OutputTx)
-lookupTransaction h = M.lookup h <$> getTxHashMap
+lookupTransaction tHash = join . fmap _outputTx <$> getTxHashEntry tHash
 
 insertTransaction :: HasPrivateHashDB m => OutputTx -> m ()
-insertTransaction tx = getTxHashMap >>= putTxHashMap . M.insert (txHash tx) tx
+insertTransaction tx = do
+  let tHash = txHash tx
+  repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithOutputTx tx) (outputTx .~ Just tx)
 
 insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do
     liftIO $ withLabel txMetrics "private_hash" incCounter
-    let r = txSigR tx
-        s = txSigS tx
-        rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-        sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-    insertChainHash rs chainId
-    insertChainHash sr chainId
-    insertChainBufferEntry chainId rs
-    insertChainBufferEntry chainId sr
+    insertTxHashEntry (txHash tx) (txHashEntryWithOutputTx tx)
+    cHashes <- generateChainHashes tx
+    mapM_ (flip insertChainHash chainId) cHashes
+    mapM_ (insertChainBufferEntry chainId) cHashes

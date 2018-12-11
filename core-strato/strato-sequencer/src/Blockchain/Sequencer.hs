@@ -19,7 +19,7 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable                             (for_, toList, traverse_)
-import           Data.Maybe                                (catMaybes, fromJust, isJust)
+import           Data.Maybe
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -38,6 +38,7 @@ import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.MissingTxDB
+import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
 import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.SeenHashDB
@@ -203,7 +204,7 @@ checkIfIsMissingTX th ch = lookupChainHash ch >>= \case
     return ()
   Just (_, cid) -> do
     $logInfoS "transformPrivateHashTXs" . T.pack $ "We know this transaction's chain Id. It's " ++ format (SHA cid) ++ ". Inserting into MissingTxDB and GetTransactions list"
-    useChainHash ch cid
+    useChainHash ch
     insertMissingTx th
     insertGetTransactionsDB th
 
@@ -211,15 +212,15 @@ runPrivateHashTX :: SHA -> SHA -> SequencerM ()
 runPrivateHashTX th ch = do
   $logInfoS "runPrivateHashTX" . T.pack $ "Transforming transaction " ++ format th ++ " with chain hash " ++ format ch
   lookupSeenTxHash th >>= \case
-    True -> do
+    Just _ -> do
       $logInfoS "runPrivateHashTX" "Transaction hash seen before!"
-    False -> do
+    Nothing -> do
       $logInfoS "runPrivateHashTX" "Transaction hash not seen before! Inserting it into SeenTxHashDB"
-      insertSeenTxHash th
+      insertSeenTxHash th ch
       lookupTransaction th >>= \case
         Just tx -> do
           $logInfoS "runPrivateHashTX" . T.pack $ "We have this transaction's body. It's: " ++ prettyOTx tx
-          useChainHash ch (fromJust . TD.transactionChainId $ otBaseTx tx)
+          useChainHash ch
         Nothing -> do
           $logInfoS "runPrivateHashTX" "We don't have this transaction's body. Looking it up by chain hash"
           checkIfIsMissingTX th ch
@@ -279,15 +280,14 @@ transformFullTransactions pairs = do
             let tHash = txHash ptx
             removeMissingTx tHash
             lookupSeenTxHash tHash >>= \case
-              True -> do
+              Just _ -> do
                 $logInfoS "transformFullTransactions" . T.pack $ "We have seen this transaction's PrivateHashTX before."
-              False -> do
+              Nothing -> do
                 insertPrivateHash ptx
                 when (otOrigin ptx == TO.API) $ do
                   cHash <- getNewChainHash chainId
-                  insertSeenTxHash tHash
+                  insertSeenTxHash tHash cHash
                   $logInfoS "transformFullTransactions" . T.pack $ "Created chain hash " ++ format cHash ++ " for transaction " ++ format tHash
-                  removeMissingTx tHash
                   let SHA th' = tHash
                       SHA ch' = cHash
                       phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
@@ -297,15 +297,35 @@ transformFullTransactions pairs = do
               Nothing -> $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " has not been put in a block."
               Just bHash -> lookupDependentTxs bHash >>= \case
                 depTxs | not (S.member tHash depTxs) ->
-                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
+                  error $ concat
+                    [ "lookupDependentTxs: transaction "
+                    , format tHash
+                    , " claims to depend on block "
+                    , format bHash
+                    , ", but it's missing from the block's dependent transaction set. "
+                    , "Dependent transactions: "
+                    , (show . map format $ S.toList depTxs)
+                    ]
                 depTxs | depTxs == S.singleton tHash -> do
-                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
+                  $logInfoS "transformFullTransactions" . T.pack $ concat
+                    [ "Transaction "
+                    , format tHash
+                    , " is the only dependent transaction in block "
+                    , format bHash
+                    ]
                   removeTxBlock tHash
                   clearDependentTxs bHash
                   mBlock <- witnessedBlock bHash
                   traverse_ runBlock mBlock
                 depTxs -> do
-                  $logInfoS "transformFullTransactions" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
+                  $logInfoS "transformFullTransactions" . T.pack $ concat
+                    [ "Transaction "
+                    , format tHash
+                    , " is a dependent transaction in block "
+                    , format bHash
+                    , ", but there are others. "
+                    , "Inserting them into MissingTxDB and GetTransactions list"
+                    ]
                   removeTxBlock tHash
                   let depTxs' = S.delete tHash depTxs
                   mapM_ insertMissingTx depTxs'
@@ -377,6 +397,7 @@ hydrateAndEmit = awaitForever $ \case
     let bHash = blockHeaderHash $ obBlockData ob
         logHydrate = $logInfoS "hydrateAndEmit" . T.pack
     logHydrate $ prettyOBlock ob
+    lift . repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
     forM_ (obReceiptTransactions ob) $ \tx ->
       when (isPrivateHashTX tx) $ do
         let TD.PrivateHashTX th' ch' = otBaseTx tx
@@ -392,8 +413,8 @@ hydrateAndEmit = awaitForever $ \case
             lift $ insertDependentTx bHash th
           else
             logHydrate $ "Transaction hash " ++ format th ++ " is not missing"
-    depTXS <- lift . lookupDependentTxs $ bHash
-    if S.null depTXS
+    depTXs <- lift . lookupDependentTxs $ bHash
+    if S.null depTXs
       then do
         logHydrate $ "Block hash " ++ format bHash ++ " has no dependent transactions. Hydrating and emitting to VM"
         hydratedBlock <- lift . hydrateBlock $ ob
@@ -401,7 +422,7 @@ hydrateAndEmit = awaitForever $ \case
         yield $ OEBlock hydratedBlock
       else do
         logHydrate $ "Block hash " ++ format bHash ++ " has dependent transactions. Inserting them into GetTransactions list"
-        lift $ mapM_ insertGetTransactionsDB depTXS
+        lift $ mapM_ insertGetTransactionsDB depTXs
   oe -> yield oe
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
@@ -429,7 +450,6 @@ transformGenesis chains = forM_ chains $ \ig -> do
     False -> do
       $logInfoS "transformGenesis" "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
       insertChainInfo cId cInfo
-      insertSeenChain cId
       markForVM $ OEGenesis og
       lookupMissingChainTxs cId >>= \case
         [] -> return ()

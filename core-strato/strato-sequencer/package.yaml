@@ -48,6 +48,7 @@ dependencies:
   - aeson
   - async
   - prometheus-client
+  - transformers
   - warp
   - servant-client
   - wai-extra
