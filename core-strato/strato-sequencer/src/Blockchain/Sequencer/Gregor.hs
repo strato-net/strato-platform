@@ -153,13 +153,13 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
   p2pq <- use gregorSeqP2P
   events <- atomically $
     fmap Left (blockFlushTQueue vmq) `orElse` fmap Right (blockFlushTQueue p2pq)
-
+  $logDebugS "gregor/seqWriter" . T.pack . show $ events
   case events of
-    Right vmevs -> do
+    Left vmevs -> do
       P.withLabel gregorLoop "seq_vm_events" P.incCounter
       P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
       writeSeqVmEvents vmevs
-    Left p2pevs -> do
+    Right p2pevs -> do
       P.withLabel gregorLoop "seq_p2p_events" P.incCounter
       P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
       writeSeqP2pEvents p2pevs
