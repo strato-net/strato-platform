@@ -164,9 +164,9 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
       P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
       writeSeqP2pEvents p2pevs
 
--- Will only read if at least one element is in the channel.
+-- Will only read if at least one element is in the queue.
 blockFlushTQueue :: TQueue a -> STM [a]
 blockFlushTQueue ch = do
   first <- readTQueue ch
   rest <- flushTQueue ch
-  return $! first:rest
+  return $ first:rest
