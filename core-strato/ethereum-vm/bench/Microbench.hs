@@ -7,11 +7,14 @@ import Control.DeepSeq
 import Control.Monad
 import GHC.Generics
 import Data.Bits ((.&.))
+import qualified Data.ByteString as B
 import Data.Word
 import qualified Data.Vector as V
 import qualified Data.Set as S
 import qualified Data.IntSet as I
 
+import Blockchain.Strato.Model.Code
+import Blockchain.VM.Code
 import Network.Haskoin.Internals (Word256)
 import qualified Blockchain.VM.MutableStack as MS
 
@@ -70,6 +73,16 @@ vec64MembershipTests n = bench ("vec word64 " ++ show n)
 set64MembershipTests :: Int -> Benchmark
 set64MembershipTests n = bench ("set word64 " ++ show n)
                        $ nf (S.member (downgrade exampleDest)) (set64Dests n)
+
+-- | Every opcode is a JUMPDEST
+getJumpDestsTime :: Int -> Benchmark
+getJumpDestsTime n = bench ("getJumpDests " ++ show n)
+                   $ nf getValidJUMPDESTs (Code $ B.replicate n 0x5b)
+
+-- | None of the opcodes are a jumpdest
+getJumpDestsMissTime :: Int -> Benchmark
+getJumpDestsMissTime n = bench ("getJumpDestsMissTime" ++ show n)
+                       $ nf getValidJUMPDESTs (Code $ B.replicate n 0x00)
 
 -- Stack benchmarks
 
@@ -143,6 +156,7 @@ main = do
   [s1, s2, s3] <- replicateM 3 defaultStack
 
   let jumpSizes = [256, 4096, 32768]
+  let codeSizes = [10, 100000, 1000000]
   defaultMain
     [ bgroup "Stacks" $
                 map oldStackFullPush stackSizes
@@ -157,4 +171,6 @@ main = do
              ++ map list64MembershipTests jumpSizes
              ++ map vec64MembershipTests jumpSizes
              ++ map set64MembershipTests jumpSizes
-             ++ map intsetMembershipTests jumpSizes]
+             ++ map intsetMembershipTests jumpSizes
+             ++ map getJumpDestsTime codeSizes
+             ++ map getJumpDestsMissTime codeSizes]
