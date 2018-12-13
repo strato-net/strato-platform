@@ -177,24 +177,6 @@ instance Arbitrary AccountInfo where
       <$> arbitrary
       <*> arbitrary `suchThat` (>=0)
 
-instance Arbitrary ChainSignature where
-  arbitrary = ChainSignature
-    <$> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-
-instance Arbitrary UnsignedChainInfo where
-  arbitrary = UnsignedChainInfo
-    <$> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-
-instance Arbitrary ChainInfo where
-  arbitrary = ChainInfo
-    <$> arbitrary
-    <*> arbitrary
+derive makeArbitrary ''ChainSignature
+derive makeArbitrary ''UnsignedChainInfo
+derive makeArbitrary ''ChainInfo

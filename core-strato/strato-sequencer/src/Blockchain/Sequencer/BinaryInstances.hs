@@ -14,44 +14,9 @@ import           Blockchain.SHA              ()
 import           Data.ByteString             ()
 
 instance Binary CI.ChainSignature where
-    put gi = sequence_ . map ($ gi) $
-        [ put . CI.chainR
-        , put . CI.chainS
-        , put . CI.chainV
-        ]
-    get = CI.ChainSignature
-          <$> get
-          <*> get
-          <*> get
-
+instance Binary CI.UnsignedChainInfo where
 instance Binary CI.ChainInfo where
-    put gi = sequence_ $ map ($ gi) $
-        [ put . CI.chainLabel     . CI.chainInfo
-        , put . CI.accountInfo    . CI.chainInfo
-        , put . CI.codeInfo       . CI.chainInfo
-        , put . CI.members        . CI.chainInfo
-        , put . CI.parentChain    . CI.chainInfo
-        , put . CI.creationBlock  . CI.chainInfo
-        , put . CI.chainNonce     . CI.chainInfo
-        , put . CI.chainMetadata  . CI.chainInfo
-        , put . CI.chainSignature
-        ]
-    get = CI.ChainInfo
-          <$> (CI.UnsignedChainInfo
-              <$> get
-              <*> get
-              <*> get
-              <*> get
-              <*> get
-              <*> get
-              <*> get
-              <*> get
-              )
-          <*> get
-
 instance Binary CI.CodeInfo where
-  put (CI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2
-  get = CI.CodeInfo <$> get <*> get <*> get
 
 instance Binary CI.AccountInfo where
   put (CI.NonContract a n) = putWord8 0 >> put a >> put n

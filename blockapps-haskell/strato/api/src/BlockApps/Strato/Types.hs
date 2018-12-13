@@ -539,18 +539,10 @@ instance ToSchema ChainSignature where
     & mapped.schema.example ?~ toJSON exampleChainSignature
 
 instance FromJSON ChainSignature where
-  parseJSON (Object o) = ChainSignature
-    <$> (o .: "r")
-    <*> (o .: "s")
-    <*> (o .: "v")
-  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToJSON ChainSignature where
-  toJSON (ChainSignature r s v) =
-    object [ "r" .= r
-           , "s" .= s
-           , "v" .= v
-           ]
+  toJSON = genericToJSON (aesonPrefix camelCase)
 
 data ChainInfo = ChainInfo
   { chainInfo      :: !(UnsignedChainInfo)

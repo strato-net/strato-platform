@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE StrictData               #-}
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..)
@@ -42,9 +43,9 @@ import qualified GHC.Generics                         as GHCG
 
 
 data CodeInfo = CodeInfo
-  { codeInfoCode   :: !B.ByteString
-  , codeInfoSource :: !T.Text
-  , codeInfoName   :: !T.Text
+  { codeInfoCode   :: B.ByteString
+  , codeInfoSource :: T.Text
+  , codeInfoName   :: T.Text
   } deriving (Show, Read, Eq, GHCG.Generic)
 
 instance FromJSON CodeInfo where
@@ -76,9 +77,9 @@ instance RLPSerializable CodeInfo where
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (decodeUtf8 $ rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
-data AccountInfo = NonContract !Address !Integer
-                 | ContractNoStorage !Address !Integer !SHA
-                 | ContractWithStorage !Address !Integer !SHA ![(Word256, Word256)]
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer SHA
+                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic)
 
 instance FromJSON AccountInfo where
@@ -141,9 +142,9 @@ instance RLPSerializable AccountInfo where
   rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
 
 data ChainSignature = ChainSignature
-  { chainR :: !Word256
-  , chainS :: !Word256
-  , chainV :: !Word8
+  { chainR :: Word256
+  , chainS :: Word256
+  , chainV :: Word8
   } deriving (Eq, Show, GHCG.Generic)
 
 instance FromJSON ChainSignature where
@@ -175,19 +176,19 @@ instance RLPSerializable ChainSignature where
   rlpDecode o = error $ "rlpDecode ChainSignature: Expected 3 element RLPArray, got " ++ show o
 
 data UnsignedChainInfo = UnsignedChainInfo
-  { chainLabel     :: !T.Text
-  , accountInfo    :: ![AccountInfo]
-  , codeInfo       :: ![CodeInfo]
-  , members        :: !(M.Map Address Enode)
-  , parentChain    :: !(Maybe Word256)
-  , creationBlock  :: !SHA
-  , chainNonce     :: !Word256
-  , chainMetadata  :: !(M.Map T.Text T.Text)
+  { chainLabel     :: T.Text
+  , accountInfo    :: [AccountInfo]
+  , codeInfo       :: [CodeInfo]
+  , members        :: (M.Map Address Enode)
+  , parentChain    :: (Maybe Word256)
+  , creationBlock  :: SHA
+  , chainNonce     :: Word256
+  , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic)
 
 data ChainInfo = ChainInfo
-  { chainInfo      :: !UnsignedChainInfo
-  , chainSignature :: !(Maybe ChainSignature)
+  { chainInfo      :: UnsignedChainInfo
+  , chainSignature :: (Maybe ChainSignature)
   } deriving (Eq, Show, GHCG.Generic)
 
 instance FromJSON ChainInfo where
