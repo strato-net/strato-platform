@@ -71,6 +71,7 @@ tests:
     main: UnitTest.hs
     dependencies:
       - interpolatedstring-perl6
+    other-modules: []
 
   test-suite:
     source-dirs: test
