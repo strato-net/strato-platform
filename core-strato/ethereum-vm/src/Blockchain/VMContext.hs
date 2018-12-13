@@ -212,7 +212,7 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m) =>
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m,
                     HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
