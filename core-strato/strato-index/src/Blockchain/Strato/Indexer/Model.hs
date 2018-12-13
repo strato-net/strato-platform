@@ -19,7 +19,7 @@ data IndexEvent = RanBlock OutputBlock
                 | UpdateTxResult (SHA, SHA, SHA, Bool) -- Deprecated
                 | NewChainInfo Word256 ChainInfo
                 | IndexTransaction Timestamp OutputTx
-                deriving (Eq, Read, Show)
+                deriving (Eq, Show)
 
 instance Binary LogDB
 instance Binary TransactionResult

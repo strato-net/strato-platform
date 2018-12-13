@@ -40,7 +40,7 @@ postChainR = do
 
   ci <- parseJsonBody :: Handler (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ acin cdin mb _ _ _ _ _ _ _) -> do
+    Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ _) _) -> do
     -- add more checks?
       when (length acin == 0) $ invalidArgs ["account info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]

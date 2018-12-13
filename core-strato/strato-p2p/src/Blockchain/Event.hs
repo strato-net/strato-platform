@@ -330,7 +330,7 @@ handleEvents peer = awaitForever $ \case
               mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cid'
               case mCInfo of
                 Nothing -> return False
-                Just cInfo -> do
+                Just (ChainInfo cInfo _) -> do
                   let pIp = readIP $ T.unpack (pPeerIp peer)
                       ipList = ipAddress <$> members cInfo
                   return $ pIp `elem` ipList
@@ -341,11 +341,11 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
               $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
               yield $ Transactions [otBaseTx tx]
-      OEGenesis (OutputGenesis og (cId, cInfo)) -> do
+      OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
-          $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show cInfo
+          $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show uci
           let pIp = readIP $ T.unpack (pPeerIp peer)
-          let ipList = ipAddress <$> members cInfo
+          let ipList = ipAddress <$> members uci
           let match = find (==pIp) ipList
 
           case match of
@@ -442,7 +442,7 @@ shouldSendGossip peer txo = recordGossipFinal
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
 checkPeerIsMember :: PPeer -> ChainInfo -> Bool
-checkPeerIsMember peer ci =
+checkPeerIsMember peer (ChainInfo ci _) =
   case match of
     Nothing -> False
     Just _ -> True

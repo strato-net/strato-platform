@@ -13,40 +13,41 @@ import           Blockchain.SHA              ()
 
 import           Data.ByteString             ()
 
+instance Binary CI.ChainSignature where
+    put gi = sequence_ . map ($ gi) $
+        [ put . CI.chainR
+        , put . CI.chainS
+        , put . CI.chainV
+        ]
+    get = CI.ChainSignature
+          <$> get
+          <*> get
+          <*> get
+
 instance Binary CI.ChainInfo where
     put gi = sequence_ $ map ($ gi) $
-        [ put . CI.chainLabel
-        , put . CI.accountInfo
-        , put . CI.codeInfo
-        , put . CI.members
-        , put . CI.parentChain
-        , put . CI.creationBlock
-        , put . CI.chainNonce
-        , put . CI.chainMetadata
+        [ put . CI.chainLabel     . CI.chainInfo
+        , put . CI.accountInfo    . CI.chainInfo
+        , put . CI.codeInfo       . CI.chainInfo
+        , put . CI.members        . CI.chainInfo
+        , put . CI.parentChain    . CI.chainInfo
+        , put . CI.creationBlock  . CI.chainInfo
+        , put . CI.chainNonce     . CI.chainInfo
+        , put . CI.chainMetadata  . CI.chainInfo
+        , put . CI.chainSignature
         ]
-    get = do
-        chainLabel    <- get
-        accountInfo   <- get
-        codeInfo      <- get
-        members       <- get
-        parentChain   <- get
-        creationBlock <- get
-        chainNonce    <- get
-        chainMetadata <- get
-        chainR        <- get
-        chainS        <- get
-        chainV        <- get
-        return $ CI.ChainInfo chainLabel
-                              accountInfo
-                              codeInfo
-                              members
-                              parentChain
-                              creationBlock
-                              chainNonce
-                              chainMetadata
-                              chainR
-                              chainS
-                              chainV
+    get = CI.ChainInfo
+          <$> (CI.UnsignedChainInfo
+              <$> get
+              <*> get
+              <*> get
+              <*> get
+              <*> get
+              <*> get
+              <*> get
+              <*> get
+              )
+          <*> get
 
 instance Binary CI.CodeInfo where
   put (CI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2

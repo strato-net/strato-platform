@@ -158,6 +158,10 @@ ChainInfoRef
     parentChain Word256 Maybe
     creationBlock SHA
     chainNonce Word256
+    deriving Eq Generic Show
+
+ChainSignatureRef
+    chainInfoId ChainInfoRefId
     r Integer
     s Integer
     v Word8

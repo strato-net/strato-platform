@@ -142,8 +142,8 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           => ChainInfo
                           -> m StateRoot
 chainInfoToGenesisState ci = do
-    initializeCodeDB (codeInfo ci)
-    initializeStateDB (accountInfo ci)
+    initializeCodeDB (codeInfo $ chainInfo ci)
+    initializeStateDB (accountInfo $ chainInfo ci)
     stateRoot <$> getStateDB
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
@@ -203,7 +203,7 @@ initializeChainDBs :: ( MonadResource m
                    -> ChainInfo
                    -> StateRoot
                    -> t m ()
-initializeChainDBs chainId ChainInfo{..} sRoot = do
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {

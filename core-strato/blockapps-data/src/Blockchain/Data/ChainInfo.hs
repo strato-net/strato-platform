@@ -8,10 +8,12 @@
 {-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfo
-  ( ChainInfo (..),
-    AccountInfo (..),
-    CodeInfo (..),
-    accountExtractor
+  ( ChainInfo (..)
+  , UnsignedChainInfo(..)
+  , ChainSignature(..)
+  , AccountInfo (..)
+  , CodeInfo (..)
+  , accountExtractor
   ) where
 
 
@@ -138,20 +140,55 @@ instance RLPSerializable AccountInfo where
   rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
   rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
 
+data ChainSignature = ChainSignature
+  { chainR :: !Word256
+  , chainS :: !Word256
+  , chainV :: !Word8
+  } deriving (Eq, Show, GHCG.Generic)
 
-data ChainInfo = ChainInfo {
-  chainLabel    :: !T.Text,
-  accountInfo   :: ![AccountInfo],
-  codeInfo      :: ![CodeInfo],
-  members       :: !(M.Map Address Enode),
-  parentChain   :: !(Maybe Word256),
-  creationBlock :: !SHA,
-  chainNonce    :: !Word256,
-  chainMetadata :: !(M.Map T.Text T.Text),
-  chainR        :: !Word256,
-  chainS        :: !Word256,
-  chainV        :: !Word8
-} deriving (Eq, Show, Read, GHCG.Generic)
+instance FromJSON ChainSignature where
+  parseJSON (Object o) = do
+    r <- o .: "r"
+    s <- o .: "s"
+    v <- o .: "v"
+    return $ ChainSignature r s v
+  parseJSON x = error $ "couldn't parse JSON for chain signature: " ++ show x
+
+instance ToJSON ChainSignature where
+  toJSON (ChainSignature r s v) =
+    object [ "r" .= r
+           , "s" .= s
+           , "v" .= v
+           ]
+
+instance RLPSerializable ChainSignature where
+  rlpEncode ChainSignature{..} = RLPArray
+    [ rlpEncode chainR
+    , rlpEncode chainS
+    , rlpEncode $ toInteger chainV
+    ]
+  rlpDecode (RLPArray [r, s, v]) =
+    ChainSignature
+      (rlpDecode r)
+      (rlpDecode s)
+      (fromInteger $ rlpDecode v)
+  rlpDecode o = error $ "rlpDecode ChainSignature: Expected 3 element RLPArray, got " ++ show o
+
+data UnsignedChainInfo = UnsignedChainInfo
+  { chainLabel     :: !T.Text
+  , accountInfo    :: ![AccountInfo]
+  , codeInfo       :: ![CodeInfo]
+  , members        :: !(M.Map Address Enode)
+  , parentChain    :: !(Maybe Word256)
+  , creationBlock  :: !SHA
+  , chainNonce     :: !Word256
+  , chainMetadata  :: !(M.Map T.Text T.Text)
+  } deriving (Eq, Show, GHCG.Generic)
+
+data ChainInfo = ChainInfo
+  { chainInfo      :: !UnsignedChainInfo
+  , chainSignature :: !(Maybe ChainSignature)
+  } deriving (Eq, Show, GHCG.Generic)
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
@@ -161,31 +198,27 @@ instance FromJSON ChainInfo where
     ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
-    cn <- o .: "chainNonce"
-    md <- o .: "chainMetadata"
-    r <- o .: "r"
-    s <- o .: "s"
-    v <- o .: "v"
-    return $ ChainInfo l as cs (M.fromList $ map toTuple ms) pc cb cn md r s v
+    cn <- o .: "nonce"
+    md <- o .: "metadata"
+    sig <- o .:? "signature"
+    return $ ChainInfo (UnsignedChainInfo l as cs (M.fromList $ map toTuple ms) pc cb cn md) sig
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON (ChainInfo cl ai ci ms pc cb cn md r s v) =
+  toJSON (ChainInfo (UnsignedChainInfo cl ai ci ms pc cb cn md) sig) =
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
            , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
            , "parentChain" .= pc
            , "creationBlock" .= cb
-           , "chainNonce" .= cn
-           , "chainMetadata" .= md
-           , "r" .= r
-           , "s" .= s
-           , "v" .= v
+           , "nonce" .= cn
+           , "metadata" .= md
+           , "signature" .= sig
            ]
 
-instance RLPSerializable ChainInfo where
-  rlpEncode ChainInfo{..} = RLPArray
+instance RLPSerializable UnsignedChainInfo where
+  rlpEncode UnsignedChainInfo{..} = RLPArray
     [ rlpEncode $ encodeUtf8 chainLabel
     , RLPArray $ map rlpEncode accountInfo
     , RLPArray $ map rlpEncode codeInfo
@@ -194,12 +227,9 @@ instance RLPSerializable ChainInfo where
     , rlpEncode creationBlock
     , rlpEncode chainNonce
     , rlpEncode chainMetadata
-    , rlpEncode chainR
-    , rlpEncode chainS
-    , rlpEncode $ toInteger chainV
     ]
-  rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms, pc, cb, cn, md, r, s, v]) =
-    ChainInfo
+  rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms, pc, cb, cn, md]) =
+    UnsignedChainInfo
       (decodeUtf8 $ rlpDecode cl)
       (rlpDecode <$> ai)
       (rlpDecode <$> coi)
@@ -208,11 +238,17 @@ instance RLPSerializable ChainInfo where
       (rlpDecode cb)
       (rlpDecode cn)
       (rlpDecode md)
-      (rlpDecode r)
-      (rlpDecode s)
-      (fromInteger $ rlpDecode v)
-  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 11 element RLPArray, got " ++ show o
+  rlpDecode o = error $ "rlpDecode UnsignedChainInfo: Expected 8 element RLPArray, got " ++ show o
 
+instance RLPSerializable ChainInfo where
+  rlpEncode (ChainInfo uci sig) =
+    let RLPArray xs = rlpEncode uci
+     in RLPArray (xs ++ [rlpEncode sig])
+  rlpDecode (RLPArray xs) =
+    ChainInfo
+      (rlpDecode . RLPArray $ take 8 xs)
+      (rlpDecode $ xs !! 8)
+  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 9 element RLPArray, got " ++ show o
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
