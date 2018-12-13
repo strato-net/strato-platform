@@ -118,6 +118,8 @@ instance HasGetTransactionsDB SequencerM where
     putGetTransactionsDB = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
+    getChainId = return . hash . rlpSerialize . rlpEncode
+    generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
     generateChainHashes tx =
       let r = txSigR tx
           s = txSigS tx

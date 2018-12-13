@@ -42,19 +42,19 @@ emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
 data BlockHashEntry = BlockHashEntry
   { _outputBlock  :: OutputBlock
-  , _dependentTXs :: Set SHA
+  , _dependentTXs :: Map Word256 (Set SHA)
   , _txHashMap    :: Map SHA SHA
   , _chainHashMap :: Map SHA (Set SHA)
   }
 makeLenses ''BlockHashEntry
 
 blockHashEntry :: OutputBlock -> BlockHashEntry
-blockHashEntry ob = BlockHashEntry ob S.empty M.empty M.empty
+blockHashEntry ob = BlockHashEntry ob M.empty M.empty M.empty
 
 data TxHashEntry = TxHashEntry
-  { _outputTx  :: Maybe OutputTx
-  , _chainHash :: Maybe SHA
-  , _inBlock   :: Maybe SHA
+  { _outputTx   :: Maybe OutputTx
+  , _chainHash  :: Maybe SHA
+  , _inBlock    :: Maybe SHA
   } deriving (Show)
 makeLenses ''TxHashEntry
 
@@ -105,6 +105,8 @@ chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
 chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs
 
 class MonadResource m => HasPrivateHashDB m where
+  getChainId               :: ChainInfo -> m SHA
+  generateInitialChainHash :: ChainInfo -> m SHA
   generateChainHashes :: OutputTx -> m [SHA]
   alterBlockHashEntry :: SHA     -> (Maybe BlockHashEntry -> m (Maybe BlockHashEntry)) -> m (Maybe BlockHashEntry)
   alterTxHashEntry    :: SHA     -> (Maybe TxHashEntry    -> m (Maybe TxHashEntry)   ) -> m (Maybe TxHashEntry)
@@ -320,37 +322,32 @@ removeMissingTxEntry :: HasPrivateHashDB m => SHA -> m ()
 removeMissingTxEntry tHash = do
   mthe <- getTxHashEntry tHash
   for_ mthe $ \TxHashEntry{_outputTx = otx} ->
-    for_ otx $ \tx ->
-      modifyChainIdEntryState_ (fromJust $ txChainId tx) $
+    for_ otx $ \tx -> for_ (txChainId tx) $ \chainId ->
+      modifyChainIdEntryState_ chainId $
         missingTXs %= S.delete tHash
 
 removeTransaction :: HasPrivateHashDB m => SHA -> m ()
 removeTransaction tHash = updateTxHashEntryState_ tHash $ do
   body <- use outputTx
-  for_ body $ \tx ->
-    lift . modifyChainIdEntryState_ (fromJust $ txChainId tx) $
+  for_ body $ \tx -> do
+    let Just chainId = txChainId tx
+    lift . modifyChainIdEntryState_ chainId $
       missingTXs %= S.delete tHash
-  bh <- use inBlock
-  for_ bh $ \bHash ->
-    lift . updateBlockHashEntryState_ bHash $ do
-      depTXs <- dependentTXs <%= S.delete tHash
-      mChash <- use (txHashMap . at tHash)
-      mPairs <- for mChash $ \cHash -> do
-        txHashMap %= M.delete tHash
-        ths <- chainHashMap . at cHash . _Just <%= S.delete tHash
-        chs <- if S.null ths
-                then chainHashMap <%= (M.delete cHash)
-                else use chainHashMap
-        lift . modifyChainHashEntryState_ cHash $ do
-          transactions %= S.delete tHash
-          when (M.null chs) $ inBlocks %= S.delete bHash
-        return (ths,chs)
-      if S.null depTXs
-        then ffor mPairs $ \(ths,chs) ->
-          if S.null ths && M.null chs
-            then return Nothing
-            else gets Just
-        else gets Just
+    bh <- use inBlock
+    for_ bh $ \bHash ->
+      lift . modifyBlockHashEntryState_ bHash $ do
+        dependentTXs %= (M.update (Just . S.delete tHash) chainId)
+        mChash <- use (txHashMap . at tHash)
+        for_ mChash $ \cHash -> do
+          txHashMap %= M.delete tHash
+          ths <- chainHashMap . at cHash . _Just <%= S.delete tHash
+          chs <- if S.null ths
+                  then chainHashMap <%= (M.delete cHash)
+                  else use chainHashMap
+          lift . modifyChainHashEntryState_ cHash $ do
+            transactions %= S.delete tHash
+            when (M.null chs) $ inBlocks %= S.delete bHash
+          return (ths,chs)
   return Nothing
 
 getChainHashForTxInBlock :: HasPrivateHashDB m => SHA -> SHA -> m (Maybe SHA)
