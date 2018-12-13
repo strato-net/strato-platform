@@ -7,6 +7,7 @@ license:             Apache-2.0
 description:         Functions to operate against the Redis-backed BlockDB
 
 dependencies:
+  - QuickCheck
   - base
   - base16-bytestring
   - blockapps-data
@@ -25,7 +26,7 @@ dependencies:
   - text
 
 library:
-  source-dirs:      src
+  source-dirs: src
   ghc-options: -Wall -Werror -O2
 
 executables:
@@ -33,13 +34,13 @@ executables:
     main: Viz.hs
     source-dirs:
       - exec_src/
-      - test/
     dependencies:
       - QuickCheck
       - diagrams-contrib
       - diagrams-html5
       - diagrams-lib
       - optparse-applicative
+      - strato-redis-blockdb
     ghc-options: -threaded -Wall -Werror
 
 
@@ -55,7 +56,6 @@ tests:
       - hspec-contrib
       - hspec
       - hspec-core
-      - QuickCheck
       - strato-redis-blockdb
     # We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind

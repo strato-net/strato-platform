@@ -11,12 +11,10 @@ module Blockchain.Event (
   ) where
 
 import           Control.Arrow                         ((&&&))
-import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.List
@@ -30,6 +28,7 @@ import           Data.Time.Clock
 import           MonadUtils
 import           System.Random
 import           Text.Printf
+import           UnliftIO.Exception
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Colors
@@ -63,7 +62,6 @@ import           Blockchain.Metrics
 import           Debug.Trace                           (trace)
 
 setTitleAndProduceBlocks :: ( MonadLogger m
-                            , MonadBaseControl IO m
                             , MonadIO m
                             , RBDB.HasRedisBlockDB m
                             , MonadState Context m
@@ -97,8 +95,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _        = ""
 
-handleEvents :: ( MonadBaseControl IO m
-                , MonadIO m
+handleEvents :: ( MonadIO m
                 , MonadResource m
                 , RBDB.HasRedisBlockDB m
                 , SK.HasUnseqSink m

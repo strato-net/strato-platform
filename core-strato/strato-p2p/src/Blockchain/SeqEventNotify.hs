@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeFamilies      #-}
@@ -19,12 +20,12 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
 
 seqEventNotificationSource :: ( MonadIO m
+                              , Monad m
                               , MonadResource m
                               , MonadLogger m
-                              , K.HasKafkaState m
                               )
-                           => ConduitM () OutputEvent m ()
-seqEventNotificationSource = do
+                           => K.KafkaState -> ConduitM () OutputEvent m ()
+seqEventNotificationSource ks = evalStateC ks $ do
     ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
     loop ofs'
     where loop nextOffset = do

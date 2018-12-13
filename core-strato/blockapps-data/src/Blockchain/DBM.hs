@@ -25,5 +25,5 @@ newtype DBs =
     sqlDB'::SQLDB
     }
 
-openDBs::(MonadResource m, MonadUnliftIO m, {- TODO(tim): Remove -} MonadBaseControl IO m)=>m DBs
+openDBs::(MonadResource m, MonadUnliftIO m) => m DBs
 openDBs = fmap DBs . runNoLoggingT . SQL.createPostgresqlPool connStr $ 20

@@ -45,51 +45,45 @@ packages:
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
   extra-dep: true
 - location:
-    git: https://github.com/echatav/servant-aeson-specs/
-    commit: cedbf002b0d5855c17dc91de97e966ee339604fa
-  extra-dep: true
-- location:
     git: https://github.com/iostat/relapse
     commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
+  extra-dep: true
+- location:
+    git: https://github.com/bitemyapp/esqueleto.git
+    commit: b81e0d951e510ebffca03c5a58658ad884cc6fbd
+  extra-dep: true
+
+- location:
+    git: https://github.com/ababkin/semver-range
+    commit: fc56a310eaac1d2dbbd7a7ef2ee94cf05f4464f5
   extra-dep: true
 
 extra-deps:
 - Crypto-4.2.5.1
-- bytestring-arbitrary-0.1.1
-- conduit-1.2.13.1
-- containers-0.5.11.0 # temp re-added, will remove
-- dequeue-0.1.12
-- diagrams-html5-1.4.1
-- ether-0.5.1.0 # temp re-added, will remove
+- bytestring-arbitrary-0.1.2
+- derive-2.6.4
 - global-lock-0.1
 - hflags-0.4.3
-- json-rpc-client-0.2.5.0
-- json-rpc-server-0.2.6.0
-- milena-0.5.2.1
-- monad-logger-0.3.28.1 # temp re-added, will remove
+- json-stream-0.4.2.3
 - monadIO-0.11.0.0
 - murmur3-1.0.3
 - nibblestring-0.0.3
+- normaldistribution-1.1.0.3
 - opaleye-0.6.7001.0
 - ordered-containers-0.1.0
 - parsec3-numbers-0.1.0
 - pbkdf-1.1.1.1
 - pcg-random-0.1.3.5
 - prometheus-client-1.0.0
-- random-bytestring-0.1.3.1
-- resourcet-1.1.11
-- saltine-0.0.0.4
 - servant-options-0.1.0.0
-- static-canvas-0.2.0.3
-- transformers-0.5.5.0
 - wai-middleware-prometheus-1.0.0
 - generic-random-1.2.0.0
 - prettyprinter-1.2.1
 - logging-effect-1.3.3
-- semver-range-0.2.7
+- bloomfilter-2.0.1.0
+- servant-aeson-specs-0.6.2.0
 
-resolver: lts-10.10 #also duplicated in docker section below
-compiler: ghc-8.0.2 # temp re-added, will remove - @see https://blockapps.atlassian.net/browse/STRATO-1086
+resolver: lts-12.4 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -106,6 +100,6 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-10.10"
+  image: "strato-buildbase:lts-12.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

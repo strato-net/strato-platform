@@ -91,7 +91,7 @@ ethEncrypt ethCryptState = do
 
 cbSafeTake :: forall o m. Monad m
            => Int
-           -> ConduitM B.ByteString o m (Maybe B.ByteString)
+           -> ConduitT B.ByteString o m (Maybe B.ByteString)
 cbSafeTake i = do
     ret <- CB.take i
     if BL.length ret /= fromIntegral i

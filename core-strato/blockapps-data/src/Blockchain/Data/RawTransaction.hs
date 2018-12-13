@@ -17,7 +17,7 @@ module Blockchain.Data.RawTransaction (
   ) where
 
 
-import           Control.Exception.Lifted
+import           UnliftIO.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -36,9 +36,9 @@ insertRawTX m rawTXs= do
   runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
 
 
-insertRawTX' :: (MonadBaseControl IO m, MonadUnliftIO m) =>
-             DebugMode->[RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
-insertRawTX' mode rawTXs= do
+insertRawTX' :: MonadUnliftIO m =>
+             DebugMode -> [RawTransaction] -> ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
+insertRawTX' mode rawTXs =
   forM_ rawTXs $ \rawTX -> do
     ret <- try $ SQL.insertBy rawTX
     case ret of

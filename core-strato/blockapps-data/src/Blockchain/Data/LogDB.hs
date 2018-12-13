@@ -24,4 +24,4 @@ putLogDB :: HasSQLDB m => LogDB -> m (Key LogDB)
 putLogDB = fmap head . putLogDBs . pure
 
 putLogDBs :: HasSQLDB m => [LogDB] -> m [Key LogDB]
-putLogDBs ls = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany ls)
+putLogDBs ls = getSQLDB >>= runResourceT . SQL.runSqlPool (SQL.insertMany ls)

@@ -35,6 +35,7 @@ dependencies:
   - ethereum-discovery
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
   - ghc
   - blockapps-haskoin
   - hflags
@@ -73,6 +74,7 @@ dependencies:
   - lifted-async
   - blockstanbul
   - unliftio-core
+  - unliftio
 
 ghc-options: -Wall -threaded
 

@@ -8,7 +8,7 @@ import qualified Data.Text                      as T
 import qualified Database.Esqueleto             as E
 import qualified Network.Haskoin.Crypto         as H
 import qualified Prelude                        as P
-import Text.Printf
+import           Text.Printf
 
 import           Blockchain.Constants
 import           Blockchain.Data.Address
@@ -29,13 +29,17 @@ import           Import
 
 import qualified Data.ByteString      as BS
 
-getFaucetKey :: Handler H.PrvKey
+zoomForApp :: ReaderT App IO a -> HandlerFor App a
+zoomForApp f = do
+  app <- getYesod
+  liftIO $ runReaderT f app
+
+getFaucetKey :: HandlerFor App H.PrvKey
 getFaucetKey = getKey >>= \case
   Just k -> return k
   Nothing -> invalidArgs ["No faucet account is defined"]
 
-
-lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend) => Address -> HandlerT site IO Integer
+lookupNonce :: Address -> HandlerFor App Integer
 lookupNonce addr' = do
   addrSt <- runDB $ E.select $
                       E.from $ \accStateRef -> do
@@ -62,7 +66,7 @@ emitTransaction tx = do
   emitKafkaTransactions [tx]
   return $ txHash tx
 
-postFaucetR :: Handler Value
+postFaucetR :: HandlerFor App Value
 postFaucetR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
@@ -72,7 +76,7 @@ postFaucetR = do
   mAddr <- lookupPostParam "address"
   toJSON <$> case fmap toAddr mAddr of
     Just target -> do
-      maxNonce <- acquireNewMaxNonce minNonce
+      maxNonce <- zoomForApp $ acquireNewMaxNonce minNonce
       $logInfoS "postFaucetR" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
       mapM (putTX maxNonce key target) [maxNonce, minNonce]
     Nothing -> do
@@ -98,7 +102,7 @@ postDataFaucetR = do
   size <- readInt 4096 <$> lookupPostParam "size"
   countOf <- readInt 1 <$> lookupPostParam "count" :: Handler Int
   fmap toJSON . CM.replicateM countOf $ do
-    maxN <- acquireNewMaxNonce minNonce
+    maxN <- zoomForApp $ acquireNewMaxNonce minNonce
     tx <- makeSizedTX maxN size key
     emitTransaction tx
 

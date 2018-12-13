@@ -9,7 +9,7 @@ import qualified Prelude            as P
 
 import Blockchain.Data.Transaction
 
-getBlkLastR :: Integer -> Handler Value
+getBlkLastR :: Integer -> HandlerFor App Value
 getBlkLastR n = do
   addHeader "Access-Control-Allow-Origin" "*"
   fetchLimit <- myFetchLimit

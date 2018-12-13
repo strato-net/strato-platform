@@ -26,39 +26,17 @@ instance ToJSON StackRepo
 instance FromJSON Package
 instance ToJSON Package
 
--- deriving instance Generic Config
--- instance FromJSON Config
--- instance ToJSON   Config
-
--- deriving instance Generic EnvSettings
--- instance FromJSON EnvSettings
--- instance ToJSON   EnvSettings
-
--- deriving instance Generic PackageIndex
--- instance FromJSON PackageIndex
--- instance ToJSON   PackageIndex
-
--- deriving instance Generic IndexLocation
--- instance FromJSON IndexLocation
--- instance ToJSON   IndexLocation
-
 -- swap liftIO for runIO to use TH
 getStackInfo :: Q String
 getStackInfo = runIO $ do
       pwd' <- getCurrentDirectory
       setCurrentDirectory $ pwd' </> ".."
-      --let pwd = pwd' </> ".."
-      --stackExists  <- doesFileExist stackFilename
-      --when stackExists
       liftIO $ do
         stackRef <- P.readFile ("stack.yaml" :: String)
-        let parsedContent = Y.decode $ BS.pack $ stackRef :: Maybe [StackRepo]
+        let parsedContent = Y.decodeEither' . BS.pack $ stackRef :: Either Y.ParseException [StackRepo]
         case parsedContent of
-          Nothing  -> return $ ("Could not parse stack config file." :: String)
-          (Just r) -> return (show . toJSON $ (r))
-          --(Just r@p) -> return (show . toJSON $ (configPackageIndices r))
-          --(Just r@p) -> return (Versioning.location $ package r)
-      --return ("bla" :: String)
+          Left err -> return $ "Could not parse stack config file:" ++ show err
+          Right r -> return . show . toJSON $ r
 
 -- | Run git with the given arguments and no stdin, returning the
 -- stdout output. If git isn't available or something goes wrong,

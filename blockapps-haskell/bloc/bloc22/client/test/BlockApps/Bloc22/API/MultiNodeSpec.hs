@@ -310,7 +310,7 @@ createContractOnMulti :: Text
                       -> TestConfig
                       -> IO Address
 createContractOnMulti src cn args config@TestConfig{..} = do
-  let blocclient = (ClientEnv mgr $ fromJust blocUrlMulti)
+  let blocclient = (ClientEnv mgr (fromJust blocUrlMulti) Nothing)
   addr <- fromEither =<< runClientM (postUsersUser userName pw) blocclient
   _ <- fromEither =<< runClientM (postUsersFill userName addr True) blocclient
   let
@@ -359,7 +359,7 @@ callMethodLocal method cAddr contractName methodArgs config@TestConfig{..} =
          False
          postUsersContractMethodRequest
        )
-       (ClientEnv mgr blocUrl)
+       (ClientEnv mgr blocUrl Nothing)
      )
 
 callMethodListLocal :: Text
@@ -394,7 +394,7 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
        False
        postMethodListRequest
      )
-     (ClientEnv mgr blocUrl)
+     (ClientEnv mgr blocUrl Nothing)
 
 getStateLocal :: Address -> Text -> TestConfig -> IO (Map Text SolidityValue)
 getStateLocal addr cn TestConfig{..} =
@@ -409,7 +409,7 @@ getStateLocal addr cn TestConfig{..} =
     Nothing
     False
   )
-  (ClientEnv mgr blocUrl)
+  (ClientEnv mgr blocUrl Nothing)
 
 
 skipIfNotMultinode :: TestConfig -> IO ()

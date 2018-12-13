@@ -66,15 +66,15 @@ import           Blockchain.Util
 sequencer :: SequencerM ()
 sequencer = do
   $logInfoS "sequencer" "Sequencer startup"
-  source <- newResumableSource <$> fuseChannels
+  source <- sealConduitT <$> fuseChannels
   bootstrapBlockstanbul
   $logInfoS "sequencer" "Sequencer initialized"
   go source
  where
-  go :: ResumableSource SequencerM SeqLoopEvent -> SequencerM ()
+  go :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM ()
   go src = oneSequencerIter src >>= go
 
-oneSequencerIter :: ResumableSource SequencerM SeqLoopEvent -> SequencerM (ResumableSource SequencerM SeqLoopEvent)
+oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM ())
 oneSequencerIter src = timeAction seqLoopTiming $ do
   clearAll
   (src', events) <- readEventsInBufferedWindow src
@@ -94,7 +94,7 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
 clearAll :: SequencerM ()
 clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
 
-readEventsInBufferedWindow :: ResumableSource SequencerM SeqLoopEvent -> SequencerM (ResumableSource SequencerM SeqLoopEvent, [SeqLoopEvent])
+readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
 readEventsInBufferedWindow src = do
   $logInfoS "sequencer/events" "Reading from fused channels..."
   dt <- asks maxUsPerIter

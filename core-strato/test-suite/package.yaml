@@ -55,17 +55,27 @@ dependencies:
 
 ghc-options: -Wall -Werror -threaded
 
+library:
+  source-dirs: src/
+
 tests:
   vm-tests:
-    source-dirs: test
+    source-dirs:
+      - test/
     main: TestMain.hs
+    dependencies:
+      - test-suite
+    other-modules: []
 
   unittests:
     source-dirs: test
     main: UnitTest.hs
     dependencies:
       - interpolatedstring-perl6
+      - test-suite
+    other-modules: []
 
   test-suite:
     source-dirs: test
     main: Spec.hs
+    other-modules: []

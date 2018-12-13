@@ -22,7 +22,7 @@ import qualified Prelude            as P
 
 
 
-getLogInfoR :: Handler Value
+getLogInfoR :: HandlerFor App Value
 getLogInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 

@@ -41,7 +41,7 @@ import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
-import Servant.Common.BaseUrl
+import Servant.Client
 import System.Log.Logger
 
 import Blockapps.Crossmon

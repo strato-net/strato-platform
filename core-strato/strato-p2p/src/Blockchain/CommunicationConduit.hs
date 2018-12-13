@@ -11,8 +11,6 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import           Control.Exception.Lifted              (throwIO)
-import           Control.Monad.Base                    (MonadBase)
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -23,10 +21,12 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
+import           Data.Conduit.TMChan
 import           Data.Maybe
 import qualified Data.Text                             as T
+import           UnliftIO.Exception
 
-import           Blockchain.MilenaTools
+import           Network.Kafka                         as K
 
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
@@ -39,7 +39,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
-import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
@@ -59,21 +58,21 @@ blockstanbulVersion = 1
 
 mkEthP2PEventSource :: ( Monad m
                        , MonadResource m
-                       , MonadBaseControl IO m
                        , MonadLogger m
-                       , HasKafkaState m
+                       , MonadUnliftIO m
                        )
                     => AppData
                     -> EthCryptState
+                    -> K.KafkaState
                     -> [ConduitM () Event m ()]
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource app inCtx extra = (.| CL.iterM recordEvent) <$> mergeSourcesCloseForAny (
+mkEthP2PEventSource app inCtx ks extra = (.| CL.iterM recordEvent) <$> mergeSources (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
-    , seqEventNotificationSource
+    , seqEventNotificationSource ks
         .| CL.map NewSeqEvent
     ] ++ extra) 4096 -- 🙏
 
@@ -138,7 +137,8 @@ handleMsgServerConduit :: (MonadIO (StateT Context m)
                          , MonadResource m
                          , RBDB.HasRedisBlockDB (StateT Context m)
                          , WrapsSQLDB (StateT Context) m
-                         , MonadLogger (StateT Context m))
+                         , MonadLogger (StateT Context m)
+                         )
                  => Point
                  -> PPeer
                  -> ConduitM Event Message (StateT Context m) ()
@@ -155,7 +155,7 @@ handleMsgServerConduit myPubkey peer = do
                 nodeId = myPubkey
             }
             yield helloMsg'
-        other -> assertHandshake other
+        other -> assertHandshake $ other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
@@ -181,7 +181,7 @@ awaitMsg = await >>= \case
     Nothing              -> return Nothing
     _                    -> awaitMsg
 
-assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
+assertHandshake :: (MonadLogger m, MonadIO m)
                 => Maybe Message
                 -> m ()
 assertHandshake mmsg = do

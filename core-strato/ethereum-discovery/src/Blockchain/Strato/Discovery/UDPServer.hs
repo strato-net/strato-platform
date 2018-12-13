@@ -10,7 +10,6 @@ module Blockchain.Strato.Discovery.UDPServer
      ) where
 
 import           ClassyPrelude                           ((<>))
-import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -51,8 +50,6 @@ runEthUDPServer :: ( MonadIO m
                    , MonadThrow m
                    , MonadLogger m
                    , MonadUnliftIO m
-                   , MonadBaseControl IO m -- TODO(tim): Remove
-                   , MonadBase IO m -- TODO(tim): Remove
                    )
                 => ContextLite
                 -> H.PrvKey

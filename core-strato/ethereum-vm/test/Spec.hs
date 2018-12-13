@@ -3,8 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Main where
-
 import           Prelude hiding (print)
 import           ClassyPrelude (print)
 
@@ -54,7 +52,7 @@ main = do
   void $ $initHFlags "Yeah Buddy"
   hspec spec
 
-runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
+runContextM' :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
                  StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM' f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"

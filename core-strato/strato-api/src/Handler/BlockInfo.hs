@@ -8,6 +8,8 @@
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE Rank2Types             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 
 module Handler.BlockInfo where
 
@@ -30,7 +32,7 @@ blockIdRef :: (E.Esqueleto query expr backend) =>(expr (Entity BlockDataRef), ex
 blockIdRef (a, t) = (a E.^. BlockDataRefBlockId E.==. t E.^. BlockId)
 -}
 
-getBlockInfoR :: Handler Value
+getBlockInfoR :: HandlerFor App Value
 getBlockInfoR = do
               getParameters <- reqGetParams <$> getRequest
 
@@ -64,7 +66,7 @@ getBlockInfoR = do
 
               let blockIds = P.map entityKey blks
 
-              txs <- runDB $ E.select $ 
+              txs <- runDB $ E.select $
                      E.from $ \(btx `E.InnerJoin` rawTX) -> do
                        E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
                        E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
@@ -72,7 +74,7 @@ getBlockInfoR = do
                        return (btx, rawTX)
 
               let getTXLists = flip (Map.findWithDefault []) $
-                               Map.fromListWith (flip (++)) $ map (fmap (:[])) $ P.map (\(x, y) -> (blockTransactionBlockDataRefId $ entityVal x, rawTX2TX $ entityVal y)) txs::(Key BlockDataRef->[Transaction]) 
+                               Map.fromListWith (flip (++)) $ map (fmap (:[])) $ P.map (\(x, y) -> (blockTransactionBlockDataRefId $ entityVal x, rawTX2TX $ entityVal y)) txs::(Key BlockDataRef->[Transaction])
 
 
               let modBlocks = P.map (\x -> (entityVal x, entityKey x)) (blks::[Entity BlockDataRef])
@@ -84,5 +86,5 @@ getBlockInfoR = do
 
               toRet (map (fmap getTXLists) modBlocks) (next addedParam)
             where
-              toRet :: [(BlockDataRef, [Transaction])] -> String -> Handler Value
+              toRet :: [(BlockDataRef, [Transaction])] -> String -> HandlerFor App Value
               toRet bs gp = returnJson . P.map (uncurry (bToBPrime gp)) $ bs
