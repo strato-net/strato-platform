@@ -67,7 +67,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
                            members
                            Nothing
                            creationBlockHash
-                           (Hex nonce)
+                           nonce
                            Map.empty
         )
         Nothing

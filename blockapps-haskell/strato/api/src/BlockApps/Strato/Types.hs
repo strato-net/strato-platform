@@ -488,7 +488,7 @@ data UnsignedChainInfo = UnsignedChainInfo
   , members       :: !(NamedMap "address" Address "enode" Text)
   , parentChain   :: !(Maybe ChainId)
   , creationBlock :: !Keccak256
-  , chainNonce    :: !(Hex Word256)
+  , chainNonce    :: !Word256
   , chainMetadata :: !(Map Text Text)
   } deriving (Eq, Show, Generic)
 
@@ -512,7 +512,7 @@ exampleUnsignedChainInfo = UnsignedChainInfo
       ]
   , parentChain = Nothing
   , creationBlock = creationBlockHash
-  , chainNonce = Hex 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+  , chainNonce = 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
   , chainMetadata = M.empty
   }
 
@@ -521,8 +521,8 @@ instance ToSchema UnsignedChainInfo where
     & mapped.schema.description ?~ "UnsignedChainInfo"
 
 data ChainSignature = ChainSignature
-  { chainR        :: !(Hex Word256)
-  , chainS        :: !(Hex Word256)
+  { chainR        :: !(Hex Natural)
+  , chainS        :: !(Hex Natural)
   , chainV        :: !(Hex Word8)
   } deriving (Eq, Show, Generic)
 
@@ -592,7 +592,7 @@ instance FromJSON ChainInfo where
     ms <- o .: "members"
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
-    cn <- o .: "nonce"
+    cn <- (o .: "nonce")
     md <- o .: "metadata"
     sig <- o .:? "signature"
     return $ ChainInfo (UnsignedChainInfo l as cs ms pc cb cn md) sig
