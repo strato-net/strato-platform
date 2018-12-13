@@ -404,7 +404,9 @@ spec = do
 
       it "should create a PrivateHashTX for a private transaction" . runTestM $ do
         let chainId = 0x12345678
-            cInfo = ChainInfo "my test chain" [] [] M.empty
+            cInfo = ChainInfo
+                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                      Nothing
             chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
         ptx <- liftIO . HK.withSource HK.devURandom $ do
           pk <- HK.genPrvKey
@@ -422,7 +424,9 @@ spec = do
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let chainId = 0x12345678
-            cInfo = ChainInfo "my test chain" [] [] M.empty
+            cInfo = ChainInfo
+                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                      Nothing
             chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
             chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
         tx <- liftIO . HK.withSource HK.devURandom $ do
@@ -451,7 +455,9 @@ spec = do
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let chainId = 0x12345678
-            cInfo = ChainInfo "my test chain" [] [] M.empty
+            cInfo = ChainInfo
+                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                      Nothing
             chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
             chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
         tx <- liftIO . HK.withSource HK.devURandom $ do
@@ -487,7 +493,9 @@ spec = do
 
         -- chain 1
         let chainId1 = 0x12345678
-            cInfo1 = ChainInfo "my test chain 1" [] [] M.empty
+            cInfo1 = ChainInfo
+                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                      Nothing
             chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
             chainHash1 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo1
         tx1 <- liftIO . HK.withSource HK.devURandom $ do
@@ -497,7 +505,9 @@ spec = do
 
         -- chain 2
         let chainId2 = 0x9abcdef0
-            cInfo2 = ChainInfo "my test chain 2" [] [] M.empty
+            cInfo2 = ChainInfo
+                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                      Nothing
             chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
             chainHash2 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo2
         tx2 <- liftIO . HK.withSource HK.devURandom $ do
