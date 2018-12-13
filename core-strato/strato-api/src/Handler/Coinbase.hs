@@ -5,7 +5,7 @@ import           Import             hiding (readFile, (</>))
 
 import           Blockchain.EthConf
 
-getCoinbaseR :: MonadHandler m => m Value
+getCoinbaseR :: HandlerFor App Value
 getCoinbaseR = do
   addHeader "Access-Control-Allow-Origin" "*"
   return $ object ["coinbase" .= coinbaseAddress (quarryConfig ethConf)]

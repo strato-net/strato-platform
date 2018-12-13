@@ -36,7 +36,7 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: forall m . MonadHandler m => m Value
+postChainR :: HandlerFor App Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 

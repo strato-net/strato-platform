@@ -12,7 +12,7 @@ import           Import
 
 import           Blockchain.EthConf
 
-getUUIDInfoR :: MonadHandler m => m TypedContent
+getUUIDInfoR :: HandlerFor App TypedContent
 getUUIDInfoR = selectRep
              . provideJson
              . ethUniqueId

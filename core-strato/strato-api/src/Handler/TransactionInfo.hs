@@ -50,7 +50,7 @@ postTransactionR :: HandlerFor App ()
 postTransactionR = do
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
-   tx <- parseJsonBody :: MonadHandler m => m (Result RawTransaction')
+   tx <- parseJsonBody :: HandlerFor App (Result RawTransaction')
    case tx of
        (Success (RawTransaction' raw "")) -> do
           let tx' = rawTX2TX raw
@@ -65,7 +65,7 @@ postTransactionR = do
           $logDebugS "transaction parse error" . T.pack . show $ err
           invalidArgs ["couldn't decode transaction"]
 
-postTransactionListR :: forall m . MonadHandler m => m ()
+postTransactionListR :: HandlerFor App ()
 postTransactionListR = do
    handlerStart <- liftIO $ getTime Realtime
 
@@ -101,7 +101,7 @@ postTransactionListR = do
         case a of String _ -> True
                   _        -> False
 
-optionsTransactionR :: MonadHandler m => m RepPlain
+optionsTransactionR :: HandlerFor App RepPlain
 optionsTransactionR = do
   addHeader "Access-Control-Allow-Origin" "*"
   addHeader "Access-Control-Allow-Headers" "Content-Type"
