@@ -31,6 +31,37 @@ const balances = [
 
 describe("Create Chain", function() {
 
+  it('should create 100 new chains', function* () {
+    this.timeout(config.timeout);
+    const uid = util.uid();
+    const alicename = 'Alice' + uid;
+    const bobname = 'Bob' + uid;
+    // create user
+    const isAsync = true;
+    const alice = yield rest.createUser(alicename, password, isAsync);
+    const bob   = yield rest.createUser(bobname, password, isAsync);
+    assert.isDefined(alice, "should exist");
+    assert.isDefined(alice.address, "should be defined");
+    assert.notEqual(alice.address, 0, "should be a nonzero address");
+    assert.isDefined(bob, "should exist");
+    assert.isDefined(bob.address, "should be defined");
+    assert.notEqual(bob.address, 0, "should be a nonzero address");
+
+    const bals = [{ address: alice.address, balance: 1000000000000000000000}
+                 ,{ address: bob.address, balance: 0}
+                 ];
+    const mems = [{address: alice.address, enode: members[0].enode}
+                 ,{address: bob.address, enode: members[1].enode}
+		 ];
+    for(var i = 0; i < 100; i++) {
+    const chainId = yield rest.createChain(label, mems, bals, src, args);
+    console.log('###CHAINID###',chainId);
+    assert.isDefined(chainId, "should exist");
+    assert.notEqual(chainId, '', "should be a nonzero address");
+    }
+
+  });
+
   it('should create a new chain and query the chain details', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();

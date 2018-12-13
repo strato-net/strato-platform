@@ -13,23 +13,10 @@ import           Blockchain.SHA              ()
 
 import           Data.ByteString             ()
 
+instance Binary CI.ChainSignature where
+instance Binary CI.UnsignedChainInfo where
 instance Binary CI.ChainInfo where
-    put gi = sequence_ $ map ($ gi) $
-        [ put. CI.chainLabel
-        , put. CI.accountInfo
-        , put. CI.codeInfo
-        , put. CI.members
-        ]
-    get = do
-        chainLabel      <- get
-        accountInfo        <- get
-        codeInfo        <- get
-        members         <- get
-        return $ CI.ChainInfo chainLabel accountInfo codeInfo members
-
 instance Binary CI.CodeInfo where
-  put (CI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2
-  get = CI.CodeInfo <$> get <*> get <*> get
 
 instance Binary CI.AccountInfo where
   put (CI.NonContract a n) = putWord8 0 >> put a >> put n

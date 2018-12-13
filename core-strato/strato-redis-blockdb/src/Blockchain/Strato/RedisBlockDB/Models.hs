@@ -69,7 +69,7 @@ newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show,
 newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Read, Show, RLPSerializable)
+newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Show, RLPSerializable)
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty

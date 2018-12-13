@@ -76,16 +76,18 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                         lift $ addMember chainId address enode' -- We only need the Text version for Postgres
                         mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
                         when (isJust mChainInfo) $ do
-                          let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
-                          void . RBDB.withRedisBlockDB $ RBDB.putChainInfo chainId cInfo{members = Map.insert address enode ms}
+                          let Just (ChainInfo (cInfo@UnsignedChainInfo{members=ms}) sig) = mChainInfo
+                          void . RBDB.withRedisBlockDB $
+                            RBDB.putChainInfo chainId $ ChainInfo cInfo{members = Map.insert address enode ms} sig
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                       lift $ removeMember chainId address
                       mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
                       when (isJust mChainInfo) $ do
-                        let Just (cInfo@ChainInfo{members=ms}) = mChainInfo
-                        void . RBDB.withRedisBlockDB $ RBDB.putChainInfo chainId cInfo{members = Map.delete address ms}
+                        let Just (ChainInfo (cInfo@UnsignedChainInfo{members=ms}) sig) = mChainInfo
+                        void . RBDB.withRedisBlockDB $
+                          RBDB.putChainInfo chainId $ ChainInfo cInfo{members = Map.delete address ms} sig
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       lift $ terminateChain chainId
