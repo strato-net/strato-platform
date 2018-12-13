@@ -31,6 +31,7 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
+import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.ChainHashDB
@@ -442,71 +443,76 @@ runConsensus = awaitForever $ \eob -> do
       yieldMany oes
 
 hydrateAndEmit :: ConduitM OutputEvent OutputEvent SequencerM ()
-hydrateAndEmit =
+hydrateAndEmit = awaitForever $ \case
+  OEBlock ob -> do
+    mOb <- lift $ hydrateAndEmit' ob S.empty
+    for_ mOb $ yield . OEBlock
+  oe -> yield oe
+
+hydrateAndEmit' :: OutputBlock -> S.Set Word256 -> SequencerM (Maybe OutputBlock)
+hydrateAndEmit' ob _ = do
   let logF = $logInfoS "hydrateAndEmit" . T.pack
-   in awaitForever $ \case
-        OEBlock ob -> do
-          let bHash = blockHeaderHash $ obBlockData ob
-          logF $ prettyOBlock ob
-          lift . repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
-          forM_ (obReceiptTransactions ob) $ \tx ->
-            when (isPrivateHashTX tx) $ do
-              let TD.PrivateHashTX th' ch' = otBaseTx tx
-                  tHash = SHA th'
-                  cHash = SHA ch'
-              lift $ runPrivateHashTX tHash cHash
-              lift $ repsertTxHashEntry_ tHash $
-                return . maybe
-                  (txHashEntryWithBlockHash bHash)
-                  (inBlock .~ Just bHash)
-              lift $ repsertChainHashEntry_ cHash $
-                return . maybe
-                  (chainHashEntryWithTxHashInBlock tHash bHash)
-                  ((inBlocks %~ S.insert bHash) . (transactions %~ S.insert tHash))
-              logF $ "Looking up transaction hash " ++ format tHash ++ " in MissingTxDB"
-              missing <- lift . isMissingTX $ tHash
-              if not missing
-                then logF $ "Transaction hash " ++ format tHash ++ " is not missing"
-                else do
-                  logF . concat $
-                    [ "Transaction hash "
-                    , format tHash
-                    , " is missing."
-                    , " Inserting into TxBlockDB and DependentTxDB"
-                    ]
-                  lift $ insertTxBlock tHash bHash
-                  mChainId <- join . fmap _onChainId <$> lift (getChainHashEntry cHash)
-                  case mChainId of
-                    Nothing ->
-                      $logErrorS "hydrateAndEmit" . T.pack . concat $
-                        [ "Transaction hash "
-                        , format tHash
-                        , " is claimed to be missing,"
-                        , " but its chainId is unknown."
-                        ]
-                    Just chainId -> lift $ insertDependentTx bHash chainId tHash
-          mbhe <- lift $ getBlockHashEntry bHash
-          let depTXs = fold $ maybe M.empty _dependentTXs mbhe
-          if S.null depTXs
-            then do
-              logF . concat $
-                [ "Block hash "
-                , format bHash
-                , " has no dependent transactions."
-                , " Hydrating and emitting to VM"
+      bHash = blockHeaderHash $ obBlockData ob
+  logF $ prettyOBlock ob
+  repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
+  forM_ (obReceiptTransactions ob) $ \tx ->
+    when (isPrivateHashTX tx) $ do
+      let TD.PrivateHashTX th' ch' = otBaseTx tx
+          tHash = SHA th'
+          cHash = SHA ch'
+      runPrivateHashTX tHash cHash
+      repsertTxHashEntry_ tHash $
+        return . maybe
+          (txHashEntryWithBlockHash bHash)
+          (inBlock .~ Just bHash)
+      repsertChainHashEntry_ cHash $
+        return . maybe
+          (chainHashEntryWithTxHashInBlock tHash bHash)
+          ((inBlocks %~ S.insert bHash) . (transactions %~ S.insert tHash))
+      logF $ "Looking up transaction hash " ++ format tHash ++ " in MissingTxDB"
+      missing <- isMissingTX $ tHash
+      if not missing
+        then logF $ "Transaction hash " ++ format tHash ++ " is not missing"
+        else do
+          logF . concat $
+            [ "Transaction hash "
+            , format tHash
+            , " is missing."
+            , " Inserting into TxBlockDB and DependentTxDB"
+            ]
+          insertTxBlock tHash bHash
+          mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
+          case mChainId of
+            Nothing ->
+              $logErrorS "hydrateAndEmit" . T.pack . concat $
+                [ "Transaction hash "
+                , format tHash
+                , " is claimed to be missing,"
+                , " but its chainId is unknown."
                 ]
-              hydratedBlock <- lift . hydrateBlock $ ob
-              lift $ P.incCounter seqBlocksReleased
-              yield $ OEBlock hydratedBlock
-            else do
-              logF . concat $
-                [ "Block hash "
-                , format bHash
-                , " has dependent transactions."
-                , " Inserting them into GetTransactions list"
-                ]
-              lift $ mapM_ insertGetTransactionsDB depTXs
-        oe -> yield oe
+            Just chainId -> insertDependentTx bHash chainId tHash
+  mbhe <- getBlockHashEntry bHash
+  let depTXs = fold $ maybe M.empty _dependentTXs mbhe
+  if S.null depTXs
+    then do
+      logF . concat $
+        [ "Block hash "
+        , format bHash
+        , " has no dependent transactions."
+        , " Hydrating and emitting to VM"
+        ]
+      hydratedBlock <- hydrateBlock ob
+      P.incCounter seqBlocksReleased
+      return $ Just hydratedBlock
+    else do
+      logF . concat $
+        [ "Block hash "
+        , format bHash
+        , " has dependent transactions."
+        , " Inserting them into GetTransactions list"
+        ]
+      mapM_ insertGetTransactionsDB depTXs
+      return Nothing
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks = mapM_ $ \ib -> do

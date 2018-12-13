@@ -5,7 +5,6 @@ module Blockchain.Sequencer.DB.ChainHashDB where
 
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.RLP
 import           Blockchain.SHA
 
 import           Control.Lens
