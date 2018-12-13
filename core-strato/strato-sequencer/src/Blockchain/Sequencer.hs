@@ -64,7 +64,6 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
-
 sequencer :: SequencerM ()
 sequencer = do
   $logInfoS "sequencer" "Sequencer startup"
@@ -445,11 +444,13 @@ runConsensus = awaitForever $ \eob -> do
 hydrateAndEmit :: ConduitM OutputEvent OutputEvent SequencerM ()
 hydrateAndEmit = awaitForever $ \case
   OEBlock ob -> do
-    mOb <- lift $ hydrateAndEmit' ob S.empty
+    mOb <- lift $ hydrateAndEmit' ob (Left S.empty)
     for_ mOb $ yield . OEBlock
   oe -> yield oe
 
-hydrateAndEmit' :: OutputBlock -> S.Set Word256 -> SequencerM (Maybe OutputBlock)
+hydrateAndEmit' :: OutputBlock
+                -> Either (S.Set Word256) (S.Set Word256)
+                -> SequencerM (Maybe OutputBlock)
 hydrateAndEmit' ob _ = do
   let logF = $logInfoS "hydrateAndEmit" . T.pack
       bHash = blockHeaderHash $ obBlockData ob
