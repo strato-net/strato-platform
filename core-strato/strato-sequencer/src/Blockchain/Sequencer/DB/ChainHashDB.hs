@@ -56,7 +56,7 @@ getNewChainHash chainId = do
 
 insertChainInfo :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
 insertChainInfo chainId cInfo = do
-  let h = hash . rlpSerialize $ rlpEncode cInfo
+  h <- generateInitialChainHash cInfo
   insertSeenChain chainId cInfo
   insertChainHash h chainId
   insertChainBufferEntry chainId h
