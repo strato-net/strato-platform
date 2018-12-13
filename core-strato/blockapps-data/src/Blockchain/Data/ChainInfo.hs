@@ -32,7 +32,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.JsonStream.Parser               as JS
-import qualified Data.Map.Strict                      as M      hiding (map, filter)
+import qualified Data.Map.Strict                      as M
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
@@ -226,7 +226,7 @@ instance RLPSerializable UnsignedChainInfo where
     , rlpEncode parentChain
     , rlpEncode creationBlock
     , rlpEncode chainNonce
-    , rlpEncode chainMetadata
+    , rlpEncode . M.mapKeys encodeUtf8 $ M.map encodeUtf8 chainMetadata
     ]
   rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms, pc, cb, cn, md]) =
     UnsignedChainInfo
@@ -237,7 +237,7 @@ instance RLPSerializable UnsignedChainInfo where
       (rlpDecode pc)
       (rlpDecode cb)
       (rlpDecode cn)
-      (rlpDecode md)
+      (M.mapKeys decodeUtf8 . M.map decodeUtf8 $ rlpDecode md)
   rlpDecode o = error $ "rlpDecode UnsignedChainInfo: Expected 8 element RLPArray, got " ++ show o
 
 instance RLPSerializable ChainInfo where
