@@ -14,7 +14,6 @@ import           Numeric
 
 import           Blockchain.ExtWord
 
-import           Data.Ratio               (numerator)
 import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import qualified Data.Binary              as Binary
