@@ -1,6 +1,8 @@
 --'aud' should not necessarily contain the URLs according to openid standard. Could be the unique client ids instead. Skipping check.
 --local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
 
+local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
+
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
   discovery                     = "<OAUTH_JWT_VALIDATION_DISCOVERY_URL>",
@@ -36,10 +38,9 @@ local function isEmpty(s)
   return s == nil or s == ''
 end
 
--- some oauth providers return email under `id_token` object, some - under `user`
 local unique_name = '' 
-if not isEmpty(res.email) then 
-  unique_name=res.email 
+if not isEmpty(res[username_property]) then
+  unique_name=res[username_property]
 else 
   unique_name=res.appid 
 end 

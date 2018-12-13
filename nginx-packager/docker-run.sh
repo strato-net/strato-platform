@@ -15,6 +15,7 @@ OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false}
 OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
+OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -128,6 +129,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ] ; then
     cp /tmp/openid-auth-jwt.tpl.lua /tmp/openid-auth-jwt.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-auth-jwt.lua
     sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-auth-jwt.lua
     #sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-auth-jwt.lua
 
