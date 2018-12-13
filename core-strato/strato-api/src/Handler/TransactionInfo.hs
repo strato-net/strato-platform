@@ -73,7 +73,7 @@ postTransactionListR = do
    addHeader "Access-Control-Allow-Headers" "Content-Type"
 
    parserStart <- liftIO $ getTime Realtime
-   tx <- parseJsonBody :: m (Result [RawTransaction'])
+   tx <- parseJsonBody :: HandlerFor App (Result [RawTransaction'])
    case tx of
        (Success raws) -> do
           txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)

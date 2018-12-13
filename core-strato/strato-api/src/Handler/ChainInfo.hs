@@ -40,7 +40,7 @@ postChainR :: HandlerFor App Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  ci <- parseJsonBody :: m (Result ChainInfo)
+  ci <- parseJsonBody :: HandlerFor App (Result ChainInfo)
   case ci of
     Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ _) _) -> do
     -- add more checks?
