@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 
 module Blockchain.Data.ChainInfo
@@ -29,18 +30,19 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.JsonStream.Parser               as JS
-import qualified Data.Map                             as M      hiding (map, filter)
+import qualified Data.Map.Strict                      as M      hiding (map, filter)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
+import           Data.Word
 
 import qualified GHC.Generics                         as GHCG
 
 
 data CodeInfo = CodeInfo
-  { codeInfoCode   :: B.ByteString
-  , codeInfoSource :: T.Text
-  , codeInfoName   :: T.Text
+  { codeInfoCode   :: !B.ByteString
+  , codeInfoSource :: !T.Text
+  , codeInfoName   :: !T.Text
   } deriving (Show, Read, Eq, GHCG.Generic)
 
 instance FromJSON CodeInfo where
@@ -72,9 +74,9 @@ instance RLPSerializable CodeInfo where
   rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (decodeUtf8 $ rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
-data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer SHA
-                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
+data AccountInfo = NonContract !Address !Integer
+                 | ContractNoStorage !Address !Integer !SHA
+                 | ContractWithStorage !Address !Integer !SHA ![(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic)
 
 instance FromJSON AccountInfo where
@@ -138,10 +140,17 @@ instance RLPSerializable AccountInfo where
 
 
 data ChainInfo = ChainInfo {
-    chainLabel      :: String,
-    accountInfo     :: [AccountInfo],
-    codeInfo        :: [CodeInfo],
-    members         :: M.Map Address Enode
+  chainLabel    :: !T.Text,
+  accountInfo   :: ![AccountInfo],
+  codeInfo      :: ![CodeInfo],
+  members       :: !(M.Map Address Enode),
+  parentChain   :: !(Maybe Word256),
+  creationBlock :: !SHA,
+  chainNonce    :: !Word256,
+  chainMetadata :: !(M.Map T.Text T.Text),
+  chainR        :: !Word256,
+  chainS        :: !Word256,
+  chainV        :: !Word8
 } deriving (Eq, Show, Read, GHCG.Generic)
 
 instance FromJSON ChainInfo where
@@ -150,31 +159,59 @@ instance FromJSON ChainInfo where
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
     ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
-    return $ ChainInfo l as cs (M.fromList $ map toTuple ms)
+    pc <- o .:? "parentChain"
+    cb <- o .: "creationBlock"
+    cn <- o .: "chainNonce"
+    md <- o .: "chainMetadata"
+    r <- o .: "r"
+    s <- o .: "s"
+    v <- o .: "v"
+    return $ ChainInfo l as cs (M.fromList $ map toTuple ms) pc cb cn md r s v
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON (ChainInfo cl ai ci ms) =
+  toJSON (ChainInfo cl ai ci ms pc cb cn md r s v) =
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
            , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
+           , "parentChain" .= pc
+           , "creationBlock" .= cb
+           , "chainNonce" .= cn
+           , "chainMetadata" .= md
+           , "r" .= r
+           , "s" .= s
+           , "v" .= v
            ]
 
 instance RLPSerializable ChainInfo where
-  rlpEncode ci = RLPArray
-    [ rlpEncode . encodeUtf8 . T.pack $ chainLabel ci
-    , RLPArray . map rlpEncode $ accountInfo ci
-    , RLPArray . map rlpEncode $ codeInfo ci
-    , rlpEncode $ members ci
+  rlpEncode ChainInfo{..} = RLPArray
+    [ rlpEncode $ encodeUtf8 chainLabel
+    , RLPArray $ map rlpEncode accountInfo
+    , RLPArray $ map rlpEncode codeInfo
+    , rlpEncode members
+    , rlpEncode parentChain
+    , rlpEncode creationBlock
+    , rlpEncode chainNonce
+    , rlpEncode chainMetadata
+    , rlpEncode chainR
+    , rlpEncode chainS
+    , rlpEncode $ toInteger chainV
     ]
-  rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms]) =
+  rlpDecode (RLPArray [cl, RLPArray ai, RLPArray coi, ms, pc, cb, cn, md, r, s, v]) =
     ChainInfo
-      (T.unpack . decodeUtf8 $ rlpDecode cl)
+      (decodeUtf8 $ rlpDecode cl)
       (rlpDecode <$> ai)
       (rlpDecode <$> coi)
       (rlpDecode ms)
-  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 4 element RLPArray, got " ++ show o
+      (rlpDecode pc)
+      (rlpDecode cb)
+      (rlpDecode cn)
+      (rlpDecode md)
+      (rlpDecode r)
+      (rlpDecode s)
+      (fromInteger $ rlpDecode v)
+  rlpDecode o = error $ "rlpDecode ChainInfo: Expected 11 element RLPArray, got " ++ show o
 
 
 accountExtractor :: JS.Parser [AccountInfo]

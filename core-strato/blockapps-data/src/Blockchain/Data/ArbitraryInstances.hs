@@ -12,6 +12,7 @@ import qualified Data.ByteString.Internal           as IB
 import qualified Data.Map                           as M    hiding (map, filter)
 import qualified Data.Text                          as T
 import           Data.Time
+import           Data.Word
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
@@ -23,6 +24,7 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia hiding (stateRoot)
+import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
 
@@ -180,8 +182,15 @@ instance Arbitrary AccountInfo where
 
 instance Arbitrary ChainInfo where
   arbitrary = do
-    cl <- arbitrary :: Gen String
+    cl <- arbitrary :: Gen T.Text
     ai <- arbitrary :: Gen [AccountInfo]
     ci <- arbitrary :: Gen [CodeInfo]
     mb <- arbitrary :: Gen (M.Map Address Enode)
-    return (ChainInfo cl ai ci mb)
+    pc <- arbitrary :: Gen (Maybe Word256)
+    cb <- arbitrary :: Gen SHA
+    cn <- arbitrary :: Gen Word256
+    md <- arbitrary :: Gen (M.Map T.Text T.Text)
+    r <- arbitrary :: Gen Word256
+    s <- arbitrary :: Gen Word256
+    v <- arbitrary :: Gen Word8
+    return (ChainInfo cl ai ci mb pc cb cn md r s v)

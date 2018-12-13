@@ -15,17 +15,38 @@ import           Data.ByteString             ()
 
 instance Binary CI.ChainInfo where
     put gi = sequence_ $ map ($ gi) $
-        [ put. CI.chainLabel
-        , put. CI.accountInfo
-        , put. CI.codeInfo
-        , put. CI.members
+        [ put . CI.chainLabel
+        , put . CI.accountInfo
+        , put . CI.codeInfo
+        , put . CI.members
+        , put . CI.parentChain
+        , put . CI.creationBlock
+        , put . CI.chainNonce
+        , put . CI.chainMetadata
         ]
     get = do
-        chainLabel      <- get
-        accountInfo        <- get
-        codeInfo        <- get
-        members         <- get
-        return $ CI.ChainInfo chainLabel accountInfo codeInfo members
+        chainLabel    <- get
+        accountInfo   <- get
+        codeInfo      <- get
+        members       <- get
+        parentChain   <- get
+        creationBlock <- get
+        chainNonce    <- get
+        chainMetadata <- get
+        chainR        <- get
+        chainS        <- get
+        chainV        <- get
+        return $ CI.ChainInfo chainLabel
+                              accountInfo
+                              codeInfo
+                              members
+                              parentChain
+                              creationBlock
+                              chainNonce
+                              chainMetadata
+                              chainR
+                              chainS
+                              chainV
 
 instance Binary CI.CodeInfo where
   put (CI.CodeInfo bs s1 s2) = put bs >> put s1 >> put s2
