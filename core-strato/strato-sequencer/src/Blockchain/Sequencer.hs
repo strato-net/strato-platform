@@ -17,6 +17,7 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.IO.Class                    (liftIO)
 
+import           Data.Bifunctor                            (bimap)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
@@ -444,14 +445,14 @@ runConsensus = awaitForever $ \eob -> do
 hydrateAndEmit :: ConduitM OutputEvent OutputEvent SequencerM ()
 hydrateAndEmit = awaitForever $ \case
   OEBlock ob -> do
-    mOb <- lift $ hydrateAndEmit' ob (Left S.empty)
-    for_ mOb $ yield . OEBlock
+    ob' <- lift $ hydrateAndEmit' ob (Left S.empty)
+    yield $ OEBlock ob'
   oe -> yield oe
 
 hydrateAndEmit' :: OutputBlock
                 -> Either (S.Set Word256) (S.Set Word256)
-                -> SequencerM (Maybe OutputBlock)
-hydrateAndEmit' ob _ = do
+                -> SequencerM OutputBlock
+hydrateAndEmit' ob chainIds = do
   let logF = $logInfoS "hydrateAndEmit" . T.pack
       bHash = blockHeaderHash $ obBlockData ob
   logF $ prettyOBlock ob
@@ -493,27 +494,24 @@ hydrateAndEmit' ob _ = do
                 ]
             Just chainId -> insertDependentTx bHash chainId tHash
   mbhe <- getBlockHashEntry bHash
-  let depTXs = fold $ maybe M.empty _dependentTXs mbhe
-  if S.null depTXs
-    then do
-      logF . concat $
-        [ "Block hash "
-        , format bHash
-        , " has no dependent transactions."
-        , " Hydrating and emitting to VM"
-        ]
-      hydratedBlock <- hydrateBlock ob
-      P.incCounter seqBlocksReleased
-      return $ Just hydratedBlock
-    else do
-      logF . concat $
-        [ "Block hash "
-        , format bHash
-        , " has dependent transactions."
-        , " Inserting them into GetTransactions list"
-        ]
-      mapM_ insertGetTransactionsDB depTXs
-      return Nothing
+  let depChains = maybe M.empty _dependentTXs mbhe
+      depTXs = fold depChains
+      chains = bimap
+                 (S.fromList . M.keys . M.filter (not . S.null) . M.restrictKeys depChains)
+                 (S.fromList . M.keys . M.filter S.null . M.restrictKeys depChains)
+                 chainIds
+  unless (S.null depTXs) $ do
+    logF . concat $
+      [ "Block hash "
+      , format bHash
+      , " has dependent transactions.\n"
+      , show (S.map format depTXs)
+      , " Inserting them into GetTransactions list"
+      ]
+    mapM_ insertGetTransactionsDB depTXs
+  hydratedBlock <- hydrateBlock ob chains
+  P.incCounter seqBlocksReleased
+  return hydratedBlock
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks = mapM_ $ \ib -> do
@@ -575,8 +573,10 @@ isPrivateHashTX = (== PrivateHash) . txType
 isPrivateChainTX :: TransactionLike t => t -> Bool
 isPrivateChainTX = isJust . txChainId
 
-hydrateBlock :: OutputBlock -> SequencerM OutputBlock
-hydrateBlock ob = do
+hydrateBlock :: OutputBlock
+             -> Either (S.Set Word256) (S.Set Word256)
+             -> SequencerM OutputBlock
+hydrateBlock ob _ = do
   otxs' <- forM (obReceiptTransactions ob) $ \otx ->
     case txType (otBaseTx otx) of
       PrivateHash -> do
