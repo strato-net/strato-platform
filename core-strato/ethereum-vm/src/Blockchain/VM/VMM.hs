@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMM (
@@ -41,6 +42,7 @@ import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Set                           as S
+import           UnliftIO.IORef
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
@@ -195,14 +197,14 @@ addLog newLog = do
   lift $ put state'{logs=newLog:logs state'}
 
 setPC::Int->VMM ()
-setPC p = do
-  state' <- lift get
-  lift $ put state'{pc=p}
+setPC !p = do
+  pcref <- lift $ gets pc
+  writeIORef pcref p
 
 incrementPC::Int->VMM ()
 incrementPC p = do
-  state' <- lift get
-  lift $ put state'{pc=pc state' + p}
+  pcref <- lift $ gets pc
+  modifyIORef' pcref (+p)
 
 addToRefund::Integer->VMM ()
 addToRefund val = do

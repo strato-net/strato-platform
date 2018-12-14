@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMState (
   VMState(..),
@@ -29,6 +30,9 @@ import           Blockchain.VM.Environment
 import           Blockchain.VM.Opcodes (CodePointer)
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
+
+instance Show (IORef a) where
+  show = const "<ioref>"
 
 data Memory =
   Memory {
@@ -60,7 +64,7 @@ data VMState =
     dbs              :: Context,
     sqldb            :: Config,
     vmGasRemaining   :: Integer,
-    pc               :: CodePointer,
+    pc               :: IORef CodePointer,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
@@ -111,12 +115,13 @@ startingAction Environment{..} = Action
 startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
 startingState isRunningTests' isHomestead env sqldb' dbs' = do
   m <- newMemory
+  pcref <- newIORef 0
   return VMState
              {
                vmIsHomestead=isHomestead,
                dbs = dbs',
                sqldb = sqldb',
-               pc = 0,
+               pc = pcref,
                done=False,
                returnVal=Nothing,
                vmException=Nothing,

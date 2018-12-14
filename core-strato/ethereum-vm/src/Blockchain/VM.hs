@@ -34,6 +34,7 @@ import qualified Formatting                         as F
 import           Numeric
 import           System.Clock
 import           Text.Printf
+import           UnliftIO.IORef
 
 
 
@@ -441,7 +442,7 @@ runOperation JUMPI = do
     (True, _)  -> setPC $ pInt - 1
     _          -> throwE InvalidJump
 
-runOperation PC = pushVMStateVar pc
+runOperation PC = push =<< readIORef =<< lift (gets pc)
 
 runOperation MSIZE = do
   memSize <- getSizeInBytes
@@ -876,7 +877,8 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
   lift $ logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
-  lift $ $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" (toInteger $ pc stateBefore) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
+  pcVal <- readIORef $ pc stateAfter
+  $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" (toInteger pcVal) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
   _ <- liftIO $ getMemAsByteString (memory stateAfter)
@@ -898,9 +900,9 @@ runCode c = do
   code <- getEnvVar envCode
 
   vmState <- lift get
-
-  let (op, len) = getOperationAt code (pc vmState)
-  --lift $ $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
+  pcVal <- readIORef (pc vmState)
+  let (op, len) = getOperationAt code pcVal
+  -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
   (val, theRefund) <- opGasPriceAndRefund op
 
@@ -915,9 +917,10 @@ runCode c = do
 
   env <- lift $ fmap environment get
 
-  when flags_sqlTrace $
+  when flags_sqlTrace $ do
+    pcVal' <- readIORef $ pc vmState
     vmTrace $
-      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex (pc vmState) "") ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
+      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
   when flags_trace $ printTrace (environment result) memBefore memAfter c op vmState result
 
