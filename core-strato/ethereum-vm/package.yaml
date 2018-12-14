@@ -60,6 +60,7 @@ dependencies:
   - temporary
   - time
   - transformers
+  - unliftio
   - unliftio-core
   - vector
   - wai-middleware-prometheus
