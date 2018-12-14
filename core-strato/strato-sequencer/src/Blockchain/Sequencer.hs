@@ -320,6 +320,7 @@ transformFullTransactions pairs = do
                 , "into PrivateHashDB"
                 ]
               let tHash = txHash ptx
+              markForP2P $ pairToOETx (ts, ptx)
               repsertTxHashEntry_ tHash $ \entry -> do
                 let the = case entry of
                       Nothing -> txHashEntryWithOutputTx ptx
