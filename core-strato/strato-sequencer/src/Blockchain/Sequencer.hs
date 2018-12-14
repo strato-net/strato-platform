@@ -24,6 +24,7 @@ import           Data.Foldable
 import           Data.List                                 (sortOn)
 import qualified Data.Map.Strict                           as M
 import           Data.Maybe
+import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -41,7 +42,6 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.DependentTxDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.MissingChainDB
 import           Blockchain.Sequencer.DB.MissingTxDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
@@ -507,7 +507,7 @@ hydrateAndEmit' ob chainIds = do
       repsertChainHashEntry_ cHash $
         return . maybe
           (chainHashEntryWithTxHashInBlock tHash bHash)
-          ((inBlocks %~ S.insert bHash) . (transactions %~ S.insert tHash))
+          ((inBlocks %~ (Q.|> bHash)) . (transactions %~ S.insert tHash))
       logF $ "Looking up transaction hash " ++ format tHash ++ " in MissingTxDB"
       insertTxBlock tHash bHash
       missing <- isMissingTX $ tHash
@@ -529,7 +529,12 @@ hydrateAndEmit' ob chainIds = do
                 , " is claimed to be missing,"
                 , " but its chainId is unknown."
                 ]
-            Just chainId -> insertDependentTx bHash chainId tHash
+            Just chainId -> do
+              insertDependentTx bHash chainId tHash
+              modifyChainIdEntryState_ chainId $ do
+                shas <- blocksToRun . bset <<%= S.insert bHash
+                when (not $ S.member bHash shas) $
+                  blocksToRun . blist %= (Q.|> bHash)
   mbhe <- getBlockHashEntry bHash
   let depChains = maybe M.empty _dependentTXs mbhe
       depTXs = fold depChains
@@ -573,22 +578,17 @@ transformGenesis chains = forM_ chains $ \ig -> do
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
-      insertChainInfo chainId cInfo
+      cHash <- generateInitialChainHash cInfo
+      insertSeenChain chainId cInfo
+      insertChainHash cHash chainId
+      insertChainBufferEntry chainId cHash
       markForVM $ OEGenesis og
-      mstxs <- lookupMissingChainTxs chainId
-      case mstxs of
-        [] -> logF $ "There are no missing chain txs for chain " ++ format (SHA chainId)
-        ths -> do
-          forM_ ths $ \th -> lookupTransaction th >>= \case
-            Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show chainId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
-            Just tx -> do
-              logF $ "Inserting transaction " ++ prettyOTx tx
-              insertPrivateHash tx
-              removeMissingTx th
-          bHashes <- catMaybes <$> mapM lookupTxBlocks ths
-          blocks <- map _outputBlock . catMaybes <$> mapM getBlockHashEntry bHashes
-          let cset = Right $ S.singleton chainId
-          runBlocks cset blocks
+      blocks <- maybe Q.empty _inBlocks <$> getChainHashEntry cHash
+      when (not $ Q.null blocks) $ do
+        let bHash Q.:< _ = Q.viewl blocks
+            cset = Right $ S.singleton chainId
+        block <- fmap _outputBlock <$> getBlockHashEntry bHash
+        for_ block $ runBlock cset
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
