@@ -21,6 +21,7 @@ import           Data.Bifunctor                            (bimap)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
+import           Data.List                                 (sortOn)
 import qualified Data.Map.Strict                           as M
 import           Data.Maybe
 import qualified Data.Set                                  as S
@@ -65,12 +66,22 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
+logFF :: T.Text -> String -> SequencerM ()
+logFF str = $logInfoS str . T.pack
+-- replace with this when debugging tests
+-- logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
+
+-- Left means "disclude all chains in set"
+-- Right means "include all chains without missing transactions in set"
+type ChainFilter = Either (S.Set Word256) (S.Set Word256)
+
 sequencer :: SequencerM ()
 sequencer = do
-  $logInfoS "sequencer" "Sequencer startup"
+  let logF = logFF "sequencer"
+  logF "Sequencer startup"
   source <- sealConduitT <$> fuseChannels
   bootstrapBlockstanbul
-  $logInfoS "sequencer" "Sequencer initialized"
+  logF "Sequencer initialized"
   go source
  where
   go :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM ()
@@ -98,7 +109,8 @@ clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
 
 readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
 readEventsInBufferedWindow src = do
-  $logInfoS "sequencer/events" "Reading from fused channels..."
+  let logF = logFF "sequencer/events"
+  logF "Reading from fused channels..."
   dt <- asks maxUsPerIter
   uch <- asks $ unseqEvents . cablePackage
   top <- atomically . tryPeekTQueue $ uch
@@ -116,7 +128,7 @@ readEventsInBufferedWindow src = do
                           .| takeC maxEvents
                           .| sinkList
   $logDebugS "sequencer/events" . T.pack . show $ events
-  $logInfoS "sequencer/events" . T.pack . printf "read %d events from fused channels" $ length events
+  logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
 checkForVotes :: [CandidateReceived] -> SequencerM ()
@@ -139,13 +151,14 @@ checkForTimeouts rns = do
 
 checkForUnseq :: [IngestEvent] -> SequencerM ()
 checkForUnseq inEvents = do
+    let logF = logFF "checkForUnseq"
     withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
     timeAction seqSplitEventsTiming $ splitEvents inEvents
     pendingLDBWrites <- gets _ldbBatchOps
     applyLDBBatchWrites $ toList pendingLDBWrites
     P.incCounter seqLdbBatchWrites
     P.setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
-    $logInfoS "sequencer" "Applied pending LDB writes"
+    logF "Applied pending LDB writes"
     chainIds <- gets _getChainsDB
     unless (S.null chainIds) $
       markForP2P . OEGetChain $ toList chainIds
@@ -201,7 +214,7 @@ blockstanbulSend' msg = do
 
 checkIfIsMissingTX :: SHA -> SHA -> SequencerM ()
 checkIfIsMissingTX th ch = do
-  let logF = $logInfoS "runPrivateHashTX" . T.pack
+  let logF = logFF "runPrivateHashTX"
   mChainId <- join . fmap _onChainId <$> getChainHashEntry ch
   case mChainId of
     Nothing -> do
@@ -219,7 +232,7 @@ checkIfIsMissingTX th ch = do
 
 runPrivateHashTX :: SHA -> SHA -> SequencerM ()
 runPrivateHashTX tHash cHash = do
-  let logF = $logInfoS "runPrivateHashTX" . T.pack
+  let logF = logFF "runPrivateHashTX"
   logF . concat $
     [ "Transforming transaction "
     , format tHash
@@ -265,7 +278,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
-  let logF = $logDebugS "transformEvents/emitTxs" . T.pack
+  let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
     case wrapTransaction itx of
       Nothing -> return Nothing
@@ -297,16 +310,7 @@ transformFullTransactions pairs = do
           ]
         mapM_ (insertTransaction . snd) ptxs
         repsertChainIdEntry_ chainId $ \case
-          Nothing -> do
-            logF . concat $
-              [ "We haven't seen the details for chain "
-              , format (SHA chainId)
-              , ". Inserting all transactions into MissingChainTxDB"
-              , "and inserting the chain Id into the GetChains list"
-              ]
-            insertGetChainsDB chainId
-            return . chainIdEntryWithMissingTXs . S.fromList $ map (txHash . otBaseTx . snd) ptxs
-          Just cie -> do
+          Just cie | isJust (_chainInfo cie) -> do
             tHashes <- forM ptxs $ \(ts, ptx) -> do
               logF . concat $
                 [ "We know the details for chain "
@@ -364,8 +368,9 @@ transformFullTransactions pairs = do
                       ]
                     removeTxBlock tHash
                     clearDependentTxs bHash chainId
-                    mBlock <- witnessedBlock bHash
-                    traverse_ runBlock mBlock
+                    mBlock <- fmap _outputBlock <$> getBlockHashEntry bHash
+                    let chainIds = Right $ S.singleton chainId
+                    for_ mBlock $ runBlock chainIds
                   depTxs -> do
                     logF . concat $
                       [ "Transaction "
@@ -382,6 +387,16 @@ transformFullTransactions pairs = do
                     insertDependentTxs bHash chainId depTxs'
               return tHash
             return $ (missingTXs %~ (S.\\ (S.fromList tHashes))) cie
+          entry -> do
+            logF . concat $
+              [ "We haven't seen the details for chain "
+              , format (SHA chainId)
+              , ". Inserting all transactions into MissingChainTxDB"
+              , " and inserting the chain Id into the GetChains list"
+              ]
+            insertGetChainsDB chainId
+            let s = S.fromList $ map (txHash . otBaseTx . snd) ptxs
+            return $ maybe (chainIdEntryWithMissingTXs s) (missingTXs %~ S.union s) entry
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
@@ -389,14 +404,35 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
     then transformPrivateHashTXs pairs
     else transformFullTransactions pairs
 
-runBlockWithConsensus :: SequencedBlock -> SequencerM ()
-runBlockWithConsensus sb = mapM_ markForVM =<< runConduit (expandBlock sb .| runConsensus .| hydrateAndEmit .| sinkList)
+runBlockWithConsensus :: ChainFilter -> SequencedBlock -> SequencerM ()
+runBlockWithConsensus chainIds sb =
+  mapM_ markForVM =<< runConduit
+    ( yield sb
+   .| expandBlock
+   .| runConsensus
+   .| hydrateAndEmit chainIds
+   .| sinkList
+    )
 
-runBlock :: SequencedBlock -> SequencerM ()
-runBlock sb = mapM_ markForVM =<< runConduit (expandBlock sb .| dropLefts .| mapC OEBlock .| hydrateAndEmit .| sinkList)
+runBlock :: ChainFilter -> OutputBlock -> SequencerM ()
+runBlock chainIds ob =
+  mapM_ markForVM =<< runConduit
+    ( yield (OEBlock ob)
+   .| hydrateAndEmit chainIds
+   .| sinkList
+    )
 
-expandBlock :: SequencedBlock -> ConduitM () (Either SequencedBlock OutputBlock) SequencerM ()
-expandBlock sb = do
+runBlocks :: ChainFilter -> [OutputBlock] -> SequencerM ()
+runBlocks chainIds obs = do
+  mapM_ markForVM =<< runConduit
+    ( yieldMany (sortOn obTotalDifficulty obs)
+   .| mapC OEBlock
+   .| hydrateAndEmit chainIds
+   .| sinkList
+    )
+
+expandBlock :: ConduitM SequencedBlock (Either SequencedBlock OutputBlock) SequencerM ()
+expandBlock = awaitForever $ \sb -> do
   readiness <- lift $ enqueueIfParentNotEmitted sb
   case readiness of
     NotReadyToEmit -> do
@@ -442,18 +478,18 @@ runConsensus = awaitForever $ \eob -> do
       oes <- lift . blockstanbulSend' . convert $ route eob
       yieldMany oes
 
-hydrateAndEmit :: ConduitM OutputEvent OutputEvent SequencerM ()
-hydrateAndEmit = awaitForever $ \case
+hydrateAndEmit :: ChainFilter -> ConduitM OutputEvent OutputEvent SequencerM ()
+hydrateAndEmit chainIds = awaitForever $ \case
   OEBlock ob -> do
-    ob' <- lift $ hydrateAndEmit' ob (Left S.empty)
+    ob' <- lift $ hydrateAndEmit' ob chainIds
     yield $ OEBlock ob'
   oe -> yield oe
 
 hydrateAndEmit' :: OutputBlock
-                -> Either (S.Set Word256) (S.Set Word256)
+                -> ChainFilter
                 -> SequencerM OutputBlock
 hydrateAndEmit' ob chainIds = do
-  let logF = $logInfoS "hydrateAndEmit" . T.pack
+  let logF = logFF "hydrateAndEmit"
       bHash = blockHeaderHash $ obBlockData ob
   logF $ prettyOBlock ob
   repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
@@ -472,6 +508,7 @@ hydrateAndEmit' ob chainIds = do
           (chainHashEntryWithTxHashInBlock tHash bHash)
           ((inBlocks %~ S.insert bHash) . (transactions %~ S.insert tHash))
       logF $ "Looking up transaction hash " ++ format tHash ++ " in MissingTxDB"
+      insertTxBlock tHash bHash
       missing <- isMissingTX $ tHash
       if not missing
         then logF $ "Transaction hash " ++ format tHash ++ " is not missing"
@@ -482,7 +519,6 @@ hydrateAndEmit' ob chainIds = do
             , " is missing."
             , " Inserting into TxBlockDB and DependentTxDB"
             ]
-          insertTxBlock tHash bHash
           mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
           case mChainId of
             Nothing ->
@@ -498,7 +534,7 @@ hydrateAndEmit' ob chainIds = do
       depTXs = fold depChains
       chains = bimap
                  (S.fromList . M.keys . M.filter (not . S.null) . M.restrictKeys depChains)
-                 (S.fromList . M.keys . M.filter S.null . M.restrictKeys depChains)
+                 (\cs -> (cs S.\\ (S.fromList . M.keys . M.filter (not . S.null) $ M.restrictKeys depChains cs)))
                  chainIds
   unless (S.null depTXs) $ do
     logF . concat $
@@ -523,49 +559,35 @@ transformBlocks = mapM_ $ \ib -> do
       P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
       witnessBlockHash (sbHash sb) sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
-      runBlockWithConsensus sb
+      runBlockWithConsensus (Left S.empty) sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
+  let logF = logFF "transformGenesis"
   let og = ingestGenesisToOutputGenesis ig
       (chainId, cInfo) = ogGenesisInfo og
   markForP2P (OEGenesis og)
-  $logInfoS "transformGenesis" . T.pack $ "Transforming ChainInfo for chain " ++ format (SHA chainId) ++ " with info " ++ show cInfo
+  logF $ "Transforming ChainInfo for chain " ++ format (SHA chainId) ++ " with info " ++ show cInfo
   lookupSeenChain chainId >>= \case
-    True -> do
-      $logInfoS "transformGenesis" "We've seen this chain before. Not emitting to VM"
-      return ()
+    True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
-      $logInfoS "transformGenesis" "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
+      logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
       insertChainInfo chainId cInfo
       markForVM $ OEGenesis og
-      lookupMissingChainTxs chainId >>= \case
-        [] -> return ()
-        ths -> forM_ ths $ \th -> lookupTransaction th >>= \case
-          Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show chainId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
-          Just tx -> do
-            $logInfoS "transformGenesis" . T.pack $ "Inserting transaction " ++ prettyOTx tx
-            let tHash = txHash tx
-            insertPrivateHash tx
-            removeMissingTx tHash
-            lookupTxBlocks tHash >>= \case
-              Nothing -> return ()
-              Just bHash -> lookupDependentTxs bHash chainId >>= \case
-                depTxs | not (S.member tHash depTxs) ->
-                  error $ "lookupDependentTxs: transaction " ++ format tHash ++ " claims to depend on block " ++ format bHash ++ ", but it's missing from the block's dependent transaction set. Dependent transactions: " ++ (show . map format $ S.toList depTxs)
-                depTxs | depTxs == S.singleton tHash -> do
-                  $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is the only dependent transaction in block " ++ format bHash
-                  removeTxBlock tHash
-                  clearDependentTxs bHash chainId
-                  mBlock <- witnessedBlock bHash
-                  mapM_ runBlock mBlock
-                depTxs -> do
-                  $logInfoS "transformGenesis" . T.pack $ "Transaction " ++ format tHash ++ " is a dependent transaction in block " ++ format bHash ++ ", but there are others. Inserting them into MissingTxDB and GetTransactions list"
-                  removeTxBlock tHash
-                  let depTxs' = S.delete tHash depTxs
-                  mapM_ insertMissingTx depTxs'
-                  mapM_ insertGetTransactionsDB depTxs'
-                  insertDependentTxs bHash chainId depTxs'
+      mstxs <- lookupMissingChainTxs chainId
+      case mstxs of
+        [] -> logF $ "There are no missing chain txs for chain " ++ format (SHA chainId)
+        ths -> do
+          forM_ ths $ \th -> lookupTransaction th >>= \case
+            Nothing -> error $ "lookupTransaction: we believe we've seen transaction " ++ format th ++ " on chain " ++ show chainId ++ ", but we haven't. Other transactions on chain: " ++ show (map format ths)
+            Just tx -> do
+              logF $ "Inserting transaction " ++ prettyOTx tx
+              insertPrivateHash tx
+              removeMissingTx th
+          bHashes <- catMaybes <$> mapM lookupTxBlocks ths
+          blocks <- map _outputBlock . catMaybes <$> mapM getBlockHashEntry bHashes
+          let cset = Right $ S.singleton chainId
+          runBlocks cset blocks
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
@@ -574,22 +596,51 @@ isPrivateChainTX :: TransactionLike t => t -> Bool
 isPrivateChainTX = isJust . txChainId
 
 hydrateBlock :: OutputBlock
-             -> Either (S.Set Word256) (S.Set Word256)
+             -> ChainFilter
              -> SequencerM OutputBlock
-hydrateBlock ob _ = do
+hydrateBlock ob chainIds = do
+  let logF = logFF "hydrateBlock"
+  logF $ show chainIds
   otxs' <- forM (obReceiptTransactions ob) $ \otx ->
     case txType (otBaseTx otx) of
       PrivateHash -> do
         let sha = SHA . TD.transactionTxHash $ otBaseTx otx
-        $logInfoS "hydrateBlock" . T.pack $ "Looking up transaction hash " ++ format sha
+        logF $ "Looking up transaction hash " ++ format sha
         mOtx' <- lookupTransaction sha
         case mOtx' of
           Nothing -> do
-            $logInfoS "hydrateBlock" . T.pack $ "Transaction hash " ++ format sha ++ " not found."
+            logF . concat $
+              [ "Transaction hash "
+              , format sha
+              , " not found."
+              ]
             return otx
           Just otx' -> do
-            $logInfoS "hydrateBlock" . T.pack $ "Transaction hash " ++ format sha ++ " found: " ++ prettyOTx otx'
-            return otx'
+            logF . concat $
+              [ "Transaction hash "
+              , format sha
+              , " found: "
+              , prettyOTx otx'
+              ]
+            let Just chainId = txChainId otx'
+            let shouldHydrate = either id id $
+                  bimap (not . S.member chainId) (S.member chainId) chainIds
+            hasChainInfo <- isJust . join . fmap _chainInfo <$> getChainIdEntry chainId
+            if hasChainInfo && shouldHydrate
+              then do
+                logF . concat $
+                  [ "Chain "
+                  , format (SHA chainId)
+                  , "ready to hydrate!"
+                  ]
+                return otx'
+              else do
+                logF . concat $
+                  [ "Chain "
+                  , format (SHA chainId)
+                  , "excluded from hydration!"
+                  ]
+                return otx
       _ -> return otx
   return ob{obReceiptTransactions = otxs'}
 

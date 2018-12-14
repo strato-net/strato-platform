@@ -45,7 +45,7 @@ data BlockHashEntry = BlockHashEntry
   , _dependentTXs :: Map Word256 (Set SHA)
   , _txHashMap    :: Map SHA SHA
   , _chainHashMap :: Map SHA (Set SHA)
-  }
+  } deriving (Show)
 makeLenses ''BlockHashEntry
 
 blockHashEntry :: OutputBlock -> BlockHashEntry
@@ -75,7 +75,7 @@ data ChainHashEntry = ChainHashEntry
   , _onChainId    :: Maybe Word256
   , _transactions :: Set SHA
   , _inBlocks     :: Set SHA
-  }
+  } deriving (Show)
 makeLenses ''ChainHashEntry
 
 chainHashEntryWithChainId :: Word256 -> ChainHashEntry
@@ -95,7 +95,7 @@ data ChainIdEntry = ChainIdEntry
   { _chainInfo   :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
-  }
+  } deriving (Show)
 makeLenses ''ChainIdEntry
 
 chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry

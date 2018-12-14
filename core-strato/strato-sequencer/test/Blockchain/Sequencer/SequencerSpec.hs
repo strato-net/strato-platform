@@ -373,6 +373,47 @@ spec = do
         (_, evs) <- readEventsInBufferedWindow src
         evs `shouldMatchList` [TimerFire 987]
 
+    describe "Private Chains" $ do
+
+      -- chain 1
+      let cInfo1 = ChainInfo
+                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    Nothing
+          SHA chainId1 = SHA.rlpHash cInfo1
+          SHA chainHash1 = SHA.rlpHash cInfo1
+          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
+      tx1 <- runIO . HK.withSource HK.devURandom $ do
+        pk <- HK.genPrvKey
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
+      let hashTx1 = PrivateHashTX (unSHA $ txHash tx1) chainHash1
+
+      -- chain 2
+      let cInfo2 = ChainInfo
+                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    Nothing
+          SHA chainId2 = SHA.rlpHash cInfo2
+          SHA chainHash2 = SHA.rlpHash cInfo2
+          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
+      tx2 <- runIO . HK.withSource HK.devURandom $ do
+        pk <- HK.genPrvKey
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
+      let hashTx2 = PrivateHashTX (unSHA $ txHash tx2) chainHash2
+
+      let b1' = makeBlockWithTransactions [hashTx1]
+          blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
+                                              , blockDataNumber = 1
+                                              }
+                      (blockReceiptTransactions b1')
+                      (blockBlockUncles b1')
+          iev1' = IEBlock . blockToIngestBlock TO.Morphism . blk1'
+          b2' = makeBlockWithTransactions [hashTx1, hashTx2]
+          blk2' h = Block (blockBlockData b2'){ blockDataParentHash = h
+                                              , blockDataNumber = 1
+                                              }
+                      (blockReceiptTransactions b2')
+                      (blockBlockUncles b2')
+          iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'
+
       it "should forward a private transaction hash" . runTestM $ do
         SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
         SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
@@ -403,16 +444,8 @@ spec = do
         txType (head txs') `shouldBe` PrivateHash
 
       it "should create a PrivateHashTX for a private transaction" . runTestM $ do
-        let chainId = 0x12345678
-            cInfo = ChainInfo
-                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
-                      Nothing
-            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
-        ptx <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
-        checkForUnseq [chainDetails]
-        checkForUnseq [IETx 0 (IngestTx TO.API ptx)]
+        checkForUnseq [chainDetails1]
+        checkForUnseq [IETx 0 (IngestTx TO.API tx1)]
         vmevs <- drainVM
         let txs = [tx | OETx _ tx <- vmevs]
         length txs `shouldBe` 1
@@ -423,24 +456,9 @@ spec = do
         txType (head txs') `shouldBe` PrivateHash
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
-        let chainId = 0x12345678
-            cInfo = ChainInfo
-                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
-                      Nothing
-            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
-            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
-        tx <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
-        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
-        let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){ blockDataParentHash = h
-                                           , blockDataNumber = 1}
-                        (blockReceiptTransactions b')
-                        (blockBlockUncles b')
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
-        checkForUnseq [chainDetails]
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
+        let iev = iev1' h
+        checkForUnseq [chainDetails1]
+        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
         checkForUnseq [iev]
         p2pevs <- drainP2P
         let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
@@ -454,90 +472,105 @@ spec = do
         txType (head otxs) `shouldBe` Message
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
-        let chainId = 0x12345678
-            cInfo = ChainInfo
-                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
-                      Nothing
-            chainDetails = IEGenesis (IngestGenesis TO.Morphism (chainId, cInfo))
-            chainHash = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo
-        tx <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId) Nothing pk
-        let hashTx = PrivateHashTX (unSHA $ txHash tx) chainHash
-        let b' = makeBlockWithTransactions [hashTx]
-            blk = Block (blockBlockData b'){ blockDataParentHash = h
-                                           , blockDataNumber = 1
-                                           }
-                        (blockReceiptTransactions b')
-                        (blockBlockUncles b')
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
-        checkForUnseq [chainDetails]
+        let iev = iev1' h
+        checkForUnseq [chainDetails1]
         checkForUnseq [iev]
         vmevs <- drainVM
         let obs = [b | OEBlock b <- vmevs]
-        obs `shouldBe` []
+        length obs `shouldBe` 1
+        let otxs = obReceiptTransactions $ head obs
+        length otxs `shouldBe` 1
+        txType (head otxs) `shouldBe` PrivateHash
         p2pevs <- drainP2P
         let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         length bs `shouldBe` 1
         let txs = blockReceiptTransactions $ head bs
         length txs `shouldBe` 1
         txType (head txs) `shouldBe` PrivateHash
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx)]
+        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
         vmevs' <- drainVM
-        let otxs' = obReceiptTransactions $ head [b | OEBlock b <- vmevs']
+        let obs' = [b | OEBlock b <- vmevs']
+        length obs' `shouldBe` 1
+        let otxs' = obReceiptTransactions $ head obs'
         length otxs' `shouldBe` 1
         txType (head otxs') `shouldBe` Message
 
-      it "should split block up by chain Id" . runPBFTTestMWithGenesis $ \h -> do
-        liftIO $ pendingWith "TODO: reinstate once sequencer splits up blocks"
-
-        -- chain 1
-        let chainId1 = 0x12345678
-            cInfo1 = ChainInfo
-                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
-                      Nothing
-            chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
-            chainHash1 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo1
-        tx1 <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
-        let hashTx1 = PrivateHashTX (unSHA $ txHash tx1) chainHash1
-
-        -- chain 2
-        let chainId2 = 0x9abcdef0
-            cInfo2 = ChainInfo
-                      (UnsignedChainInfo "my test chain" [] [] M.empty Nothing (SHA 0) 0 M.empty)
-                      Nothing
-            chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
-            chainHash2 = unSHA . superProprietaryStratoSHAHash . rlpSerialize $ rlpEncode cInfo2
-        tx2 <- liftIO . HK.withSource HK.devURandom $ do
-          pk <- HK.genPrvKey
-          createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
-        let hashTx2 = PrivateHashTX (unSHA $ txHash tx2) chainHash2
-
-        let b' = makeBlockWithTransactions [hashTx1, hashTx2]
-            blk = Block (blockBlockData b'){ blockDataParentHash = h
-                                           , blockDataNumber = 1
-                                           }
-                        (blockReceiptTransactions b')
-                        (blockBlockUncles b')
-            iev = IEBlock . blockToIngestBlock TO.Morphism $ blk
+      it "should not split up block when all chains are known" . runPBFTTestMWithGenesis $ \h -> do
+        let iev = iev2' h
+            ietx = IETx 0 . IngestTx TO.Morphism
         checkForUnseq [chainDetails1, chainDetails2]
+        checkForUnseq [ietx tx1, ietx tx2]
         checkForUnseq [iev]
-        vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
-        obs `shouldBe` []
         p2pevs <- drainP2P
         let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         length bs `shouldBe` 1
         let txs = blockReceiptTransactions $ head bs
         length txs `shouldBe` 2
-        txType (txs !! 0) `shouldBe` PrivateHash
-        txType (txs !! 1) `shouldBe` PrivateHash
-        let ietx = IETx 0 . IngestTx TO.Morphism
+        mapM_ ((`shouldBe` PrivateHash) . txType) txs
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        length obs `shouldBe` 1
+        let otxs = obReceiptTransactions $ head obs
+        length otxs `shouldBe` 2
+        mapM_ ((`shouldBe` Message) . txType) otxs
+
+      it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
+        let iev = iev2' h
+            ietx = IETx 0 . IngestTx TO.Morphism
         checkForUnseq [ietx tx1, ietx tx2]
+        checkForUnseq [iev]
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 2
+        mapM_ ((`shouldBe` PrivateHash) . txType) txs
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        length obs `shouldBe` 1
+        let otxs = obReceiptTransactions $ head obs
+        length otxs `shouldBe` 2
+        mapM_ ((`shouldBe` PrivateHash) . txType) otxs
+        checkForUnseq [chainDetails1, chainDetails2]
         vmevs' <- drainVM
         let obs' = [b | OEBlock b <- vmevs']
-        length obs' `shouldBe` 3
-        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs'
-        mapM_ ((`shouldBe` Message) . txType . head . obReceiptTransactions) obs'
+        length obs' `shouldBe` 2
+        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs'
+        let otxs1 = obReceiptTransactions $ obs' !! 0
+            otxs2 = obReceiptTransactions $ obs' !! 1
+        txType (otxs1 !! 0) `shouldBe` Message
+        txType (otxs1 !! 1) `shouldBe` PrivateHash
+        txType (otxs2 !! 0) `shouldBe` PrivateHash
+        txType (otxs2 !! 1) `shouldBe` Message
+
+      it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
+        let iev = iev2' h
+            ietx = IETx 0 . IngestTx TO.Morphism
+        checkForUnseq [ietx tx1, ietx tx2, iev]
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 2
+        mapM_ ((`shouldBe` PrivateHash) . txType) txs
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        length obs `shouldBe` 1
+        let otxs = obReceiptTransactions $ head obs
+        length otxs `shouldBe` 2
+        mapM_ ((`shouldBe` PrivateHash) . txType) otxs
+        checkForUnseq [chainDetails1]
+        vmevs' <- drainVM
+        let obs' = [b | OEBlock b <- vmevs']
+        length obs' `shouldBe` 1
+        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs'
+        let otxs1 = obReceiptTransactions $ head obs'
+        txType (otxs1 !! 0) `shouldBe` Message
+        txType (otxs1 !! 1) `shouldBe` PrivateHash
+        checkForUnseq [chainDetails2]
+        vmevs'' <- drainVM
+        let obs'' = [b | OEBlock b <- vmevs'']
+        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs''
+        let otxs2 = obReceiptTransactions $ head obs''
+        txType (otxs2 !! 0) `shouldBe` PrivateHash
+        txType (otxs2 !! 1) `shouldBe` Message
