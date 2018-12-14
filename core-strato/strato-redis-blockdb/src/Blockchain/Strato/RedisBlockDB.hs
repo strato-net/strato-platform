@@ -94,7 +94,7 @@ putChainInfo :: Word256
 putChainInfo cId cInfo = do
     let rChain    = RedisChainInfo cInfo
 
-    res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
+    res <- multiExec $ set (inNamespace PrivateChainInfo cId) (toValue rChain)
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
