@@ -452,8 +452,9 @@ spec = do
         txType (head txs) `shouldBe` PrivateHash
         p2pevs <- drainP2P
         let txs' = [tx | OETx _ tx <- p2pevs]
-        length txs' `shouldBe` 1
-        txType (head txs') `shouldBe` PrivateHash
+        length txs' `shouldBe` 2
+        txType (txs' !! 0) `shouldBe` Message
+        txType (txs' !! 1) `shouldBe` PrivateHash
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
