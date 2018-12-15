@@ -217,7 +217,7 @@ setParentStateRoot b@OutputBlock{..} = do
     return bSum
 
 addBlock :: OutputBlock -> ContextM [Action]
-addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
+addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
     putBlockHeaderInChainDB bd
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
@@ -239,20 +239,23 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
     db <- getStateDB
 
-    b' <- do
+    -- If there are no transactions in th
+    -- TODO: this should be handled more officially,
+    -- e.g. adding a chainId to the block
+    let skipCheck = (not $ null otxs) && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
+    unless skipCheck $ do
       when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
-          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
-          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
-      return b
+        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
+        error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
-    valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b'
-    case valid of
-        Right _ -> P.incCounter vmBlocksValid
-        Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+      valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+      case valid of
+          Right _ -> P.incCounter vmBlocksValid
+          Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed
-    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
+    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
     return actions
 
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
