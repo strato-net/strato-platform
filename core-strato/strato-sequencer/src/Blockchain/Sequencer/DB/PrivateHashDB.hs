@@ -91,28 +91,19 @@ chainHashEntryWithTxHashInBlock tHash bHash = ChainHashEntry
                                                 (S.singleton tHash)
                                                 (Q.singleton bHash)
 
-data BlockSet = BlockSet
-  { _bset  :: Set SHA
-  , _blist :: Q.Seq SHA
-  } deriving (Show)
-makeLenses ''BlockSet
-
-emptyBlockSet :: BlockSet
-emptyBlockSet = BlockSet S.empty Q.empty
-
 data ChainIdEntry = ChainIdEntry
   { _chainInfo   :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
-  , _blocksToRun :: BlockSet
+  , _blocksToRun :: Q.Seq SHA
   } deriving (Show)
 makeLenses ''ChainIdEntry
 
 chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry
-chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty emptyBlockSet
+chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty Q.empty
 
 chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
-chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs emptyBlockSet
+chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs Q.empty
 
 class MonadResource m => HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA
