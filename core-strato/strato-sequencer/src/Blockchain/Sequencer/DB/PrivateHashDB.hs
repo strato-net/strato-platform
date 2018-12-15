@@ -91,19 +91,50 @@ chainHashEntryWithTxHashInBlock tHash bHash = ChainHashEntry
                                                 (S.singleton tHash)
                                                 (Q.singleton bHash)
 
+data BlockSet = BlockSet
+  { _bset :: Set SHA
+  , _blist :: Q.Seq SHA
+  } deriving (Show)
+makeLenses ''BlockSet
+
+emptyBlockSet :: BlockSet
+emptyBlockSet = BlockSet S.empty Q.empty
+
+blockSetFromList :: [SHA] -> BlockSet
+blockSetFromList = go emptyBlockSet
+  where go bs [] = bs
+        go bs (s:ss) = go (enqueueBlockSet s bs) ss
+
+enqueueBlockSet :: SHA -> BlockSet -> BlockSet
+enqueueBlockSet sha BlockSet{..} =
+  if S.member sha _bset
+    then BlockSet _bset _blist
+    else BlockSet
+           (S.insert sha _bset)
+           (_blist Q.|> sha)
+
+dequeueBlockSet :: BlockSet -> BlockSet
+dequeueBlockSet BlockSet{..} =
+  case Q.viewl _blist of
+    Q.EmptyL -> BlockSet _bset _blist
+    b Q.:< bs -> BlockSet (S.delete b _bset) bs
+
 data ChainIdEntry = ChainIdEntry
   { _chainInfo   :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
-  , _blocksToRun :: Q.Seq SHA
+  , _blocksToRun :: BlockSet
   } deriving (Show)
 makeLenses ''ChainIdEntry
 
 chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry
-chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty Q.empty
+chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo)
+                                               emptyCircularBuffer
+                                               S.empty
+                                               emptyBlockSet
 
 chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
-chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs Q.empty
+chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs emptyBlockSet
 
 class MonadResource m => HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA

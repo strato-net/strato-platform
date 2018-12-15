@@ -468,9 +468,10 @@ spec = do
         length txs `shouldBe` 1
         txType (head txs) `shouldBe` PrivateHash
         vmevs <- drainVM
-        let otxs = obReceiptTransactions $ head [b | OEBlock b <- vmevs]
-        length otxs `shouldBe` 1
-        txType (head otxs) `shouldBe` Message
+        let obs = [b | OEBlock b <- vmevs]
+        length obs `shouldBe` 2
+        txType (head . obReceiptTransactions $ obs !! 0) `shouldBe` PrivateHash
+        txType (head . obReceiptTransactions $ obs !! 1) `shouldBe` Message
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
@@ -510,10 +511,10 @@ spec = do
         mapM_ ((`shouldBe` PrivateHash) . txType) txs
         vmevs <- drainVM
         let obs = [b | OEBlock b <- vmevs]
-        length obs `shouldBe` 1
-        let otxs = obReceiptTransactions $ head obs
-        length otxs `shouldBe` 2
-        mapM_ ((`shouldBe` Message) . txType) otxs
+        length obs `shouldBe` 2
+        mapM_ ((`shouldBe` 2) . length  . obReceiptTransactions) obs
+        mapM_ ((`shouldBe` PrivateHash) . txType) . obReceiptTransactions $ obs !! 0
+        mapM_ ((`shouldBe` Message) . txType) . obReceiptTransactions $ obs !! 1
 
       it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -536,13 +537,8 @@ spec = do
         vmevs' <- drainVM
         let obs' = [b | OEBlock b <- vmevs']
         length obs' `shouldBe` 2
-        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs'
-        let otxs1 = obReceiptTransactions $ obs' !! 0
-            otxs2 = obReceiptTransactions $ obs' !! 1
-        txType (otxs1 !! 0) `shouldBe` Message
-        txType (otxs1 !! 1) `shouldBe` PrivateHash
-        txType (otxs2 !! 0) `shouldBe` PrivateHash
-        txType (otxs2 !! 1) `shouldBe` Message
+        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs'
+        mapM_ ((`shouldBe` Message) . txType . head . obReceiptTransactions) obs'
 
       it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -564,14 +560,42 @@ spec = do
         vmevs' <- drainVM
         let obs' = [b | OEBlock b <- vmevs']
         length obs' `shouldBe` 1
-        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs'
+        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs'
         let otxs1 = obReceiptTransactions $ head obs'
         txType (otxs1 !! 0) `shouldBe` Message
-        txType (otxs1 !! 1) `shouldBe` PrivateHash
         checkForUnseq [chainDetails2]
         vmevs'' <- drainVM
         let obs'' = [b | OEBlock b <- vmevs'']
-        mapM_ ((`shouldBe` 2) . length . obReceiptTransactions) obs''
+        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs''
         let otxs2 = obReceiptTransactions $ head obs''
-        txType (otxs2 !! 0) `shouldBe` PrivateHash
-        txType (otxs2 !! 1) `shouldBe` Message
+        txType (otxs2 !! 0) `shouldBe` Message
+
+      it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
+        let iev = iev1' h
+            ietx = IETx 0 . IngestTx TO.Morphism
+        checkForUnseq [iev]
+        p2pevs <- drainP2P
+        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        length bs `shouldBe` 1
+        let txs = blockReceiptTransactions $ head bs
+        length txs `shouldBe` 1
+        mapM_ ((`shouldBe` PrivateHash) . txType) txs
+        vmevs <- drainVM
+        let obs = [b | OEBlock b <- vmevs]
+        length obs `shouldBe` 1
+        let otxs = obReceiptTransactions $ head obs
+        length otxs `shouldBe` 1
+        mapM_ ((`shouldBe` PrivateHash) . txType) otxs
+        checkForUnseq [chainDetails1]
+        vmevs' <- drainVM
+        let obs' = [b | OEBlock b <- vmevs']
+        length obs' `shouldBe` 0
+        p2pevs' <- drainP2P
+        let gtxs' = [th | OEGetTx th <- p2pevs']
+        length gtxs' `shouldBe` 1
+        checkForUnseq [ietx tx1]
+        vmevs'' <- drainVM
+        let obs'' = [b | OEBlock b <- vmevs'']
+        mapM_ ((`shouldBe` 1) . length . obReceiptTransactions) obs''
+        let otxs2 = obReceiptTransactions $ head obs''
+        txType (head otxs2) `shouldBe` Message

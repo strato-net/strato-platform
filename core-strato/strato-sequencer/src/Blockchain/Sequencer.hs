@@ -352,9 +352,9 @@ transformFullTransactions pairs = do
                         markForP2P $ pairToOETx (ts, phtx)
                         return $ (chainHash .~ Just cHash) the
             for_ (_blocksToRun <$> mcie) $ \q -> do
-              let go cid bl = case Q.viewl bl of
-                    Q.EmptyL -> return Q.empty
-                    b Q.:< bs -> do
+              let go cid bl = case Q.viewl (_blist bl) of
+                    Q.EmptyL -> return bl
+                    b Q.:< _ -> do
                       mBlock <- fmap _outputBlock <$> getBlockHashEntry b
                       case mBlock of
                         Nothing -> return bl
@@ -362,7 +362,7 @@ transformFullTransactions pairs = do
                           success <- runBlock cid block
                           if not success
                             then return bl
-                            else go cid bs
+                            else go cid $ dequeueBlockSet bl
               remainingBlocks <- go chainId q
               modifyChainIdEntryState_ chainId $ blocksToRun .= remainingBlocks
 
@@ -454,15 +454,16 @@ accumT s (a:as) run = do
   (bs,s'') <- accumT s' as run
   return (b:bs,s'')
 
+-- using this explicit state monad because SequencerM is already MonadState
 hydratePrivateHashes :: OutputBlock
                      -> Maybe Word256
                      -> SequencerM (Maybe OutputBlock)
 hydratePrivateHashes ob chainF = do
-  let logF = logFF "hydrateAndEmit"
+  let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ obBlockData ob
   logF $ prettyOBlock ob
   repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
-  let discluded cId = maybe False (== cId) chainF
+  let discluded cId = maybe False (/= cId) chainF
   (txs', newDiscludes) <- accumT S.empty (obReceiptTransactions ob) $ \st tx -> do
     if not $ isPrivateHashTX tx
       then return (Nothing, st)
@@ -484,21 +485,26 @@ hydratePrivateHashes ob chainF = do
         case mChainId of
           Nothing -> return (Nothing, st)
           Just chainId -> if discluded chainId || S.member chainId st
-            then return (Nothing, st)
+            then do
+              logF "This chain is discluded!"
+              return (Nothing, st)
             else getChainIdEntry chainId >>= \case
               Nothing -> return (Nothing, st)
               Just ChainIdEntry{..} ->
-                if (not $ Q.null _blocksToRun)
-                  then do
+                case Q.viewl (_blist _blocksToRun) of
+                  b Q.:< _ | b /= bHash -> do
+                    logF "This is not the chain's next block to run."
                     modifyChainIdEntryState_ chainId $
                       when (isNothing chainF) $
-                        blocksToRun %= (Q.|> bHash)
+                        blocksToRun %= enqueueBlockSet bHash
                     return (Nothing, S.insert chainId st)
-                  else do
+                  _ -> do
+                    logF "Ready to run block on this chain"
                     body <- join . fmap _outputTx <$> getTxHashEntry tHash
                     case body of
                       Just otx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing"
+                        removeDependentTx bHash chainId tHash
                         return (Just otx, st)
                       Nothing -> do
                         logF . concat $
@@ -510,7 +516,7 @@ hydratePrivateHashes ob chainF = do
                         insertDependentTx bHash chainId tHash
                         modifyChainIdEntryState_ chainId $ do
                           when (isNothing chainF) $
-                            blocksToRun %= (Q.|> bHash)
+                            blocksToRun %= enqueueBlockSet bHash
                         return (Nothing, S.insert chainId st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
@@ -563,12 +569,12 @@ transformGenesis chains = forM_ chains $ \ig -> do
       insertChainHash cHash chainId
       insertChainBufferEntry chainId cHash
       markForVM $ OEGenesis og
-      blocks <- maybe Q.empty _inBlocks <$> getChainHashEntry cHash
-      remainingBlocks <- go chainId blocks
+      blocks <- toList . maybe Q.empty _inBlocks <$> getChainHashEntry cHash
+      remainingBlocks <- go chainId $ blockSetFromList blocks
       modifyChainIdEntry_ chainId $ return . (blocksToRun .~ remainingBlocks)
-  where go cid bl = case Q.viewl bl of
-          Q.EmptyL -> return Q.empty
-          b Q.:< bs -> do
+  where go cid bl = case Q.viewl (_blist bl) of
+          Q.EmptyL -> return bl
+          b Q.:< _ -> do
             mBlock <- fmap _outputBlock <$> getBlockHashEntry b
             case mBlock of
               Nothing -> return bl
@@ -576,7 +582,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                 success <- runBlock cid block
                 if not success
                   then return bl
-                  else go cid bs
+                  else go cid $ dequeueBlockSet bl
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType

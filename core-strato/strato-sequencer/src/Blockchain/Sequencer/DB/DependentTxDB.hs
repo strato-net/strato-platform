@@ -36,6 +36,12 @@ lookupDependentTxs :: HasPrivateHashDB m => SHA -> Word256 -> m (Set SHA)
 lookupDependentTxs bHash chainId = do
   fromMaybe S.empty . join . fmap (M.lookup chainId . _dependentTXs) <$> getBlockHashEntry bHash
 
+removeDependentTx :: HasPrivateHashDB m => SHA -> Word256 -> SHA -> m ()
+removeDependentTx bHash chainId tHash = do
+  liftIO $ withLabel txMetrics "dependent_tx" incCounter
+  modifyBlockHashEntryState_ bHash $
+    dependentTXs %= M.alter (fmap (S.delete tHash)) chainId
+
 clearDependentTxs :: HasPrivateHashDB m => SHA -> Word256 -> m ()
 clearDependentTxs bHash chainId = do
   liftIO $ withLabel txMetrics "dependent_tx_removed" incCounter
