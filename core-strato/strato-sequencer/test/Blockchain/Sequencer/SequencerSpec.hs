@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-unused-imports #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}

@@ -491,21 +491,19 @@ hydratePrivateHashes ob chainF = do
               return (Nothing, st)
             else getChainIdEntry chainId >>= \case
               Nothing -> return (Nothing, st)
-              Just ChainIdEntry{..} ->
-                if S.null _blocksToRun
+              Just ChainIdEntry{..} -> do
+                let ready = if S.null _blocksToRun
+                             then True
+                             else (_bhash $ S.elemAt 0 _blocksToRun) == bHash
+                if ready
                   then do
-                    logF "This is not the chain's next block to run."
-                    modifyChainIdEntryState_ chainId $
-                      when (isNothing chainF) $
-                        blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
-                    return (Nothing, S.insert chainId st)
-                  else do
                     logF "Ready to run block on this chain"
                     body <- join . fmap _outputTx <$> getTxHashEntry tHash
                     case body of
                       Just otx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing"
                         removeDependentTx bHash chainId tHash
+                        findTxChildren otx
                         return (Just otx, st)
                       Nothing -> do
                         logF . concat $
@@ -519,6 +517,12 @@ hydratePrivateHashes ob chainF = do
                           when (isNothing chainF) $
                             blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
                         return (Nothing, S.insert chainId st)
+                  else do
+                    logF "This is not the chain's next block to run."
+                    modifyChainIdEntryState_ chainId $
+                      when (isNothing chainF) $
+                        blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
+                    return (Nothing, S.insert chainId st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
@@ -570,10 +574,9 @@ transformGenesis chains = forM_ chains $ \ig -> do
       insertChainHash cHash chainId
       insertChainBufferEntry chainId cHash
       markForVM $ OEGenesis og
-      blocks <- toList . maybe Q.empty _inBlocks <$> getChainHashEntry cHash
-      bDiffs <- map (fmap (obTotalDifficulty . _outputBlock)) <$> mapM getBlockHashEntry blocks
-      let infos = catMaybes $ zipWith (\b -> fmap (flip BlockInfo b)) blocks bDiffs
-      remainingBlocks <- go chainId $ S.fromList infos
+      findChainHashUses chainId [cHash]
+      btr <- maybe S.empty _blocksToRun <$> getChainIdEntry chainId
+      remainingBlocks <- go chainId btr
       modifyChainIdEntry_ chainId $ return . (blocksToRun .~ remainingBlocks)
   where go cid bl = if S.null bl
           then return S.empty
