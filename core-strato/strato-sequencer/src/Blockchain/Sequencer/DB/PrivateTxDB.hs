@@ -26,13 +26,6 @@ insertTransaction tx = do
   let tHash = txHash tx
   repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithOutputTx tx) (outputTx .~ Just tx)
 
-findTxChildren :: HasPrivateHashDB m => OutputTx -> m ()
-findTxChildren tx = case txChainId tx of
-  Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
-  Just chainId -> do
-    cHashes <- generateChainHashes tx
-    findChainHashUses chainId cHashes
-
 findChainHashUses :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
 findChainHashUses chainId cHashes = do
   blocks <- toList

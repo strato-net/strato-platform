@@ -496,7 +496,7 @@ hydratePrivateHashes ob chainF = do
                     case body of
                       Just otx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing"
-                        findTxChildren otx
+                        insertPrivateHash otx
                         return (Just otx, st)
                       Nothing -> do
                         logF . concat $
