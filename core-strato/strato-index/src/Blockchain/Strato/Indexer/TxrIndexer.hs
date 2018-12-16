@@ -22,7 +22,6 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
 import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
@@ -74,20 +73,16 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                         let Just enode = mEnode
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                         lift $ addMember chainId address enode' -- We only need the Text version for Postgres
-                        mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
-                        when (isJust mChainInfo) $ do
-                          let Just (ChainInfo (cInfo@UnsignedChainInfo{members=ms}) sig) = mChainInfo
-                          void . RBDB.withRedisBlockDB $
-                            RBDB.putChainInfo chainId $ ChainInfo cInfo{members = Map.insert address enode ms} sig
+                        mems <- RBDB.withRedisBlockDB $ RBDB.getChainMembers chainId
+                        void . RBDB.withRedisBlockDB $
+                          RBDB.putChainMembers chainId $ Map.insert address enode mems
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                       lift $ removeMember chainId address
-                      mChainInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo chainId
-                      when (isJust mChainInfo) $ do
-                        let Just (ChainInfo (cInfo@UnsignedChainInfo{members=ms}) sig) = mChainInfo
-                        void . RBDB.withRedisBlockDB $
-                          RBDB.putChainInfo chainId $ ChainInfo cInfo{members = Map.delete address ms} sig
+                      mems <- RBDB.withRedisBlockDB $ RBDB.getChainMembers chainId
+                      void . RBDB.withRedisBlockDB $
+                        RBDB.putChainMembers chainId $ Map.delete address mems
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       lift $ terminateChain chainId
