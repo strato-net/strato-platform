@@ -19,6 +19,7 @@ import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 
 import           Data.Foldable                (for_)
+import           Data.Function                (on)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromJust)
@@ -91,39 +92,20 @@ chainHashEntryWithTxHashInBlock tHash bHash = ChainHashEntry
                                                 (S.singleton tHash)
                                                 (Q.singleton bHash)
 
-data BlockSet = BlockSet
-  { _bset :: Set SHA
-  , _blist :: Q.Seq SHA
-  } deriving (Show)
-makeLenses ''BlockSet
+data BlockInfo = BlockInfo
+  { _tDifficulty :: Integer
+  , _bhash       :: SHA
+  } deriving (Eq, Show)
+makeLenses ''BlockInfo
 
-emptyBlockSet :: BlockSet
-emptyBlockSet = BlockSet S.empty Q.empty
-
-blockSetFromList :: [SHA] -> BlockSet
-blockSetFromList = go emptyBlockSet
-  where go bs [] = bs
-        go bs (s:ss) = go (enqueueBlockSet s bs) ss
-
-enqueueBlockSet :: SHA -> BlockSet -> BlockSet
-enqueueBlockSet sha BlockSet{..} =
-  if S.member sha _bset
-    then BlockSet _bset _blist
-    else BlockSet
-           (S.insert sha _bset)
-           (_blist Q.|> sha)
-
-dequeueBlockSet :: BlockSet -> BlockSet
-dequeueBlockSet BlockSet{..} =
-  case Q.viewl _blist of
-    Q.EmptyL -> BlockSet _bset _blist
-    b Q.:< bs -> BlockSet (S.delete b _bset) bs
+instance Ord BlockInfo where
+  compare = compare `on` _tDifficulty
 
 data ChainIdEntry = ChainIdEntry
   { _chainInfo   :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _missingTXs  :: Set SHA
-  , _blocksToRun :: BlockSet
+  , _blocksToRun :: Set BlockInfo
   } deriving (Show)
 makeLenses ''ChainIdEntry
 
@@ -131,10 +113,13 @@ chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry
 chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo)
                                                emptyCircularBuffer
                                                S.empty
-                                               emptyBlockSet
+                                               S.empty
 
 chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
-chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs emptyBlockSet
+chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs S.empty
+
+chainIdEntryWithBlocks :: Set BlockInfo -> ChainIdEntry
+chainIdEntryWithBlocks blocks = ChainIdEntry Nothing emptyCircularBuffer S.empty blocks
 
 class MonadResource m => HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA

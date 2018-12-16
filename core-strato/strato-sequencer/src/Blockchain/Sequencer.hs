@@ -352,9 +352,10 @@ transformFullTransactions pairs = do
                         markForP2P $ pairToOETx (ts, phtx)
                         return $ (chainHash .~ Just cHash) the
             for_ (_blocksToRun <$> mcie) $ \q -> do
-              let go cid bl = case Q.viewl (_blist bl) of
-                    Q.EmptyL -> return bl
-                    b Q.:< _ -> do
+              let go cid bl = if S.null bl
+                    then return S.empty
+                    else do
+                      let b = _bhash $ S.elemAt 0 bl
                       mBlock <- fmap _outputBlock <$> getBlockHashEntry b
                       case mBlock of
                         Nothing -> return bl
@@ -362,7 +363,7 @@ transformFullTransactions pairs = do
                           success <- runBlock cid block
                           if not success
                             then return bl
-                            else go cid $ dequeueBlockSet bl
+                            else go cid $ S.deleteAt 0 bl
               remainingBlocks <- go chainId q
               modifyChainIdEntryState_ chainId $ blocksToRun .= remainingBlocks
 
@@ -491,14 +492,14 @@ hydratePrivateHashes ob chainF = do
             else getChainIdEntry chainId >>= \case
               Nothing -> return (Nothing, st)
               Just ChainIdEntry{..} ->
-                case Q.viewl (_blist _blocksToRun) of
-                  b Q.:< _ | b /= bHash -> do
+                if S.null _blocksToRun
+                  then do
                     logF "This is not the chain's next block to run."
                     modifyChainIdEntryState_ chainId $
                       when (isNothing chainF) $
-                        blocksToRun %= enqueueBlockSet bHash
+                        blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
                     return (Nothing, S.insert chainId st)
-                  _ -> do
+                  else do
                     logF "Ready to run block on this chain"
                     body <- join . fmap _outputTx <$> getTxHashEntry tHash
                     case body of
@@ -516,7 +517,7 @@ hydratePrivateHashes ob chainF = do
                         insertDependentTx bHash chainId tHash
                         modifyChainIdEntryState_ chainId $ do
                           when (isNothing chainF) $
-                            blocksToRun %= enqueueBlockSet bHash
+                            blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
                         return (Nothing, S.insert chainId st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
@@ -570,11 +571,14 @@ transformGenesis chains = forM_ chains $ \ig -> do
       insertChainBufferEntry chainId cHash
       markForVM $ OEGenesis og
       blocks <- toList . maybe Q.empty _inBlocks <$> getChainHashEntry cHash
-      remainingBlocks <- go chainId $ blockSetFromList blocks
+      bDiffs <- map (fmap (obTotalDifficulty . _outputBlock)) <$> mapM getBlockHashEntry blocks
+      let infos = catMaybes $ zipWith (\b -> fmap (flip BlockInfo b)) blocks bDiffs
+      remainingBlocks <- go chainId $ S.fromList infos
       modifyChainIdEntry_ chainId $ return . (blocksToRun .~ remainingBlocks)
-  where go cid bl = case Q.viewl (_blist bl) of
-          Q.EmptyL -> return bl
-          b Q.:< _ -> do
+  where go cid bl = if S.null bl
+          then return S.empty
+          else do
+            let b = _bhash $ S.elemAt 0 bl
             mBlock <- fmap _outputBlock <$> getBlockHashEntry b
             case mBlock of
               Nothing -> return bl
@@ -582,7 +586,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
                 success <- runBlock cid block
                 if not success
                   then return bl
-                  else go cid $ dequeueBlockSet bl
+                  else go cid $ S.deleteAt 0 bl
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
