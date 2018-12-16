@@ -13,7 +13,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainMembers, putChainMembers
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
-    , getTransactions, getUncles
+    , getTransactions, getPrivateTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
@@ -36,7 +36,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
-import           Control.Arrow                         (second)
+import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Logger
@@ -84,6 +84,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             Canonical           -> "q:"
             PrivateChainInfo    -> "x:"
             PrivateChainMembers -> "m:"
+            PrivateTransactions -> "pt:"
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -185,6 +186,15 @@ getTransactions sha = getInNamespace Transactions sha >>= \case
     Right Nothing     -> return Nothing
     Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
         return . Just $ morphTx <$> txs
+
+getPrivateTransactions :: TransactionLike t
+                       => SHA
+                       -> Redis (Maybe t)
+getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
+    Left _            -> return Nothing
+    Right Nothing     -> return Nothing
+    Right (Just rtx) -> let (RedisTx tx) = fromValue rtx in
+        return . Just $ morphTx tx
 
 getUncles :: BlockHeaderLike h
           => SHA
@@ -352,12 +362,18 @@ putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
 putBlock b = do
     let sha     = blockHash b
         header  = blockHeader b
-        number'  = blockHeaderBlockNumber header
+        number' = blockHeaderBlockNumber header
         parent  = blockHeaderParentHash header
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
+        ptxs    = filter
+                    (isJust . txChainId)
+                    (morphTx <$> blockTransactions b :: [Models.RedisTx])
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
+    unless (null ptxs) $
+      void . multiExec . msetnx $
+        map ((inNamespace PrivateTransactions . txHash) &&& toValue) ptxs
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header')
         void $ setnx (inNS' Transactions) (toValue txs)

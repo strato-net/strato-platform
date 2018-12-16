@@ -29,6 +29,7 @@ data BlockDBNamespace = Headers
                       | Canonical
                       | PrivateChainInfo
                       | PrivateChainMembers
+                      | PrivateTransactions
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where

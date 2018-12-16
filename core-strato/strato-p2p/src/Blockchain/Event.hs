@@ -293,9 +293,7 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (show <$> trHashes))
-      trs <- fmap (concat . catMaybes) . lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
-      let ptrs = filter (isJust . txChainId) trs
-
+      ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
       mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
       let trMems = zip ptrs mems
       yield . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
