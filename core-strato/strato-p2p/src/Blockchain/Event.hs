@@ -18,7 +18,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.List
-import           Data.Map.Strict                       (toList)
+import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import qualified Data.ByteString                       as BS
@@ -55,6 +55,7 @@ import           Blockchain.Verification
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
@@ -268,12 +269,13 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetChainDetails cids) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
-      cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
-      let unfilteredPairs =  zip cids cInfos
-          chPairs = map (fmap fromJust) $ filter (isJust . snd) unfilteredPairs -- remove pairs where ChainInfo is Nothing
-          finalPairs = filter ((checkPeerIsMember peer) . snd) chPairs -- remove pairs where peer is not a member
+      mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
+      let pairs = zip cids mems
+          filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
 
-      unless (null finalPairs) $ do
+      unless (null filteredPairs) $ do
+        cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
+        let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
         yield $ ChainDetails finalPairs
         stampActionTimestamp
         $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
@@ -294,11 +296,9 @@ handleEvents peer = awaitForever $ \case
       trs <- fmap (concat . catMaybes) . lift . RBDB.withRedisBlockDB $ mapM RBDB.getTransactions trHashes
       let ptrs = filter (isJust . txChainId) trs
 
-      cidMems <- fmap (map (S.fromList . map ipAddress . M.elems)) . lift . RBDB.withRedisBlockDB $
-                   mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
-      let trMems = zip ptrs cidMems
-      let pIp = readIP $ T.unpack (pPeerIp peer)
-      yield . Transactions . map fst $ filter (S.member pIp . snd) trMems
+      mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
+      let trMems = zip ptrs mems
+      yield . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -432,12 +432,8 @@ shouldSendGossip peer txo = recordGossipFinal
 
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
-checkPeerIsMember :: PPeer -> ChainInfo -> Bool
-checkPeerIsMember peer (ChainInfo ci _) =
-  case match of
-    Nothing -> False
-    Just _ -> True
-  where
-    pIp = readIP $ T.unpack (pPeerIp peer)
-    ipList = ipAddress <$> (snd <$> (toList $ members ci))
-    match = find (==pIp) ipList
+checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
+checkPeerIsMember peer mems =
+  let ips = S.fromList . map ipAddress $ M.elems mems
+      pIp = readIP $ T.unpack (pPeerIp peer)
+   in S.member pIp ips
