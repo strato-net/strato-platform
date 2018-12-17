@@ -1,6 +1,6 @@
 BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
-FAKEROOT=$(BASILWORK)/fakeroot
+FAKEROOT=$(BASILWORK_ABS)/fakeroot
 
 all: build_docker clean
 
