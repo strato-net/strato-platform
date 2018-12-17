@@ -1,4 +1,4 @@
-name:                vault-wrapper-server
+name:                vault-wrapper
 version:             0.1.0.0
 github:              "githubuser/vault-wrapper"
 license:             BSD3
@@ -90,4 +90,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - vault-wrapper-server
+    - vault-wrapper
