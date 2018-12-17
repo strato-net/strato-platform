@@ -30,7 +30,8 @@ module Blockchain.VM.VMM (
   putStorageKeyVal,
   vmTrace,
   getAllStorageKeyVals,
-  Word256Storable
+  Word256Storable,
+  downcastGas
   ) where
 
 import           Control.Monad
@@ -278,3 +279,8 @@ vmTrace msg = do
   cxt <- lift $ get
   lift $ put cxt{theTrace=msg:theTrace cxt}
 
+
+downcastGas :: Word256 -> VMM Gas
+downcastGas g = if g > fromIntegral (maxBound :: Int)
+                  then throwE OutOfGasException
+                  else return $! fromIntegral g
