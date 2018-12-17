@@ -6,6 +6,8 @@
 
 module Blockchain.VM.VMState (
   VMState(..),
+  readGasRemaining,
+  Gas,
   action,
   Memory(..),
   startingState,
@@ -33,6 +35,8 @@ import           Blockchain.VM.Environment
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
+type Gas = Int
+
 instance Show Counter where
   show = const "<unboxed_ioref>"
 
@@ -56,7 +60,7 @@ data DebugCallCreate =
   DebugCallCreate {
     ccData        :: B.ByteString,
     ccDestination :: Maybe Address,
-    ccGasLimit    :: Integer,
+    ccGasLimit    :: Gas,
     ccValue       :: Integer
     } deriving (Show, Eq)
 
@@ -65,12 +69,12 @@ data VMState =
     vmIsHomestead    :: Bool,
     dbs              :: Context,
     sqldb            :: Config,
-    vmGasRemaining   :: Integer,
+    vmGasRemaining   :: Counter,
     pc               :: Counter,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
-    refund           :: Integer,
+    refund           :: Counter,
 
     suicideList      :: S.Set Address,
     done             :: Bool,
@@ -94,6 +98,8 @@ data VMState =
     } deriving (Show)
 makeLenses ''VMState
 
+readGasRemaining :: VMState -> IO Gas
+readGasRemaining = readIORefU . vmGasRemaining
 
 instance Format VMState where
   format state =
@@ -118,6 +124,8 @@ startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
 startingState isRunningTests' isHomestead env sqldb' dbs' = do
   m <- newMemory
   pcref <- newCounter 0
+  gasref <- newCounter 0
+  refundref <- newCounter 0
   return VMState
              {
                vmIsHomestead=isHomestead,
@@ -128,11 +136,11 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
                returnVal=Nothing,
                vmException=Nothing,
                writable=True,
-               vmGasRemaining=0,
+               vmGasRemaining=gasref,
                stack=[],
                memory=m,
                callDepth=0,
-               refund=0,
+               refund=refundref,
                theTrace=[],
                logs=[],
                environment=env,

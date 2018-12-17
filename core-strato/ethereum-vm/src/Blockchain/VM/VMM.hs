@@ -206,16 +206,18 @@ incrementPC p = do
   pcref <- lift $ gets pc
   void . liftIO $ atomicAddCounter pcref p
 
-addToRefund::Integer->VMM ()
+addToRefund::Int->VMM ()
 addToRefund val = do
-  state' <- lift get
-  lift $ put state'{refund=refund state' + val}
+  refundref <- lift $ gets refund
+  void . liftIO . atomicAddCounter refundref $ val
 
 getCallDepth::VMM Int
 getCallDepth = lift $ fmap callDepth $ get
 
-getGasRemaining::VMM Integer
-getGasRemaining = lift $ fmap vmGasRemaining $ get
+getGasRemaining::VMM Int
+getGasRemaining = do
+  gasref <- lift $ gets vmGasRemaining
+  liftIO $ readIORefU gasref
 
 getReturnVal :: VMM B.ByteString
 getReturnVal = (fromMaybe B.empty . returnVal) <$> lift get
@@ -230,26 +232,26 @@ setReturnVal returnVal' = do
   state' <- lift get
   lift $ put state'{returnVal=returnVal'}
 
-setGasRemaining::Integer->VMM ()
+setGasRemaining::Int->VMM ()
 setGasRemaining gasRemaining' = do
-  state' <- lift get
-  lift $ put state'{vmGasRemaining=gasRemaining'}
+  gasref <- lift $ gets vmGasRemaining
+  liftIO $ writeIORefU gasref gasRemaining'
 
-useGas::Integer->VMM ()
+useGas::Int->VMM ()
 useGas gas = do
-  state' <- lift get
-  case vmGasRemaining state' - gas of
-    x | x < 0 -> do
-      lift $ put state'{vmGasRemaining=0}
-      throwE OutOfGasException
-    x -> lift $ put state'{vmGasRemaining=x}
+  gasref <- lift $ gets vmGasRemaining
+  g <- liftIO $ atomicSubCounter gasref gas
+  when (g < 0) $ do
+    liftIO $ writeIORefU gasref 0
+    throwE OutOfGasException
 
-addGas::Integer->VMM ()
+addGas::Int->VMM ()
 addGas gas = do
-  state' <- lift get
-  case vmGasRemaining state' + gas of
-    x | x < 0 -> throwE OutOfGasException
-    x -> lift $ put state'{vmGasRemaining=x}
+  gasref <- lift $ gets vmGasRemaining
+  currentGas <- liftIO $ readIORefU gasref
+  if currentGas + gas < 0
+    then throwE OutOfGasException
+    else void . liftIO $ atomicAddCounter gasref gas
 
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do

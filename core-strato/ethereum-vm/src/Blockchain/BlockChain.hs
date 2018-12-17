@@ -31,6 +31,7 @@ import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
+import           Data.IORef.Unboxed
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
@@ -314,7 +315,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
         Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
-blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
+blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 
 addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
@@ -333,12 +334,13 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
+        realIG = fromIntegral intrinsicGas'
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
-    when (intrinsicGas' > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
+    when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > remainingBlockGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
     unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
-    let availableGas = transactionGasLimit bt - intrinsicGas'
+    let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
     theAddress <- if isContractCreationTX bt
                   then lift $ getNewAddress tAddr
@@ -351,7 +353,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (transactionGasLimit bt - intrinsicGas') tAddr theAddress t
+            -- TODO(tim): What if gas > maxBound :: Int?
+            (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -359,9 +362,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                 Left e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ P.incCounter vmTxsUnsuccessful
+                    gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erRemainingTxGas     = if e == RevertException
-                                                                  then vmGasRemaining newVMState'
+                                                                  then gr
                                                                   else 0
                                        -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
                                        , erReturnVal          = returnVal newVMState'
@@ -372,8 +376,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Just e
                                        }
                 Right _ -> do
-                    let realRefund = min (refund newVMState') ((transactionGasLimit bt - vmGasRemaining newVMState') `div` 2)
-                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + vmGasRemaining newVMState') * transactionGasPrice bt)
+                    ref <- fmap fromIntegral . liftIO . readIORefU . refund $ newVMState'
+                    gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
+                    let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
+                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + ref) * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
 
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
@@ -381,8 +387,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
                     lift $ P.incCounter vmTxsSuccessful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
-                                       , erRemainingTxGas     = vmGasRemaining newVMState'
+                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - gr)
+                                       , erRemainingTxGas     = gr
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
@@ -391,7 +397,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Nothing
                                        }
         else do
-            s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
+            s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
@@ -408,7 +414,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 runCodeForTransaction :: Bool
                       -> Bool
                       -> BlockData
-                      -> Integer
+                      -> Gas
                       -> Address
                       -> Address
                       -> OutputTx
@@ -425,7 +431,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
            tAddr
            tAddr
            (transactionValue ut)
-           (transactionGasPrice ut)
+           (fromInteger $ transactionGasPrice ut)
            availableGas
            newAddress
            (transactionInit ut)
@@ -469,10 +475,10 @@ zeroBytesLength OutputTx{otBaseTx=bt} = length $ filter (==0) $ B.unpack codeByt
                   where
                     Code codeBytes' = transactionInit bt
 
-calculateIntrinsicGas' :: Integer -> OutputTx -> Integer
+calculateIntrinsicGas' :: Integer -> OutputTx -> Gas
 calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)
 
-intrinsicGas :: Bool -> OutputTx -> Integer
+intrinsicGas :: Bool -> OutputTx -> Gas
 intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
     where
       zeroLen = fromIntegral $ zeroBytesLength t

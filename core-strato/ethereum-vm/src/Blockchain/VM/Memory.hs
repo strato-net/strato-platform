@@ -22,6 +22,7 @@ import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import           Data.IORef
+import           Data.IORef.Unboxed
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
@@ -79,7 +80,7 @@ setNewMaxSize newSize' = do
   oldSize <- liftIO $ readIORef (mSize $ memory state)
 
 
-  let gasCharge =
+  let gasCharge = fromIntegral $
         if newSize > fromIntegral oldSize
         then
           let newWordSize = fromInteger $ (ceiling $ fromIntegral newSize/(32::Double))
@@ -89,8 +90,8 @@ setNewMaxSize newSize' = do
           else 0
 
   let oldLength = fromIntegral $ V.length (mVector $ memory state)
-
-  if vmGasRemaining state < gasCharge
+  gr <- liftIO . readIORefU . vmGasRemaining $ state
+  if gr < gasCharge
      then do
           setGasRemaining 0
           throwE OutOfGasException

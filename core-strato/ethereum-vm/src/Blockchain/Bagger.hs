@@ -40,6 +40,7 @@ import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
@@ -170,7 +171,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
               !nb <- makeNewBlock
               return nb
 
-    setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
+    setCalculateIntrinsicGas :: (Integer -> OutputTx -> Gas) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
