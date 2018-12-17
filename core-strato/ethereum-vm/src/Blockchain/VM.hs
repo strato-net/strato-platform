@@ -526,8 +526,8 @@ runOperation CREATE = do
     Nothing       -> push (0::Word256)
 
 runOperation CALL = do
-  -- TODO(tim): what if gas > maxBound :: Int?
-  gas <- pop::VMM Gas
+  gas' <- pop::VMM Word256
+  gas <- downcastGas gas'
   to <- pop
   value <- pop::VMM Word256
   when (value /= 0) guardStorage
@@ -581,8 +581,8 @@ runOperation CALL = do
   push result
 
 runOperation CALLCODE = do
-  -- TODO(tim): what if gas > maxBound :: Int?
-  gas <- pop::VMM Gas
+  gas' <- pop::VMM Word256
+  gas <- downcastGas gas'
   to <- pop
   value <- pop::VMM Word256
   inOffset <- pop

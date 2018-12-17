@@ -335,9 +335,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
         realIG = fromIntegral intrinsicGas'
+        maxGas = fromIntegral (maxBound :: Int)
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
-    when (transactionGasLimit bt > remainingBlockGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
+    when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
     unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
@@ -353,7 +354,6 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            -- TODO(tim): What if gas > maxBound :: Int?
             (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
