@@ -866,18 +866,18 @@ formatOp (PUSH x) = "PUSH" ++ show (length x) -- ++ show x
 formatOp x        = show x
 
 
-printTrace::Environment->Word256->Word256->Int->Operation->VMState->VMState->VMM ()
+printTrace::Operation->Gas->CodePointer->VMState->VMM ()
 --printDebugInfo env memBefore memAfter c op stateBefore stateAfter = do
-printTrace _ _ _15 _ op _ stateAfter = do
+printTrace op gasBefore pcBefore stateAfter = do
 
   --CPP style trace
 {-  lift $ logInfoN $ "EVM [ eth | " ++ show (callDepth stateBefore) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc stateBefore)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining stateBefore) ++ " | " ++ show (vmGasRemaining stateAfter - vmGasRemaining stateBefore) ++ " | " ++ show(fromIntegral memAfter - fromIntegral memBefore) ++ "x32 ]"
   lift $ logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
-  pcVal <- liftIO $ readIORefU $ pc stateAfter
-  gr <- liftIO $ readGasRemaining stateAfter
-  $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" pcVal ++ ": " ++ formatOp op ++ " GAS: " ++ show gr
+  gasAfter <- liftIO $ readGasRemaining stateAfter
+  $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" pcBefore ++ ": " ++ formatOp op
+      ++ " GAS: " ++ show gasAfter ++ " COST: " ++ show (gasAfter - gasBefore)
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
   _ <- liftIO $ getMemAsByteString (memory stateAfter)
@@ -899,8 +899,8 @@ runCode c = do
   code <- getEnvVar envCode
 
   vmState <- lift get
-  pcVal <- liftIO . readIORefU . pc $ vmState
-  let (op, len) = getOperationAt code pcVal
+  pcBefore <- liftIO . readIORefU . pc $ vmState
+  let (op, len) = getOperationAt code pcBefore
   -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
   (val, theRefund) <- opGasPriceAndRefund op
@@ -922,7 +922,7 @@ runCode c = do
     vmTrace $
       "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show gasAfter ++ " | " ++ show (gasAfter - gasBefore) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
-  when flags_trace $ printTrace (environment result) memBefore memAfter c op vmState result
+  when flags_trace $ printTrace op gasBefore pcBefore result
 
 
   timeAfter <- liftIO $ getTime Monotonic
