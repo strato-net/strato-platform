@@ -2,7 +2,6 @@ BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
 FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
-BUILDER_HOME=$(BASILWORK)/builder_home
 DEPLOYBASE_NAME=bloch-deploybase
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
@@ -15,7 +14,6 @@ prebuild:
 	mkdir -p $(STACKWORK)
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(BLOCHOME)
-	mkdir -p $(BUILDER_HOME)
 	mkdir -p $(LICENSE_SOURCE_DIR)
 	mkdir -p /tmp/docker-dummy-bloc
 
