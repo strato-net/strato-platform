@@ -40,9 +40,9 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
+import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Set                           as S
-import           UnliftIO.IORef
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
@@ -199,12 +199,12 @@ addLog newLog = do
 setPC::Int->VMM ()
 setPC !p = do
   pcref <- lift $ gets pc
-  writeIORef pcref p
+  liftIO $ writeIORefU pcref p
 
 incrementPC::Int->VMM ()
 incrementPC p = do
   pcref <- lift $ gets pc
-  modifyIORef' pcref (+p)
+  void . liftIO $ atomicAddCounter pcref p
 
 addToRefund::Integer->VMM ()
 addToRefund val = do

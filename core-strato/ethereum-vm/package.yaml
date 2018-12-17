@@ -63,7 +63,7 @@ dependencies:
   - temporary
   - time
   - transformers
-  - unliftio
+  - unboxed-ref
   - unliftio-core
   - vector
   - wai-middleware-prometheus
