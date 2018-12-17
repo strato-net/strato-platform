@@ -64,7 +64,7 @@ valueToSolidityValue (ValueContract (Address addr)) =
   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
 valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index -- SolidityValueAsString $ name `Text.append` "." `Text.append` value
 valueToSolidityValue (ValueStruct namedItems) =
   SolidityObject $ map (fmap valueToSolidityValue) namedItems
