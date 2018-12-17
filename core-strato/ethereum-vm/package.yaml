@@ -11,6 +11,10 @@ description:
     The client described in the Ethereum Yellowpaper
 github: blockapps/strato-platform/core-strato/ethereum-vm
 
+default-extensions:
+  - DeriveGeneric
+  - DeriveAnyClass
+
 dependencies:
   - base >= 4 && < 5
   - aeson-pretty
@@ -101,7 +105,7 @@ executables:
     main: Main.hs
     dependencies:
       - ethereum-vm
-    ghc-options: -Wall -O2 -threaded
+    ghc-options: -Wall -O2 -threaded -rtsopts
 
 tests:
   ethereum-vm-test:

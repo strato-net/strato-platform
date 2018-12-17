@@ -5,6 +5,7 @@ module Blockchain.Database.MerklePatricia.MPDB (
   openMPDB
   ) where
 
+import           Control.DeepSeq
 import           Control.Monad.Trans.Resource
 import           Data.Binary
 import qualified Data.ByteString                              as B
@@ -24,6 +25,9 @@ data MPDB = MPDB {
     ldb       :: DB.DB,
     stateRoot :: StateRoot
 }
+
+instance NFData MPDB where
+  rnf (MPDB ld sr) = ld `seq` sr `seq` ()
 
 -- | This function is used to create an MPDB object corresponding to the blank database.
 -- After creation, the stateRoot can be changed to a previously saved version.

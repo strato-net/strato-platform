@@ -1,7 +1,8 @@
-
 module Blockchain.VM.Environment where
 
+import           Control.DeepSeq
 import qualified Data.ByteString            as B
+import           GHC.Generics
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -26,4 +27,4 @@ data Environment =
       envTxHash      :: SHA,
       envChainId     :: Maybe Word256,
       envMetadata    :: Maybe (Map Text Text)
-    } deriving (Show)
+    } deriving (Show, Generic, NFData)
