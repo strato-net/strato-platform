@@ -1,5 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMState (
@@ -14,6 +16,7 @@ import           Control.Lens                 hiding (Context)
 import           Control.Monad
 import qualified Data.ByteString              as B
 import           Data.IORef
+import           Data.IORef.Unboxed
 import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
@@ -27,12 +30,11 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
-import           Blockchain.VM.Opcodes (CodePointer)
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
-instance Show (IORef a) where
-  show = const "<ioref>"
+instance Show Counter where
+  show = const "<unboxed_ioref>"
 
 data Memory =
   Memory {
@@ -64,7 +66,7 @@ data VMState =
     dbs              :: Context,
     sqldb            :: Config,
     vmGasRemaining   :: Integer,
-    pc               :: IORef CodePointer,
+    pc               :: Counter,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
@@ -115,7 +117,7 @@ startingAction Environment{..} = Action
 startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
 startingState isRunningTests' isHomestead env sqldb' dbs' = do
   m <- newMemory
-  pcref <- newIORef 0
+  pcref <- newCounter 0
   return VMState
              {
                vmIsHomestead=isHomestead,

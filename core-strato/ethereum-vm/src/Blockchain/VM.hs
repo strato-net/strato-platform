@@ -23,6 +23,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Char
 import           Data.Function
+import           Data.IORef.Unboxed
 import qualified Data.IntSet                        as I
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
@@ -31,7 +32,6 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
-import           UnliftIO.IORef
 
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Action
@@ -437,7 +437,7 @@ runOperation JUMPI = do
     (True, _)  -> setPC $ pInt - 1
     _          -> throwE InvalidJump
 
-runOperation PC = push =<< readIORef =<< lift (gets pc)
+runOperation PC = push =<< (liftIO . readIORefU) =<< lift (gets pc)
 
 runOperation MSIZE = do
   memSize <- getSizeInBytes
@@ -872,7 +872,7 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
   lift $ logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
-  pcVal <- readIORef $ pc stateAfter
+  pcVal <- liftIO $ readIORefU $ pc stateAfter
   $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" (toInteger pcVal) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
@@ -892,7 +892,7 @@ runCode c = do
   code <- getEnvVar envCode
 
   vmState <- lift get
-  pcVal <- readIORef (pc vmState)
+  pcVal <- liftIO . readIORefU . pc $ vmState
   let (op, len) = getOperationAt code pcVal
   -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
@@ -910,7 +910,7 @@ runCode c = do
   env <- lift $ fmap environment get
 
   when flags_sqlTrace $ do
-    pcVal' <- readIORef $ pc vmState
+    pcVal' <- liftIO . readIORefU . pc $ vmState
     vmTrace $
       "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
