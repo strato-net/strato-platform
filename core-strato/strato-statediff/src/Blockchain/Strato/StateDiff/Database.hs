@@ -14,6 +14,7 @@ import qualified Database.Persist.Postgresql                 as SQL hiding (Upda
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
@@ -25,9 +26,10 @@ import           Blockchain.Util
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                             as BS (empty)
 import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
-import           Data.Maybe                                  (listToMaybe)
+import           Data.Maybe
 
 import           Blockchain.Strato.StateDiff
 
@@ -97,7 +99,18 @@ updateAccount :: MonadResource m =>
 updateAccount chainId blockNumber address diff = do
   mAddrID <- getAddressStateSQL chainId address
   case mAddrID of
-    Nothing -> createAccount chainId blockNumber [(address, incrementalToEventual diff)]
+    Nothing ->
+      let eDiff = incrementalToEventual diff
+          nonce'        = Just . fromMaybe (Value 0) $ nonce eDiff
+          balance'      = Just . fromMaybe (Value 0) $ balance eDiff
+          contractRoot' = Just . fromMaybe (Value emptyTriePtr) $ contractRoot eDiff
+          code'         = Just . fromMaybe (Value BS.empty) $ code eDiff
+          eDiff' = eDiff { nonce = nonce'
+                         , balance = balance'
+                         , contractRoot = contractRoot'
+                         , code = code'
+                         }
+       in createAccount chainId blockNumber [(address, eDiff')]
     Just addrID -> do
       SQL.update addrID $
         setField nonce AddressStateRefNonce $
