@@ -197,12 +197,12 @@ addLog newLog = do
   state' <- lift get
   lift $ put state'{logs=newLog:logs state'}
 
-setPC::Int->VMM ()
+setPC::CodePointer->VMM ()
 setPC !p = do
   pcref <- lift $ gets pc
   liftIO $ writeIORefU pcref p
 
-incrementPC::Int->VMM ()
+incrementPC::CodePointer->VMM ()
 incrementPC p = do
   pcref <- lift $ gets pc
   void . liftIO $ atomicAddCounter pcref p
@@ -215,7 +215,7 @@ addToRefund val = do
 getCallDepth::VMM Int
 getCallDepth = lift $ fmap callDepth $ get
 
-getGasRemaining::VMM Int
+getGasRemaining::VMM Gas
 getGasRemaining = do
   gasref <- lift $ gets vmGasRemaining
   liftIO $ readIORefU gasref
@@ -233,12 +233,12 @@ setReturnVal returnVal' = do
   state' <- lift get
   lift $ put state'{returnVal=returnVal'}
 
-setGasRemaining::Int->VMM ()
+setGasRemaining::Gas->VMM ()
 setGasRemaining gasRemaining' = do
   gasref <- lift $ gets vmGasRemaining
   liftIO $ writeIORefU gasref gasRemaining'
 
-useGas::Int->VMM ()
+useGas::Gas->VMM ()
 useGas gas = do
   gasref <- lift $ gets vmGasRemaining
   g <- liftIO $ atomicSubCounter gasref gas
@@ -246,7 +246,7 @@ useGas gas = do
     liftIO $ writeIORefU gasref 0
     throwE OutOfGasException
 
-addGas::Int->VMM ()
+addGas::Gas->VMM ()
 addGas gas = do
   gasref <- lift $ gets vmGasRemaining
   currentGas <- liftIO $ readIORefU gasref
