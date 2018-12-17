@@ -60,8 +60,7 @@ ethereumVM = void . execContextM $ do
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
-    -- TODO(tim): What if gas > maxBound :: Int
-    Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
+    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
     bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
