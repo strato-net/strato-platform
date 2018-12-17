@@ -25,6 +25,8 @@ import qualified Blockchain.Data.DataDefs           as DD
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Gas
+
 
 {-# NOINLINE upsertPT #-}
 
@@ -50,7 +52,7 @@ data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
                                , queued                :: ATL -- TXs that are lingering in the pool
                                , seen                  :: M.Map SHA OutputTx
-                               , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
+                               , calculateIntrinsicGas :: Integer -> OutputTx -> Gas -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
                                } deriving (Generic)
@@ -118,7 +120,7 @@ calculateIntrinsicTxFee bs t@OutputTx{otBaseTx = bt} =
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache { bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
-    cig (DD.blockDataNumber bh + 1)
+    toInteger . cig (DD.blockDataNumber bh + 1)
 
 addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, OutputTx, BaggerState)
 addToPending t s@BaggerState{pending = p} =
