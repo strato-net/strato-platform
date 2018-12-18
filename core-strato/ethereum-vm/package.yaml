@@ -28,7 +28,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - classy-prelude
-  - clock
+  - clockwork
   - containers
   - cross-monitoring
   - cryptohash

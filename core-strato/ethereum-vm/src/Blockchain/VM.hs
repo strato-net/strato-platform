@@ -12,6 +12,7 @@ module Blockchain.VM
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
+import           Clockwork
 import           Control.DeepSeq
 import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
@@ -32,10 +33,7 @@ import           Data.Maybe
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
-import qualified Formatting                         as F
---import           Formatting.Clock
 import           Numeric
-import           System.Clock
 import           Text.Printf
 
 
@@ -894,7 +892,7 @@ printTrace op gasBefore pcBefore stateAfter = do
 
 runCode :: Int -> VMM ()
 runCode c = do
-  timeBefore <- liftIO $ getTime Monotonic
+  when flags_evmProfile $ liftIO cwBefore
 
   memBefore <- getSizeInWords
   gasBefore <- getGasRemaining
@@ -926,18 +924,13 @@ runCode c = do
 
   when flags_trace $ printTrace op gasBefore pcBefore result
 
+  incrementPC len
 
-  timeAfter <- liftIO $ getTime Monotonic
+  when flags_evmProfile $ do
+    totalNanoseconds <- liftIO cwAfter
+    lift $ $logInfoS "runCode" $ T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
 
-  when flags_evmProfile $
---    liftIO $ putStrLn $ T.unpack $ F.sformat ("OPCODE: " F.% F.string F.% " " F.% timeSpecs) (show op) timeBefore timeAfter
-    lift $ $logInfoS "runCode" $ F.sformat ("OPCODE: " F.% F.string F.% " " F.% F.int F.% "ns") (show op) $ toNanoSecs $ timeAfter `diffTimeSpec` timeBefore
-
-  case result of
-    VMState{done=True} -> incrementPC len
-    _ -> do
-      incrementPC len
-      runCode (c+1)
+  when (not $ done result) $ runCode (c+1)
 
 runCodeFromStart :: VMM ()
 runCodeFromStart = do
