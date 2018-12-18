@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -16,6 +17,7 @@ import           Clockwork
 import           Control.DeepSeq
 import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
+import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
@@ -870,47 +872,89 @@ printTrace op gasBefore pcBefore stateAfter = do
   lift $ $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
 -}
 
-runCode :: Int -> VMM ()
-runCode c = do
-  when flags_evmProfile $ liftIO cwBefore
-
-  memBefore <- getSizeInWords
-  gasBefore <- getGasRemaining
-  code <- getEnvVar envCode
-
+{-# INLINE runCode #-}
+runCode :: VMM ()
+runCode = do
   vmState <- lift get
-  !pcBefore <- readPC vmState
+  pcBefore <- readPC vmState
+  code <- getEnvVar envCode
   let (op, len) = getOperationAt code pcBefore
-  -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
   (val, theRefund) <- opGasPriceAndRefund op
-
   useGas val
   addToRefund theRefund
 
   runOperation op
 
-  memAfter <- getSizeInWords
-
-  result <- lift get
-
-  env <- lift $ fmap environment get
-
-  when flags_sqlTrace $ do
-    pcVal' <- readPC vmState
-    gasAfter <- getGasRemaining
-    vmTrace $
-      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show gasAfter ++ " | " ++ show (gasAfter - gasBefore) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
-
-  when flags_trace $ printTrace op gasBefore pcBefore result
-
   incrementPC len
 
-  when flags_evmProfile $ do
-    totalNanoseconds <- liftIO cwAfter
-    lift $ $logInfoS "runCode" $ T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
+runCodeEVMProfile :: VMM ()
+runCodeEVMProfile = whileM $ do
+  vmState <- lift get
+  pcBefore <- readPC vmState
+  code <- getEnvVar envCode
+  let (op, _) = getOperationAt code pcBefore
+  liftIO cwBefore
+  runCode
+  totalNanoseconds <- liftIO cwAfter
+  $logInfoS "runCodeEVMProfile" . T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
+  fmap not . lift $ gets done
 
-  unless (done result) $ runCode (c+1)
+runCodeSQLTrace :: Int -> VMM ()
+runCodeSQLTrace !c = do
+  vmState <- lift get
+  gasBefore <- readGasRemaining vmState
+  pcBefore <- readPC vmState
+  memBefore <- getSizeInWords
+  code <- getEnvVar envCode
+  let (op, _) = getOperationAt code pcBefore
+  runCode
+  gasAfter <- readGasRemaining vmState
+  pcAfter <- readPC vmState
+  memAfter <- getSizeInWords
+  env <- lift $ gets environment
+  vmTrace $ "EVM [ eth | " ++ show (callDepth vmState)
+                  ++ " | " ++ formatAddressWithoutColor (envOwner env)
+                  ++ " | #" ++ show c
+                  ++ " | " ++ map toUpper (showHex pcAfter "") ++ " : " ++ formatOp op
+                  ++ " | " ++ show gasAfter
+                  ++ " | " ++ show (gasAfter - gasBefore)
+                  ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
+  unlessM (lift (gets done)) $
+    runCodeSQLTrace (c+1)
+
+
+runCodeTrace :: VMM ()
+runCodeTrace = whileM $ do
+  vmState <- lift get
+  gasBefore <- readGasRemaining vmState
+  pcBefore <- readPC vmState
+  code <- getEnvVar envCode
+  let (op, _) = getOperationAt code pcBefore
+  runCode
+  result <- lift get
+  printTrace op gasBefore pcBefore result
+  fmap not . lift $ gets done
+
+runCodeFast :: VMM ()
+runCodeFast = do
+  runCode
+  d <- lift $ gets done
+  unless d $ runCodeFast
+
+data TraceType = Fast | Trace | SQLTrace | EVMProfile deriving (Eq, Enum, Show)
+
+parseTraceFlag :: String -> TraceType
+parseTraceFlag = \case
+  "false" -> Fast
+  "fast" -> Fast
+  "none" -> Fast
+  "" -> Fast
+  "trace" -> Trace
+  "true" -> Trace
+  "sqlTrace" -> SQLTrace
+  "evmProfile" -> EVMProfile
+  x -> error $ "Unknown tracing format: " ++ show x
 
 runCodeFromStart :: VMM ()
 runCodeFromStart = do
@@ -926,7 +970,11 @@ runCodeFromStart = do
      vmState <- lift get
      lift $ put vmState{returnVal=Just ret}
      return ()
-   _ -> runCode 0
+   _ -> case parseTraceFlag flags_trace of
+     Fast -> $logInfoS "runCodeFromStart" "running fast code" >> runCodeFast
+     Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
+     SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0
+     EVMProfile -> $logInfoS "runCodeFromStart" "running evm profiled code" >> runCodeEVMProfile
 
 -- | runVMM fully evaluates its results to limit memory leaks.
 runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM (Either VMException a, VMState)

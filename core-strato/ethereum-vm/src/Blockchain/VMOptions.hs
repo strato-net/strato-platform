@@ -5,8 +5,6 @@ module Blockchain.VMOptions (
   flags_testnet,
   flags_debug,
   flags_trace,
-  flags_sqlTrace,
-  flags_evmProfile,
   flags_altGenBlock,
   flags_createTransactionResults,
   flags_sqlDiff,
@@ -24,9 +22,11 @@ import           Blockchain.CoreFlags
 import           HFlags
 
 defineFlag "debug" False "turn debug info on or off"
-defineFlag "trace" False "turn trace info on or off"
-defineFlag "sqlTrace" False "Flag to insert VM trace in sql, independent of trace flag"
-defineFlag "evmProfile" False "turn on EVM profiling, independent of trace flag (warning....  this will slow the EVM down a lot, and should never be used in production)"
+defineFlag "trace" "none" "Style of tracing. \n\
+ \ none|fast|false|∅ -> No tracing enabled \n\
+ \ trace|true -> Geth style tracing \n\
+ \ sqltrace -> Tracing as pipe separated values to be dumped into SQL \n\
+ \ evmprofile -> Profile runtimes labeled by opcode"
 defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
 defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
