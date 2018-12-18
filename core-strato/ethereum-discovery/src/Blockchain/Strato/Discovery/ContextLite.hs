@@ -23,11 +23,10 @@ import qualified Database.Persist.Postgresql           as SQL
 newtype ContextLite =
   ContextLite { liteSQLDB::SQLDB }
 
--- TODO(tim): Remove MonadBaseControl
-instance (MonadUnliftIO m, MonadBaseControl IO m)=>HasSQLDB (ReaderT ContextLite m) where
+instance  MonadUnliftIO m  => HasSQLDB (ReaderT ContextLite m) where
   getSQLDB = asks liteSQLDB
 
-initContextLite :: (MonadResource m, MonadUnliftIO m, MonadBaseControl IO m) => m ContextLite
+initContextLite :: (MonadResource m, MonadUnliftIO m) => m ContextLite
 initContextLite = do
   dbs <- openDBs
   return ContextLite { liteSQLDB = sqlDB' dbs }

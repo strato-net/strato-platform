@@ -10,11 +10,10 @@ module Executable.StratoAdit (
   stratoAdit
 ) where
 
-import           Control.Concurrent.Lifted      hiding (yield, takeMVar, putMVar, newEmptyMVar)
-import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Logger
+import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka
 import           Blockchain.MilenaTools
@@ -22,6 +21,8 @@ import           Network.Kafka.Protocol
 import           Prelude                        hiding (lookup)
 import           System.CPUTime
 import           Text.PrettyPrint.ANSI.Leijen   hiding ((<$>))
+import           UnliftIO.Concurrent
+import           UnliftIO.STM
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs       ()
@@ -76,7 +77,7 @@ doBlock minerNumber n newNonce = do
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
 mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
-    mineNewBlock =<< liftIO (atomically $ readTMVar mv)
+    mineNewBlock =<< atomically (readTMVar mv)
   where
     mineNewBlock b = do
       liftIO (theMiner b) >>= maybe (return ()) (miningSuccess b)
@@ -127,7 +128,8 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" . T.pack $ "Dispatching " ++ show (length miners) ++ " miners"
 
     !nnow <- liftIO getCPUTime
-    mapM_ (fork . mineBlock c nnow 0) miners
+    initialState <- get
+    mapM_ (lift . forkIO . flip evalStateT initialState . mineBlock c nnow 0) miners
 
     $logInfoS "stratoAdit" "Initing runKafka"
     $logInfoS "stratoAdit" "Will fetch offsets"

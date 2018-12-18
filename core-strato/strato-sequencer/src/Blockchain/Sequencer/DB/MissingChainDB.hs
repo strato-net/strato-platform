@@ -1,41 +1,33 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.Sequencer.DB.MissingChainDB where
 
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.SHA
 
+import           Control.Lens
 import           Control.Monad.IO.Class
-import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as M
-import           Data.Maybe                   (fromMaybe)
+import qualified Data.Set                     as S
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-getMissingChainsDB :: HasPrivateHashDB m => m (Map Word256 [SHA])
-getMissingChainsDB = missingChainDB <$> getPrivateHashDB
-
-putMissingChainsDB :: HasPrivateHashDB m => Map Word256 [SHA] -> m ()
-putMissingChainsDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ missingChainDB = m }
-
 lookupMissingChainTxs :: HasPrivateHashDB m => Word256 -> m [SHA]
-lookupMissingChainTxs chainId = fromMaybe [] . M.lookup chainId <$> getMissingChainsDB
+lookupMissingChainTxs chainId = maybe [] (S.toList . _missingTXs) <$> getChainIdEntry chainId
 
 insertMissingChainTx :: HasPrivateHashDB m => Word256 -> SHA -> m ()
-insertMissingChainTx chainId th = do
-  liftIO $ withLabel chainMetrics "missing_chain_tx" incCounter
-  m <- getMissingChainsDB
-  case M.lookup chainId m of
-    Nothing -> putMissingChainsDB (M.insert chainId [th] m)
-    Just ths -> putMissingChainsDB (M.insert chainId (th:ths) m)
+insertMissingChainTx chainId th = insertMissingChainTxs chainId [th]
 
 insertMissingChainTxs :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
 insertMissingChainTxs chainId ths = do
   liftIO $ withLabel chainMetrics "missing_chain_tx" (flip unsafeAddCounter . fromIntegral . length $ ths)
-  getMissingChainsDB >>= putMissingChainsDB . M.insert chainId ths
+  repsertChainIdEntry_ chainId $ \case
+    Nothing -> return . chainIdEntryWithMissingTXs $ S.fromList ths
+    Just cie -> return $ (missingTXs %~ S.union (S.fromList ths)) cie
 
 clearMissingChainTxs :: HasPrivateHashDB m => Word256 -> m ()
 clearMissingChainTxs chainId = do
   liftIO $ withLabel chainMetrics "missing_chain_tx_removed" incCounter
-  getMissingChainsDB >>= putMissingChainsDB . M.delete chainId
+  modifyChainIdEntryState_ chainId $ missingTXs .= S.empty

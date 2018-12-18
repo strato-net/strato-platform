@@ -29,6 +29,9 @@ import           BlockApps.Ethereum
 
 newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 
+instance Arbitrary ContractName where
+  arbitrary = GR.genericArbitrary GR.uniform
+
 instance IsString ContractName where
   fromString = ContractName . Text.pack
 

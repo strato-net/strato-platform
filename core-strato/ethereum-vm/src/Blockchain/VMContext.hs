@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
 
@@ -26,6 +27,7 @@ module Blockchain.VMContext
     ) where
 
 
+import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -33,7 +35,6 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
@@ -43,7 +44,9 @@ import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as PSQL
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
+import           GHC.Generics
 import qualified Network.Kafka                      as K
+import qualified Network.Kafka.Protocol             as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
 import           System.IO.Temp
@@ -77,10 +80,17 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
+instance NFData Redis.Connection where
+  rnf c = c `seq` ()
+
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
-    deriving (Eq, Read, Show)
+    deriving (Eq, Read, Show, Generic, NFData)
 
 newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
+
+instance NFData Config where
+  rnf = const ()
+
 data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHashDB                 :: HashDB
                        , contextCodeDB                 :: CodeDB
@@ -99,7 +109,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
-                       }
+                       } deriving (Generic, NFData)
 makeLenses ''Context
 
 
@@ -190,7 +200,7 @@ instance HasCodeDB ContextM where
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = contextBlockSummaryDB <$> get
 
-instance (MonadReader Config m, MonadIO m, MonadUnliftIO m, MonadBaseControl IO m) => HasSQLDB m where
+instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
@@ -202,7 +212,8 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadMask m) =>
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m,
+                    HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
@@ -224,9 +235,10 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
           Redis.connectPort = Redis.PortNumber 2023,
           Redis.connectDatabase = 0
         }
-        let initialKafkaState = error "TODO(tim): require sinks"
-        runStateT f (Context
-                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+        let initialKafkaState = K.mkKafkaState (K.KString "fake_client")
+                                               (K.Host (K.KString "localhost"), K.Port 1234132)
+        flip runStateT (Context
+                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
                      hdb
                      cdb
                      blksumdb
@@ -242,9 +254,12 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      redisPool
                      Q.empty []
                      False
-                     False)
+                     False) $ do
+          MP.initializeBlank =<< getStateDB
+          setStateDBStateRoot MP.emptyTriePtr
+          f
 
-runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -283,10 +298,10 @@ runContextM f = do
                        False)
 
 
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()

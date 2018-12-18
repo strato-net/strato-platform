@@ -11,6 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
+import           Crypto.Random.Entropy
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (isJust)
 import qualified Data.Text                         as Text
@@ -56,9 +57,20 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
               contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
               codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
+  nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let nonContractAcctInfo = nmap NonContract balances
       acctInfo = cAcctInfo ++ nonContractAcctInfo
-      chainInfo = ChainInfo lbl acctInfo codeInfo members
+      chainInfo = ChainInfo
+        (UnsignedChainInfo lbl
+                           acctInfo
+                           codeInfo
+                           members
+                           Nothing
+                           creationBlockHash
+                           nonce
+                           Map.empty
+        )
+        Nothing
   chainId <- blocStrato $ Strato.postChain chainInfo
   when (isJust mContract) $ do
     let Just (cmId, _) = mContract
@@ -81,7 +93,7 @@ getChainInfo chainIds = do
       convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
         let chtup = (toTuple chp :: (ChainId, ChainInfo))
-        let chinfo =  snd chtup
+        let chinfo =  chainInfo $ snd chtup
         let getAddrBalance acct = case acct of
                                     NonContract a b -> (a, b)
                                     ContractNoStorage a b _ -> (a, b)

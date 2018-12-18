@@ -185,21 +185,32 @@ addBlocks blocks' = do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
-      replacedBest   <- liftIO (newIORef undefined)
+      ranPrivateTxs  <- liftIO (newIORef False)
+      replacedBest   <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
         actions <- addBlock block
-        (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
+        (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block
         when didReplaceThisTime . liftIO $ do
           writeIORef didReplaceBest True
           writeIORef replacedBest (block, replacedBits)
+        when ranPriv . liftIO $ do
+          writeIORef ranPrivateTxs True
+          drb <- liftIO (readIORef didReplaceBest)
+          unless drb $ do
+            writeIORef replacedBest (block, replacedBits)
         return actions
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
+      ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
       timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
-      when didReplaceBest' $ do
+      when (didReplaceBest' || ranPrivateTxs') $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        timeit "calculateAndEmitStateDiffs " timerToUse $ calculateAndEmitStateDiffs theBlock oldHeader
+        timeit "calculateAndEmitStateDiffs " timerToUse $
+          calculateAndEmitStateDiffs theBlock
+                                     oldHeader
+                                     didReplaceBest'
+                                     ranPrivateTxs'
       return $ concat actions
 
   where
@@ -217,7 +228,7 @@ setParentStateRoot b@OutputBlock{..} = do
     return bSum
 
 addBlock :: OutputBlock -> ContextM [Action]
-addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
+addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
     putBlockHeaderInChainDB bd
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
@@ -239,20 +250,23 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
     db <- getStateDB
 
-    b' <- do
+    -- If there are no transactions in th
+    -- TODO: this should be handled more officially,
+    -- e.g. adding a chainId to the block
+    let skipCheck = (not $ null otxs) && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
+    unless skipCheck $ do
       when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
-          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
-          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
-      return b
+        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
+        error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
-    valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b'
-    case valid of
-        Right _ -> P.incCounter vmBlocksValid
-        Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+      valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+      case valid of
+          Right _ -> P.incCounter vmBlocksValid
+          Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed
-    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
+    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
     return actions
 
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
@@ -277,7 +291,7 @@ addTransactions bd bg ts = go bd bg ts []
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT
@@ -304,7 +318,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     flushMemAddressStateTxToBlockDB
     flushStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
-    (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
+    (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time'
@@ -416,7 +430,7 @@ runCodeForTransaction :: Bool
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  !(result, vmState) <-
+  (result, vmState) <-
     create isRunningTests'
            isHomestead
            S.empty
@@ -584,7 +598,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -605,6 +619,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+            ranPriv = any ((==PrivateHash) . txType) txs
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
@@ -621,7 +636,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
             bestNum       = if shouldReplace then newNumber else oldNumber
             bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-        return (shouldReplace, bestBlockInfo)
+        return (shouldReplace, ranPriv, bestBlockInfo)
 
 splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, SHA)]
 splitCreateDiffs =
@@ -633,8 +648,10 @@ splitCreateDiffs =
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> BlockData
+                           -> Bool
+                           -> Bool
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs newBlock oldHeader runPublic runPrivate = when flags_sqlDiff $ do
     let oldHash      = blockHeaderHash oldHeader
         oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
         newHeader    = blockHeader newBlock
@@ -642,11 +659,17 @@ calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+    diffs <- if runPublic
+      then (:[]) <$> stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+      else return []
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
-    chainDiffs <- chainDiff newNumber oldHash newHash
+    chainDiffs <- if runPrivate
+      then if runPublic
+        then chainDiff newNumber oldHash newHash
+        else chainDiff newNumber (blockHeaderParentHash newHeader) newHash
+      else return []
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allDiffs = diffs:chainDiffs
+    let allDiffs = diffs ++ chainDiffs
 
     forM_ allDiffs $ lift . commitSqlDiffs

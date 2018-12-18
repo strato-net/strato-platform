@@ -1,4 +1,7 @@
-local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
+--'aud' should not necessarily contain the URLs according to openid standard. Could be the unique client ids instead. Skipping check.
+--local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
+
+local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
@@ -17,11 +20,11 @@ if err or not res then
     ngx.exit(ngx.HTTP_FORBIDDEN)
 end
 
-if res.aud ~= expected_audience then
-  ngx.status = 403
-  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
-  ngx.exit(ngx.HTTP_FORBIDDEN)
-end
+--if res.aud ~= expected_audience then
+--  ngx.status = 403
+--  ngx.say("audience in token (" .. res.aud .. ") does not match with expected audience (" .. expected_audience .. ")")
+--  ngx.exit(ngx.HTTP_FORBIDDEN)
+--end
 
 --if res.scope ~= "edit" then
 --  ngx.exit(ngx.HTTP_FORBIDDEN)
@@ -35,10 +38,9 @@ local function isEmpty(s)
   return s == nil or s == ''
 end
 
--- some oauth providers return email under `id_token` object, some - under `user`
 local unique_name = '' 
-if not isEmpty(res.email) then 
-  unique_name=res.email 
+if not isEmpty(res[username_property]) then
+  unique_name=res[username_property]
 else 
   unique_name=res.appid 
 end 

@@ -7,7 +7,6 @@ module TestImport
 
 import           Application           (makeFoundation, makeLogware)
 import           ClassyPrelude         as XX hiding (delete, deleteBy)
-import           Control.Monad.IO.Unlift
 import           Database.Persist      as XX hiding (get)
 import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
                                         rawSql, runSqlPersistMPool, unSingle, runMigrationSilent)
@@ -20,9 +19,6 @@ import qualified Blockchain.Data.Blockchain as DataBlock
 import qualified Blockchain.Data.DataDefs as DataDefs
 import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
-
-instance MonadUnliftIO (YesodExample App) where
-  askUnliftIO = error "TODO(tim): Remove when yesod is upgraded to 1.6.*"
 
 instance SQL.HasSQLDB (YesodExample App) where
   getSQLDB = appConnPool <$> getTestYesod

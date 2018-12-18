@@ -402,7 +402,7 @@ oneTimeSetup genesisBlockName = do
 
       let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
 
-      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []))
+      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []) :: SqlWriteBackend -> NoLoggingT IO ())
 
       {- CONFIG: create kafka topics -}
 

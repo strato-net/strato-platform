@@ -33,12 +33,12 @@ import           Handler.TransactionInfo
 contains :: BSL8.ByteString -> String -> Bool
 contains a b = DL.isInfixOf b (TL.unpack $ decodeUtf8 a)
 
-bodyContains' :: String -> YesodExample site ()
+bodyContains' :: String -> YesodExample App ()
 bodyContains' needle = withResponse $ \ res ->
   let haystack = simpleBody res
   in liftIO $ HUnit.assertBool ("Expected body " ++ show haystack ++ " to contain " ++ needle) $ haystack `contains` needle
 
-testJSON  ::  (Show a, Eq a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample site ()
+testJSON  ::  (Show a, Eq a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample App ()
 testJSON f want = withResponse $ \res ->
   let extract (Right bs) = map bPrimeToB bs
       extract (Left err) = error err
@@ -56,7 +56,7 @@ genesisBlock = case eitherGenesis of
     Right [] -> error "no block"
     Right (b:_) -> b
 
-checkKeyValue :: CI ByteString -> ByteString -> YT.YesodExample site ()
+checkKeyValue :: CI ByteString -> ByteString -> YT.YesodExample App ()
 checkKeyValue k v = withResponse $ \ SResponse { simpleHeaders = h } ->
                          liftIO $ HUnit.assertBool ("Value should be " ++ (show v)) $
                          fromJust (lookup k h) == v

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Bagger.Transactions where
 
 import           Control.DeepSeq

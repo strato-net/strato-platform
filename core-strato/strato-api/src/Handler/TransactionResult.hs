@@ -9,7 +9,7 @@ import           Handler.Filters              (fromHexText)
 import           Import
 import qualified Prelude                      as P
 
-getTransactionResultR :: SHA -> Handler Value
+getTransactionResultR :: SHA -> HandlerFor App Value
 getTransactionResultR txHash      = do
   chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"

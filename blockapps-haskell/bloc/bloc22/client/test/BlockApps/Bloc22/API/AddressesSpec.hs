@@ -13,5 +13,5 @@ spec :: SpecWith TestConfig
 spec =
   describe "getAddresses" $
     it "gets a list of addresses" $ \ TestConfig {..} -> do
-      Right addrs <- runClientM getAddresses (ClientEnv mgr blocUrl)
+      Right addrs <- runClientM getAddresses (ClientEnv mgr blocUrl Nothing)
       addrs `shouldContain` [userAddress,toUserAddress]

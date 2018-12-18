@@ -61,10 +61,10 @@ readSolFile filename = do
 
 resolveTx :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTx testConfig@TestConfig{..} hash = do
-  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocUrl)
+  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocUrl Nothing)
   case eResult of
     Left _ -> return eResult
-    Right result -> 
+    Right result ->
       case blocTransactionStatus result of
         Pending -> resolveTx testConfig hash
         _ -> return eResult
@@ -86,10 +86,10 @@ getResolvedBatchTx testConfig io = do
 resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTxMulti testConfig@TestConfig{..} hash = do
   let Just blocclient = blocUrlMulti
-  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocclient)
+  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocclient Nothing)
   case eResult of
     Left _ -> return eResult
-    Right result -> 
+    Right result ->
       case blocTransactionStatus result of
         Pending -> resolveTxMulti testConfig hash
         _ -> return eResult
@@ -104,7 +104,7 @@ getResolvedTxMulti testConfig io = do
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
   result <- getBlocTransactionResult (blocTransactionHash bloc) Nothing True
-  case blocTransactionStatus result of 
+  case blocTransactionStatus result of
     Pending -> resolveBlocTx result
     _ -> return result
 

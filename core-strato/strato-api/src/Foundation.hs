@@ -1,12 +1,13 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Foundation where
 
 import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
 import           Import.NoFoundation
-import           Control.Monad.IO.Unlift
 import qualified Data.ByteString.Char8    as BC
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as T
@@ -14,7 +15,7 @@ import qualified Data.Text.Encoding.Error as T
 import           Data.Time
 import qualified Network.Wai              as W
 import qualified Prelude                  as P
-import           Yesod.Core.Types         (Logger, HandlerT(..))
+import           Yesod.Core.Types         (Logger)
 
 import           Network.Haskoin.Crypto   as HK
 import           Blockchain.DB.SQLDB
@@ -46,13 +47,13 @@ data App = App
     , appFaucetKey   :: Maybe HK.PrvKey
     }
 
-getKey :: MonadReader App m => m (Maybe HK.PrvKey)
-getKey = asks appFaucetKey
+getKey :: HandlerFor App (Maybe HK.PrvKey)
+getKey = appFaucetKey <$> getYesod
 
 initialMaxNonce :: MonadIO m => m (IORef Integer)
 initialMaxNonce = liftIO $ newIORef (-1)
 
-acquireNewMaxNonce :: (MonadIO m, MonadReader App m) => Integer -> m Integer
+acquireNewMaxNonce :: (MonadReader App m, MonadIO m) => Integer -> m Integer
 acquireNewMaxNonce minNonce = do
   let findNext :: Integer -> (Integer, Integer)
       -- Another node may have jumped ahead of our faucet stream or we may
@@ -78,9 +79,6 @@ instance HasHttpManager App where
 
 mkYesodData "App" $(parseRoutesFile "config/routes.txt")
 
--- | A convenient synonym for creating forms.
-type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
-
 -- Please see the documentation for the Yesod typeclass. There are a number
 -- of settings which can be configured by overriding methods here.
 instance Yesod App where
@@ -105,27 +103,22 @@ instance Yesod App where
 
     maximumContentLength _ _ = Just (4 * 1024 * 1024 :: Word64) -- 4M
 
-    shouldLog app _source level =
+    shouldLogIO app _source level = return $
         appShouldLogAll (appSettings app)
             || level == LevelWarn
             || level == LevelError
 
     makeLogger = return . appLogger
 
--- How to run database actions.
-instance HasSQLDB Foundation.Handler where
-    getSQLDB = appConnPool <$> getYesod
-
-instance MonadUnliftIO Foundation.Handler where
-  {-# INLINE askUnliftIO #-}
-  askUnliftIO = HandlerT $ \r ->
-                return (UnliftIO (flip unHandlerT r))
+instance HasSQLDB (HandlerFor App) where
+  getSQLDB = appConnPool <$> getYesod
 
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend
     runDB action = do
         master <- getYesod
         runSqlPool action $ appConnPool master
+
 instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
 

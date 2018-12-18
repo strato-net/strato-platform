@@ -1,4 +1,4 @@
-version: "2.1"
+version: "3"
 volumes:
   dapps:
     driver: local
@@ -195,13 +195,14 @@ services:
     - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
-    - NODE_HOST=${NODE_HOST}
+    #- NODE_HOST=${NODE_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
     - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false}
     - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
+    - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}

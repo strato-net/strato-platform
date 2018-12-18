@@ -12,6 +12,7 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Format
 
@@ -40,6 +41,8 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
                 $logInfoS "p2pIndexer" . T.pack $
                     "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo
                 void . RBDB.withRedisBlockDB $ RBDB.putChainInfo cId cInfo
+                let cMembers = members $ chainInfo cInfo
+                void . RBDB.withRedisBlockDB $ RBDB.putChainMembers cId cMembers
             _ -> return ()
         setKafkaCheckpoint nextIdx
 

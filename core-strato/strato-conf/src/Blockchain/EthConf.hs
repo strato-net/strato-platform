@@ -149,7 +149,7 @@ instance ToJSON BlockConf
 ethConf :: EthConf
 ethConf = unsafePerformIO $ do
     contents <- B.readFile ".ethereumH/ethconf.yaml"
-    return $ (either error id . decodeEither) contents
+    return $ (either (error.show) id . decodeEither') contents
 
 
 {- CONFIG: clobber connection string -}

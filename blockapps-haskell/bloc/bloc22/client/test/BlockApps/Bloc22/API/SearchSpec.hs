@@ -18,5 +18,5 @@ spec = do
     it "gets a list of addresses in a contract" $ \ TestConfig {..} -> do
       Right addrs <- runClientM
         (getSearchContract "SimpleStorage")
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       addrs `shouldContain` [One $ Unnamed simpleStorageContractAddress]

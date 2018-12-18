@@ -1,41 +1,49 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Sequencer.DB.DependentTxDB where
 
+import           Blockchain.ExtWord
+import           Blockchain.Format
 import           Blockchain.SHA
 
+import           Control.Lens
+import           Control.Monad          (join)
 import           Control.Monad.IO.Class
-import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as M
-import           Data.Maybe                   (fromMaybe)
-import qualified Data.Set                     as S
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (fromMaybe)
+import           Data.Set               (Set)
+import qualified Data.Set               as S
 import           Prometheus
 
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.Metrics
 
-getDependentTxDB :: HasPrivateHashDB m => m (Map SHA (S.Set SHA))
-getDependentTxDB = dependentTxDB <$> getPrivateHashDB
-
-putDependentTxDB :: HasPrivateHashDB m => Map SHA (S.Set SHA) -> m ()
-putDependentTxDB m = getPrivateHashDB >>= \db -> putPrivateHashDB db{ dependentTxDB = m }
-
-lookupDependentTxs :: HasPrivateHashDB m => SHA -> m (S.Set SHA)
-lookupDependentTxs bHash = fromMaybe S.empty . M.lookup bHash <$> getDependentTxDB
-
-insertDependentTx :: HasPrivateHashDB m => SHA -> SHA -> m ()
-insertDependentTx bHash tHash = do
+insertDependentTx :: HasPrivateHashDB m => SHA -> Word256 -> SHA -> m ()
+insertDependentTx bHash chainId tHash = do
   liftIO $ withLabel txMetrics "dependent_tx" incCounter
-  m <- getDependentTxDB
-  case M.lookup bHash m of
-    Nothing -> putDependentTxDB (M.insert bHash (S.singleton tHash) m)
-    Just ths -> putDependentTxDB (M.insert bHash (S.insert tHash ths) m)
+  modifyBlockHashEntryState_ bHash $
+    dependentTXs %= M.alter (Just . maybe (S.singleton tHash) (S.insert tHash)) chainId
 
-insertDependentTxs :: HasPrivateHashDB m => SHA -> S.Set SHA -> m ()
-insertDependentTxs bHash ths = do
-  liftIO $ withLabel txMetrics "dependent_tx" (flip unsafeAddCounter . fromIntegral . S.size $ ths)
-  getDependentTxDB >>= putDependentTxDB . M.insert bHash ths
+insertDependentTxs :: HasPrivateHashDB m => SHA -> Word256 -> Set SHA -> m ()
+insertDependentTxs bHash chainId tHashes = do
+  liftIO $ withLabel txMetrics "dependent_tx" (flip unsafeAddCounter . fromIntegral . S.size $ tHashes)
+  repsertBlockHashEntry_ bHash $ \entry -> do
+    case entry of
+      Nothing -> error $ "insertDependentTXs: Block hash " ++ format bHash ++ " not found"
+      Just b -> return $
+        (dependentTXs %~ M.insert chainId tHashes) b
 
-clearDependentTxs :: HasPrivateHashDB m => SHA -> m ()
-clearDependentTxs bHash = do
+lookupDependentTxs :: HasPrivateHashDB m => SHA -> Word256 -> m (Set SHA)
+lookupDependentTxs bHash chainId = do
+  fromMaybe S.empty . join . fmap (M.lookup chainId . _dependentTXs) <$> getBlockHashEntry bHash
+
+removeDependentTx :: HasPrivateHashDB m => SHA -> Word256 -> SHA -> m ()
+removeDependentTx bHash chainId tHash = do
+  liftIO $ withLabel txMetrics "dependent_tx" incCounter
+  modifyBlockHashEntryState_ bHash $
+    dependentTXs %= M.alter (fmap (S.delete tHash)) chainId
+
+clearDependentTxs :: HasPrivateHashDB m => SHA -> Word256 -> m ()
+clearDependentTxs bHash chainId = do
   liftIO $ withLabel txMetrics "dependent_tx_removed" incCounter
-  getDependentTxDB >>= putDependentTxDB . M.delete bHash
+  modifyBlockHashEntryState_ bHash $
+    dependentTXs %= M.delete chainId

@@ -7,11 +7,12 @@ module Blockchain.TCPClientWithTimeout (
   TCPClientWithTimeoutException(..)
   ) where
 
-import           Control.Concurrent.Lifted
-import           Control.Exception.Lifted
+import           Control.Exception.Lifted (throw)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Control
+import           Control.Monad.IO.Unlift
 import           Data.Conduit.Network
+import           UnliftIO.Concurrent
+import           UnliftIO.Exception
 
 data TCPClientWithTimeoutException = TimeoutException deriving (Show)
 
@@ -21,17 +22,17 @@ threadDelaySeconds :: Double -> IO ()
 threadDelaySeconds secs =
   threadDelay (ceiling $ secs * 1e6)
 
-runTCPClientWithConnectTimeout::(MonadIO m, MonadBaseControl IO m)=>
-                                ClientSettings->Double->(AppData->m ())->m ()
+runTCPClientWithConnectTimeout::(MonadIO m, MonadUnliftIO m)
+                              => ClientSettings->Double->(AppData->m ())->m ()
 runTCPClientWithConnectTimeout settings secs cont = do
   race <- liftIO newChan
   resultMVar <- liftIO newEmptyMVar
 
-  timerThreadID <- fork $ liftIO $ do
+  timerThreadID <- forkIO $ liftIO $ do
     threadDelaySeconds secs
     writeChan race False
 
-  clientThreadID <- fork $ do
+  clientThreadID <- forkIO $ do
     result <-
       try $
       runGeneralTCPClient settings $ \appData -> do

@@ -6,8 +6,7 @@ import System.Exit        (die)
 import System.IO (readFile, withFile, IOMode(..))
 
 import Control.Monad (when)
-import Data.Aeson (encode)
-import Data.Aeson.Extra (eitherDecodeStrict)
+import Data.Aeson (encode, eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
@@ -98,5 +97,5 @@ showAccountInfo (ContractWithStorage (Address address) balance (SHA code) storag
 
 
 
-  
-  
+
+

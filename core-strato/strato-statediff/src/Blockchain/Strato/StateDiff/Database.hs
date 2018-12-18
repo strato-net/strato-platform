@@ -14,6 +14,7 @@ import qualified Database.Persist.Postgresql                 as SQL hiding (Upda
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
@@ -25,7 +26,10 @@ import           Blockchain.Util
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                             as BS (empty)
+import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
+import           Data.Maybe
 
 import           Blockchain.Strato.StateDiff
 
@@ -85,19 +89,34 @@ getField def field =
 deleteAccount :: MonadResource m =>
                  Maybe Word256 -> Address -> SQL.SqlPersistT m ()
 deleteAccount chainId address = do
-  addrID <- getAddressStateSQL chainId address "delete"
-  SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
-  SQL.delete addrID
+  mAddrID <- getAddressStateSQL chainId address
+  for_ mAddrID $ \addrID -> do
+    SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
+    SQL.delete addrID
 
-updateAccount :: (MonadResource m, MonadBaseControl IO m) =>
+updateAccount :: MonadResource m =>
                  Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount chainId blockNumber address diff = do
-  addrID <- getAddressStateSQL chainId address "update"
-  SQL.update addrID $
-    setField nonce AddressStateRefNonce $
-    setField balance AddressStateRefBalance $
-      [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
-  sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
+  mAddrID <- getAddressStateSQL chainId address
+  case mAddrID of
+    Nothing ->
+      let eDiff = incrementalToEventual diff
+          nonce'        = Just . fromMaybe (Value 0) $ nonce eDiff
+          balance'      = Just . fromMaybe (Value 0) $ balance eDiff
+          contractRoot' = Just . fromMaybe (Value emptyTriePtr) $ contractRoot eDiff
+          code'         = Just . fromMaybe (Value BS.empty) $ code eDiff
+          eDiff' = eDiff { nonce = nonce'
+                         , balance = balance'
+                         , contractRoot = contractRoot'
+                         , code = code'
+                         }
+       in createAccount chainId blockNumber [(address, eDiff')]
+    Just addrID -> do
+      SQL.update addrID $
+        setField nonce AddressStateRefNonce $
+        setField balance AddressStateRefBalance $
+          [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
+      sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
 
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
@@ -121,14 +140,11 @@ commitStorage addrID key Update{newValue} = do
 getAddressStateSQL :: MonadResource m
                    => Maybe Word256
                    -> Address
-                   -> String
-                   -> SqlDbM m (SQL.Key AddressStateRef)
-getAddressStateSQL chainId addr' s = do
+                   -> SqlDbM m (Maybe (SQL.Key AddressStateRef))
+getAddressStateSQL chainId addr' = do
   addrIDs <- SQL.selectKeysList
               [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. chainId ] [ LimitTo 1 ]
-  if null addrIDs
-    then error $ s ++ ": Address not found in SQL db: " ++ formatAddressWithoutColor addr' ++ " with chain Id " ++ show chainId
-    else return $ head addrIDs
+  return $ listToMaybe addrIDs
 
 getStorageKeySQL :: MonadResource m
                  => SQL.Key AddressStateRef

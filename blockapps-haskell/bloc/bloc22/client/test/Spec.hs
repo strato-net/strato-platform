@@ -54,7 +54,7 @@ setup = do
         return (Just str',Just b')
 
   mgr' <- newManager defaultManagerSettings{managerResponseTimeout=responseTimeoutMicro 60000000}
- 
+
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
@@ -124,7 +124,7 @@ setup = do
           , simpleStorageContractAddress = sscAddr
           }
       return config
-  cfgEither <- runClientM clients (ClientEnv mgr' bloc)
+  cfgEither <- runClientM clients (ClientEnv mgr' bloc Nothing)
   case cfgEither of
     Left err  -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg

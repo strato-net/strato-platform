@@ -14,7 +14,6 @@ import           Numeric
 
 import           Blockchain.ExtWord
 
-import           Data.Ratio               (numerator)
 import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import qualified Data.Binary              as Binary
@@ -118,7 +117,7 @@ isContiguous _          = False
 newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral)
 
 posixTimeToMicrotime :: POSIXTime -> Microtime
-posixTimeToMicrotime = Microtime . numerator . toRational . (* 1000000)
+posixTimeToMicrotime = Microtime . round . (* 1000000)
 
 secondsToMicrotime :: Integer -> Microtime
 secondsToMicrotime = Microtime . (* 1000000)

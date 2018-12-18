@@ -8,7 +8,7 @@ import           Handler.Filters
 import           Import
 import qualified Prelude            as P
 
-getTxLastR ::  Integer -> Handler Value
+getTxLastR :: Integer -> HandlerFor App Value
 getTxLastR  num = do
   chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   addHeader "Access-Control-Allow-Origin" "*"

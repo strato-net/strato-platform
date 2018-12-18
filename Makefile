@@ -14,7 +14,7 @@ endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
-TMPDIR=/tmp/strato-docker-dummy
+TMPDIR=/tmp/$(shell whoami)/strato-docker-dummy
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -85,7 +85,7 @@ docker-compose:
 build_buildbase:
 	mkdir -p $(TMPDIR)
 	blockapps-haskell/pull_solc.sh 0.4.25 $(TMPDIR)/solc-0.4 $(TMPDIR)/license
-	blockapps-haskell/pull_solc.sh 0.5.0 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
+	blockapps-haskell/pull_solc.sh 0.5.1 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
 	ln -f $(TMPDIR)/solc-0.4 $(TMPDIR)/solc
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}

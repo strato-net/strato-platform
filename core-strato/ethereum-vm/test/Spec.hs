@@ -3,8 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Main where
-
 import           Prelude hiding (print)
 import           ClassyPrelude (print)
 
@@ -13,28 +11,19 @@ import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Control.Monad.State
-import           Control.Monad.Trans.Resource
-import           System.Directory
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
-import qualified Data.Default            (def)
-import qualified Data.Map                as M
 import           Data.Maybe
-import qualified Data.Sequence           as Q
 import qualified Data.Set                as S
 import           Data.Either
 import qualified Data.Text.Encoding      as Text
-import qualified Database.LevelDB        as DB
 
+import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Block as BDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
-import           Blockchain.Bagger.BaggerState (defaultBaggerState)
-import           Blockchain.Constants
 import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
@@ -42,9 +31,8 @@ import           Blockchain.VM
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
-import qualified Blockchain.Database.MerklePatricia as MP
 
-import           Executable.EVMFlags
+import           Executable.EVMFlags ()
 
 --noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 --noLog _ _ _ _ = return ()
@@ -54,58 +42,15 @@ main = do
   void $ $initHFlags "Yeah Buddy"
   hspec spec
 
-runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
-runContextM' f = do
-    liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    runResourceT
-      . flip runReaderT (error "Postgres connection no initialized") --conn
-      $ do
-        let ldbOptions = DB.defaultOptions {
-            DB.createIfMissing = True,
-            DB.cacheSize       = flags_ldbCacheSize,
-            DB.blockSize       = flags_ldbBlockSize
-        }
-        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-        let stateRoot = C8.pack "yuhhh"
-            bytes = rlpSerialize $ RLPScalar 0
-        DB.put sdb Data.Default.def stateRoot bytes
-        --conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
-        --redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-        --let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-        runStateT f (Context
-                        MP.MPDB{MP.ldb=sdb, MP.stateRoot= MP.StateRoot stateRoot}
-                        hdb
-                        cdb
-                        blksumdb
-                        M.empty
-                        M.empty
-                        M.empty
-                        M.empty
-                        MP.emptyTriePtr
-                        MP.emptyTriePtr
-                        defaultBaggerState
-                        (error "Kafka not initialized") --initialKafkaState
-                        Unspecified
-                        (error "Redis not initialized") --redisPool
-                        Q.empty
-                        []
-                        False False)
-
-
-
 spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runContextM' $ do
+      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
-          blockData = undefined
+          blockData = BDB.blockBlockData $ BML.makeBlock 0 0
           availableGas = 10000000
           tAddr = (Address 0xfeedbeef)
           newAddress = (Address 0xdeadbeef)
@@ -146,7 +91,7 @@ spec = do
              (fromIntegral txGasPrice)
              (fst $ B16.decode "ec630643")
              availableGas
-             undefined
+             tAddr
              (SHA 0)
              Nothing
              Nothing
