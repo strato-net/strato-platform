@@ -874,10 +874,10 @@ printTrace op gasBefore pcBefore stateAfter = do
 
 runCode :: VMM ()
 runCode = do
-  !vmState <- lift get
-  !pcBefore <- readPC vmState
+  vmState <- lift get
+  pcBefore <- readPC vmState
   code <- getEnvVar envCode
-  let (!op, !len) = getOperationAt code pcBefore
+  let (op, len) = getOperationAt code pcBefore
 
   (val, theRefund) <- opGasPriceAndRefund op
   useGas val
@@ -967,10 +967,10 @@ runCodeFromStart = do
      lift $ put vmState{returnVal=Just ret}
      return ()
    _ -> case parseTraceFlag flags_trace_kind of
-     Fast -> runCodeFast
-     Trace -> runCodeTrace
-     SQLTrace -> runCodeSQLTrace 0
-     EVMProfile -> runCodeEVMProfile
+     Fast -> $logInfoS "runCodeFromStart" "running fast code" >> runCodeFast
+     Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
+     SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0
+     EVMProfile -> $logInfoS "runCodeFromStart" "running evm profiled code" >> runCodeEVMProfile
 
 -- | runVMM fully evaluates its results to limit memory leaks.
 runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM (Either VMException a, VMState)
