@@ -10,9 +10,9 @@ packages:
 - blockapps-haskell/strato/api
 - blockapps-haskell/strato/client
 - blockapps-haskell/strato/server
-- blockapps-haskell/vault-wrapper/src/api
-- blockapps-haskell/vault-wrapper/src/client
-- blockapps-haskell/vault-wrapper/src/server
+- blockapps-haskell/vault-wrapper/api
+- blockapps-haskell/vault-wrapper/client
+- blockapps-haskell/vault-wrapper/server
 - core-strato/blockapps-milena
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
