@@ -1,4 +1,4 @@
-name:                vault-wrapper
+name:                blockapps-vault-wrapper-server
 version:             0.1.0.0
 github:              "githubuser/vault-wrapper"
 license:             BSD3
@@ -22,10 +22,10 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - aeson
 - ansi-wl-pprint
-- API
 - base
 - base16-bytestring
 - binary
+- blockapps-ethereum
 - bytestring
 - byteable
 - conduit 
@@ -68,6 +68,7 @@ dependencies:
 - transformers
 - transformers-base
 - unordered-containers
+- blockapps-vault-wrapper-api
 - wai
 - wai-cors
 - wai-extra
@@ -90,4 +91,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - vault-wrapper
+    - blockapps-vault-wrapper-server

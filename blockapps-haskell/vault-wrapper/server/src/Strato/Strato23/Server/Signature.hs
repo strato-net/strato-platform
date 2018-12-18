@@ -5,10 +5,10 @@
 
 module Strato.Strato23.Server.Signature where
 
+import           BlockApps.Ethereum
 import           Crypto.Secp256k1
 import           Data.Text                        (Text)
 import           Strato.Strato23.Monad
-import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries (getUserKeyQuery)

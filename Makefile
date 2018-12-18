@@ -73,7 +73,7 @@ strato: build_buildbase
 
 vault-wrapper:
 	@echo Now building vault-wrapper...
-	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=vault-wrapper/
+	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=blockapps-haskell/vault-wrapper/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
