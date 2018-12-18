@@ -41,7 +41,7 @@ instance Show Counter where
   show = const "<unboxed_ioref>"
 
 instance NFData Counter where
-  rnnf = (`seq` ())
+  rnf = (`seq` ())
 
 data Memory =
   Memory {
