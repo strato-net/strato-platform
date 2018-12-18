@@ -193,7 +193,11 @@ addBlocks blocks' = do
         when didReplaceThisTime . liftIO $ do
           writeIORef didReplaceBest True
           writeIORef replacedBest (block, replacedBits)
-        when ranPriv . liftIO $ writeIORef ranPrivateTxs True
+        when ranPriv . liftIO $ do
+          writeIORef ranPrivateTxs True
+          drb <- liftIO (readIORef didReplaceBest)
+          unless drb $ do
+            writeIORef replacedBest (block, replacedBits)
         return actions
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
