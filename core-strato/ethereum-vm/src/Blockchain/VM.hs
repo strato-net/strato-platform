@@ -930,7 +930,7 @@ runCode c = do
     totalNanoseconds <- liftIO cwAfter
     lift $ $logInfoS "runCode" $ T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
 
-  when (not $ done result) $ runCode (c+1)
+  unless (done result) $ runCode (c+1)
 
 runCodeFromStart :: VMM ()
 runCodeFromStart = do
