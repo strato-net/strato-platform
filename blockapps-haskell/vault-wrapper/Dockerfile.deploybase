@@ -6,4 +6,3 @@ RUN apt-get -y update                                           && \
     apt-get autoremove                                          && \
     rm -rf /var/lib/apt/lists/*                                 && \
     apt-get clean
-    mkdir -p /usr/bin/vault-wrapper
