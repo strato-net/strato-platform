@@ -1,4 +1,4 @@
-name:                API
+name:                vault-wrapper-api
 version:             0.1.0.0
 github:              "githubuser/API"
 license:             BSD3
@@ -54,4 +54,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - API
+    - vault-wrapper-api
