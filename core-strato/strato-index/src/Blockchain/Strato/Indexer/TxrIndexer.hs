@@ -14,7 +14,6 @@ import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
-import qualified Data.Map.Strict                    as Map
 import           Data.Maybe                         (isJust)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -73,12 +72,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                         let Just enode = mEnode
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                         lift $ addMember chainId address enode' -- We only need the Text version for Postgres
-                        RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+                        void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                       lift $ removeMember chainId address
-                      RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+                      void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       lift $ terminateChain chainId

@@ -132,35 +132,25 @@ addChainMember :: Word256
                -> Enode
                -> Redis (Either Reply Status)
 addChainMember cId address enode = do
-    res <- multiExec $ do
-      rmems <- get $ inNamespace PrivateChainMembers key
-      case rmems of
-        Right (Just rmems) -> do
-          let RedisChainMembers mems = fromValue rmems
-              mems' = RedisChainMembers $ M.insert address enode
-          set (inNamespace PrivateChainMembers cId) (toValue mems')
-        _ -> return ()
+    mems <- getChainMembers cId
+    let mems' = RedisChainMembers $ M.insert address enode mems
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
 removeChainMember :: Word256
                   -> Address
                   -> Redis (Either Reply Status)
 removeChainMember cId address = do
-    res <- multiExec $ do
-      rmems <- get $ inNamespace PrivateChainMembers key
-      case rmems of
-        Right (Just rmems) -> do
-          let RedisChainMembers mems = fromValue rmems
-              mems' = RedisChainMembers $ M.delete address
-          set (inNamespace PrivateChainMembers cId) (toValue mems')
-        _ -> return ()
+    mems <- getChainMembers cId
+    let mems' = RedisChainMembers $ M.delete address mems
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"

@@ -51,9 +51,7 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         let txs = [tx | IndexTransaction _ tx <- idxEvents]
         lift $ forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
-            chainMembers = map (fmap (_members . _chainInfo)) chainInfos
         lift $ forM_ chainInfos . uncurry $ putChainInfo
-        lift $ forM_ chainMembers . uncurry $ putChainMembers
         let blocks = [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks
