@@ -6,7 +6,6 @@
 
 module Blockchain.VM.VMState (
   VMState(..),
-  readGasRemaining,
   Gas,
   action,
   Memory(..),
@@ -23,7 +22,6 @@ import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
-
 
 import           Blockchain.Data.Action
 import           Blockchain.Data.Address
@@ -98,8 +96,6 @@ data VMState =
     } deriving (Show)
 makeLenses ''VMState
 
-readGasRemaining :: VMState -> IO Gas
-readGasRemaining = readIORefU . vmGasRemaining
 
 instance Format VMState where
   format state =

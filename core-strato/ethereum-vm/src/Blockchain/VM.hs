@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -437,13 +438,13 @@ runOperation JUMPI = do
     (True, _)  -> setPC $ pInt - 1
     _          -> throwE InvalidJump
 
-runOperation PC = push =<< (liftIO . readIORefU) =<< lift (gets pc)
+runOperation PC = push =<< readPC =<< lift get
 
 runOperation MSIZE = do
   memSize <- getSizeInBytes
   push memSize
 
-runOperation GAS = push =<< (liftIO . readIORefU) =<< lift (gets vmGasRemaining)
+runOperation GAS = push =<< readGasRemaining =<< lift get
 
 runOperation JUMPDEST = return ()
 
@@ -899,7 +900,7 @@ runCode c = do
   code <- getEnvVar envCode
 
   vmState <- lift get
-  pcBefore <- liftIO . readIORefU . pc $ vmState
+  !pcBefore <- readPC vmState
   let (op, len) = getOperationAt code pcBefore
   -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
@@ -917,7 +918,7 @@ runCode c = do
   env <- lift $ fmap environment get
 
   when flags_sqlTrace $ do
-    pcVal' <- liftIO . readIORefU . pc $ vmState
+    pcVal' <- readPC vmState
     gasAfter <- getGasRemaining
     vmTrace $
       "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show gasAfter ++ " | " ++ show (gasAfter - gasBefore) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
@@ -1256,7 +1257,7 @@ create_debugWrapper block owner value initCodeBytes = do
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
           action . actionData %= M.unionWith mergeActionData (_actionData $ _action finalVMState)
-          ref <- liftIO . readIORefU . refund $ finalVMState
+          ref <- readRefund finalVMState
           addToRefund ref
 
           return $ Just newAddress
@@ -1311,7 +1312,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
           gr <- liftIO . readGasRemaining $ finalVMState
           useGas $ negate gr
-          ref <- liftIO . readIORefU . refund $ finalVMState
+          ref <- readRefund finalVMState
           addToRefund ref
           return (1, Just retVal)
         Left RevertException -> do
@@ -1319,7 +1320,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
           useGas $ negate gr
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)
-          ref <- liftIO . readIORefU . refund $ finalVMState
+          ref <- readRefund finalVMState
           addToRefund ref
           return (0, returnVal finalVMState)
         Left e -> do

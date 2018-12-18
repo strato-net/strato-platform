@@ -31,7 +31,10 @@ module Blockchain.VM.VMM (
   vmTrace,
   getAllStorageKeyVals,
   Word256Storable,
-  downcastGas
+  downcastGas,
+  readGasRemaining,
+  readPC,
+  readRefund
   ) where
 
 import           Control.Monad
@@ -197,12 +200,12 @@ addLog newLog = do
   state' <- lift get
   lift $ put state'{logs=newLog:logs state'}
 
-setPC::CodePointer->VMM ()
+setPC::Int->VMM ()
 setPC !p = do
   pcref <- lift $ gets pc
   liftIO $ writeIORefU pcref p
 
-incrementPC::CodePointer->VMM ()
+incrementPC::Int->VMM ()
 incrementPC p = do
   pcref <- lift $ gets pc
   void . liftIO $ atomicAddCounter pcref p
@@ -216,9 +219,7 @@ getCallDepth::VMM Int
 getCallDepth = lift $ fmap callDepth $ get
 
 getGasRemaining::VMM Gas
-getGasRemaining = do
-  gasref <- lift $ gets vmGasRemaining
-  liftIO $ readIORefU gasref
+getGasRemaining = readGasRemaining =<< lift get
 
 getReturnVal :: VMM B.ByteString
 getReturnVal = (fromMaybe B.empty . returnVal) <$> lift get
@@ -284,3 +285,15 @@ downcastGas :: Word256 -> VMM Gas
 downcastGas g = if g > fromIntegral (maxBound :: Int)
                   then throwE OutOfGasException
                   else return $! fromIntegral g
+
+{-# SPECIALIZE INLINE readGasRemaining :: VMState -> VMM Gas #-}
+readGasRemaining :: MonadIO m => VMState -> m Gas
+readGasRemaining = liftIO . readIORefU . vmGasRemaining
+
+{-# SPECIALIZE INLINE readRefund :: VMState -> VMM Gas #-}
+readRefund :: MonadIO m => VMState -> m Gas
+readRefund = liftIO . readIORefU . refund
+
+{-# SPECIALIZE INLINE readPC :: VMState -> VMM Int #-}
+readPC :: MonadIO m => VMState -> m Int
+readPC = liftIO . readIORefU . refund

@@ -31,7 +31,6 @@ import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
-import           Data.IORef.Unboxed
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
@@ -75,6 +74,7 @@ import           Blockchain.Verifier
 import           Blockchain.VM
 import           Blockchain.VM.Code
 import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMM (readRefund, readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -376,8 +376,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Just e
                                        }
                 Right _ -> do
-                    ref <- fmap fromIntegral . liftIO . readIORefU . refund $ newVMState'
-                    gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
+                    ref <- fmap fromIntegral $ readRefund newVMState'
+                    gr <- fmap fromIntegral $ readGasRemaining newVMState'
                     let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
                     success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + ref) * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
