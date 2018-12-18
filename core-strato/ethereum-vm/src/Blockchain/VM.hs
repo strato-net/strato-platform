@@ -1047,17 +1047,10 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
 
       purgeStorageMap newAddress
       deleteAddressState newAddress
-<<<<<<< HEAD
       -- Need to zero gas in the case of an exception.
       liftIO $ writeIORefU (vmGasRemaining vmState') 0
       return (Left e, vmState')
-    _ -> do
-
-      return ret
-=======
-      return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
     _ -> return ret
->>>>>>> helloLarry
 
 create' :: VMM Code
 create' = do
