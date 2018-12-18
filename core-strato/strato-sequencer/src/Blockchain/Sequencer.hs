@@ -39,7 +39,6 @@ import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.MissingTxDB
 import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.PrivateTxDB
 import           Blockchain.Sequencer.DB.SeenChainDB
@@ -219,7 +218,6 @@ checkIfIsMissingTX th ch = do
         , ". Inserting into MissingTxDB and GetTransactions list"
         ]
       useChainHash ch
-      insertMissingTx th
       insertGetTransactionsDB th
 
 runPrivateHashTX :: SHA -> SHA -> SequencerM ()
@@ -231,25 +229,10 @@ runPrivateHashTX tHash cHash = do
     , " with chain hash "
     , format cHash
     ]
-  repsertTxHashEntry_ tHash $ \case
-    Nothing -> do
-      logF "Transaction hash not seen before! Inserting it into SeenTxHashDB"
-      checkIfIsMissingTX tHash cHash
-      return $ txHashEntryWithChainHash cHash
-    Just the -> do
-      logF "Transaction hash seen before!"
-      let the' = (chainHash .~ Just cHash) the
-      void $ case _outputTx the' of
-        Just tx -> do
-          logF $ "We have this transaction's body. It's: " ++ prettyOTx tx
-          useChainHash cHash
-        Nothing -> do
-          logF "We don't have this transaction's body. Looking it up by chain hash"
-          checkIfIsMissingTX tHash cHash
-      return the'
-  repsertChainHashEntry_ cHash $ \case
-    Nothing -> return $ chainHashEntryWithTxHash tHash
-    Just che -> return $ (transactions %~ S.insert tHash) che
+  mthe <- getTxHashEntry tHash
+  for_ mthe . const $ repsertChainHashEntry_ cHash $
+    return . maybe chainHashEntryUsed (used .~ True)
+  checkIfIsMissingTX tHash cHash
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
@@ -301,8 +284,7 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
-        mcie <- getChainIdEntry chainId
-        let mcInfo = join $ fmap _chainInfo mcie
+        mcInfo <- fmap _chainInfo <$> getChainIdEntry chainId
         case mcInfo of
           Nothing -> do
             logF . concat $
@@ -322,32 +304,20 @@ transformFullTransactions pairs = do
                 ]
               let tHash = txHash ptx
               markForP2P $ pairToOETx (ts, ptx)
-              repsertTxHashEntry_ tHash $ \entry -> do
-                let the = case entry of
-                      Nothing -> txHashEntryWithOutputTx ptx
-                      Just e -> (outputTx .~ Just ptx) e
-                case _chainHash the of
-                  Just _ -> do
-                    logF $ "We have seen this transaction's PrivateHashTX before."
-                    return the
-                  Nothing -> do
-                    insertPrivateHash ptx
-                    if otOrigin ptx /= TO.API
-                      then return the
-                      else do
-                        cHash <- getNewChainHash chainId
-                        logF . concat $
-                          [ "Created chain hash "
-                          , format cHash
-                          , " for transaction "
-                          , format tHash
-                          ]
-                        let SHA th' = tHash
-                            SHA ch' = cHash
-                            phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
-                        markForVM $ pairToOETx (ts, phtx)
-                        markForP2P $ pairToOETx (ts, phtx)
-                        return $ (chainHash .~ Just cHash) the
+              insertPrivateHash ptx
+              when (otOrigin ptx == TO.API) $ do
+                cHash <- getNewChainHash chainId
+                logF . concat $
+                  [ "Created chain hash "
+                  , format cHash
+                  , " for transaction "
+                  , format tHash
+                  ]
+                let SHA th' = tHash
+                    SHA ch' = cHash
+                    phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                markForVM $ pairToOETx (ts, phtx)
+                markForP2P $ pairToOETx (ts, phtx)
             runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
@@ -476,14 +446,10 @@ hydratePrivateHashes ob chainF = do
             tHash = SHA th'
             cHash = SHA ch'
         runPrivateHashTX tHash cHash
-        repsertTxHashEntry_ tHash $
-          return . maybe
-            (txHashEntryWithBlockHash bHash)
-            (inBlock .~ Just bHash)
         repsertChainHashEntry_ cHash $
           return . maybe
-            (chainHashEntryWithTxHashInBlock tHash bHash)
-            ((inBlocks %~ (Q.|> bHash)) . (transactions %~ S.insert tHash))
+            (chainHashEntryInBlock bHash)
+            (inBlocks %~ (Q.|> bHash))
         mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
         case mChainId of
           Nothing -> do
@@ -503,7 +469,8 @@ hydratePrivateHashes ob chainF = do
                              else (_bhash $ S.elemAt 0 _blocksToRun) == bHash
                 if ready
                   then do
-                    body <- join . fmap _outputTx <$> getTxHashEntry tHash
+                    logF "Ready to run block on this chain"
+                    body <- fmap _outputTx <$> getTxHashEntry tHash
                     case body of
                       Just otx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"

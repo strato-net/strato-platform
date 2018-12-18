@@ -3,8 +3,7 @@ module Blockchain.Sequencer.DB.PrivateTxDB where
 
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           Control.Lens           ((.~), (%~))
-import           Control.Monad          (join)
+import           Control.Lens           ((.~), (%=))
 import           Control.Monad.IO.Class
 import           Data.Foldable          (toList)
 import           Data.Maybe             (catMaybes)
@@ -18,13 +17,10 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 
-lookupTransaction :: HasPrivateHashDB m => SHA -> m (Maybe OutputTx)
-lookupTransaction tHash = join . fmap _outputTx <$> getTxHashEntry tHash
-
 insertTransaction :: HasPrivateHashDB m => OutputTx -> m ()
 insertTransaction tx = do
   let tHash = txHash tx
-  repsertTxHashEntry_ tHash $ return . maybe (txHashEntryWithOutputTx tx) (outputTx .~ Just tx)
+  repsertTxHashEntry_ tHash $ return . maybe (txHashEntry tx) (outputTx .~ tx)
 
 findChainHashUses :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
 findChainHashUses chainId cHashes = do
@@ -35,9 +31,7 @@ findChainHashUses chainId cHashes = do
         <$> mapM getChainHashEntry cHashes
   bDiffs <- map (fmap (obTotalDifficulty . _outputBlock)) <$> mapM getBlockHashEntry blocks
   let infos = S.fromList . catMaybes $ zipWith (\b -> fmap (flip BlockInfo b)) blocks bDiffs
-  repsertChainIdEntry_ chainId $
-    return . maybe (chainIdEntryWithBlocks infos)
-                   (blocksToRun %~ S.union infos)
+  modifyChainIdEntryState_ chainId $ blocksToRun %= S.union infos
 
 insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of

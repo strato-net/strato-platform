@@ -9,8 +9,6 @@ module Blockchain.Sequencer.DB.PrivateHashDB where
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord           (Word256)
-import           Blockchain.Format
-import           Blockchain.Strato.Model.Class
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Lens
@@ -18,10 +16,7 @@ import           Control.Monad                (join, void)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 
-import           Data.Foldable                (for_)
 import           Data.Function                (on)
-import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromJust)
 import qualified Data.Sequence                as Q
 import           Data.Set                     (Set)
@@ -41,56 +36,37 @@ maxBufferCapacity = 4096
 emptyCircularBuffer :: CircularBuffer a
 emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
-data BlockHashEntry = BlockHashEntry
+newtype BlockHashEntry = BlockHashEntry
   { _outputBlock  :: OutputBlock
-  , _dependentTXs :: Map Word256 (Set SHA)
-  , _txHashMap    :: Map SHA SHA
-  , _chainHashMap :: Map SHA (Set SHA)
   } deriving (Show)
 makeLenses ''BlockHashEntry
 
 blockHashEntry :: OutputBlock -> BlockHashEntry
-blockHashEntry ob = BlockHashEntry ob M.empty M.empty M.empty
+blockHashEntry = BlockHashEntry
 
-data TxHashEntry = TxHashEntry
-  { _outputTx   :: Maybe OutputTx
-  , _chainHash  :: Maybe SHA
-  , _inBlock    :: Maybe SHA
+newtype TxHashEntry = TxHashEntry
+  { _outputTx   :: OutputTx
   } deriving (Show)
 makeLenses ''TxHashEntry
 
-emptyTxHashEntry :: TxHashEntry
-emptyTxHashEntry = TxHashEntry Nothing Nothing Nothing
-
-txHashEntryWithOutputTx :: OutputTx -> TxHashEntry
-txHashEntryWithOutputTx otx = TxHashEntry (Just otx) Nothing Nothing
-
-txHashEntryWithChainHash :: SHA -> TxHashEntry
-txHashEntryWithChainHash cHash = TxHashEntry Nothing (Just cHash) Nothing
-
-txHashEntryWithBlockHash :: SHA -> TxHashEntry
-txHashEntryWithBlockHash bHash = TxHashEntry Nothing Nothing (Just bHash)
+txHashEntry :: OutputTx -> TxHashEntry
+txHashEntry = TxHashEntry
 
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
-  , _transactions :: Set SHA
   , _inBlocks     :: Q.Seq SHA
   } deriving (Show)
 makeLenses ''ChainHashEntry
 
+chainHashEntryUsed :: ChainHashEntry
+chainHashEntryUsed = ChainHashEntry True Nothing Q.empty
+
 chainHashEntryWithChainId :: Word256 -> ChainHashEntry
-chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty Q.empty
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) Q.empty
 
-chainHashEntryWithTxHash :: SHA -> ChainHashEntry
-chainHashEntryWithTxHash tHash = ChainHashEntry True Nothing (S.singleton tHash) Q.empty
-
-chainHashEntryWithTxHashInBlock :: SHA -> SHA -> ChainHashEntry
-chainHashEntryWithTxHashInBlock tHash bHash = ChainHashEntry
-                                                True
-                                                Nothing
-                                                (S.singleton tHash)
-                                                (Q.singleton bHash)
+chainHashEntryInBlock :: SHA -> ChainHashEntry
+chainHashEntryInBlock bHash = ChainHashEntry True Nothing (Q.singleton bHash)
 
 data BlockInfo = BlockInfo
   { _tDifficulty :: Integer
@@ -102,24 +78,14 @@ instance Ord BlockInfo where
   compare = compare `on` _tDifficulty
 
 data ChainIdEntry = ChainIdEntry
-  { _chainInfo   :: Maybe ChainInfo
+  { _chainInfo   :: ChainInfo
   , _chainHashes :: CircularBuffer SHA
-  , _missingTXs  :: Set SHA
   , _blocksToRun :: Set BlockInfo
   } deriving (Show)
 makeLenses ''ChainIdEntry
 
-chainIdEntryWithChainInfo :: ChainInfo -> ChainIdEntry
-chainIdEntryWithChainInfo cInfo = ChainIdEntry (Just cInfo)
-                                               emptyCircularBuffer
-                                               S.empty
-                                               S.empty
-
-chainIdEntryWithMissingTXs :: Set SHA -> ChainIdEntry
-chainIdEntryWithMissingTXs txs = ChainIdEntry Nothing emptyCircularBuffer txs S.empty
-
-chainIdEntryWithBlocks :: Set BlockInfo -> ChainIdEntry
-chainIdEntryWithBlocks blocks = ChainIdEntry Nothing emptyCircularBuffer S.empty blocks
+chainIdEntry :: ChainInfo -> ChainIdEntry
+chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
 class MonadResource m => HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA
@@ -324,27 +290,3 @@ modifyChainIdEntryState_ cId = void . modifyChainIdEntryState cId
 
 repsertChainIdEntry_ :: HasPrivateHashDB m => Word256 -> (Maybe ChainIdEntry -> m ChainIdEntry) -> m ()
 repsertChainIdEntry_ cId = void . repsertChainIdEntry cId
-
-insertHashPairs :: HasPrivateHashDB m => SHA -> Map SHA SHA -> m ()
-insertHashPairs bHash thchs = repsertBlockHashEntry_ bHash $ \case
-  Nothing -> error $ "insertThChPairs: Block hash " ++ format bHash ++ " not found"
-  Just bhe -> return . flip execState bhe $ do
-    txHashMap %= M.union thchs
-    chainHashMap %= build (M.toList thchs)
-  where build :: [(SHA,SHA)] -> Map SHA (Set SHA) -> Map SHA (Set SHA)
-        build [] m = m
-        build ((th,ch):xs) m = build xs $ M.alter (Just . maybe (S.singleton th) (S.insert th)) ch m
-
-removeMissingTxEntry :: HasPrivateHashDB m => SHA -> m ()
-removeMissingTxEntry tHash = do
-  mthe <- getTxHashEntry tHash
-  for_ mthe $ \TxHashEntry{_outputTx = otx} ->
-    for_ otx $ \tx -> for_ (txChainId tx) $ \chainId ->
-      modifyChainIdEntryState_ chainId $
-        missingTXs %= S.delete tHash
-
-getChainHashForTxInBlock :: HasPrivateHashDB m => SHA -> SHA -> m (Maybe SHA)
-getChainHashForTxInBlock bHash tHash = join . fmap (M.lookup tHash . _txHashMap) <$> getBlockHashEntry bHash
-
-getTxHashSetForChainHashInBlock :: HasPrivateHashDB m => SHA -> SHA -> m (Maybe (Set SHA))
-getTxHashSetForChainHashInBlock bHash cHash = join . fmap (M.lookup cHash . _chainHashMap) <$> getBlockHashEntry bHash
