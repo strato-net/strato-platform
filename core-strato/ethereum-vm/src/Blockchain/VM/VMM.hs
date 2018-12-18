@@ -296,4 +296,4 @@ readRefund = liftIO . readIORefU . refund
 
 {-# SPECIALIZE INLINE readPC :: VMState -> VMM Int #-}
 readPC :: MonadIO m => VMState -> m Int
-readPC = liftIO . readIORefU . refund
+readPC = liftIO . readIORefU . pc
