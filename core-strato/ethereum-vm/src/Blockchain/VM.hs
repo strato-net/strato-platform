@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -11,6 +12,7 @@ module Blockchain.VM
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
+import           Clockwork
 import           Control.DeepSeq
 import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
@@ -24,6 +26,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Char
 import           Data.Function
+import           Data.IORef.Unboxed
 import qualified Data.IntSet                        as I
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
@@ -32,6 +35,8 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
+
+
 
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Action
@@ -91,11 +96,6 @@ pushEnvVar::Word256Storable a=>(Environment->a)->VMM ()
 pushEnvVar f = do
   VMState{environment=env} <- lift get
   push $ f env
-
-pushVMStateVar::Word256Storable a=>(VMState->a)->VMM ()
-pushVMStateVar f = do
-  state' <- lift get::VMM VMState
-  push $ f state'
 
 logN::Int->VMM ()
 logN n = do
@@ -437,13 +437,13 @@ runOperation JUMPI = do
     (True, _)  -> setPC $ pInt - 1
     _          -> throwE InvalidJump
 
-runOperation PC = pushVMStateVar pc
+runOperation PC = push =<< readPC =<< lift get
 
 runOperation MSIZE = do
   memSize <- getSizeInBytes
   push memSize
 
-runOperation GAS = pushVMStateVar vmGasRemaining
+runOperation GAS = push =<< readGasRemaining =<< lift get
 
 runOperation JUMPDEST = return ()
 
@@ -512,10 +512,11 @@ runOperation CREATE = do
           then return Nothing
           else do
           --addToBalance' owner (-fromIntegral value)
+          gr <- liftIO . readGasRemaining $ vmState
           addDebugCallCreate DebugCallCreate {
             ccData=initCodeBytes,
             ccDestination=Nothing,
-            ccGasLimit=vmGasRemaining vmState,
+            ccGasLimit=gr,
             ccValue=fromIntegral value
             }
           return $ Just newAddress
@@ -525,7 +526,8 @@ runOperation CREATE = do
     Nothing       -> push (0::Word256)
 
 runOperation CALL = do
-  gas <- pop::VMM Word256
+  gas' <- pop::VMM Word256
+  gas <- downcastGas gas'
   to <- pop
   value <- pop::VMM Word256
   when (value /= 0) guardStorage
@@ -551,8 +553,8 @@ runOperation CALL = do
     case (callDepth > 1023, fromIntegral value > addressStateBalance addressState, debugCallCreates vmState) of
       (True, _, _) -> do
         lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Call stack too deep."
-        addGas $ fromIntegral stipend
-        addGas $ fromIntegral gas
+        addGas stipend
+        addGas gas
         return (0, Nothing)
       (_, True, _) -> do
         lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Not enough ether to transfer the value."
@@ -579,7 +581,8 @@ runOperation CALL = do
   push result
 
 runOperation CALLCODE = do
-  gas <- pop::VMM Word256
+  gas' <- pop::VMM Word256
+  gas <- downcastGas gas'
   to <- pop
   value <- pop::VMM Word256
   inOffset <- pop
@@ -744,7 +747,7 @@ runOperation x = error $ "Missing case in runOperation: " ++ show x
 
 -------------------
 
-opGasPriceAndRefund :: Operation -> VMM (Integer, Integer)
+opGasPriceAndRefund :: Operation -> VMM (Gas, Gas)
 
 opGasPriceAndRefund LOG0 = do
   size <- getStackItem 1::VMM Word256
@@ -773,7 +776,7 @@ opGasPriceAndRefund EXP = do
       else return (gEXPBASE + gEXPBYTE*bytesNeeded e, 0)
 
     where
-      bytesNeeded::Word256->Integer
+      bytesNeeded::Word256->Gas
       bytesNeeded 0 = 0
       bytesNeeded x = 1+bytesNeeded (x `shiftR` 8)
 
@@ -807,16 +810,16 @@ opGasPriceAndRefund CALLCODE = do
 
   return
     (
-      toInteger gas +
+      fromIntegral gas +
       gCALL +
       --(if toAccountExists then 0 else gCALLNEWACCOUNT) +
-      (if val > 0 then toInteger gCALLVALUETRANSFER else 0),
+      (if val > 0 then fromIntegral gCALLVALUETRANSFER else 0),
       0
     )
 
 opGasPriceAndRefund DELEGATECALL = do
   gas <- getStackItem 0::VMM Word256
-  return (toInteger gas + gCALL, 0)
+  return (fromIntegral gas + gCALL, 0)
 
 opGasPriceAndRefund CODECOPY = do
     size <- getStackItem 2::VMM Word256
@@ -863,16 +866,18 @@ formatOp (PUSH x) = "PUSH" ++ show (length x) -- ++ show x
 formatOp x        = show x
 
 
-printTrace::Environment->Word256->Word256->Int->Operation->VMState->VMState->VMM ()
+printTrace::Operation->Gas->CodePointer->VMState->VMM ()
 --printDebugInfo env memBefore memAfter c op stateBefore stateAfter = do
-printTrace _ _ _15 _ op stateBefore stateAfter = do
+printTrace op gasBefore pcBefore stateAfter = do
 
   --CPP style trace
-{-  lift $ logInfoN $ "EVM [ eth | " ++ show (callDepth stateBefore) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc stateBefore)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining stateBefore) ++ " | " ++ show (vmGasRemaining stateAfter - vmGasRemaining stateBefore) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]"
+{-  lift $ logInfoN $ "EVM [ eth | " ++ show (callDepth stateBefore) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc stateBefore)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining stateBefore) ++ " | " ++ show (vmGasRemaining stateAfter - vmGasRemaining stateBefore) ++ " | " ++ show(fromIntegral memAfter - fromIntegral memBefore) ++ "x32 ]"
   lift $ logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
-  lift $ $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" (toInteger $ pc stateBefore) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
+  gasAfter <- liftIO $ readGasRemaining stateAfter
+  $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" pcBefore ++ ": " ++ formatOp op
+      ++ " GAS: " ++ show gasAfter ++ " COST: " ++ show (gasAfter - gasBefore)
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
   _ <- liftIO $ getMemAsByteString (memory stateAfter)
@@ -887,13 +892,16 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
 
 runCode :: Int -> VMM ()
 runCode c = do
+  when flags_evmProfile $ liftIO cwBefore
+
   memBefore <- getSizeInWords
+  gasBefore <- getGasRemaining
   code <- getEnvVar envCode
 
   vmState <- lift get
-
-  let (op, len) = getOperationAt code (pc vmState)
-  --lift $ $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
+  !pcBefore <- readPC vmState
+  let (op, len) = getOperationAt code pcBefore
+  -- $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
   (val, theRefund) <- opGasPriceAndRefund op
 
@@ -908,17 +916,21 @@ runCode c = do
 
   env <- lift $ fmap environment get
 
-  when flags_sqlTrace $
+  when flags_sqlTrace $ do
+    pcVal' <- readPC vmState
+    gasAfter <- getGasRemaining
     vmTrace $
-      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex (pc vmState) "") ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining vmState) ++ " | " ++ show (vmGasRemaining result - vmGasRemaining result) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
+      "EVM [ eth | " ++ show (callDepth vmState) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex pcVal' "") ++ " : " ++ formatOp op ++ " | " ++ show gasAfter ++ " | " ++ show (gasAfter - gasBefore) ++ " | " ++ show(toInteger memAfter - toInteger memBefore) ++ "x32 ]\n"
 
-  when flags_trace $ printTrace (environment result) memBefore memAfter c op vmState result
+  when flags_trace $ printTrace op gasBefore pcBefore result
 
-  case result of
-    VMState{done=True} -> incrementPC len
-    _ -> do
-      incrementPC len
-      runCode (c+1)
+  incrementPC len
+
+  when flags_evmProfile $ do
+    totalNanoseconds <- liftIO cwAfter
+    lift $ $logInfoS "runCode" $ T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
+
+  unless (done result) $ runCode (c+1)
 
 runCodeFromStart :: VMM ()
 runCodeFromStart = do
@@ -937,16 +949,16 @@ runCodeFromStart = do
    _ -> runCode 0
 
 -- | runVMM fully evaluates its results to limit memory leaks.
-runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Integer -> VMM a -> ContextM (Either VMException a, VMState)
-runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
+runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM (Either VMException a, VMState)
+runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
-
+  gasref <- liftIO $ newCounter availableGas
   result <- lift . lift $
       flip runStateT vmState{
                          callDepth=callDepth,
-                         vmGasRemaining=availableGas,
+                         vmGasRemaining=gasref,
                          suicideList=preExistingSuicideList} $
       runExceptT f
 
@@ -972,7 +984,7 @@ create :: Bool
        -> Address
        -> Integer
        -> Integer
-       -> Integer
+       -> Gas
        -> Address
        -> Code
        -> SHA
@@ -1028,7 +1040,9 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
 
       purgeStorageMap newAddress
       deleteAddressState newAddress
-      return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
+      -- Need to zero gas in the case of an exception.
+      liftIO $ writeIORefU (vmGasRemaining vmState') 0
+      return (Left e, vmState')
     _ -> return ret
 
 create' :: VMM Code
@@ -1047,22 +1061,23 @@ create' = do
 
   lift $ do
     $logInfoS "create'" "Trying to create contract"
-    $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes))
+    $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
     $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show (vmGasRemaining vmState)
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
-  if (not $ vmIsHomestead vmState) && (vmGasRemaining vmState < gCREATEDATA * toInteger (B.length codeBytes))
+  gr <- getGasRemaining
+  if (not $ vmIsHomestead vmState) && (gr < gCREATEDATA * fromIntegral (B.length codeBytes))
     then do
       lift $ do
         $logInfoS "create'/lowGas" . T.pack $ CL.red "Not enough gas to create contract, contract being thrown away (account was created though)"
-        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes))
-        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show gr
       lift $ put vmState{returnVal=Nothing}
       assignCode "" owner
       assignDetails
       return $ Code ""
     else do
-      useGas $ gCREATEDATA * toInteger (B.length codeBytes)
+      useGas $ gCREATEDATA * fromIntegral (B.length codeBytes)
       assignCode codeBytes owner
       assignDetails
       return $ Code codeBytes
@@ -1099,7 +1114,7 @@ call :: Bool
      -> Word256
      -> Word256
      -> B.ByteString
-     -> Integer
+     -> Gas
      -> Address
      -> SHA
      -> Maybe Word256
@@ -1220,8 +1235,8 @@ create_debugWrapper block owner value initCodeBytes = do
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
       putStorageTxMap $ contextStorageTxMap finalDBs
       putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
-
-      setGasRemaining $ vmGasRemaining finalVMState
+      gr <- liftIO . readGasRemaining $ finalVMState
+      setGasRemaining gr
 
       case result of
         Left e -> do
@@ -1233,11 +1248,12 @@ create_debugWrapper block owner value initCodeBytes = do
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
           action . actionData %= M.unionWith mergeActionData (_actionData $ _action finalVMState)
-          addToRefund (refund finalVMState)
+          ref <- readRefund finalVMState
+          addToRefund ref
 
           return $ Just newAddress
 
-nestedRun_debugWrapper :: Bool -> Integer -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe B.ByteString)
+nestedRun_debugWrapper :: Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe B.ByteString)
 nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) sender value inputData = do
 
   currentCallDepth <- getCallDepth
@@ -1285,14 +1301,18 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
           action . actionData %= M.unionWith mergeActionData (_actionData $ _action finalVMState)
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
-          useGas (- vmGasRemaining finalVMState)
-          addToRefund (refund finalVMState)
+          gr <- liftIO . readGasRemaining $ finalVMState
+          useGas $ negate gr
+          ref <- readRefund finalVMState
+          addToRefund ref
           return (1, Just retVal)
         Left RevertException -> do
-          useGas (- vmGasRemaining finalVMState)
+          gr <- liftIO . readGasRemaining $ finalVMState
+          useGas $ negate gr
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)
-          addToRefund (refund finalVMState)
+          ref <- readRefund finalVMState
+          addToRefund ref
           return (0, returnVal finalVMState)
         Left e -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e

@@ -28,6 +28,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - classy-prelude
+  - clockwork
   - containers
   - cross-monitoring
   - cryptohash
@@ -38,6 +39,7 @@ dependencies:
   - ethereum-rlp
   - exceptions
   - extra
+  - formatting
   - hedis
   - hflags
   - lens
@@ -64,6 +66,7 @@ dependencies:
   - temporary
   - time
   - transformers
+  - unboxed-ref
   - unliftio-core
   - vector
   - wai-middleware-prometheus
@@ -91,6 +94,7 @@ library:
     - Blockchain.VM.Environment
     - Blockchain.VM.Opcodes
     - Blockchain.VM.VMException
+    - Blockchain.VM.VMM
     - Blockchain.VM.VMState
     - Blockchain.VMMetrics
     - Executable.EthereumVM

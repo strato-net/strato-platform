@@ -79,7 +79,7 @@ setNewMaxSize newSize' = do
   oldSize <- liftIO $ readIORef (mSize $ memory state)
 
 
-  let gasCharge =
+  let gasCharge = fromIntegral $
         if newSize > fromIntegral oldSize
         then
           let newWordSize = fromInteger $ (ceiling $ fromIntegral newSize/(32::Double))
@@ -89,8 +89,8 @@ setNewMaxSize newSize' = do
           else 0
 
   let oldLength = fromIntegral $ V.length (mVector $ memory state)
-
-  if vmGasRemaining state < gasCharge
+  gr <- readGasRemaining $ state
+  if gr < gasCharge
      then do
           setGasRemaining 0
           throwE OutOfGasException
