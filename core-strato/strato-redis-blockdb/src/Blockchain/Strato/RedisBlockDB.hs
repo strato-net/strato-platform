@@ -10,9 +10,11 @@
 module Blockchain.Strato.RedisBlockDB
     ( inNamespace, getSHAsByNumber
     , getChainInfo, putChainInfo
+    , getChainMembers, putChainMembers
+    , addChainMember, removeChainMember
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
-    , getTransactions, getUncles
+    , getTransactions, getPrivateTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
@@ -27,20 +29,23 @@ module Blockchain.Strato.RedisBlockDB
     ) where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
-import           Control.Arrow                         (second)
+import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
-import qualified Data.Set                              as Set
+import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
@@ -71,14 +76,16 @@ inNamespace :: RedisDBKeyable k
             -> S8.ByteString
 inNamespace ns k = ns' `S8.append` toKey k
     where ns' = case ns of
-            Headers          -> "h:"
-            Transactions     -> "t:"
-            Numbers          -> "n:"
-            Uncles           -> "u:"
-            Parent           -> "p:"
-            Children         -> "c:"
-            Canonical        -> "q:"
-            PrivateChainInfo -> "x:"
+            Headers             -> "h:"
+            Transactions        -> "t:"
+            Numbers             -> "n:"
+            Uncles              -> "u:"
+            Parent              -> "p:"
+            Children            -> "c:"
+            Canonical           -> "q:"
+            PrivateChainInfo    -> "x:"
+            PrivateChainMembers -> "m:"
+            PrivateTransactions -> "pt:"
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -99,6 +106,51 @@ putChainInfo cId cInfo = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
+
+getChainMembers :: Word256
+                -> Redis (M.Map Address Enode)
+getChainMembers cId = getInNamespace PrivateChainMembers cId >>= \case
+    Left _             -> return M.empty
+    Right Nothing      -> return M.empty
+    Right (Just rmems) -> let RedisChainMembers mems = fromValue rmems
+                           in return mems
+
+putChainMembers :: Word256
+          -> M.Map Address Enode
+          -> Redis (Either Reply Status)
+putChainMembers cId mems = do
+    let rmems    = RedisChainMembers mems
+
+    res <- multiExec $ setnx (inNamespace PrivateChainMembers cId) (toValue rmems)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+
+addChainMember :: Word256
+               -> Address
+               -> Enode
+               -> Redis (Either Reply Status)
+addChainMember cId address enode = do
+    mems <- getChainMembers cId
+    let mems' = RedisChainMembers $ M.insert address enode mems
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
+
+removeChainMember :: Word256
+                  -> Address
+                  -> Redis (Either Reply Status)
+removeChainMember cId address = do
+    mems <- getChainMembers cId
+    let mems' = RedisChainMembers $ M.delete address mems
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -160,6 +212,15 @@ getTransactions sha = getInNamespace Transactions sha >>= \case
     Right Nothing     -> return Nothing
     Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
         return . Just $ morphTx <$> txs
+
+getPrivateTransactions :: TransactionLike t
+                       => SHA
+                       -> Redis (Maybe t)
+getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
+    Left _            -> return Nothing
+    Right Nothing     -> return Nothing
+    Right (Just rtx) -> let (RedisTx tx) = fromValue rtx in
+        return . Just $ morphTx tx
 
 getUncles :: BlockHeaderLike h
           => SHA
@@ -327,12 +388,18 @@ putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
 putBlock b = do
     let sha     = blockHash b
         header  = blockHeader b
-        number'  = blockHeaderBlockNumber header
+        number' = blockHeaderBlockNumber header
         parent  = blockHeaderParentHash header
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
+        ptxs    = filter
+                    (isJust . txChainId)
+                    (morphTx <$> blockTransactions b :: [Models.RedisTx])
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
+    unless (null ptxs) $
+      void . multiExec . msetnx $
+        map ((inNamespace PrivateTransactions . txHash) &&& toValue) ptxs
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header')
         void $ setnx (inNS' Transactions) (toValue txs)
@@ -380,17 +447,17 @@ putBestBlockInfo newSha newNumber newTDiff = do
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
-commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
+commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (S.fromList [oldSha', newSha'])
         where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
               helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
               helper oldShaChain newShaChain seen = do
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
                 ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
-                if newParent `Set.member` seen
+                let seen' = foldl (flip S.insert) seen (filter (/= (SHA 0)) ps) -- todo double S.insert is probably more optimal
+                if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
-                else if oldParent `Set.member` seen
+                else if oldParent `S.member` seen
                       then complete oldParent (mkParentChain oldParent newShaChain)
                       else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 

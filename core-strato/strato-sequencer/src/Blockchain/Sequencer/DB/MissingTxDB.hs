@@ -16,8 +16,8 @@ isMissingTX tHash = maybe False (isNothing . _outputTx) <$> getTxHashEntry tHash
 insertMissingTx :: HasPrivateHashDB m => SHA -> m ()
 insertMissingTx tHash = do
   liftIO $ withLabel txMetrics "missing_tx" incCounter
-  alterTxHashEntry_ tHash $
-    return . Just . fromMaybe emptyTxHashEntry
+  repsertTxHashEntry_ tHash $
+    return . fromMaybe emptyTxHashEntry
 
 removeMissingTx :: HasPrivateHashDB m => SHA -> m ()
 removeMissingTx tHash = do

@@ -1,12 +1,12 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.Sequencer.DB.ChainHashDB where
 
 import           Blockchain.ExtWord           (Word256)
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.RLP
 import           Blockchain.SHA
 
-import           Control.Arrow                ((&&&))
 import           Control.Lens
 import           Control.Monad.IO.Class
 import qualified Data.Sequence                as Q
@@ -17,11 +17,10 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.Metrics
 
-lookupChainHash :: HasPrivateHashDB m => SHA -> m (Maybe (Bool, Word256))
-lookupChainHash cHash = fmap (_used &&& _onChainId) <$> getChainHashEntry cHash
-
 insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
-insertChainHash cHash chainId = insertChainHashEntry cHash $ chainHashEntry chainId
+insertChainHash cHash chainId = repsertChainHashEntry_ cHash $ \case
+  Nothing -> return $ chainHashEntryWithChainId chainId
+  Just che -> return $ (onChainId .~ Just chainId) che
 
 useChainHash :: HasPrivateHashDB m => SHA -> m ()
 useChainHash cHash = modifyChainHashEntryState_ cHash $ used .= True
@@ -49,14 +48,14 @@ getNewChainHash chainId = do
     Q.EmptyL -> error $ "getNewChainHash: Empty chain buffer for chainId " ++ show chainId
     (h Q.:< q') -> do
       modifyChainIdEntryState_ chainId $ chainHashes .= CircularBuffer cap (sz - 1) q'
-      Just (used', _) <- lookupChainHash h
+      Just used' <- fmap _used <$> getChainHashEntry h
       if not used'
         then useChainHash h >> return h
         else getNewChainHash chainId
 
 insertChainInfo :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
 insertChainInfo chainId cInfo = do
-  let h = hash . rlpSerialize $ rlpEncode cInfo
+  h <- generateInitialChainHash cInfo
   insertSeenChain chainId cInfo
   insertChainHash h chainId
   insertChainBufferEntry chainId h
