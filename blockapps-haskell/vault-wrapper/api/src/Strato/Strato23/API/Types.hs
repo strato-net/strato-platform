@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds         #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -44,23 +45,14 @@ data SignatureDetails = SignatureDetails {
     r :: Hex Word256
   , s :: Hex Word256
   , v :: Hex Word8
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data UserData = UserData {
   msgHash :: Hex Word256
-} deriving (Eq, Show, Generic)
-
-instance ToJSON SignatureDetails
-instance FromJSON SignatureDetails
-
-instance ToSchema SignatureDetails where
+} deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
 
 instance ToSchema (Hex Word256) where
   declareNamedSchema = const . pure $ named "hex word256" binarySchema
 
 instance ToSchema (Hex Word8) where
   declareNamedSchema = const . pure $ named "hex word8" binarySchema
-
-instance ToJSON UserData
-instance FromJSON UserData
-instance ToSchema UserData where
