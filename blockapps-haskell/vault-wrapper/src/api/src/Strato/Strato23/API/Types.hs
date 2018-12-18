@@ -3,7 +3,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Strato.Strato23.API.Types where
+module Strato.Strato23.API.Types
+  ( module BlockApps.Ethereum
+  , vaultWrapperSchemaOptions
+  , StatusAndAddress(..)
+  ) where
 
 import           BlockApps.Ethereum
 import           Control.Lens           ((&), (?~), mapped)
