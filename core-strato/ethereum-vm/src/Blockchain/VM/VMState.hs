@@ -40,6 +40,9 @@ type Gas = Int
 instance Show Counter where
   show = const "<unboxed_ioref>"
 
+instance NFData Counter where
+  rnnf = (`seq` ())
+
 data Memory =
   Memory {
     mVector :: V.IOVector Word8,
