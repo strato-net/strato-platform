@@ -9,7 +9,6 @@ import           Test.QuickCheck
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Internal           as IB
-import qualified Data.Map                           as M    hiding (map, filter)
 import qualified Data.Text                          as T
 import           Data.Time
 
@@ -178,10 +177,6 @@ instance Arbitrary AccountInfo where
       <$> arbitrary
       <*> arbitrary `suchThat` (>=0)
 
-instance Arbitrary ChainInfo where
-  arbitrary = do
-    cl <- arbitrary :: Gen String
-    ai <- arbitrary :: Gen [AccountInfo]
-    ci <- arbitrary :: Gen [CodeInfo]
-    mb <- arbitrary :: Gen (M.Map Address Enode)
-    return (ChainInfo cl ai ci mb)
+derive makeArbitrary ''ChainSignature
+derive makeArbitrary ''UnsignedChainInfo
+derive makeArbitrary ''ChainInfo

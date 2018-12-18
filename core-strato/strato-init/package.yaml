@@ -72,16 +72,19 @@ executables:
     main: Main.hs
     dependencies:
       - strato-init
+    other-modules: []
 
   strato-backup:
     source-dirs: exec_src/
     main: Backup.hs
     dependencies:
       - monad-control
+    other-modules: []
 
   strato-block-backup:
     source-dirs: exec_src/
     main: BlockBackup.hs
+    other-modules: []
 
   strato-ez-restore:
     source-dirs: exec_src/
@@ -89,12 +92,14 @@ executables:
     dependencies:
       - strato-init
       - monad-control
+    other-modules: []
 
   mkCoinbase:
     source-dirs: exec_src/
     main: MkCoinbase.hs
     dependencies:
       - base64-bytestring
+    other-modules: []
 
 tests:
   strato-init-test:

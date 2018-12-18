@@ -155,13 +155,23 @@ LogDB
 ChainInfoRef
     chainId Word256
     chainLabel String
-    deriving Eq Generic Read Show
+    parentChain Word256 Maybe
+    creationBlock SHA
+    chainNonce Word256
+    deriving Eq Generic Show
+
+ChainSignatureRef
+    chainInfoId ChainInfoRefId
+    r Integer
+    s Integer
+    v Word8
+    deriving Eq Generic Show
 
 ChainMemberRef
     chainInfoId ChainInfoRefId
     name String
     address Address
-    deriving Eq Generic Read Show
+    deriving Eq Generic Show
 
 AccountInfoRef
     chainInfoId ChainInfoRefId
@@ -169,11 +179,17 @@ AccountInfoRef
     balance Integer
     codeHash SHA Maybe
     map [MapPair] Maybe
-    deriving Eq Generic Read Show
+    deriving Eq Generic Show
 
 CodeInfoRef
     chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
     contractName String
-    deriving Eq Generic Read Show
+    deriving Eq Generic Show
+
+ChainMetadataRef
+    chainInfoId ChainInfoRefId
+    key String
+    value String
+    deriving Eq Generic Show

@@ -38,4 +38,5 @@ tests:
      - http-client
      - quickcheck-instances
      - QuickCheck
+     - servant-aeson-specs
      - vector

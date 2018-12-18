@@ -19,7 +19,7 @@ import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
-import           Servant.Common.BaseUrl
+import           Servant.Client
 import           System.IO                          (BufferMode (..),
                                                      hSetBuffering, stderr,
                                                      stdout)

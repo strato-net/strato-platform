@@ -71,8 +71,8 @@ getVote = client (Proxy @ AdminAPI)
 
 uploadVote ::  BaseUrl -> CandidateReceived -> IO (Either String ())
 uploadVote url cr = do
-  manager <- newManager defaultManagerSettings
-  vot <- runClientM (getVote cr) (ClientEnv manager url)
+  mgr <- newManager defaultManagerSettings
+  vot <- runClientM (getVote cr) (ClientEnv mgr url Nothing)
   return $ case vot of
     Left err -> Left $ "uploadVote: " ++ show err
     Right _ -> Right ()

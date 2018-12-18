@@ -41,7 +41,7 @@ import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
 import Numeric
-import Servant.Common.BaseUrl
+import Servant.Client
 import System.Log.Logger
 
 import Blockapps.Crossmon
@@ -352,15 +352,13 @@ processTheMessages messages conn g = do
           hist <- isHistoric g $ actionCodeHash row
           (hs,fhs) <- unzip <$> if hist
             then accumStateT oldState actions $ \hRow -> do
-              st <- get
-              let newSt = SVR.decodeCacheValues
-                          (typeDefs cont)
-                          (mainStruct cont)
-                          cache
-                          0
-                          st
-                  newMap = Map.fromList newSt
-              put newSt
+              let hCache = flip Map.lookup $ actionStorage hRow
+              modify $ SVR.decodeCacheValues
+                       (typeDefs cont)
+                       (mainStruct cont)
+                       hCache
+                       0
+              newMap <- gets Map.fromList
               let hInsert = processedContract strAbi strName chain newMap hRow
               functionHist <- isFunctionHistoric g $ actionCodeHash hRow
               fInserts <- if functionHist

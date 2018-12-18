@@ -8,16 +8,28 @@ module Blockchain.Strato.RedisBlockDB.Models where
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Base16        as SB16
 import qualified Data.ByteString.Char8         as S8
+import qualified Data.Map.Strict               as M
 
 import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction   as TXD
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 
-data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children | Canonical | PrivateChainInfo
+data BlockDBNamespace = Headers
+                      | Transactions
+                      | Numbers
+                      | Uncles
+                      | Parent
+                      | Children
+                      | Canonical
+                      | PrivateChainInfo
+                      | PrivateChainMembers
+                      | PrivateTransactions
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -50,6 +62,10 @@ instance RedisDBValuable RedisChainInfo where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
+instance RedisDBValuable RedisChainMembers where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
@@ -69,7 +85,8 @@ newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show,
 newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Read, Show, RLPSerializable)
+newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Show, RLPSerializable)
+newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving (Eq, Show, RLPSerializable)
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty

@@ -33,7 +33,7 @@ instance ToJSON StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) addr)
 
-getStorageInfoR :: Handler Value
+getStorageInfoR :: HandlerFor App Value
 getStorageInfoR = do
                  getParameters <- reqGetParams <$> getRequest
 
@@ -47,7 +47,7 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)) 
+                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid))
 
                                         let chainCriteria = case chainIds of
                                               [] -> [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
@@ -59,7 +59,7 @@ getStorageInfoR = do
                                               cids -> P.map matchChainId cids
 
                                         let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
-                                        
+
                                         E.on (P.foldl1 (E.||.) $ P.map (criteria E.&&.) chainCriteria)
 
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getStorageFilter (storage,addrStRef)) $ getParameters ))

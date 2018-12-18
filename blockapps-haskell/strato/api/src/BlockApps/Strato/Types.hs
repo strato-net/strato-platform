@@ -36,7 +36,10 @@ module BlockApps.Strato.Types
   , AbiBin (..)
   , exampleTxResult
   , ChainInfo (..)
+  , UnsignedChainInfo (..)
+  , ChainSignature (..)
   , ChainIdChainInfo
+  , creationBlockHash
   ) where
 
 import           Control.Applicative
@@ -47,8 +50,8 @@ import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
-import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
+import qualified Data.Map.Strict              as M
 import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import           Data.Proxy
@@ -71,6 +74,7 @@ import           Text.Read
 import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
                                                Keccak256 (..), Nonce (..),
                                                addressString, keccak256,
+                                               stringKeccak256,
                                                keccak256lazy, stringAddress,
                                                AccountInfo(..), CodeInfo(..),
                                                stringChainId)
@@ -105,9 +109,6 @@ instance ToSchema x => ToSchema (WithNext x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
 instance ToSchema x => ToSchema (Strung x) where
-  declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
-
-instance ToSchema x => ToSchema (NonEmpty x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
 instance ToSchema Transaction where
@@ -476,30 +477,94 @@ instance ToJSON BatchTransactionResult where
 instance FromJSON BatchTransactionResult where
     parseJSON = fmap BatchTransactionResult . parseJSON
 
-data ChainInfo = ChainInfo
-  {  chainLabel    :: Text
-  ,  accountInfo   :: [AccountInfo]
-  ,  codeInfo      :: [CodeInfo]
-  ,  members       :: NamedMap "address" Address "enode" Text
+data UnsignedChainInfo = UnsignedChainInfo
+  { chainLabel    :: !Text
+  , accountInfo   :: ![AccountInfo]
+  , codeInfo      :: ![CodeInfo]
+  , members       :: !(NamedMap "address" Address "enode" Text)
+  , parentChain   :: !(Maybe ChainId)
+  , creationBlock :: !Keccak256
+  , chainNonce    :: !Word256
+  , chainMetadata :: !(Map Text Text)
   } deriving (Eq, Show, Generic)
 
+exampleUnsignedChainInfo :: UnsignedChainInfo
+exampleUnsignedChainInfo = UnsignedChainInfo
+  { chainLabel = "myChain"
+  , accountInfo =
+      [ (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (2000 :: Integer))
+      , (NonContract (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c) (400000 :: Integer))
+      ]
+  , codeInfo = []
+  , members = map fromTuple
+      [ ( Address 0x5815b9975001135697b5739956b9a6c87f1c575c
+        , "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+          :: Text
+        )
+      , ( Address 0x93fdd1d21502c4f87295771253f5b71d897d911c
+        , "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+          :: Text
+        )
+      ]
+  , parentChain = Nothing
+  , creationBlock = creationBlockHash
+  , chainNonce = 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+  , chainMetadata = M.empty
+  }
+
+instance ToSchema UnsignedChainInfo where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "UnsignedChainInfo"
+
+data ChainSignature = ChainSignature
+  { chainR        :: !(Hex Natural)
+  , chainS        :: !(Hex Natural)
+  , chainV        :: !(Hex Word8)
+  } deriving (Eq, Show, Generic)
+
+exampleChainSignature :: ChainSignature
+exampleChainSignature = ChainSignature
+  { chainR = Hex 0
+  , chainS = Hex 0
+  , chainV = Hex 0x1b
+  }
+
+instance ToSchema ChainSignature where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "ChainSignature"
+    & mapped.schema.example ?~ toJSON exampleChainSignature
+
+instance FromJSON ChainSignature where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToJSON ChainSignature where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+data ChainInfo = ChainInfo
+  { chainInfo      :: !(UnsignedChainInfo)
+  , chainSignature :: !(Maybe ChainSignature)
+  } deriving (Eq, Show, Generic)
+
+creationBlockHash :: Keccak256
+creationBlockHash = fromJust $
+  stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
 instance ToSchema (NamedTuple "address" Address "enode" Text) where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "address and enode pair"
-    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)) :: NamedTuple "address" Address "enode" Text)
+    & mapped.schema.example ?~ toJSON
+      ((NamedTuple
+        ( Address 0x5815b9975001135697b5739956b9a6c87f1c575c
+        , "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+          :: Text
+        )
+       ) :: NamedTuple "address" Address "enode" Text
+      )
 
 exampleChainInfo :: ChainInfo
 exampleChainInfo = ChainInfo
-  {
-     chainLabel = "myChain"
-  ,  accountInfo = [
-       (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (2000 :: Integer))
-     , (NonContract (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c) (400000 :: Integer))
-     ]
-  ,  codeInfo = []
-  ,  members = map fromTuple [(Address 0x5815b9975001135697b5739956b9a6c87f1c575c, "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303" :: Text)
-               , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303" :: Text)]
+  { chainInfo = exampleUnsignedChainInfo
+  , chainSignature = Just exampleChainSignature
   }
 
 instance ToSchema ChainInfo where
@@ -513,17 +578,26 @@ instance FromJSON ChainInfo where
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
     ms <- o .: "members"
-    return $ ChainInfo l as cs ms
+    pc <- o .:? "parentChain"
+    cb <- o .: "creationBlock"
+    cn <- (o .: "nonce")
+    md <- o .: "metadata"
+    sig <- o .:? "signature"
+    return $ ChainInfo (UnsignedChainInfo l as cs ms pc cb cn md) sig
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
-  toJSON x =
-    object [
-       "label" .= chainLabel x
-    ,  "accountInfo" .= accountInfo x
-    ,  "codeInfo" .= codeInfo x
-    ,  "members" .= members x
-    ]
+  toJSON (ChainInfo (UnsignedChainInfo cl ai ci ms pc cb cn md) sig) =
+    object [ "label" .= cl
+           , "accountInfo" .= ai
+           , "codeInfo" .= ci
+           , "members" .= ms
+           , "parentChain" .= pc
+           , "creationBlock" .= cb
+           , "nonce" .= cn
+           , "metadata" .= md
+           , "signature" .= sig
+           ]
 
 type ChainIdChainInfo = NamedTuple "id" ChainId "info" ChainInfo
 

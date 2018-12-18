@@ -19,10 +19,12 @@ import           Data.Aeson.Casing
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Text                          (Text)
+import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API                        as S
 import           Servant.Docs
+import           Test.QuickCheck
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
@@ -59,8 +61,8 @@ data PostBlocTransactionRequest = PostBlocTransactionRequest
   , postbloctransactionrequestTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 
---instance Arbitrary PostBlocTransactionRequest where
-  --arbitrary = genericArbitrary uniform
+instance Arbitrary PostBlocTransactionRequest where
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostBlocTransactionRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -100,6 +102,10 @@ data BlocTransactionPayload = BlocTransfer TransferPayload
                             | BlocFunction FunctionPayload
                             deriving (Eq, Show, Generic)
 
+instance Arbitrary BlocTransactionPayload where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
 instance ToJSON BlocTransactionPayload where
   toJSON (BlocTransfer t) = object ["type" .= TRANSFER, "payload" .= t]
   toJSON (BlocContract c) = object ["type" .= CONTRACT, "payload" .= c]
@@ -136,6 +142,13 @@ data FunctionPayload = FunctionPayload
   , functionpayloadValue           :: Maybe (Strung Natural)
   , functionpayloadMetadata        :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
+
+instance Arbitrary ContractPayload where
+  arbitrary = GR.genericArbitrary GR.uniform
+instance Arbitrary TransferPayload where
+  arbitrary = GR.genericArbitrary GR.uniform
+instance Arbitrary FunctionPayload where
+  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON ContractPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)

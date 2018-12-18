@@ -37,7 +37,6 @@ module Blockchain.Data.Transaction (
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                as B
 import qualified Data.ByteString.Base16         as B16
 import           Data.ByteString.Internal
@@ -175,12 +174,12 @@ insertTX mode origin blockNum txs = do
   insertRawTX mode rawTXs
   return $ toNanoSecs $ afterECRecover - beforeECRecover
 
-insertTXIfNew' :: (MonadBaseControl IO m, MonadUnliftIO m)=>
-                 TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTXIfNew' :: MonadUnliftIO m =>
+                  TXOrigin -> Maybe Integer -> [Transaction] -> ReaderT SQL.SqlBackend m ()
 insertTXIfNew' = insertTX' Fail
 
-insertTX' :: (MonadBaseControl IO m, MonadUnliftIO m) =>
-           DebugMode->TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTX' :: MonadUnliftIO m =>
+             DebugMode -> TXOrigin -> Maybe Integer -> [Transaction] -> ReaderT SQL.SqlBackend m ()
 insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   let rawTXs =

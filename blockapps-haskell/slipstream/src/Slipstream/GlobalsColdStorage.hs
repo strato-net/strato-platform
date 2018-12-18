@@ -19,13 +19,13 @@ module Slipstream.GlobalsColdStorage
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
 import ClassyPrelude hiding (Handle)
-import Control.Monad.IO.Unlift
 import Data.Binary hiding (get)
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
 import qualified Prelude as P ()
 import System.IO.Unsafe
+import UnliftIO.Concurrent
 import UnliftIO.Resource
 
 import qualified Slipstream.DelayedBloomFilter as DBF
@@ -98,13 +98,13 @@ deserialize (Just (ColdStorage _ _ bvs)) =
 -- API --
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
-initStorage :: (MonadUnliftIO m, MonadIO m, MonadBaseControl IO m, MonadResource m)
+initStorage :: (MonadUnliftIO m, MonadIO m, MonadResource m)
             => Int -> ReaderT SqlBackend m (Bool, Handle)
 initStorage cacheSize = do
   void $ runMigrationSilent migrateStore
   queue <- atomically newTQueue
   ourBloom <- initFilter $ cacheSize `div` 2
-  tid <- fork $ storageWorker queue
+  tid <- forkIO $ storageWorker queue
   void . register . liftIO . killThread $ tid
   sql <- ask
   return $! (ourBloom, Handle queue sql)

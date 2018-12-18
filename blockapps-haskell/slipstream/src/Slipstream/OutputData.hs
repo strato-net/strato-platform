@@ -108,7 +108,11 @@ dbConnect =  PGDatabase
   }
 
 dbInsert :: MonadIO m => PGConnection -> Text -> m ()
-dbInsert conn insrt = liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
+dbInsert conn insrt = liftIO
+                    . handle handlePostgresError
+                    . void
+                    . pgQuery conn
+                    . rawPGSimpleQuery $! encodeUtf8 insrt
 
 isFunction :: Value -> Bool
 isFunction ValueFunction{} = False
@@ -117,14 +121,11 @@ isFunction _ = True
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
 handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
 
-outputData :: ( MonadIO m
-              , MonadBase IO m
-              , MonadBaseControl IO m
-              )
+outputData :: ( MonadIO m)
            => PGConnection
            -> ConduitM () Text m ()
            -> m ()
-outputData conn c = runConduit $ c .| catchC (mapM_C (dbInsert conn)) handlePostgresError
+outputData conn c = runConduit $ c .| mapM_C (dbInsert conn)
 
 baseColumns :: [Text]
 baseColumns = [ "address"
@@ -139,7 +140,7 @@ baseColumns = [ "address"
 baseTableColumns :: [Text]
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
-createInserts :: (MonadIO m, MonadBase IO m)
+createInserts :: (MonadIO m)
               => IORef Globals
               -> [ProcessedContract]
               -> ConduitM () Text m ()
@@ -152,7 +153,7 @@ createInserts globalsIORef contracts = do
     insertHistoryTable globalsIORef contracts
 
 createInsertIndexTable
-  :: (MonadIO m, MonadBase IO m)
+  :: (MonadIO m)
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -163,7 +164,7 @@ createInsertIndexTable g cs = do
     insertIndexTable g cs
 
 createInsertHistoryTable
-  :: (MonadIO m, MonadBase IO m)
+  :: (MonadIO m)
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -174,7 +175,7 @@ createInsertHistoryTable g cs = do
     insertHistoryTable g cs
 
 createInsertFunctionHistoryTable
-  :: (MonadIO m, MonadBase IO m)
+  :: (MonadIO m)
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -186,7 +187,7 @@ createInsertFunctionHistoryTable _ cs = do
     -- insertFunctionHistoryTable g cs
     pure ()
 
-createIndexTable :: (MonadIO m, MonadBase IO m)
+createIndexTable :: (MonadIO m)
                  => IORef Globals
                  -> ProcessedContract
                  -> ConduitM () Text m ()
@@ -208,7 +209,7 @@ createIndexTable globalsIORef contract = do
     yield $ createIndexTableQuery contract
     setContractCreated globalsIORef hashVal
 
-createHistoryTable :: (MonadIO m, MonadBase IO m)
+createHistoryTable :: (MonadIO m)
                    => IORef Globals
                    -> ProcessedContract
                    -> ConduitM () Text m ()
@@ -219,7 +220,7 @@ createHistoryTable globalsIORef contract = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract
 
-insertIndexTable :: (MonadIO m, MonadBase IO m)
+insertIndexTable :: (MonadIO m)
                  => IORef Globals
                  -> [ProcessedContract]
                  -> ConduitM () Text m ()
@@ -229,7 +230,7 @@ insertIndexTable globalsIORef contracts@(x:_) = do
   index <- shouldIndex globalsIORef hashVal
   when index . yield $ insertIndexTableQuery contracts
 
-insertHistoryTable :: (MonadIO m, MonadBase IO m)
+insertHistoryTable :: (MonadIO m)
                    => IORef Globals
                    -> [ProcessedContract]
                    -> ConduitM () Text m ()

@@ -39,17 +39,17 @@ spec =
       let
           userName1 = UserName "blockapps1"
           userName2 = UserName "blockapps2"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       threadDelay 3000000
-      postUsersEither2 <- runClientM (postUsersUser userName2 pw) (ClientEnv mgr blocUrl)
+      postUsersEither2 <- runClientM (postUsersUser userName2 pw) (ClientEnv mgr blocUrl Nothing)
       threadDelay 3000000
       postUsersEither1 `shouldSatisfy` isRight
       postUsersEither2 `shouldSatisfy` isRight
       let
         Right address1 = postUsersEither1
         Right address2 = postUsersEither2
-      postUsersFillEither1 <- runClientM (postUsersFill userName1 address1 True) (ClientEnv mgr blocUrl)
-      postUsersFillEither2 <- runClientM (postUsersFill userName2 address2 True) (ClientEnv mgr blocUrl)
+      postUsersFillEither1 <- runClientM (postUsersFill userName1 address1 True) (ClientEnv mgr blocUrl Nothing)
+      postUsersFillEither2 <- runClientM (postUsersFill userName2 address2 True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither1 `shouldSatisfy` isRight
       postUsersFillEither2 `shouldSatisfy` isRight
       let
@@ -58,10 +58,10 @@ spec =
         params2 = accountsFilterParams {qaAddress = Just address2}
       accts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       accts2 <- runClientM
         (getAccountsFilter params2)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       accts1 `shouldSatisfy` isRight
       accts2 `shouldSatisfy` isRight
       let
@@ -75,12 +75,12 @@ spec =
       let
         weiToSend = 100
         postSendParameters = PostSendParameters address2 (Strung weiToSend) pw testTxParams Nothing
-      postSendEither <- getResolvedTx testConfig $ runClientM (postUsersSend userName1 address1 Nothing True postSendParameters) (ClientEnv mgr blocUrl)
+      postSendEither <- getResolvedTx testConfig $ runClientM (postUsersSend userName1 address1 Nothing True postSendParameters) (ClientEnv mgr blocUrl Nothing)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
       accts2AfterSend <- runClientM
         (getAccountsFilter params2)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       accts2AfterSend `shouldSatisfy` isRight
       let
         Right (account2AS : _) = accts2AfterSend
@@ -90,11 +90,11 @@ spec =
     it "should create SimpleStorage contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -109,12 +109,12 @@ spec =
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList [("src",simpleStorageSrc),("name", simpleStorageContractName)]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
       let
         Right result = postUsersContractEither
@@ -132,7 +132,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither `shouldSatisfy` isRight
       let
         Right contractStateMap = contractStateEither
@@ -156,7 +156,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
 
       -- call get value and verify
@@ -172,7 +172,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call values))) = postUsersContractMethodEitherGet
@@ -190,7 +190,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
       let
         Right contractStateMap' = contractStateEither'
@@ -206,18 +206,18 @@ spec =
             addr <- fromEither =<<
                     runClientM
                     (postUsersUser un pw)
-                    (ClientEnv mgr blocUrl)
+                    (ClientEnv mgr blocUrl Nothing)
             _ <- fromEither =<<
                  runClientM
                  (postUsersFill un addr True)
-                 (ClientEnv mgr blocUrl)
+                 (ClientEnv mgr blocUrl Nothing)
             threadDelay 4000000
             return addr
       let checkAccount addr = do
             let params = accountsFilterParams {qaAddress = Just addr}
             eAccts <- runClientM
                       (getAccountsFilter params)
-                      (ClientEnv mgr stratoUrl)
+                      (ClientEnv mgr stratoUrl Nothing)
             eAccts `shouldSatisfy` isRight
       let createContract fName ctName args un addr = do
             src <- readSolFile fName
@@ -240,7 +240,7 @@ spec =
                       ( getResolvedTx testConfig $
                         runClientM
                         clientMethod
-                        (ClientEnv mgr blocUrl)
+                        (ClientEnv mgr blocUrl Nothing)
                       )
             let Just (Upload contractDetails) = blocTransactionData result
                 Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
@@ -256,7 +256,7 @@ spec =
                                         Nothing
                                         False
                                       )
-                                      (ClientEnv mgr blocUrl)
+                                      (ClientEnv mgr blocUrl Nothing)
       -- Test --
       let userName1 = UserName "blockapps1"
           ctName  = "AppMetadata"
@@ -293,11 +293,11 @@ spec =
       pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps999"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
       threadDelay 4000000
@@ -314,12 +314,12 @@ spec =
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList [("src",simpleStorageAddressSrc),("name",simpleStorageAddressContractName)]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -339,7 +339,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither `shouldSatisfy` isRight
       let
         Right contractStateMap = contractStateEither
@@ -362,7 +362,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
 
       -- call get value and verify
@@ -378,7 +378,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call values))) = postUsersContractMethodEitherGet
@@ -388,7 +388,7 @@ spec =
 
       contractStateEither' <- runClientM
         (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
       let
@@ -403,11 +403,11 @@ spec =
       pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps444"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
       threadDelay 4000000
@@ -430,13 +430,13 @@ spec =
               ,("name",simpleStorageBytes32ArrayContractName)
               ]
           }
-      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -456,7 +456,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither `shouldSatisfy` isRight
       let
         Right contractStateMap = contractStateEither
@@ -481,7 +481,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
 
       -- call get value and verify
@@ -497,7 +497,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call values))) = postUsersContractMethodEitherGet
@@ -512,7 +512,7 @@ spec =
 
       contractStateEither' <- runClientM
         (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
       let
@@ -530,11 +530,11 @@ spec =
       pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps444"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
-      postUsersEither1 `shouldSatisfy` isRight  
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
+      postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "BytesComboTest.sol"
       threadDelay 4000000
@@ -568,13 +568,13 @@ spec =
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList [("src", simpleStorageBytes32ArraySrc),("name",simpleStorageBytes32ArrayContractName)]
           }
-      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
 
@@ -604,19 +604,19 @@ spec =
           }
       Right (BlocTransactionResult _ _ _ (Just (Upload sameName1Details))) <- getResolvedTx testConfig $ runClientM
         (postUsersContract userName userAddress Nothing True sameName1ContractRequest)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       Right (BlocTransactionResult _ _ _ (Just (Upload sameName2Details))) <- getResolvedTx testConfig $ runClientM
         (postUsersContract userName userAddress Nothing True sameName2ContractRequest)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       Right sameName1Symbols <- runClientM
         (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName1Details) Nothing)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       Right sameName2Symbols <- runClientM
         (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName2Details) Nothing)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       Right sameNameLatestSymbols <- runClientM
         (getContractsSymbols "SameName" (Named "Latest") Nothing)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       sameName1Symbols `shouldBe` [SymbolName "myString"]
       sameName2Symbols `shouldBe` [SymbolName "myInt"]
       sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
@@ -628,11 +628,11 @@ spec =
 
           simpleConstructorName = "SimpleConstructor"
       simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -648,12 +648,12 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", simpleConstructorSrc),("name",simpleConstructorName)]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1 -- todo: uh what?
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
       let
         Right result = postUsersContractEither
@@ -672,7 +672,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither `shouldSatisfy` isRight
       let
         Right contractStateMap = contractStateEither
@@ -689,11 +689,11 @@ spec =
 
           testArrayStatName = "TestArrayStatCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -711,12 +711,12 @@ spec =
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
 
@@ -727,11 +727,11 @@ spec =
 
           testArrayStatName = "TestArrayDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -749,12 +749,12 @@ spec =
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestBytesDynCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
@@ -764,11 +764,11 @@ spec =
 
           testArrayStatName = "TestBytesDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -786,12 +786,12 @@ spec =
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
@@ -801,11 +801,11 @@ spec =
 
           testArrayStatName = "TestAddressBytesCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -827,12 +827,12 @@ spec =
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestLessComplexCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
@@ -842,11 +842,11 @@ spec =
 
           testArrayStatName = "TestLessComplexCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -873,12 +873,12 @@ spec =
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+        (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create SimpleTuple contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
@@ -886,11 +886,11 @@ spec =
       let
           userName1 = UserName "blockapps455"
 
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       simpleTupleSrc <- readSolFile "SimpleTuple.sol"
       threadDelay 4000000
@@ -908,12 +908,12 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", simpleTupleSrc),("name", simpleTupleContractName)]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -933,7 +933,7 @@ spec =
           Nothing
           False
         )
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither `shouldSatisfy` isRight
       let
         Right contractStateMap = contractStateEither
@@ -962,7 +962,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
 
       -- call get value and verify
@@ -978,7 +978,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call values))) = postUsersContractMethodEitherGet
@@ -988,7 +988,7 @@ spec =
 
       contractStateEither' <- runClientM
         (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
       let
@@ -1008,11 +1008,11 @@ spec =
       let
           userName1 = UserName "blockapps2"
           -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       testSrc' <- readSolFile "Bytes32Test.sol"
       threadDelay 4000000
@@ -1030,12 +1030,12 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", testSrc'),("name", testContractName')]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -1069,7 +1069,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call vs))) = postUsersContractMethodEitherSet
@@ -1088,7 +1088,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call values))) = postUsersContractMethodEitherGet
@@ -1099,11 +1099,11 @@ spec =
       let
           userName1 = UserName "blockapps2"
           -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       testSrc' <- readSolFile "StorageBlob.sol"
       threadDelay 4000000
@@ -1121,12 +1121,12 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", testSrc'),("name", testContractName')]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -1148,7 +1148,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractNameDeployer contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call [SolidityValueAsString storageAddr]))) = postUsersContractMethodEitherGet
@@ -1179,7 +1179,7 @@ spec =
           }
       postUsersContractMethodEitherSet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 storageName (fromJust . stringAddress . Text.unpack $ storageAddr) Nothing True postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call vs))) = postUsersContractMethodEitherSet
@@ -1190,11 +1190,11 @@ spec =
       let
           iamUsername = UserName "IAM"
 
-      postIAMEither <- runClientM (postUsersUser iamUsername pw) (ClientEnv mgr blocUrl)
+      postIAMEither <- runClientM (postUsersUser iamUsername pw) (ClientEnv mgr blocUrl Nothing)
       postIAMEither `shouldSatisfy` isRight
       let
         Right addressIAM = postIAMEither
-      postUsersFillEitherIAM <- runClientM (postUsersFill iamUsername addressIAM True) (ClientEnv mgr blocUrl)
+      postUsersFillEitherIAM <- runClientM (postUsersFill iamUsername addressIAM True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEitherIAM `shouldSatisfy` isRight
       iamBlob <- readSolFile "BadgerIam.sol"
       threadDelay 4000000
@@ -1215,13 +1215,13 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", iamBlob),("name", iamName)]
           }
-      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
-      eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl)
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
+      eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl Nothing)
       eAccts2 `shouldSatisfy` isRight
       let
         Right accts2 = eAccts2
       length accts2 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract iamUsername iamUserAddr Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract iamUsername iamUserAddr Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -1229,11 +1229,11 @@ spec =
         Just (Upload contractDetails) = blocTransactionData result
         Just (Unnamed iamAddr) = contractdetailsAddress contractDetails
         bobName = UserName "bob"
-      postBobEither <- runClientM (postUsersUser bobName pw) (ClientEnv mgr blocUrl)
+      postBobEither <- runClientM (postUsersUser bobName pw) (ClientEnv mgr blocUrl Nothing)
       postBobEither `shouldSatisfy` isRight
       let
         Right address = postBobEither
-      postUsersFillEither <- runClientM (postUsersFill bobName address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill bobName address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -1242,7 +1242,7 @@ spec =
         contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args (Just $ Strung 0) Nothing Nothing
       identityAgentEither <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr Nothing True contrMethodReq)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       identityAgentEither `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call [SolidityArray [SolidityValueAsString storeAddr, _]])))  = identityAgentEither
@@ -1263,18 +1263,18 @@ spec =
         storeMethodReq = PostUsersContractMethodRequest pw "writeDataToStorage" storeArgs (Just $ Strung 0) Nothing Nothing
       storeEither <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod iamUsername iamUserAddr cName (fromJust . stringAddress . Text.unpack $ storeAddr) Nothing True storeMethodReq)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       storeEither `shouldSatisfy` isRight
 
     it "should create ReturnTuple contract, call methods " $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps2"
-      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
       returnTupleSrc <- readSolFile "ReturnTuple.sol"
       let
@@ -1295,12 +1295,12 @@ spec =
           , postuserscontractrequestMetadata = Just $ Map.fromList
               [("src", returnTupleSrc),("name", testContractName')]
           }
-      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
       let
@@ -1322,7 +1322,7 @@ spec =
           }
       postUsersContractMethodEitherGet <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod userName1 addr1 contractNameDeployer contractAddr Nothing True postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
+        (ClientEnv mgr blocUrl Nothing)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (BlocTransactionResult _ _ _ (Just (Call returnValues))) = postUsersContractMethodEitherGet

@@ -13,6 +13,7 @@ module Blockchain.VM.VMState (
   DebugCallCreate(..),
   ) where
 
+import           Control.DeepSeq
 import           Control.Lens                 hiding (Context)
 import           Control.Monad
 import qualified Data.ByteString              as B
@@ -22,6 +23,7 @@ import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
+import           GHC.Generics
 
 import           Blockchain.Data.Action
 import           Blockchain.Data.Address
@@ -42,7 +44,7 @@ data Memory =
   Memory {
     mVector :: V.IOVector Word8,
     mSize   :: IORef Word256
-    }
+    } deriving (Generic, NFData)
 
 instance Show Memory where
   show = const "<memory>"
@@ -60,7 +62,7 @@ data DebugCallCreate =
     ccDestination :: Maybe Address,
     ccGasLimit    :: Gas,
     ccValue       :: Integer
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Generic, NFData)
 
 data VMState =
   VMState {
@@ -93,7 +95,7 @@ data VMState =
     isRunningTests   :: Bool,
     debugCallCreates :: Maybe [DebugCallCreate]
 
-    } deriving (Show)
+    } deriving (Show, Generic, NFData)
 makeLenses ''VMState
 
 

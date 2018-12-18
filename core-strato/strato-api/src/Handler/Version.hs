@@ -14,7 +14,7 @@ data Repo = Repo { name   :: String
 
 instance ToJSON Repo
 
-getVersionR :: Handler Value
+getVersionR :: HandlerFor App Value
 getVersionR = do
               addHeader "Access-Control-Allow-Origin" "*"
               return $ object ["monostrato" .= Repo "monostrato" "" $(gitHashMonostrato) $(gitBranchMonostrato)

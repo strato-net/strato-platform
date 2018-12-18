@@ -31,8 +31,7 @@ import           Data.Time.Format
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
-import           Network.HTTP.Client
-import           Network.HTTP.Media
+import           Network.HTTP.Client                hiding (responseBody)
 import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
@@ -74,8 +73,9 @@ toUserError :: MonadError BlocError m => Text -> m a -> m a
 toUserError msg = flip catchError (\_ -> throwError $ UserError msg)
 
 -- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
+
 formatError::BlocError->String
-formatError (StratoError FailureResponse{responseBody=e}) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError (StratoError (FailureResponse Response{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
 formatError e = show e
 
 
@@ -165,24 +165,15 @@ enterBloc env x
     reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
-          StratoError (FailureResponse url' Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+          StratoError (FailureResponse (Response Status{statusCode=404} _ _ _)) ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
-                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "Response from server:",
-                     boxIt $ Lazy.Char8.unpack responseBody'
-                   ]}
-          StratoError (FailureResponse url' Status{statusCode=404} _ _) ->
-            err500{errBody = fromString $ unlines
-                   [
-                     "Error!",
-                     "Bloc seems to be improperly configured: Strato page " ++ show url' ++ "is missing.",
+                     "Bloc seems to be improperly configured: Strato page is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          StratoError FailureResponse{..} | statusIsClientError responseStatus ->
+          StratoError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
             err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
             err500{errBody = fromString $ unlines
@@ -202,7 +193,7 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          VaultWrapperError FailureResponse{..} | statusIsClientError responseStatus ->
+          VaultWrapperError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
             err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           VaultWrapperError (ConnectionError _) ->
             err500{errBody = fromString $ unlines
@@ -330,14 +321,14 @@ blocModify1 modify = do
 blocTransaction :: Bloc x -> Bloc x
 blocTransaction bloc = do
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftBaseOp_ (withTransaction conn) bloc)
+  withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: HasCallStack => ClientM x -> Bloc x
 blocStrato client' = do
   logWithCallStack callStack logNotice "Querying Strato"
   url <- asks urlStrato
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   either (blocError . StratoError) return resultEither
 
 blocVaultWrapper :: HasCallStack => ClientM x -> Bloc x
@@ -345,7 +336,7 @@ blocVaultWrapper client' = do
   logWithCallStack callStack logNotice "Querying Vault Wrapper"
   url <- asks urlVaultWrapper
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: Text -> Maybe x -> Bloc x
@@ -356,7 +347,7 @@ blocCirrusFireForget client' = do
   logWithCallStack callStack logNotice "Querying Cirrus"
   url <- asks urlCirrus
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   case resultEither of
     Left err -> do
       logWith logError (Text.pack $ show err ++ "\n  Cirrus returned an error")
@@ -368,6 +359,6 @@ blocCirrus client' = do
   logWithCallStack callStack logNotice "Querying Cirrus"
   url <- asks urlCirrus
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   either (throwError . CirrusError) return resultEither
 -}

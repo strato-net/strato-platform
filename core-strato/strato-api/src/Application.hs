@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Application
     ( appMain
     , makeFoundation
@@ -108,15 +109,7 @@ myLogger = runNoLoggingT --runStdoutLoggingT
 noPool :: PG.Connection -> IO ()
 noPool = const $ return ()
 
-{-
-prePool :: PG.Connection -> IO ()
-prePool conn = withConnection conn $ const $ do
-                            --id <- PQ.backendPID
-                            liftIO $ traceIO $ "hello"
-                            return ()
--}
-
-myPool :: (MonadBaseControl IO m, MonadLogger m, MonadIO m)
+myPool :: (MonadLogger m, MonadIO m, MonadUnliftIO m)
        => ConnectionString -> Int -> m ConnectionPool
 myPool = createPostgresqlPoolModified $ noPool
 

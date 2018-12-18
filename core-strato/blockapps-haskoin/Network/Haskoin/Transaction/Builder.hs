@@ -28,8 +28,7 @@ import Control.DeepSeq (NFData, rnf)
 import Data.Maybe (catMaybes, maybeToList, isJust, fromJust, isNothing)
 import Data.List (find, nub)
 import Data.Word (Word64)
-import Data.Conduit (await, runConduit, ConduitM, (.|))
-import Data.Void
+import Data.Conduit (await, runConduit, ConduitM, Void, (.|))
 import Data.Conduit.List (sourceList)
 import qualified Data.ByteString as BS (length, replicate, empty, null)
 import Data.Aeson
