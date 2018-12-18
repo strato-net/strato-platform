@@ -755,12 +755,77 @@ testFiles =
   -- stateTests ++
   -- homesteadFiles
   -- ["./tests/VMTests/vmArithmeticTest/add0.json"]
-  [ "./tests/VMTests/vmEnvironmentalInfo/address0.json"]
-
-
-
-
-
-
-
-
+  -- [ "./tests/VMTests/vmEnvironmentalInfo/address0.json"]
+  [ "./tests/VMTests/vmPushDupSwapTest/push1.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push2.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push3.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push4.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push5.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push6.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push7.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push8.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push9.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push10.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push11.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push12.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push13.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push14.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push15.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push16.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push17.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push18.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push19.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push20.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push21.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push22.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push23.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push24.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push25.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push26.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push27.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push28.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push29.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push30.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push31.json"
+  -- , "./tests/VMTests/vmPushDupSwapTest/push32AndSuicide.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push32Undefined.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push32Undefined2.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push32Undefined3.json"
+  , "./tests/VMTests/vmPushDupSwapTest/push33.json"
+  ] ++
+  [ "./tests/VMTests/vmPushDupSwapTest/swap1.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap2.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap3.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap4.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap5.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap6.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap7.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap8.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap9.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap10.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap11.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap12.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap13.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap14.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap15.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap16.json"
+  , "./tests/VMTests/vmPushDupSwapTest/swap2error.json"
+  ] ++
+  [ "./tests/VMTests/vmPushDupSwapTest/dup1.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup2.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup3.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup4.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup5.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup6.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup7.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup8.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup9.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup10.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup11.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup12.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup13.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup14.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup15.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup16.json"
+  , "./tests/VMTests/vmPushDupSwapTest/dup2error.json"
+  ]
