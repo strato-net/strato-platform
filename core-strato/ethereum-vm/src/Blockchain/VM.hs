@@ -968,7 +968,7 @@ runCodeFromStart = do
      vmState <- lift get
      lift $ put vmState{returnVal=Just ret}
      return ()
-   _ -> case parseTraceFlag flags_trace_kind of
+   _ -> case parseTraceFlag flags_trace of
      Fast -> $logInfoS "runCodeFromStart" "running fast code" >> runCodeFast
      Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
      SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0

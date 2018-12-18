@@ -4,7 +4,7 @@ module Blockchain.VMOptions (
   flags_difficultyBomb,
   flags_testnet,
   flags_debug,
-  flags_trace_kind,
+  flags_trace,
   flags_altGenBlock,
   flags_createTransactionResults,
   flags_sqlDiff,
@@ -22,7 +22,7 @@ import           Blockchain.CoreFlags
 import           HFlags
 
 defineFlag "debug" False "turn debug info on or off"
-defineFlag "trace_kind" "none" "Style of tracing. \n\
+defineFlag "trace" "none" "Style of tracing. \n\
  \ none|fast|∅ -> No tracing enabled \n\
  \ trace -> Geth style tracing \n\
  \ sqltrace -> Tracing as pipe separated values to be dumped into SQL \n\
