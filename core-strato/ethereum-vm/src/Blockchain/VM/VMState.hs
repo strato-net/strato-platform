@@ -31,14 +31,16 @@ import           Blockchain.Data.Log
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.VM.Environment
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 
-type Gas = Int
-
 instance Show Counter where
   show = const "<unboxed_ioref>"
+
+instance NFData Counter where
+  rnf = (`seq` ())
 
 data Memory =
   Memory {
