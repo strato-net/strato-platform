@@ -20,12 +20,12 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/client#readme>
 
 dependencies:
+- aeson
 - base >= 4.7 && < 5
-- API
-- text
 - servant-client
 - servant
-- aeson
+- text
+- vault-wrapper-api
 
 library:
   source-dirs: src

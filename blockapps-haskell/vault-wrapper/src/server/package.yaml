@@ -22,7 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - aeson
 - ansi-wl-pprint
-- API
 - base
 - base16-bytestring
 - binary
@@ -68,6 +67,7 @@ dependencies:
 - transformers
 - transformers-base
 - unordered-containers
+- vault-wrapper-api
 - wai
 - wai-cors
 - wai-extra
