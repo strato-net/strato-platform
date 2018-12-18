@@ -1064,7 +1064,7 @@ create' = do
       lift $ do
         $logInfoS "create'/lowGas" . T.pack $ CL.red "Not enough gas to create contract, contract being thrown away (account was created though)"
         $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
-        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show gr
       lift $ put vmState{returnVal=Nothing}
       assignCode "" owner
       assignDetails
