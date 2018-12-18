@@ -59,6 +59,7 @@ library:
     - semigroups >=0.16.2.2 && <0.19
     - transformers >=0.3 && <0.6
     - zlib >=0.6.1.2 && <0.7
+    - deepseq
 
 tests:
   test:
