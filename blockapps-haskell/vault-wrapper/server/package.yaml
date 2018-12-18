@@ -68,7 +68,7 @@ dependencies:
 - transformers
 - transformers-base
 - unordered-containers
-- vault-wrapper-api
+- blockapps-vault-wrapper-api
 - wai
 - wai-cors
 - wai-extra

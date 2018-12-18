@@ -25,7 +25,7 @@ dependencies:
 - servant-client
 - servant
 - text
-- vault-wrapper-api
+- blockapps-vault-wrapper-api
 
 library:
   source-dirs: src
