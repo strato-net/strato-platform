@@ -22,7 +22,6 @@ import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import           Data.IORef
-import           Data.IORef.Unboxed
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
@@ -90,7 +89,7 @@ setNewMaxSize newSize' = do
           else 0
 
   let oldLength = fromIntegral $ V.length (mVector $ memory state)
-  gr <- liftIO . readIORefU . vmGasRemaining $ state
+  gr <- readGasRemaining $ state
   if gr < gasCharge
      then do
           setGasRemaining 0
