@@ -186,7 +186,7 @@ addBlocks blocks' = do
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
       ranPrivateTxs  <- liftIO (newIORef False)
-      replacedBest   <- liftIO (newIORef undefined)
+      replacedBest   <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
         actions <- addBlock block
         (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block

@@ -73,16 +73,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                         let Just enode = mEnode
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                         lift $ addMember chainId address enode' -- We only need the Text version for Postgres
-                        mems <- RBDB.withRedisBlockDB $ RBDB.getChainMembers chainId
-                        void . RBDB.withRedisBlockDB $
-                          RBDB.putChainMembers chainId $ Map.insert address enode mems
+                        RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                       lift $ removeMember chainId address
-                      mems <- RBDB.withRedisBlockDB $ RBDB.getChainMembers chainId
-                      void . RBDB.withRedisBlockDB $
-                        RBDB.putChainMembers chainId $ Map.delete address mems
+                      RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
                     Just x | SHA x == terminateTopic -> do
                       $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
                       lift $ terminateChain chainId

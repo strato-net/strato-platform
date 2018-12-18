@@ -11,6 +11,7 @@ module Blockchain.Strato.RedisBlockDB
     ( inNamespace, getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
+    , addChainMember, removeChainMember
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getPrivateTransactions, getUncles
@@ -120,7 +121,42 @@ putChainMembers :: Word256
 putChainMembers cId mems = do
     let rmems    = RedisChainMembers mems
 
-    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
+    res <- multiExec $ setnx (inNamespace PrivateChainMembers cId) (toValue rmems)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+
+addChainMember :: Word256
+               -> Address
+               -> Enode
+               -> Redis (Either Reply Status)
+addChainMember cId address enode = do
+    res <- multiExec $ do
+      rmems <- get $ inNamespace PrivateChainMembers key
+      case rmems of
+        Right (Just rmems) -> do
+          let RedisChainMembers mems = fromValue rmems
+              mems' = RedisChainMembers $ M.insert address enode
+          set (inNamespace PrivateChainMembers cId) (toValue mems')
+        _ -> return ()
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
+
+removeChainMember :: Word256
+                  -> Address
+                  -> Redis (Either Reply Status)
+removeChainMember cId address = do
+    res <- multiExec $ do
+      rmems <- get $ inNamespace PrivateChainMembers key
+      case rmems of
+        Right (Just rmems) -> do
+          let RedisChainMembers mems = fromValue rmems
+              mems' = RedisChainMembers $ M.delete address
+          set (inNamespace PrivateChainMembers cId) (toValue mems')
+        _ -> return ()
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")

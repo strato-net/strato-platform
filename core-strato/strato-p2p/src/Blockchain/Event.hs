@@ -283,9 +283,6 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
-      RBDB.withRedisBlockDB $ mapM_ (uncurry RBDB.putChainInfo) chpairs
-      let mems = map (fmap (members . chainInfo)) chpairs
-      RBDB.withRedisBlockDB $ mapM_ (uncurry RBDB.putChainMembers) mems
       mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
