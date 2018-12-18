@@ -14,7 +14,7 @@ endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
-TMPDIR=/tmp/strato-docker-dummy
+TMPDIR=/tmp/$(shell whoami)/strato-docker-dummy
 
 ifndef VERSION
   ifeq ($(REPO),public)
