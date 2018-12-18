@@ -872,6 +872,7 @@ printTrace op gasBefore pcBefore stateAfter = do
   lift $ $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
 -}
 
+{-# INLINE runCode #-}
 runCode :: VMM ()
 runCode = do
   vmState <- lift get
@@ -936,9 +937,10 @@ runCodeTrace = whileM $ do
   fmap not . lift $ gets done
 
 runCodeFast :: VMM ()
-runCodeFast = whileM $ do
+runCodeFast = do
   runCode
-  fmap not . lift $ gets done
+  d <- lift $ gets done
+  unless d $ runCodeFast
 
 data TraceType = Fast | Trace | SQLTrace | EVMProfile deriving (Eq, Enum, Show)
 
