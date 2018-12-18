@@ -1,0 +1,8 @@
+FROM ubuntu:16.04
+RUN apt-get -y update                                           && \
+    apt-get install -y libleveldb-dev libpq-dev libpcre3-dev autoconf libblas-dev \
+                       liblapack-dev libsodium-dev netbase netcat-openbsd libstdc++6 \
+                       locales curl supervisor postgresql-client && \
+    apt-get autoremove                                          && \
+    rm -rf /var/lib/apt/lists/*                                 && \
+    apt-get clean
