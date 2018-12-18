@@ -1,8 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMState (
   VMState(..),
+  Gas,
   action,
   Memory(..),
   startingState,
@@ -14,12 +18,12 @@ import           Control.Lens                 hiding (Context)
 import           Control.Monad
 import qualified Data.ByteString              as B
 import           Data.IORef
+import           Data.IORef.Unboxed
 import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           GHC.Generics
-
 
 import           Blockchain.Data.Action
 import           Blockchain.Data.Address
@@ -28,9 +32,16 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
-import           Blockchain.VM.Opcodes (CodePointer)
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
+
+type Gas = Int
+
+instance Show Counter where
+  show = const "<unboxed_ioref>"
+
+instance NFData Counter where
+  rnf = (`seq` ())
 
 data Memory =
   Memory {
@@ -52,7 +63,7 @@ data DebugCallCreate =
   DebugCallCreate {
     ccData        :: B.ByteString,
     ccDestination :: Maybe Address,
-    ccGasLimit    :: Integer,
+    ccGasLimit    :: Gas,
     ccValue       :: Integer
     } deriving (Show, Eq, Generic, NFData)
 
@@ -61,12 +72,12 @@ data VMState =
     vmIsHomestead    :: Bool,
     dbs              :: Context,
     sqldb            :: Config,
-    vmGasRemaining   :: Integer,
-    pc               :: CodePointer,
+    vmGasRemaining   :: Counter,
+    pc               :: Counter,
     memory           :: Memory,
     stack            :: [Word256],
     callDepth        :: Int,
-    refund           :: Integer,
+    refund           :: Counter,
 
     suicideList      :: S.Set Address,
     done             :: Bool,
@@ -113,21 +124,24 @@ startingAction Environment{..} = Action
 startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
 startingState isRunningTests' isHomestead env sqldb' dbs' = do
   m <- newMemory
+  pcref <- newCounter 0
+  gasref <- newCounter 0
+  refundref <- newCounter 0
   return VMState
              {
                vmIsHomestead=isHomestead,
                dbs = dbs',
                sqldb = sqldb',
-               pc = 0,
+               pc = pcref,
                done=False,
                returnVal=Nothing,
                vmException=Nothing,
                writable=True,
-               vmGasRemaining=0,
+               vmGasRemaining=gasref,
                stack=[],
                memory=m,
                callDepth=0,
-               refund=0,
+               refund=refundref,
                theTrace=[],
                logs=[],
                environment=env,
