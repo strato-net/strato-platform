@@ -946,10 +946,12 @@ data TraceType = Fast | Trace | SQLTrace | EVMProfile deriving (Eq, Enum, Show)
 
 parseTraceFlag :: String -> TraceType
 parseTraceFlag = \case
+  "false" -> Fast
   "fast" -> Fast
   "none" -> Fast
   "" -> Fast
   "trace" -> Trace
+  "true" -> Trace
   "sqlTrace" -> SQLTrace
   "evmProfile" -> EVMProfile
   x -> error $ "Unknown tracing format: " ++ show x
