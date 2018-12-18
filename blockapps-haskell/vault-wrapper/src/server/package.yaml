@@ -25,6 +25,7 @@ dependencies:
 - base
 - base16-bytestring
 - binary
+- blockapps-ethereum
 - bytestring
 - byteable
 - conduit 

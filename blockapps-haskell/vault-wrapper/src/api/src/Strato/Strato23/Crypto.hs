@@ -6,6 +6,7 @@
 
 module Strato.Strato23.Crypto where
 
+import           BlockApps.Ethereum                hiding (deriveAddress)
 import           Control.Monad.IO.Class
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import           Crypto.Random.Entropy
@@ -18,7 +19,6 @@ import qualified Data.ByteString                   as BS
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
-import           Strato.Strato23.API
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
@@ -86,8 +86,3 @@ newKeyStore (Password pw) = liftIO $ do
     , keystoreAcctEncSecKey = encAcctSk
     , keystoreAcctAddress = acctAddr
     }
-
-newSecKey :: IO SecKey
-newSecKey = fromMaybe err . secKey <$> getEntropy 32
-  where
-    err = error "could not generate secret key"

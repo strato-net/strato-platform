@@ -1,21 +1,22 @@
 {-# LANGUAGE DataKinds         #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Strato.Strato23.API.Types
-  ( module BlockApps.Ethereum
-  , vaultWrapperSchemaOptions
-  , StatusAndAddress(..)
-  ) where
+module Strato.Strato23.API.Types where
 
 import           BlockApps.Ethereum
-import           Control.Lens           ((&), (?~), mapped)
+import           Control.Lens                 ((&), (?~), mapped)
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
-import           Data.Aeson.Types       hiding (fieldLabelModifier)
-import           Data.Text              (Text)
+import           Data.Aeson.Types             hiding (fieldLabelModifier)
+import           Data.LargeWord
+import           Data.Text                    (Text)
 import           Data.Swagger
+import           Data.Swagger.Internal.Schema (named)
+import           Data.Word
 import           GHC.Generics
 
 vaultWrapperSchemaOptions :: SchemaOptions
@@ -38,3 +39,28 @@ instance ToSchema StatusAndAddress where
     & mapped.schema.description ?~ "Status and Address"
     & mapped.schema.example ?~ toJSON ex
     where ex = StatusAndAddress $ Address 0xdeadbeef
+
+data SignatureDetails = SignatureDetails {
+    r :: Hex Word256
+  , s :: Hex Word256
+  , v :: Hex Word8
+} deriving (Eq, Show, Generic)
+
+data UserData = UserData {
+  msgHash :: Hex Word256
+} deriving (Eq, Show, Generic)
+
+instance ToJSON SignatureDetails
+instance FromJSON SignatureDetails
+
+instance ToSchema SignatureDetails where
+
+instance ToSchema (Hex Word256) where
+  declareNamedSchema = const . pure $ named "hex word256" binarySchema
+
+instance ToSchema (Hex Word8) where
+  declareNamedSchema = const . pure $ named "hex word8" binarySchema
+
+instance ToJSON UserData
+instance FromJSON UserData
+instance ToSchema UserData where

@@ -25,8 +25,8 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract()
 import           BlockApps.SolidityVarReader       (byteStringToWord256) -- TODO: Find a better module for this function
 import           BlockApps.Strato.Types            hiding (Transaction (..))
-import           BlockApps.VaultWrapper.Client
-import           BlockApps.VaultWrapper.Types
+import           Strato.Strato23.Client
+import           Strato.Strato23.API.Types
 
 postBlocTransaction :: Maybe Text -> Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionRequest mAddr txs' txParams) = do
@@ -35,7 +35,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
     (Just _, Nothing) -> error "Did not find X-USER-ID in the header"
     (Just userName, Just userId) -> do
       addr <- case mAddr of
-        Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey mUserName mUserId
+        Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName userId Nothing
         Just addr' -> return addr'
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
@@ -119,7 +119,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
 callSignature :: Text -> Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName userId unsigned@UnsignedTransaction{..} = do
   let msgHash = byteStringToWord256 $ rlpHash unsigned
-  SignatureDetails{..} <- blocVaultWrapper $ postSignature (Just userName) (Just userId) (userData msgHash)
+  SignatureDetails{..} <- blocVaultWrapper $ postSignature userName userId (UserData $ Hex msgHash)
   return $ Transaction
     unsignedTransactionNonce
     unsignedTransactionGasPrice

@@ -11,6 +11,7 @@
 
 module Strato.Strato23.Database.Queries where
 
+import           BlockApps.Ethereum
 import           Control.Arrow
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
@@ -23,7 +24,6 @@ import           Data.Text                       (Text)
 import           Database.PostgreSQL.Simple      (Connection)
 import           Opaleye                         hiding (not, null, index)
 
-import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables
 
