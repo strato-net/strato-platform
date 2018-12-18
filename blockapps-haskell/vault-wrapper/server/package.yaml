@@ -1,4 +1,4 @@
-name:                vault-wrapper-server
+name:                blockapps-vault-wrapper-server
 version:             0.1.0.0
 github:              "githubuser/vault-wrapper"
 license:             BSD3
@@ -91,4 +91,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - vault-wrapper-server
+    - blockapps-vault-wrapper-server

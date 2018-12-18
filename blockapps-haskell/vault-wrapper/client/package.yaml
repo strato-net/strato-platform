@@ -1,4 +1,4 @@
-name:                vault-wrapper-client
+name:                blockapps-vault-wrapper-client
 version:             0.1.0.0
 github:              "githubuser/client"
 license:             BSD3
@@ -39,4 +39,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - vault-wrapper-client
+    - blockapps-vault-wrapper-client

@@ -23,8 +23,8 @@ dependencies:
   - blockapps-bloc22-api
   - blockapps-strato-api
   - blockapps-strato-client
-  - vault-wrapper-api
-  - vault-wrapper-client
+  - blockapps-vault-wrapper-api
+  - blockapps-vault-wrapper-client
   - classy-prelude
   - clock
   - containers
