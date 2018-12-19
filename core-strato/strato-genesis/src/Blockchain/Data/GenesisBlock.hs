@@ -220,7 +220,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
          in (cHash, md)
-      getMetadata = fmap (Map.union chainMetadata) . flip Map.lookup metadatas
+      getMetadata = fmap (`Map.union` chainMetadata) . flip Map.lookup metadatas
       toAction a d = A.Action
         { A._actionBlockHash = creationBlock
         , A._actionBlockTimestamp = posixSecondsToUTCTime 0
