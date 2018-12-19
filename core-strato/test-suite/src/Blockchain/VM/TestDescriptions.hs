@@ -85,7 +85,7 @@ data Test =
     callcreates  ::  Maybe [DebugCallCreate],
     env          ::  Env,
     theInput     ::  InputWrapper,
-    remainingGas ::  Maybe Integer,
+    remainingGas ::  Maybe Int,
     out          ::  RawData,
     pre          ::  M.Map Address AddressState',
     post         ::  M.Map Address AddressState'

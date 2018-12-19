@@ -27,6 +27,7 @@ packages:
 - core-strato/blockapps-util/
 - core-strato/strato-api/
 - core-strato/blockapps-tools/
+- core-strato/vrun/
 - core-strato/strato-genesis/
 - core-strato/strato-adit/
 - core-strato/strato-index/
@@ -41,6 +42,7 @@ packages:
 - core-strato/ethereum-rlp/
 - core-strato/blockstanbul/
 - shared-util/cross-monitoring/
+- clockwork
 - location:
     git: https://github.com/echatav/secp256k1-haskell/
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c

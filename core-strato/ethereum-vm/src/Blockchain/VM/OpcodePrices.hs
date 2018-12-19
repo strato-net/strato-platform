@@ -4,10 +4,10 @@ module Blockchain.VM.OpcodePrices where
 
 import           Prelude               hiding (EQ, GT, LT)
 
-import           Blockchain.ExtWord
 import           Blockchain.VM.Opcodes
+import           Blockchain.Strato.Model.Gas
 
-opGasPrice::Operation->Integer
+opGasPrice::Operation->Gas
 opGasPrice DUP1                = 3
 opGasPrice DUP2                = 3
 opGasPrice DUP3                = 3
@@ -107,49 +107,49 @@ opGasPrice x                   = error $ "Missing opcode in opCodePrice: " ++ sh
 
 
 
-gHomesteadFirstBlock = 1150000
+gHomesteadFirstBlock = 1150000 :: Gas
 
 
-gTX = 21000
-gCREATETX = 53000
-gTXDATANONZERO = 68
-gTXDATAZERO = 4
+gTX = 21000 :: Gas
+gCREATETX = 53000 :: Gas
+gTXDATANONZERO = 68 :: Gas
+gTXDATAZERO = 4 :: Gas
 
 
-gMEMWORD = 3
-gQUADCOEFFDIV = 512
+gMEMWORD = 3 :: Gas
+gQUADCOEFFDIV = 512 :: Gas
 
 
-gEXPBASE = 10
-gEXPBYTE = 10
+gEXPBASE = 10 :: Gas
+gEXPBYTE = 10 :: Gas
 
-gCALLDATACOPYBASE = 3
+gCALLDATACOPYBASE = 3 :: Gas
 
-gCODECOPYBASE = 3
-gEXTCODECOPYBASE = 20
-gCOPYWORD = 3
+gCODECOPYBASE = 3 :: Gas
+gEXTCODECOPYBASE = 20 :: Gas
+gCOPYWORD = 3 :: Gas
 
-gRETURNDATACOPYBASE = 3
+gRETURNDATACOPYBASE = 3 :: Gas
 
-gLOG = 375
-gLOGTOPIC = 375
-gLOGDATA = 8
+gLOG = 375 :: Gas
+gLOGTOPIC = 375 :: Gas
+gLOGDATA = 8 :: Gas
 
-gCALL = 40
-gCALLVALUETRANSFER = 9000::Word256
-gCALLSTIPEND = 2300::Word256
-gCALLNEWACCOUNT = 25000::Word256
+gCALL = 40 :: Gas
+gCALLVALUETRANSFER = 9000::Gas
+gCALLSTIPEND = 2300::Gas
+gCALLNEWACCOUNT = 25000::Gas
 
-gCREATEDATA = 200
+gCREATEDATA = 200 :: Gas
 
 
 
-gSHA3BASE = 30
-gSHA3WORD = 6
-gECRECOVER = 3000
-gSHA256BASE = 60
-gSHA256WORD = 12
-gRIPEMD160BASE = 600
-gRIPEMD160WORD = 120
-gIDENTITYBASE = 15
-gIDENTITYWORD = 3
+gSHA3BASE = 30 :: Gas
+gSHA3WORD = 6 :: Gas
+gECRECOVER = 3000 :: Gas
+gSHA256BASE = 60 :: Gas
+gSHA256WORD = 12 :: Gas
+gRIPEMD160BASE = 600 :: Gas
+gRIPEMD160WORD = 120 :: Gas
+gIDENTITYBASE = 15 :: Gas
+gIDENTITYWORD = 3 :: Gas
