@@ -13,7 +13,7 @@ module BlockApps.Bloc22.Server.Chain where
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (isJust)
+import           Data.Maybe                        (fromMaybe, isJust)
 import qualified Data.Text                         as Text
 import           Opaleye                           hiding (not, null, index, sum)
 
@@ -35,7 +35,7 @@ governanceAddress :: Address
 governanceAddress = Address 0x100
 
 postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
+postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
@@ -68,7 +68,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
                            Nothing
                            creationBlockHash
                            nonce
-                           Map.empty
+                           (fromMaybe Map.empty mmd)
         )
         Nothing
   chainId <- blocStrato $ Strato.postChain chainInfo
