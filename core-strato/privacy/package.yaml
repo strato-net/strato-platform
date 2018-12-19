@@ -1,0 +1,34 @@
+name: blockapps-privacy
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - blockapps-data
+  - blockapps-haskoin
+  - blockapps-util
+  - bytestring
+  - containers
+  - lens
+  - mtl
+  - QuickCheck
+  - strato-model
+  - text
+  - transformers
+  - monad-logger
+  - wai-extra
+  - wai-middleware-prometheus
+  - wai
+  - warp
+  - prometheus-client
+
+library:
+  source-dirs: src/
+
+tests:
+  privacy-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+      - blockapps-privacy
+      - hspec
+      - hspec-expectations-lifted
