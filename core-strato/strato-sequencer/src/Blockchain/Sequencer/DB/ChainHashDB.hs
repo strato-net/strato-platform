@@ -17,21 +17,21 @@ import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.Metrics
 
-insertChainHash :: HasPrivateHashDB m => SHA -> Word256 -> m ()
+insertChainHash :: HasPrivateHashDB h t b m => SHA -> Word256 -> m ()
 insertChainHash cHash chainId = repsertChainHashEntry_ cHash $ \case
   Nothing -> return $ chainHashEntryWithChainId chainId
   Just che -> return $ (onChainId .~ Just chainId) che
 
-useChainHash :: HasPrivateHashDB m => SHA -> m ()
+useChainHash :: HasPrivateHashDB h t b m => SHA -> m ()
 useChainHash cHash = modifyChainHashEntryState_ cHash $ used .= True
 
-getChainBuffer :: HasPrivateHashDB m => Word256 -> m (CircularBuffer SHA)
+getChainBuffer :: HasPrivateHashDB h t b m => Word256 -> m (CircularBuffer SHA)
 getChainBuffer chainId = maybe emptyCircularBuffer _chainHashes <$> getChainIdEntry chainId
 
-lookupChainBuffer :: HasPrivateHashDB m => Word256 -> m (CircularBuffer SHA)
+lookupChainBuffer :: HasPrivateHashDB h t b m => Word256 -> m (CircularBuffer SHA)
 lookupChainBuffer = getChainBuffer
 
-insertChainBufferEntry :: HasPrivateHashDB m => Word256 -> SHA -> m ()
+insertChainBufferEntry :: HasPrivateHashDB h t b m => Word256 -> SHA -> m ()
 insertChainBufferEntry chainId cHash = modifyChainIdEntryState_ chainId $ do
   CircularBuffer cap sz q <- use chainHashes
   liftIO $ withLabel chainBuffer (fromString (show chainId)) (flip setGauge (fromIntegral sz))
@@ -41,7 +41,7 @@ insertChainBufferEntry chainId cHash = modifyChainIdEntryState_ chainId $ do
            Q.EmptyL -> chainHashes .= CircularBuffer cap 1 (q Q.|> cHash)
            (_ Q.:< q') -> chainHashes .= CircularBuffer cap sz (q' Q.|> cHash)
 
-getNewChainHash :: HasPrivateHashDB m => Word256 -> m SHA
+getNewChainHash :: HasPrivateHashDB h t b m => Word256 -> m SHA
 getNewChainHash chainId = do
   CircularBuffer cap sz q <- getChainBuffer chainId
   case Q.viewl q of
@@ -53,7 +53,7 @@ getNewChainHash chainId = do
         then useChainHash h >> return h
         else getNewChainHash chainId
 
-insertChainInfo :: HasPrivateHashDB m => Word256 -> ChainInfo -> m ()
+insertChainInfo :: HasPrivateHashDB h t b m => Word256 -> ChainInfo -> m ()
 insertChainInfo chainId cInfo = do
   h <- generateInitialChainHash cInfo
   insertSeenChain chainId cInfo

@@ -21,6 +21,9 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     buildBlock :: h -> [t] -> [h] -> b
     {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
+    blockOrdering :: b -> Integer
+    blockOrdering = blockHeaderBlockNumber . blockHeader
+
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
 

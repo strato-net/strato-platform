@@ -351,7 +351,7 @@ runBlocks chainId = do
   btr <- maybe S.empty _blocksToRun <$> getChainIdEntry chainId
   unless (S.null btr) $ do
     let b = S.elemAt 0 btr
-    mBlock <- fmap _outputBlock <$> getBlockHashEntry (_bhash b)
+    mBlock <- getBlockHashEntry (_bhash b)
     for_ mBlock $ \block -> do
       success <- runBlock chainId block
       when success $ do
@@ -428,7 +428,7 @@ hydratePrivateHashes ob chainF = do
   let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ obBlockData ob
   logF $ prettyOBlock ob
-  repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
+  insertBlockHashEntry bHash ob
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (obReceiptTransactions ob) $ \st@(dts,cs) tx -> do
     let notHydrating msg = logF . concat $
@@ -470,8 +470,7 @@ hydratePrivateHashes ob chainF = do
                 if ready
                   then do
                     logF "Ready to run block on this chain"
-                    body <- fmap _outputTx <$> getTxHashEntry tHash
-                    case body of
+                    getTxHashEntry tHash >>= \case
                       Just otx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
                         insertPrivateHash otx
@@ -480,13 +479,13 @@ hydratePrivateHashes ob chainF = do
                         notHydrating "we don't have this transaction's body"
                         modifyChainIdEntryState_ chainId $ do
                           when (isNothing chainF) $
-                            blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
+                            blocksToRun %= S.insert (BlockInfo bHash (blockOrdering ob))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                   else do
                     notHydrating "this is not the chain's next block to run"
                     modifyChainIdEntryState_ chainId $
                       when (isNothing chainF) $
-                        blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
+                        blocksToRun %= S.insert (BlockInfo bHash (blockOrdering ob))
                     return (Nothing, (dts,S.insert chainId cs))
 
   -- we have to filter out lingering transactions that weren't initially discluded,

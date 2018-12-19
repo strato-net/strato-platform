@@ -1,9 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Blockchain.Sequencer.DB.PrivateTxDB where
 
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           Control.Lens           ((.~), (%=))
+import           Control.Arrow          ((&&&))
+import           Control.Lens           ((%=))
 import           Control.Monad.IO.Class
 import           Data.Foldable          (toList)
 import           Data.Maybe             (catMaybes)
@@ -14,26 +17,23 @@ import           Prometheus
 import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.Sequencer.DB.PrivateHashDB
-import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 
-insertTransaction :: HasPrivateHashDB m => OutputTx -> m ()
-insertTransaction tx = do
-  let tHash = txHash tx
-  repsertTxHashEntry_ tHash $ return . maybe (txHashEntry tx) (outputTx .~ tx)
+insertTransaction :: HasPrivateHashDB h t b m => t -> m ()
+insertTransaction = uncurry insertTxHashEntry . (txHash &&& id)
 
-findChainHashUses :: HasPrivateHashDB m => Word256 -> [SHA] -> m ()
+findChainHashUses :: HasPrivateHashDB h t b m => Word256 -> [SHA] -> m ()
 findChainHashUses chainId cHashes = do
   blocks <- toList
           . S.fromList
           . concat
           . map (toList . maybe Q.empty _inBlocks)
         <$> mapM getChainHashEntry cHashes
-  bDiffs <- map (fmap (obTotalDifficulty . _outputBlock)) <$> mapM getBlockHashEntry blocks
-  let infos = S.fromList . catMaybes $ zipWith (\b -> fmap (flip BlockInfo b)) blocks bDiffs
+  bOrders <- map (fmap blockOrdering) <$> mapM getBlockHashEntry blocks
+  let infos = S.fromList . catMaybes $ zipWith (\b -> fmap (BlockInfo b)) blocks bOrders
   modifyChainIdEntryState_ chainId $ blocksToRun %= S.union infos
 
-insertPrivateHash :: HasPrivateHashDB m => OutputTx -> m ()
+insertPrivateHash :: HasPrivateHashDB h t b m => t -> m ()
 insertPrivateHash tx = case txChainId tx of
   Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
   Just chainId -> do

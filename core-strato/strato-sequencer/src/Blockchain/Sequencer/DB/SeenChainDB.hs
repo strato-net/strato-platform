@@ -12,10 +12,10 @@ import           Prometheus
 import           Blockchain.Sequencer.DB.Metrics
 import           Blockchain.Sequencer.DB.PrivateHashDB
 
-lookupSeenChain :: HasPrivateHashDB m => Word256 -> m Bool
+lookupSeenChain :: HasPrivateHashDB h t b m => Word256 -> m Bool
 lookupSeenChain chainId = isJust <$> getChainIdEntry chainId
 
-insertSeenChain :: HasPrivateHashDB m => Word256 -> CI.ChainInfo -> m ()
+insertSeenChain :: HasPrivateHashDB h t b m => Word256 -> CI.ChainInfo -> m ()
 insertSeenChain chainId cInfo = do
   liftIO $ withLabel chainMetrics "seen_chains" incCounter
   repsertChainIdEntry_ chainId $ return . maybe (chainIdEntry cInfo) (chainInfo .~ cInfo)

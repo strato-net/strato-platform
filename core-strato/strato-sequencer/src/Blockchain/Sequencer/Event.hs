@@ -414,4 +414,5 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockTransactions = obReceiptTransactions
     blockUncleHeaders = obBlockUncles
 
+    blockOrdering = obTotalDifficulty
     buildBlock = OutputBlock TO.Morphism 0
