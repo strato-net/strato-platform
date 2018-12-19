@@ -572,7 +572,7 @@ encodeByteString offset byte size bs =
    in [(offset, byteStringToWord256 bss)]
 
 decodeByteString::Storage->Word256->Int->Int->Value
-decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B16.encode $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
 
 decodeCacheByteString :: Cache -> Word256 -> Int -> Int -> Value -> Value
 decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . B16.encode . ByteString.take size . ByteString.drop (32 - byte - size) . word256ToByteString <$> storage offset
