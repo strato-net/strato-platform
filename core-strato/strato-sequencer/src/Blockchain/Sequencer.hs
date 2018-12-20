@@ -12,7 +12,6 @@ import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
-import           Control.Lens
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -22,7 +21,6 @@ import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
 import           Data.Maybe
-import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -37,6 +35,8 @@ import           Blockchain.Format
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.GetChainsDB
+import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.DB.Witnessable
@@ -198,37 +198,6 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
   return vmevs
 
-checkIfIsMissingTX :: SHA -> SHA -> SequencerM ()
-checkIfIsMissingTX th ch = do
-  let logF = logFF "runPrivateHashTX"
-  mChainId <- join . fmap _onChainId <$> getChainHashEntry ch
-  case mChainId of
-    Nothing -> do
-      logF "We don't know this transaction's chain Id. Oh well..."
-      return ()
-    Just chainId -> do
-      logF . concat $
-        [ "We know this transaction's chain Id. It's "
-        , format (SHA chainId)
-        , ". Inserting into MissingTxDB and GetTransactions list"
-        ]
-      useChainHash ch
-      insertGetTransactionsDB th
-
-runPrivateHashTX :: SHA -> SHA -> SequencerM ()
-runPrivateHashTX tHash cHash = do
-  let logF = logFF "runPrivateHashTX"
-  logF . concat $
-    [ "Transforming transaction "
-    , format tHash
-    , " with chain hash "
-    , format cHash
-    ]
-  mthe <- getTxHashEntry tHash
-  for_ mthe . const $ repsertChainHashEntry_ cHash $
-    return . maybe chainHashEntryUsed (used .~ True)
-  checkIfIsMissingTX tHash cHash
-
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
   for_ (wrapTransaction t) $ \otx -> do
@@ -279,7 +248,7 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
-        mcInfo <- fmap _chainInfo <$> getChainIdEntry chainId
+        mcInfo <- fmap _chainIdInfo <$> getChainIdEntry chainId
         case mcInfo of
           Nothing -> do
             logF . concat $
@@ -313,7 +282,7 @@ transformFullTransactions pairs = do
                     phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
                 markForVM $ pairToOETx (ts, phtx)
                 markForP2P $ pairToOETx (ts, phtx)
-            runBlocks chainId
+            mapM_ (markForVM . OEBlock) =<< runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
@@ -341,18 +310,6 @@ runBlock chainId ob = do
   mapM_ markForVM blocks
   return . not $ null blocks
 
-runBlocks :: Word256 -> SequencerM ()
-runBlocks chainId = do
-  btr <- maybe S.empty _blocksToRun <$> getChainIdEntry chainId
-  unless (S.null btr) $ do
-    let b = S.elemAt 0 btr
-    mBlock <- getBlockHashEntry (_bhash b)
-    for_ mBlock $ \block -> do
-      success <- runBlock chainId block
-      when success $ do
-        modifyChainIdEntryState_ chainId $ blocksToRun %= S.delete b
-        runBlocks chainId
-
 expandBlock :: ConduitM SequencedBlock (Either SequencedBlock OutputBlock) SequencerM ()
 expandBlock = awaitForever $ \sb -> do
   readiness <- lift $ enqueueIfParentNotEmitted sb
@@ -372,11 +329,6 @@ expandBlock = awaitForever $ \sb -> do
         else do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           yield $ Left sb
-
-dropLefts :: Monad m => ConduitM (Either a b) b m ()
-dropLefts = awaitForever $ \case
-  Right b -> yield b
-  _ -> return ()
 
 runConsensus :: ConduitM (Either SequencedBlock OutputBlock) OutputEvent SequencerM ()
 runConsensus = awaitForever $ \eob -> do
@@ -404,105 +356,9 @@ hydrateAndEmit :: Maybe Word256 -> ConduitM OutputEvent OutputEvent SequencerM (
 hydrateAndEmit chainId = awaitForever $ \case
   OEBlock ob -> do
     when (isNothing chainId) . yield $ OEBlock ob
-    ob' <- lift $ hydratePrivateHashes ob chainId
+    ob' <- lift $ hydratePrivateHashes chainId ob
     for_ ob' $ yield . OEBlock
   oe -> yield oe
-
-accumT :: Monad m => s -> [a] -> (s -> a -> m (b,s)) -> m ([b],s)
-accumT s [] _ = pure ([],s)
-accumT s (a:as) run = do
-  (b,s') <- run s a
-  (bs,s'') <- accumT s' as run
-  return (b:bs,s'')
-
--- using this explicit state monad because SequencerM is already MonadState
-hydratePrivateHashes :: OutputBlock
-                     -> Maybe Word256
-                     -> SequencerM (Maybe OutputBlock)
-hydratePrivateHashes ob chainF = do
-  let logF = logFF "hydratePrivateHashes"
-      bHash = blockHeaderHash $ obBlockData ob
-  logF $ prettyOBlock ob
-  insertBlockHashEntry bHash ob
-  let discluded cId = maybe False (/= cId) chainF
-  (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (obReceiptTransactions ob) $ \st@(dts,cs) tx -> do
-    let notHydrating msg = logF . concat $
-          [ "Not hydrating "
-          , format (txHash tx)
-          , " because "
-          , msg
-          ]
-    if not $ isPrivateHashTX tx
-      then do
-        notHydrating "it's not a private transaction"
-        return (Nothing, st)
-      else do
-        let TD.PrivateHashTX th' ch' = otBaseTx tx
-            tHash = SHA th'
-            cHash = SHA ch'
-        runPrivateHashTX tHash cHash
-        repsertChainHashEntry_ cHash $
-          return . maybe
-            (chainHashEntryInBlock bHash)
-            (inBlocks %~ (Q.|> bHash))
-        mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
-        case mChainId of
-          Nothing -> do
-            notHydrating "we don't know the chain ID"
-            return (Nothing, st)
-          Just chainId -> if discluded chainId || S.member chainId cs
-            then do
-              notHydrating "its chain ID is discluded from this hydration round"
-              return (Nothing, st)
-            else getChainIdEntry chainId >>= \case
-              Nothing -> do
-                notHydrating "we don't have the info for its chain"
-                return (Nothing, st)
-              Just ChainIdEntry{..} -> do
-                let ready = if S.null _blocksToRun
-                             then True
-                             else (_bhash $ S.elemAt 0 _blocksToRun) == bHash
-                if ready
-                  then do
-                    logF "Ready to run block on this chain"
-                    getTxHashEntry tHash >>= \case
-                      Just otx -> do
-                        logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
-                        insertPrivateHash otx
-                        return (Just otx, st)
-                      Nothing -> do
-                        notHydrating "we don't have this transaction's body"
-                        modifyChainIdEntryState_ chainId $ do
-                          when (isNothing chainF) $
-                            blocksToRun %= S.insert (BlockInfo bHash (blockOrdering ob))
-                        return (Nothing, (tHash:dts, S.insert chainId cs))
-                  else do
-                    notHydrating "this is not the chain's next block to run"
-                    modifyChainIdEntryState_ chainId $
-                      when (isNothing chainF) $
-                        blocksToRun %= S.insert (BlockInfo bHash (blockOrdering ob))
-                    return (Nothing, (dts,S.insert chainId cs))
-
-  -- we have to filter out lingering transactions that weren't initially discluded,
-  -- but were discluded by a subsequent missing transcation
-  let txs'' = filter (\otx -> not (discluded (fromJust $ txChainId otx)
-                     || S.member (fromJust $ txChainId otx) newDiscludes)
-                     ) $ catMaybes txs'
-
-  unless (null depTXs) $ do
-    logF . concat $
-      [ "Block hash "
-      , format bHash
-      , " has dependent transactions.\n"
-      , show (map format depTXs)
-      , " Inserting them into GetTransactions list"
-      ]
-    mapM_ insertGetTransactionsDB depTXs
-  if null txs''
-    then return Nothing
-    else do
-      P.incCounter seqBlocksReleased
-      return . Just $ ob{obReceiptTransactions = txs''}
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
 transformBlocks = mapM_ $ \ib -> do
@@ -527,19 +383,8 @@ transformGenesis chains = forM_ chains $ \ig -> do
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
-      cHash <- generateInitialChainHash cInfo
-      insertSeenChain chainId cInfo
-      insertChainHash cHash chainId
-      insertChainBufferEntry chainId cHash
       markForVM $ OEGenesis og
-      findChainHashUses chainId [cHash]
-      runBlocks chainId
-
-isPrivateHashTX :: TransactionLike t => t -> Bool
-isPrivateHashTX = (== PrivateHash) . txType
-
-isPrivateChainTX :: TransactionLike t => t -> Bool
-isPrivateChainTX = isJust . txChainId
+      mapM_ (markForVM . OEBlock) =<< insertNewChainInfo chainId cInfo
 
 splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->

@@ -55,11 +55,11 @@ import           Blockchain.Constants
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
+import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
@@ -128,6 +128,8 @@ instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
           sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
        in return [rs,sr]
 
+    requestChain = insertGetChainsDB
+    requestTransaction = insertGetTransactionsDB
     -- TODO: Add persistence layer
     alterBlockHashEntry bHash f = do
       bhr <- use blockHashRegistry
