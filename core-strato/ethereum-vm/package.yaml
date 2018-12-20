@@ -95,6 +95,7 @@ library:
     - Blockchain.VM.Environment
     - Blockchain.VM.MutableStack
     - Blockchain.VM.Opcodes
+    - Blockchain.VM.OpcodePrices
     - Blockchain.VM.VMException
     - Blockchain.VM.VMM
     - Blockchain.VM.VMState
@@ -128,8 +129,18 @@ benchmarks:
   microbench:
     source-dirs: bench/
     main: Microbench.hs
+    other-modules: []
     dependencies:
       - criterion
       - ethereum-vm
       - hashable
       - unordered-containers
+
+  gasbench:
+    source-dirs: bench/
+    main: GasBench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - weigh

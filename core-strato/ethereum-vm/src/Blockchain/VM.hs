@@ -8,6 +8,7 @@ module Blockchain.VM
     ( runCodeFromStart
     , call
     , create
+    , opGasPriceAndRefund
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
