@@ -158,7 +158,13 @@ bootstrapBlockstanbul = do
   createFirstTimer
 
 blockstanbulSend :: [InEvent] -> SequencerM ()
-blockstanbulSend = mapM_ (mapM_ markForVM <=< blockstanbulSend')
+blockstanbulSend = mapM_ $ \ie -> do
+  oes <- blockstanbulSend' ie
+  mapM_ markForVM =<< runConduit
+    ( yieldMany oes
+   .| hydrateAndEmit Nothing
+   .| sinkList
+    )
 
 blockstanbulSend' :: InEvent -> SequencerM [OutputEvent]
 blockstanbulSend' msg = do
@@ -299,16 +305,6 @@ runBlockWithConsensus sb =
    .| hydrateAndEmit Nothing
    .| sinkList
     )
-
-runBlock :: Word256 -> OutputBlock -> SequencerM Bool
-runBlock chainId ob = do
-  blocks <- runConduit
-    ( yield (OEBlock ob)
-   .| hydrateAndEmit (Just chainId)
-   .| sinkList
-    )
-  mapM_ markForVM blocks
-  return . not $ null blocks
 
 expandBlock :: ConduitM SequencedBlock (Either SequencedBlock OutputBlock) SequencerM ()
 expandBlock = awaitForever $ \sb -> do
