@@ -461,8 +461,16 @@ hydratePrivateHashes ob chainF = do
   repsertBlockHashEntry_ bHash $ return . fromMaybe (blockHashEntry ob)
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (obReceiptTransactions ob) $ \st@(dts,cs) tx -> do
+    let notHydrating msg = logF . concat $
+          [ "Not hydrating "
+          , format (txHash tx)
+          , " because "
+          , msg
+          ]
     if not $ isPrivateHashTX tx
-      then return (Nothing, st)
+      then do
+        notHydrating "it's not a private transaction"
+        return (Nothing, st)
       else do
         let TD.PrivateHashTX th' ch' = otBaseTx tx
             tHash = SHA th'
@@ -478,39 +486,37 @@ hydratePrivateHashes ob chainF = do
             ((inBlocks %~ (Q.|> bHash)) . (transactions %~ S.insert tHash))
         mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
         case mChainId of
-          Nothing -> return (Nothing, st)
+          Nothing -> do
+            notHydrating "we don't know the chain ID"
+            return (Nothing, st)
           Just chainId -> if discluded chainId || S.member chainId cs
             then do
-              logF "This chain is discluded!"
+              notHydrating "its chain ID is discluded from this hydration round"
               return (Nothing, st)
             else getChainIdEntry chainId >>= \case
-              Nothing -> return (Nothing, st)
+              Nothing -> do
+                notHydrating "we don't have the info for its chain"
+                return (Nothing, st)
               Just ChainIdEntry{..} -> do
                 let ready = if S.null _blocksToRun
                              then True
                              else (_bhash $ S.elemAt 0 _blocksToRun) == bHash
                 if ready
                   then do
-                    logF "Ready to run block on this chain"
                     body <- join . fmap _outputTx <$> getTxHashEntry tHash
                     case body of
                       Just otx -> do
-                        logF $ "Transaction hash " ++ format tHash ++ " is not missing"
+                        logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
                         insertPrivateHash otx
                         return (Just otx, st)
                       Nothing -> do
-                        logF . concat $
-                          [ "Transaction hash "
-                          , format tHash
-                          , " is missing."
-                          , " Inserting into TxBlockDB and DependentTxDB"
-                          ]
+                        notHydrating "we don't have this transaction's body"
                         modifyChainIdEntryState_ chainId $ do
                           when (isNothing chainF) $
                             blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                   else do
-                    logF "This is not the chain's next block to run."
+                    notHydrating "this is not the chain's next block to run"
                     modifyChainIdEntryState_ chainId $
                       when (isNothing chainF) $
                         blocksToRun %= S.insert (BlockInfo (obTotalDifficulty ob) bHash)
