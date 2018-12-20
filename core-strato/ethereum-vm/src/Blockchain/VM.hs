@@ -77,8 +77,8 @@ bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
 
-word256ToWidth :: Word256 -> Int
-word256ToWidth = fromInteger . toInteger . max 256
+-- word256ToWidth :: Word256 -> Int
+-- word256ToWidth = fromInteger . toInteger . max 256
 {-
 word2562Bool::Word256->Bool
 word2562Bool 1 = True
@@ -216,7 +216,6 @@ runOperation SIGNEXTEND = binaryAction signExtend
 
 
 
-runOperation NEG = unaryAction negate
 runOperation LT = binaryAction ((bool2Word256 .) . (<))
 runOperation GT = binaryAction ((bool2Word256 .) . (>))
 runOperation SLT = binaryAction ((bool2Word256 .) . ((<) `on` s256ToInteger))
@@ -230,15 +229,6 @@ runOperation XOR = binaryAction xor
 runOperation NOT = unaryAction (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF `xor`)
 
 runOperation BYTE = binaryAction getByte
-
-runOperation SHL = binaryAction $ \positions pattern ->
-      shiftL pattern (word256ToWidth positions)
-
-runOperation SHR = binaryAction $ \positions pattern ->
-      shiftR pattern (word256ToWidth positions)
-
-runOperation SAR = binaryAction $ \positions pattern ->
-      fromInteger $ shiftR (s256ToInteger pattern) (word256ToWidth positions)
 
 runOperation SHA3 = do
   p <- pop
@@ -429,8 +419,38 @@ runOperation GAS = push =<< readGasRemaining =<< lift get
 
 runOperation JUMPDEST = return ()
 
-runOperation (PUSH vals) =
-  push $ (fromIntegral (bytes2Integer vals)::Word256)
+runOperation PUSH1 = pushn 1
+runOperation PUSH2 = pushn 2
+runOperation PUSH3 = pushn 3
+runOperation PUSH4 = pushn 4
+runOperation PUSH5 = pushn 5
+runOperation PUSH6 = pushn 6
+runOperation PUSH7 = pushn 7
+runOperation PUSH8 = pushn 8
+runOperation PUSH9 = pushn 9
+runOperation PUSH10 = pushn 10
+runOperation PUSH11 = pushn 11
+runOperation PUSH12 = pushn 12
+runOperation PUSH13 = pushn 13
+runOperation PUSH14 = pushn 14
+runOperation PUSH15 = pushn 15
+runOperation PUSH16 = pushn 16
+runOperation PUSH17 = pushn 17
+runOperation PUSH18 = pushn 18
+runOperation PUSH19 = pushn 19
+runOperation PUSH20 = pushn 20
+runOperation PUSH21 = pushn 21
+runOperation PUSH22 = pushn 22
+runOperation PUSH23 = pushn 23
+runOperation PUSH24 = pushn 24
+runOperation PUSH25 = pushn 25
+runOperation PUSH26 = pushn 26
+runOperation PUSH27 = pushn 27
+runOperation PUSH28 = pushn 28
+runOperation PUSH29 = pushn 29
+runOperation PUSH30 = pushn 30
+runOperation PUSH31 = pushn 31
+runOperation PUSH32 = pushn 32
 
 runOperation DUP1 = dupn 1
 runOperation DUP2 = dupn 2
@@ -682,8 +702,7 @@ runOperation DELEGATECALL = do
       push result
 
     else do
-      let MalformedOpcode opcode = DELEGATECALL
-      when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
+      when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ show DELEGATECALL)
       throwE MalformedOpcodeException
 
 runOperation STATICCALL = do
@@ -719,11 +738,6 @@ runOperation SUICIDE = do
 
   addSuicideList owner
   setDone True
-
-
-runOperation (MalformedOpcode opcode) = do
-  when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
-  throwE MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
 
@@ -844,9 +858,7 @@ opGasPriceAndRefund x = return (opGasPrice x, 0)
 --Glogtopic 1 Paid for each topic of a LOG operation.
 
 formatOp::Operation->String
-formatOp (PUSH x) = "PUSH" ++ show (length x) -- ++ show x
-formatOp x        = show x
-
+formatOp = show
 
 printTrace::Operation->Gas->CodePointer->VMState->VMM ()
 --printDebugInfo env memBefore memAfter c op stateBefore stateAfter = do
@@ -879,7 +891,7 @@ runCode = do
   vmState <- lift get
   pcBefore <- readPC vmState
   code <- getEnvVar envCode
-  let (op, len) = getOperationAt code pcBefore
+  let op = getOperationAt code pcBefore
 
   (val, theRefund) <- opGasPriceAndRefund op
   useGas val
@@ -887,14 +899,14 @@ runCode = do
 
   runOperation op
 
-  incrementPC len
+  incrementPC 1
 
 runCodeEVMProfile :: VMM ()
 runCodeEVMProfile = whileM $ do
   vmState <- lift get
   pcBefore <- readPC vmState
   code <- getEnvVar envCode
-  let (op, _) = getOperationAt code pcBefore
+  let op = getOperationAt code pcBefore
   liftIO cwBefore
   runCode
   totalNanoseconds <- liftIO cwAfter
@@ -908,7 +920,7 @@ runCodeSQLTrace !c = do
   pcBefore <- readPC vmState
   memBefore <- getSizeInWords
   code <- getEnvVar envCode
-  let (op, _) = getOperationAt code pcBefore
+  let op = getOperationAt code pcBefore
   runCode
   gasAfter <- readGasRemaining vmState
   pcAfter <- readPC vmState
@@ -931,7 +943,7 @@ runCodeTrace = whileM $ do
   gasBefore <- readGasRemaining vmState
   pcBefore <- readPC vmState
   code <- getEnvVar envCode
-  let (op, _) = getOperationAt code pcBefore
+  let op = getOperationAt code pcBefore
   runCode
   result <- lift get
   printTrace op gasBefore pcBefore result

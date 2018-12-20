@@ -8,7 +8,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
 import qualified Data.ByteString     as B
-import qualified Data.Map            as M
+-- import qualified Data.Map            as M
 import qualified Data.Vector         as V
 import qualified Data.Vector.Unboxed as UV
 import Data.Word
@@ -34,13 +34,13 @@ benchJumpGet :: Int -> Benchmark
 benchJumpGet n = bench ("getOperationAt: " ++ show n ++ " bytes")
                $ nf (flip getOperationAt (n-1)) (jumpDestCode n)
 
-operationLookupHit :: Benchmark
-operationLookupHit = bench "operation lookup hit"
-                   $ nf (M.lookup 0x5b) code2OpMap
+-- operationLookupHit :: Benchmark
+-- operationLookupHit = bench "operation lookup hit"
+--                    $ nf (M.lookup 0x5b) code2OpMap
 
-operationLookupMiss :: Benchmark
-operationLookupMiss = bench "operation lookup miss"
-                    $ nf (M.lookup 0xfb) code2OpMap
+-- operationLookupMiss :: Benchmark
+-- operationLookupMiss = bench "operation lookup miss"
+--                     $ nf (M.lookup 0xfb) code2OpMap
 
 vectorLookup :: Benchmark
 vectorLookup = bench "vector operation lookup"
@@ -92,10 +92,10 @@ main :: IO ()
 main = do
   states <- replicateM 100 initialState
   defaultMain $ map benchJumpGet [1, 100, 10000, 1000000]
-             ++ [operationLookupHit, operationLookupMiss,
+             ++ [-- operationLookupHit, operationLookupMiss,
                  vectorLookup, unsafeVectorLookup,
                  unboxedVectorLookup, unboxedVectorUnsafeLookup,
                  benchIdOp, benchFromEnumOp]
-             ++ map benchOperationGasPrice [DUP1, SWAP1, PUSH [3, 4, 5], GASLIMIT, SUICIDE]
+             ++ map benchOperationGasPrice [DUP1, SWAP1, PUSH3, GASLIMIT, SUICIDE]
              ++ [ benchVMMNothing (states !! 0)
                 , benchPriceAndRefund (states !! 1) JUMPDEST]

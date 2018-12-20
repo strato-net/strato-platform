@@ -10,6 +10,7 @@ module Blockchain.VM.VMM (
   localState,
   getStackItem,
   push,
+  pushn,
   swapn,
   dupn,
   addDebugCallCreate,
@@ -181,6 +182,9 @@ push val = do
   stack' <- lift $ gets stack
   unlessM (liftIO . MS.push stack' . toWord256 $ val) $
     throwE StackTooLarge
+
+pushn :: Int -> VMM ()
+pushn = undefined
 
 swapn::Int->VMM ()
 swapn n = do
