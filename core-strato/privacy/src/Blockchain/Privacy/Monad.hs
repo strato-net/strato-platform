@@ -75,11 +75,11 @@ chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 class (BlockLike h t b, MonadResource m, MonadLogger m) => HasPrivateHashDB h t b m | m -> h t b where
   getChainId               :: ChainInfo -> m SHA
   generateInitialChainHash :: ChainInfo -> m SHA
-  generateChainHashes      :: TransactionLike t => t -> m [SHA]
+  generateChainHashes      :: t -> m [SHA]
   requestChain             :: Word256 -> m ()
   requestTransaction       :: SHA -> m ()
-  alterBlockHashEntry      :: BlockLike h t b => SHA -> (Maybe b -> m (Maybe b)) -> m (Maybe b)
-  alterTxHashEntry         :: TransactionLike t => SHA -> (Maybe t -> m (Maybe t)) -> m (Maybe t)
+  alterBlockHashEntry      :: SHA -> (Maybe b -> m (Maybe b)) -> m (Maybe b)
+  alterTxHashEntry         :: SHA -> (Maybe t -> m (Maybe t)) -> m (Maybe t)
   alterChainHashEntry      :: SHA -> (Maybe ChainHashEntry -> m (Maybe ChainHashEntry)) -> m (Maybe ChainHashEntry)
   alterChainIdEntry        :: Word256 -> (Maybe ChainIdEntry -> m (Maybe ChainIdEntry)) -> m (Maybe ChainIdEntry)
 
