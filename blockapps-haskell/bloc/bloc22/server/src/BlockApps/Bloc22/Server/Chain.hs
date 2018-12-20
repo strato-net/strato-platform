@@ -12,8 +12,10 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
+import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (fromMaybe, isJust)
+import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Opaleye                           hiding (not, null, index, sum)
 
@@ -23,6 +25,9 @@ import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
@@ -33,6 +38,21 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 
 governanceAddress :: Address
 governanceAddress = Address 0x100
+
+replaceMembers :: Struct
+               -> [Address]
+               -> Map.Map Text Text
+               -> Map.Map Text Text
+replaceMembers Struct{..} addrs m =
+  let tag = "__members__"
+      members = valueToText $ ValueArrayDynamic $ map (SimpleValue . ValueAddress) addrs
+      m' = Map.alter (const members) tag m
+   in case OMap.lookup tag fields of
+        Nothing -> m'
+        Just (Left _, _) -> m
+        Just (_, ty) -> case ty of
+          TypeArrayDynamic (SimpleType TypeAddress) -> m'
+          _ -> m
 
 postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
@@ -53,7 +73,15 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argsText = map (fmap argValueToText) $ Map.toList chaininputArgs
-              storage = encodeValues (typeDefs contract) (mainStruct contract) 0 argsText
+              argsText' = replaceMembers
+                            (mainStruct contract)
+                            (nmap1' members)
+                            (Map.fromList argsText)
+              storage = encodeValues
+                          (typeDefs contract)
+                          (mainStruct contract)
+                          0
+                          (Map.toList argsText')
               contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
               codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
