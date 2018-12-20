@@ -1,7 +1,7 @@
 module Blockchain.Privacy
-  ( module Blockchain.Privacy.DB
-  , module Blockchain.Privacy.EventLoop
+  ( module Blockchain.Privacy.Monad
+  , module Blockchain.Privacy.Event
   ) where
 
-import Blockchain.Privacy.DB
-import Blockchain.Privacy.EventLoop
+import Blockchain.Privacy.Monad
+import Blockchain.Privacy.Event
