@@ -4,22 +4,16 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-data
-  - blockapps-haskoin
   - blockapps-util
-  - bytestring
   - containers
   - lens
-  - mtl
+  - monad-logger
+  - prometheus-client
   - QuickCheck
+  - resourcet
   - strato-model
   - text
   - transformers
-  - monad-logger
-  - wai-extra
-  - wai-middleware-prometheus
-  - wai
-  - warp
-  - prometheus-client
 
 library:
   source-dirs: src/

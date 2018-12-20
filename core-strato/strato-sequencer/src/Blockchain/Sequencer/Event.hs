@@ -386,6 +386,7 @@ instance RLPSerializable OutputTx where
 instance TransactionLike OutputTx where
     txHash        = otHash
     txPartialHash = txPartialHash . otBaseTx
+    txChainHash   = txChainHash . otBaseTx
     txSigner      = Just . otSigner
     txNonce       = txNonce . otBaseTx
     txType        = txType . otBaseTx

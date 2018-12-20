@@ -6,23 +6,23 @@
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
-module Blockchain.Privacy.PrivateHashDB where
+module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
-import           Blockchain.ExtWord           (Word256)
+import           Blockchain.ExtWord            (Word256)
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
-import           Control.Monad                (join, void)
+import           Control.Monad                 (join, void)
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
-
-import           Data.Function                (on)
-import           Data.Maybe                   (fromJust)
-import qualified Data.Sequence                as Q
-import           Data.Set                     (Set)
-import qualified Data.Set                     as S
-import           Data.Traversable             (for)
+import           Data.Function                 (on)
+import           Data.Maybe                    (fromJust)
+import qualified Data.Sequence                 as Q
+import           Data.Set                      (Set)
+import qualified Data.Set                      as S
+import           Data.Traversable              (for)
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int
@@ -63,7 +63,7 @@ instance Ord BlockInfo where
   compare = compare `on` _bordering
 
 data ChainIdEntry = ChainIdEntry
-  { _chainInfo   :: ChainInfo
+  { _chainIdInfo :: ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _blocksToRun :: Set BlockInfo
   } deriving (Show)
@@ -72,10 +72,12 @@ makeLenses ''ChainIdEntry
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
-class (BlockLike h t b, MonadResource m) => HasPrivateHashDB h t b m | m -> h t b where
+class (BlockLike h t b, MonadResource m, MonadLogger m) => HasPrivateHashDB h t b m | m -> h t b where
   getChainId               :: ChainInfo -> m SHA
   generateInitialChainHash :: ChainInfo -> m SHA
   generateChainHashes      :: TransactionLike t => t -> m [SHA]
+  requestTransaction       :: SHA -> m ()
+  requestChain             :: Word256 -> m ()
   alterBlockHashEntry      :: BlockLike h t b => SHA -> (Maybe b -> m (Maybe b)) -> m (Maybe b)
   alterTxHashEntry         :: TransactionLike t => SHA -> (Maybe t -> m (Maybe t)) -> m (Maybe t)
   alterChainHashEntry      :: SHA -> (Maybe ChainHashEntry -> m (Maybe ChainHashEntry)) -> m (Maybe ChainHashEntry)

@@ -1,31 +1,62 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
-module Blockchain.Privacy.EventLoop where
+module Blockchain.Privacy.Event
+  ( lookupSeenChain
+  , insertSeenChain
+  , insertTransaction
+  , findChainHashUses
+  , insertPrivateHash
+  , insertChainHash
+  , useChainHash
+  , getChainBuffer
+  , lookupChainBuffer
+  , insertChainBufferEntry
+  , getNewChainHash
+  , insertChainInfo
+  , checkIfIsMissingTX
+  , runPrivateHashTX
+  , runBlocks
+  , hydratePrivateHashes
+  , insertNewChainInfo
+  , isPrivateHashTX
+  , isPrivateChainTX
+  ) where
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord
+import           Blockchain.Format
 import           Blockchain.Privacy.DB
 import           Blockchain.Privacy.Metrics
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Arrow                 ((&&&))
 import           Control.Lens
+import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.Foldable                 (toList)
-import           Data.Maybe                    (catMaybes, isJust)
+import           Control.Monad.Logger
+import           Data.Foldable                 (for_, toList)
+import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Sequence                 as Q
 import           Data.String
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import           Data.Traversable
 import           Prometheus
+
+logFF :: MonadLogger m => Text -> String -> m ()
+logFF str = $logInfoS str . T.pack
 
 lookupSeenChain :: HasPrivateHashDB h t b m => Word256 -> m Bool
 lookupSeenChain chainId = isJust <$> getChainIdEntry chainId
 
-insertSeenChain :: HasPrivateHashDB h t b m => Word256 -> CI.ChainInfo -> m ()
+insertSeenChain :: HasPrivateHashDB h t b m => Word256 -> ChainInfo -> m ()
 insertSeenChain chainId cInfo = do
   liftIO $ withLabel chainMetrics "seen_chains" incCounter
-  repsertChainIdEntry_ chainId $ return . maybe (chainIdEntry cInfo) (chainInfo .~ cInfo)
+  repsertChainIdEntry_ chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
 
 insertTransaction :: HasPrivateHashDB h t b m => t -> m ()
 insertTransaction = uncurry insertTxHashEntry . (txHash &&& id)
@@ -109,7 +140,7 @@ checkIfIsMissingTX th ch = do
         , ". Inserting into MissingTxDB and GetTransactions list"
         ]
       useChainHash ch
-      insertGetTransactionsDB th
+      requestTransaction th
 
 runPrivateHashTX :: HasPrivateHashDB h t b m => SHA -> SHA -> m ()
 runPrivateHashTX tHash cHash = do
@@ -125,59 +156,21 @@ runPrivateHashTX tHash cHash = do
     return . maybe chainHashEntryUsed (used .~ True)
   checkIfIsMissingTX tHash cHash
 
-handlePrivateTransactions :: HasPrivateHashDB h t b m => Word256 -> [t] -> m ()
-handlePrivateTransactions chainId ptxs = do
-  mapM_ (insertTransaction . snd) ptxs
-  mcInfo <- fmap _chainInfo <$> getChainIdEntry chainId
-  case mcInfo of
-    Nothing -> do
-      logF . concat $
-        [ "We haven't seen the details for chain "
-        , format (SHA chainId)
-        , ". Inserting the chain Id into the GetChains list"
-        ]
-      requestChain chainId
-    Just _ -> do
-      forM_ ptxs $ \(ts, ptx) -> do
-        logF . concat $
-          [ "We know the details for chain "
-          , format (SHA chainId)
-          , ". Inserting "
-          , prettyOTx ptx
-          , "into PrivateHashDB"
-          ]
-        let tHash = txHash ptx
-        broadcast ptx
-        insertPrivateHash ptx
-        when (otOrigin ptx == TO.API) $ do
-          cHash <- getNewChainHash chainId
-          logF . concat $
-            [ "Created chain hash "
-            , format cHash
-            , " for transaction "
-            , format tHash
-            ]
-          let SHA th' = tHash
-              SHA ch' = cHash
-              phtx = TD.PrivateHashTX th' ch'
-          yield phtx
-          broadcase phtx
-      runBlocks chainId
-
 runBlocks :: HasPrivateHashDB h t b m => Word256 -> m [b]
 runBlocks chainId = go
-  where go = do
-    btr <- maybe S.empty _blocksToRun <$> getChainIdEntry chainId
-    if S.null btr
-      then return []
-      else do
-        let b0 = S.elemAt 0 btr
-        mBlock <- getBlockHashEntry (_bhash b0)
-        fmap (fromMaybe [] . join) . for mBlock $ \block -> do
-          mBlock <- hydratePrivateHashes chainId block
-          for mBlock $ \b -> do
-            modifyChainIdEntryState_ chainId $ blocksToRun %= S.delete b
-            return (b:go)
+  where
+    go = do
+      btr <- maybe S.empty _blocksToRun <$> getChainIdEntry chainId
+      if S.null btr
+        then return []
+        else do
+          let b0 = S.elemAt 0 btr
+          mBlock <- getBlockHashEntry (_bhash b0)
+          fmap (fromMaybe [] . join) . for mBlock $ \block -> do
+            mHydrated <- hydratePrivateHashes (Just chainId) block
+            for mHydrated $ \b -> do
+              modifyChainIdEntryState_ chainId $ blocksToRun %= S.delete b0
+              (b:) <$> go
 
 accumT :: Monad m => s -> [a] -> (s -> a -> m (b,s)) -> m ([b],s)
 accumT s [] _ = pure ([],s)
@@ -196,12 +189,19 @@ hydratePrivateHashes chainF b = do
   insertBlockHashEntry bHash b
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (blockTransactions b) $ \st@(dts,cs) tx -> do
+    let tHash = txHash tx
+        notHydrating msg = logF . concat $
+          [ "Not hydrating transaction "
+          , format tHash
+          , " because "
+          , msg
+          ]
     if not $ isPrivateHashTX tx
-      then return (Nothing, st)
+      then do
+      notHydrating "it's not a private transaction"
+      return (Nothing, st)
       else do
-        let TD.PrivateHashTX th' ch' = tx
-            tHash = SHA th'
-            cHash = SHA ch'
+        let cHash = txChainHash tx
         runPrivateHashTX tHash cHash
         repsertChainHashEntry_ cHash $
           return . maybe
@@ -209,42 +209,37 @@ hydratePrivateHashes chainF b = do
             (inBlocks %~ (Q.|> bHash))
         mChainId <- join . fmap _onChainId <$> getChainHashEntry cHash
         case mChainId of
-          Nothing -> return (Nothing, st)
+          Nothing -> do
+            notHydrating "we don't know the chain ID"
+            return (Nothing, st)
           Just chainId -> if discluded chainId || S.member chainId cs
             then do
-              logF "This chain is discluded!"
+              notHydrating "its chain ID is discluded from this hydration round"
               return (Nothing, st)
             else getChainIdEntry chainId >>= \case
-              Nothing -> return (Nothing, st)
+              Nothing -> do
+                notHydrating "we don't have the info for its chain"
+                return (Nothing, st)
               Just ChainIdEntry{..} -> do
-                let ready = if S.null _blocksToRun
-                             then True
-                             else (_bhash $ S.elemAt 0 _blocksToRun) == bHash
-                if ready
+                if not (S.null _blocksToRun || (_bhash $ S.elemAt 0 _blocksToRun) == bHash)
                   then do
-                    logF "Ready to run block on this chain"
-                    getTxHashEntry tHash >>= \case
-                      Just ptx -> do
-                        logF $ "Transaction hash " ++ format tHash ++ " is not missing"
-                        insertPrivateHash ptx
-                        return (Just ptx, st)
-                      Nothing -> do
-                        logF . concat $
-                          [ "Transaction hash "
-                          , format tHash
-                          , " is missing."
-                          , " Inserting into TxBlockDB and DependentTxDB"
-                          ]
-                        modifyChainIdEntryState_ chainId $ do
-                          when (isNothing chainF) $
-                            blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
-                        return (Nothing, (tHash:dts, S.insert chainId cs))
-                  else do
-                    logF "This is not the chain's next block to run."
+                    notHydrating "this is not the chain's next block to run"
                     modifyChainIdEntryState_ chainId $
                       when (isNothing chainF) $
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                     return (Nothing, (dts,S.insert chainId cs))
+                  else do
+                    getTxHashEntry tHash >>= \case
+                      Nothing -> do
+                        notHydrating "we don't have this transaction's body"
+                        modifyChainIdEntryState_ chainId $ do
+                          when (isNothing chainF) $
+                            blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
+                        return (Nothing, (tHash:dts, S.insert chainId cs))
+                      Just ptx -> do
+                        logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
+                        insertPrivateHash ptx
+                        return (Just ptx, st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
@@ -260,15 +255,13 @@ hydratePrivateHashes chainF b = do
       , show (map format depTXs)
       , " Inserting them into GetTransactions list"
       ]
-    mapM_ insertGetTransactionsDB depTXs
+    mapM_ requestTransaction depTXs
   if null txs''
     then return Nothing
-    else do
-      P.incCounter seqBlocksReleased
-      return . Just $ b{bReceiptTransactions = txs''}
+    else return . Just $ buildBlock' (blockHeader b) txs'' (blockUncleHeaders b)
 
-insertNewChainInfo :: HasPrivateHashDB h t b m => [IngestGenesis] -> m ()
-insertNewChainInfo chains = forM_ chains $ \ig -> do
+insertNewChainInfo :: HasPrivateHashDB h t b m => [(Word256,ChainInfo)] -> m ()
+insertNewChainInfo chains = forM_ chains $ \(chainId,cInfo) -> do
   cHash <- generateInitialChainHash cInfo
   insertSeenChain chainId cInfo
   insertChainHash cHash chainId

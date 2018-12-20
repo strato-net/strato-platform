@@ -34,14 +34,9 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
-import           Blockchain.Sequencer.DB.ChainHashDB
 import           Blockchain.Sequencer.DB.DependentBlockDB
-import           Blockchain.Sequencer.DB.GetChainsDB
-import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.PrivateHashDB
-import           Blockchain.Sequencer.DB.PrivateTxDB
-import           Blockchain.Sequencer.DB.SeenChainDB
 import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.DB.Witnessable
