@@ -77,14 +77,6 @@ bool2Word256::Bool->Word256
 bool2Word256 True  = 1
 bool2Word256 False = 0
 
--- word256ToWidth :: Word256 -> Int
--- word256ToWidth = fromInteger . toInteger . max 256
-{-
-word2562Bool::Word256->Bool
-word2562Bool 1 = True
-word2562Bool _ = False
--}
-
 binaryAction::(Word256->Word256->Word256)->VMM ()
 binaryAction act = do
   x <- pop
