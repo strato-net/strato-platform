@@ -975,7 +975,7 @@ runCodeFromStart = do
   theData <- getEnvVar envInputData
 
   when flags_debug $
-     lift $ $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
+     $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode code))
 
   case code of
    PrecompiledCode x -> do

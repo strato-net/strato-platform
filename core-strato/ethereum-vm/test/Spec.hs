@@ -11,6 +11,7 @@ import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
 import           Data.Maybe
@@ -28,6 +29,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
+import           Blockchain.VM.Code
 import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.Opcodes
 import           Blockchain.VM.VMState hiding (isRunningTests)
@@ -327,3 +329,11 @@ spec = do
       t 0xfd REVERT
       t 0xfe INVALID
       t 0xff SUICIDE
+
+  describe "showCode" $ do
+    it "more or less maintains format" $
+      let c = Code . B.pack . map (fromIntegral . fromEnum) $ [PUSH3, UUBB, UUCC, UUDD, JUMPDEST, ADD, MUL]
+      in showCode c `shouldBe` unlines ["0 62bbccdd PUSH3 [187,204,221] -- 12307677",
+                                        "4 5b JUMPDEST",
+                                        "5 01 ADD",
+                                        "6 02 MUL"]

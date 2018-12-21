@@ -65,6 +65,8 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
+import           Blockchain.Util
+import           Blockchain.VM.Code
 import           Blockchain.VM.Environment
 import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.VMState
@@ -184,7 +186,13 @@ push val = do
     throwE StackTooLarge
 
 pushn :: Int -> VMM ()
-pushn = error "TODO(tim): pushn"
+pushn n = do
+  vmState <- lift get
+  curPC <- readPC vmState
+  code <- getEnvVar envCode
+  let val = byteString2Integer . codeSlice (curPC+1) n $ code
+  push val
+  incrementPC n
 
 swapn::Int->VMM ()
 swapn n = do
