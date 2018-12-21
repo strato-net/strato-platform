@@ -184,7 +184,7 @@ push val = do
     throwE StackTooLarge
 
 pushn :: Int -> VMM ()
-pushn = undefined
+pushn = error "TODO(tim): pushn"
 
 swapn::Int->VMM ()
 swapn n = do

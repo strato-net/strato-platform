@@ -1,18 +1,15 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 import Criterion.Main
-import Control.DeepSeq
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
 import qualified Data.ByteString     as B
--- import qualified Data.Map            as M
 import qualified Data.Vector         as V
 import qualified Data.Vector.Unboxed as UV
 import Data.Word
-import GHC.Generics
 
 import Blockchain.Data.Code
 import Blockchain.VM
@@ -33,14 +30,6 @@ benchOperationGasPrice op = bench ("opGasPrice: " ++ show op)
 benchJumpGet :: Int -> Benchmark
 benchJumpGet n = bench ("getOperationAt: " ++ show n ++ " bytes")
                $ nf (flip getOperationAt (n-1)) (jumpDestCode n)
-
--- operationLookupHit :: Benchmark
--- operationLookupHit = bench "operation lookup hit"
---                    $ nf (M.lookup 0x5b) code2OpMap
-
--- operationLookupMiss :: Benchmark
--- operationLookupMiss = bench "operation lookup miss"
---                     $ nf (M.lookup 0xfb) code2OpMap
 
 vectorLookup :: Benchmark
 vectorLookup = bench "vector operation lookup"
@@ -77,25 +66,13 @@ benchPriceAndRefund :: VMState -> Operation -> Benchmark
 benchPriceAndRefund s op = bench ("VMM opGasPriceAndRefund " ++ show op)
                          . nfIO . runBenchVMM s $ opGasPriceAndRefund op
 
-data FakeOp = STOP | ADD | MUL | SUB | DIFF | OK | YEYAH
-            deriving (Show, Enum, Eq, Ord, Generic, NFData)
-
-benchIdOp :: Benchmark
-benchIdOp = bench "FakeOp id"
-          $ nf id YEYAH
-
-benchFromEnumOp :: Benchmark
-benchFromEnumOp = bench "FakeOp fromEnum"
-                $ nf fromEnum YEYAH
-
 main :: IO ()
 main = do
   states <- replicateM 100 initialState
   defaultMain $ map benchJumpGet [1, 100, 10000, 1000000]
-             ++ [-- operationLookupHit, operationLookupMiss,
-                 vectorLookup, unsafeVectorLookup,
-                 unboxedVectorLookup, unboxedVectorUnsafeLookup,
-                 benchIdOp, benchFromEnumOp]
+             ++ [vectorLookup, unsafeVectorLookup,
+                 unboxedVectorLookup, unboxedVectorUnsafeLookup
+               ]
              ++ map benchOperationGasPrice [DUP1, SWAP1, PUSH3, GASLIMIT, SUICIDE]
              ++ [ benchVMMNothing (states !! 0)
                 , benchPriceAndRefund (states !! 1) JUMPDEST]
