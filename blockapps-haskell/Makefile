@@ -29,13 +29,13 @@ $(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4 $(FAKEROOT)/usr/bin/solc-
 	ln -f $< $@
 
 build_haskell: prebuild $(FAKEROOT)/usr/bin/solc
-	stack setup
-	stack install --local-bin-path=$(FAKEROOT)/usr/bin
-	stack test --no-run-tests
+	stack build --test --no-run-tests \
+        --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_haskell_profiled: prebuild build_solidity
-	stack setup
-	stack install --profile --work-dir .stack-work-profile --local-bin-path=$(FAKEROOT)/usr/bin
+	stack build --profile --work-dir .stack-work-profile \
+        --test --no-run-tests \
+        --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_deploybase: prebuild
 	cp -f Dockerfile.deploybase $(DOCKER_DUMMY)
