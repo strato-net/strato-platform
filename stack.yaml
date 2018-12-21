@@ -41,6 +41,7 @@ packages:
 - core-strato/blockapps-haskoin/
 - core-strato/ethereum-rlp/
 - core-strato/blockstanbul/
+- core-strato/privacy/
 - shared-util/cross-monitoring/
 - clockwork
 - location:
