@@ -69,6 +69,7 @@ import           Blockchain.VM.PrecompiledContracts
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
@@ -898,6 +899,7 @@ runCodeEVMProfile = whileM $ do
   runCode
   totalNanoseconds <- liftIO cwAfter
   $logInfoS "runCodeEVMProfile" . T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
+  recordOpTiming op totalNanoseconds
   fmap not . lift $ gets done
 
 runCodeSQLTrace :: Int -> VMM ()

@@ -1,7 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.VMMetrics where
 
+import Control.Monad.IO.Class
+import Data.Data
+import Data.Int
 import Prometheus
+import qualified Data.Text as T
+
+import Blockchain.VM.Opcodes
 
 vmBlocksProcessed :: Counter
 vmBlocksProcessed = unsafeRegister $ counter (Info "vm_blocks_processed" "evm counter for blocks processed")
@@ -41,3 +47,14 @@ vmTxMined= unsafeRegister $ gauge (Info "vm_tx_mined" "evm gauge for tx mined")
 
 vmTxMining :: Gauge
 vmTxMining = unsafeRegister $ gauge (Info "vm_tx_mining" "evm gauge for transaction mining")
+
+opTiming :: Vector T.Text Summary
+opTiming = unsafeRegister
+         . vector "operation_constructor"
+         . flip summary defaultQuantiles
+         $ Info "opcode_timing" "Measured duration in ns for different opcodes"
+
+
+recordOpTiming :: (MonadIO m) => Operation -> Int64 -> m ()
+recordOpTiming op t = liftIO $
+  withLabel opTiming (T.pack . showConstr . toConstr $ op) (flip observe (fromIntegral t))
