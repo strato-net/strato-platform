@@ -86,8 +86,10 @@ function newnode {
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
   if [ -n "${blockstanbulAdmins}" ]; then
-    baFlag="blockstanbul_admins=${blockstanbulAdmins}"
+    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
+  echo ${blockstanbulAdmins}
+
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${baFlag}"\
     --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer

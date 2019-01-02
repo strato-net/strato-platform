@@ -90,6 +90,7 @@ debugShowCtx = do
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
+  debugLog "showctx/admins" authSenders show
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
