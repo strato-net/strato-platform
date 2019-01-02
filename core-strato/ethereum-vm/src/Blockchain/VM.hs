@@ -373,7 +373,7 @@ runOperation LOG4 = logN 4
 runOperation MLOAD = do
   p <- pop
   bytes <- mLoad p
-  push $ (fromInteger (bytes2Integer bytes)::Word256)
+  push $ fastBytesToWord256 bytes
 
 runOperation MSTORE = do
   p <- pop

@@ -49,12 +49,20 @@ safeRead mem x = do
     then V.read mem (fromIntegral x)
     else return 0
 
-safeReadRange :: V.IOVector Word8 -> Word256 -> Word256 -> IO [Word8]
-safeReadRange v offset count = do
-  let len = V.length v
-  if (offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)
-    then mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
-    else return []
+safeReadRange :: V.IOVector Word8 -> Word256 -> Word256 -> IO B.ByteString
+safeReadRange v offset count' = do
+  let count = fromIntegral count'
+  dst <- PBA.newPinnedByteArray count
+  PBA.fillByteArray dst 0 count 0
+  let V.MV_Word8 (P.MVector physicalOffset len src) = v
+  let logicalOffset = fromIntegral offset
+  PBA.copyMutableByteArray dst 0 src (physicalOffset + logicalOffset) (min (len - logicalOffset) count)
+  let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+  BU.unsafePackAddressLen 32 addr#
+  -- let
+  -- if (offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)
+  --   then mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
+  --   else return []
 
 getSizeInWords::VMM Word256
 getSizeInWords = do
@@ -120,14 +128,14 @@ getShow::Memory->IO String
 getShow (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
   --fmap (show . B16.encode . B.pack) $ sequence $ V.read arr <$> fromIntegral <$> [0..fromIntegral msize-1]
-  fmap (show . B16.encode . B.pack) $ safeReadRange arr 0 msize
+  fmap (show . B16.encode) $ safeReadRange arr 0 msize
 
 getMemAsByteString::Memory->IO B.ByteString
 getMemAsByteString (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
-  liftIO $ fmap B.pack $ safeReadRange arr 0 msize
+  safeReadRange arr 0 msize
 
-mLoad::Word256->VMM [Word8]
+mLoad::Word256->VMM B.ByteString
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
@@ -144,8 +152,7 @@ mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if n
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
   state <- lift get
-  val <- liftIO $ fmap B.pack $ safeReadRange (mVector $ memory state) p size
-  return val
+  liftIO $ safeReadRange (mVector $ memory state) p size
 
 unsafeSliceByteString::Word256->Word256->VMM B.ByteString
 unsafeSliceByteString _ 0 = return $ B.empty
