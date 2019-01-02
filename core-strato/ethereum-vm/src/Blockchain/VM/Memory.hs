@@ -1,7 +1,5 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE BangPatterns         #-}
-{-# LANGUAGE MagicHash            #-}
 module Blockchain.VM.Memory (
   Memory(..),
   getSizeInBytes,
@@ -23,14 +21,11 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
-import qualified Data.ByteString.Unsafe       as BU
 import           Data.IORef
-import qualified Data.Primitive.Addr          as PA
-import qualified Data.Primitive.ByteArray     as PBA
 import qualified Data.Vector                  as DV
-import qualified Data.Vector.Unboxed.Mutable  as V
-import qualified Data.Vector.Primitive        as P
+import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
+import           Foreign
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
@@ -151,20 +146,19 @@ unsafeSliceByteString::Word256->Word256->VMM B.ByteString
 unsafeSliceByteString _ 0 = return $ B.empty
 unsafeSliceByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
-  V.MV_Word8 (P.MVector off _ src) <- lift $ gets (mVector . memory)
-  liftIO $ do
-    dst <- PBA.newPinnedByteArray 32
-    PBA.copyMutableByteArray dst 0 src (off + fromIntegral p) 32
-    let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
-    BU.unsafePackAddressLen 32 addr#
+  state <- lift get
+  let (fptr, len) = V.unsafeToForeignPtr0 (V.slice (fromIntegral p) (fromIntegral size) $ mVector $ memory state)
+  liftIO $ withForeignPtr fptr $ \ptr ->
+    B.packCStringLen (castPtr ptr, len * sizeOf (undefined :: Word8))
+
 
 mStore::Word256->Word256->VMM ()
 mStore p val = do
-  setNewMaxSize (fromIntegral p + 32)
-  V.MV_Word8 (P.MVector off _ dst) <- lift $ gets (mVector . memory)
-  liftIO $! do
-    src <- fastWord256ToByteArray val
-    PBA.copyMutableByteArray dst (off + fromIntegral p) src 0 32
+  setNewMaxSize (fromIntegral p+32)
+  state <- lift get
+  let bytes = DV.fromList $ word256ToBytes val
+      ps    = DV.enumFromN (fromIntegral p) (DV.length bytes)
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) ps bytes
 
 mStore8::Word256->Word8->VMM ()
 mStore8 p val = do

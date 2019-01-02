@@ -9,7 +9,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
-    word256ToBytes, bytesToWord256, fastWord256ToByteString, fastWord256ToByteArray, fastBytesToWord256,
+    word256ToBytes, bytesToWord256, fastWord256ToBytes, fastBytesToWord256,
     word512ToBytes, bytesToWord512
  ) where
 
@@ -65,23 +65,16 @@ bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of byt
 word256ToBytes :: Word256 -> [Word8]
 word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 
-fastWord256ToByteString :: Word256 -> B.ByteString
-fastWord256ToByteString ws = unsafePerformIO $ do
-  mba <- fastWord256ToByteArray ws
-  let !(PA.Addr addr#) = PBA.mutableByteArrayContents mba
-  BU.unsafePackAddressLen 32 addr#
-
--- Creates a pinned bytearray from a word256
-{-# INLINE fastWord256ToByteArray #-}
-fastWord256ToByteArray :: Word256 -> IO (PBA.MutableByteArray RealWorld)
-fastWord256ToByteArray ws = do
+fastWord256ToBytes :: Word256 -> B.ByteString
+fastWord256ToBytes ws =
   let n = getBigWordInteger ws
-  case n of
-    S# i# -> do
+  in case n of
+    S# i# -> unsafePerformIO $ do
       dst <- PBA.newPinnedByteArray 32
       PBA.writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
-      return dst
-    Jp# bn -> do
+      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
+    Jp# bn -> unsafePerformIO $ do
       dst <- PBA.newPinnedByteArray 32
       case sizeofBigNat# bn of
         1# -> do
@@ -105,7 +98,8 @@ fastWord256ToByteArray ws = do
           PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
           PBA.writeByteArray dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
         k# -> error $ "Word256 overflow or unanticipated architecture" ++ show (I# k#)
-      return dst
+      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
     _ -> error "negative Word256"
 
 bytesToWord256 :: [Word8] -> Word256
