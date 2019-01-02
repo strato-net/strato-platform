@@ -21,7 +21,6 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
-import qualified Data.ByteString.Unsafe       as BU
 import           Data.IORef
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
@@ -157,13 +156,9 @@ mStore::Word256->Word256->VMM ()
 mStore p val = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  let bytes = fastWord256ToBytes val
-      mem = mVector $! memory state
-  liftIO $ V.unsafeWith mem $ \dst ->
-             -- bytes is not null terminated, so this isn't a real C String.
-             -- That's not a problem, because we know how long it is.
-             BU.unsafeUseAsCString bytes $ \src ->
-               copyBytes (plusPtr dst (fromIntegral p)) src 32
+  let bytes = DV.fromList $ word256ToBytes val
+      ps    = DV.enumFromN (fromIntegral p) (DV.length bytes)
+  liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) ps bytes
 
 mStore8::Word256->Word8->VMM ()
 mStore8 p val = do
