@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE BangPatterns         #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Model.ExtendedWord
  (
@@ -7,7 +9,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
-    word256ToBytes, bytesToWord256,
+    word256ToBytes, bytesToWord256, fastWord256ToBytes, fastBytesToWord256,
     word512ToBytes, bytesToWord512
  ) where
 
@@ -15,14 +17,24 @@ import qualified Data.Aeson                as Ae
 import qualified Data.Aeson.Encoding       as Enc
 import           Data.Binary
 import           Data.Bits
+import qualified Data.ByteArray            as BA
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Lazy      as BL
 import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
+import qualified Data.ByteString.Unsafe    as BU
 import           Data.Ix
+import qualified Data.Primitive.Addr       as PA
+import qualified Data.Primitive.ByteArray  as PBA
 import qualified Data.Text                 as T
-import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512)
+import qualified Foreign.Storable          as FS
+import           GHC.Exts
+import           GHC.Integer.GMP.Internals
+import           GHC.Word
+import           System.Endian
+import           System.IO.Unsafe
 
+import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Format
 
@@ -53,11 +65,85 @@ bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of byt
 word256ToBytes :: Word256 -> [Word8]
 word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 
+fastWord256ToBytes :: Word256 -> B.ByteString
+fastWord256ToBytes ws =
+  let n = getBigWordInteger ws
+  in case n of
+    S# i# -> unsafePerformIO $ do
+      dst <- PBA.newPinnedByteArray 32
+      PBA.writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
+      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
+    Jp# bn -> unsafePerformIO $ do
+      dst <- PBA.newPinnedByteArray 32
+      case sizeofBigNat# bn of
+        1# -> do
+          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          PBA.writeByteArray dst 2 (0 :: Word)
+          PBA.writeByteArray dst 1 (0 :: Word)
+          PBA.writeByteArray dst 0 (0 :: Word)
+        2# -> do
+          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          PBA.writeByteArray dst 1 (0 :: Word)
+          PBA.writeByteArray dst 0 (0 :: Word)
+        3# -> do
+          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+          PBA.writeByteArray dst 0 (0 :: Word)
+        4# -> do
+          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+          PBA.writeByteArray dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
+        k# -> error $ "Word256 overflow or unanticipated architecture" ++ show (I# k#)
+      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
+    _ -> error "negative Word256"
+
 bytesToWord256 :: [Word8] -> Word256
 bytesToWord256 bytes | length bytes == 32 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [256-8,256-16..0] bytes
                      | otherwise = error $
                         "bytesToWord256 was called with the wrong number of bytes: " ++ show bytes
+
+fastBytesToWord256 :: B.ByteString -> Word256
+fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256f called with the wrong number of bytes: " ++ show bytes
+                         | otherwise = unsafePerformIO $
+  (BA.withByteArray bytes :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
+    hh <- fromBE64 <$> FS.peekElemOff src 0
+    hl <- fromBE64 <$> FS.peekElemOff src 1
+    lh <- fromBE64 <$> FS.peekElemOff src 2
+    ll <- fromBE64 <$> FS.peekElemOff src 3
+    let numWords = case () of
+                      () | hh .|. hl .|. lh == 0 -> 1
+                         | hh .|. hl == 0 -> 2
+                         | hh == 0 -> 3
+                         | otherwise -> 4
+    if numWords == 1 && ll <= 0x7fffffffffffffff
+      then let !(W64# w#) = ll
+           in return (BigWord (S# (word2Int# w#)))
+      else do
+        dst <- PBA.newPinnedByteArray (8 * numWords)
+        case numWords of
+          1 -> PBA.writeByteArray dst 0 ll
+          2 -> do
+            PBA.writeByteArray dst 0 ll
+            PBA.writeByteArray dst 1 lh
+          3 -> do
+            PBA.writeByteArray dst 0 ll
+            PBA.writeByteArray dst 1 lh
+            PBA.writeByteArray dst 2 hl
+          4 -> do
+            PBA.writeByteArray dst 0 ll
+            PBA.writeByteArray dst 1 lh
+            PBA.writeByteArray dst 2 hl
+            PBA.writeByteArray dst 3 hh
+          _ -> error $ "unexpected number of words in word256: " ++ show numWords
+        let !(PBA.MutableByteArray dst#) = dst
+        let dst'# = unsafeCoerce# dst# :: PBA.ByteArray#
+        return . BigWord $ Jp# (BN# dst'#)
 
 word512ToBytes :: Word512 -> [Word8]
 word512ToBytes word = map (fromIntegral . (word `shiftR`)) [512-8, 512-16..0]

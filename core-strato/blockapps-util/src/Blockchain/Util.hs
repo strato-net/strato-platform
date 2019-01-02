@@ -3,6 +3,7 @@
 module Blockchain.Util where
 
 import           Control.Monad.State.Lazy (State, execState, get, put)
+import qualified Data.Binary              as Binary
 import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
@@ -11,12 +12,10 @@ import qualified Data.Map.Strict          as M
 import qualified Data.NibbleString        as N
 import           Data.Word
 import           Numeric
+import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
 import           Blockchain.ExtWord
 
-import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
-
-import qualified Data.Binary              as Binary
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
@@ -67,6 +66,37 @@ integer2Bytes x = integer2Bytes (x `shiftR` 8) ++ [fromInteger (x .&. 255)]
 integer2Bytes1::Integer->[Word8]
 integer2Bytes1 0 = [0]
 integer2Bytes1 x = integer2Bytes x
+
+word256ToBytes :: Word256 -> B.ByteString
+word256ToBytes ws =
+  let n = getBigWordInteger ws
+  in case n of
+    S# i# -> unsafePerformIO $ do
+      dst <- newPinnedByteArray 32
+      writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
+      let !(Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
+    Jp# bn -> unsafePerformIO $ do
+      dst <- newPinnedByteArray 32
+      case sizeofBigNat# bn of
+        1# -> do
+          writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+        2# -> do
+          writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+        3# -> do
+          writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+        4# -> do
+          writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+          writeByteArray dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
+        k# -> error $ "Word256 overflow or unanticipated architecture" ++ show (I# k#)
+      let !(Addr addr#) = PBA.mutableByteArrayContents dst
+      BU.unsafePackAddressLen 32 addr#
+    _ -> error "negative Word256"
 
 padZeros::Int->String->String
 padZeros n s = replicate (n - length s) '0' ++ s
