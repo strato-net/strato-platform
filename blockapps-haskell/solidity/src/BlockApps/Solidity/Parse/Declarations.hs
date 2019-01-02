@@ -6,6 +6,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Declarations where
 
+import           Data.Function                        (on)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -24,7 +25,6 @@ import           BlockApps.Solidity.Xabi              (Xabi (..))
 import qualified BlockApps.Solidity.Xabi              as Xabi
 import qualified BlockApps.Solidity.Xabi.Def          as Xabi
 import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
-
 
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
@@ -47,13 +47,13 @@ solidityContract = do
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-  allCtors <- if length ctorList > 1
+  mCtor <- if length ctorList > 1
                   then fail "multiple constructors defined"
-                  else return . Map.fromList $ ctorList
+                  else return . fmap snd . listToMaybe $ ctorList
 
   return $ NamedXabi (Text.pack contractName') (
         Xabi { xabiFuncs = allFunctions
-             , xabiConstr = allCtors
+             , xabiConstr = mCtor
              , xabiVars = (constants declarations) `Map.union`(variables declarations)
              , xabiTypes =
                Map.fromList $
@@ -205,6 +205,9 @@ simpleVariableDeclaration = do
 
 {- Functions and function-like -}
 
+constructorName :: String
+constructorName = "constructor"
+
 -- | Parses a function definition.
 --
 functionDeclaration :: SolidityParser (String, Declaration)
@@ -212,10 +215,10 @@ functionDeclaration = do
   functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
                   -- Starting with 0.4.22, constructor() <mods> { <body> } is
                   -- the preferred syntax for defining a constructor
-                  (reserved "constructor" >> getContractName)
+                  (reserved constructorName >> return constructorName)
   cName <- getContractName
   xabi <- functionXabi
-  let tipe = if cName == functionName
+  let tipe = if ((||) `on` (== functionName)) cName constructorName
                 then ConstructorDeclaration
                 else FuncDeclaration
   return (functionName, tipe xabi)

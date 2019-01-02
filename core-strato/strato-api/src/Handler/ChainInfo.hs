@@ -1,7 +1,9 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Handler.ChainInfo where
 
@@ -10,21 +12,18 @@ import qualified Data.Map                       as M
 import qualified Data.Set                       as S
 import qualified Data.Text                      as T
 
-import           Blockchain.SHA
-import           Blockchain.Data.TXOrigin
-import           Blockchain.EthConf             (runKafkaConfigured)
-import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
-import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
-import           Import                         hiding (hash)
-import           Numeric                        (showHex)
-
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
-import           Blockchain.TypeLits
-import           System.Entropy
-import           Blockchain.Util
+import           Blockchain.Data.TXOrigin
+import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord             (Word256)
+import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
+import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.SHA
+
 import           Handler.Filters
+import           Import                         hiding (hash)
+import           Numeric                        (showHex)
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
@@ -37,13 +36,13 @@ emitKafkaTransactions gs = do
     return ()
 
 
-postChainR :: Handler Value
+postChainR :: HandlerFor App Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
-  ci <- parseJsonBody :: Handler (Result ChainInfo)
+  ci <- parseJsonBody :: HandlerFor App (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo _ acin cdin mb) -> do
+    Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ _) _) -> do
     -- add more checks?
       when (length acin == 0) $ invalidArgs ["account info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
@@ -55,23 +54,22 @@ postChainR = do
       case accountCodeHashes S.\\ codeCodeHashes of
         s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]
           | otherwise -> do
-            liftIO $ putStrLn $ T.pack $ show gen
-            bytes <- liftIO $ getEntropy 32
-            let cid = fromInteger $ byteString2Integer bytes
+            $logDebugS "postChainR" . T.pack $ show gen
+            let SHA cid = rlpHash gen
             emitKafkaTransactions [(cid, gen)]
             return . String . T.pack $ showHex cid ""
     _ -> invalidArgs ["could not parse the args"]
 
-getChainR :: Handler Value
+getChainR :: HandlerFor App Value
 getChainR = do
-  chainIds <- lookupGetParams "chainid" 
+  chainIds <- lookupGetParams "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
-  cInfos <- case chainIds of 
+  cInfos <- case chainIds of
       [] -> getChainInfos []
       [cid] -> if (T.unpack cid == "all")
                    then getChainInfos []
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
   case cInfos of
-      [] -> returnJson ([]::NamedMap "id" Word256 "info" ChainInfo)
+      [] -> notFound
       cis -> returnJson cis

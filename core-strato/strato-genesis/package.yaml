@@ -54,23 +54,24 @@ library:
     ghc-options: -Wall -O2
 
 executables:
-  genesis-setup:
-    ghc-options: -Wall -O2 -threaded
-    dependencies:
-      - strato-genesis
-      - hflags
-    main: GenesisSetup.hs
-    source-dirs: exec_src
-
   generate-genesis:
-    main: GenerateGenesis.hs
-    source-dirs: exec_src
-    ghc-options: -Wall -O2 -threaded
+    source-dirs: exec_src/
+    main: Main.hs
+    other-modules: []
     dependencies:
       - aeson-extra
       - aeson-pretty
       - hflags
       - strato-genesis
+
+  genesis-setup:
+    source-dirs: exec_src/
+    main: GenesisSetup.hs
+    other-modules: []
+    dependencies:
+      - strato-genesis
+      - hflags
+
 
 tests:
   strato-genesis-test:

@@ -64,7 +64,7 @@ valueToSolidityValue (ValueContract (Address addr)) =
   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
 valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index -- SolidityValueAsString $ name `Text.append` "." `Text.append` value
 valueToSolidityValue (ValueStruct namedItems) =
   SolidityObject $ map (fmap valueToSolidityValue) namedItems
@@ -509,45 +509,41 @@ encodeValue typeDefs' offset Struct{..} varName val = case OMap.lookup varName f
    Nothing -> Nothing
    Just (Right position, theType) -> case (textToValue (Just typeDefs') val theType) of
      Left err -> error $ "encodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
-     Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) v
+     Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) theType v
    Just (Left _, _) -> error "decodeValue: cannot convert constant variable to storage"
 
 encodeValue'
   :: TypeDefs
   -> Storage.Position
+  -> Type
   -> Value
   -> [(Word256,Word256)]
-encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} = \case
+encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
-  SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  ValueContract (Address a) -> encodeValue' typeDefs' position . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  ValueContract (Address a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]
 
-  SimpleValue (ValueString v) -> encodeValue' typeDefs' position . SimpleValue . ValueBytes Nothing $ Text.encodeUtf8 v
+  SimpleValue (ValueString v) -> encodeValue' typeDefs' position ty . SimpleValue . ValueBytes Nothing $ Text.encodeUtf8 v
 
   ValueFunction _ _ _ -> error "Cannot convert function to storage"
 
-  ValueArrayFixed _ _ -> error "Arrays not supported yet" --if len
-    -- then SimpleValue $ ValueUInt $ fromIntegral size
-    -- else ValueArrayFixed size theList
-    -- where
-    --   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-    --   ofs' :: Word256 = fromIntegral . toInteger $ maybe 0 id ofs
-    --   cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') . fromIntegral $ maybe 100 id cnt
-    --   theList = map (flip (encodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
+  ValueArrayFixed _ vs -> case ty of
+    TypeArrayFixed _ ty' ->
+      let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+          f i v = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) i `Storage.addOffset` offset) ty' v
+       in join $ zipWith f [0..] vs
+    _ -> error $ "encodeValue': Expected ValueArrayFixed to have type TypeArrayFixed, but got: " ++ show ty
 
-  ValueArrayDynamic _ -> error "Arrays not supported yet" --if len
-    -- then SimpleValue $ ValueUInt (storage offset)
-    -- else ValueArrayDynamic theList
-    -- where
-    --   (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-    --   --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-    --   ofs' = maybe 0 id ofs
-    --   cnt' = max 0 . min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
-    --   theList = (flip (EncodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
-    --   startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
+  ValueArrayDynamic vs -> case ty of
+    TypeArrayDynamic ty' ->
+      let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty'
+          startingKey = getArrayStartingKey offset
+          f i v = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) i `Storage.addOffset` startingKey) ty' v
+       in (offset, fromIntegral $ length vs) : (join $ zipWith f [0..] vs)
+    _ -> error $ "encodeValue': Expected ValueArrayDynamic to have type TypeArrayDynamic, but got: " ++ show ty
 
   -- ValueMapping _ -> error "Mappings not supported yet" --SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleValue tyk ++ " => " ++ formatValue tyv ++ ")"
 
@@ -572,7 +568,7 @@ encodeByteString offset byte size bs =
    in [(offset, byteStringToWord256 bss)]
 
 decodeByteString::Storage->Word256->Int->Int->Value
-decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B16.encode $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
 
 decodeCacheByteString :: Cache -> Word256 -> Int -> Int -> Value -> Value
 decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . B16.encode . ByteString.take size . ByteString.drop (32 - byte - size) . word256ToByteString <$> storage offset

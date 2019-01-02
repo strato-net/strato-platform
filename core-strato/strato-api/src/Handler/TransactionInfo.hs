@@ -7,6 +7,8 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE RankNTypes             #-}
 
 
 module Handler.TransactionInfo where
@@ -44,11 +46,11 @@ emitKafkaTransactions txs = do
         Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
-postTransactionR :: Handler ()
+postTransactionR :: HandlerFor App ()
 postTransactionR = do
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
-   tx <- parseJsonBody :: Handler (Result RawTransaction')
+   tx <- parseJsonBody :: HandlerFor App (Result RawTransaction')
    case tx of
        (Success (RawTransaction' raw "")) -> do
           let tx' = rawTX2TX raw
@@ -63,7 +65,7 @@ postTransactionR = do
           $logDebugS "transaction parse error" . T.pack . show $ err
           invalidArgs ["couldn't decode transaction"]
 
-postTransactionListR :: Handler ()
+postTransactionListR :: HandlerFor App ()
 postTransactionListR = do
    handlerStart <- liftIO $ getTime Realtime
 
@@ -71,7 +73,7 @@ postTransactionListR = do
    addHeader "Access-Control-Allow-Headers" "Content-Type"
 
    parserStart <- liftIO $ getTime Realtime
-   tx <- parseJsonBody :: Handler (Result [RawTransaction'])
+   tx <- parseJsonBody :: HandlerFor App (Result [RawTransaction'])
    case tx of
        (Success raws) -> do
           txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
@@ -99,7 +101,7 @@ postTransactionListR = do
         case a of String _ -> True
                   _        -> False
 
-optionsTransactionR :: Handler RepPlain
+optionsTransactionR :: HandlerFor App RepPlain
 optionsTransactionR = do
   addHeader "Access-Control-Allow-Origin" "*"
   addHeader "Access-Control-Allow-Headers" "Content-Type"
@@ -107,7 +109,7 @@ optionsTransactionR = do
 
   return $ RepPlain $ toContent ("" :: Text)
 
-getTransactionR :: Handler Value
+getTransactionR :: HandlerFor App Value
 getTransactionR = do
                  getParameters <- reqGetParams <$> getRequest
 

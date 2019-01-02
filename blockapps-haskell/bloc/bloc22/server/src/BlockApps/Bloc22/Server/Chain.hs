@@ -11,8 +11,11 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
+import           Crypto.Random.Entropy
+import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (isJust)
+import           Data.Maybe                        (fromMaybe, isJust)
+import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Opaleye                           hiding (not, null, index, sum)
 
@@ -22,6 +25,9 @@ import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
@@ -33,8 +39,23 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 governanceAddress :: Address
 governanceAddress = Address 0x100
 
+replaceMembers :: Struct
+               -> [Address]
+               -> Map.Map Text Text
+               -> Map.Map Text Text
+replaceMembers Struct{..} addrs m =
+  let tag = "__members__"
+      members = valueToText $ ValueArrayDynamic $ map (SimpleValue . ValueAddress) addrs
+      m' = Map.alter (const members) tag m
+   in case OMap.lookup tag fields of
+        Nothing -> m'
+        Just (Left _, _) -> m
+        Just (_, ty) -> case ty of
+          TypeArrayDynamic (SimpleType TypeAddress) -> m'
+          _ -> m
+
 postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
+postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
@@ -52,13 +73,32 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members) = do
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argsText = map (fmap argValueToText) $ Map.toList chaininputArgs
-              storage = encodeValues (typeDefs contract) (mainStruct contract) 0 argsText
+              argsText' = replaceMembers
+                            (mainStruct contract)
+                            (nmap1' members)
+                            (Map.fromList argsText)
+              storage = encodeValues
+                          (typeDefs contract)
+                          (mainStruct contract)
+                          0
+                          (Map.toList argsText')
               contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
               codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
+  nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let nonContractAcctInfo = nmap NonContract balances
       acctInfo = cAcctInfo ++ nonContractAcctInfo
-      chainInfo = ChainInfo lbl acctInfo codeInfo members
+      chainInfo = ChainInfo
+        (UnsignedChainInfo lbl
+                           acctInfo
+                           codeInfo
+                           members
+                           Nothing
+                           creationBlockHash
+                           nonce
+                           (fromMaybe Map.empty mmd)
+        )
+        Nothing
   chainId <- blocStrato $ Strato.postChain chainInfo
   when (isJust mContract) $ do
     let Just (cmId, _) = mContract
@@ -81,7 +121,7 @@ getChainInfo chainIds = do
       convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
         let chtup = (toTuple chp :: (ChainId, ChainInfo))
-        let chinfo =  snd chtup
+        let chinfo =  chainInfo $ snd chtup
         let getAddrBalance acct = case acct of
                                     NonContract a b -> (a, b)
                                     ContractNoStorage a b _ -> (a, b)

@@ -82,7 +82,7 @@ data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
 
 data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
                                    , igGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Read, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbHash                :: SHA
@@ -136,7 +136,7 @@ data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Read, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic)
 
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
@@ -386,6 +386,7 @@ instance RLPSerializable OutputTx where
 instance TransactionLike OutputTx where
     txHash        = otHash
     txPartialHash = txPartialHash . otBaseTx
+    txChainHash   = txChainHash . otBaseTx
     txSigner      = Just . otSigner
     txNonce       = txNonce . otBaseTx
     txType        = txType . otBaseTx
@@ -414,4 +415,5 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockTransactions = obReceiptTransactions
     blockUncleHeaders = obBlockUncles
 
+    blockOrdering = obTotalDifficulty
     buildBlock = OutputBlock TO.Morphism 0

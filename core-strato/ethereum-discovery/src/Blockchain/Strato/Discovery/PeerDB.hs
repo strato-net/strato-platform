@@ -11,8 +11,6 @@ module Blockchain.Strato.Discovery.PeerDB (
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Trans.Control
-
 import           Crypto.Types.PubKey.ECC
 import qualified Data.Text as T
 import           Data.Time.Clock
@@ -22,18 +20,14 @@ import           Blockchain.DB.SQLDB                   (withGlobalSQLPool)
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 
-getNumAvailablePeers :: (MonadUnliftIO m
-                        , MonadBaseControl IO m -- TODO(tim): Remove after upgrading postgres
-                        ) => m Int
+getNumAvailablePeers :: MonadUnliftIO m => m Int
 getNumAvailablePeers = do
     currentTime <- liftIO getCurrentTime
     withGlobalSQLPool $ \sqldb -> fmap length $ flip SQL.runSqlPool sqldb $ -- lolololol ever heard of SELECT COUNT
         SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 -- todo: respect the requester's target. also is this basically getClosePeers?s
-getPeersClosestTo :: (MonadUnliftIO m
-                     , MonadBaseControl IO m -- TODO(tim): Remove after upgrading postgres
-                     ) => NodeID -> T.Text -> Point -> m [PPeer]
+getPeersClosestTo :: MonadUnliftIO m => NodeID -> T.Text -> Point -> m [PPeer]
 getPeersClosestTo _ requesterIP _ = do
     peerEnts <- withGlobalSQLPool $ \sqldb -> flip SQL.runSqlPool sqldb $
         SQL.selectList [ PPeerIp SQL.!=. requesterIP, PPeerPubkey SQL.!=. Nothing] []

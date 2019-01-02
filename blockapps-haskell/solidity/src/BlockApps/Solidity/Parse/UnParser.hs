@@ -45,7 +45,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
   <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
   <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
-  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (xabiConstr contract)
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 

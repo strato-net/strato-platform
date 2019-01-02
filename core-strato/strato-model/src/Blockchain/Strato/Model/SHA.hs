@@ -64,3 +64,6 @@ keccak256 bs = convert (hash bs :: Digest Keccak_256)
 
 keccak512 :: S8.ByteString -> S8.ByteString
 keccak512 bs = convert (hash bs :: Digest Keccak_512)
+
+rlpHash :: RLPSerializable a => a -> SHA
+rlpHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode

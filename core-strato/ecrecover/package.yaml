@@ -57,10 +57,10 @@ default-extensions:
   - UnboxedTuples
 
 dependencies:
-  - text == 1.*
-  - bytestring == 0.10.*
-  - base-prelude == 1.*
-  - base == 4.*
+  - text
+  - bytestring
+  - base-prelude
+  - base
 
 library:
   source-dirs:
@@ -80,15 +80,15 @@ tests:
     dependencies:
       - blockapps-ecrecover
       # testing:
-      - tasty < 0.12
+      - tasty
       - tasty-quickcheck
-      - tasty-hunit < 0.10
-      - QuickCheck < 3
+      - tasty-hunit
+      - QuickCheck
       # parallelism and concurrency:
-      - parallel == 3.*
+      - parallel
       # basics:
-      - base == 4.*
-      - bytestring == 0.10.*
+      - base
+      - bytestring
 
 benchmarks:
   sequential-benchmark:

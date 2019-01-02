@@ -22,10 +22,10 @@ import qualified Database.Esqueleto as E
 import qualified Data.Text          as T
 import qualified Prelude            as P
 
-accountInfo :: [(Text, Text)] -> Handler Value
+accountInfo :: [(Text, Text)] -> HandlerFor App Value
 accountInfo params = do
     limit <- liftIO $ myFetchLimit
- 
+
     chainIds <- lookupGetParams "chainid"
 
     let index'   = fromIntegral $ (maybe 0 id $ extractPage "index" params) :: Int64
@@ -39,22 +39,22 @@ accountInfo params = do
             True ->  runDB $ E.select . E.distinct $
               E.from $ \(accStateRef) -> do
 
-              let criteria = P.map (getAccFilter (accStateRef)) $ params 
+              let criteria = P.map (getAccFilter (accStateRef)) $ params
               let matchChainId cid = (accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)
               let chainCriteria = case chainIds of
                     [] -> [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
                     [cid] -> do
-                        if (T.unpack cid == "main") 
+                        if (T.unpack cid == "main")
                             then [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
                             else if (T.unpack cid == "all")
-                                     then [] 
+                                     then []
                                      else [matchChainId cid]
-                    cids -> P.map matchChainId cids 
+                    cids -> P.map matchChainId cids
               let otherCriteria = ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
-              let allCriteria = case chainCriteria of 
+              let allCriteria = case chainCriteria of
                      [] -> [otherCriteria]
                      _ -> P.map (\cc -> cc : otherCriteria) chainCriteria
- 
+
               E.where_ (P.foldl1 (E.||.) (P.map (P.foldl1 (E.&&.)) allCriteria))
 
               E.limit $ limit
@@ -70,10 +70,10 @@ accountInfo params = do
 
     toRet (P.map E.entityVal modAccounts) (next $ appendIndex params)
   where
-    toRet :: [AddressStateRef] -> String -> Handler Value
+    toRet :: [AddressStateRef] -> String -> HandlerFor App Value
     toRet as gp = returnJson . P.map asrToAsrPrime . P.zip (P.repeat gp) $ as
 
-getAccountInfoR :: Handler Value
+getAccountInfoR :: HandlerFor App Value
 getAccountInfoR = do
         getParameters <- reqGetParams <$> getRequest
         accountInfo getParameters

@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 import ClassyPrelude
-import Control.Concurrent.Async.Lifted
 import Foundation
 
 import Test.Hspec.Core.Runner

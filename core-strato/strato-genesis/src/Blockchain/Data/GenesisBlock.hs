@@ -142,8 +142,8 @@ chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m
                           => ChainInfo
                           -> m StateRoot
 chainInfoToGenesisState ci = do
-    initializeCodeDB (codeInfo ci)
-    initializeStateDB (accountInfo ci)
+    initializeCodeDB (codeInfo $ chainInfo ci)
+    initializeStateDB (accountInfo $ chainInfo ci)
     stateRoot <$> getStateDB
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
@@ -203,7 +203,7 @@ initializeChainDBs :: ( MonadResource m
                    -> ChainInfo
                    -> StateRoot
                    -> t m ()
-initializeChainDBs chainId ChainInfo{..} sRoot = do
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
   genAddrStates <- getAllAddressStates
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
@@ -220,9 +220,9 @@ initializeChainDBs chainId ChainInfo{..} sRoot = do
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
          in (cHash, md)
-      getMetadata = flip Map.lookup metadatas
+      getMetadata = fmap (`Map.union` chainMetadata) . flip Map.lookup metadatas
       toAction a d = A.Action
-        { A._actionBlockHash = SHA 0
+        { A._actionBlockHash = creationBlock
         , A._actionBlockTimestamp = posixSecondsToUTCTime 0
         , A._actionBlockNumber = 0
         , A._actionTransactionHash = SHA chainId

@@ -9,9 +9,10 @@ build-type:          Simple
 
 
 dependencies:
-  - base >=4.8 && <4.10
+  - base >=4.8 && <4.12
   - alarmclock
   - bimap
+  - blockapps-privacy
   - classy-prelude
   - strato-model
   - blockapps-data
@@ -21,6 +22,7 @@ dependencies:
   - conduit
   - containers
   - directory
+  - exceptions
   - extra
   - mtl
   - resourcet
@@ -40,6 +42,7 @@ dependencies:
   - stm
   - stm-chans
   - stm-conduit
+  - conduit
   - conduit-combinators
   - blockstanbul
   - stm-chans
@@ -48,12 +51,14 @@ dependencies:
   - aeson
   - async
   - prometheus-client
+  - transformers
   - warp
   - servant-client
   - wai-extra
   - wai-middleware-prometheus
   - deepseq
   - exceptions
+  - unliftio
 
 ghc-options: -Wall -O2 -threaded
 
@@ -68,6 +73,7 @@ executables:
       - hflags
       - safe
       - strato-sequencer
+    other-modules: [Flags]
 
   keygen:
     source-dirs: exec-src/
@@ -77,6 +83,7 @@ executables:
       - aeson-pretty
       - entropy
       - hflags
+    other-modules: [Flags]
 
 tests:
   strato-sequencer-spec:

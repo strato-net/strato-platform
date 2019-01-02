@@ -30,11 +30,11 @@ instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
       where f = T.pack . formatSHAWithoutColor . unStrungSHA
 
-postBatchTransactionResultR :: Handler Value
+postBatchTransactionResultR :: HandlerFor App Value
 postBatchTransactionResultR = do
   addHeader "Access-Control-Allow-Origin" "*"
   chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
-  hashesR <- parseJsonBody :: Handler (Result [StrungSHA])
+  hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
         txrs <- runDB . E.select . E.from $ \txr -> do

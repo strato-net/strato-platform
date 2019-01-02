@@ -12,6 +12,7 @@ import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
+import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 import qualified Data.Text                          as T
@@ -52,12 +53,27 @@ getChainInfo chainId = do
           cInfos <- E.select . E.from $ \ciRef -> do
             E.where_ (ciRef E.^. CodeInfoRefChainInfoId E.==. E.val chainInfoRefId)
             return ciRef
-          return . Just . fromTuple $ (chainId,
-                                       ChainInfo
-                                         chainInfoRefChainLabel
-                                         (map ai aInfos)
-                                         (map ci cInfos)
-                                         (M.fromList (map makePairs members)))
+          mds <- E.select . E.from $ \cmdRef -> do
+            E.where_ (cmdRef E.^. ChainMetadataRefChainInfoId E.==. E.val chainInfoRefId)
+            return cmdRef
+          sig <- fmap listToMaybe . E.select . E.from $ \csRef -> do
+            E.where_ (csRef E.^. ChainSignatureRefChainInfoId E.==. E.val chainInfoRefId)
+            return csRef
+          return . Just . fromTuple $
+            ( chainId
+            , ChainInfo
+               (UnsignedChainInfo
+                 (T.pack chainInfoRefChainLabel)
+                 (map ai aInfos)
+                 (map ci cInfos)
+                 (M.fromList (map makePairs members))
+                 chainInfoRefParentChain
+                 chainInfoRefCreationBlock
+                 chainInfoRefChainNonce
+                 (M.fromList $ map md mds)
+               )
+               (fmap csig sig)
+            )
           where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
                 ai = \aInfo ->
                         let AccountInfoRef{..} = entityVal aInfo
@@ -83,6 +99,15 @@ getChainInfo chainId = do
                               codeInfoRefEvmByteCode
                               (T.pack codeInfoRefContractCode)
                               (T.pack codeInfoRefContractName)
+                md = \metadata ->
+                        let ChainMetadataRef{..} = entityVal metadata
+                         in (T.pack chainMetadataRefKey, T.pack chainMetadataRefValue)
+                csig = \sig ->
+                          let ChainSignatureRef{..} = entityVal sig
+                           in ChainSignature
+                                (fromInteger chainSignatureRefR)
+                                (fromInteger chainSignatureRefS)
+                                chainSignatureRefV
 
 getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do
@@ -103,14 +128,20 @@ getChainInfos chainIds = do
       Just cis -> return cis
 
 putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
-putChainInfo chainId ChainInfo{..} = do
+putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
   db <- getSQLDB
   runResourceT . flip SQL.runSqlPool db $ do
-    let chainInfoRef = ChainInfoRef chainId chainLabel
+    let chainInfoRef = ChainInfoRef chainId
+                                    (T.unpack chainLabel)
+                                    parentChain
+                                    creationBlock
+                                    chainNonce
     cirId <- E.insert chainInfoRef
     insertMany_ $ map (parseAInfo cirId) accountInfo
     insertMany_ $ map (parseCInfo cirId) codeInfo
     insertMany_ $ map (parseMember cirId) (M.toList members)
+    insertMany_ $ map (parseMetadata cirId) (M.toList chainMetadata)
+    traverse_ insert_ $ fmap (parseSignature cirId) csig
     return cirId
       where
         parseAInfo chid aInfo =
@@ -122,6 +153,14 @@ putChainInfo chainId ChainInfo{..} = do
           CodeInfoRef ch bc (T.unpack cc) (T.unpack cn)
         parseMember chi (ad, en) =
           ChainMemberRef chi (showEnode en) ad
+        parseMetadata chi (k, v) =
+          ChainMetadataRef chi (T.unpack k) (T.unpack v)
+        parseSignature chi ChainSignature{..} =
+          ChainSignatureRef
+            chi
+            (toInteger chainR)
+            (toInteger chainS)
+            chainV
 
 addMember :: (HasSQLDB m) => Word256 -> Address -> String -> m ()
 addMember chainId address enode = do

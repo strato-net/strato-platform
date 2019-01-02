@@ -39,8 +39,11 @@ import           Control.Monad.Trans.Resource
 
 import           Conduit
 import           Data.Conduit.TMChan
+import           Data.Conduit.TQueue
 import           Data.Foldable                             (toList)
 import           Data.IORef
+import           Data.Map                                  (Map)
+import qualified Data.Map                                  as M
 import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
@@ -49,16 +52,19 @@ import           Data.Time.Clock
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
+import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Class
 import           System.Directory                          (createDirectoryIfMissing)
 
 import qualified Database.LevelDB                          as LDB
@@ -67,7 +73,10 @@ data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
                       , _seenBlockDB         :: SeenBlockDB
                       , _seenTransactionDB   :: SeenTransactionDB
-                      , _privateHashDB       :: PrivateHashDB
+                      , _blockHashRegistry   :: Map SHA OutputBlock
+                      , _txHashRegistry      :: Map SHA OutputTx
+                      , _chainHashRegistry   :: Map SHA ChainHashEntry
+                      , _chainIdRegistry     :: Map Word256 ChainIdEntry
                       , _getChainsDB         :: S.Set Word256
                       , _getTransactionsDB   :: S.Set SHA
                       , _ldbBatchOps         :: Q.Seq LDB.BatchOp
@@ -109,9 +118,42 @@ instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
     putGetTransactionsDB = assign getTransactionsDB
 
-instance HasPrivateHashDB SequencerM where
-    getPrivateHashDB = use privateHashDB
-    putPrivateHashDB = assign privateHashDB
+instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
+    getChainId = return . hash . rlpSerialize . rlpEncode
+    generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
+    generateChainHashes tx =
+      let r = txSigR tx
+          s = txSigS tx
+          rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+          sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+       in return [rs,sr]
+
+    requestChain = insertGetChainsDB
+    requestTransaction = insertGetTransactionsDB
+    -- TODO: Add persistence layer
+    alterBlockHashEntry bHash f = do
+      bhr <- use blockHashRegistry
+      mbhe <- f $ M.lookup bHash bhr
+      blockHashRegistry %= M.alter (const mbhe) bHash
+      return mbhe
+
+    alterTxHashEntry tHash f = do
+      thr <- use txHashRegistry
+      mthe <- f $ M.lookup tHash thr
+      txHashRegistry %= M.alter (const mthe) tHash
+      return mthe
+
+    alterChainHashEntry cHash f = do
+      chr <- use chainHashRegistry
+      mche <- f $ M.lookup cHash chr
+      chainHashRegistry %= M.alter (const mche) cHash
+      return mche
+
+    alterChainIdEntry cId f = do
+      cir <- use chainIdRegistry
+      mcie <- f $ M.lookup cId cir
+      chainIdRegistry %= M.alter (const mcie) cId
+      return mcie
 
 instance HasSeenBlockDB SequencerM where
     getSeenBlockDB = use seenBlockDB
@@ -139,7 +181,10 @@ runSequencerM c mbc m = do
             { _dependentBlockDB    = depBlock
             , _seenBlockDB         = mkSeenBlockDB stxSize
             , _seenTransactionDB   = mkSeenTxDB stxSize
-            , _privateHashDB       = emptyPrivateHashDB
+            , _blockHashRegistry   = M.empty
+            , _txHashRegistry      = M.empty
+            , _chainHashRegistry   = M.empty
+            , _chainIdRegistry     = M.empty
             , _getChainsDB         = S.empty
             , _getTransactionsDB   = S.empty
             , _ldbBatchOps         = Q.empty
@@ -222,7 +267,7 @@ fuseChannels = do
   loop <- use loopTimeout
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
   (debugLog . transPipe lift) <$> mergeSources
-               [ sourceTMChan unseq .| mapC UnseqEvent
+               [ sourceTQueue unseq .| mapC UnseqEvent
                , sourceTMChan votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]

@@ -47,6 +47,7 @@ import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
@@ -59,7 +60,7 @@ ethereumVM = void . execContextM $ do
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
-    Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
+    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
     bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
@@ -156,7 +157,7 @@ insertNewChains events = do
       Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> do
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-        putGenesisStateRoot cId sr >> return [(cId, cInfo)]
+        putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 

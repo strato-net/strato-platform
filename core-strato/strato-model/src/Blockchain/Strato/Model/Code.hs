@@ -6,9 +6,11 @@ import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
+import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
 import           GHC.Generics
 import           Data.Aeson
+import           Data.Aeson.Types
 
 import           Blockchain.Data.RLP
 
@@ -29,5 +31,9 @@ instance ToJSON Code where
   toJSON (PrecompiledCode _) = error "cannot serialize precompiled codes"
 
 instance FromJSON Code where
-  parseJSON (String text) = return . Code . fst . B16.decode . encodeUtf8 $ text
-  parseJSON _ = error "malformed code"
+  parseJSON (String text) = return . Code . fst . B16.decode . encodeUtf8 . drop0x $ text
+    where drop0x :: T.Text -> T.Text
+          drop0x t = if "0x" `T.isPrefixOf` t
+                       then T.drop 2 t
+                       else t
+  parseJSON x = typeMismatch "Code" x

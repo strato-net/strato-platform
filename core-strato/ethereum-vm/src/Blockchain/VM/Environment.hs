@@ -1,7 +1,8 @@
-
 module Blockchain.VM.Environment where
 
+import           Control.DeepSeq
 import qualified Data.ByteString            as B
+import           GHC.Generics
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -9,6 +10,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Data.Map.Strict            (Map)
+import qualified Data.IntSet                as I
 import           Data.Text                  (Text)
 
 data Environment =
@@ -20,10 +22,9 @@ data Environment =
       envSender      :: Address,
       envValue       :: Integer,
       envCode        :: Code,
-      envJumpDests   :: [Word256],
+      envJumpDests   :: I.IntSet,
       envBlockHeader :: BlockData,
       envTxHash      :: SHA,
       envChainId     :: Maybe Word256,
       envMetadata    :: Maybe (Map Text Text)
-    }
-
+    } deriving (Show, Generic, NFData)

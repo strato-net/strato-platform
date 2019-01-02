@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Network.Kafka where
 
 import Control.Applicative
+import Control.DeepSeq
 import Control.Exception (Exception, IOException)
 import Control.Exception.Lifted (catch)
 import Control.Lens
@@ -51,6 +54,9 @@ data KafkaState = KafkaState { -- | Name to use as a client ID.
                              } deriving (Generic, Show)
 
 makeLenses ''KafkaState
+
+instance NFData KafkaState where
+  rnf ks = ks `seq` () -- TODO(tim): Supply a real deepseq
 
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)

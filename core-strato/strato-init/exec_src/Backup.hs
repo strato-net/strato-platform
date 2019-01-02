@@ -6,7 +6,6 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
 import qualified Data.ByteString.Base16                      as B16
@@ -37,7 +36,7 @@ data DBs =
     sqlDB   :: SQLDB
     }
 
-instance (LDB.MonadResource m, MonadBaseControl IO m, MonadUnliftIO m)=>HasSQLDB (ReaderT DBs m) where
+instance (LDB.MonadResource m, MonadUnliftIO m) => HasSQLDB (ReaderT DBs m) where
   getSQLDB = asks sqlDB
 
 main :: IO ()

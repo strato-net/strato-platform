@@ -1,8 +1,6 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
-
-module Main (main) where
-
+module Main where
 import           Control.Exception                         (bracket)
 import           Control.Monad
 import           Control.Monad.IO.Class

@@ -15,10 +15,11 @@ import           System.IO.Unsafe
 type TopicLabel = String
 type TopicName' = String
 
+{-# NOINLINE kafkaTopics #-}
 kafkaTopics:: Map.Map TopicLabel TopicName'
 kafkaTopics = unsafePerformIO $ do
-            contents <- B.readFile $ ".ethereumH/topics.yaml"
-            return $ (either error id . decodeEither) contents
+            contents <- B.readFile ".ethereumH/topics.yaml"
+            return $ (either (error . show) id . decodeEither') contents
 
 
 lookupTopic :: TopicLabel -> TopicName

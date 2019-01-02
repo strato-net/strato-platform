@@ -100,6 +100,23 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
 instance (NFData a, NFData b) => NFData (LargeKey a b) where
   rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
 
+instance ToSchema Word256 where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "LargeWord")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
+        & description ?~ "Fixed-size words of > 64 bits" )
+
+instance ToJSON Word256 where toJSON = toJSON . show256
+
+instance FromJSON Word256 where
+  parseJSON value = do
+    string <- parseJSON value
+    case fmap fromInteger (readMaybe $ "0x" ++ string) of
+      Nothing      -> fail $ "Could not decode Word256: " <> string
+      Just word256 -> return word256
+
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
 
 instance (Integral n, Show n) => Show (Hex n) where

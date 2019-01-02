@@ -35,7 +35,7 @@ import Test.QuickCheck
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, or ethconf. It does need redis, but targets
 -- a test instance.
-testContext :: (MonadIO m, MonadBaseControl IO m)
+testContext :: (MonadIO m, MonadUnliftIO m)
             => m (TMChan [IngestEvent], Config, Context)
 testContext = do
   redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {

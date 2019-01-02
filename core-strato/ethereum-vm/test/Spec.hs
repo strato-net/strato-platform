@@ -3,8 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Main where
-
 import           Prelude hiding (print)
 import           ClassyPrelude (print)
 
@@ -13,38 +11,29 @@ import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Control.Monad.State
-import           Control.Monad.Trans.Resource
-import           System.Directory
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
-import qualified Data.Default            (def)
-import qualified Data.Map                as M
 import           Data.Maybe
-import qualified Data.Sequence           as Q
 import qualified Data.Set                as S
 import           Data.Either
 import qualified Data.Text.Encoding      as Text
-import qualified Database.LevelDB        as DB
 
+import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Block as BDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
-import           Blockchain.Bagger.BaggerState (defaultBaggerState)
-import           Blockchain.Constants
 import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
+import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
-import qualified Blockchain.Database.MerklePatricia as MP
 
-import           Executable.EVMFlags
+import           Executable.EVMFlags ()
 
 --noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 --noLog _ _ _ _ = return ()
@@ -54,60 +43,15 @@ main = do
   void $ $initHFlags "Yeah Buddy"
   hspec spec
 
-runContextM' :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
-runContextM' f = do
-    liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    runResourceT
-      . flip runReaderT (error "Postgres connection no initialized") --conn
-      $ do
-        let ldbOptions = DB.defaultOptions {
-            DB.createIfMissing = True,
-            DB.cacheSize       = flags_ldbCacheSize,
-            DB.blockSize       = flags_ldbBlockSize
-        }
-        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-        let stateRoot = C8.pack "yuhhh"
-            bytes = rlpSerialize $ RLPScalar 0
-        DB.put sdb Data.Default.def stateRoot bytes
-        --conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
-        --redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-        --let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-        runStateT f (Context
-                        MP.MPDB{MP.ldb=sdb, MP.stateRoot= MP.StateRoot stateRoot}
-                        hdb
-                        cdb
-                        blksumdb
-                        M.empty
-                        M.empty
-                        M.empty
-                        M.empty
-                        MP.emptyTriePtr
-                        MP.emptyTriePtr
-                        (SHA 0)
-                        Nothing
-                        defaultBaggerState
-                        (error "Kafka not initialized") --initialKafkaState
-                        Unspecified
-                        (error "Redis not initialized") --redisPool
-                        Q.empty
-                        []
-                        False False)
-
-
-
 spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runContextM' $ do
+      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
-          blockData = undefined
+          blockData = BDB.blockBlockData $ BML.makeBlock 0 0
           availableGas = 10000000
           tAddr = (Address 0xfeedbeef)
           newAddress = (Address 0xdeadbeef)
@@ -148,7 +92,7 @@ spec = do
              (fromIntegral txGasPrice)
              (fst $ B16.decode "ec630643")
              availableGas
-             undefined
+             tAddr
              (SHA 0)
              Nothing
              Nothing
@@ -163,3 +107,73 @@ spec = do
           print . fst . B16.decode $ code
           print . Text.decodeUtf8 $ code
           print . C8.takeWhile (/= '\0') . C8.drop 64 $ code
+  describe "Mutable Stack" $ do
+    it "can push elements" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.push s 4 `shouldReturn` True
+      MS.push s 7 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 7
+      MS.pop s `shouldReturn` Just 4
+      MS.pop s `shouldReturn` Nothing
+
+    it "has a limit of 1024" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [1..1024] `shouldReturn` replicate 1024 True
+      MS.push s 2048 `shouldReturn` False
+      MS.isEmpty s `shouldReturn` False
+      replicateM 1024 (MS.pop s) `shouldReturn` map Just [1024,1023..1]
+      MS.isEmpty s `shouldReturn` True
+
+    it "dups the correct positions" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [10,9..0] `shouldReturn` replicate 11 True
+      MS.isEmpty s `shouldReturn` False
+      let test k = do
+            MS.dup s k `shouldReturn` True
+            MS.pop s
+      test 0 `shouldReturn` Just 0
+      test 1 `shouldReturn` Just 1
+      test 7 `shouldReturn` Just 7
+      test 10 `shouldReturn` Just 10
+      MS.dup s 11 `shouldReturn` False
+      MS.pop s `shouldReturn` Just 0
+
+    it "swaps the correct positions" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      mapM (MS.push s) [50,40..0] `shouldReturn` replicate 6 True
+      MS.swap s 0 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 10
+      MS.pop s `shouldReturn` Just 0
+      -- Stack: [50, 40, 30, 20]
+      MS.push s 10 `shouldReturn` True
+      MS.push s 0 `shouldReturn` True
+      -- Stack: [50, 40, 30, 20, 10, 0]
+      MS.swap s 4 `shouldReturn` True
+      -- Stack: [0, 40, 30, 20, 10, 50]
+      MS.pop s `shouldReturn` Just 50
+      MS.pop s `shouldReturn` Just 10
+      -- Stack: [0, 40, 30, 20]
+      MS.swap s 3 `shouldReturn` False
+      -- Stack: [0, 40, 30, 20]
+      replicateM 4 (MS.pop s) `shouldReturn` map Just [20, 30, 40, 0]
+
+    it "does not underflow on a short swap" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.push s 17 `shouldReturn` True
+      MS.push s 99 `shouldReturn` True
+      MS.swap s 0 `shouldReturn` True
+      MS.pop s `shouldReturn` Just 17
+      MS.pop s `shouldReturn` Just 99
+      MS.pop s `shouldReturn` Nothing
+
+    it "can populate a list" $ do
+      s <- MS.empty :: IO (MS.MutableStack Int)
+      MS.toList s `shouldReturn` []
+      MS.push s 3 `shouldReturn` True
+      MS.toList s `shouldReturn` [3]
+      MS.push s 4 `shouldReturn` True
+      MS.toList s `shouldReturn` [4, 3]
+      MS.push s 5 `shouldReturn` True
+      MS.toList s `shouldReturn` [5, 4, 3]
+      MS.pop s `shouldReturn` Just 5
+      MS.toList s `shouldReturn` [4, 3]

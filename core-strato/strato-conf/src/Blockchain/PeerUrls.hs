@@ -16,5 +16,5 @@ ipAddresses = map (fmap fromIntegral) ipAddresses'
 ipAddresses'::[(String, Int)]
 ipAddresses' = STOP_TORTURING_INNOCENT_CHILDREN.unsafePerformIO $ do
             contents <- B.readFile ".ethereumH/peers.yaml"
-            return $ (either error id . decodeEither) contents
+            return $ (either (error.show) id . decodeEither') contents
 

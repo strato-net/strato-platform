@@ -23,6 +23,7 @@ dependencies:
   - bytestring
   - bytestring-arbitrary
   - clock
+  - conduit
   - conduit-combinators
   - containers
   - crypto-pubkey-types

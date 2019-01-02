@@ -58,7 +58,7 @@ bloc = return gitInfo
   :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI
-serveBloc env = enter (NT (enterBloc env)) bloc
+serveBloc env = hoistServer blocApi (enterBloc env) bloc
 
 blocSwagger :: Swagger
 blocSwagger = toSwagger (Proxy @BlocAPI)

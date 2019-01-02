@@ -21,16 +21,15 @@ module Blockchain.Sequencer.Gregor
   , writeSeqVmEvents
   ) where
 
-import           ClassyPrelude              (atomically, TMChan, writeTMChan, STM,
-                                             tryReadTMChan, tryPeekTMChan)
-import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Async.Lifted (race_)
+import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import           Control.Monad.State
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import qualified Data.Text as T
 import qualified Prometheus as P
+import           UnliftIO.STM
 
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
@@ -53,9 +52,9 @@ data GregorConfig = GregorConfig
 data GregorContext = GregorContext
                      { _gregorKafkaState :: K.KafkaState
                      , _gregorConsumerGroup :: KP.ConsumerGroup
-                     , _gregorUnseq :: TMChan IngestEvent
-                     , _gregorSeqP2P :: TMChan OutputEvent
-                     , _gregorSeqVM :: TMChan OutputEvent
+                     , _gregorUnseq :: TQueue IngestEvent
+                     , _gregorSeqP2P :: TQueue OutputEvent
+                     , _gregorSeqVM :: TQueue OutputEvent
                      }
 makeLenses ''GregorContext
 
@@ -140,8 +139,8 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
   ch <- use gregorUnseq
-  atomically . forM_ inEvents $ writeTMChan ch . snd
-  hd <- atomically $ tryPeekTMChan ch
+  atomically . forM_ inEvents $ writeTQueue ch . snd
+  hd <- atomically $ tryPeekTQueue ch
   $logDebugS "gregor/unseqchHead" . T.pack . show $ hd
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
@@ -150,24 +149,24 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
 
 seqWriters :: GregorM ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
-  vmch <- use gregorSeqVM
-  vmevs <- atomically $ drainTMChan vmch
-  unless (null vmevs) $ do
-    P.withLabel gregorLoop "seq_vm_events" P.incCounter
-    P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
-    writeSeqVmEvents vmevs
-  p2pch <- use gregorSeqP2P
-  p2pevs <- atomically $ drainTMChan p2pch
-  unless (null p2pevs) $ do
-    P.withLabel gregorLoop "seq_p2p_events" P.incCounter
-    P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
-    writeSeqP2pEvents p2pevs
-  liftIO $ threadDelay 1000 -- 1ms
+  vmq <- use gregorSeqVM
+  p2pq <- use gregorSeqP2P
+  events <- atomically $
+    fmap Left (blockFlushTQueue vmq) `orElse` fmap Right (blockFlushTQueue p2pq)
+  $logDebugS "gregor/seqWriter" . T.pack . show $ events
+  case events of
+    Left vmevs -> do
+      P.withLabel gregorLoop "seq_vm_events" P.incCounter
+      P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
+      writeSeqVmEvents vmevs
+    Right p2pevs -> do
+      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
+      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
+      writeSeqP2pEvents p2pevs
 
-drainTMChan :: TMChan a -> STM [a]
-drainTMChan ch = do
-  mmx <- tryReadTMChan ch
-  case mmx of
-    Nothing -> return []
-    Just Nothing -> return []
-    Just (Just x) -> (x:) <$> drainTMChan ch
+-- Will only read if at least one element is in the queue.
+blockFlushTQueue :: TQueue a -> STM [a]
+blockFlushTQueue ch = do
+  first <- readTQueue ch
+  rest <- flushTQueue ch
+  return $ first:rest

@@ -11,6 +11,10 @@ description:
     The client described in the Ethereum Yellowpaper
 github: blockapps/strato-platform/core-strato/ethereum-vm
 
+default-extensions:
+  - DeriveGeneric
+  - DeriveAnyClass
+
 dependencies:
   - base >= 4 && < 5
   - aeson-pretty
@@ -24,6 +28,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - classy-prelude
+  - clockwork
   - containers
   - cross-monitoring
   - cryptohash
@@ -32,7 +37,10 @@ dependencies:
   - either
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
   - extra
+  - formatting
+  - ghc
   - hedis
   - hflags
   - lens
@@ -43,6 +51,7 @@ dependencies:
   - mtl
   - ordered-containers
   - persistent-postgresql
+  - persistent-sqlite
   - postgresql-simple
   - prometheus-client
   - resourcet
@@ -51,13 +60,14 @@ dependencies:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-p2p
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
   - text
+  - temporary
   - time
   - transformers
+  - unboxed-ref
   - unliftio-core
   - vector
   - wai-middleware-prometheus
@@ -83,8 +93,10 @@ library:
     - Blockchain.VM
     - Blockchain.VM.Code
     - Blockchain.VM.Environment
+    - Blockchain.VM.MutableStack
     - Blockchain.VM.Opcodes
     - Blockchain.VM.VMException
+    - Blockchain.VM.VMM
     - Blockchain.VM.VMState
     - Blockchain.VMMetrics
     - Executable.EthereumVM
@@ -99,7 +111,7 @@ executables:
     main: Main.hs
     dependencies:
       - ethereum-vm
-    ghc-options: -Wall -O2 -threaded
+    ghc-options: -Wall -O2 -threaded -rtsopts
 
 tests:
   ethereum-vm-test:
@@ -111,3 +123,13 @@ tests:
       - ethereum-vm
       - hspec
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+
+benchmarks:
+  microbench:
+    source-dirs: bench/
+    main: Microbench.hs
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - hashable
+      - unordered-containers
