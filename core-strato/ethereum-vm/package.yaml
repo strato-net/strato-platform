@@ -53,6 +53,7 @@ dependencies:
   - persistent-postgresql
   - persistent-sqlite
   - postgresql-simple
+  - primitive
   - prometheus-client
   - resourcet
   - strato-adit

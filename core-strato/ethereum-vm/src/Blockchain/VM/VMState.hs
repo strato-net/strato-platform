@@ -21,7 +21,7 @@ import           Data.IORef
 import           Data.IORef.Unboxed
 import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
-import qualified Data.Vector.Storable.Mutable as V
+import qualified Data.Vector.Unboxed.Mutable as V
 import           Data.Word
 import           GHC.Generics
 
