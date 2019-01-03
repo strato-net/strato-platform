@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.TxrIndexer where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class             (liftIO)
@@ -67,7 +68,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
                           enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
                           enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
-                      mEnode <- liftIO $ (return . Just $ readEnode enode') `catch` (\(_ :: SomeException) -> return Nothing)
+                      mEnode <- liftIO $ (Just <$> evaluate (readEnode enode')) `catch` (\(_ :: SomeException) -> return Nothing)
                       when (isJust mEnode) $ do
                         let Just enode = mEnode
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
