@@ -43,7 +43,6 @@ dependencies:
   - ghc
   - hedis
   - hflags
-  - hspec-expectations-lifted
   - lens
   - leveldb-haskell
   - merkle-patricia-db
