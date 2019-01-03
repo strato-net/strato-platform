@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE MagicHash            #-}
 module Blockchain.VM.Memory (
   Memory(..),
   getSizeInBytes,
@@ -16,6 +17,7 @@ module Blockchain.VM.Memory (
   ) where
 
 import           Control.Monad
+import           Control.Monad.Primitive
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)
@@ -23,11 +25,15 @@ import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Unsafe       as BU
 import           Data.IORef
+import qualified Data.Primitive.Addr          as PA
+import qualified Data.Primitive.ByteArray     as PBA
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
+import           GHC.Exts
 import           System.Exit
+-- import           Test.Hspec.Expectations.Lifted
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
@@ -42,7 +48,17 @@ safeReadRange v !offset !count = do
   let len = V.length v
   unless ((offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)) .
     die $ "reading out of range:" ++ show (offset, count, len)
-  B.pack <$> mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
+  -- legacy <- B.pack <$> mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
+  newMoney <- V.unsafeWith v $ \src -> do
+    dst <- PBA.newPinnedByteArray count
+    let !(Ptr src#) = plusPtr src offset
+        !(PBA.MutableByteArray dst#) = dst
+        !(I# count#) = count
+    primitive_ $ copyAddrToByteArray# src# dst# 0# count#
+    let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+    BU.unsafePackAddressLen count addr#
+  -- newMoney `shouldBe` legacy
+  return newMoney
 
 getSizeInWords::VMM Word256
 getSizeInWords = do

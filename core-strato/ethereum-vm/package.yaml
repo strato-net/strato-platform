@@ -43,6 +43,7 @@ dependencies:
   - ghc
   - hedis
   - hflags
+  - hspec-expectations-lifted
   - lens
   - leveldb-haskell
   - merkle-patricia-db
@@ -53,6 +54,7 @@ dependencies:
   - persistent-postgresql
   - persistent-sqlite
   - postgresql-simple
+  - primitive
   - prometheus-client
   - resourcet
   - strato-adit
