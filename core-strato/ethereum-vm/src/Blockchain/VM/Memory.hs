@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE BangPatterns         #-}
 module Blockchain.VM.Memory (
   Memory(..),
   getSizeInBytes,
@@ -7,7 +8,6 @@ module Blockchain.VM.Memory (
   getShow,
   getMemAsByteString,
   mLoad,
-  mLoad8,
   mLoadByteString,
   unsafeSliceByteString,
   mStore,
@@ -27,6 +27,7 @@ import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
+import           System.Exit
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
@@ -36,17 +37,8 @@ import           Blockchain.VM.VMException
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 
-safeRead::V.IOVector Word8->Word256->IO Word8
-safeRead _ x | x > 0x7fffffffffffffff = return 0 --There is no way that memory will be filled up this high, it would cost too much gas.  I think it is safe to assume it is zero.
---safeRead _ x | x > 0x7fffffffffffffff = error "error in safeRead, value too large"
-safeRead mem x = do
-  let len = V.length mem
-  if x < fromIntegral len
-    then V.read mem (fromIntegral x)
-    else return 0
-
-safeReadRange :: V.IOVector Word8 -> Word256 -> Word256 -> IO B.ByteString
-safeReadRange v offset count = B.pack <$> do
+safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
+safeReadRange v !offset !count = B.pack <$> do
   let len = V.length v
   if (offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)
     then mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
@@ -127,20 +119,17 @@ mLoad::Word256->VMM B.ByteString
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  liftIO $ safeReadRange (mVector $ memory state) p 32
-
-mLoad8::Word256->VMM Word8
-mLoad8 p = do
-  --setNewMaxSize m p
-  state <- lift get
-  liftIO $ safeRead (mVector $ memory state) (fromIntegral p)
+  liftIO . when (p > fromIntegral (maxBound :: Int)) . die $ "mload: p is too large" ++ show p
+  liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) 32
 
 mLoadByteString::Word256->Word256->VMM B.ByteString
 mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if nothing returned
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
   state <- lift get
-  val <- liftIO $ safeReadRange (mVector $ memory state) p size
+  liftIO . when (p > fromIntegral (maxBound :: Int)) . die $ "mloadbytestring: p is too large" ++ show p
+  liftIO . when (size > fromIntegral (maxBound :: Int)) . die $ "mloadbytestring: size is too large" ++ show size
+  val <- liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) (fromIntegral size)
   return val
 
 unsafeSliceByteString::Word256->Word256->VMM B.ByteString
