@@ -383,7 +383,7 @@ runOperation MSTORE = do
 runOperation MSTORE8 = do
   p <- pop
   val <- pop::VMM Word256
-  mStore8 p (fromIntegral $ val .&. 0xFF)
+  mStore8 p (fastWord256LSB val)
 
 runOperation SLOAD = do
   p <- pop

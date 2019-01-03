@@ -9,7 +9,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Blockchain.Strato.Model.ExtendedWord
-import Network.Haskoin.Internals (getBigWordInteger)
+import Network.Haskoin.Internals (BigWord(..))
 
 main :: IO ()
 main = hspec spec
@@ -37,6 +37,11 @@ spec = do
 
     it "works on arbitrary word256" $ property $ \n ->
       fastWord256ToBytes n `shouldBe` B.pack (word256ToBytes n)
+
+    it "works on small word256" $ do
+        let input = BigWord (S# 1#)
+        let want = B.replicate 31 0 <> B.replicate 1 1
+        fastWord256ToBytes input `shouldBe` want
 
   describe "fastDeserialize" $ do
     it "maintains Integer invariants" $ property $ \n ->

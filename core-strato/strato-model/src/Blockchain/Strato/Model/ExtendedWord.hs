@@ -10,7 +10,8 @@ module Blockchain.Strato.Model.ExtendedWord
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
     word256ToBytes, bytesToWord256, fastWord256ToBytes, fastBytesToWord256,
-    word512ToBytes, bytesToWord512
+    word512ToBytes, bytesToWord512,
+    fastWord256LSB
  ) where
 
 import qualified Data.Aeson                as Ae
@@ -66,41 +67,31 @@ word256ToBytes :: Word256 -> [Word8]
 word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 
 fastWord256ToBytes :: Word256 -> B.ByteString
-fastWord256ToBytes ws =
+fastWord256ToBytes ws = unsafePerformIO $ do
   let n = getBigWordInteger ws
-  in case n of
-    S# i# -> unsafePerformIO $ do
-      dst <- PBA.newPinnedByteArray 32
-      PBA.writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
-      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
-      BU.unsafePackAddressLen 32 addr#
-    Jp# bn -> unsafePerformIO $ do
-      dst <- PBA.newPinnedByteArray 32
+  dst <- PBA.newPinnedByteArray 32
+  PBA.fillByteArray dst 0 32 0
+  case n of
+    S# i# -> PBA.writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
+    Jp# bn -> do
       case sizeofBigNat# bn of
         1# -> do
           PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-          PBA.writeByteArray dst 2 (0 :: Word)
-          PBA.writeByteArray dst 1 (0 :: Word)
-          PBA.writeByteArray dst 0 (0 :: Word)
         2# -> do
           PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
           PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-          PBA.writeByteArray dst 1 (0 :: Word)
-          PBA.writeByteArray dst 0 (0 :: Word)
         3# -> do
           PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
           PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
           PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
-          PBA.writeByteArray dst 0 (0 :: Word)
-        4# -> do
+        _ -> do
           PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
           PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
           PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
           PBA.writeByteArray dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
-        k# -> error $ "Word256 overflow or unanticipated architecture" ++ show (I# k#)
-      let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
-      BU.unsafePackAddressLen 32 addr#
     _ -> error "negative Word256"
+  let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
+  BU.unsafePackAddressLen 32 addr#
 
 bytesToWord256 :: [Word8] -> Word256
 bytesToWord256 bytes | length bytes == 32 =
@@ -144,6 +135,13 @@ fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256f calle
         let !(PBA.MutableByteArray dst#) = dst
         let dst'# = unsafeCoerce# dst# :: PBA.ByteArray#
         return . BigWord $ Jp# (BN# dst'#)
+
+fastWord256LSB :: Word256 -> Word8
+fastWord256LSB ws = case (getBigWordInteger ws) of
+                      S# i# -> W8# (int2Word# (andI# i# 0xff#))
+                      Jp# bn -> let w# = bigNatToWord bn
+                                in W8# (and# w# (int2Word# 0xff#))
+                      _ -> error "negative Word256"
 
 word512ToBytes :: Word512 -> [Word8]
 word512ToBytes word = map (fromIntegral . (word `shiftR`)) [512-8, 512-16..0]
