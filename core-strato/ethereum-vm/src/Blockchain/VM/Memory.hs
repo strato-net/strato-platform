@@ -38,11 +38,11 @@ import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 
 safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
-safeReadRange v !offset !count = B.pack <$> do
+safeReadRange v !offset !count = do
   let len = V.length v
-  if (offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)
-    then mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
-    else return []
+  unless ((offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)) .
+    die $ "reading out of range:" ++ show (offset, count, len)
+  B.pack <$> mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
 
 getSizeInWords::VMM Word256
 getSizeInWords = do
@@ -66,6 +66,7 @@ setNewMaxSize::Integer->VMM ()
 setNewMaxSize newSize' = do
   --TODO- I should just store the number of words....  memory size can only be a multiple of words.
   --For now I will just use this hack to allocate to the nearest higher number of words.
+  liftIO . when (newSize' > 0x7fffffffffffffff) . die $ "setNewMaxSize: " ++ show newSize'
   let newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Integer
   state <- lift get
 
