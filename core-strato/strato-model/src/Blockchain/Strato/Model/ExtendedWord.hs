@@ -14,6 +14,7 @@ module Blockchain.Strato.Model.ExtendedWord
     fastWord256LSB
  ) where
 
+import           Control.Monad
 import qualified Data.Aeson                as Ae
 import qualified Data.Aeson.Encoding       as Enc
 import           Data.Binary
@@ -103,15 +104,20 @@ fastBytesToWord256 :: B.ByteString -> Word256
 fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256f called with the wrong number of bytes: " ++ show bytes
                          | otherwise = unsafePerformIO $
   (BA.withByteArray bytes :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
-    hh <- fromBE64 <$> FS.peekElemOff src 0
-    hl <- fromBE64 <$> FS.peekElemOff src 1
-    lh <- fromBE64 <$> FS.peekElemOff src 2
-    ll <- fromBE64 <$> FS.peekElemOff src 3
+    hh <- fromBE64 <$!> FS.peekElemOff src 0
+    hl <- fromBE64 <$!> FS.peekElemOff src 1
+    lh <- fromBE64 <$!> FS.peekElemOff src 2
+    ll <- fromBE64 <$!> FS.peekElemOff src 3
     let numWords = case () of
                       () | hh .|. hl .|. lh == 0 -> 1
                          | hh .|. hl == 0 -> 2
                          | hh == 0 -> 3
                          | otherwise -> 4
+    -- This branch is not technically needed as a Jp# can
+    -- accept 1 word ByteArrays. I'm presuming that
+    -- its cheaper to use S# than to allocate pinned memory,
+    -- but that may only be for avoiding the problems of memory
+    -- fragmentation.
     if numWords == 1 && ll <= 0x7fffffffffffffff
       then let !(W64# w#) = ll
            in return (BigWord (S# (word2Int# w#)))
@@ -132,8 +138,8 @@ fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256f calle
             PBA.writeByteArray dst 2 hl
             PBA.writeByteArray dst 3 hh
           _ -> error $ "unexpected number of words in word256: " ++ show numWords
-        let !(PBA.MutableByteArray dst#) = dst
-        let dst'# = unsafeCoerce# dst# :: PBA.ByteArray#
+        dst' <- PBA.unsafeFreezeByteArray dst
+        let !(PBA.ByteArray dst'#) = dst'
         return . BigWord $ Jp# (BN# dst'#)
 
 fastWord256LSB :: Word256 -> Word8
