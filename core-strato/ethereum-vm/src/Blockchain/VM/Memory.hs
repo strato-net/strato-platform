@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TemplateHaskell      #-}
 module Blockchain.VM.Memory (
   Memory(..),
   getSizeInBytes,
@@ -17,6 +19,7 @@ module Blockchain.VM.Memory (
   ) where
 
 import           Control.Monad
+import           Control.Monad.Logger
 import           Control.Monad.Primitive
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
@@ -27,14 +30,13 @@ import qualified Data.ByteString.Unsafe       as BU
 import           Data.IORef
 import qualified Data.Primitive.Addr          as PA
 import qualified Data.Primitive.ByteArray     as PBA
+import qualified Data.Text                    as T
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
 import           GHC.Exts
 import           System.Exit
--- import           Test.Hspec.Expectations.Lifted
---import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Colors            as CL
 import           Blockchain.ExtWord
@@ -46,10 +48,9 @@ import           Blockchain.VM.VMState
 safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
 safeReadRange v !offset !count = do
   let len = V.length v
-  unless ((offset >= 0) && (count >= 0) && (fromIntegral (offset + count - 1) < len)) .
-    die $ "reading out of range:" ++ show (offset, count, len)
-  -- legacy <- B.pack <$> mapM (V.unsafeRead v) [(fromIntegral offset)..(fromIntegral (offset + count - 1))]
-  newMoney <- V.unsafeWith v $ \src -> do
+  unless ((offset >= 0) && (count >= 0) && (offset + count - 1 < len)) .
+    die $ "programmer error: reading out of range:" ++ show (offset, count, len)
+  V.unsafeWith v $ \src -> do
     dst <- PBA.newPinnedByteArray count
     let !(Ptr src#) = plusPtr src offset
         !(PBA.MutableByteArray dst#) = dst
@@ -57,8 +58,6 @@ safeReadRange v !offset !count = do
     primitive_ $ copyAddrToByteArray# src# dst# 0# count#
     let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
     BU.unsafePackAddressLen count addr#
-  -- newMoney `shouldBe` legacy
-  return newMoney
 
 getSizeInWords::VMM Word256
 getSizeInWords = do
@@ -82,18 +81,20 @@ setNewMaxSize::Integer->VMM ()
 setNewMaxSize newSize' = do
   --TODO- I should just store the number of words....  memory size can only be a multiple of words.
   --For now I will just use this hack to allocate to the nearest higher number of words.
-  liftIO . when (newSize' > 0x7fffffffffffffff) . die $ "setNewMaxSize: " ++ show newSize'
-  let newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Integer
+  when (newSize' > 0x7fffffffffffffff) $ do
+    $logErrorS "setNewMaxSize" . T.pack $ "unable to cast to int: " ++ show newSize'
+    throwE OutOfGasException
+  let newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Int
   state <- lift get
 
   oldSize <- liftIO $ readIORef (mSize $ memory state)
 
 
   let gasCharge = fromIntegral $
-        if newSize > fromIntegral oldSize
+        if newSize > oldSize
         then
-          let newWordSize = fromInteger $ (ceiling $ fromIntegral newSize/(32::Double))
-              oldWordSize = (ceiling $ fromIntegral oldSize/(32::Double))
+          let newWordSize = ceiling $ fromIntegral newSize/(32::Double)
+              oldWordSize = ceiling $ fromIntegral oldSize/(32::Double)
               sizeCost c = gMEMWORD * c + (c*c `quot` gQUADCOEFFDIV)
           in sizeCost newWordSize - sizeCost oldWordSize
           else 0
@@ -105,8 +106,8 @@ setNewMaxSize newSize' = do
           setGasRemaining 0
           throwE OutOfGasException
     else do
-    when (newSize > fromIntegral oldSize) $ do
-      liftIO $ writeIORef (mSize $ memory state) (fromInteger newSize)
+    when (newSize > oldSize) $ do
+      liftIO $ writeIORef (mSize $ memory state) newSize
     if newSize > oldLength
       then do
         state' <- lift get
@@ -136,7 +137,6 @@ mLoad::Word256->VMM B.ByteString
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  liftIO . when (p > fromIntegral (maxBound :: Int)) . die $ "mload: p is too large" ++ show p
   liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) 32
 
 mLoadByteString::Word256->Word256->VMM B.ByteString
@@ -144,8 +144,6 @@ mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if n
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
   state <- lift get
-  liftIO . when (p > fromIntegral (maxBound :: Int)) . die $ "mloadbytestring: p is too large" ++ show p
-  liftIO . when (size > fromIntegral (maxBound :: Int)) . die $ "mloadbytestring: size is too large" ++ show size
   val <- liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) (fromIntegral size)
   return val
 
