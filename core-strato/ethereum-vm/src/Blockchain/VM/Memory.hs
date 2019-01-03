@@ -127,7 +127,7 @@ mLoad::Word256->VMM B.ByteString
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  safeReadRange (mVector $ memory state) p 32
+  liftIO $ safeReadRange (mVector $ memory state) p 32
 
 mLoad8::Word256->VMM Word8
 mLoad8 p = do
