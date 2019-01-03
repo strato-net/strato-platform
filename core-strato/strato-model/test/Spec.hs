@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MagicHash #-}
 import Control.Monad
+import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.Word
 import GHC.Exts
 import GHC.Integer.GMP.Internals
 import Test.Hspec
@@ -56,3 +58,11 @@ spec = do
     it "works on arbitrary serialized word256" $ property $ \n -> do
       let b = fastWord256ToBytes n
       fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+
+  describe "fastLowByte" $ do
+    let slowByte :: Word256 -> Word8
+        slowByte n = fromIntegral $ n Bits..&. 0xff
+    it "works on arbitrary word256" $ property $ \n ->
+      fastWord256LSB n `shouldBe` slowByte n
+    it "works on S# Word256" $ do
+      fastWord256LSB (BigWord (S# 0x93342434#)) `shouldBe` 0x34
