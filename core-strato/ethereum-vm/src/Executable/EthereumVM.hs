@@ -151,11 +151,16 @@ insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
+    $logInfoS "insertNewChains" $ T.pack $ "Chain ID: " ++ format (SHA cId)
+    $logInfoS "insertNewChains" $ T.pack $ "ChainInfo: " ++ show cInfo
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
-      Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
+      Just gsr -> do
+        $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
+        return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
       Nothing -> do
+        $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
         putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
 
