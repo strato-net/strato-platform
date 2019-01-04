@@ -181,7 +181,15 @@ function doInit {
     tail -f /dev/null
   fi
 
-  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
+
+  if [[ -n "${validators}" ]]; then
+    # Keep active discovery until all other validators are peers
+    echo "Overriding minAvailablePeers with number of consensus peers"
+    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
+  else
+    actualMinPeers=$numMinPeers
+  fi
+  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$actualMinPeers"'/' .ethereumH/ethconf.yaml
 
   echo "Creating a random coinbase"
   mkCoinbase
