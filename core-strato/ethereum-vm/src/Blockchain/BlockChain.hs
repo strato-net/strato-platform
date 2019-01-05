@@ -230,7 +230,20 @@ setParentStateRoot b@OutputBlock{..} = do
 
 addBlock :: OutputBlock -> ContextM [Action]
 addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
+    when flags_debug $ do
+      bhr <- getBlockHashRoot
+      cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
+      $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
+
     putBlockHeaderInChainDB bd
+
+    when flags_debug $ do
+      bhr' <- getBlockHashRoot
+      cr' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
+      $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr'
+
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
     s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
@@ -265,6 +278,12 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
           Right _ -> P.incCounter vmBlocksValid
           Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
+    when flags_debug $ do
+      bhr'' <- getBlockHashRoot
+      cr'' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
+      $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr''
+
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
@@ -278,10 +297,16 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
   fmap concat . forM chains $ \(chainId, txs) -> do
     $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
+      when flags_debug $ do
+        sr <- getStateRoot
+        $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
       flushMemStorageDB
       flushMemAddressStateDB
+      when flags_debug $ do
+        sr' <- getStateRoot
+        $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
