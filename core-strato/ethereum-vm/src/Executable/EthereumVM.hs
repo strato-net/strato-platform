@@ -151,8 +151,8 @@ insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
-    $logInfoS "insertNewChains" $ T.pack $ "Chain ID: " ++ format (SHA cId)
-    $logDebugS "insertNewChains" $ T.pack $ "ChainInfo: " ++ show cInfo
+    $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
+    $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
