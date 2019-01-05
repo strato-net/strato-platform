@@ -158,7 +158,7 @@ insertNewChains events = do
     case mGSR of
       Just gsr -> do
         $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
-        return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
+        return []
       Nothing -> do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
