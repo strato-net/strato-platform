@@ -119,13 +119,15 @@ isFunction ValueFunction{} = False
 isFunction _ = True
 
 handlePostgresError :: (MonadIO m) => SomeException -> m ()
-handlePostgresError = liftIO . putStrLn . ("postgres error: " ++) . show
+handlePostgresError = liftIO . errorM "handlePGError" . show
 
 outputData :: ( MonadIO m)
            => PGConnection
            -> ConduitM () Text m ()
            -> m ()
-outputData conn c = runConduit $ c .| mapM_C (dbInsert conn)
+outputData conn c = runConduit $ c
+                              .| iterMC (liftIO . debugM "outputData" . T.unpack)
+                              .| mapM_C (dbInsert conn)
 
 baseColumns :: [Text]
 baseColumns = [ "address"

@@ -299,7 +299,7 @@ processTheMessages messages conn g = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+      liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
 
       let md = actionMetadata row
       mcd <- getContractDetailsByCodeHash $ actionCodeHash row
