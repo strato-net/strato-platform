@@ -18,6 +18,7 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as BC
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
+import Data.Time.Format
 import HFlags
 import Network.Kafka
 import qualified Network.Kafka.Protocol as K hiding (Message)
@@ -25,6 +26,9 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import System.Exit
 import System.IO
+import System.Log.Formatter
+import System.Log.Handler hiding (handle, setLevel)
+import System.Log.Handler.Simple
 import System.Log.Logger
 import Text.Printf
 
@@ -41,13 +45,18 @@ connStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
-  updateGlobalLogger rootLoggerName (setLevel INFO)
+  let timeFormat = iso8601DateFormat (Just "%TZ")
+  let formatter = tfLogFormatter timeFormat "[$utcTime $prio $loggername] $msg"
+  let level = if flags_debug then DEBUG else INFO
+  handler <- streamHandler stdout level
+  updateGlobalLogger rootLoggerName $ setLevel level
+                                    . setHandlers [setFormatter handler formatter]
   hSetBuffering stdout LineBuffering
   hSetBuffering stdin LineBuffering
 
-  putStrLn "Welcome to Slipstream!!!!"
+  infoM "main" "Welcome to Slipstream!!!!"
   void . forkIO . run 10777 $ metricsApp
-  putStrLn "Serving metrics on port 10777"
+  infoM "main" "Serving metrics on port 10777"
 
   conn <- liftIO $ pgConnect dbConnect
   msg <- runResourceT . runNoLoggingT . withPostgresqlConn connStr $ \simpleConn -> do
@@ -67,5 +76,5 @@ main = do
 
     liftIO . runKafka state $ getAndProcessMessages conn cachedContractsIORef offset 0
   case msg of
-    Left e -> error $ show e
-    Right y -> print y
+    Left e -> die $ show e
+    Right () -> infoM "main" "completing successfully"
