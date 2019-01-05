@@ -152,7 +152,7 @@ insertNewChains events = do
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     $logInfoS "insertNewChains" $ T.pack $ "Chain ID: " ++ format (SHA cId)
-    $logInfoS "insertNewChains" $ T.pack $ "ChainInfo: " ++ show cInfo
+    $logDebugS "insertNewChains" $ T.pack $ "ChainInfo: " ++ show cInfo
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
