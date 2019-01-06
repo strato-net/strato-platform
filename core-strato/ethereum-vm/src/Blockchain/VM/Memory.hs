@@ -78,42 +78,30 @@ setNewMaxSize newSize' = do
   when (newSize' > 0x7fffffffffffffff) $ do
     $logErrorS "setNewMaxSize" . T.pack $ "unable to cast to int: " ++ show newSize'
     throwE OutOfGasException
-  let newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Int
+  let !newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Int
   state <- lift get
-
   oldSize <- liftIO $ readIORef (mSize $ memory state)
-
-
-  let gasCharge = fromIntegral $
-        if newSize > oldSize
-        then
+  when (oldSize < newSize) $ do
+    let gasCharge = fromIntegral $
           let newWordSize = ceiling $ fromIntegral newSize/(32::Double)
               oldWordSize = ceiling $ fromIntegral oldSize/(32::Double)
               sizeCost c = gMEMWORD * c + (c*c `quot` gQUADCOEFFDIV)
           in sizeCost newWordSize - sizeCost oldWordSize
-          else 0
-
-  let oldLength = fromIntegral $ V.length (mVector $ memory state)
-  gr <- readGasRemaining $ state
-  if gr < gasCharge
-     then do
-          setGasRemaining 0
-          throwE OutOfGasException
-    else do
-    when (newSize > oldSize) $ do
-      liftIO $ writeIORef (mSize $ memory state) newSize
-    if newSize > oldLength
-      then do
-        state' <- lift get
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red ("Warning, memory needs to grow to a huge value: " ++ show (fromIntegral newSize/(1000000::Double)) ++ "MB")
-        arr' <- liftIO $ V.grow (mVector $ memory state') $ fromIntegral $ (newSize+1000000)
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "clearing out memory"
-        --liftIO $ forM_ [oldLength..(newSize+1000000)-1] $ \p -> V.write arr' (fromIntegral p) 0
-        liftIO $ V.set (V.unsafeSlice (fromIntegral oldLength) (fromIntegral newSize+1000000) arr') 0
-        when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "Finished growing memory"
-        lift $ put $ state'{memory=(memory state'){mVector = arr'}}
-      else return ()
-
+    let oldLength = V.length (mVector $ memory state)
+    gr <- readGasRemaining $ state
+    when (gr < gasCharge) $ do
+      setGasRemaining 0
+      throwE OutOfGasException
+    liftIO $ writeIORef (mSize $ memory state) newSize
+    when (newSize > oldLength) $ do
+      state' <- lift get
+      let newLength = 2 * newSize
+      when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red ("Warning, memory needs to grow to a huge value: " ++ show (fromIntegral newSize/(1000000::Double)) ++ "MB")
+      arr' <- liftIO $ V.grow (mVector $ memory state') $ fromIntegral $ newLength
+      when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "clearing out memory"
+      liftIO $ V.set (V.unsafeSlice (fromIntegral oldLength) newLength arr') 0
+      when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "Finished growing memory"
+      lift $ put $ state'{memory=(memory state'){mVector = arr'}}
     useGas gasCharge
 
 getShow::Memory->IO String
