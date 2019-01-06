@@ -20,22 +20,19 @@ module Blockchain.VM.Memory (
 
 import           Control.Monad
 import           Control.Monad.Logger
-import           Control.Monad.Primitive
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
+import qualified Data.ByteString.Internal              as BI
 import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Unsafe       as BU
 import           Data.IORef
-import qualified Data.Primitive.Addr          as PA
-import qualified Data.Primitive.ByteArray     as PBA
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           Foreign
-import           GHC.Exts
 import           System.Exit
 
 import qualified Blockchain.Colors            as CL
@@ -50,14 +47,11 @@ safeReadRange v !offset !count = do
   let len = V.length v
   unless ((offset >= 0) && (count >= 0) && (offset + count - 1 < len)) .
     die $ "programmer error: reading out of range:" ++ show (offset, count, len)
-  V.unsafeWith v $ \src -> do
-    dst <- PBA.newPinnedByteArray count
-    let !(Ptr src#) = plusPtr src offset
-        !(PBA.MutableByteArray dst#) = dst
-        !(I# count#) = count
-    primitive_ $ copyAddrToByteArray# src# dst# 0# count#
-    let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
-    BU.unsafePackAddressLen count addr#
+  dstFP <- mallocForeignPtrBytes count
+  withForeignPtr dstFP $ \dst ->
+    V.unsafeWith v $ \src ->
+       BI.memcpy dst (plusPtr src offset) count
+  return $! BI.PS dstFP 0 count
 
 getSizeInWords::VMM Word256
 getSizeInWords = do
