@@ -47,7 +47,7 @@ safeReadRange v !offset !count = do
   let len = V.length v
   unless ((offset >= 0) && (count >= 0) && (offset + count - 1 < len)) .
     die $ "programmer error: reading out of range:" ++ show (offset, count, len)
-  dstFP <- mallocForeignPtrBytes count
+  dstFP <- BI.mallocByteString count
   withForeignPtr dstFP $ \dst ->
     V.unsafeWith v $ \src ->
        BI.memcpy dst (plusPtr src offset) count

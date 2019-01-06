@@ -71,7 +71,7 @@ word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 fastWord256ToBytes :: Word256 -> B.ByteString
 fastWord256ToBytes ws = unsafePerformIO $ do
   let n = getBigWordInteger ws
-  dstFP <- mallocForeignPtrBytes 32 :: IO (ForeignPtr Word8)
+  dstFP <- BI.mallocByteString 32 :: IO (ForeignPtr Word8)
   withForeignPtr dstFP $ \dst' -> do
     let dst = castPtr dst' :: Ptr Word64
     FS.pokeElemOff dst 0 0
