@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Blockchain.VM.MutableStack where
 
 import Control.DeepSeq
@@ -41,7 +42,7 @@ isEmpty = fmap (== stackMax) . readIORefU . stackPointer
 
 -- | Insert a new SP[0]
 push :: MutableStack a -> a -> IO Bool
-push (MutableStack spref p) n = do
+push (MutableStack spref p) !n = do
   off <- readIORefU spref
   if off == 0
     then return False
