@@ -21,14 +21,15 @@ import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteArray            as BA
 import qualified Data.ByteString           as B
+import qualified Data.ByteString.Internal  as BI
 import qualified Data.ByteString.Lazy      as BL
 import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
-import qualified Data.ByteString.Unsafe    as BU
 import           Data.Ix
-import qualified Data.Primitive.Addr       as PA
 import qualified Data.Primitive.ByteArray  as PBA
 import qualified Data.Text                 as T
+import           Foreign.ForeignPtr
+import           Foreign.Ptr
 import qualified Foreign.Storable          as FS
 import           GHC.Exts
 import           GHC.Integer.GMP.Internals
@@ -70,29 +71,33 @@ word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 fastWord256ToBytes :: Word256 -> B.ByteString
 fastWord256ToBytes ws = unsafePerformIO $ do
   let n = getBigWordInteger ws
-  dst <- PBA.newPinnedByteArray 32
-  PBA.fillByteArray dst 0 32 0
-  case n of
-    S# i# -> PBA.writeByteArray dst 3 (toBE64 (W64# (int2Word# i#)))
-    Jp# bn -> do
-      case sizeofBigNat# bn of
-        1# -> do
-          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-        2# -> do
-          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-        3# -> do
-          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-          PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
-        _ -> do
-          PBA.writeByteArray dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
-          PBA.writeByteArray dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
-          PBA.writeByteArray dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
-          PBA.writeByteArray dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
-    _ -> error "negative Word256"
-  let !(PA.Addr addr#) = PBA.mutableByteArrayContents dst
-  BU.unsafePackAddressLen 32 addr#
+  dstFP <- mallocForeignPtrBytes 32 :: IO (ForeignPtr Word8)
+  withForeignPtr dstFP $ \dst' -> do
+    let dst = castPtr dst' :: Ptr Word64
+    FS.pokeElemOff dst 0 0
+    FS.pokeElemOff dst 1 0
+    FS.pokeElemOff dst 2 0
+    FS.pokeElemOff dst 3 0
+    case n of
+      S# i# -> FS.pokeElemOff dst 3 (toBE64 (W64# (int2Word# i#)))
+      Jp# bn -> do
+        case sizeofBigNat# bn of
+          1# -> do
+            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+          2# -> do
+            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+          3# -> do
+            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+          _ -> do
+            FS.pokeElemOff dst 3 (toBE64 (W64# (indexBigNat# bn 0#)))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (indexBigNat# bn 1#)))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (indexBigNat# bn 2#)))
+            FS.pokeElemOff dst 0 (toBE64 (W64# (indexBigNat# bn 3#)))
+      _ -> error "negative Word256"
+  return $! BI.PS dstFP 0 32
 
 bytesToWord256 :: [Word8] -> Word256
 bytesToWord256 bytes | length bytes == 32 =
