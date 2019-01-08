@@ -51,6 +51,13 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   , CodeInfo (..)
   , AccountInfo (..)
+  , padZeros
+  , show256
+  , show192
+  , show160
+  , show128
+  , show64
+  , show32
   ) where
 
 import           ClassyPrelude ((<>))
