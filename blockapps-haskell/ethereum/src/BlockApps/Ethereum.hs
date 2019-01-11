@@ -51,6 +51,13 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   , CodeInfo (..)
   , AccountInfo (..)
+  , padZeros
+  , show256
+  , show192
+  , show160
+  , show128
+  , show64
+  , show32
   ) where
 
 import           ClassyPrelude ((<>))
@@ -315,7 +322,7 @@ instance ToCapture (Capture "chainid" ChainId) where
   toCapture _ = DocCapture "chainid" "a private chain Id"
 
 instance RLPEncodable ChainId where
-  rlpEncode chainId = rlpEncode . fst . Base16.decode . Char8.pack $ chainIdString chainId
+  rlpEncode (ChainId n) = rlpEncode $ toInteger n
   rlpDecode obj = ChainId . fromInteger <$> rlpDecode obj
 
 instance ToParam (QueryParam "chainid" ChainId) where

@@ -40,7 +40,6 @@ import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
 import Network.HTTP.Client
-import Numeric
 import Servant.Client
 import System.Log.Logger
 
@@ -299,7 +298,7 @@ processTheMessages messages conn g = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      liftIO . infoM "processTheMessages" . show $ T.concat ["--------\n", formatAction row]
+      liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
 
       let md = actionMetadata row
       mcd <- getContractDetailsByCodeHash $ actionCodeHash row
@@ -318,7 +317,7 @@ processTheMessages messages conn g = do
               strAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict . JSON.encode $ contractdetailsXabi details
               strName = T.replace "\"" "" $ contractdetailsName details
               cont = either error id . xAbiToContract $ contractdetailsXabi details
-              chain = maybe "" (T.pack . flip showHex "" . unChainId) $ actionTxChainId row
+              chain = maybe "" (T.pack . show256 . unChainId) $ actionTxChainId row
               cache = flip Map.lookup $ actionStorage row
               updateGlobal m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
                 let contracts = filter (not . T.null) $ T.splitOn "," v

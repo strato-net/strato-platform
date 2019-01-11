@@ -26,6 +26,7 @@ slipstream:
 --vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
+--debug="${SLIPSTREAM_DEBUG:-false}"
 
 strato-server:
 no vars/flags set
@@ -107,7 +108,7 @@ echo "Bloc is up - running slipstream now..."
 
 runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
-           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" &>> logs/slipstream
+           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" --debug="${SLIPSTREAM_DEBUG:-false}" &>> logs/slipstream
 
 set +x
 if [ "${PROCESS_MONITORING}" = true ] ; then
