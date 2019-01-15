@@ -82,7 +82,9 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
                           (mainStruct contract)
                           0
                           (Map.toList argsText')
-              contractAcctInfo = ContractWithStorage governanceAddress (0::Integer) contractdetailsCodeHash storage
+              balMap = Map.fromList $ map toTuple balances
+              govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
+              contractAcctInfo = ContractWithStorage governanceAddress govBal contractdetailsCodeHash storage
               codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
