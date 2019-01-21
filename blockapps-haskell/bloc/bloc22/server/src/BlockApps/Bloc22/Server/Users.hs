@@ -377,34 +377,27 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
     else do
       let mc = head txs
       params <- getAccountTxParams fromAddr chainId $ methodcallTxParams mc
-      (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip txs [0..]) $
+      txsCmIdsFuncNames <- fmap fst . forStateT Map.empty (zip txs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
-          (names, cmIds, fIds) <- get
-          (mapKey, names') <- case Map.lookup methodcallContractName names of
-            Just cmId -> return (cmId, names)
+          mtuple <- use $ at methodcallContractName
+          (mapKey, xabi) <- case mtuple of
+            Just (cmId, x) -> return (cmId, x)
             Nothing -> do
-              (mapKey' :: Int32) <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
-                (_,_,_,_,_,_,cmId,_) <- getContractsContractLatestQuery methodcallContractName -< ()
-                returnA -< cmId
-              return (mapKey', Map.insert methodcallContractName mapKey' names)
-          (contract', cmIds') <- case Map.lookup mapKey cmIds of
-            Just entry -> return (entry, cmIds)
-            Nothing -> do
-              mapValue <- lift $ getContractContractByMetadataId mapKey
-              return (mapValue, Map.insert mapKey mapValue cmIds)
+              (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
+                (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
+                returnA -< (cmId,x'')
+              x <- lift $ decodeXabiJSON x'
+              at methodcallContractName <?= (mapKey', x)
+          contract' <- case xAbiToContract xabi of
+            Left err -> throwError . AnError $ Text.pack err
+            Right c -> return c
           let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
           sel <-
             case maybeFunc of
              Just (_, TypeFunction selector _ _) -> return selector
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-
-          functionId <- lift $ getFunctionId mapKey methodcallMethodName
-          (xabiArgs, fIds') <- case Map.lookup functionId fIds of
-            Just xabiArgs' -> return (xabiArgs', fIds)
-            Nothing -> do
-              zxcv <- lift $ getXabiFunctionsArgsQuery functionId
-              return (zxcv, Map.insert functionId zxcv fIds)
+          let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
           tx <- lift . signAndPrepare sign fromAddr methodcallMetadata $
             TransactionHeader
@@ -415,7 +408,6 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               (sel <> argsBin)
               nonceIncr
               chainId
-          put (names', cmIds', fIds')
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
       let txs' = [tx | (tx,_,_) <- txsCmIdsFuncNames]
