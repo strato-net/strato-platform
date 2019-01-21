@@ -26,7 +26,7 @@ import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
-import           Data.ByteString.Lazy            (fromStrict)
+import           Data.ByteString.Lazy            (fromStrict, toStrict)
 import           Data.Foldable
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
@@ -869,6 +869,9 @@ getXabiVariablesQuery cmId = do
     ty <- getXabiType typeid
     return $ Xabi.VarType atbytes (Just ispublic) (Just isconstant) value ty
 
+serializeXabi :: Xabi -> ByteString
+serializeXabi = toStrict . encode
+
 deserializeXabi :: ByteString -> Bloc Xabi
 deserializeXabi = decodeXabiJSON
 
@@ -1005,7 +1008,7 @@ insertContractMetaDataQuery
       , constant codeHash
       , constant xcodeHash
       , constant srcHash
-      , constant (encode xabi)
+      , constant (serializeXabi xabi)
       )]
       (\ (contractmetadataId,_,_,_,_,_,_,_) -> contractmetadataId)
 
