@@ -458,18 +458,23 @@ postUsersContractMethod
 postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractMethod' FunctionParameters{..} sign = do
     params <- getAccountTxParams fromAddr chainId txParams
-    cmId <- getContractsMetaDataIdExhaustive contractName contractAddr chainId
 
-    contract' <- getContractContractByMetadataId cmId
+    (cmId,xabi) <- fmap contractdetailsXabi <$> getContractDetailsAndMetadataId
+                  (ContractName contractName)
+                  (Unnamed contractAddr)
+                  chainId
+    contract' <- case xAbiToContract xabi of
+      Left err -> throwError . AnError $ Text.pack err
+      Right c -> return c
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
+        xabiArgs = maybe Map.empty funcArgs . Map.lookup funcName $ xabiFuncs xabi
 
     sel <-
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
-    functionId <- getFunctionId cmId funcName
-    argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
+    argsBin <- constructArgValues (Just (fmap argValueToText args)) xabiArgs
     tx <- signAndPrepare sign fromAddr metadata $
       TransactionHeader
         (Just contractAddr)

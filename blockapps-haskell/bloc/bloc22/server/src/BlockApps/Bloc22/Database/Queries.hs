@@ -944,11 +944,14 @@ getContractDetailsByMetadataId cmId addr chainId = do
     }
 
 getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
-getContractDetails (ContractName contractName) contractId chainId = do
+getContractDetails name contractId = fmap snd . getContractDetailsAndMetadataId name contractId
+
+getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Int32, ContractDetails)
+getContractDetailsAndMetadataId (ContractName contractName) contractId chainId = do
     let
-      detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,_ :: Int32,xabi') = do
+      detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
         xabi <- decodeXabiJSON xabi'
-        return ContractDetails
+        return (cmId, ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr
           , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
@@ -957,7 +960,7 @@ getContractDetails (ContractName contractName) contractId chainId = do
           , contractdetailsSrc = src
           , contractdetailsXabi = xabi
           , contractdetailsChainId = cid
-          }
+          })
     case contractId of
       Named "Latest" -> do
         tuple <- blocQuery1 "getContractDetails/latest" $
