@@ -272,7 +272,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 returnA -< (bin16,src,cmId',x'')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              x <- lift $ decodeXabiJSON x'
+              x <- lift $ deserializeXabi x'
               at name <?= (b, src, cmId', x)
           let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
@@ -386,7 +386,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
                 (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< (cmId,x'')
-              x <- lift $ decodeXabiJSON x'
+              x <- lift $ deserializeXabi x'
               at methodcallContractName <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
             Left err -> throwError . AnError $ Text.pack err

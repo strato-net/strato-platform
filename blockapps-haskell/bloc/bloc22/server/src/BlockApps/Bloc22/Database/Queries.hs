@@ -922,6 +922,9 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId
   returnA -< varName
 
+deserializeXabi :: ByteString -> Bloc Xabi
+deserializeXabi = decodeXabiJSON
+
 decodeXabiJSON :: ByteString -> Bloc Xabi
 decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwError $ DBError "Corrupted Xabi stored in database"
@@ -931,7 +934,7 @@ getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -
 getContractDetailsByMetadataId cmId addr chainId = do
   (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
     blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
-  xabi <- decodeXabiJSON xabi'
+  xabi <- deserializeXabi xabi'
   return ContractDetails
     { contractdetailsBin = Text.decodeUtf8 bin
     , contractdetailsAddress = Just addr
@@ -950,7 +953,7 @@ getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe C
 getContractDetailsAndMetadataId (ContractName contractName) contractId chainId = do
     let
       detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
-        xabi <- decodeXabiJSON xabi'
+        xabi <- deserializeXabi xabi'
         return (cmId, ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr
@@ -984,7 +987,7 @@ getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
-      xabi <- decodeXabiJSON xabi'
+      xabi <- deserializeXabi xabi'
       return (cmId, ContractDetails
         { contractdetailsBin = Text.decodeUtf8 bin
         , contractdetailsAddress = Nothing
@@ -1254,7 +1257,7 @@ compileContract source = do
     then compileContractFromScratch source
     else fmap Map.fromList . forM details $
       \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
-        xabi <- decodeXabiJSON xabi'
+        xabi <- deserializeXabi xabi'
         return (name,(cmId, ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = Nothing
