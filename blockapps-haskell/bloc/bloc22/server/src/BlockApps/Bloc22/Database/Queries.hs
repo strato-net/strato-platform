@@ -28,7 +28,7 @@ import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.ByteString.Lazy            (fromStrict)
 import           Data.Foldable
-import           Data.Int                        (Int32, Int64)
+import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
@@ -41,7 +41,7 @@ import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
-import qualified Opaleye                         (not, null)
+import qualified Opaleye                         (not)
 
 
 import           BlockApps.Bloc22.API.Utils
@@ -483,43 +483,6 @@ getContractSourceByCodeHash codeHash = proc () -> do
   restrict -< ch .== constant codeHash
   returnA -< src
 
-insertXabiFunctionArg
-  :: Int32
-  -> Map Text Xabi.IndexedType
-  -> Bloc Int64
-insertXabiFunctionArg funcId args = do
-  argsWithIds <- for args $ \ (Xabi.IndexedType index xt) -> do
-    xtid <- insertXabiType xt
-    return (index,xtid)
-  blocModify $ \conn ->
-    runInsertMany conn xabiFunctionArgumentsTable
-      [ ( Nothing
-        , constant funcId
-        , constant xtid
-        , constant name
-        , constant index
-        )
-      | (name,(index,xtid)) <- Map.toList argsWithIds
-      ]
-
-insertXabiFunctionRet
-  :: Int32
-  -> [Xabi.IndexedType]
-  -> Bloc Int64
-insertXabiFunctionRet funcId vals = do
-  valIds <- for vals $ \ (Xabi.IndexedType index xt) -> do
-    xtid <- insertXabiType xt
-    return (index,xtid)
-  blocModify $ \conn ->
-    runInsertMany conn xabiFunctionReturnsTable
-      [ ( Nothing
-        , constant funcId
-        , constant index
-        , constant xtid
-        )
-      | (index,xtid) <- valIds
-      ]
-
 {- |
 SELECT CM.id
 FROM contracts_metadata CM
@@ -827,14 +790,6 @@ getXabiConstrQuery cmId = do
                   , funcModifiers = Nothing
                   }
 
-getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
-getXabiFunctionNamesQuery metadataId = proc () -> do
-  (_,cmid,isc,name,_) <-
-    queryTable xabiFunctionsTable -< ()
-  restrict -< cmid .== constant metadataId .&& Opaleye.not isc
-  returnA -< name
-
-
 {- |
 SELECT
   ,XFA.name
@@ -913,14 +868,6 @@ getXabiVariablesQuery cmId = do
   for varsWithIds $ \ (atbytes,ispublic,isconstant, value,typeid) -> do
     ty <- getXabiType typeid
     return $ Xabi.VarType atbytes (Just ispublic) (Just isconstant) value ty
-
-
-getXabiVariableNamesQuery :: Int32 -> Query ( Column PGText )
-getXabiVariableNamesQuery metadataId = proc () -> do
-  (_,cmid,_,varName,_,_,_,_) <-
-    queryTable xabiVariablesTable -< ()
-  restrict -< cmid .== constant metadataId
-  returnA -< varName
 
 deserializeXabi :: ByteString -> Bloc Xabi
 deserializeXabi = decodeXabiJSON
@@ -1151,89 +1098,6 @@ instance Default Constant (Maybe ChainId) (Column PGBytea) where
                 Nothing -> BS.empty
                 Just cid -> word256ToByteString $ unChainId cid
 
-insertXabiVariables
-  :: Int32
-  -> Map Text Xabi.VarType
-  -> Bloc Int64
-insertXabiVariables metadataId vars = do
-  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic isconstant value xt) -> do
-    varIds :: [Int32] <- blocQuery $ proc () -> do
-      (vId,cmId,_,vname,_,_,_,_) <- queryTable xabiVariablesTable -< ()
-      restrict -< cmId .== constant metadataId
-        .&& vname .== constant name
-      returnA -< vId
-    if null varIds
-    then do
-      xtid <- insertXabiType xt
-      return $ Just (name,atBytes,ispublic,isconstant,value,xtid)
-    else
-      return Nothing
-  blocModify $ \conn ->
-    runInsertMany conn xabiVariablesTable
-      [ ( Nothing
-        , constant metadataId
-        , constant xtid
-        , constant name
-        , constant atBytes
-        , constant (fromMaybe False ispublic)
-        , constant (fromMaybe False isconstant)
-        , constant value
-        )
-      | Just (name,atBytes,ispublic,isconstant,value,xtid) <- varsWithIds
-      ]
-
-{- |
-INSERT INTO xabi_functions
-  (contract_metadata_id,name,selector,is_constructor)
-  VALUES ($1,$2,$3,$4) RETURNING id;
--}
-insertXabiFunction
-  :: Int32
-  -> (Text, Func)
-  -> Bloc ()
-insertXabiFunction metadataId (name,Func{..}) = do
-  funcIds :: [Int32] <- blocQuery $ proc () -> do
-    (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
-    restrict -< cmId .== constant metadataId
-      .&& fname .== constant name
-    returnA -< fId
-  when (null funcIds) $ do
-    funcId <- blocModify1 $ \ conn -> runInsertManyReturning conn xabiFunctionsTable [
-      ( Nothing
-      , constant metadataId
-      , constant False
-      , constant name
-      , constant funcStateMutability
-      )]
-      (\ (xfId,_,_,_,_) -> xfId)
-    void $ insertXabiFunctionArg funcId funcArgs
-    void $ insertXabiFunctionRet funcId (toList funcVals)
-
-insertXabiConstr
-  :: Int32
-  -> Text
-  -> Map Text Xabi.IndexedType
-  -> Bloc ()
-insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArgs) $ do
-  funcId <- blocModify1 $ \ conn -> runInsertManyReturning conn xabiFunctionsTable [
-    ( Nothing
-    , constant metadataId
-    , constant True
-    , constant contractName
-    , constant (Nothing :: Maybe StateMutability)
-    )]
-    (\ (xfId,_,_,_, _) -> xfId)
-  void $ insertXabiFunctionArg funcId constrArgs
-
-insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
-insertXabi metadataId contractName Xabi{..} = do
-  traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
-  case xabiConstr of
-    Just constr -> insertXabiConstr metadataId contractName (funcArgs constr)
-    Nothing -> return ()
-  void $ insertXabiVariables metadataId xabiVars
-  void $ insertXabiTypeDefs metadataId xabiTypes
-
 insertContractInstance
   :: Int32
   -> Address
@@ -1318,210 +1182,6 @@ compileContractFromScratch source = do
 
   return metadataIds
 
-insertXabiType :: Xabi.Type -> Bloc Int32
-insertXabiType = \case
-  Xabi.Int signed bytes ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Int"::Text)
-        , Opaleye.null
-        , constant False
-        , constant $ fromMaybe False signed
-        , constant bytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.String dynamic ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("String"::Text)
-        , Opaleye.null
-        , constant $ fromMaybe False dynamic
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Bytes dynamic bytes ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Bytes"::Text)
-        , Opaleye.null
-        , constant $ fromMaybe False dynamic
-        , constant False
-        , constant bytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Bool ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Bool"::Text)
-        , Opaleye.null
-        , constant False
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Address ->
-    blocModify1 $ \ conn->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Address"::Text)
-        , Opaleye.null
-        , constant False
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Struct bytes typedef ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Struct"::Text)
-        , constant $ Just typedef
-        , constant False
-        , constant False
-        , constant bytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-    -- parentTypeId <- blocModify1 $ \ conn -> do
-    --   runInsertManyReturning conn xabiTypesTable [
-    --     ( Nothing
-    --     , constant ("Struct"::Text)
-    --     , constant $ Just typedef
-    --     , constant False
-    --     , constant False
-    --     , constant bytes
-    --     , Opaleye.null
-    --     , Opaleye.null
-    --     , Opaleye.null
-    --     , Opaleye.null
-    --     )]
-    --     (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-    -- void $ blocModify $ \ conn -> do
-    --   runInsertMany conn xabiStructFieldsTable
-    --     [ ( Nothing
-    --       , constant name
-    --       , constant atby
-    --       , constant parentTypeId
-    --       , constant tyid
-    --       )
-    --     | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
-    -- return parentTypeId
-  Xabi.Enum bytes typedef _ ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Enum"::Text)
-        , constant $ Just typedef
-        , constant False
-        , constant False
-        , constant bytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-    -- void $ blocModify $ \ conn -> do
-    --   runInsertMany conn xabiEnumNamesTable
-    --     [ ( Nothing
-    --       , constant name
-    --       , constant value
-    --       , constant tyid
-    --       )
-    --     | (name,value) <- zip names [(0::Int32)..]]
-    -- return tyid
-  Xabi.Array entry len -> do
-    entryId <- insertXabiType entry
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Array"::Text)
-        , Opaleye.null
-        , constant $ isNothing len
-        , constant False
-        , Opaleye.null
-        , constant (fmap fromIntegral len :: Maybe Int32)
-        , constant $ Just entryId
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Contract typedef ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Contract"::Text)
-        , constant $ Just typedef
-        , constant False
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Mapping dynamic key value -> do
-    keyId <- insertXabiType key
-    valueId <- insertXabiType value
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Mapping"::Text)
-        , Opaleye.null
-        , constant $ fromMaybe False dynamic
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , constant $ Just valueId
-        , constant $ Just keyId
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Label name ->
-    blocModify1 $ \conn ->
-      runInsertManyReturning conn xabiTypesTable [
-        ( Nothing
-        , constant ("Label"::Text)
-        , constant $ Just name
-        , constant False
-        , constant False
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
-        )]
-        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-
 getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
 getXabiType typeId = do
@@ -1577,22 +1237,6 @@ getXabiStructFields typeDefId = do
     ty <- getXabiType ftid
     return (name, Xabi.FieldType atbytes ty)
 
-insertXabiStructFields :: Int32 ->  [(Text, Xabi.FieldType)] -> Bloc Int64
-insertXabiStructFields typeDefId fields = do
-  fieldsWithIds <- for fields $ \ (name,(Xabi.FieldType atBytes xt)) -> do
-    xtid <- insertXabiType xt
-    return (name,(atBytes,xtid))
-  blocModify $ \ conn ->
-    runInsertMany conn xabiStructFieldsTable
-      [ ( Nothing
-        , constant name
-        , constant atBytes
-        , constant typeDefId
-        , constant xtid
-        )
-      | (name,(atBytes,xtid)) <- fieldsWithIds
-      ]
-
 getXabiEnumNames :: Int32 -> Bloc [Text]
 getXabiEnumNames typeDefId = blocQuery $ proc () -> do
   (_,name,_,tdid) <-
@@ -1600,17 +1244,6 @@ getXabiEnumNames typeDefId = blocQuery $ proc () -> do
       (queryTable xabiEnumNamesTable) -< ()
   restrict -< tdid .== constant typeDefId
   returnA -< name
-
-insertXabiEnumNames :: Int32 -> [Text] -> Bloc Int64
-insertXabiEnumNames typeDefId names = blocModify $ \ conn ->
-  runInsertMany conn xabiEnumNamesTable
-    [ ( Nothing
-      , constant name
-      , constant value
-      , constant typeDefId
-      )
-    | (name,value) <- zip names [0::Int32 ..]
-    ]
 
 getXabiTypeDefs :: Int32 -> Bloc (Map Text Xabi.Def.Def)
 getXabiTypeDefs metadataId = do
@@ -1629,32 +1262,6 @@ getXabiTypeDefs metadataId = do
         return $ Xabi.Def.Contract $ fromIntegral by
       _ -> throwError $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
-
-insertXabiTypeDefs :: Int32 -> Map Text Xabi.Def.Def -> Bloc ()
-insertXabiTypeDefs metadataId typeDefs = do
-  typeDefIds <- fmap Map.fromList . blocModify $ \ conn -> do
-    let
-      tyOf :: Xabi.Def.Def -> Text
-      tyOf = \case
-        Xabi.Def.Enum _ _ -> "Enum"
-        Xabi.Def.Struct _ _ -> "Struct"
-        Xabi.Def.Contract _ -> "Contract"
-      byOf :: Xabi.Def.Def -> Int32
-      byOf = fromIntegral . Xabi.Def.bytes
-    runInsertManyReturning conn xabiTypeDefsTable
-      [ ( Nothing
-        , constant name
-        , constant metadataId
-        , constant (tyOf enumOrStruct)
-        , constant (byOf enumOrStruct)
-        )
-      | (name,enumOrStruct) <- Map.toList typeDefs
-      ]
-      (\ (tdId,name,_,_,_) -> (name,tdId))
-  for_ (Map.intersectionWith (,) typeDefs typeDefIds) $ \case
-    (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
-    (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
-    (Xabi.Def.Contract _, _) -> return 0
 
 getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
 getContractXabiByMetadataId metadataId = do
@@ -1708,36 +1315,3 @@ getContractXabiAndMetadataId (ContractName contractName) contractId chainId = do
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
-
-getConstructorId :: Int32 -> Bloc (Maybe Int32)
-getConstructorId cmId = do
-  functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_,_)
-      <- queryTable xabiFunctionsTable -< ()
-    restrict -< contractMetaDataId .== constant cmId .&& isConstr
-    returnA -< xfId
-  return $ listToMaybe functionIds
-
-getFunctionId :: Int32 -> Text -> Bloc Int32
-getFunctionId cmId funcName = blocQuery1 "getFunctionId" $ proc () -> do
-  (xfId,contractMetaDataId,isConstr,name,_)
-    <- queryTable xabiFunctionsTable -< ()
-  restrict -< contractMetaDataId .== constant cmId
-    .&& name .== constant funcName
-    .&& Opaleye.not isConstr
-  returnA -< xfId
-
-getEnumValues :: Int32 -> Text -> Bloc [(Text,Int)]
-getEnumValues cmId enumName = blocQuery $
-  orderBy (asc snd) $ proc () -> do
-    (name,enumValue,enumIndex,contractMetaDataId,ty) <- joinTable -< ()
-    restrict -< contractMetaDataId .== constant cmId
-      .&& name .== constant enumName
-      .&& ty .== constant ("Enum" :: Text)
-    returnA -< (enumValue,enumIndex)
-  where
-    joinTable = joinF
-      (\ (_,name,contractMetaDataId,ty,_) (_,enumValue,enumIndex,_) -> (name,enumValue,enumIndex,contractMetaDataId,ty))
-      (\ (tdId,_,_,_,_) (_,_,_,typedefId) -> tdId .== typedefId)
-      (queryTable xabiTypeDefsTable)
-      (queryTable xabiEnumNamesTable)

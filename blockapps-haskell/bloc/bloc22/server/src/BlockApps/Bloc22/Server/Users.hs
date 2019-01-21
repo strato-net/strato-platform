@@ -695,13 +695,6 @@ convertResultResToVals txResp responseTypes =
   let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
-buildArgumentByteString args mFunctionId = case mFunctionId of
-  Nothing -> return ByteString.empty
-  Just functionId -> do
-    argNamesTypes <- getXabiFunctionsArgsQuery functionId
-    constructArgValues args argNamesTypes
-
 constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
 constructArgValues args argNamesTypes = do
     let
