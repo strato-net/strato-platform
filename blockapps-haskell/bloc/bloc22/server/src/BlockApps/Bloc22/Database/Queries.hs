@@ -1208,25 +1208,6 @@ insertXabi metadataId contractName Xabi{..} = do
   void $ insertXabiVariables metadataId xabiVars
   void $ insertXabiTypeDefs metadataId xabiTypes
 
-insertContract
-  :: Text
-  -> Text
-  -> Text
-  -> Text
-  -> Text
-  -> Xabi
-  -> Bloc Int32
-insertContract parentContr contr bin binRuntime src xabi = do
-  let
-    codeHash = binRuntimeToCodeHash binRuntime
-    xcodeHash = keccak256 (Text.encodeUtf8 bin)
-  contrId <- createContractQuery contr
-  (_,srcHash) <- insertContractSourceQuery src
-  metadataId <- insertContractMetaDataQuery
-    contrId bin binRuntime codeHash xcodeHash srcHash
-  insertXabi metadataId parentContr xabi
-  return metadataId
-
 insertContractInstance
   :: Int32
   -> Address
@@ -1700,20 +1681,6 @@ getContractXabiAndMetadataId (ContractName contractName) contractId chainId = do
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   xabi <- getContractXabiByMetadataId metadataId
   return (metadataId, xabi)
-
-getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
-getContractMetadataAndBin contract = blocTransaction $ do
-  cmIds_bins <- blocQuery $ proc () -> do
-    (cmId,name,bin) <- joinF
-      (\ (cmId,_,bin,_,_,_,_) (_,name) -> (cmId,name,bin))
-      (\ (_,contractId,_,_,_,_,_) (cid,_) -> cid .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable) -< ()
-    restrict -< name .== constant contract
-    returnA -< (cmId,bin)
-  blocMaybe
-    "No contract metadata id found. Likely, contract did not compile successfully"
-    (listToMaybe cmIds_bins)
 
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
 getConstructorId cmId = do
