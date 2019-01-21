@@ -13,6 +13,7 @@ import           Control.Concurrent
 import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
+import           Control.Lens                      ((<?=), at, use)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -260,30 +261,20 @@ postUsersUploadList' ContractListParameters{..} sign = do
     else do
       let UploadListContract _ _ mtp _ _ = head contracts
       params <- getAccountTxParams fromAddr chainId mtp
-      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
+      (namesCmIdsTxs,_) <- forStateT Map.empty (zip contracts [0..]) $
         \(UploadListContract name args _ value md,nonceIncr) -> do
-          (names, cmIds, fIds) <- get
-          (bin, src, cmId, names') <- case Map.lookup name names of
-            Just (b, src, cm) -> return (b, src, cm, names)
+          mtuple <- use $ at name
+          (bin, src, cmId, xabi) <- case mtuple of
+            Just (b, src, cmId', x) -> return (b, src, cmId', x)
             Nothing -> do
-              (b16,src,cm) <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
-                (bin16,_,_,_,_,src,cmId',_) <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,src,cmId')
+              (b16,src,(cmId' :: Int32),x') <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
+                (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,src,cmId',x'')
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              return (b, src, cm, Map.insert name (b, src, cm) names)
-          (mFunctionId, cmIds') <- case Map.lookup cmId cmIds of
-            Just fId -> return (fId, cmIds)
-            Nothing -> do
-              fId <- lift $ getConstructorId cmId
-              return (fId, Map.insert cmId fId cmIds)
-          (xabiArgs, fIds') <- case mFunctionId of
-            Nothing -> return (Map.empty, fIds)
-            Just functionId -> case Map.lookup functionId fIds of
-              Just xabiArgs' -> return (xabiArgs', fIds)
-              Nothing -> do
-                xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
-                return (xabiArgs', Map.insert functionId xabiArgs' fIds)
+              x <- lift $ decodeXabiJSON x'
+              at name <?= (b, src, cmId', x)
+          let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
           let metadata' = Just $ fromMaybe Map.empty md `Map.union`Map.fromList [("src",src),("name",name)]
           tx <- lift . signAndPrepare sign fromAddr metadata' $
@@ -295,7 +286,6 @@ postUsersUploadList' ContractListParameters{..} sign = do
                 (bin <> argsBin)
                 nonceIncr
                 chainId
-          put (names', cmIds', fIds')
           return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs
