@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS contracts_metadata(
   code_hash bytea NOT NULL,
   xcode_hash bytea NOT NULL,
   src_hash bytea NOT NULL,
+  xabi bytea NOT NULL,
   FOREIGN KEY (contract_id) REFERENCES contracts(id)
 );
 |]

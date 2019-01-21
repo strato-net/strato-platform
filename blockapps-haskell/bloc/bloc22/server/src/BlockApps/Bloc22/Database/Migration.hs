@@ -40,6 +40,7 @@ migrations = [ (Throw, createTables)
              , (Throw, contractsSourceTable)
              , (Throw, addSrcHashColumn)
              , (Throw, alterValueColumn)
+             , (Throw, addXabiColumn)
              ]
 
 getSchemaVersion :: Query
@@ -72,3 +73,6 @@ addSrcHashColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS
 
 alterValueColumn :: Query
 alterValueColumn = [sql| ALTER TABLE xabi_variables ALTER COLUMN value TYPE text; |]
+
+addXabiColumn :: Query
+addXabiColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS xabi bytea; |]
