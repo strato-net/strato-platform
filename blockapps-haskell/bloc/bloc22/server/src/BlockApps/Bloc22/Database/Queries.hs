@@ -1659,16 +1659,17 @@ insertXabiTypeDefs metadataId typeDefs = do
 
 getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
 getContractXabiByMetadataId metadataId = do
-  funcs <- getXabiFunctionsQuery metadataId
-  constr <- getXabiConstrQuery metadataId
-  vars <- getXabiVariablesQuery metadataId
-  typeDefs <- getXabiTypeDefs metadataId
-  -- TODO: Add modifiers table and pull modifiers from there
-  return xabiEmpty{ xabiFuncs = funcs
-                  , xabiConstr = constr
-                  , xabiVars = vars
-                  , xabiTypes = typeDefs
-                  }
+  (   _ :: ByteString
+    , _ :: ByteString
+    , _ :: Keccak256
+    , _ :: ByteString
+    , _ :: Keccak256
+    , _ :: Text
+    , _ :: Text
+    , _ :: Int32
+    , xabi'
+    ) <- blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId metadataId
+  deserializeXabi xabi'
 
 getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
 getContractContractByMetadataId metadataId = getContractRetry 0
