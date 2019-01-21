@@ -222,8 +222,8 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-  mFunctionId <- getConstructorId cmId
-  argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
+  let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+  argsBin <- constructArgValues (fmap (fmap argValueToText) args) xabiArgs
   tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing
