@@ -1305,13 +1305,3 @@ getContractXabi (ContractName contractName) contractId chainId = do
     Named _ -> blocQuery1 "getContractXabi" $ getContractsMetaDataId contractName contractId chainId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
   getContractXabiByMetadataId metadataId
-
-getContractXabiAndMetadataId :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Int32, Xabi)
-getContractXabiAndMetadataId (ContractName contractName) contractId chainId = do
-  metadataId <- case contractId of
-    Named _ -> blocQuery1 "getContractXabiAndMetadataId" $
-      getContractsMetaDataId contractName contractId chainId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
-  xabi <- getContractXabiByMetadataId metadataId
-  return (metadataId, xabi)
