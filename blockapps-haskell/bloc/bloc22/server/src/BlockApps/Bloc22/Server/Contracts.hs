@@ -34,6 +34,7 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
 import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
@@ -163,14 +164,14 @@ getContractsDetails contractAddress chainId = do
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId chainId = blocTransaction $ do
   metadataId <- blocQuery1 "getContractsFunctions" $ getContractsMetaDataId contractName contractId chainId
-  funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
-  return $ map FunctionName funcs
+  xabi <- getContractXabiByMetadataId metadataId
+  return . map FunctionName . Map.keys $ xabiFuncs xabi
 
 getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
 getContractsSymbols (ContractName contractName) contractId chainId = blocTransaction $ do
   metadataId <- blocQuery1 "getContractsSymbols" $ getContractsMetaDataId contractName contractId chainId
-  vars <- blocQuery $ getXabiVariableNamesQuery metadataId
-  return $ map SymbolName vars
+  xabi <- getContractXabiByMetadataId metadataId
+  return . map SymbolName . Map.keys $ xabiVars xabi
 
 getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> Bloc [EnumValue]
 getContractsEnum (ContractName contractName) contractId (EnumName enumName) chainId =
@@ -178,7 +179,9 @@ getContractsEnum (ContractName contractName) contractId (EnumName enumName) chai
     metadataId <- case contractId of
       Named _ -> blocQuery1 "getContractsEnum" $ getContractsMetaDataId contractName contractId chainId
       Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
-    map (EnumValue . fst) <$> getEnumValues metadataId enumName
+    xabi <- getContractXabiByMetadataId metadataId
+    let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
+    return $ map EnumValue enums
 
 getContractsStateMapping :: ContractName
                          -> MaybeNamed Address

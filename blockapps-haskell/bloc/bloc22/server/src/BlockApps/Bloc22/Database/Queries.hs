@@ -1310,7 +1310,6 @@ compileContractFromScratch source = do
       xcodeHash
       srcHash
       contractdetailsXabi
-    insertXabi metadataId contrName contractdetailsXabi
     return (metadataId,detail)
 
   for_ metadataIds $ \ (leftmetadataId,_) ->
