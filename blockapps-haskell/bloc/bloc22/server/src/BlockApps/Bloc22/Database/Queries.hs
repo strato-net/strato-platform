@@ -163,8 +163,8 @@ contractsJoinTable = joinF
     (\ (_,n) (cmId,_,b,br,ch,xch,src) -> (cmId,n,src,b,br,ch,xch))
     (\ (cid,_) (_,contractId,_,_,_,_,_) -> cid .== contractId)
     (queryTable contractsTable) $ joinF
-      (\ (cmId,cid,b,br,ch,xch,_) (_,_,src) -> (cmId,cid,b,br,ch,xch,src))
-      (\ (_,_,_,_,_,_,sh) (_,sh',_) -> sh .== sh')
+      (\ (cmId,cid,b,br,ch,xch,_,_) (_,_,src) -> (cmId,cid,b,br,ch,xch,src))
+      (\ (_,_,_,_,_,_,sh,_) (_,sh',_) -> sh .== sh')
       (queryTable contractsMetaDataTable)
       (queryTable contractsSourceTable)
 
@@ -182,8 +182,8 @@ contractDetailsJoinTable = joinF
   (\ (_,name) (cmId,_,b,br,ch,xch,sh,src) -> (b,br,ch,xch,sh,name,src,cmId))
   (\ (cId,_) (_,contractId,_,_,_,_,_,_) -> cId .== contractId)
   (queryTable contractsTable) $ joinF
-    (\ (cmId,cid,b,br,ch,xch,sh) (_,_,src) -> (cmId,cid,b,br,ch,xch,sh,src))
-    (\ (_,_,_,_,_,_,sh) (_,sh',_) -> sh .== sh')
+    (\ (cmId,cid,b,br,ch,xch,sh,_) (_,_,src) -> (cmId,cid,b,br,ch,xch,sh,src))
+    (\ (_,_,_,_,_,_,sh,_) (_,sh',_) -> sh .== sh')
     (queryTable contractsMetaDataTable)
     (queryTable contractsSourceTable)
 
@@ -300,8 +300,8 @@ linkedContractsJoinTable = joinF
   (\ (_,name2) (name,src,cm2Id,_,b,br,ch,xch) -> (b,br,ch,xch,name,name2,src,cm2Id))
   (\ (c2Id,_) (_,_,_,contractId2,_,_,_,_) -> c2Id .== contractId2)
   (queryTable contractsTable) $ joinF
-    (\ (cm2Id,contractId2,_,_,_,_,_) (name,src,_,b,br,ch,xch) -> (name,src,cm2Id,contractId2,b,br,ch,xch))
-    (\ (cm2Id,_,_,_,_,_,_) (_,_,linkedmetadataId,_,_,_,_) -> cm2Id .== linkedmetadataId)
+    (\ (cm2Id,contractId2,_,_,_,_,_,_) (name,src,_,b,br,ch,xch) -> (name,src,cm2Id,contractId2,b,br,ch,xch))
+    (\ (cm2Id,_,_,_,_,_,_,_) (_,_,linkedmetadataId,_,_,_,_) -> cm2Id .== linkedmetadataId)
     (queryTable contractsMetaDataTable) $ joinF
       (\ (_,linkedmetadataId) (name,src,_,b,br,ch,xch) -> (name,src,linkedmetadataId,b,br,ch,xch))
       (\ (contractmetadataId,_) (_,_,cmId,_,_,_,_) -> contractmetadataId .== cmId)
@@ -309,8 +309,8 @@ linkedContractsJoinTable = joinF
         (\ (_,name) (cmId,_,b,br,ch,xch,src) -> (name,src,cmId,b,br,ch,xch))
         (\ (cid,_) (_,contractId,_,_,_,_,_) -> cid .== contractId)
         (queryTable contractsTable) $ joinF
-          (\ (cmId,cid,b,br,ch,xch,_) (_,_,src)-> (cmId,cid,b,br,ch,xch,src))
-          (\ (_,_,_,_,_,_,sh) (_,sh',_)-> sh .== sh')
+          (\ (cmId,cid,b,br,ch,xch,_,_) (_,_,src)-> (cmId,cid,b,br,ch,xch,src))
+          (\ (_,_,_,_,_,_,sh,_) (_,sh',_)-> sh .== sh')
           (queryTable contractsMetaDataTable)
           (queryTable contractsSourceTable)
 
@@ -666,8 +666,8 @@ getContractsMetaDataIdBySameNameQuery contractName =
     returnA -< cmId
   where
     joinTable = joinF
-      (\ (cmId,_,_,_,_,_,_) (_,name) -> (cmId,name))
-      (\ (_,contractId,_,_,_,_,_) (cId,_) -> cId .== contractId)
+      (\ (cmId,_,_,_,_,_,_,_) (_,name) -> (cmId,name))
+      (\ (_,contractId,_,_,_,_,_,_) (cId,_) -> cId .== contractId)
       (queryTable contractsMetaDataTable)
       (queryTable contractsTable)
 
@@ -1033,8 +1033,9 @@ insertContractMetaDataQuery
       , constant codeHash
       , constant xcodeHash
       , constant srcHash
+      , constant BS.empty
       )]
-      (\ (contractmetadataId,_,_,_,_,_,_) -> contractmetadataId)
+      (\ (contractmetadataId,_,_,_,_,_,_,_) -> contractmetadataId)
 
 {- |
 INSERT INTO contracts_lookup (contract_metadata_id, linked_metadata_id)
