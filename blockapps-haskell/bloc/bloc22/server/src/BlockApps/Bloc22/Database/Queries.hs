@@ -421,53 +421,13 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Bloc Int32
-getContractsMetaDataId contractName mContractId chainId = case mContractId of
-  Unnamed contractAddress ->
-    getContractsMetaDataIdExhaustive contractName contractAddress chainId
-  Named name -> blocQuery1 "getContractsMetaDataId" $
-    if name == "Latest"
-      then getContractsMetaDataIdByLatestQuery contractName
-      else if contractName == name
-        then getContractsMetaDataIdBySameNameQuery contractName
-        else getContractsMetaDataIdByNameQuery contractName name
-
-getContractsMetaDataIdExhaustive :: Text -> Address -> Maybe ChainId -> Bloc Int32
-getContractsMetaDataIdExhaustive contractName contractAddr chainId = do
-  cmIdsByAddress <- byAddress
-  cmIdsByLatest <- byLatest
-  cmIdsBySameName <- bySameName
-  let cmIds = cmIdsByAddress ++ cmIdsByLatest ++ cmIdsBySameName
-  case cmIds of
-    [] -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
-    cmId:_ -> return cmId
-  where
-    byAddress = blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr chainId
-    byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
-    bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
+getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Int32)
+getContractsMetaDataId name contractId = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name) contractId
 
 getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
   mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
   fmap join . for mName $ \name -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
-
-{- |
-SELECT CM.id
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM.id
-WHERE C.name=$1 AND CI.address=$2;
--}
-getContractsMetaDataIdByAddressQuery
-  :: Text
-  -> Address
-  -> Maybe ChainId
-  -> Query (Column PGInt4)
-getContractsMetaDataIdByAddressQuery contractName contractAddress chainId =
-  getContractsContractByAddressQuery contractName contractAddress chainId
-    >>> arr (\(_,_,_,_,_,_,cmId,_) -> cmId)
 
 {- |
 SELECT
@@ -524,30 +484,6 @@ getContractsContractByCodeHashQuery codeHash =
     returnA -< details
 
 {- |
-SELECT CM2.id
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-WHERE C.name = $1 AND C2.name=$2
-ORDER BY CM2.id DESC
-LIMIT 1;
--}
-getContractsMetaDataIdByNameQuery
-  :: Text
-  -> Text
-  -> Query (Column PGInt4)
-getContractsMetaDataIdByNameQuery name1 name2 =
-  limit 1 . orderBy (desc id) $
-    getContractsContractByNameQuery name1 name2
-      >>> arr (\(_,_,_,_,_,_,cm2Id,_) -> cm2Id)
-
-{- |
 SELECT
    CM2.bin
  , CM2.bin_runtime
@@ -584,21 +520,6 @@ getContractsContractByNameQuery contractName1 contractName2 = proc () -> do
   returnA -< (b,br,ch,xch,name2,src,cm2Id,xabi)
 
 {- |
-SELECT CM.id
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-WHERE C.name = $1
-ORDER BY CM.id DESC
-LIMIT 1;
--}
-getContractsMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
-getContractsMetaDataIdBySameNameQuery contractName =
-  limit 1 . orderBy (desc id) $
-    getContractsContractBySameNameQuery contractName
-      >>> arr (\(_,_,_,_,_,_,cmId,_) -> cmId)
-
-{- |
 SELECT
    CM.bin
  , CM.bin_runtime
@@ -625,23 +546,6 @@ getContractsContractBySameNameQuery contractName = proc () -> do
   (b,br,ch,xch,_,name,src,cmId,xabi) <- contractDetailsJoinTable -< ()
   restrict -< name .== constant contractName
   returnA -< (b,br,ch,xch,name,src,cmId,xabi)
-
-{- |
-SELECT CM.id
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM.id
-WHERE C.name = $1
-ORDER BY CI.timestamp DESC
-LIMIT 1;
--}
-getContractsMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
-getContractsMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
-  (_,_,_,_,_,_,cmId,_) <-
-    getContractsContractLatestQuery contractName -< ()
-  returnA -< cmId
 
 {- |
 SELECT

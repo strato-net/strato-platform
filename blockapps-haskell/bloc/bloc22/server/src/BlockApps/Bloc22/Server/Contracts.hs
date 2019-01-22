@@ -101,19 +101,18 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
               , "with ID "
               , Text.pack $ show contractId
               ]
-  mXabi <- getContractXabi contract contractId chainId
-  eitherErrorOrContract' <- maybe (throwError err) (return . xAbiToContract) mXabi
+  (cmId, details) <- maybe (throwError err) return =<< getContractDetailsAndMetadataId contract contractId chainId
+  let eitherErrorOrContract' = xAbiToContract $ contractdetailsXabi details
   contract' <- either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> do
-      metadataId <- getContractsMetaDataId contractName contractId chainId
       blocQuery1 "getContractsState/instances" $ proc () -> do
         (_,cmId',addr,_,_) <-
           (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
             (queryTable contractsInstanceTable) -< ()
-        restrict -< cmId' .== constant (metadataId::Int32)
+        restrict -< cmId' .== constant cmId
         returnA -< addr
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
@@ -233,11 +232,10 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
               , "with ID "
               , Text.pack $ show contractId
               ]
-  mXabi <- getContractXabi contract contractId chainId
-  eitherErrorOrContract <- maybe (throwError err) (return . xAbiToContract) mXabi
+  (metadataId, details) <- maybe (throwError err) return =<< getContractDetailsAndMetadataId contract contractId chainId
+  let eitherErrorOrContract = xAbiToContract $ contractdetailsXabi details
 
   contract' <- either (throwError . UserError . Text.pack) return eitherErrorOrContract
-  metadataId <- getContractsMetaDataId contractName contractId chainId
   address <- case contractId of
               Unnamed addr -> return addr
               Named "Latest" -> blocQuery1 "getContractsStateMapping/instances" $ proc () -> do
