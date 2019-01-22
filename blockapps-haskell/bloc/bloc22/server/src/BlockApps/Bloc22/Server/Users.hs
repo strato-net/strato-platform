@@ -484,12 +484,19 @@ postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransaction
 postUsersContractMethod' FunctionParameters{..} sign = do
     params <- getAccountTxParams fromAddr chainId txParams
 
-    (cmId,xabi) <- fmap contractdetailsXabi <$> getContractDetailsAndMetadataId
-                  (ContractName contractName)
-                  (Unnamed contractAddr)
-                  chainId
+    let err = UserError $ Text.concat
+                [ "postUsersContractMethod': Couldn't find contract details for "
+                , contractName
+                , " at address "
+                , Text.pack $ addressString contractAddr
+                ]
+    (cmId,xabi) <- maybe (throwError err) (return . fmap contractdetailsXabi) =<<
+      getContractDetailsAndMetadataId
+        (ContractName contractName)
+        (Unnamed contractAddr)
+        chainId
     contract' <- case xAbiToContract xabi of
-      Left err -> throwError . AnError $ Text.pack err
+      Left e -> throwError . AnError $ Text.pack e
       Right c -> return c
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
@@ -635,21 +642,17 @@ contractResult hash mtxr cmId name index = do
           Nothing -> lift $ throwError $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
-      xs::[Int32] <- lift $ blocQuery $ proc () -> do
-        (cmId',_,_,_,_,_,_,_,_,_,_) <- contractByAddress name addr' chainId -< ()
-        returnA -< cmId'
-      if isNothing $ listToMaybe xs
-        then do
+      let cn = ContractName name
+      mcds <- lift $ getContractDetails cn (Unnamed addr') chainId
+      case mcds of
+        Nothing -> do
           contractsList %= ((addr', ContractCreationData cmId hash (ContractName name) chainId mtxr index):)
           return Nothing
-        else do
-          let cn  = ContractName name
+        Just cds -> do
           mdetails <- use $ contractDetailsMap . at cn
           details <- case mdetails of
             Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
-            Nothing -> do
-              details' <- lift $ getContractDetails cn (Unnamed addr') chainId
-              contractDetailsMap . at cn <?= details'
+            Nothing -> contractDetailsMap . at cn <?= cds
           return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
 
 functionResult :: Keccak256

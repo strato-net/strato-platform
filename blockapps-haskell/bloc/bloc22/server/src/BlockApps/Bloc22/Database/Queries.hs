@@ -446,12 +446,10 @@ getContractsMetaDataIdExhaustive contractName contractAddr chainId = do
     byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
     bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
 
-getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
-  mName <- blocQuery $ contractNameFromAddress contractAddr chainId
-  case mName of
-    [] -> throwError $ UserError "getContractDetailsByAddressOnly: couldn't find contract metadata id"
-    name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
+  mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
+  fmap join . for mName $ \name -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
 
 {- |
 SELECT CM.id
@@ -469,7 +467,7 @@ getContractsMetaDataIdByAddressQuery
   -> Query (Column PGInt4)
 getContractsMetaDataIdByAddressQuery contractName contractAddress chainId =
   getContractsContractByAddressQuery contractName contractAddress chainId
-    >>> arr (\(_,_,(_,_,_,_,_,_,cmId,_)) -> cmId)
+    >>> arr (\(_,_,_,_,_,_,cmId,_) -> cmId)
 
 {- |
 SELECT
@@ -494,20 +492,18 @@ getContractsContractByAddressQuery
   -> Query
     ( Column PGBytea
     , Column PGBytea
-    , ( Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGText
-      , Column PGText
-      , Column PGInt4
-      , Column PGBytea
-    ) )
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGText
+    , Column PGInt4
+    , Column PGBytea
+    )
 getContractsContractByAddressQuery contractName contractAddress chainId =
   limit 1 $ proc () -> do
-    (cmId,name,src,addr,_,bin,binRuntime,codeHash,xcodeHash,cid,xabi) <-
+    (cmId,name,src,_,_,bin,binRuntime,codeHash,xcodeHash,_,xabi) <-
       contractByAddress contractName contractAddress chainId -< ()
-    returnA -< (addr,cid,(bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi))
+    returnA -< (bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi)
 
 getContractsContractByCodeHashQuery
   :: Keccak256
@@ -709,10 +705,10 @@ getContractDetailsByMetadataId cmId addr chainId = do
     , contractdetailsChainId = chainId
     }
 
-getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
-getContractDetails name contractId = fmap snd . getContractDetailsAndMetadataId name contractId
+getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
+getContractDetails name contractId = fmap (fmap snd) . getContractDetailsAndMetadataId name contractId
 
-getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Int32, ContractDetails)
+getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsAndMetadataId (ContractName contractName) contractId chainId = do
     let
       detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
@@ -729,22 +725,22 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
           })
     case contractId of
       Named "Latest" -> do
-        tuple <- blocQuery1 "getContractDetails/latest" $
+        tuple <- blocQueryMaybe $
           getContractsContractLatestQuery contractName
-        detailsWith Nothing chainId tuple
+        for tuple $ detailsWith Nothing chainId
       Unnamed addr -> do
-        (addr',cid,tuple) <- blocQuery1 "getContractDetails/unnamed" . limit 1 $
+        tuple <- fmap listToMaybe . blocQuery $
           getContractsContractByAddressQuery contractName addr chainId
-        detailsWith (Just (Unnamed addr')) cid tuple
+        for tuple $ detailsWith (Just (Unnamed addr)) chainId
       Named name -> if contractName == name
         then do
-          tuple <- blocQuery1 "getContractDetails/named" . limit 1 $
+          tuple <- fmap listToMaybe . blocQuery $
             getContractsContractBySameNameQuery name
-          detailsWith (Just (Named name)) chainId tuple
+          for tuple $ detailsWith (Just (Named name)) chainId
         else do
-          tuple <- blocQuery1 "getContractDetails/otherNamed" . limit 1 $
+          tuple <- fmap listToMaybe . blocQuery $
             getContractsContractByNameQuery contractName name
-          detailsWith (Just (Named name)) chainId tuple
+          for tuple $ detailsWith (Just (Named name)) chainId
 
 getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
@@ -981,6 +977,6 @@ getContractXabiByMetadataId cmId = do
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
 getContractXabi :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
+                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
 getContractXabi contractName contractId =
-  fmap contractdetailsXabi . getContractDetails contractName contractId
+  fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

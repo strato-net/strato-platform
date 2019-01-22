@@ -69,7 +69,16 @@ getContractsData (ContractName contractName) = blocTransaction $ do
   return $ map (Unnamed . fst) addresses ++ map Named names
 
 getContractsContract :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
-getContractsContract name addr = getContractDetails name addr
+getContractsContract name addr chainId =
+  let err = UserError $ Text.concat
+              [ "getContractsContract: Couldn't find contract details for "
+              , Text.pack $ show name
+              , " at address "
+              , Text.pack $ show addr
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
+   in maybe (throwError err) return =<< getContractDetails name addr chainId
 
 translateStorageMap :: [T.Storage] -> S.Storage
 translateStorageMap storage' =
@@ -86,12 +95,15 @@ getContractsState :: ContractName
                   -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId chainId mName mCount mOffset mLength = do
-  eitherErrorOrContract' <- toUserError
-    (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
-      $ xAbiToContract <$> getContractXabi contract contractId chainId
-
-  contract' <-
-    either (throwError . UserError . Text.pack) return eitherErrorOrContract'
+  let err = UserError $ Text.concat
+              [ "getContractsState: Couldn't find "
+              , contractName
+              , "with ID "
+              , Text.pack $ show contractId
+              ]
+  mXabi <- getContractXabi contract contractId chainId
+  eitherErrorOrContract' <- maybe (throwError err) (return . xAbiToContract) mXabi
+  contract' <- either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
   address <- case contractId of
     Unnamed addr -> return addr
@@ -156,26 +168,56 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
 
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do
-  toUserError
-    (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-    (getContractDetailsByAddressOnly contractAddress chainId >>= return . completeContractDetailXabi)
+  let err = UserError $ Text.concat
+              [ "getContractsDetails: couldn't find contract details for address "
+              , Text.pack $ addressString contractAddress
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
+  mdetails <- getContractDetailsByAddressOnly contractAddress chainId
+  maybe (throwError err) (return . completeContractDetailXabi) mdetails
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
 getContractsFunctions contractName contractId chainId = blocTransaction $ do
-  xabi <- getContractXabi contractName contractId chainId
-  return . map FunctionName . Map.keys $ xabiFuncs xabi
+  let err = UserError $ Text.concat
+              [ "getContractsFunctions: couldn't find contract details for "
+              , Text.pack $ show contractName
+              , " at address "
+              , Text.pack $ show contractId
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
+  mXabi <- getContractXabi contractName contractId chainId
+  maybe (throwError err) (return . map FunctionName . Map.keys . xabiFuncs) mXabi
 
 getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
 getContractsSymbols contractName contractId chainId = blocTransaction $ do
-  xabi <- getContractXabi contractName contractId chainId
-  return . map SymbolName . Map.keys $ xabiVars xabi
+  let err = UserError $ Text.concat
+              [ "getContractsSymbols: couldn't find contract details for "
+              , Text.pack $ show contractName
+              , " at address "
+              , Text.pack $ show contractId
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
+  mXabi <- getContractXabi contractName contractId chainId
+  maybe (throwError err) (return . map SymbolName . Map.keys . xabiVars) mXabi
 
 getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> Bloc [EnumValue]
-getContractsEnum contractName contractId (EnumName enumName) chainId =
+getContractsEnum contractName contractId (EnumName enumName) chainId = do
+  let err = UserError $ Text.concat
+              [ "getContractsEnum: couldn't find contract details for "
+              , Text.pack $ show contractName
+              , " at address "
+              , Text.pack $ show contractId
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
   blocTransaction $ do
-    xabi <- getContractXabi contractName contractId chainId
-    let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
-    return $ map EnumValue enums
+    mXabi <- getContractXabi contractName contractId chainId
+    flip (maybe (throwError err)) mXabi $ \xabi ->
+      let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
+      in return $ map EnumValue enums
 
 getContractsStateMapping :: ContractName
                          -> MaybeNamed Address
@@ -185,7 +227,14 @@ getContractsStateMapping :: ContractName
                          -> Bloc GetContractsStateMappingResponse
                          -- state-translation
 getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName chainId = do
-  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId chainId
+  let err = UserError $ Text.concat
+              [ "getContractsStateMapping: Couldn't find "
+              , contractName
+              , "with ID "
+              , Text.pack $ show contractId
+              ]
+  mXabi <- getContractXabi contract contractId chainId
+  eitherErrorOrContract <- maybe (throwError err) (return . xAbiToContract) mXabi
 
   contract' <- either (throwError . UserError . Text.pack) return eitherErrorOrContract
   metadataId <- getContractsMetaDataId contractName contractId chainId
@@ -216,7 +265,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
     ]
 
   case ret of
-   Left err -> throwError $ UserError $ Text.pack err
+   Left e -> throwError . UserError $ Text.pack e
    Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
 
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
