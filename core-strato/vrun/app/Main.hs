@@ -1,10 +1,12 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
 
 module Main where
 
 import qualified Data.ByteString                             as B
+import qualified Data.ByteString.Lazy                        as BL
 import qualified Data.ByteString.Char8                       as BC
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
@@ -14,6 +16,7 @@ import           Control.Monad.Trans.Except
 import           HFlags
 import           Network.Haskoin.Crypto                      (withSource)
 import qualified Network.Haskoin.Internals                   as Haskoin
+import           Prometheus
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
@@ -37,14 +40,19 @@ main = do
   _ <- $initHFlags "The Ethereum Test program"
 
   let secretKey = fromJust . Haskoin.makePrvKey $ 0x1234
+      rep = B.concat . replicate 100000 . B.pack
+      jumpAll = B.replicate 1000000 0x5b
+      pushOnes = rep [0x60, 0xf2, 0x50]
+      pushBigs = rep $ (0x7f:replicate 32 0x72) ++ [0x50]
+      pushMeds = rep $ (0x6f:replicate 16 0x34) ++ [0x50]
+      pushSmalls = rep $ (0x67:replicate 8 0x21) ++ [0x50]
+      pushLarges = rep $ (0x77:replicate 24 0x99) ++ [0x50]
       t = createContractCreationTX
             0 --nonce
             1 --gas price
             1000000000000000000 --gas limit
             1 --value
---            (Code $ B.replicate 10000000 0x5b)
-            (Code $ B.replicate 1000000 0x5b)
---            (Code $ B.replicate 1 0x5b)
+            (Code pushLarges)
             Nothing
             secretKey
 
@@ -89,8 +97,7 @@ main = do
   case result of
     Left e -> putStrLn $ show e
     Right r -> putStrLn $ "vrun: " ++ show r
-
-
+  BL.putStr =<< exportMetricsAsText
 
 
 vrunLogger :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
