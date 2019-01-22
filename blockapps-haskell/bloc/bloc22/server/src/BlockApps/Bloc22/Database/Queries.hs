@@ -11,9 +11,7 @@
 
 module BlockApps.Bloc22.Database.Queries where
 
-import           ClassyPrelude                   ((<>))
 import           Control.Arrow
-import           Control.Concurrent              (threadDelay)
 import           Control.Monad
 import           Control.Monad.Except
 import           Crypto.Hash
@@ -48,11 +46,9 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
-import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
-import           BlockApps.XAbiConverter
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -425,15 +421,16 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Query (Column PGInt4)
+getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Bloc Int32
 getContractsMetaDataId contractName mContractId chainId = case mContractId of
-  Named "Latest" ->
-    getContractsMetaDataIdByLatestQuery contractName
   Unnamed contractAddress ->
-    getContractsMetaDataIdByAddressQuery contractName contractAddress chainId
-  Named name -> if contractName == name
-    then getContractsMetaDataIdBySameNameQuery contractName
-    else getContractsMetaDataIdByNameQuery contractName name
+    getContractsMetaDataIdExhaustive contractName contractAddress chainId
+  Named name -> blocQuery1 "getContractsMetaDataId" $
+    if name == "Latest"
+      then getContractsMetaDataIdByLatestQuery contractName
+      else if contractName == name
+        then getContractsMetaDataIdBySameNameQuery contractName
+        else getContractsMetaDataIdByNameQuery contractName name
 
 getContractsMetaDataIdExhaustive :: Text -> Address -> Maybe ChainId -> Bloc Int32
 getContractsMetaDataIdExhaustive contractName contractAddr chainId = do
@@ -471,10 +468,8 @@ getContractsMetaDataIdByAddressQuery
   -> Maybe ChainId
   -> Query (Column PGInt4)
 getContractsMetaDataIdByAddressQuery contractName contractAddress chainId =
-  proc () -> do
-    (cmId,_,_,_,_,_,_,_,_,_,_) <-
-      contractByAddress contractName contractAddress chainId -< ()
-    returnA -< cmId
+  getContractsContractByAddressQuery contractName contractAddress chainId
+    >>> arr (\(_,_,(_,_,_,_,_,_,cmId,_)) -> cmId)
 
 {- |
 SELECT
@@ -553,7 +548,8 @@ getContractsMetaDataIdByNameQuery
   -> Query (Column PGInt4)
 getContractsMetaDataIdByNameQuery name1 name2 =
   limit 1 . orderBy (desc id) $
-    byNameQuery name1 name2 >>> arr (\(_,_,_,_,_,_,cm2Id,_) -> cm2Id)
+    getContractsContractByNameQuery name1 name2
+      >>> arr (\(_,_,_,_,_,_,cm2Id,_) -> cm2Id)
 
 {- |
 SELECT
@@ -571,7 +567,6 @@ JOIN contracts_metadata CM2
 JOIN contracts C2
   ON C2.id = CM2.contract_id
 WHERE C.name = $1 AND C2.name=$2
-LIMIT 1;
 -}
 getContractsContractByNameQuery
   :: Text
@@ -586,40 +581,7 @@ getContractsContractByNameQuery
     , Column PGInt4
     , Column PGBytea
     )
-getContractsContractByNameQuery contractName1 contractName2 =
-  limit 1 $ byNameQuery contractName1 contractName2
-
-{- |
-SELECT
-   CM2.bin
- , CM2.bin_runtime
- , CM2.code_hash
- , C2.name
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-WHERE C.name = $1 AND C2.name=$2
--}
-byNameQuery
-  :: Text
-  -> Text
-  -> Query
-    ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGText
-    , Column PGInt4
-    , Column PGBytea
-    )
-byNameQuery contractName1 contractName2 = proc () -> do
+getContractsContractByNameQuery contractName1 contractName2 = proc () -> do
   (b,br,ch,xch,name1,name2,src,cm2Id,xabi) <- linkedContractsJoinTable -< ()
   restrict -< name1 .== constant contractName1
   restrict -< name2 .== constant contractName2
@@ -636,16 +598,9 @@ LIMIT 1;
 -}
 getContractsMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
 getContractsMetaDataIdBySameNameQuery contractName =
-  limit 1 . orderBy (desc id) $ proc () -> do
-    (cmId,name) <- joinTable -< ()
-    restrict -< name .== constant contractName
-    returnA -< cmId
-  where
-    joinTable = joinF
-      (\ (cmId,_,_,_,_,_,_,_) (_,name) -> (cmId,name))
-      (\ (_,contractId,_,_,_,_,_,_) (cId,_) -> cId .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable)
+  limit 1 . orderBy (desc id) $
+    getContractsContractBySameNameQuery contractName
+      >>> arr (\(_,_,_,_,_,_,cmId,_) -> cmId)
 
 {- |
 SELECT
@@ -657,7 +612,6 @@ FROM contracts_metadata CM
 JOIN contracts C
   ON C.id = CM.contract_id
 WHERE C.name = $1
-LIMIT 1;
 -}
 getContractsContractBySameNameQuery
   :: Text
@@ -671,11 +625,10 @@ getContractsContractBySameNameQuery
     , Column PGInt4
     , Column PGBytea
     )
-getContractsContractBySameNameQuery contractName =
-  limit 1 $ proc () -> do
-    (b,br,ch,xch,_,name,src,cmId,xabi) <- contractDetailsJoinTable -< ()
-    restrict -< name .== constant contractName
-    returnA -< (b,br,ch,xch,name,src,cmId,xabi)
+getContractsContractBySameNameQuery contractName = proc () -> do
+  (b,br,ch,xch,_,name,src,cmId,xabi) <- contractDetailsJoinTable -< ()
+  restrict -< name .== constant contractName
+  returnA -< (b,br,ch,xch,name,src,cmId,xabi)
 
 {- |
 SELECT CM.id
@@ -780,16 +733,16 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
           getContractsContractLatestQuery contractName
         detailsWith Nothing chainId tuple
       Unnamed addr -> do
-        (addr',cid,tuple) <- blocQuery1 "getContractDetails/unnamed" $
+        (addr',cid,tuple) <- blocQuery1 "getContractDetails/unnamed" . limit 1 $
           getContractsContractByAddressQuery contractName addr chainId
         detailsWith (Just (Unnamed addr')) cid tuple
       Named name -> if contractName == name
         then do
-          tuple <- blocQuery1 "getContractDetails/named" $
+          tuple <- blocQuery1 "getContractDetails/named" . limit 1 $
             getContractsContractBySameNameQuery name
           detailsWith (Just (Named name)) chainId tuple
         else do
-          tuple <- blocQuery1 "getContractDetails/otherNamed" $
+          tuple <- blocQuery1 "getContractDetails/otherNamed" . limit 1 $
             getContractsContractByNameQuery contractName name
           detailsWith (Just (Named name)) chainId tuple
 
@@ -1027,31 +980,7 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractContractByMetadataId :: HasCallStack => Int32 -> Bloc Contract
-getContractContractByMetadataId metadataId = getContractRetry 0
-  where
-  -- Impatient clients may have submitted a contract and immediately issued
-  -- a function call against it. Here we give a basic defense against it.
-  -- A much nicer way to handle that is to return cookies to the client
-  -- after writes, and use that cookie on subsequent calls to block until
-  -- their write will be visible.
-  -- In the case of a true failure, the total sleep is (2^10 - 1)* 5ms = 5s
-      sleep t = liftIO . threadDelay . (1000*) $ t
-      getContractRetry :: Int -> Bloc Contract
-      getContractRetry t = do
-        x <- getContractXabiByMetadataId metadataId
-        case xAbiToContract x of
-          Right c -> return c
-          Left err ->
-            if t < 5000
-              then sleep t >> getContractRetry (1 + 2 * t)
-              else throwError . UserError $
-                    "getContractContractByMetadataId: invalid types in contract: " <> (Text.pack . show $ err)
-
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
-getContractXabi (ContractName contractName) contractId chainId = do
-  metadataId <- case contractId of
-    Named _ -> blocQuery1 "getContractXabi" $ getContractsMetaDataId contractName contractId chainId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
-  getContractXabiByMetadataId metadataId
+getContractXabi contractName contractId =
+  fmap contractdetailsXabi . getContractDetails contractName contractId

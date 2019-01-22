@@ -262,9 +262,7 @@ getXabiTypeDefs metadataId = do
 getContractXabiDeprecated :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
 getContractXabiDeprecated (ContractName contractName) contractId chainId = do
-  metadataId <- case contractId of
-    Named _ -> blocQuery1 "getContractXabi" $ getContractsMetaDataId contractName contractId chainId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
+  metadataId <- getContractsMetaDataId contractName contractId chainId
   funcs <- getXabiFunctionsQuery metadataId
   constr <- getXabiConstrQuery metadataId
   vars <- getXabiVariablesQuery metadataId

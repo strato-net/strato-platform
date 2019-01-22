@@ -96,8 +96,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> do
-      metadataId <- blocQuery1 "getContractsState/metadataid" $
-        getContractsMetaDataId contractName contractId chainId
+      metadataId <- getContractsMetaDataId contractName contractId chainId
       blocQuery1 "getContractsState/instances" $ proc () -> do
         (_,cmId',addr,_,_) <-
           (limit 1 . orderBy (desc (\(_,_,_,time,_) -> time)))
@@ -188,12 +187,8 @@ getContractsStateMapping :: ContractName
 getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName chainId = do
   eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId chainId
 
-  contract' <-
-    either (throwError . UserError . Text.pack) return eitherErrorOrContract
-
-  metadataId <- blocQuery1 "getContractsStateMapping/metadata" $
-    getContractsMetaDataId contractName contractId chainId
-
+  contract' <- either (throwError . UserError . Text.pack) return eitherErrorOrContract
+  metadataId <- getContractsMetaDataId contractName contractId chainId
   address <- case contractId of
               Unnamed addr -> return addr
               Named "Latest" -> blocQuery1 "getContractsStateMapping/instances" $ proc () -> do
