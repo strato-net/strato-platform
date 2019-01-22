@@ -156,18 +156,6 @@ contractsInstanceTable = Table "contracts_instance" $ p5
   , required "chainid"
   )
 
-contractsLookupTable :: Table
-  ( Column PGInt4
-  , Column PGInt4
-  )
-  ( Column PGInt4
-  , Column PGInt4
-  )
-contractsLookupTable = Table "contracts_lookup" $ p2
-  ( required "contract_metadata_id"
-  , required "linked_metadata_id"
-  )
-
 xabiFunctionsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4

@@ -162,24 +162,19 @@ getContractsDetails contractAddress chainId = do
     (getContractDetailsByAddressOnly contractAddress chainId >>= return . completeContractDetailXabi)
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [FunctionName]
-getContractsFunctions (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 "getContractsFunctions" $ getContractsMetaDataId contractName contractId chainId
-  xabi <- getContractXabiByMetadataId metadataId
+getContractsFunctions contractName contractId chainId = blocTransaction $ do
+  xabi <- getContractXabi contractName contractId chainId
   return . map FunctionName . Map.keys $ xabiFuncs xabi
 
 getContractsSymbols :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc [SymbolName]
-getContractsSymbols (ContractName contractName) contractId chainId = blocTransaction $ do
-  metadataId <- blocQuery1 "getContractsSymbols" $ getContractsMetaDataId contractName contractId chainId
-  xabi <- getContractXabiByMetadataId metadataId
+getContractsSymbols contractName contractId chainId = blocTransaction $ do
+  xabi <- getContractXabi contractName contractId chainId
   return . map SymbolName . Map.keys $ xabiVars xabi
 
 getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> Bloc [EnumValue]
-getContractsEnum (ContractName contractName) contractId (EnumName enumName) chainId =
+getContractsEnum contractName contractId (EnumName enumName) chainId =
   blocTransaction $ do
-    metadataId <- case contractId of
-      Named _ -> blocQuery1 "getContractsEnum" $ getContractsMetaDataId contractName contractId chainId
-      Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr chainId
-    xabi <- getContractXabiByMetadataId metadataId
+    xabi <- getContractXabi contractName contractId chainId
     let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
     return $ map EnumValue enums
 
