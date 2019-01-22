@@ -98,7 +98,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   let err = UserError $ Text.concat
               [ "getContractsState: Couldn't find "
               , contractName
-              , "with ID "
+              , " with ID "
               , Text.pack $ show contractId
               ]
   (cmId, details) <- maybe (throwError err) return =<< getContractDetailsAndMetadataId contract contractId chainId

@@ -14,7 +14,7 @@ import           Control.Concurrent
 import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
-import           Control.Lens                      ((%=), (<?=), at, use)
+import           Control.Lens                      ((<?=), at, use)
 import           Control.Lens.TH
 import           Control.Monad
 import           Control.Monad.Except
@@ -87,18 +87,8 @@ data TRD = TRD -- transaction resolution data
   , trdResult :: Maybe TransactionResult
   }
 
-data ContractCreationData = ContractCreationData
-  { metadataId :: Int32
-  , transactionHash :: Keccak256
-  , contractName :: ContractName
-  , contractChainId :: Maybe ChainId
-  , transactionResult :: Maybe TransactionResult
-  , batchIndex :: Integer
-  }
-
 data BatchState = BatchState
-  { _contractsList      :: [(Address, ContractCreationData)]
-  , _contractDetailsMap :: Map.Map ContractName ContractDetails
+  { _contractDetailsMap :: Map.Map ContractName ContractDetails
   , _functionXabiMap    :: Map.Map Int32 Xabi
   }
 makeLenses ''BatchState
@@ -528,7 +518,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
     getBlocTransactionResult' chainId [hash] resolve
 
 emptyBatchState :: BatchState
-emptyBatchState = BatchState [] Map.empty Map.empty
+emptyBatchState = BatchState Map.empty Map.empty
 
 getBlocTransactionResult' :: Maybe ChainId -> [Keccak256] -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' _ [] _ = throwError $ AnError "getBlockTransactionResult': no TX hashes"
@@ -550,81 +540,66 @@ getBatchBlocTransactionResult' chainId hashes resolve = do
       forM hashes $ \h -> return (BlocTransactionResult Pending h Nothing Nothing)
 
 postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
-postBlocTransactionResults chainId resolve hashes = do
-  let resolutions' = zipWith (\h i -> TRD Pending h i Nothing) hashes [0..]
-  resolutions <- recurseTRDs chainId (0 :: Int) resolve resolutions' -- recursively batch resolve transactions
-  evalAndReturn resolutions -- evaluate transaction results
-
-merge :: [a] -> [a] -> (a -> a -> Bool) -> [a]
-merge [] ps _ = ps
-merge ds [] _ = ds
-merge (d:ds) (p:ps) c =
-  if c d p
-    then (d : merge ds (p:ps) c)
-    else (p : merge (d:ds) ps c)
+postBlocTransactionResults chainId resolve hashes = recurseTRDs chainId resolve hashes >>= evalAndReturn
 
 recurseTRDs :: Maybe ChainId
-        -> Int
-        -> Bool
-        -> [TRD]
-        -> Bloc [TRD]
-recurseTRDs chainId num resolve list = do
-  let his = map (arr trdHash &&& arr trdIndex) list
-  statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus chainId (map fst his)
-  let (pending', done) = partitionEithers $
-                  flip map statusAndMtxrs
-                    (\((s,r),(h,i)) ->
-                       if s == Pending
-                         then Left $ TRD s h i r
-                         else Right $ TRD s h i r)
-  pending <- if not resolve || null pending'
-    then return pending'
-    else
-      if num >= 60
+            -> Bool
+            -> [Keccak256]
+            -> Bloc [TRD]
+recurseTRDs chainId resolve hashes = go 0 (toPending hashes)
+  where
+    go :: Int -> [TRD] -> Bloc [TRD]
+    go num list = do
+      let his = map (trdHash &&& trdIndex) list
+      statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus chainId (map fst his)
+      let (pending', done) = partitionEithers $
+                      flip map statusAndMtxrs
+                        (\((s,r),(h,i)) ->
+                          if s == Pending
+                            then Left $ TRD s h i r
+                            else Right $ TRD s h i r)
+      pending <- if not resolve || null pending'
         then return pending'
-        else do
-          logWith logNotice . Text.pack $
-            "Polling BlocTransactionStatus for transaction hashes: " ++ (show $ map trdHash pending')
-          void . liftIO $ threadDelay 1000000
-          recurseTRDs chainId (num + 1) resolve pending'
-  return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
+        else
+          if num >= 60
+            then return pending'
+            else do
+              logWith logNotice . Text.pack $
+                "Polling BlocTransactionStatus for transaction hashes: " ++ (show $ map trdHash pending')
+              void . liftIO $ threadDelay 1000000
+              go (num + 1) pending'
+      return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
+
+    toPending :: [Keccak256] -> [TRD]
+    toPending = zipWith (\i h -> TRD Pending h i Nothing) [0..]
+
+    merge :: [a] -> [a] -> (a -> a -> Bool) -> [a]
+    merge [] ps _ = ps
+    merge ds [] _ = ds
+    merge (d:ds) (p:ps) c =
+      if c d p
+        then (d : merge ds (p:ps) c)
+        else (p : merge (d:ds) ps c)
 
 evalAndReturn :: [TRD] -> Bloc [BlocTransactionResult]
-evalAndReturn list = do
-  (mbtrs,state) <- forStateT emptyBatchState list $
-    \(TRD status hash index mtxr) -> do
-      case status of
-        Pending -> return . Just $ (BlocTransactionResult Pending hash Nothing Nothing, index)
-        Failure -> return . Just $ (BlocTransactionResult Failure hash mtxr Nothing, index)
+evalAndReturn list = fmap fst . forStateT emptyBatchState list $
+    \(TRD status hash _ mtxr) -> case status of
+        Pending -> return $ BlocTransactionResult Pending hash Nothing Nothing
+        Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing
         Success -> do
           (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 "evalAndReturn" $ contractByTxHash hash
           case ttype of
-            0 -> return . Just $ (BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata), index)
-            1 -> contractResult hash mtxr cmId tdata index
-            2 -> functionResult hash mtxr cmId tdata index
+            0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
+            1 -> contractResult hash mtxr cmId tdata
+            2 -> functionResult hash mtxr cmId tdata
             _ -> error $ "Unexpected transaction type: got" ++ show ttype
-  let jbtrs = [btr | Just btr <- mbtrs]
-      cl = reverse $ _contractsList state
-  (nbtrs,_) <- do
-    forStateT state cl $
-      \(addr', ContractCreationData cmId hash name chainId mtxr index) -> do
-        mdetails <- use (contractDetailsMap . at name)
-        details <- case mdetails of
-          Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
-          Nothing -> do
-            details' <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') chainId
-            contractDetailsMap . at name <?= details'
-        return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
-  let btrs = map fst $ merge jbtrs nbtrs (\r1 r2 -> snd r1 < snd r2)
-  return btrs
 
 contractResult :: Keccak256
                -> Maybe TransactionResult
                -> Int32
                -> Text
-               -> Integer
-               -> StateT BatchState Bloc (Maybe (BlocTransactionResult, Integer))
-contractResult hash mtxr cmId name index = do
+               -> StateT BatchState Bloc BlocTransactionResult
+contractResult hash mtxr cmId name = do
   let
     Just txResult = mtxr
     chainId = transactionresultChainId txResult
@@ -643,25 +618,20 @@ contractResult hash mtxr cmId name index = do
       stratoMsg  -> lift $ throwError $ UserError stratoMsg
     Just addr' -> do
       let cn = ContractName name
-      mcds <- lift $ getContractDetails cn (Unnamed addr') chainId
-      case mcds of
+      mdetails <- use $ contractDetailsMap . at cn
+      details <- case mdetails of
+        Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
         Nothing -> do
-          contractsList %= ((addr', ContractCreationData cmId hash (ContractName name) chainId mtxr index):)
-          return Nothing
-        Just cds -> do
-          mdetails <- use $ contractDetailsMap . at cn
-          details <- case mdetails of
-            Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
-            Nothing -> contractDetailsMap . at cn <?= cds
-          return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
+          cds <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') chainId
+          contractDetailsMap . at cn <?= cds
+      return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
 
 functionResult :: Keccak256
                -> Maybe TransactionResult
                -> Int32
                -> Text
-               -> Integer
-               -> StateT BatchState Bloc (Maybe (BlocTransactionResult, Integer))
-functionResult hash mtxr cmId funcName index = do
+               -> StateT BatchState Bloc BlocTransactionResult
+functionResult hash mtxr cmId funcName = do
   let Just txResult = mtxr
   mxabi <- use $ functionXabiMap . at cmId
   xabi <- case mxabi of
@@ -683,7 +653,7 @@ functionResult hash mtxr cmId funcName index = do
   case transactionresultMessage txResult of
     "Success!" -> do
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-      return $ Just (BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse), index)
+      return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
     stratoMsg  -> lift $ throwError $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
