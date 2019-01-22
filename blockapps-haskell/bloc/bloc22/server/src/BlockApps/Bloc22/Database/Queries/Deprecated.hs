@@ -13,50 +13,25 @@ module BlockApps.Bloc22.Database.Queries.Deprecated where
 
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
-import           Control.Concurrent              (threadDelay)
-import           Control.Monad
 import           Control.Monad.Except
-import           Crypto.Hash
-import qualified Crypto.Saltine.Class            as Saltine
-import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
-import           Crypto.Secp256k1
-import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
-import qualified Data.ByteArray                  as ByteArray
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Char8           as Char8
-import           Data.ByteString.Lazy            (fromStrict, toStrict)
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
-import           Data.Maybe
-import           Data.Profunctor
-import           Data.Profunctor.Product.Default
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
-import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
 import qualified Opaleye                         (not)
 
-
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
+import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
-import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
-import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
-import           BlockApps.Solidity.Contract
-import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
-import           BlockApps.Strato.Types
-import           BlockApps.XAbiConverter
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -202,75 +177,6 @@ getXabiVariablesQuery cmId = do
   for varsWithIds $ \ (atbytes,ispublic,isconstant, value,typeid) -> do
     ty <- getXabiType typeid
     return $ Xabi.VarType atbytes (Just ispublic) (Just isconstant) value ty
-
-instance QueryRunnerColumnDefault PGBytea Address where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
-    queryRunnerColumnDefault
-instance Default Constant Address (Column PGBytea) where
-  def = lmap (Char8.pack . addressString) def
-
-instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode nonce") . Saltine.decode)
-    queryRunnerColumnDefault
-instance Default Constant SecretBox.Nonce (Column PGBytea) where
-  def = lmap Saltine.encode def
-
-instance Default Constant PubKey (Column PGBytea) where
-  def = lmap (exportPubKey False) def
-
-instance QueryRunnerColumnDefault PGBytea PubKey where
-  queryRunnerColumnDefault =
-     queryRunnerColumn id toPubKey queryRunnerColumnDefault
-     where toPubKey :: ByteString -> PubKey
-           toPubKey = fromMaybe (error "could not import pubkey") . importPubKey
-
-instance Default Constant UserName (Column PGText) where
-  def = lmap getUserName def
-
-instance Default Constant StateMutability (Column PGText) where
-  def = lmap tShow def
-
-instance QueryRunnerColumnDefault PGText StateMutability where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode mutability") . tRead)
-    queryRunnerColumnDefault
-
-instance QueryRunnerColumnDefault PGBytea Keccak256 where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toKecc queryRunnerColumnDefault
-    where
-      toKecc :: ByteString -> Keccak256
-      toKecc
-        = Keccak256
-        . fromMaybe (error "could not decode hash")
-        . digestFromByteString
-
-instance Default Constant Keccak256 (Column PGBytea) where
-  def = lmap fromKecc def
-    where
-      fromKecc :: Keccak256 -> ByteString
-      fromKecc (Keccak256 digest) = ByteArray.convert digest
-
-instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toChainId queryRunnerColumnDefault
-    where
-      toChainId :: ByteString -> Maybe ChainId
-      toChainId bs
-        = if BS.null bs
-            then Nothing
-            else Just
-               . ChainId
-               . byteStringToWord256
-               $ bs
-
-instance Default Constant (Maybe ChainId) (Column PGBytea) where
-  def = lmap fromChainId def
-        where fromChainId = \case
-                Nothing -> BS.empty
-                Just cid -> word256ToByteString $ unChainId cid
 
 getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
