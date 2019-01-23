@@ -180,7 +180,7 @@ pipeline {
               git checkout develop
               git pull
               git merge master
-              git push
+              git push origin develop --force
             '''
           }
         }
