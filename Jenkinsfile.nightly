@@ -39,7 +39,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=localhost
-          NODE_HOST=${NODE_HOST} ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
