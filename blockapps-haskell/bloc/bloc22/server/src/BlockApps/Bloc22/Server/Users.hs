@@ -561,7 +561,7 @@ recurseTRDs chainId resolve hashes = go 0 (toPending hashes)
       pending <- if not resolve || null pending'
         then return pending'
         else
-          if num >= 60
+          if num >= 600
             then return pending'
             else do
               logWith logNotice . Text.pack $
