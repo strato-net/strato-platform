@@ -128,8 +128,21 @@ benchmarks:
   microbench:
     source-dirs: bench/
     main: Microbench.hs
+    other-modules: []
     dependencies:
       - criterion
       - ethereum-vm
       - hashable
       - unordered-containers
+
+  codebench:
+    source-dirs: bench/
+    main: CodeBench.hs
+    other-modules: []
+    dependencies:
+      - cpu
+      - criterion
+      - ethereum-vm
+      - hspec
+      - integer-gmp
+      - primitive
