@@ -566,7 +566,7 @@ recurseTRDs chainId resolve hashes = go 0 (toPending hashes)
             else do
               logWith logNotice . Text.pack $
                 "Polling BlocTransactionStatus for transaction hashes: " ++ (show $ map trdHash pending')
-              void . liftIO $ threadDelay 1000000
+              void . liftIO $ threadDelay 100000
               go (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
 
