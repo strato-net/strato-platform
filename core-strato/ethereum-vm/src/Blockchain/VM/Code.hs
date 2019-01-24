@@ -14,11 +14,8 @@ import           Blockchain.Util
 
 
 getOperationAt::Code->CodePointer->(Operation, CodePointer)
-getOperationAt (Code bytes) p        = getOperationAt' bytes p
+getOperationAt (Code bytes) p        = opCode2Op bytes p
 getOperationAt (PrecompiledCode _) _ = error "getOperationAt called for precompilded code"
-
-getOperationAt'::B.ByteString->Int->(Operation, CodePointer)
-getOperationAt' rom p = opCode2Op $ safeIntDrop p rom
 
 showCode::CodePointer->Code->String
 showCode _ (Code bytes) | B.null bytes = ""

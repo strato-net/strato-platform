@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Blockchain.VM.Opcodes where
 
 import           Prelude                      hiding (EQ, GT, LT)
@@ -33,7 +34,7 @@ data Operation =
     ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
     BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
     POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
-    PUSH [Word8] |
+    PUSH Word256 |
     DUP1 | DUP2 | DUP3 | DUP4 |
     DUP5 | DUP6 | DUP7 | DUP8 |
     DUP9 | DUP10 | DUP11 | DUP12 |
@@ -51,7 +52,7 @@ data Operation =
 
 instance Pretty Operation where
   pretty x@JUMPDEST    = text $ "------" ++ show x
-  pretty x@(PUSH vals) = text $ show x ++ " --" ++ show (bytes2Integer vals)
+  pretty (PUSH _)      = error "TODO(tim): pretty Operation"
   pretty x             = text $ show x
 
 data OPData = OPData Word8 Operation Int Int String
@@ -193,10 +194,7 @@ code2OpMap::M.Map Word8 Operation
 code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
 op2OpCode::Operation->[Word8]
-op2OpCode (PUSH theList) | length theList <= 32 && not (null theList) =
-  0x5F + fromIntegral (length theList):theList
-op2OpCode (PUSH []) = error "PUSH needs at least one word"
-op2OpCode (PUSH x) = error $ "PUSH can only take up to 32 words: " ++ show x
+op2OpCode (PUSH _) = error "TODO(tim): op2OpCode"
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
@@ -205,20 +203,20 @@ op2OpCode op =
     Nothing -> error $ "op is missing in op2CodeMap: " ++ show op
 
 opLen::Operation->Int
-opLen (PUSH x) = 1 + length x
+opLen (PUSH _) = error "TODO(tim): opLen"
 opLen _        = 1
 
-opCode2Op::B.ByteString->(Operation, CodePointer)
-opCode2Op rom | B.null rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
-opCode2Op rom =
-  let opcode = B.head rom in --head OK, null weeded out above
-  if opcode >= 0x60 && opcode <= 0x7f
-  then (PUSH $ B.unpack $ safeTake (fromIntegral $ opcode-0x5F) $ B.tail rom, fromIntegral $ opcode - 0x5E)
-  else
---    let op = fromMaybe (error $ "code is missing in code2OpMap: 0x" ++ showHex (B.head rom) "")
-    let op = fromMaybe (MalformedOpcode opcode)
-             $ M.lookup opcode code2OpMap in
-    (op, 1)
+opCode2Op::B.ByteString -> Int -> (Operation, CodePointer)
+opCode2Op rom !idx | idx > B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
+opCode2Op rom !idx =
+  let opcode = BU.unsafeIndex rom idx in
+  if opcode < 0x60 || opcode > 0x7f
+    then (,1) . fromMaybe (MalformedOpcode opcode) . M.lookup opcode $ code2OpMap
+  else case fromIntegral (opcode - 0x59) of
+    1 -> (PUSH $! fastExtractByte rom (idx + 1), 2)
+    len | len <= 7 -> (PUSH $! fastExtractSingle rom (idx+1) len, len+1)
+        | len >= 25 -> (PUSH $! fastExtractQuad rom (idx+1) len, len+1)
+        | otherwise -> (PUSH $! defaultExtract rom (idx+1) len, len+1)
 
 -- Unoptimized extraction, for 8-24 bytes that are too infrequently seen
 -- to bother writing a specialization.
@@ -252,6 +250,7 @@ fastExtractQuad :: B.ByteString -> Int -> Int -> Word256
 fastExtractQuad !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
   let !offPtr = castPtr (plusPtr ptr (off + len)) :: Ptr Word64
   !dst <- newByteArray 32
+  fillByteArray dst 0 32 0x0
   !ll <- peekElemOff offPtr (-1)
   !lh <- peekElemOff offPtr (-2)
   !hl <- peekElemOff offPtr (-3)

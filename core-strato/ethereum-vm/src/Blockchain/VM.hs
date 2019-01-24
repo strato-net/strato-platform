@@ -431,8 +431,7 @@ runOperation GAS = push =<< readGasRemaining =<< lift get
 
 runOperation JUMPDEST = return ()
 
-runOperation (PUSH vals) =
-  push $ (fromIntegral (bytes2Integer vals)::Word256)
+runOperation (PUSH vals) = push vals
 
 runOperation DUP1 = dupn 1
 runOperation DUP2 = dupn 2
@@ -725,6 +724,7 @@ runOperation SUICIDE = do
 
 runOperation (MalformedOpcode opcode) = do
   when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
+  $logInfoS "runOperation/malformed" . T.pack $ show opcode
   throwE MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
@@ -846,7 +846,7 @@ opGasPriceAndRefund x = return (opGasPrice x, 0)
 --Glogtopic 1 Paid for each topic of a LOG operation.
 
 formatOp::Operation->String
-formatOp (PUSH x) = "PUSH" ++ show (length x) -- ++ show x
+formatOp (PUSH x) = "PUSH " ++ show x
 formatOp x        = show x
 
 
