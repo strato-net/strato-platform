@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
@@ -68,6 +69,8 @@ import Data.Aeson
 import Data.Ratio (numerator, denominator)
 import qualified Data.ByteString as BS (head, length, reverse)
 import qualified Data.Text as T (pack, unpack)
+import Data.Data (Data(..))
+import Data.Typeable (Typeable)
 import Text.Printf
 
 import Network.Haskoin.Crypto.Curve
@@ -96,7 +99,7 @@ type FieldP  = BigWord ModP
 type FieldN  = BigWord ModN
 
 data Mod512
-data Mod256
+data Mod256 deriving (Data, Typeable)
 data Mod256Tx
 data Mod256Block
 data Mod160
@@ -105,7 +108,7 @@ data ModP
 data ModN
 
 newtype BigWord n = BigWord { getBigWordInteger :: Integer }
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 instance NFData (BigWord n) where
     rnf (BigWord n) = rnf n

@@ -5,27 +5,33 @@ maintainer:          blockapps
 build-type:          Simple
 license:             Apache-2.0
 
+dependencies:
+  - aeson
+  - ansi-wl-pprint
+  - base
+  - base16-bytestring
+  - containers
+  - ethereum-rlp
+  - binary
+  - bytestring
+  - cryptonite
+  - deepseq
+  - lens
+  - path-pieces
+  - memory
+  - nibblestring
+  - blockapps-haskoin
+  - text
+  - time
+  - QuickCheck
+  - http-api-data
+  - primitive
+  - cpu
+  - integer-gmp
+
+ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
+
 library:
-  dependencies:
-    - aeson
-    - ansi-wl-pprint
-    - base
-    - base16-bytestring
-    - containers
-    - ethereum-rlp
-    - binary
-    - bytestring
-    - cryptonite
-    - deepseq
-    - lens
-    - path-pieces
-    - memory
-    - nibblestring
-    - blockapps-haskoin
-    - text
-    - time
-    - QuickCheck
-    - http-api-data
   source-dirs: src
   default-extensions:
     - MultiParamTypeClasses
@@ -36,4 +42,20 @@ library:
     - LambdaCase
     - RecordWildCards
     - FunctionalDependencies
-  ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
+
+tests:
+  word256-tests:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - strato-model
+      - hspec
+      - QuickCheck
+
+benchmarks:
+  word256:
+    source-dirs: bench/
+    main: Word256Bench.hs
+    dependencies:
+      - strato-model
+      - criterion

@@ -1,10 +1,11 @@
-
+{-# LANGUAGE DeriveDataTypeable #-}
 module Blockchain.VM.Opcodes where
 
 import           Prelude                      hiding (EQ, GT, LT)
 
 import           Data.Binary
 import qualified Data.ByteString              as B
+import           Data.Data
 import qualified Data.Map                     as M
 import           Data.Maybe
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
@@ -34,7 +35,7 @@ data Operation =
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
-    MalformedOpcode Word8 deriving (Show, Eq, Ord)
+    MalformedOpcode Word8 deriving (Show, Eq, Ord, Typeable, Data)
 
 instance Pretty Operation where
   pretty x@JUMPDEST    = text $ "------" ++ show x
