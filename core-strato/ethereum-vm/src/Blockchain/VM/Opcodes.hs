@@ -207,27 +207,27 @@ opLen (PUSH _) = error "TODO(tim): opLen"
 opLen _        = 1
 
 opCode2Op::B.ByteString -> Int -> (Operation, CodePointer)
-opCode2Op rom !idx | idx > B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
+opCode2Op rom !idx | idx >= B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
 opCode2Op rom !idx =
   let opcode = BU.unsafeIndex rom idx in
   if opcode < 0x60 || opcode > 0x7f
     then (,1) . fromMaybe (MalformedOpcode opcode) . M.lookup opcode $ code2OpMap
-  else case fromIntegral (opcode - 0x59) of
-    1 -> (PUSH $! fastExtractByte rom (idx + 1), 2)
-    len | len <= 7 -> (PUSH $! fastExtractSingle rom (idx+1) len, len+1)
-        | len >= 25 -> (PUSH $! fastExtractQuad rom (idx+1) len, len+1)
-        | otherwise -> (PUSH $! defaultExtract rom (idx+1) len, len+1)
+    else case fromIntegral (opcode - 0x5f) of
+          1 -> (PUSH $! fastExtractByte rom (idx + 1), 2)
+          len | len <= 7 -> (PUSH $! fastExtractSingle rom (idx+1) len, len+1)
+              | len >= 25 -> (PUSH $! fastExtractQuad rom (idx+1) len, len+1)
+              | otherwise -> (PUSH $! defaultExtract rom (idx+1) len, len+1)
 
 -- Unoptimized extraction, for 8-24 bytes that are too infrequently seen
 -- to bother writing a specialization.
 defaultExtract :: B.ByteString -> Int -> Int -> Word256
 -- TODO(tim): Use fastBytesToWord256 once available
 defaultExtract bs off len = fromIntegral
-                                 . bytes2Integer
-                                 . B.unpack
-                                 . B.take len
-                                 . B.drop off
-                                 $ bs
+                          . bytes2Integer
+                          . B.unpack
+                          . B.take len
+                          . B.drop off
+                          $ bs
 
 -- Used to push 1 byte
 fastExtractByte :: B.ByteString-> Int -> Word256
