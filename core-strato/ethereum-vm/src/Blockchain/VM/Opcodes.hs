@@ -23,6 +23,7 @@ import           Data.Maybe
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Network.Haskoin.Internals (BigWord(..), Word256)
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Util
 
 type CodePointer = Int
@@ -52,7 +53,7 @@ data Operation =
 
 instance Pretty Operation where
   pretty x@JUMPDEST    = text $ "------" ++ show x
-  pretty (PUSH _)      = error "TODO(tim): pretty Operation"
+  pretty (PUSH v)      = text $ "PUSH " ++ show v
   pretty x             = text $ show x
 
 data OPData = OPData Word8 Operation Int Int String
@@ -194,17 +195,13 @@ code2OpMap::M.Map Word8 Operation
 code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
 op2OpCode::Operation->[Word8]
-op2OpCode (PUSH _) = error "TODO(tim): op2OpCode"
+op2OpCode (PUSH v) = 0x7f:word256ToBytes v -- This preserves semantics, but it will print a different opcode than was actually in the code
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
   case M.lookup op op2CodeMap of
     Just x  -> [x]
     Nothing -> error $ "op is missing in op2CodeMap: " ++ show op
-
-opLen::Operation->Int
-opLen (PUSH _) = error "TODO(tim): opLen"
-opLen _        = 1
 
 opCode2Op::B.ByteString -> Int -> (Operation, CodePointer)
 opCode2Op rom !idx | idx >= B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
