@@ -34,6 +34,7 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
+import           Data.Tuple                      (swap)
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
@@ -685,6 +686,18 @@ createContractQuery contractName = do
       [(Nothing, constant contractName)]
       fst
 
+createContractBatchQuery :: [Text] -> Bloc (Map Text Int32)
+createContractBatchQuery names = do
+  cidMap <- fmap Map.fromList . blocQuery $ proc () -> do
+    (cId,name) <- queryTable contractsTable -< ()
+    restrict -< in_ (map constant names) name
+    returnA -< (name, cId)
+  let new = filter (isNothing . flip Map.lookup cidMap) names
+      inserts = map (\n -> (Nothing, constant n)) new
+  newCids <- fmap Map.fromList . blocModify $ \conn ->
+    runInsertManyReturning conn contractsTable inserts swap
+  return $ Map.union newCids cidMap
+
 insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
@@ -724,6 +737,24 @@ insertContractMetaDataQuery
       , constant (serializeXabi xabi)
       )]
       (\ (contractmetadataId,_,_,_,_,_,_,_) -> contractmetadataId)
+
+insertContractMetaDataBatchQuery
+  :: Keccak256
+  -> [(Int32, ContractDetails)]
+  -> Bloc (Map Int32 Int32)
+insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
+  let inserts = flip map details $ \(contractId, ContractDetails{..}) ->
+        ( Nothing
+        , constant contractId
+        , constant (Text.encodeUtf8 contractdetailsBin)
+        , constant (Text.encodeUtf8 contractdetailsBinRuntime)
+        , constant contractdetailsCodeHash
+        , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
+        , constant srcHash
+        , constant (serializeXabi contractdetailsXabi)
+        )
+   in Map.fromList <$> runInsertManyReturning conn contractsMetaDataTable inserts
+        (\(contractmetadataId,cId,_,_,_,_,_,_) -> (cId,contractmetadataId))
 
 instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id
@@ -858,21 +889,11 @@ compileContractFromScratch source = do
         }
 
   (_,srcHash) <- insertContractSourceQuery source
-  metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
-    let
-      xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
-    contrId <- createContractQuery contrName
-    metadataId <- insertContractMetaDataQuery
-      contrId
-      contractdetailsBin
-      contractdetailsBinRuntime
-      contractdetailsCodeHash
-      xcodeHash
-      srcHash
-      contractdetailsXabi
-    return (metadataId,detail)
-
-  return metadataIds
+  contractIdMap <- createContractBatchQuery $ Map.keys details
+  let idDetails = Map.elems $ Map.intersectionWith (,) contractIdMap details
+  mdIdMap <- insertContractMetaDataBatchQuery srcHash idDetails
+  let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
+  return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
 getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
 getContractXabiByMetadataId cmId = do
