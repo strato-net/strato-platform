@@ -148,10 +148,10 @@ functionDetailsFromContract contract selector' =
       $ OMap.assocs
         (fields $ mainStruct contract)
 
-getFunctionDetailsFromSelector :: Int32 -> ByteString -> Bloc (Text, ([(Text,Type)],[(Maybe Text, Type)]))
-getFunctionDetailsFromSelector cmId sel' = do
-  contract' <- getContractContractByMetadataId cmId
-  return $ functionDetailsFromContract contract' sel'
+getFunctionDetailsFromSelector :: Xabi -> ByteString -> (Text, ([(Text,Type)],[(Maybe Text, Type)]))
+getFunctionDetailsFromSelector xabi sel' = case xAbiToContract xabi of
+  Left err -> error $ "getFunctionDetailsFromSelector: " ++ err
+  Right contract' -> functionDetailsFromContract contract' sel'
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
@@ -163,12 +163,12 @@ convertEnumTypeToInt = \case
 convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
 convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-getFunctionCallValues :: Int32 -> ByteString -> ByteString -> Bloc (Text, [(Text, SolidityValue)], [(Text, SolidityValue)])
-getFunctionCallValues cmId input' output' = do
+getFunctionCallValues :: Xabi -> ByteString -> ByteString -> (Text, [(Text, SolidityValue)], [(Text, SolidityValue)])
+getFunctionCallValues xabi input' output' =
   let sel = B.take 4 input'
       data' = B.drop 4 input'
-  (fname,(itypes,otypes)) <- getFunctionDetailsFromSelector cmId sel
-  let typemap bs = uncurry zip
+      (fname,(itypes,otypes)) = getFunctionDetailsFromSelector xabi sel
+      typemap bs = uncurry zip
                    . fmap ( fromMaybe (repeat (SolidityValueAsString ""))
                      . convertByteStringToVals bs
                      . map convertEnumTypeToInt
@@ -178,7 +178,7 @@ getFunctionCallValues cmId input' output' = do
                (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
                ([0..] :: [Integer])
                (typemap output' otypes)
-  return (fname,imap,omap)
+   in (fname,imap,omap)
 
 processedContract :: Text
                   -> Text
@@ -202,19 +202,19 @@ processedContract abi name chain state Action{..} =
     , functionCallData = Nothing
     }
 
-makeFunctionInserts :: Int32
+makeFunctionInserts :: Xabi
                     -> Text
                     -> Text
                     -> Text
                     -> Map.Map Text Value
                     -> Action
                     -> Bloc [ProcessedContract]
-makeFunctionInserts cmId abi name chain state Action{..} =
+makeFunctionInserts xabi abi name chain state Action{..} =
   forM actionCallData $ \CallData{..} -> do
     let ibytes = _input
         obytes = fromMaybe B.empty _output
-    (f',i,o) <- getFunctionCallValues cmId ibytes obytes
-    let f = if T.null f'
+        (f',i,o) = getFunctionCallValues xabi ibytes obytes
+        f = if T.null f'
               then if actionType == Create
                     then "constructor"
                     else "fallback"
@@ -361,7 +361,13 @@ processTheMessages messages conn g = do
               let hInsert = processedContract strAbi strName chain newMap hRow
               functionHist <- isFunctionHistoric g $ actionCodeHash hRow
               fInserts <- if functionHist
-                            then lift $ makeFunctionInserts cmId strAbi strName chain newMap hRow
+                            then lift $ makeFunctionInserts
+                                          (contractdetailsXabi details)
+                                          strAbi
+                                          strName
+                                          chain
+                                          newMap
+                                          hRow
                             else pure []
               pure (hInsert, fInserts)
             else pure []

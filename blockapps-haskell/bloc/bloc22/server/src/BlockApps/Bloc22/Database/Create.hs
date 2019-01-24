@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-
+{-# LANGUAGE QuasiQuotes       #-} 
 module BlockApps.Bloc22.Database.Create where
 
 import           Database.PostgreSQL.Simple
@@ -69,7 +68,9 @@ CREATE TABLE IF NOT EXISTS contracts_metadata(
   code_hash bytea NOT NULL,
   xcode_hash bytea NOT NULL,
   src_hash bytea NOT NULL,
-  FOREIGN KEY (contract_id) REFERENCES contracts(id)
+  xabi bytea NOT NULL,
+  FOREIGN KEY (contract_id) REFERENCES contracts(id),
+  CONSTRAINT uc_contracts_metadata UNIQUE (code_hash, src_hash)
 );
 |]
 
@@ -93,17 +94,6 @@ CREATE TABLE IF NOT EXISTS contracts_instance(
   timestamp timestamptz NOT NULL DEFAULT now(),
   chainid bytea NOT NULL,
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
-);
-|]
-
-contractsLookupTable :: Query
-contractsLookupTable = [sql|
-CREATE TABLE IF NOT EXISTS contracts_lookup(
-  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
-  linked_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
-  PRIMARY KEY (contract_metadata_id, linked_metadata_id),
-  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
-  FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]
 
@@ -227,7 +217,6 @@ createTables = mconcat
   , contractsMetaDataTable
   , hashNameTable
   , contractsInstanceTable
-  , contractsLookupTable
   , xabiFunctionsTable
   , xabiTypesTable
   , xabiFunctionArgumentsTable
