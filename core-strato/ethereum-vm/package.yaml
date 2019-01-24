@@ -145,4 +145,3 @@ benchmarks:
     dependencies:
       - criterion
       - ethereum-vm
-      - hspec
