@@ -138,9 +138,9 @@ benchmarks:
       - hashable
       - unordered-containers
 
-  codebench:
+  extractbench:
     source-dirs: bench/
-    main: CodeBench.hs
+    main: ExtractBench.hs
     other-modules: []
     dependencies:
       - criterion

@@ -29,8 +29,8 @@ import           Blockchain.Data.Code
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
-import           Blockchain.VM.Code
 import qualified Blockchain.VM.MutableStack as MS
+import           Blockchain.VM.Opcodes
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
