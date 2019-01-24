@@ -41,8 +41,8 @@ import           Executable.EVMFlags ()
 --noLog _ _ _ _ = return ()
 
 {-# NOINLINE exampleCode #-}
-exampleCode :: Code
-exampleCode = Code $ B.pack $ [0..255]
+exampleCode :: B.ByteString
+exampleCode = B.pack $ [0..255]
 
 main :: IO ()
 main = do

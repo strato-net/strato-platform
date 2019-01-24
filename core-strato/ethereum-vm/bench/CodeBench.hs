@@ -1,12 +1,11 @@
 import Criterion.Main
 import qualified Data.ByteString        as B
 
-import Blockchain.Data.Code
 import Blockchain.VM.Code
 
 {-# NOINLINE exampleCode #-}
-exampleCode :: Code
-exampleCode = Code $ B.pack $ [0..255]
+exampleCode :: B.ByteString
+exampleCode = B.pack $ [0..255]
 
 
 benchExtract1Slow :: Benchmark

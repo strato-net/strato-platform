@@ -66,24 +66,22 @@ compile x = Code bytes
 
 -- Unoptimized push, for 8-24 bytes that are too infrequently seen
 -- to bother writing a specialization.
-defaultExtract :: Code -> Int -> Int -> Word256
+defaultExtract :: B.ByteString -> Int -> Int -> Word256
 -- TODO(tim): Use fastBytesToWord256 once available
-defaultExtract (Code bs) off len = fromIntegral
+defaultExtract bs off len = fromIntegral
                                  . bytes2Integer
                                  . B.unpack
                                  . B.take len
                                  . B.drop off
                                  $ bs
-defaultExtract _ _ _ = error "precompiled contracts cannot slice code"
 
-fastExtractByte :: Code -> Int -> Word256
-fastExtractByte (Code !code) !off = let !(W8# b#) = BU.unsafeIndex code off
-                                    in BigWord (S# (word2Int# b#))
-fastExtractByte _ _ = error "cannot slice out of precompiled"
+fastExtractByte :: B.ByteString-> Int -> Word256
+fastExtractByte !code !off = let !(W8# b#) = BU.unsafeIndex code off
+                             in BigWord (S# (word2Int# b#))
 
 -- Used to push 2-7 bytes
-fastExtractSingle :: Code -> Int -> Int -> Word256
-fastExtractSingle (Code !code) !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
+fastExtractSingle :: B.ByteString-> Int -> Int -> Word256
+fastExtractSingle !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
   let !offPtr = castPtr ptr :: Ptr Word64
       !delta = 64 - (8 * len)
   -- This may read past the end of the bytestring, but if the read is allowed
@@ -91,19 +89,18 @@ fastExtractSingle (Code !code) !off !len = unsafePerformIO . BU.unsafeUseAsCStri
   !rawBits <- peekByteOff offPtr off
   let !(W64# w#) = toBE64 rawBits `shiftR` delta
   return $! BigWord (S# (word2Int# w#))
-fastExtractSingle _ _ _ = error "cannot slice out of precompiled"
 
 -- Used to push 25-32 bytes
-fastExtractQuad :: Code -> Int -> Int -> Word256
-fastExtractQuad (Code !code) !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
+fastExtractQuad :: B.ByteString -> Int -> Int -> Word256
+fastExtractQuad !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
   let !offPtr = castPtr (plusPtr ptr (off + len)) :: Ptr Word64
-  dst <- newByteArray 32
-  ll <- peekElemOff offPtr (-1)
-  lh <- peekElemOff offPtr (-2)
-  hl <- peekElemOff offPtr (-3)
+  !dst <- newByteArray 32
+  !ll <- peekElemOff offPtr (-1)
+  !lh <- peekElemOff offPtr (-2)
+  !hl <- peekElemOff offPtr (-3)
   -- This might be a violation: we read before the beginning of the bytestring.
   -- However if the read is allowed, the garbage bytes are masked off.
-  hh <- peekElemOff offPtr (-4)
+  !hh <- peekElemOff offPtr (-4)
 
   writeByteArray dst 0 $! toBE64 ll
   writeByteArray dst 1 $! toBE64 lh
@@ -112,4 +109,3 @@ fastExtractQuad (Code !code) !off !len = unsafePerformIO . BU.unsafeUseAsCString
   writeByteArray dst 3 $! toBE64 hh .&. mask
   !(ByteArray ba#) <- unsafeFreezeByteArray dst
   return (BigWord (Jp# (BN# ba#)))
-fastExtractQuad _ _ _ = error "cannot slice out of precompiled"
