@@ -151,6 +151,7 @@ pipeline {
               set -x
               echo 'Running local integration tests'
               pushd strato-worktree/tests
+              rm -rf node_modules
               npm install
               npm run test:truchainz
               npm run test:multicontract

@@ -13,6 +13,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
+import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
@@ -116,7 +117,8 @@ ethereumVM = void . execContextM $ do
         pbft <- gets contextHasBlockstanbul
         reqd <- use contextBlockRequested
         let pending = B.pending state
-            hasTxs = not (null poolableNewTxs) || not (M.null pending)
+            priv = B.privateHashes $ B.miningCache state
+            hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (O.null priv)
             shouldOutputBlocks = isCaughtUp && (
               if pbft
                 then reqd && hasTxs
