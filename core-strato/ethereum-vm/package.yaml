@@ -30,6 +30,7 @@ dependencies:
   - classy-prelude
   - clockwork
   - containers
+  - cpu
   - cross-monitoring
   - cryptohash
   - deepseq
@@ -43,6 +44,7 @@ dependencies:
   - ghc
   - hedis
   - hflags
+  - integer-gmp
   - lens
   - leveldb-haskell
   - merkle-patricia-db
@@ -53,6 +55,7 @@ dependencies:
   - persistent-postgresql
   - persistent-sqlite
   - postgresql-simple
+  - primitive
   - prometheus-client
   - resourcet
   - strato-adit
@@ -140,9 +143,6 @@ benchmarks:
     main: CodeBench.hs
     other-modules: []
     dependencies:
-      - cpu
       - criterion
       - ethereum-vm
       - hspec
-      - integer-gmp
-      - primitive
