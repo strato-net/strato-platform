@@ -14,7 +14,7 @@ import           Control.Monad.Except
 import           Crypto.Random.Entropy
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (fromMaybe, isJust)
+import           Data.Maybe                        (catMaybes, fromMaybe, isJust)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 
@@ -86,7 +86,9 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
               codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
-  let nonContractAcctInfo = nmap NonContract balances
+  let maybeNonContract a b | a == governanceAddress = Nothing
+                           | otherwise = Just $ NonContract a b
+      nonContractAcctInfo = catMaybes $ nmap maybeNonContract balances
       acctInfo = cAcctInfo ++ nonContractAcctInfo
       chainInfo = ChainInfo
         (UnsignedChainInfo lbl
