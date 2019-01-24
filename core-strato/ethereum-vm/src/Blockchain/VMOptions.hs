@@ -23,10 +23,11 @@ import           HFlags
 
 defineFlag "debug" False "turn debug info on or off"
 defineFlag "trace" "none" "Style of tracing. \n\
- \ none|fast|false|∅ -> No tracing enabled \n\
+ \ none|fast|false|<empty> -> No tracing enabled \n\
  \ trace|true -> Geth style tracing \n\
- \ sqltrace -> Tracing as pipe separated values to be dumped into SQL \n\
- \ evmprofile -> Profile runtimes labeled by opcode"
+ \ sqlTrace -> Tracing as pipe separated values to be dumped into SQL \n\
+ \ evmProfile -> Profile runtimes labeled by opcode, emitted to the log \n\
+ \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
 defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
 defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
