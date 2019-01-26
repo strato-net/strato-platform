@@ -7,11 +7,10 @@ dependencies:
 
 library:
   source-dirs: src/
+  c-sources: c-src/keccak-tiny.c
+  cc-options: -std=c11
+  include-dirs: c-src/
   other-extensions: ForeignFunctionInterface
-  extra-libraries: fastkeccak256rs
-  # This does not work with relative paths
-  extra-lib-dirs: /tmp/lib
-
 
 tests:
   keccak256-test:

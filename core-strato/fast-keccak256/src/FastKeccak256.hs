@@ -7,10 +7,10 @@ import Foreign.C.Types
 import Foreign.Ptr
 import System.IO.Unsafe
 
-foreign import ccall "fastKeccak256" c_fastKeccak256 :: Ptr CUChar -> Int -> Ptr CUChar -> IO ()
+foreign import ccall "keccak_256" c_keccak256 :: Ptr CUChar -> Int -> Ptr CUChar -> Int -> IO ()
 
 fastKeccak256 :: B.ByteString -> B.ByteString
 fastKeccak256 bs = unsafePerformIO
                  $ BI.create 32
                  $ \dst -> BU.unsafeUseAsCStringLen bs
-                 $ \(src, len) -> c_fastKeccak256 (castPtr src) len (castPtr dst)
+                 $ \(src, len) -> c_keccak256 (castPtr dst) 32 (castPtr src) len
