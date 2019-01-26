@@ -4,6 +4,8 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - bytestring
+  - cryptonite
+  - memory
 
 library:
   source-dirs: src/
@@ -19,13 +21,11 @@ tests:
     dependencies:
       - fast-keccak256
       - hspec
-      - strato-model
 
 benchmarks:
   hash-bench:
     main: HashBench.hs
     source-dirs: bench/
     dependencies:
-      - strato-model
       - fast-keccak256
       - criterion

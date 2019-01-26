@@ -3,6 +3,8 @@ module FastKeccak256 where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
+import              Data.ByteArray                       (convert)
+import Crypto.Hash                          (Digest, hash, Keccak_256)
 import Foreign.C.Types
 import Foreign.Ptr
 import System.IO.Unsafe
@@ -14,3 +16,7 @@ fastKeccak256 bs = unsafePerformIO
                  $ BI.create 32
                  $ \dst -> BU.unsafeUseAsCStringLen bs
                  $ \(src, len) -> c_keccak256 (castPtr dst) 32 (castPtr src) len
+
+-- For testing and benchmarks
+slowKeccak256 :: B.ByteString -> B.ByteString
+slowKeccak256 bs = convert (hash bs :: Digest Keccak_256)

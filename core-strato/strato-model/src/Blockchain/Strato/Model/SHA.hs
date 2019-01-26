@@ -6,8 +6,7 @@ import              Blockchain.Strato.Model.ExtendedWord (Word256, word256ToByte
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
 import              Control.Monad                        (replicateM)
-import "cryptonite" Crypto.Hash                          (Digest, hash)
-import              Crypto.Hash.Algorithms               (Keccak_256, Keccak_512)
+import "cryptonite" Crypto.Hash                          (Digest, hash, Keccak_512)
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
 import              Data.Binary
@@ -20,7 +19,9 @@ import qualified    Data.Text                            as T
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
 
+import              FastKeccak256
 import              Blockchain.Data.RLP
+import              Blockchain.Strato.Model.ExtendedWord
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 
@@ -57,10 +58,10 @@ shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
 superProprietaryStratoSHAHash :: S8.ByteString -> SHA
-superProprietaryStratoSHAHash = SHA . fromIntegral . byteString2Integer . keccak256
+superProprietaryStratoSHAHash = SHA . fastBytesToWord256 . keccak256
 
 keccak256 :: S8.ByteString -> S8.ByteString
-keccak256 bs = convert (hash bs :: Digest Keccak_256)
+keccak256 = fastKeccak256
 
 keccak512 :: S8.ByteString -> S8.ByteString
 keccak512 bs = convert (hash bs :: Digest Keccak_512)
