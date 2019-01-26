@@ -1,10 +1,10 @@
 module FastKeccak256 where
 
+import Data.ByteArray (convert)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
-import              Data.ByteArray                       (convert)
-import Crypto.Hash                          (Digest, hash, Keccak_256)
+import Crypto.Hash (Digest, hash, Keccak_256)
 import Foreign.C.Types
 import Foreign.Ptr
 import System.IO.Unsafe
