@@ -20,6 +20,7 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/ecrecover/
 - core-strato/fast-ecrecover/
+- core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
 - core-strato/ethereum-encryption/
@@ -94,6 +95,7 @@ extra-include-dirs:
 
 extra-lib-dirs:
 - /usr/local/lib
+- /tmp/lib
 
 ghc-options:
   "$locals": -Wall -Werror
@@ -107,3 +109,4 @@ docker:
   image: "strato-buildbase:lts-12.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+  mount: ["/tmp/lib"]

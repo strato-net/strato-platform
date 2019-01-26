@@ -1,0 +1,12 @@
+[package]
+name = "rust-src"
+version = "0.1.0"
+authors = ["Tim Holland <tim@blockapps.net>"]
+edition = "2018"
+
+[dependencies]
+sha3 = "0.8.1"
+
+[lib]
+name = "fastkeccak256rs"
+crate-type = ["staticlib"]

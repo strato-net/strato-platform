@@ -1,0 +1,32 @@
+name: fast-keccak256
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - bytestring
+
+library:
+  source-dirs: src/
+  other-extensions: ForeignFunctionInterface
+  extra-libraries: fastkeccak256rs
+  # This does not work with relative paths
+  extra-lib-dirs: /tmp/lib
+
+
+tests:
+  keccak256-test:
+    main: Spec.hs
+    source-dirs: test/
+    dependencies:
+      - fast-keccak256
+      - hspec
+      - strato-model
+
+benchmarks:
+  hash-bench:
+    main: HashBench.hs
+    source-dirs: bench/
+    dependencies:
+      - strato-model
+      - fast-keccak256
+      - criterion
