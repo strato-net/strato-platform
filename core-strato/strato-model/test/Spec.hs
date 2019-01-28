@@ -51,13 +51,13 @@ spec = do
       in I# (isValidInteger# (getBigWordInteger n')) `shouldBe` 1
     it "works on 99656985947821947480 (66 bits)" $ do
       let b = fastWord256ToBytes 99656985947821947480
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      fastBytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
     it "works on 10291335769063634520 (63+\\epsilon bits)" $ do
       let b = fastWord256ToBytes 10291335769063634520
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      fastBytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
     it "works on arbitrary serialized word256" $ property $ \n -> do
       let b = fastWord256ToBytes n
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      fastBytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
 
   describe "fastLowByte" $ do
     let slowByte :: Word256 -> Word8

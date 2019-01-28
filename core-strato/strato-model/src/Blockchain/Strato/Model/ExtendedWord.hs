@@ -9,7 +9,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
-    word256ToBytes, bytesToWord256, fastWord256ToBytes, fastBytesToWord256,
+    word256ToBytes, slowBytesToWord256, fastWord256ToBytes, fastBytesToWord256,
     word512ToBytes, bytesToWord512,
     fastWord256LSB
  ) where
@@ -99,14 +99,14 @@ fastWord256ToBytes ws = unsafePerformIO $ do
       _ -> error "negative Word256"
   return $! BI.PS dstFP 0 32
 
-bytesToWord256 :: [Word8] -> Word256
-bytesToWord256 bytes | length bytes == 32 =
+slowBytesToWord256 :: [Word8] -> Word256
+slowBytesToWord256 bytes | length bytes == 32 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [256-8,256-16..0] bytes
                      | otherwise = error $
-                        "bytesToWord256 was called with the wrong number of bytes: " ++ show bytes
+                        "slowBytesToWord256 was called with the wrong number of bytes: " ++ show bytes
 
 fastBytesToWord256 :: B.ByteString -> Word256
-fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256f called with the wrong number of bytes: " ++ show bytes
+fastBytesToWord256 bytes | B.length bytes /= 32 = error $ "slowBytesToWord256f called with the wrong number of bytes: " ++ show bytes
                          | otherwise = unsafePerformIO $
   (BA.withByteArray bytes :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
     hh <- fromBE64 <$!> FS.peekElemOff src 0
@@ -160,7 +160,7 @@ word512ToBytes word = map (fromIntegral . (word `shiftR`)) [512-8, 512-16..0]
 bytesToWord512 :: [Word8] -> Word512
 bytesToWord512 bytes | length bytes == 64 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [512-8,512-16..0] bytes
-bytesToWord512 _ = error "bytesToWord256 was called with the wrong number of bytes"
+bytesToWord512 _ = error "slowBytesToWord256 was called with the wrong number of bytes"
 
 instance Ix Word256 where
     range (x, y) | x == y = [x]

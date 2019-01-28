@@ -26,8 +26,8 @@ instance RLPSerializable ExtendedSignature where
             vstr = [if yIsOdd then 1 else 0]
 
   rlpDecode (RLPString bs) = ExtendedSignature (HK.Signature r s) yIsOdd
-      where r = fromIntegral . bytesToWord256 . B.unpack . B.take 32 $ bs
-            s = fromIntegral . bytesToWord256 . B.unpack . B.take 32 . B.drop 32 $ bs
+      where r = fromIntegral . slowBytesToWord256 . B.unpack . B.take 32 $ bs
+            s = fromIntegral . slowBytesToWord256 . B.unpack . B.take 32 . B.drop 32 $ bs
             yIsOdd = (==1) . head . B.unpack . B.drop 64 $ bs
   rlpDecode x = error $ "invalid rlp for extendedsignature: " ++ show x
 
