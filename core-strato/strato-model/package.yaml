@@ -28,6 +28,7 @@ dependencies:
   - primitive
   - cpu
   - integer-gmp
+  - fast-keccak256
 
 ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
 
