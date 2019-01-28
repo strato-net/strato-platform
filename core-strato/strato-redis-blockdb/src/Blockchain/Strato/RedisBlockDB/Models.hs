@@ -5,7 +5,6 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
-import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Base16        as SB16
 import qualified Data.ByteString.Char8         as S8
 import qualified Data.Map.Strict               as M
@@ -56,7 +55,7 @@ instance RedisDBValuable SHA where
     fromValue = shaFromHex . S8.unpack
 
 instance RedisDBKeyable Word256 where
-    toKey = BS.pack . word256ToBytes
+    toKey = fastWord256ToBytes
 
 instance RedisDBValuable RedisChainInfo where
     toValue   = rlpSerialize . rlpEncode

@@ -84,7 +84,7 @@ runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = 
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  value <- getStorageKeyVal' address $ bytesToWord256 $ B.unpack key
-  liftIO $ produceResponse id $ B.pack $ word256ToBytes value
+  value <- getStorageKeyVal' address $ fastBytesToWord256 $ key
+  liftIO $ produceResponse id $ fastWord256ToBytes value
   liftIO $ putStrLn $ show value
 runJsonRpcCommand (JRCCall _ _ _) = error "unsupported RPC command call"

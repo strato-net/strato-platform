@@ -38,10 +38,10 @@ instance Format Point where
 
 instance RLPSerializable Point where
   rlpEncode (Point x y) =
-    rlpEncode $ B.pack $ (word256ToBytes $ fromInteger x) ++ (word256ToBytes $ fromInteger y)
+    rlpEncode $ fastWord256ToBytes (fromInteger x) <> fastWord256ToBytes (fromInteger y)
   rlpEncode PointO = error "rlpEncode for Point called for PointO"
   rlpDecode o =
-    Point (toInteger $ bytesToWord256 $ B.unpack x) (toInteger $ bytesToWord256 $ B.unpack y)
+    Point (toInteger $ fastBytesToWord256 x) (toInteger $ fastBytesToWord256 y)
     where
       (x, y) = B.splitAt 32 $ rlpDecode o
 
@@ -56,8 +56,8 @@ pointToBytes (Point x y) = intToBytes x ++ intToBytes y
 pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
 
 hPointToBytes::H.Point->[Word8]
-hPointToBytes point =
-  word256ToBytes (fromIntegral x) ++ word256ToBytes (fromIntegral y)
+hPointToBytes point = B.unpack $
+  fastWord256ToBytes (fromIntegral x) <> fastWord256ToBytes (fromIntegral y)
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY point

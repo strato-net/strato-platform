@@ -24,7 +24,6 @@ import qualified Network.Socket.ByteString             as NB
 
 import           Control.Error                         (fmapL, note)
 import           Control.Exception
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Crypto.Types.PubKey.ECC
@@ -212,50 +211,44 @@ sendPacket :: (MonadIO m, MonadLogger m)
 sendPacket sock prv addr packet = do
   $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
   let (theType', theRLP) = ndPacketToRLP packet
-      theData = B.unpack $ rlpSerialize theRLP
-      SHA theMsgHash = hash $ B.pack $ theType' : theData
+      theData = rlpSerialize theRLP
+      SHA theMsgHash = hash $ B.singleton theType' <> theData
 
   ExtendedSignature signature' yIsOdd' <- liftIO $ H.withSource H.devURandom $ extSignMsg theMsgHash prv
 
   let v' = if yIsOdd' then 1 else 0
       r' = H.sigR signature'
       s' = H.sigS signature'
-      theSignature = word256ToBytes (fromIntegral r') ++ word256ToBytes (fromIntegral s') ++ [v']
-      theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType'] ++ theData
+      theSignature = fastWord256ToBytes (fromIntegral r') <> fastWord256ToBytes (fromIntegral s') <> B.singleton v'
+      theHash = keccak256 $ theSignature <> B.singleton theType' <> theData
 
-  _ <- liftIO $ NB.sendTo sock ( B.pack $ theHash ++ theSignature ++ [theType'] ++ theData) addr
+  _ <- liftIO $ NB.sendTo sock ( theHash <> theSignature <> B.singleton theType' <> theData) addr
   return ()
 
-processDataStream'::[Word8]->IO H.PubKey
-processDataStream'
-  (h1:h2:h3:h4:h5:h6:h7:h8:h9:h10:h11:h12:h13:h14:h15:h16:
-   h17:h18:h19:h20:h21:h22:h23:h24:h25:h26:h27:h28:h29:h30:h31:h32:
-   r1:r2:r3:r4:r5:r6:r7:r8:r9:r10:r11:r12:r13:r14:r15:r16:
-   r17:r18:r19:r20:r21:r22:r23:r24:r25:r26:r27:r28:r29:r30:r31:r32:
-   s1:s2:s3:s4:s5:s6:s7:s8:s9:s10:s11:s12:s13:s14:s15:s16:
-   s17:s18:s19:s20:s21:s22:s23:s24:s25:s26:s27:s28:s29:s30:s31:s32:
-   v:
-   theType:rest) = do
-  let theHash = bytesToWord256 [h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11,h12,h13,h14,h15,h16,
-                                h17,h18,h19,h20,h21,h22,h23,h24,h25,h26,h27,h28,h29,h30,h31,h32]
-      r = bytesToWord256 [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,
-                          r17,r18,r19,r20,r21,r22,r23,r24,r25,r26,r27,r28,r29,r30,r31,r32]
-      s = bytesToWord256 [s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14,s15,s16,
-                          s17,s18,s19,s20,s21,s22,s23,s24,s25,s26,s27,s28,s29,s30,s31,s32]
+processDataStream'::B.ByteString-> H.PubKey
+processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
+processDataStream' bs =
+  let (hs, bs') = B.splitAt 32 bs
+      (rs, bs'') = B.splitAt 32 bs'
+      (ss, bs''') = B.splitAt 32 bs''
+      (vtype, rest) = B.splitAt 2 bs'''
+      v = B.index vtype 0
+      theType = B.index vtype 1
+      theHash = fastBytesToWord256 hs
+      r = fastBytesToWord256 rs
+      s = fastBytesToWord256 ss
       yIsOdd = v == 1 -- 0x1c
       signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
 
-  let (rlp, _) = rlpSplit $ B.pack rest
+      (rlp, _) = rlpSplit rest
 
-  let SHA messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
+      SHA messageHash = hash $ B.singleton theType <> rlpSerialize rlp
       publicKey = getPubKeyFromSignature signature messageHash
-      SHA theHash' = hash $ B.pack $ word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v] ++ [theType] ++ B.unpack (rlpSerialize rlp)
-
-  when (theHash /= theHash') $ error "bad UDP data sent from peer, the hash isn't correct"
-
-  return $ fromMaybe (error "malformed signature in call to processDataStream") publicKey
-
-processDataStream' _ = error "processDataStream' called with too few bytes"
+      SHA theHash' = hash $ fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s)
+                         <> B.singleton v <> B.singleton theType <> rlpSerialize rlp
+  in if theHash /= theHash'
+    then error "bad UDP data sent from peer, the hash isn't correct"
+    else fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
@@ -268,7 +261,7 @@ nodeIDToPoint (NodeID nodeID) = Point x y
 
 pointToNodeID::Point->NodeID
 pointToNodeID PointO      = error "called pointToNodeID with PointO, we can't handle that yet"
-pointToNodeID (Point x y) = NodeID $ B.pack $ word256ToBytes (fromInteger x) ++ word256ToBytes (fromInteger y)
+pointToNodeID (Point x y) = NodeID $ fastWord256ToBytes (fromInteger x) <> fastWord256ToBytes (fromInteger y)
 
 instance RLPSerializable NodeID where
   rlpEncode (NodeID x) = RLPString x
@@ -305,8 +298,8 @@ getServerPubKey myPriv domain _ =
       let (theType, theRLP) =
             ndPacketToRLP $
             Ping 4 (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (timestamp + 50)
-          theData = B.unpack $ rlpSerialize theRLP
-          SHA theMsgHash = hash $ B.pack $ theType : theData
+          theData = rlpSerialize theRLP
+          SHA theMsgHash = hash $ B.singleton theType <> theData
 
       ExtendedSignature signature yIsOdd <- H.withSource H.devURandom $ encrypt prvKey' theMsgHash
 
@@ -314,14 +307,14 @@ getServerPubKey myPriv domain _ =
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
-            word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-          theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType] ++ theData
+            fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s) <> B.singleton v
+          theHash = keccak256 $ theSignature <> B.singleton theType <> theData
 
-      _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
+      _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 
       --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
       --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-      pubKey <- try (timeout 5000000 (NB.recv socket' 2000 >>= processDataStream' . B.unpack)) :: IO (Either SomeException (Maybe H.PubKey))
+      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe H.PubKey))
 
       case pubKey of
         Right Nothing  -> return $ Left $ SomeException UDPTimeout
@@ -339,8 +332,8 @@ findNeighbors myPriv domain _ =
       let (theType, theRLP) =
             ndPacketToRLP $
             FindNeighbors (NodeID $ fst $ B16.decode "eab4e595d178422cb8b31eddde2d6dda74ad16609693614a29a214d2b2f457a7c97a442e74e58afd1b16657c5c5908255a450d8a202e8d3b2b31c9b17e7221f3") 100000000000000000
-          theData = B.unpack $ rlpSerialize theRLP
-          SHA theMsgHash = hash $ B.pack (theType : theData)
+          theData = rlpSerialize theRLP
+          SHA theMsgHash = hash $ B.singleton theType <> theData
 
       ExtendedSignature signature yIsOdd <-
         H.withSource H.devURandom $ encrypt prvKey' theMsgHash
@@ -349,10 +342,10 @@ findNeighbors myPriv domain _ =
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
-            word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-          theHash = B.unpack $ keccak256 $ B.pack $ theSignature ++ [theType] ++ theData
+            fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s) <> B.singleton v
+          theHash = keccak256 $ theSignature <> B.singleton theType <> theData
 
-      _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
+      _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 
       _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
       return ()

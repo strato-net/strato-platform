@@ -24,11 +24,11 @@ import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Strato.Model.SHA (keccak256)
 
-sigToBytes::ExtendedSignature->[Word8]
+sigToBytes::ExtendedSignature->B.ByteString
 sigToBytes (ExtendedSignature signature yIsOdd) =
-  word256ToBytes (fromIntegral $ H.sigR signature) ++
-  word256ToBytes (fromIntegral $ H.sigS signature) ++
-  [if yIsOdd then 1 else 0]
+  fastWord256ToBytes (fromIntegral $ H.sigR signature) <>
+  fastWord256ToBytes (fromIntegral $ H.sigS signature) <>
+  B.singleton (if yIsOdd then 1 else 0)
 
 
 data AckMessage = AckMessage {
@@ -96,7 +96,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
       getPubKeyFromSignature sig msg
     hepubk = keccak256 $ B.pack $ pubKeyToBytes ephemeral
     pubk = B.pack $ pointToBytes myPublic
-    theData = B.pack (sigToBytes sig) `B.append`
+    theData = sigToBytes sig `B.append`
                 hepubk `B.append`
                 pubk `B.append`
                 myNonce `B.append`
