@@ -95,8 +95,8 @@ instance Binary ECIESMessage where
 
   put (ECIESMessage form (Point pubKeyX pubKeyY) cipherIV cipher mac) = do
     putWord8 form
-    putByteString . fastWord256ToBytes . fromInteger $ pubKeyX
-    putByteString . fastWord256ToBytes . fromInteger $ pubKeyY
+    putByteString . word256ToBytes . fromInteger $ pubKeyX
+    putByteString . word256ToBytes . fromInteger $ pubKeyY
     putByteString cipherIV
     putByteString cipher
     sequence_ $ map putWord8 mac

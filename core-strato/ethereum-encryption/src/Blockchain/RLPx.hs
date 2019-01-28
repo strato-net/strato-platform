@@ -51,7 +51,7 @@ ethCryptConnect :: MonadIO m
                 -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptConnect myPriv otherPubKey = do
 
-  let myNonce = fastWord256ToBytes 20 --TODO- Important!  Don't hardcode this
+  let myNonce = word256ToBytes 20 --TODO- Important!  Don't hardcode this
 
   handshakeInitBytes <- liftIO $ getHandshakeBytes myPriv otherPubKey myNonce
 
@@ -63,7 +63,7 @@ ethCryptConnect myPriv otherPubKey = do
 
   let ackMsg            = bytesToAckMsg $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
       m_originated      = False -- hardcoded for now, I can only connect as client
-      otherNonce        = fastWord256ToBytes $ ackNonce ackMsg
+      otherNonce        = word256ToBytes $ ackNonce ackMsg
       SharedKey shared' = getShared ECIES.theCurve myPriv (ackEphemeralPubKey ackMsg)
       shared            = B.pack $ intToBytes shared'
       frameDecKey       = myNonce `add` otherNonce `add` shared `add` shared
@@ -161,7 +161,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
   let SharedKey ephemeralSharedSecret = getShared ECIES.theCurve myPriv' otherEphemeral
       ephemeralSharedSecretBytes = intToBytes ephemeralSharedSecret
 
-      myNonceBS = fastWord256ToBytes myNonce
+      myNonceBS = word256ToBytes myNonce
       frameDecKey = otherNonce `add`
                         myNonceBS `add`
                         (B.pack ephemeralSharedSecretBytes) `add`
@@ -211,7 +211,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
     let SharedKey ephemeralSharedSecret = getShared ECIES.theCurve myPriv' otherEphemeral
         ephemeralSharedSecretBytes = intToBytes ephemeralSharedSecret
 
-        myNonceBS = fastWord256ToBytes myNonce
+        myNonceBS = word256ToBytes myNonce
         frameDecKey = otherNonce `add`
                         myNonceBS `add`
                         (B.pack ephemeralSharedSecretBytes) `add`

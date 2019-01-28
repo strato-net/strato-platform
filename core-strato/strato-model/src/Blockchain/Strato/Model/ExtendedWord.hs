@@ -9,7 +9,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
-    slowWord256ToBytes, slowBytesToWord256, fastWord256ToBytes, fastBytesToWord256,
+    slowWord256ToBytes, slowBytesToWord256, word256ToBytes, fastBytesToWord256,
     word512ToBytes, bytesToWord512,
     fastWord256LSB
  ) where
@@ -68,8 +68,8 @@ bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of byt
 slowWord256ToBytes :: Word256 -> [Word8]
 slowWord256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 
-fastWord256ToBytes :: Word256 -> B.ByteString
-fastWord256ToBytes ws = unsafePerformIO $ do
+word256ToBytes :: Word256 -> B.ByteString
+word256ToBytes ws = unsafePerformIO $ do
   let n = getBigWordInteger ws
   dstFP <- BI.mallocByteString 32 :: IO (ForeignPtr Word8)
   withForeignPtr dstFP $ \dst' -> do

@@ -58,7 +58,7 @@ emptyTriePtr::StateRoot
 emptyTriePtr = StateRoot $ keccak256 $ rlpSerialize $ rlpEncode (0::Integer)
 
 sha2StateRoot::SHA->StateRoot
-sha2StateRoot (SHA x) = StateRoot $ fastWord256ToBytes x
+sha2StateRoot (SHA x) = StateRoot $ word256ToBytes x
 
 unboxStateRoot :: StateRoot -> B.ByteString
 unboxStateRoot (StateRoot b) = b

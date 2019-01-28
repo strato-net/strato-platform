@@ -55,7 +55,7 @@ instance RedisDBValuable SHA where
     fromValue = shaFromHex . S8.unpack
 
 instance RedisDBKeyable Word256 where
-    toKey = fastWord256ToBytes
+    toKey = word256ToBytes
 
 instance RedisDBValuable RedisChainInfo where
     toValue   = rlpSerialize . rlpEncode

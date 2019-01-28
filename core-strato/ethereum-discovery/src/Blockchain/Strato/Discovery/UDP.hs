@@ -219,7 +219,7 @@ sendPacket sock prv addr packet = do
   let v' = if yIsOdd' then 1 else 0
       r' = H.sigR signature'
       s' = H.sigS signature'
-      theSignature = fastWord256ToBytes (fromIntegral r') <> fastWord256ToBytes (fromIntegral s') <> B.singleton v'
+      theSignature = word256ToBytes (fromIntegral r') <> word256ToBytes (fromIntegral s') <> B.singleton v'
       theHash = keccak256 $ theSignature <> B.singleton theType' <> theData
 
   _ <- liftIO $ NB.sendTo sock ( theHash <> theSignature <> B.singleton theType' <> theData) addr
@@ -244,7 +244,7 @@ processDataStream' bs =
 
       SHA messageHash = hash $ B.singleton theType <> rlpSerialize rlp
       publicKey = getPubKeyFromSignature signature messageHash
-      SHA theHash' = hash $ fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s)
+      SHA theHash' = hash $ word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s)
                          <> B.singleton v <> B.singleton theType <> rlpSerialize rlp
   in if theHash /= theHash'
     then error "bad UDP data sent from peer, the hash isn't correct"
@@ -261,7 +261,7 @@ nodeIDToPoint (NodeID nodeID) = Point x y
 
 pointToNodeID::Point->NodeID
 pointToNodeID PointO      = error "called pointToNodeID with PointO, we can't handle that yet"
-pointToNodeID (Point x y) = NodeID $ fastWord256ToBytes (fromInteger x) <> fastWord256ToBytes (fromInteger y)
+pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 instance RLPSerializable NodeID where
   rlpEncode (NodeID x) = RLPString x
@@ -307,7 +307,7 @@ getServerPubKey myPriv domain _ =
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
-            fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s) <> B.singleton v
+            word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
           theHash = keccak256 $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
@@ -342,7 +342,7 @@ findNeighbors myPriv domain _ =
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
-            fastWord256ToBytes (fromIntegral r) <> fastWord256ToBytes (fromIntegral s) <> B.singleton v
+            word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
           theHash = keccak256 $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData

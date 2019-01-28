@@ -26,8 +26,8 @@ import                 Blockchain.Strato.Model.SHA (keccak256)
 
 sigToBytes::ExtendedSignature->B.ByteString
 sigToBytes (ExtendedSignature signature yIsOdd) =
-  fastWord256ToBytes (fromIntegral $ H.sigR signature) <>
-  fastWord256ToBytes (fromIntegral $ H.sigS signature) <>
+  word256ToBytes (fromIntegral $ H.sigR signature) <>
+  word256ToBytes (fromIntegral $ H.sigS signature) <>
   B.singleton (if yIsOdd then 1 else 0)
 
 
@@ -62,7 +62,7 @@ instance Binary AckMessage where
 
   put (AckMessage point nonce kp) = do
     putByteString . pointToBytes $ point
-    putByteString . fastWord256ToBytes $ nonce
+    putByteString . word256ToBytes $ nonce
     putByteString . B.singleton . boolToWord8 $ kp
 
 bytesToAckMsg::B.ByteString->AckMessage

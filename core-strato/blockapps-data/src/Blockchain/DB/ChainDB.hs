@@ -23,7 +23,7 @@ import           Blockchain.Format
 
 import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.ExtendedWord (Word256, fastWord256ToBytes)
+import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.SHA          (SHA(..))
 
 import qualified Database.LevelDB                     as DB
@@ -93,7 +93,7 @@ getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
 
 word256ToMPKey :: Word256 -> N.NibbleString
-word256ToMPKey = N.EvenNibbleString . fastWord256ToBytes
+word256ToMPKey = N.EvenNibbleString . word256ToBytes
 
 getkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> m (Maybe a)
 getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db

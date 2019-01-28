@@ -98,7 +98,7 @@ verifyProposerSeal blk sig =
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
 commitmentMessage :: SHA -> HK.Word256
-commitmentMessage (SHA dig) = unSHA . hash . (<> B.singleton 2) . fastWord256ToBytes $ dig
+commitmentMessage (SHA dig) = unSHA . hash . (<> B.singleton 2) . word256ToBytes $ dig
 
 commitmentSeal :: (MonadIO m) => SHA -> HK.PrvKey -> m ExtendedSignature
 commitmentSeal sha pk =

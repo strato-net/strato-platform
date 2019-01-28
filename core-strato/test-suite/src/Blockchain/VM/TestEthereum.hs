@@ -120,7 +120,7 @@ getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
 someHashes::M.Map SHA Int
-someHashes = M.fromList $ map (\x -> (hash (fastWord256ToBytes x), fromIntegral x)) [0..255]
+someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String
 showHash val =
@@ -277,7 +277,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = fromIntegral . fastBytesToWord256 . keccak256 . fastWord256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . fastBytesToWord256 . keccak256 . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

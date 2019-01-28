@@ -195,7 +195,7 @@ code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
 op2OpCode::Operation->[Word8]
 -- This preserves semantics, but it will print a different opcode than was actually in the code
-op2OpCode (PUSH v) = 0x7f:B.unpack (fastWord256ToBytes v)
+op2OpCode (PUSH v) = 0x7f:B.unpack (word256ToBytes v)
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =

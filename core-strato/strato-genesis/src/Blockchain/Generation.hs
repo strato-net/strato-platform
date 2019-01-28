@@ -83,7 +83,7 @@ equalChunksOf n ws | BS.length ws == 0 = []
                                  in car : (equalChunksOf n cdr)
 
 hash :: Word256 -> Word256
-hash = fastBytesToWord256 . keccak256 . fastWord256ToBytes
+hash = fastBytesToWord256 . keccak256 . word256ToBytes
 
 encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
 encodeSequentially k [] = ([], k)
@@ -93,7 +93,7 @@ encodeSequentially k (t:ts) =
   in (tSlots ++ tsSlots, k'')
 
 mapHash :: Word256 -> Word256 -> Word256
-mapHash x y = fastBytesToWord256 . keccak256 $ fastWord256ToBytes x <> fastWord256ToBytes y
+mapHash x y = bytesToWord256 . keccak256 $ word256ToBytes x <> word256ToBytes y
 
 -- First return value is the slots for this value, and the second return value
 -- is the next available slot.
