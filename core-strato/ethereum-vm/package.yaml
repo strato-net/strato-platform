@@ -30,6 +30,7 @@ dependencies:
   - classy-prelude
   - clockwork
   - containers
+  - cpu
   - cross-monitoring
   - cryptohash
   - deepseq
@@ -43,6 +44,7 @@ dependencies:
   - ghc
   - hedis
   - hflags
+  - integer-gmp
   - lens
   - leveldb-haskell
   - merkle-patricia-db
@@ -53,6 +55,7 @@ dependencies:
   - persistent-postgresql
   - persistent-sqlite
   - postgresql-simple
+  - primitive
   - prometheus-client
   - resourcet
   - strato-adit
@@ -128,8 +131,17 @@ benchmarks:
   microbench:
     source-dirs: bench/
     main: Microbench.hs
+    other-modules: []
     dependencies:
       - criterion
       - ethereum-vm
       - hashable
       - unordered-containers
+
+  extractbench:
+    source-dirs: bench/
+    main: ExtractBench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm

@@ -11,6 +11,7 @@ import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
 import           Data.Maybe
@@ -29,6 +30,7 @@ import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
 import qualified Blockchain.VM.MutableStack as MS
+import           Blockchain.VM.Opcodes
 import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
@@ -37,6 +39,10 @@ import           Executable.EVMFlags ()
 
 --noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 --noLog _ _ _ _ = return ()
+
+{-# NOINLINE exampleCode #-}
+exampleCode :: B.ByteString
+exampleCode = B.pack $ [0..255]
 
 main :: IO ()
 main = do
@@ -177,3 +183,32 @@ spec = do
       MS.toList s `shouldReturn` [5, 4, 3]
       MS.pop s `shouldReturn` Just 5
       MS.toList s `shouldReturn` [4, 3]
+
+  describe "Code" $ do
+    describe "extract byte" $ do
+      it "can extract 1 byte" $ do
+         fastExtractByte exampleCode 0 `shouldBe` defaultExtract exampleCode 0 1
+         fastExtractByte exampleCode 1 `shouldBe` defaultExtract exampleCode 1 1
+         fastExtractByte exampleCode 2 `shouldBe` defaultExtract exampleCode 2 1
+         map (fastExtractByte exampleCode) [0..255] `shouldBe` map (\x -> defaultExtract exampleCode x 1) [0..255]
+
+    describe "extract single word" $ do
+      it "can extract 3 bytes" $ do
+        forM_ [0, 1, 7, 128] $ \n ->
+          fastExtractSingle exampleCode n 3 `shouldBe` defaultExtract exampleCode n 3
+      it "can extract 7 bytes" $ do
+        forM_ [0, 1, 0xbb] $ \n ->
+          fastExtractSingle exampleCode n 7 `shouldBe` defaultExtract exampleCode n 7
+
+    describe "extract four words" $ do
+      it "can extract 25 bytes" $ do
+        fastExtractQuad exampleCode 1 25 `shouldBe` defaultExtract exampleCode 1 25
+      it "can extract 31 bytes" $ do
+        fastExtractQuad exampleCode 0 31 `shouldBe` defaultExtract exampleCode 0 31
+        fastExtractQuad exampleCode 1 31 `shouldBe` defaultExtract exampleCode 1 31
+        fastExtractQuad exampleCode 2 31 `shouldBe` defaultExtract exampleCode 2 31
+      it "can extract 32 bytes" $ do
+        fastExtractQuad exampleCode 0 32 `shouldBe`  defaultExtract exampleCode 0 32
+        fastExtractQuad exampleCode 1 32 `shouldBe`  defaultExtract exampleCode 1 32
+        fastExtractQuad exampleCode 2 32 `shouldBe`  defaultExtract exampleCode 2 32
+        fastExtractQuad exampleCode 64 32 `shouldBe` defaultExtract exampleCode 64 32
