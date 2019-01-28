@@ -21,8 +21,8 @@ instance Arbitrary ExtendedSignature where
 
 instance RLPSerializable ExtendedSignature where
   rlpEncode (ExtendedSignature (HK.Signature r s) yIsOdd) = RLPString . B.pack $ rstr ++ sstr ++ vstr
-      where rstr = word256ToBytes . fromIntegral $ r
-            sstr = word256ToBytes . fromIntegral $ s
+      where rstr = slowWord256ToBytes . fromIntegral $ r
+            sstr = slowWord256ToBytes . fromIntegral $ s
             vstr = [if yIsOdd then 1 else 0]
 
   rlpDecode (RLPString bs) = ExtendedSignature (HK.Signature r s) yIsOdd

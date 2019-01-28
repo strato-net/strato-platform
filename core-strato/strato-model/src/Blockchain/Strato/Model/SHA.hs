@@ -2,7 +2,7 @@
 {-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
 
-import              Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+import              Blockchain.Strato.Model.ExtendedWord (Word256, slowWord256ToBytes)
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
 import              Control.Monad                        (replicateM)
@@ -31,7 +31,7 @@ unSHA :: SHA -> Word256
 unSHA (SHA w) = w
 
 instance Binary SHA where
-    put (SHA x) = sequence_ (put <$> word256ToBytes x)
+    put (SHA x) = sequence_ (put <$> slowWord256ToBytes x)
     get = SHA . fromInteger . byteString2Integer . B.pack <$> replicateM 32 get
 
 instance RLPSerializable SHA where

@@ -38,7 +38,7 @@ spec = do
                 0x33, 0x22, 0x11, 0x00]
 
     it "works on arbitrary word256" $ property $ \n ->
-      fastWord256ToBytes n `shouldBe` B.pack (word256ToBytes n)
+      fastWord256ToBytes n `shouldBe` B.pack (slowWord256ToBytes n)
 
     it "works on small word256" $ do
         let input = BigWord (S# 1#)

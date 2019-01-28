@@ -9,7 +9,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
-    word256ToBytes, slowBytesToWord256, fastWord256ToBytes, fastBytesToWord256,
+    slowWord256ToBytes, slowBytesToWord256, fastWord256ToBytes, fastBytesToWord256,
     word512ToBytes, bytesToWord512,
     fastWord256LSB
  ) where
@@ -65,8 +65,8 @@ bytesToWord160 bytes | length bytes == 20 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [160-8,160-16..0] bytes
 bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of bytes"
 
-word256ToBytes :: Word256 -> [Word8]
-word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
+slowWord256ToBytes :: Word256 -> [Word8]
+slowWord256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
 
 fastWord256ToBytes :: Word256 -> B.ByteString
 fastWord256ToBytes ws = unsafePerformIO $ do
@@ -203,7 +203,7 @@ instance RLPSerializable Word16 where
     rlpDecode x             = error ("Missing case in rlp2Word16: " ++ show x)
 
 instance Format Word256 where
-  format x = BC.unpack $ B16.encode $ B.pack $ word256ToBytes x
+  format x = BC.unpack $ B16.encode $ B.pack $ slowWord256ToBytes x
 
 instance Ae.ToJSONKey Word256 where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
