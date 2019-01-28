@@ -9,7 +9,6 @@ import           UnliftIO.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import           Data.Maybe
 import qualified Data.Text                               as T
@@ -32,7 +31,7 @@ ethereumDiscovery = do
   let Right pubKey = hPubKeyToPubKey $ H.derivePubKey privateKey
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
-  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ B.pack $ pointToBytes pubKey)
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ pointToBytes pubKey)
   _ <- runResourceT $ do
     cxt <- initContextLite
 

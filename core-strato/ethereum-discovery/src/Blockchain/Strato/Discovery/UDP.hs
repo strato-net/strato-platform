@@ -181,8 +181,8 @@ ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rl
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, H.PubKey)
 dataToPacket msg = do
-    let r = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 msg
-        s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 64 msg
+    let r = fastBytesToWord256 $ B.take 32 $ B.drop 32 msg
+        s = fastBytesToWord256 $ B.take 32 $ B.drop 64 msg
     v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
     let yIsOdd = v == 1
         signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd

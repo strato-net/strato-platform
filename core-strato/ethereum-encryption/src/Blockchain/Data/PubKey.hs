@@ -26,15 +26,15 @@ import           Blockchain.Format
 stringToPoint::String->Point
 stringToPoint string =
   case B16.decode $ BC.pack string of
-   (val, "") -> bytesToPoint $ B.unpack val
+   (val, "") -> bytesToPoint val
    _         -> error $ "stringToPoint called with malformed string: " ++ string
 
 pointToString :: Point -> String
-pointToString = BC.unpack . B16.encode . B.pack . pointToBytes
+pointToString = BC.unpack . B16.encode . pointToBytes
 
 instance Format Point where
   format x =
-    CL.yellow (take 30 (format $ B.pack $ pointToBytes x) ++ "...")
+    CL.yellow (take 30 (format $ pointToBytes x) ++ "...")
 
 instance RLPSerializable Point where
   rlpEncode (Point x y) =
@@ -51,23 +51,23 @@ instance Format Point where
   format PointO = "PointO"
 -}
 
-pointToBytes::Point->[Word8]
-pointToBytes (Point x y) = intToBytes x ++ intToBytes y
+pointToBytes::Point->B.ByteString
+pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
 pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
 
-hPointToBytes::H.Point->[Word8]
-hPointToBytes point = B.unpack $
-  fastWord256ToBytes (fromIntegral x) <> fastWord256ToBytes (fromIntegral y)
+hPointToBytes::H.Point->B.ByteString
+hPointToBytes point = fastWord256ToBytes (fromIntegral x) <> fastWord256ToBytes (fromIntegral y)
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY point
 
-pubKeyToBytes::H.PubKey->[Word8]
+pubKeyToBytes::H.PubKey->B.ByteString
 pubKeyToBytes pubKey = hPointToBytes $ H.pubKeyPoint pubKey
 
-bytesToPoint::[Word8]->Point
-bytesToPoint x | length x == 64 =
-  Point (toInteger $ bytesToWord256 $ take 32 x) (toInteger $ bytesToWord256 $ drop 32 x)
+bytesToPoint::B.ByteString->Point
+bytesToPoint bs | B.length bs == 64 =
+  let (xs, ys)= B.splitAt 32 bs
+  in Point (toInteger $ fastBytesToWord256 xs) (toInteger $ fastBytesToWord256 ys)
 bytesToPoint _ = error "bytesToPoint called with the wrong number of bytes"
 
 intToBytes::Integer->[Word8]

@@ -61,7 +61,7 @@ ethCryptConnect myPriv otherPubKey = do
 
   when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes"
 
-  let ackMsg            = bytesToAckMsg $ B.unpack $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
+  let ackMsg            = bytesToAckMsg $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
       m_originated      = False -- hardcoded for now, I can only connect as client
       otherNonce        = fastWord256ToBytes $ ackNonce ackMsg
       SharedKey shared' = getShared ECIES.theCurve myPriv (ackEphemeralPubKey ackMsg)
@@ -137,12 +137,12 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
       extSig = rlpDecode signatureRLP
       version = rlpDecode versionRLP::Integer
 
-  let otherPoint = bytesToPoint $ B.unpack pubKey
+  let otherPoint = bytesToPoint pubKey
 
   when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
 
   let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
-      msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
+      msg = fromIntegral sharedKey `xor` fastBytesToWord256 otherNonce
       otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg
@@ -191,7 +191,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
 
     let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
         otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
-        msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
+        msg = fromIntegral sharedKey `xor` fastBytesToWord256 otherNonce
         extSig = rlpDecode . RLPString $ eciesMsgIBytes
         otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
