@@ -277,7 +277,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = fromIntegral . fastBytesToWord256 . keccak256 . word256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . bytesToWord256 . keccak256 . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

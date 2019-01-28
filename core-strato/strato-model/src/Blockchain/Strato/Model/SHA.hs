@@ -58,7 +58,7 @@ shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
 superProprietaryStratoSHAHash :: S8.ByteString -> SHA
-superProprietaryStratoSHAHash = SHA . fastBytesToWord256 . keccak256
+superProprietaryStratoSHAHash = SHA . bytesToWord256 . keccak256
 
 keccak256 :: S8.ByteString -> S8.ByteString
 keccak256 = fastKeccak256

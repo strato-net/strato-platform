@@ -142,7 +142,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
   when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
 
   let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
-      msg = fromIntegral sharedKey `xor` fastBytesToWord256 otherNonce
+      msg = fromIntegral sharedKey `xor` bytesToWord256 otherNonce
       otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             getPubKeyFromSignature extSig msg
@@ -191,7 +191,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
 
     let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
         otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
-        msg = fromIntegral sharedKey `xor` fastBytesToWord256 otherNonce
+        msg = fromIntegral sharedKey `xor` bytesToWord256 otherNonce
         extSig = rlpDecode . RLPString $ eciesMsgIBytes
         otherEphemeral = hPubKeyToPubKey $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $

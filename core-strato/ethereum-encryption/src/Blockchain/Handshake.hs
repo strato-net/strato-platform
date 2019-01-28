@@ -56,7 +56,7 @@ errorHead msg _   = error msg
 instance Binary AckMessage where
   get = do
     point <- bytesToPoint <$> getByteString 64
-    nonce <- fastBytesToWord256 <$> getByteString 32
+    nonce <- bytesToWord256 <$> getByteString 32
     kp <- fmap (knownPeer . errorHead "head error in instance Binary AckMessage" . B.unpack) $ getByteString 1
     return $ (AckMessage point nonce kp)
 
@@ -69,7 +69,7 @@ bytesToAckMsg::B.ByteString->AckMessage
 bytesToAckMsg bytes | B.length bytes == 97 =
   AckMessage {
     ackEphemeralPubKey=bytesToPoint $ B.take 64 bytes,
-    ackNonce=fastBytesToWord256 $ B.take 32 $ B.drop 64 bytes,
+    ackNonce=bytesToWord256 $ B.take 32 $ B.drop 64 bytes,
     ackKnownPeer=
       case bytes `B.index` 96 of
         0 -> False
@@ -84,7 +84,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
     myPublic = calculatePublic ECIES.theCurve myPriv
     SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPubKey
 
-    msg = fromIntegral sharedKey `xor` fastBytesToWord256 myNonce
+    msg = fromIntegral sharedKey `xor` bytesToWord256 myNonce
 
 
  --  putStrLn $ "sharedKey: " ++ show sharedKey

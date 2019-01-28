@@ -41,7 +41,7 @@ instance RLPSerializable Point where
     rlpEncode $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
   rlpEncode PointO = error "rlpEncode for Point called for PointO"
   rlpDecode o =
-    Point (toInteger $ fastBytesToWord256 x) (toInteger $ fastBytesToWord256 y)
+    Point (toInteger $ bytesToWord256 x) (toInteger $ bytesToWord256 y)
     where
       (x, y) = B.splitAt 32 $ rlpDecode o
 
@@ -67,7 +67,7 @@ pubKeyToBytes pubKey = hPointToBytes $ H.pubKeyPoint pubKey
 bytesToPoint::B.ByteString->Point
 bytesToPoint bs | B.length bs == 64 =
   let (xs, ys)= B.splitAt 32 bs
-  in Point (toInteger $ fastBytesToWord256 xs) (toInteger $ fastBytesToWord256 ys)
+  in Point (toInteger $ bytesToWord256 xs) (toInteger $ bytesToWord256 ys)
 bytesToPoint _ = error "bytesToPoint called with the wrong number of bytes"
 
 intToBytes::Integer->[Word8]

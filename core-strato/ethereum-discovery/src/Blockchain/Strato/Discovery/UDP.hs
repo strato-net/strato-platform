@@ -181,8 +181,8 @@ ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rl
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, H.PubKey)
 dataToPacket msg = do
-    let r = fastBytesToWord256 $ B.take 32 $ B.drop 32 msg
-        s = fastBytesToWord256 $ B.take 32 $ B.drop 64 msg
+    let r = bytesToWord256 $ B.take 32 $ B.drop 32 msg
+        s = bytesToWord256 $ B.take 32 $ B.drop 64 msg
     v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
     let yIsOdd = v == 1
         signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
@@ -234,9 +234,9 @@ processDataStream' bs =
       (vtype, rest) = B.splitAt 2 bs'''
       v = B.index vtype 0
       theType = B.index vtype 1
-      theHash = fastBytesToWord256 hs
-      r = fastBytesToWord256 rs
-      s = fastBytesToWord256 ss
+      theHash = bytesToWord256 hs
+      r = bytesToWord256 rs
+      s = bytesToWord256 ss
       yIsOdd = v == 1 -- 0x1c
       signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
 

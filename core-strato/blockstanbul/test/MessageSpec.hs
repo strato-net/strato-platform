@@ -23,7 +23,7 @@ spec = parallel $ do
     let vw = View 54975581388 45212608023800330
         digest = SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1
         addr = Address 0x787878787878787878787878
-        mkCoord = fromIntegral . fastBytesToWord256 . B.pack
+        mkCoord = fromIntegral . bytesToWord256 . B.pack
         sig = ExtendedSignature (HK.Signature (mkCoord [0..31]) (mkCoord [32..63])) True
         seal = ExtendedSignature (HK.Signature (mkCoord [64..95]) (mkCoord [96..127])) False
     it "matches on serializing Preprepares" $ do

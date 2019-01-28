@@ -83,7 +83,7 @@ equalChunksOf n ws | BS.length ws == 0 = []
                                  in car : (equalChunksOf n cdr)
 
 hash :: Word256 -> Word256
-hash = fastBytesToWord256 . keccak256 . word256ToBytes
+hash = bytesToWord256 . keccak256 . word256ToBytes
 
 encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
 encodeSequentially k [] = ([], k)
@@ -104,11 +104,11 @@ encodeType k (Stryng s) =
   if BS.length payload < 32
       then let pad = BS.replicate (31 - BS.length payload) 0
                size = BS.singleton . fromIntegral $ BS.length payload `shiftL` 1
-           in ([(k, fastBytesToWord256 $ payload <> pad <> size)], k+1)
+           in ([(k, bytesToWord256 $ payload <> pad <> size)], k+1)
       else let size = fromIntegral $ (BS.length payload `shiftL` 1) .|. 1
                pointer = (k, size)
                start = hash k
-               packets = zip (map (start+) [0..]) . map fastBytesToWord256 . equalChunksOf 32 $ payload
+               packets = zip (map (start+) [0..]) . map bytesToWord256 . equalChunksOf 32 $ payload
            in (pointer:packets, k + 1)
   where payload = encodeUtf8 s
 encodeType k (List payload) =
@@ -129,7 +129,7 @@ encodeType p (Mapping hm) =
                         else BS.take 32 raw
       -- For a mapping value located in contract slot p with key s
       -- the slot is keccak256(s <> p)
-      trieKey s = mapHash (fastBytesToWord256 . payload $ s) p
+      trieKey s = mapHash (bytesToWord256 . payload $ s) p
       place (s, v) = fst . encodeType (trieKey s) $ v
   in (pointer:(concatMap place . HM.toList $ hm), p+1)
 

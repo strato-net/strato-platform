@@ -219,7 +219,7 @@ opCode2Op rom !idx =
 -- to bother writing a specialization.
 defaultExtract :: B.ByteString -> Int -> Int -> Word256
 defaultExtract bs off len = let slice = B.take len . B.drop off $ bs
-                            in fastBytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
+                            in bytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
 
 -- Used to push 1 byte
 fastExtractByte :: B.ByteString-> Int -> Word256

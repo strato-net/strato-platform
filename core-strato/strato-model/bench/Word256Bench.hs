@@ -23,7 +23,7 @@ benchDeserializeSlow :: Word256 -> Benchmark
 benchDeserializeSlow w = bench ("deserializing slow: " ++ show w) $ nf slowBytesToWord256 (slowWord256ToBytes w)
 
 benchDeserializeFast :: Word256 -> Benchmark
-benchDeserializeFast w = bench ("deserializing fast: " ++ show w) $ nf fastBytesToWord256 (word256ToBytes w)
+benchDeserializeFast w = bench ("deserializing fast: " ++ show w) $ nf bytesToWord256 (word256ToBytes w)
 
 main :: IO ()
 main = do
