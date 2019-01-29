@@ -60,7 +60,6 @@ import           Blockchain.VM.Environment
 import           Blockchain.VM.VMM (readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
-import qualified Data.NibbleString                           as N
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
@@ -121,7 +120,7 @@ getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
 someHashes::M.Map SHA Int
-someHashes = M.fromList $ map (\x -> (hash (B.pack $ word256ToBytes x), fromIntegral x)) [0..255]
+someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String
 showHash val =
@@ -278,7 +277,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . keccak256 . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . bytesToWord256 . keccak256 . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

@@ -195,7 +195,7 @@ code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
 op2OpCode::Operation->[Word8]
 -- This preserves semantics, but it will print a different opcode than was actually in the code
-op2OpCode (PUSH v) = 0x7f:B.unpack (fastWord256ToBytes v)
+op2OpCode (PUSH v) = 0x7f:B.unpack (word256ToBytes v)
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
@@ -219,7 +219,7 @@ opCode2Op rom !idx =
 -- to bother writing a specialization.
 defaultExtract :: B.ByteString -> Int -> Int -> Word256
 defaultExtract bs off len = let slice = B.take len . B.drop off $ bs
-                            in fastBytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
+                            in bytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
 
 -- Used to push 1 byte
 fastExtractByte :: B.ByteString-> Int -> Word256

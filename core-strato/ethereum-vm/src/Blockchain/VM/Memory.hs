@@ -143,7 +143,7 @@ mStore::Word256->Word256->VMM ()
 mStore p val = do
   setNewMaxSize (fromIntegral p+32)
   state <- lift get
-  let bytes = fastWord256ToBytes val
+  let bytes = word256ToBytes val
       mem = mVector $! memory state
   liftIO $ V.unsafeWith mem $ \dst ->
              -- bytes is not null terminated, so this isn't a real C String.

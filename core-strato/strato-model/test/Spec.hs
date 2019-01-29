@@ -19,45 +19,45 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "fastSerialize" $ do
-    it "works on 0" $ fastWord256ToBytes 0 `shouldBe` B.replicate 32 0
-    it "works on ff" $ fastWord256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)
+    it "works on 0" $ word256ToBytes 0 `shouldBe` B.replicate 32 0
+    it "works on ff" $ word256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)
     it "works of aabbccdd" $
-      fastWord256ToBytes 0xaabbccdd `shouldBe` (B.replicate 28 0 <> B.pack [0xaa, 0xbb, 0xcc, 0xdd])
+      word256ToBytes 0xaabbccdd `shouldBe` (B.replicate 28 0 <> B.pack [0xaa, 0xbb, 0xcc, 0xdd])
     it "works on first large size" $
-      fastWord256ToBytes 0x887766554433221100 `shouldBe`
+      word256ToBytes 0x887766554433221100 `shouldBe`
         (B.replicate 23 0 <> B.pack [0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0])
 
     it "works on mid size" $
       replicateM_ 1000 $
-        fastWord256ToBytes 0x60646359b0ecaf704caa6f35 `shouldBe` fst (B16.decode
+        word256ToBytes 0x60646359b0ecaf704caa6f35 `shouldBe` fst (B16.decode
               "000000000000000000000000000000000000000060646359b0ecaf704caa6f35")
     it "works on max" $
-      fastWord256ToBytes 0xffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100 `shouldBe`
+      word256ToBytes 0xffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100 `shouldBe`
         B.pack [0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
                 0x11, 0x00, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44,
                 0x33, 0x22, 0x11, 0x00]
 
     it "works on arbitrary word256" $ property $ \n ->
-      fastWord256ToBytes n `shouldBe` B.pack (word256ToBytes n)
+      word256ToBytes n `shouldBe` B.pack (slowWord256ToBytes n)
 
     it "works on small word256" $ do
         let input = BigWord (S# 1#)
         let want = B.replicate 31 0 <> B.replicate 1 1
-        fastWord256ToBytes input `shouldBe` want
+        word256ToBytes input `shouldBe` want
 
   describe "fastDeserialize" $ do
     it "maintains Integer invariants" $ property $ \n ->
-      let n' = fastBytesToWord256 . fastWord256ToBytes $ n
+      let n' = bytesToWord256 . word256ToBytes $ n
       in I# (isValidInteger# (getBigWordInteger n')) `shouldBe` 1
     it "works on 99656985947821947480 (66 bits)" $ do
-      let b = fastWord256ToBytes 99656985947821947480
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      let b = word256ToBytes 99656985947821947480
+      bytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
     it "works on 10291335769063634520 (63+\\epsilon bits)" $ do
-      let b = fastWord256ToBytes 10291335769063634520
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      let b = word256ToBytes 10291335769063634520
+      bytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
     it "works on arbitrary serialized word256" $ property $ \n -> do
-      let b = fastWord256ToBytes n
-      fastBytesToWord256 b `shouldBe` bytesToWord256 (B.unpack b)
+      let b = word256ToBytes n
+      bytesToWord256 b `shouldBe` slowBytesToWord256 (B.unpack b)
 
   describe "fastLowByte" $ do
     let slowByte :: Word256 -> Word8

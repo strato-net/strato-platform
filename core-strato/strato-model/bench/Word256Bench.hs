@@ -14,16 +14,16 @@ benchLSBFast :: Word256 -> Benchmark
 benchLSBFast w = bench ("least significant byte fast: " ++ show w) $ nf fastWord256LSB w
 
 benchSerializeSlow :: Word256 -> Benchmark
-benchSerializeSlow w = bench ("serializing slow: " ++ show w) $ nf (B.pack . word256ToBytes) w
+benchSerializeSlow w = bench ("serializing slow: " ++ show w) $ nf (B.pack . slowWord256ToBytes) w
 
 benchSerializeFast :: Word256 -> Benchmark
-benchSerializeFast w = bench ("serializing fast: " ++ show w) $ nf fastWord256ToBytes w
+benchSerializeFast w = bench ("serializing fast: " ++ show w) $ nf word256ToBytes w
 
 benchDeserializeSlow :: Word256 -> Benchmark
-benchDeserializeSlow w = bench ("deserializing slow: " ++ show w) $ nf bytesToWord256 (word256ToBytes w)
+benchDeserializeSlow w = bench ("deserializing slow: " ++ show w) $ nf slowBytesToWord256 (slowWord256ToBytes w)
 
 benchDeserializeFast :: Word256 -> Benchmark
-benchDeserializeFast w = bench ("deserializing fast: " ++ show w) $ nf fastBytesToWord256 (fastWord256ToBytes w)
+benchDeserializeFast w = bench ("deserializing fast: " ++ show w) $ nf bytesToWord256 (word256ToBytes w)
 
 main :: IO ()
 main = do

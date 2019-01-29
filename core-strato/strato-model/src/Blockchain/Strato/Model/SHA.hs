@@ -2,14 +2,14 @@
 {-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
 
-import              Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
-import              Control.Monad                        (replicateM)
 import "cryptonite" Crypto.Hash                          (Digest, hash, Keccak_512)
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
 import              Data.Binary
+import              Data.Binary.Get
+import              Data.Binary.Put
 import              Data.ByteArray                       (convert)
 import qualified    Data.ByteString                      as B
 import qualified    Data.ByteString.Base16               as B16
@@ -31,8 +31,8 @@ unSHA :: SHA -> Word256
 unSHA (SHA w) = w
 
 instance Binary SHA where
-    put (SHA x) = sequence_ (put <$> word256ToBytes x)
-    get = SHA . fromInteger . byteString2Integer . B.pack <$> replicateM 32 get
+    put (SHA x) = putByteString . word256ToBytes $ x
+    get = SHA . bytesToWord256 <$> getByteString 32
 
 instance RLPSerializable SHA where
     rlpDecode (RLPString s) | B.length s == 32 = SHA $ decode $ BL.fromStrict s
@@ -58,7 +58,7 @@ shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
 superProprietaryStratoSHAHash :: S8.ByteString -> SHA
-superProprietaryStratoSHAHash = SHA . fastBytesToWord256 . keccak256
+superProprietaryStratoSHAHash = SHA . bytesToWord256 . keccak256
 
 keccak256 :: S8.ByteString -> S8.ByteString
 keccak256 = fastKeccak256
