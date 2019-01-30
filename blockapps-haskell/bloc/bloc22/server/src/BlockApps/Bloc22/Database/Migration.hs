@@ -101,5 +101,5 @@ migrateXabi = do
                       |]
   maxId <- fromMaybe 0 . listToMaybe . map fromOnly <$> blocModify (flip query_ idQuery)
   forM_ [0..maxId] $ \i -> do
-    xabi <- serializeXabi <$> getContractXabiFromMetaDataIdDeprecated i
+    xabi <- Binary . serializeXabi <$> getContractXabiFromMetaDataIdDeprecated i
     void . blocModify $ \conn -> execute conn xabiQuery (i,xabi)
