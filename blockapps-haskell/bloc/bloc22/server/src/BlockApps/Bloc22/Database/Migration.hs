@@ -77,8 +77,7 @@ addValueColumn :: Query
 addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
 
 addMutabilityColumn :: Query
-addMutabilityColumn = [sql|
-ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
+addMutabilityColumn = [sql| ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
 
 addChainIdColumn :: Query
 addChainIdColumn = [sql| ALTER TABLE contracts_instance ADD COLUMN IF NOT EXISTS chainid bytea; |]
@@ -96,9 +95,9 @@ migrateXabi :: Bloc ()
 migrateXabi = do
   let idQuery = [sql| SELECT id FROM contracts_metadata ORDER BY id DESC LIMIT 1; |]
       xabiQuery = [sql| UPDATE contracts_metadata
-                           SET contracts_metadata.xabi = tup.x
-                          FROM (VALUES (?,?)) as tup(i,x)
-                         WHERE contracts_metadata.id = tup.i;
+                           SET xabi = tup.x
+                          FROM (VALUES (?,?::bytea)) as tup(i,x)
+                         WHERE id = tup.i;
                       |]
   maxId <- fromMaybe 0 . listToMaybe . map fromOnly <$> blocModify (flip query_ idQuery)
   forM_ [0..maxId] $ \i -> do
