@@ -56,6 +56,7 @@ migrations = [ MigrationQuery (Throw, createTables)
              , MigrationQuery (Throw, alterValueColumn)
              , MigrationQuery (Throw, addXabiColumn)
              , MigrationAction migrateXabi
+             , MigrationQuery (Throw, dropXabiTables)
              ]
 
 getSchemaVersion :: Query
@@ -71,13 +72,13 @@ dropHashNameTable :: Query
 dropHashNameTable = [sql| DROP TABLE IF EXISTS hash_name; |]
 
 addConstantColumn :: Query
-addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
+addConstantColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
 
 addValueColumn :: Query
-addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
+addValueColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
 
 addMutabilityColumn :: Query
-addMutabilityColumn = [sql| ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
+addMutabilityColumn = [sql| ALTER TABLE IF EXISTS xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
 
 addChainIdColumn :: Query
 addChainIdColumn = [sql| ALTER TABLE contracts_instance ADD COLUMN IF NOT EXISTS chainid bytea; |]
@@ -86,7 +87,7 @@ addSrcHashColumn :: Query
 addSrcHashColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS src_hash bytea; |]
 
 alterValueColumn :: Query
-alterValueColumn = [sql| ALTER TABLE xabi_variables ALTER COLUMN value TYPE text; |]
+alterValueColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ALTER COLUMN value TYPE text; |]
 
 addXabiColumn :: Query
 addXabiColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS xabi bytea; |]
@@ -103,3 +104,15 @@ migrateXabi = do
   forM_ [0..maxId] $ \i -> do
     xabi <- Binary . serializeXabi <$> getContractXabiFromMetaDataIdDeprecated i
     void . blocModify $ \conn -> execute conn xabiQuery (i,xabi)
+
+dropXabiTables :: Query
+dropXabiTables = [sql| DROP TABLE IF EXISTS contracts_lookup;
+                       DROP TABLE IF EXISTS xabi_function_arguments;
+                       DROP TABLE IF EXISTS xabi_function_returns;
+                       DROP TABLE IF EXISTS xabi_variables;
+                       DROP TABLE IF EXISTS xabi_enum_names;
+                       DROP TABLE IF EXISTS xabi_struct_fields;
+                       DROP TABLE IF EXISTS xabi_functions;
+                       DROP TABLE IF EXISTS xabi_types;
+                       DROP TABLE IF EXISTS xabi_type_defs;
+                     |]
