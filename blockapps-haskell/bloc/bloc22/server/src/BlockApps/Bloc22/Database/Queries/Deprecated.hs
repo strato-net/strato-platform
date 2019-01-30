@@ -265,13 +265,16 @@ getContractXabiDeprecated (ContractName contractName) contractId chainId = do
   mCmId <- getContractsMetaDataId contractName contractId chainId
   case mCmId of
     Nothing -> return xabiEmpty
-    Just cmId -> do
-      funcs <- getXabiFunctionsQuery cmId
-      constr <- getXabiConstrQuery cmId
-      vars <- getXabiVariablesQuery cmId
-      typeDefs <- getXabiTypeDefs cmId
-      return xabiEmpty{ xabiFuncs = funcs
-                      , xabiConstr = constr
-                      , xabiVars = vars
-                      , xabiTypes = typeDefs
-                      }
+    Just cmId -> getContractXabiFromMetaDataIdDeprecated cmId
+
+getContractXabiFromMetaDataIdDeprecated :: Int32 -> Bloc Xabi
+getContractXabiFromMetaDataIdDeprecated cmId = do
+  funcs <- getXabiFunctionsQuery cmId
+  constr <- getXabiConstrQuery cmId
+  vars <- getXabiVariablesQuery cmId
+  typeDefs <- getXabiTypeDefs cmId
+  return xabiEmpty{ xabiFuncs = funcs
+                  , xabiConstr = constr
+                  , xabiVars = vars
+                  , xabiTypes = typeDefs
+                  }
