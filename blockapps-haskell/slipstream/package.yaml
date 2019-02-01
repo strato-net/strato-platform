@@ -104,7 +104,6 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - largeword
       - parsec
       - persistent-sqlite
       - QuickCheck

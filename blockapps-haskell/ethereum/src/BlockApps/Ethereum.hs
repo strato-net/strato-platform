@@ -13,10 +13,10 @@ module BlockApps.Ethereum
     Word160
   , Word256
   , word256ToBytes
+  , word256ToShortBytes
   , bytesToWord256
+  , shortBytesToWord256
   , lastWord64
-  , removeThisConversion
-  , alsoRemoveThisOne
   , Hex (..)
   -- * Addresses
   , Address (..)
@@ -103,19 +103,11 @@ import           Text.Read              hiding (String)
 import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
-import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.ExtendedWord
 
 
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
-
--- TODO(tim): Convert Secp256k1 to avoid the LargeWord usage entirely
-removeThisConversion :: Word256 -> LW.Word256
-removeThisConversion = fromIntegral
-
-alsoRemoveThisOne :: LW.Word256 -> Word256
-alsoRemoveThisOne = fromIntegral
 
 instance ToSchema Word256 where
   declareNamedSchema _ = return $
@@ -558,8 +550,8 @@ signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionV = testV + 0x1b
-    , transactionR = alsoRemoveThisOne r
-    , transactionS = alsoRemoveThisOne s
+    , transactionR = shortBytesToWord256 r
+    , transactionS = shortBytesToWord256 s
     , transactionInitOrData = unsignedTransactionInitOrData
     , transactionChainId = unsignedTransactionChainId
     , transactionMetadata = md
@@ -586,7 +578,7 @@ verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
   let
     message = rlpMsg $ unsignTransaction t
   in
-    case importCompactSig (CompactSig (removeThisConversion r) (removeThisConversion s)) of
+    case importCompactSig (CompactSig (word256ToShortBytes r) (word256ToShortBytes s)) of
       Nothing  -> False
       Just sig -> verifySig pk sig message
 
@@ -595,7 +587,7 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
   let
     message = rlpMsg $ unsignTransaction t
     v' = v - 0x1b
-    compactRecSig = CompactRecSig (removeThisConversion r) (removeThisConversion s) v'
+    compactRecSig = CompactRecSig (word256ToShortBytes r) (word256ToShortBytes s) v'
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
 

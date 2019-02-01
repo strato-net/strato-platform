@@ -33,7 +33,7 @@ dependencies:
   - QuickCheck
   - quickcheck-instances
   - saltine
-  - secp256k1
+  - secp256k1-haskell
   - servant
   - servant-server
   - servant-swagger

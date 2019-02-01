@@ -4,6 +4,7 @@ import Control.Monad
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Short as BS
 import Data.Word
 import GHC.Exts
 import GHC.Integer.GMP.Internals
@@ -66,3 +67,10 @@ spec = do
       fastWord256LSB n `shouldBe` slowByte n
     it "works on S# Word256" $ do
       fastWord256LSB (BigWord (S# 0x93342434#)) `shouldBe` 0x34
+
+  describe "short serialization" $ do
+    it "round trips correctly" $ property $ \n ->
+      shortBytesToWord256 (word256ToShortBytes n) `shouldBe` n
+
+    it "matches long bytestrings" $ property $ \n ->
+      word256ToShortBytes n `shouldBe` BS.toShort (word256ToBytes n)

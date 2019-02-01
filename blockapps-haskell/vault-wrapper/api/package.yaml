@@ -30,7 +30,7 @@ dependencies:
   - lens
   - memory
   - saltine
-  - secp256k1
+  - secp256k1-haskell
   - servant
   - servant-server
   - swagger2

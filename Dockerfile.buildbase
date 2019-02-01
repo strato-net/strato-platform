@@ -8,6 +8,16 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
+# When STACK_RESOLVER >= lts-13, prefer to use the secp256k1-dev package.
+# Unfortunately, it not available in xenial based images.
+RUN git clone https://github.com/bitcoin-core/secp256k1 && \
+    cd secp256k1 && \
+    ./autogen.sh && \
+    ./configure --enable-module-recovery && \
+    make && \
+    make install && \
+    ldconfig
+
 # package the pre-built solc (e.g. required for 'stack test blockapps-bloc22-server')
 COPY ./solc /usr/local/bin/
 COPY ./solc-0.5 /usr/local/bin

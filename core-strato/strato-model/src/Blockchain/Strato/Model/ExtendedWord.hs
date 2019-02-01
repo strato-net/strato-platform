@@ -10,6 +10,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
     slowWord256ToBytes, slowBytesToWord256, word256ToBytes, bytesToWord256,
+    word256ToShortBytes, shortBytesToWord256,
     word512ToBytes, bytesToWord512,
     fastWord256LSB
  ) where
@@ -25,6 +26,7 @@ import qualified Data.ByteString.Internal  as BI
 import qualified Data.ByteString.Lazy      as BL
 import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
+import qualified Data.ByteString.Short     as BS
 import           Data.Ix
 import qualified Data.Primitive.ByteArray  as PBA
 import qualified Data.Text                 as T
@@ -146,6 +148,12 @@ bytesToWord256 bytes | B.length bytes /= 32 = error $ "slowBytesToWord256f calle
         dst' <- PBA.unsafeFreezeByteArray dst
         let !(PBA.ByteArray dst'#) = dst'
         return . BigWord $ Jp# (BN# dst'#)
+
+shortBytesToWord256 :: BS.ShortByteString -> Word256
+shortBytesToWord256 = bytesToWord256 . BS.fromShort
+
+word256ToShortBytes :: Word256 -> BS.ShortByteString
+word256ToShortBytes = BS.toShort . word256ToBytes
 
 fastWord256LSB :: Word256 -> Word8
 fastWord256LSB ws = case (getBigWordInteger ws) of

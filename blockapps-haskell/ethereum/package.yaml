@@ -33,13 +33,12 @@ dependencies:
   - hashable
   - http-api-data
   - lens
-  - largeword
   - memory
   - persistent
   - QuickCheck
   - quickcheck-instances
   - relapse
-  - secp256k1
+  - secp256k1-haskell
   - servant
   - servant-docs
   - strato-model
