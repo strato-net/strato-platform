@@ -7,6 +7,7 @@ import Control.Applicative (liftA2)
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.ByteString.Base16 as Base16
+import Data.LargeWord
 import Data.RLP
 import Test.Hspec
 import Test.Hspec.QuickCheck
@@ -19,6 +20,17 @@ import BlockApps.Ethereum
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
+
+  describe "Word256" $ do
+    it "shows correctly" $ do
+      show (0x0 :: Word256) `shouldBe` "0"
+      show (0x7 :: Word256) `shouldBe` "7"
+      show (0x45 :: Word256) `shouldBe` "69"
+
+    it "renders json correctly" $ do
+      encode (0x0 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000000\""
+      encode (0x7 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000007\""
+      encode (0x45 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000045\""
 
   describe "Hex" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
