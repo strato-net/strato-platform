@@ -72,6 +72,7 @@ import qualified Data.Text as T (pack, unpack)
 import Data.Data (Data(..))
 import Data.Typeable (Typeable)
 import Text.Printf
+import Text.Read (Read(..))
 
 import Network.Haskoin.Crypto.Curve
 import Network.Haskoin.Crypto.NumberTheory
@@ -108,7 +109,13 @@ data ModP
 data ModN
 
 newtype BigWord n = BigWord { getBigWordInteger :: Integer }
-    deriving (Eq, Ord, Read, Show, Data, Typeable)
+    deriving (Eq, Ord, Data, Typeable)
+
+instance Show (BigWord n) where
+  show (BigWord n) = show n
+
+instance Read (BigWord n) where
+  readPrec = BigWord <$> readPrec
 
 instance NFData (BigWord n) where
     rnf (BigWord n) = rnf n
