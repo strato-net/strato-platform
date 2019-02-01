@@ -15,6 +15,7 @@ import           Control.DeepSeq
 import           Control.Monad
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
+import           Test.QuickCheck                      (Arbitrary(..))
 
 import           Blockchain.Data.RLP
 import qualified Blockchain.Strato.Model.Colors       as CL
@@ -139,3 +140,6 @@ addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteSt
 
 formatAddressWithoutColor::Address->String
 formatAddressWithoutColor = formatAddress
+
+instance Arbitrary Address where
+  arbitrary = Address <$> arbitrary
