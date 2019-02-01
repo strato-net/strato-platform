@@ -25,7 +25,6 @@ dependencies:
   - generic-random
   - http-api-data
   - http-client
-  - largeword
   - lens
   - quickcheck-instances
   - prettyprinter

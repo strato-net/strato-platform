@@ -4,11 +4,11 @@ module BlockApps.Solidity.Contract where
 import           Control.DeepSeq
 import qualified Data.Bimap                  as Bimap
 import           Data.Bits
-import           Data.LargeWord
 import qualified Data.Map                    as Map
 import qualified Data.Text                   as T
 import           GHC.Generics
 
+import           BlockApps.Ethereum          (Word256)
 import           BlockApps.Solidity.Struct   (Struct)
 import qualified BlockApps.Solidity.Struct   as Struct
 import           BlockApps.Solidity.Type

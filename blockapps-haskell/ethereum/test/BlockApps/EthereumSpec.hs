@@ -7,7 +7,6 @@ import Control.Applicative (liftA2)
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.ByteString.Base16 as Base16
-import Data.LargeWord
 import Data.RLP
 import Test.Hspec
 import Test.Hspec.QuickCheck

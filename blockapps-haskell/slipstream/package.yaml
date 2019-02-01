@@ -43,7 +43,6 @@ dependencies:
   - hflags
   - hslogger
   - http-client
-  - largeword
   - lens
   - logging-effect
   - lrucache
