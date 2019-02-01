@@ -23,16 +23,12 @@ module BlockApps.SolidityVarReader (
 import           Control.Exception
 import           Control.Monad.Except
 import qualified Data.Bimap                       as Bimap
-import           Data.Binary.Get                  (runGet, getWord64be)
 import           Data.Bits
 import qualified Data.ByteArray                   as ByteArray
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
-import qualified Data.ByteString.Builder          as BB
 import qualified Data.ByteString.Char8            as BC
-import qualified Data.ByteString.Lazy             as BL
-import           Data.LargeWord
 import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
@@ -84,19 +80,10 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
 
 
 word256ToByteString::Word256->ByteString
-word256ToByteString (LargeKey w1 (LargeKey w2 (LargeKey w3 w4))) =
-  ByteString.concat $ map (BL.toStrict . BB.toLazyByteString . BB.word64BE) [w4,w3,w2,w1]
+word256ToByteString = word256ToBytes
 
 byteStringToWord256 :: ByteString->Word256
-byteStringToWord256 bs =
-  let
-    [w4,w3,w2,w1] = flip runGet (BL.fromStrict bs) $ do
-      w_4 <- getWord64be
-      w_3 <- getWord64be
-      w_2 <- getWord64be
-      w_1 <- getWord64be
-      return [w_4,w_3,w_2,w_1]
-  in LargeKey w1 (LargeKey w2 (LargeKey w3 w4))
+byteStringToWord256 = bytesToWord256
 
 getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
@@ -228,15 +215,11 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
       then --large string, 32+ bytes
         let
           len' = lastWord64 w `div` 2
-          lastWord64::Word256->Word64
-          lastWord64 (LargeKey x _) = x
           startingKey = getArrayStartingKey offset
         in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey+)) [0..] -- if the length is there, so should the data
       else --small string, less than 32 bytes
         let
           len' = lastWord64 w .&. 0xfe `div` 2
-          lastWord64::Word256->Word64
-          lastWord64 (LargeKey x _) = x
         in
           SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString w
 
@@ -384,16 +367,12 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   SimpleType (TypeBytes Nothing) | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
       len' = lastWord64 (storage offset) `div` 2
-      lastWord64::Word256->Word64
-      lastWord64 (LargeKey x _) = x
       startingKey = getArrayStartingKey offset
     in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType (TypeBytes Nothing) -> --small string, less than 32 bytes
     let
       len' = lastWord64 (storage offset) .&. 0xfe `div` 2
-      lastWord64::Word256->Word64
-      lastWord64 (LargeKey x _) = x
     in
       SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 

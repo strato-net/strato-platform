@@ -24,7 +24,6 @@ dependencies:
   - generic-random
   - http-api-data
   - http-client
-  - largeword
   - lens
   - QuickCheck
   - quickcheck-instances

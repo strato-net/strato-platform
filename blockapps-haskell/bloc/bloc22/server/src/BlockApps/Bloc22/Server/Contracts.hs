@@ -14,7 +14,6 @@ import           Control.Monad.Log
 import           Control.Monad.Reader.Class      (asks)
 import           Data.Foldable
 import           Data.Int
-import           Data.LargeWord                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Text                       (Text)

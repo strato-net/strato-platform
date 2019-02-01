@@ -27,7 +27,6 @@ dependencies:
   - bytestring
   - cryptonite
   - http-media
-  - largeword
   - lens
   - memory
   - saltine

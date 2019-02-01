@@ -26,7 +26,6 @@ import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Data.Text.Encoding
 import           Data.Time
-import           Data.LargeWord          (Word256)
 import           Data.Aeson
 import           GHC.Generics
 

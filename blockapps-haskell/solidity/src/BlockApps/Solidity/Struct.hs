@@ -2,12 +2,11 @@
 module BlockApps.Solidity.Struct where
 
 import           Control.DeepSeq
-import           Data.LargeWord
 import           Data.Map.Ordered        (OMap, assocs)
 import           Data.Text               (Text)
 import           GHC.Generics
 
-import           BlockApps.Ethereum ()
+import           BlockApps.Ethereum      (Word256)
 import           BlockApps.Solidity.Type
 import qualified BlockApps.Storage       as Storage
 
