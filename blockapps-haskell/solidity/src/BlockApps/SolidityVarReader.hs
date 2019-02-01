@@ -20,6 +20,7 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
+import           Control.Exception
 import           Control.Monad.Except
 import qualified Data.Bimap                       as Bimap
 import           Data.Binary.Get                  (runGet, getWord64be)
@@ -53,6 +54,12 @@ import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
+
+data SolidityDecodingException = EnumOutOfBounds Text Int
+                               | MissingTypeStruct Text
+                               deriving Show
+
+instance Exception SolidityDecodingException
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
@@ -144,7 +151,7 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
                                        ++ ": Functions are not kept in storage"
         TypeStruct name ->
           case Map.lookup name structDefs of
-            Nothing -> error ""
+            Nothing -> throw $ MissingTypeStruct name
             Just theStruct -> [(offset, size theStruct)] -- TODO: support struct field accessors, e.g. vehicle.vin
               -- case vs of
               -- [] -> [(offset, size theStruct)]
@@ -277,15 +284,16 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
           let
             len' = Bimap.size enumset `shiftR` 8 + 1
             val = fromMaybe v . fmap ((.&. ((1 `shiftL` 8*(fromIntegral len')) - 1)) . (`shiftR` (byte*8))) $ cache offset
+            ival = fromIntegral val
            in
-            case Bimap.lookup (fromIntegral val) enumset of
-              Nothing -> error "bad enum value"
+            case Bimap.lookup ival enumset of
+              Nothing -> throw $ EnumOutOfBounds name ival
               Just x  -> ValueEnum name x val
         v -> error $ "decodeCacheValue': Expected ValueEnum, but got: " ++ show v
 
   TypeStruct name ->
     case Map.lookup name structDefs of
-     Nothing -> error ""
+     Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> case value of
        ValueStruct kvs -> ValueStruct $ decodeCacheValues typeDefs' theStruct cache (Storage.alignedByte position) kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
@@ -426,12 +434,12 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
          val = fromIntegral $ (.&. ((1 `shiftL` 8*len') - 1)) $ (`shiftR` (byte*8)) $ storage offset
        in
         case Bimap.lookup val enumset of
-         Nothing -> error "bad enum value"
+         Nothing -> throw $ EnumOutOfBounds name val
          Just x  -> ValueEnum name x (fromIntegral val)
 
   TypeStruct name ->
     case Map.lookup name structDefs of
-     Nothing -> error ""
+     Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
@@ -550,9 +558,6 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   ValueEnum _ _ index -> encodeInt offset byte index
 
   ValueStruct _ -> error "Structs not supported yet"
-    -- case Map.lookup name structDefs of
-    --  Nothing -> error ""
-    --  Just theStruct -> ValueStruct $ EncodeValues typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 
