@@ -105,7 +105,6 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 import           Blockchain.Strato.Model.ExtendedWord
 
-
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
 
@@ -549,18 +548,19 @@ signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
     , transactionGasLimit = unsignedTransactionGasLimit
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
-    , transactionV = testV + 0x1b
-    , transactionR = shortBytesToWord256 r
-    , transactionS = shortBytesToWord256 s
+    , transactionV = getCompactRecSigV + 0x1b
+    -- Please see https://github.com/haskoin/secp256k1-haskell/issues/12
+    -- The fact that r and s are swapped is *not* a typo.
+    , transactionR = shortBytesToWord256 getCompactRecSigS
+    , transactionS = shortBytesToWord256 getCompactRecSigR
     , transactionInitOrData = unsignedTransactionInitOrData
     , transactionChainId = unsignedTransactionChainId
     , transactionMetadata = md
     }
   where
-    CompactRecSig r s testV =
-      exportCompactRecSig
-      . signRecMsg sk
-      $ rlpMsg u
+    CompactRecSig {..} = exportCompactRecSig
+                       . signRecMsg sk
+                       $ rlpMsg u
 
 unsignTransaction :: Transaction -> UnsignedTransaction
 unsignTransaction Transaction{..} = UnsignedTransaction
@@ -577,8 +577,12 @@ verifyTransaction :: PubKey -> Transaction -> Bool
 verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
   let
     message = rlpMsg $ unsignTransaction t
+    -- Please see https://github.com/haskoin/secp256k1-haskell/issues/12
+    -- The fact that r and s are swapped is *not* a typo.
+    compactSig = CompactSig {getCompactSigR=word256ToShortBytes s,
+                             getCompactSigS=word256ToShortBytes r}
   in
-    case importCompactSig (CompactSig (word256ToShortBytes r) (word256ToShortBytes s)) of
+    case importCompactSig compactSig of
       Nothing  -> False
       Just sig -> verifySig pk sig message
 
@@ -587,7 +591,11 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
   let
     message = rlpMsg $ unsignTransaction t
     v' = v - 0x1b
-    compactRecSig = CompactRecSig (word256ToShortBytes r) (word256ToShortBytes s) v'
+    -- Please see https://github.com/haskoin/secp256k1-haskell/issues/12
+    -- The fact that r and s are swapped is *not* a typo.
+    compactRecSig = CompactRecSig { getCompactRecSigR=word256ToShortBytes s
+                                  , getCompactRecSigS=word256ToShortBytes r
+                                  , getCompactRecSigV=v'}
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
 

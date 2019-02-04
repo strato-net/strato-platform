@@ -34,6 +34,8 @@ postSignature userName userId (UserData (Hex msgHash)) = do
       Just msg' -> do
         let sig = exportCompactRecSig $ signRecMsg prvKey msg'
         return $ SignatureDetails
-                  (Hex . shortBytesToWord256 $ getCompactRecSigR sig)
+        -- Please see https://github.com/haskoin/secp256k1-haskell/issues/12
+        -- The fact that r and s are swapped is *not* a typo.
                   (Hex . shortBytesToWord256 $ getCompactRecSigS sig)
+                  (Hex . shortBytesToWord256 $ getCompactRecSigR sig)
                   (Hex $ 0x1b + getCompactRecSigV sig)
