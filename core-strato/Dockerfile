@@ -1,4 +1,6 @@
-FROM strato-deploybase:latest
+FROM blockapps-deploybase:latest
+
+RUN mkdir -p /var/lib/strato
 
 COPY ./ /
 

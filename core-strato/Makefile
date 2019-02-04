@@ -27,15 +27,10 @@ build_haskell_profiled: prebuild build_buildbase
         --test --no-run-tests \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
-build_deploybase: prebuild
-	cp -f Dockerfile.deploybase $(DOCKER_DUMMY)
-	cp -fr licenses/* ${LICENSE_DIR}
-	docker build -t strato-deploybase:latest -f $(DOCKER_DUMMY)/Dockerfile.deploybase $(DOCKER_DUMMY)
-	rm -f $(DOCKER_DUMMY)/Dockerfile.deploybase
-
-build_docker: build_deploybase build_haskell
+build_docker: prebuild build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(LIBHOME)
+	cp -fr licenses/* ${LICENSE_DIR}
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
 clean:

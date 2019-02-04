@@ -2,7 +2,6 @@ BASILWORK=$(shell pwd)/.basil-work
 STACKWORK=$(BASILWORK)/stack
 FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
-DEPLOYBASE_NAME=bloch-deploybase
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
@@ -37,17 +36,12 @@ build_haskell_profiled: prebuild build_solidity
         --test --no-run-tests \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
-build_deploybase: prebuild
-	cp -f Dockerfile.deploybase $(DOCKER_DUMMY)
-	cp -fr licenses/* ${LICENSE_DIR}
-	docker build --tag=$(DEPLOYBASE_NAME):latest -f $(DOCKER_DUMMY)/Dockerfile.deploybase $(DOCKER_DUMMY)
-	rm -f $(DOCKER_DUMMY)/Dockerfile.deploybase
-
-build_docker: build_deploybase build_haskell $(FAKEROOT)/usr/bin/solc
+build_docker: build_haskell $(FAKEROOT)/usr/bin/solc
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)
+	cp -fr licenses/* ${LICENSE_DIR}
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
 clean:

@@ -39,7 +39,7 @@ apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
 
-bloc: build_buildbase
+bloc: build_buildbase build_deploybase
 	@echo Now building bloc...
 	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
 
@@ -67,11 +67,11 @@ smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
-strato: build_buildbase
+strato: build_buildbase build_deploybase
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
-vault-wrapper:
+vault-wrapper: build_buildbase build_deploybase
 	@echo Now building vault-wrapper...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=blockapps-haskell/vault-wrapper/
 
@@ -89,6 +89,11 @@ build_buildbase:
 	ln -f $(TMPDIR)/solc-0.4 $(TMPDIR)/solc
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
+
+build_deploybase:
+	mkdir -p $(TMPDIR)
+	cp -f Dockerfile.deploybase $(TMPDIR)
+	docker build --tag=blockapps-deploybase:latest -f $(TMPDIR)/Dockerfile.deploybase $(TMPDIR)
 
 test:
 	@echo ${VERSION}
