@@ -5,7 +5,6 @@ BLOCHOME=$(FAKEROOT)/usr/bin/bloc
 LICENSE_DIR=$(FAKEROOT)/licenses
 LICENSE_SOURCE_DIR=$(LICENSE_DIR)/sources
 SLIPSTREAM=${FAKEROOT}/usr/bin/slipstream
-DOCKER_DUMMY=/tmp/$(shell whoami)/docker-dummy-bloc
 
 all: build_docker clean
 
@@ -15,7 +14,6 @@ prebuild:
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(BLOCHOME)
 	mkdir -p $(LICENSE_SOURCE_DIR)
-	mkdir -p $(DOCKER_DUMMY)
 
 
 $(FAKEROOT)/usr/bin/solc-0.4: prebuild
@@ -46,4 +44,3 @@ build_docker: build_haskell $(FAKEROOT)/usr/bin/solc
 
 clean:
 	rm -rf $(BASILWORK)
-	rm -rf $(DOCKER_DUMMY)
