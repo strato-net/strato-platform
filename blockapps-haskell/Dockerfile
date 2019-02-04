@@ -1,4 +1,6 @@
-FROM bloch-deploybase:latest
+FROM blockapps-deploybase:latest
+
+RUN mkdir -p /usr/bin/bloc
 
 COPY ./ /
 
