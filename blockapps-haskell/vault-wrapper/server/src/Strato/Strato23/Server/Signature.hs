@@ -5,14 +5,13 @@
 module Strato.Strato23.Server.Signature where
 
 import           BlockApps.Ethereum
-import           Crypto.Secp256k1
+import           Crypto.HaskoinShim
 import           Data.Text                        (Text)
 import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries (getUserKeyQuery)
 import           Strato.Strato23.Server.Key       (postKey)
-import           Strato.Strato23.Server.Utils     (word256ToByteString)
 
 postSignature :: Text -> UserData -> VaultM SignatureDetails
 postSignature userName (UserData (Hex msgHash)) = do
@@ -28,7 +27,7 @@ postSignature userName (UserData (Hex msgHash)) = do
         $ getUserKeyQuery userName
   withPassword $ \pw -> case decryptSecKey pw salt nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
-    Just prvKey -> case msg (word256ToByteString msgHash) of
+    Just prvKey -> case msg msgHash of
       Nothing -> vaultWrapperError $ AnError "Message was not 32 bytes long"
       Just msg' -> do
         let sig = exportCompactRecSig $ signRecMsg prvKey msg'

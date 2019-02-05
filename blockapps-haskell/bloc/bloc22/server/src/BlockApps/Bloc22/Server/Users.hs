@@ -20,7 +20,7 @@ import           Control.Monad.Except
 import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy
-import           Crypto.Secp256k1
+import           Crypto.HaskoinShim
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString

@@ -55,6 +55,7 @@ packages:
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
+- shared-util/haskoin-shim/
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
@@ -85,8 +86,6 @@ extra-deps:
 - bloomfilter-2.0.1.0
 - servant-aeson-specs-0.6.2.0
 - strings-1.1
-- git: https://github.com/echatav/secp256k1-haskell/
-  commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
 - git: https://github.com/iostat/relapse
   commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
 - git: https://github.com/bitemyapp/esqueleto.git

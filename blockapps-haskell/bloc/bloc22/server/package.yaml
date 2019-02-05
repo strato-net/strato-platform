@@ -38,6 +38,7 @@ dependencies:
   - base16-bytestring
   - generic-random
   - either
+  - haskoin-shim
   - hflags
   - http-client
   - http-conduit
@@ -64,7 +65,6 @@ dependencies:
   - relapse
   - resource-pool
   - saltine
-  - secp256k1
   - servant
   - servant-client
   - servant-docs

@@ -26,11 +26,11 @@ dependencies:
   - blockapps-ethereum
   - bytestring
   - cryptonite
+  - haskoin-shim
   - http-media
   - lens
   - memory
   - saltine
-  - secp256k1
   - servant
   - servant-server
   - swagger2

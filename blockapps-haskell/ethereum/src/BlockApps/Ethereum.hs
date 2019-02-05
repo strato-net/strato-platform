@@ -68,13 +68,13 @@ module BlockApps.Ethereum
   , AccountInfo (..)
   , padZeros
   ) where
-
+import Debug.Trace
 import           ClassyPrelude ((<>), Hashable(hashWithSalt))
 import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
-import           Crypto.Secp256k1
+import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import qualified Data.Aeson.Encoding    as AesonEnc
@@ -110,7 +110,6 @@ import           Text.Read              hiding (String)
 import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
-import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA (CodePtr(..), shaToHex, SHA(..))
@@ -120,11 +119,11 @@ lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
 
 -- TODO(tim): Convert Secp256k1 to avoid the LargeWord usage entirely
-removeThisConversion :: Word256 -> LW.Word256
-removeThisConversion = fromIntegral
+removeThisConversion :: Word256 -> Word256
+removeThisConversion = id
 
-alsoRemoveThisOne :: LW.Word256 -> Word256
-alsoRemoveThisOne = fromIntegral
+alsoRemoveThisOne :: Word256 -> Word256
+alsoRemoveThisOne = id
 
 instance ToSchema Word256 where
   declareNamedSchema _ = return $
@@ -531,6 +530,7 @@ rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
   = fromMaybe (error "rlpMsg failure")
   . msg
+  . bytesToWord256
   . rlpHash
 
 rlpHash :: RLPEncodable x => x -> ByteString
@@ -594,7 +594,9 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
     message = rlpMsg $ unsignTransaction t
     v' = v - 0x1b
     compactRecSig = CompactRecSig (removeThisConversion r) (removeThisConversion s) v'
+  traceShowM ('r':"ecoverTransaction/compact", compactRecSig)
   recSig <- importCompactRecSig compactRecSig
+  traceShowM ('r':"ecoverTransaction/normal", recSig)
   recover recSig message
 
 transactionFrom :: Transaction -> Maybe Address
