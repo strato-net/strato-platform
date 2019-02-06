@@ -11,10 +11,12 @@ TESTS=(
   ethereum-discovery
   ethereum-rlp
   ethereum-vm
+  fast-keccak256
   merkle-patricia-db
   strato-api:unittests
   strato-genesis
   strato-init
+  strato-model
   strato-p2p
   strato-redis-blockdb
   strato-sequencer

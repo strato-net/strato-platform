@@ -95,7 +95,8 @@ putStorageKeyValDB owner key 0 = do --when val=0, we actually delete the key fro
   addressState <- getAddressState owner
   db <- fmap fst getStorageBlockDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  newContractRoot <- fmap MP.stateRoot $ MP.deleteKey mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
+  newContractRoot <- fmap MP.stateRoot
+                   $ MP.deleteKey mpdb (N.EvenNibbleString $ word256ToBytes key)
   putAddressState owner addressState{addressStateContractRoot=newContractRoot}
 
 putStorageKeyValDB owner key val = do
@@ -103,9 +104,10 @@ putStorageKeyValDB owner key val = do
   addressState <- getAddressState owner
   db <- fmap fst getStorageBlockDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  newContractRoot <- fmap MP.stateRoot $ MP.putKeyVal mpdb storageKeyNibbles (rlpEncode $ rlpSerialize $ rlpEncode val)
+  newContractRoot <- fmap MP.stateRoot
+                   $ MP.putKeyVal mpdb storageKeyNibbles (rlpEncode $ rlpSerialize $ rlpEncode val)
   putAddressState owner addressState{addressStateContractRoot=newContractRoot}
-  where storageKeyNibbles = N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key
+  where storageKeyNibbles = N.EvenNibbleString $ word256ToBytes key
 
 getStorageKeyValDB :: (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m) =>
                    Address -> Word256 -> m Word256
@@ -113,7 +115,7 @@ getStorageKeyValDB owner key = do
   addressState <- getAddressState owner
   db <- fmap fst getStorageBlockDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  maybeVal <- MP.getKeyVal mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
+  maybeVal <- MP.getKeyVal mpdb (N.EvenNibbleString $ word256ToBytes key)
   case maybeVal of
     Nothing -> return 0
     Just x  -> return $ fromInteger $ rlpDecode $ rlpDeserialize $ rlpDecode x

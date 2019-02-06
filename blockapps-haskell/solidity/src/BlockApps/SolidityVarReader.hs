@@ -20,18 +20,15 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
+import           Control.Exception
 import           Control.Monad.Except
 import qualified Data.Bimap                       as Bimap
-import           Data.Binary.Get                  (runGet, getWord64be)
 import           Data.Bits
 import qualified Data.ByteArray                   as ByteArray
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
-import qualified Data.ByteString.Builder          as BB
 import qualified Data.ByteString.Char8            as BC
-import qualified Data.ByteString.Lazy             as BL
-import           Data.LargeWord
 import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
@@ -53,6 +50,12 @@ import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
+
+data SolidityDecodingException = EnumOutOfBounds Text Int
+                               | MissingTypeStruct Text
+                               deriving Show
+
+instance Exception SolidityDecodingException
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
@@ -77,19 +80,10 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
 
 
 word256ToByteString::Word256->ByteString
-word256ToByteString (LargeKey w1 (LargeKey w2 (LargeKey w3 w4))) =
-  ByteString.concat $ map (BL.toStrict . BB.toLazyByteString . BB.word64BE) [w4,w3,w2,w1]
+word256ToByteString = word256ToBytes
 
 byteStringToWord256 :: ByteString->Word256
-byteStringToWord256 bs =
-  let
-    [w4,w3,w2,w1] = flip runGet (BL.fromStrict bs) $ do
-      w_4 <- getWord64be
-      w_3 <- getWord64be
-      w_2 <- getWord64be
-      w_1 <- getWord64be
-      return [w_4,w_3,w_2,w_1]
-  in LargeKey w1 (LargeKey w2 (LargeKey w3 w4))
+byteStringToWord256 = bytesToWord256
 
 getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
@@ -144,7 +138,7 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
                                        ++ ": Functions are not kept in storage"
         TypeStruct name ->
           case Map.lookup name structDefs of
-            Nothing -> error ""
+            Nothing -> throw $ MissingTypeStruct name
             Just theStruct -> [(offset, size theStruct)] -- TODO: support struct field accessors, e.g. vehicle.vin
               -- case vs of
               -- [] -> [(offset, size theStruct)]
@@ -221,15 +215,11 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
       then --large string, 32+ bytes
         let
           len' = lastWord64 w `div` 2
-          lastWord64::Word256->Word64
-          lastWord64 (LargeKey x _) = x
           startingKey = getArrayStartingKey offset
         in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey+)) [0..] -- if the length is there, so should the data
       else --small string, less than 32 bytes
         let
           len' = lastWord64 w .&. 0xfe `div` 2
-          lastWord64::Word256->Word64
-          lastWord64 (LargeKey x _) = x
         in
           SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString w
 
@@ -277,15 +267,16 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
           let
             len' = Bimap.size enumset `shiftR` 8 + 1
             val = fromMaybe v . fmap ((.&. ((1 `shiftL` 8*(fromIntegral len')) - 1)) . (`shiftR` (byte*8))) $ cache offset
+            ival = fromIntegral val
            in
-            case Bimap.lookup (fromIntegral val) enumset of
-              Nothing -> error "bad enum value"
+            case Bimap.lookup ival enumset of
+              Nothing -> throw $ EnumOutOfBounds name ival
               Just x  -> ValueEnum name x val
         v -> error $ "decodeCacheValue': Expected ValueEnum, but got: " ++ show v
 
   TypeStruct name ->
     case Map.lookup name structDefs of
-     Nothing -> error ""
+     Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> case value of
        ValueStruct kvs -> ValueStruct $ decodeCacheValues typeDefs' theStruct cache (Storage.alignedByte position) kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
@@ -376,16 +367,12 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   SimpleType (TypeBytes Nothing) | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
       len' = lastWord64 (storage offset) `div` 2
-      lastWord64::Word256->Word64
-      lastWord64 (LargeKey x _) = x
       startingKey = getArrayStartingKey offset
     in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType (TypeBytes Nothing) -> --small string, less than 32 bytes
     let
       len' = lastWord64 (storage offset) .&. 0xfe `div` 2
-      lastWord64::Word256->Word64
-      lastWord64 (LargeKey x _) = x
     in
       SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 
@@ -426,12 +413,12 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
          val = fromIntegral $ (.&. ((1 `shiftL` 8*len') - 1)) $ (`shiftR` (byte*8)) $ storage offset
        in
         case Bimap.lookup val enumset of
-         Nothing -> error "bad enum value"
+         Nothing -> throw $ EnumOutOfBounds name val
          Just x  -> ValueEnum name x (fromIntegral val)
 
   TypeStruct name ->
     case Map.lookup name structDefs of
-     Nothing -> error ""
+     Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
@@ -550,9 +537,6 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   ValueEnum _ _ index -> encodeInt offset byte index
 
   ValueStruct _ -> error "Structs not supported yet"
-    -- case Map.lookup name structDefs of
-    --  Nothing -> error ""
-    --  Just theStruct -> ValueStruct $ EncodeValues typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 

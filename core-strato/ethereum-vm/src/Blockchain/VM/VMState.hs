@@ -47,7 +47,7 @@ instance NFData Counter where
 data Memory =
   Memory {
     mVector :: V.IOVector Word8,
-    mSize   :: IORef Word256
+    mSize   :: IORef Int
     } deriving (Generic, NFData)
 
 instance Show Memory where

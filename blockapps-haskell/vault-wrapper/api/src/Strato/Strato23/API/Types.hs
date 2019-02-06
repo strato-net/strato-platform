@@ -13,7 +13,6 @@ import           Control.Lens                 ((&), (?~), mapped)
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
-import           Data.LargeWord
 import           Data.Text                    (Text)
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)

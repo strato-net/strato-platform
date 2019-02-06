@@ -13,7 +13,6 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
-import           Data.LargeWord          (Word256)
 import           Data.List               (intersperse)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Map.Strict         as Map

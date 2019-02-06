@@ -9,8 +9,16 @@
 {-# LANGUAGE TypeApplications      #-}
 
 module BlockApps.Ethereum
-  ( -- * Addresses
-    Hex (..)
+  ( -- Number type reexports
+    Word160
+  , Word256
+  , word256ToBytes
+  , bytesToWord256
+  , lastWord64
+  , removeThisConversion
+  , alsoRemoveThisOne
+  , Hex (..)
+  -- * Addresses
   , Address (..)
   , deriveAddress
   , addressString
@@ -52,17 +60,11 @@ module BlockApps.Ethereum
   , CodeInfo (..)
   , AccountInfo (..)
   , padZeros
-  , show256
-  , show192
-  , show160
-  , show128
-  , show64
-  , show32
   ) where
 
 import           ClassyPrelude ((<>))
 import           Control.Lens.Operators
-import           Control.DeepSeq (NFData, rnf)
+import           Control.DeepSeq (NFData)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
 import           Crypto.Secp256k1
@@ -70,6 +72,7 @@ import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import qualified Data.Aeson.Encoding    as AesonEnc
 import qualified Data.Binary            as Binary
+import           Data.Bits
 import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
@@ -77,7 +80,6 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
 import qualified Data.ByteString.Lazy   as Lazy
 import           Data.Either.Extra      (maybeToEither)
-import           Data.LargeWord
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
 import           Data.Maybe
@@ -95,34 +97,33 @@ import           Numeric
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
-import           Test.QuickCheck
+import           Test.QuickCheck        hiding ((.&.))
 import           Test.QuickCheck.Instances    ()
 import           Text.Read              hiding (String)
 import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
-instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = LargeKey <$> arbitrary <*> arbitrary
+import qualified Data.LargeWord as LW
+import           Blockchain.Strato.Model.ExtendedWord
 
-instance (NFData a, NFData b) => NFData (LargeKey a b) where
-  rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
+
+lastWord64 :: Word256 -> Word64
+lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
+
+-- TODO(tim): Convert Secp256k1 to avoid the LargeWord usage entirely
+removeThisConversion :: Word256 -> LW.Word256
+removeThisConversion = fromIntegral
+
+alsoRemoveThisOne :: LW.Word256 -> Word256
+alsoRemoveThisOne = fromIntegral
 
 instance ToSchema Word256 where
   declareNamedSchema _ = return $
-    NamedSchema (Just "LargeWord")
+    NamedSchema (Just "Word256")
       ( mempty
         & type_ .~ SwaggerString
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
-        & description ?~ "Fixed-size words of > 64 bits" )
-
-instance ToJSON Word256 where toJSON = toJSON . show256
-
-instance FromJSON Word256 where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe $ "0x" ++ string) of
-      Nothing      -> fail $ "Could not decode Word256: " <> string
-      Just word256 -> return word256
+        & description ?~ "Fixed-size words of 256 bits" )
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
 
@@ -175,25 +176,10 @@ padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
 show256 :: Word256 -> String
-show256 (LargeKey w64 w192) = (show192 w192) ++ (show64 w64)
-
-show192 :: Word192 -> String
-show192 (LargeKey w64 w128) = (show128 w128) ++ (show64 w64)
-
-show160 :: Word160 -> String
-show160 (LargeKey w32 w128) = (show128 w128) ++ (show32 w32)
-
-show128 :: Word128 -> String
-show128 (LargeKey w1 w2) = (show64 w2) ++ (show64 w1)
-
-show64 :: Word64 -> String
-show64 w64 = padZeros 16 (showHex w64 "")
-
-show32 :: Word32 -> String
-show32 w32 = padZeros 8 (showHex w32 "")
+show256 = padZeros 64 . flip showHex ""
 
 addressString :: Address -> String
-addressString (Address address) = show160 address
+addressString (Address address) = padZeros 40 $ showHex address ""
 
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
@@ -572,8 +558,8 @@ signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionV = testV + 0x1b
-    , transactionR = r
-    , transactionS = s
+    , transactionR = alsoRemoveThisOne r
+    , transactionS = alsoRemoveThisOne s
     , transactionInitOrData = unsignedTransactionInitOrData
     , transactionChainId = unsignedTransactionChainId
     , transactionMetadata = md
@@ -600,7 +586,7 @@ verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
   let
     message = rlpMsg $ unsignTransaction t
   in
-    case importCompactSig (CompactSig r s) of
+    case importCompactSig (CompactSig (removeThisConversion r) (removeThisConversion s)) of
       Nothing  -> False
       Just sig -> verifySig pk sig message
 
@@ -609,7 +595,7 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
   let
     message = rlpMsg $ unsignTransaction t
     v' = v - 0x1b
-    compactRecSig = CompactRecSig r s v'
+    compactRecSig = CompactRecSig (removeThisConversion r) (removeThisConversion s) v'
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
 
@@ -726,11 +712,7 @@ instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode n
   rlpDecode obj = Gas <$> rlpDecode obj
 
-newtype BloomFilter = BloomFilter
-  ( LargeKey
-    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
-    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
-  ) deriving (Eq,Show,Generic)
+newtype BloomFilter = BloomFilter ByteString deriving (Eq, Show, Generic)
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: Text

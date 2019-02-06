@@ -20,6 +20,7 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/ecrecover/
 - core-strato/fast-ecrecover/
+- core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
 - core-strato/ethereum-encryption/

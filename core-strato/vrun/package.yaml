@@ -33,6 +33,7 @@ dependencies:
 - monad-control
 - monad-logger
 - persistent-sqlite
+- prometheus-client
 - resourcet
 - strato-model
 - strato-sequencer

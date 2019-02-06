@@ -21,7 +21,6 @@ import           Data.List
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
-import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Set                              as S
@@ -95,7 +94,7 @@ peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
     where
         key = p2s (pPeerPubkey peer)
-        p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
+        p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
         p2s _        = ""
 
 handleEvents :: ( MonadIO m

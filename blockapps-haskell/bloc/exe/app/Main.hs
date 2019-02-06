@@ -63,11 +63,6 @@ main = do
 
   close dbCreateConn
 
-  conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}
-
-  void $ Bloc22.runBlocMigrations conn22
-  close conn22
-
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl flags_stratourl
@@ -75,6 +70,7 @@ main = do
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
   let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 (toEnum flags_loglevel) mode flags_stateFetchLimit
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
+  void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
   run flags_port (appBloc blocEnv)
 
 dbExistsQuery22 :: Query

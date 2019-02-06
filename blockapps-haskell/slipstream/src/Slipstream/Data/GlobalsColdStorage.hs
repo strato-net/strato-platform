@@ -8,7 +8,6 @@ module Slipstream.Data.GlobalsColdStorage where
 import ClassyPrelude hiding (Handle, (.))
 import Database.Persist.Sql
 import qualified Data.Aeson as Ae
-import Data.LargeWord
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
@@ -29,10 +28,6 @@ fakeHandle = FakeHandle
 -- key type to have Show and Read instances to use derivePeristField.
 deriving instance Read Address
 deriving instance Read ChainId
-deriving instance Read Word128
-deriving instance Read Word160
-deriving instance Read Word192
-deriving instance Read Word256
 
 -- Primary keys are not nullable, so avoid using persistent's Maybe modifier
 newtype MChainId = MChainId { unMChainId :: Maybe ChainId }

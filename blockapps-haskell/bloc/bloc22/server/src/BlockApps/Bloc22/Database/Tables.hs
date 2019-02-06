@@ -113,6 +113,7 @@ contractsMetaDataTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
@@ -121,8 +122,9 @@ contractsMetaDataTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
-contractsMetaDataTable = Table "contracts_metadata" $ p7
+contractsMetaDataTable = Table "contracts_metadata" $ p8
   ( optional "id"
   , required "contract_id"
   , required "bin"
@@ -130,6 +132,7 @@ contractsMetaDataTable = Table "contracts_metadata" $ p7
   , required "code_hash"
   , required "xcode_hash"
   , required "src_hash"
+  , required "xabi"
   )
 
 contractsInstanceTable :: Table
@@ -151,18 +154,6 @@ contractsInstanceTable = Table "contracts_instance" $ p5
   , required "address"
   , optional "timestamp"
   , required "chainid"
-  )
-
-contractsLookupTable :: Table
-  ( Column PGInt4
-  , Column PGInt4
-  )
-  ( Column PGInt4
-  , Column PGInt4
-  )
-contractsLookupTable = Table "contracts_lookup" $ p2
-  ( required "contract_metadata_id"
-  , required "linked_metadata_id"
   )
 
 xabiFunctionsTable :: Table

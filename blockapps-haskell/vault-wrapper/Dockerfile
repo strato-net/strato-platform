@@ -1,21 +1,4 @@
-FROM ubuntu:18.04
-
-RUN apt-get -y update                                          && \
-    apt-get install -y \
-      curl \
-      libgmp-dev \
-      libsodium-dev \
-      locales \
-      postgresql-client \
-                                                               && \
-    apt-get autoremove                                         && \
-    rm -rf /var/lib/apt/lists/*                                && \
-    apt-get clean                                              && \
-    locale-gen en_US.UTF-8
-
-ENV LANG="en_US.UTF-8" \
-    LANGUAGE="en_US:en" \
-    LC_ALL="en_US.UTF-8"
+FROM blockapps-deploybase:latest
 
 EXPOSE 8000
 

@@ -32,8 +32,8 @@ dependencies:
   - generic-random
   - hashable
   - http-api-data
-  - largeword
   - lens
+  - largeword
   - memory
   - persistent
   - QuickCheck
@@ -42,6 +42,7 @@ dependencies:
   - secp256k1
   - servant
   - servant-docs
+  - strato-model
   - swagger2
   - text
   - time

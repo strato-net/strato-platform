@@ -24,11 +24,11 @@ import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Strato.Model.SHA (keccak256)
 
-sigToBytes::ExtendedSignature->[Word8]
+sigToBytes::ExtendedSignature->B.ByteString
 sigToBytes (ExtendedSignature signature yIsOdd) =
-  word256ToBytes (fromIntegral $ H.sigR signature) ++
-  word256ToBytes (fromIntegral $ H.sigS signature) ++
-  [if yIsOdd then 1 else 0]
+  word256ToBytes (fromIntegral $ H.sigR signature) <>
+  word256ToBytes (fromIntegral $ H.sigS signature) <>
+  B.singleton (if yIsOdd then 1 else 0)
 
 
 data AckMessage = AckMessage {
@@ -55,23 +55,23 @@ errorHead msg _   = error msg
 
 instance Binary AckMessage where
   get = do
-    point <- fmap (bytesToPoint . B.unpack) $ getByteString 64
-    nonce <- fmap (bytesToWord256 . B.unpack) $ getByteString 32
+    point <- bytesToPoint <$> getByteString 64
+    nonce <- bytesToWord256 <$> getByteString 32
     kp <- fmap (knownPeer . errorHead "head error in instance Binary AckMessage" . B.unpack) $ getByteString 1
     return $ (AckMessage point nonce kp)
 
   put (AckMessage point nonce kp) = do
-    putByteString $ (B.pack . pointToBytes) $ point
-    putByteString (B.pack . word256ToBytes $ nonce)
-    putByteString (B.pack $ [(boolToWord8 kp)])
+    putByteString . pointToBytes $ point
+    putByteString . word256ToBytes $ nonce
+    putByteString . B.singleton . boolToWord8 $ kp
 
-bytesToAckMsg::[Word8]->AckMessage
-bytesToAckMsg bytes | length bytes == 97 =
+bytesToAckMsg::B.ByteString->AckMessage
+bytesToAckMsg bytes | B.length bytes == 97 =
   AckMessage {
-    ackEphemeralPubKey=bytesToPoint $ take 64 bytes,
-    ackNonce=bytesToWord256 $ take 32 $ drop 64 bytes,
+    ackEphemeralPubKey=bytesToPoint $ B.take 64 bytes,
+    ackNonce=bytesToWord256 $ B.take 32 $ B.drop 64 bytes,
     ackKnownPeer=
-      case bytes !! 96 of
+      case bytes `B.index` 96 of
         0 -> False
         1 -> True
         _ -> error "known peer byte in ackMessage is neither 0 nor 1"
@@ -84,7 +84,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
     myPublic = calculatePublic ECIES.theCurve myPriv
     SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPubKey
 
-    msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack myNonce)
+    msg = fromIntegral sharedKey `xor` bytesToWord256 myNonce
 
 
  --  putStrLn $ "sharedKey: " ++ show sharedKey
@@ -94,9 +94,9 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
     ephemeral =
       fromMaybe (error "malformed signature given to call getHandshakeBytes") $
       getPubKeyFromSignature sig msg
-    hepubk = keccak256 $ B.pack $ pubKeyToBytes ephemeral
-    pubk = B.pack $ pointToBytes myPublic
-    theData = B.pack (sigToBytes sig) `B.append`
+    hepubk = keccak256 $ pubKeyToBytes ephemeral
+    pubk = pointToBytes myPublic
+    theData = sigToBytes sig `B.append`
                 hepubk `B.append`
                 pubk `B.append`
                 myNonce `B.append`

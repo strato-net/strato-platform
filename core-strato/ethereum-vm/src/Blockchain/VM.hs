@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Blockchain.VM
     ( runCodeFromStart
@@ -28,8 +29,9 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Char
 import           Data.Function
-import           Data.IORef.Unboxed
+import           Data.Int
 import qualified Data.IntSet                        as I
+import           Data.IORef.Unboxed
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import qualified Data.Set                           as S
@@ -69,6 +71,7 @@ import           Blockchain.VM.PrecompiledContracts
 import           Blockchain.VM.VMM
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
+import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
@@ -372,7 +375,7 @@ runOperation LOG4 = logN 4
 runOperation MLOAD = do
   p <- pop
   bytes <- mLoad p
-  push $ (fromInteger (bytes2Integer bytes)::Word256)
+  push $! bytesToWord256 bytes
 
 runOperation MSTORE = do
   p <- pop
@@ -382,7 +385,7 @@ runOperation MSTORE = do
 runOperation MSTORE8 = do
   p <- pop
   val <- pop::VMM Word256
-  mStore8 p (fromIntegral $ val .&. 0xFF)
+  mStore8 p $! fastWord256LSB val
 
 runOperation SLOAD = do
   p <- pop
@@ -428,8 +431,7 @@ runOperation GAS = push =<< readGasRemaining =<< lift get
 
 runOperation JUMPDEST = return ()
 
-runOperation (PUSH vals) =
-  push $ (fromIntegral (bytes2Integer vals)::Word256)
+runOperation (PUSH vals) = push vals
 
 runOperation DUP1 = dupn 1
 runOperation DUP2 = dupn 2
@@ -722,6 +724,7 @@ runOperation SUICIDE = do
 
 runOperation (MalformedOpcode opcode) = do
   when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
+  $logInfoS "runOperation/malformed" . T.pack $ show opcode
   throwE MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
@@ -843,7 +846,7 @@ opGasPriceAndRefund x = return (opGasPrice x, 0)
 --Glogtopic 1 Paid for each topic of a LOG operation.
 
 formatOp::Operation->String
-formatOp (PUSH x) = "PUSH" ++ show (length x) -- ++ show x
+formatOp (PUSH x) = "PUSH " ++ show x
 formatOp x        = show x
 
 
@@ -888,16 +891,26 @@ runCode = do
 
   incrementPC len
 
-runCodeEVMProfile :: VMM ()
-runCodeEVMProfile = whileM $ do
+runCodeClockwork :: VMM (Operation, Int64)
+runCodeClockwork = do
   vmState <- lift get
   pcBefore <- readPC vmState
   code <- getEnvVar envCode
   let (op, _) = getOperationAt code pcBefore
   liftIO cwBefore
   runCode
-  totalNanoseconds <- liftIO cwAfter
-  $logInfoS "runCodeEVMProfile" . T.pack $ "OPCODE: " ++ show op ++ " " ++ show totalNanoseconds
+  (op,) <$> liftIO cwAfter
+
+runCodeEVMProfile :: VMM ()
+runCodeEVMProfile = whileM $ do
+  (op, t) <- runCodeClockwork
+  $logInfoS "runCodeEVMProfile" . T.pack $ "OPCODE: " ++ show op ++ " " ++ show t
+  fmap not . lift $ gets done
+
+runCodeEVMMetrics :: VMM ()
+runCodeEVMMetrics = whileM $ do
+  (op, t) <- runCodeClockwork
+  recordOpTiming op t
   fmap not . lift $ gets done
 
 runCodeSQLTrace :: Int -> VMM ()
@@ -942,7 +955,7 @@ runCodeFast = do
   d <- lift $ gets done
   unless d $ runCodeFast
 
-data TraceType = Fast | Trace | SQLTrace | EVMProfile deriving (Eq, Enum, Show)
+data TraceType = Fast | Trace | SQLTrace | EVMProfile | EVMMetrics deriving (Eq, Enum, Show)
 
 parseTraceFlag :: String -> TraceType
 parseTraceFlag = \case
@@ -954,6 +967,7 @@ parseTraceFlag = \case
   "true" -> Trace
   "sqlTrace" -> SQLTrace
   "evmProfile" -> EVMProfile
+  "evmMetrics" -> EVMMetrics
   x -> error $ "Unknown tracing format: " ++ show x
 
 runCodeFromStart :: VMM ()
@@ -971,10 +985,11 @@ runCodeFromStart = do
      lift $ put vmState{returnVal=Just ret}
      return ()
    _ -> case parseTraceFlag flags_trace of
-     Fast -> $logInfoS "runCodeFromStart" "running fast code" >> runCodeFast
+     Fast -> runCodeFast
      Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
      SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0
      EVMProfile -> $logInfoS "runCodeFromStart" "running evm profiled code" >> runCodeEVMProfile
+     EVMMetrics -> $logInfoS "runCodeFromStart" "running evm metrics profiled code" >> runCodeEVMMetrics
 
 -- | runVMM fully evaluates its results to limit memory leaks.
 runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM (Either VMException a, VMState)
@@ -1087,13 +1102,13 @@ create' = do
   (action . actionData . at owner . mapped . actionDataCodeHash) .= hash codeBytes
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
+  -- this used to say "not enough ether, but im pretty sure it meant gas -io
+  gr <- getGasRemaining
   lift $ do
     $logInfoS "create'" "Trying to create contract"
     $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
-    $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show (vmGasRemaining vmState)
+    $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show gr
 
-  -- this used to say "not enough ether, but im pretty sure it meant gas -io
-  gr <- getGasRemaining
   if (not $ vmIsHomestead vmState) && (gr < gCREATEDATA * fromIntegral (B.length codeBytes))
     then do
       lift $ do

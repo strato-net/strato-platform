@@ -16,7 +16,6 @@ import           Control.Monad.Trans.Resource
 import           Data.Maybe                           (isNothing)
 import qualified Data.NibbleString                    as N
 import           Data.Traversable                     (for)
-import           Data.Word                            (Word8)
 
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.Data.RLP
@@ -93,11 +92,8 @@ class Monad m => HasChainDB m where
 getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
 
-bytesToMPKey :: [Word8] -> N.NibbleString
-bytesToMPKey = N.pack . (N.byte2Nibbles =<<)
-
 word256ToMPKey :: Word256 -> N.NibbleString
-word256ToMPKey = bytesToMPKey . word256ToBytes
+word256ToMPKey = N.EvenNibbleString . word256ToBytes
 
 getkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> m (Maybe a)
 getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db

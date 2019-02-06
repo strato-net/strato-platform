@@ -46,3 +46,15 @@ tests:
       - HUnit
       - hspec
       - hspec-contrib
+
+benchmarks:
+  mpbench:
+    main: MPBench.hs
+    source-dirs: bench/
+    dependencies:
+      - criterion
+      - directory
+      - merkle-patricia-db
+      - directory
+      - unix
+      - QuickCheck

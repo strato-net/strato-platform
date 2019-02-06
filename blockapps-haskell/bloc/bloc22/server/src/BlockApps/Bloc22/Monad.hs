@@ -148,12 +148,19 @@ renderLocation:: (a -> Doc ann) -> WithCallStack a -> Doc ann
 renderLocation k (WithCallStack stack msg) =
   fill 40 (pretty (formatTopLocation $ getCallStack stack)) <> k msg
 
+runBlocWithEnv :: BlocEnv -> Bloc a -> ExceptT BlocError IO a
+runBlocWithEnv env = flip runLoggingT (filterPrintLog $ logLevel env)
+                   . flip runReaderT env
+                   . runBloc
+
+runBlocToIO :: BlocEnv -> Bloc a -> IO (Either BlocError a)
+runBlocToIO env = runExceptT . runBlocWithEnv env
+
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
   = Handler
-  $ withExceptT reThrowError
-  $ flip runLoggingT (filterPrintLog $ logLevel env)
-  $ flip runReaderT env $ runBloc
+  . withExceptT reThrowError
+  . runBlocWithEnv env
   $ convertRuntimeErrors x
   where
     convertRuntimeErrors::Bloc x->Bloc x

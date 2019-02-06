@@ -42,7 +42,6 @@ dependencies:
   - http-media
   - http-types
   - insert-ordered-containers
-  - largeword
   - lens
   - lifted-async
   - lifted-base

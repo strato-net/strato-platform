@@ -49,7 +49,6 @@ import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
 import qualified Data.HashMap.Strict          as HashMap
-import           Data.LargeWord
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe
@@ -71,13 +70,8 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
-import           BlockApps.Ethereum           (Hex (..), Address (..), ChainId (..),
-                                               Keccak256 (..), Nonce (..),
-                                               addressString, keccak256,
-                                               stringKeccak256,
-                                               keccak256lazy, stringAddress,
-                                               AccountInfo(..), CodeInfo(..),
-                                               stringChainId)
+-- TODO: Unify Bloch and Strato transactions
+import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
 import           BlockApps.Strato.TypeLits
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
