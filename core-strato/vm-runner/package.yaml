@@ -12,46 +12,23 @@ default-extensions:
 
 dependencies:
   - base >= 4 && < 5
-  - aeson-pretty
   - ansi-wl-pprint
-  - array
   - base16-bytestring
   - binary
   - blockapps-data
-  - blockapps-haskoin
   - blockapps-milena
   - blockapps-util
   - bytestring
-  - classy-prelude
-  - clockwork
   - containers
-  - cpu
   - cross-monitoring
-  - cryptohash
-  - deepseq
-  - directory
-  - either
-  - ethereum-encryption
   - ethereum-rlp
   - ethereum-vm
-  - exceptions
-  - extra
-  - formatting
-  - ghc
-  - hedis
   - hflags
-  - integer-gmp
   - lens
-  - leveldb-haskell
   - merkle-patricia-db
-  - monad-control
   - monad-logger
   - mtl
   - ordered-containers
-  - persistent-postgresql
-  - persistent-sqlite
-  - postgresql-simple
-  - primitive
   - prometheus-client
   - resourcet
   - strato-adit
@@ -63,28 +40,18 @@ dependencies:
   - strato-sequencer
   - strato-statediff
   - text
-  - temporary
   - time
   - transformers
-  - unboxed-ref
-  - unliftio-core
-  - vector
   - vm-tools
   - wai-middleware-prometheus
   - warp
   - async
-  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
-                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
-
+  
 library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.BlockChain
-    - Blockchain.TheDAOFork
-    - Blockchain.Timing
-    - Blockchain.Verifier
     - Executable.EthereumVM
-    - Executable.EVMCheckpoint
   ghc-options: -Wall -O2
 
 

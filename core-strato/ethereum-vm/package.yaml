@@ -2,14 +2,11 @@ name: ethereum-vm
 version: 0.0.4
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
-synopsis: A Haskell version of an Ethereum client
+synopsis: A Haskell version of an Ethereum EVM
 category:      Data Structures
-license: Apache-2.0
 description:
     The client described in the Ethereum Yellowpaper
-github: blockapps/strato-platform/core-strato/ethereum-vm
 
 default-extensions:
   - DeriveGeneric
@@ -17,68 +14,35 @@ default-extensions:
 
 dependencies:
   - base >= 4 && < 5
-  - aeson-pretty
   - ansi-wl-pprint
-  - array
   - base16-bytestring
   - binary
   - blockapps-data
   - blockapps-haskoin
-  - blockapps-milena
   - blockapps-util
   - bytestring
-  - classy-prelude
   - clockwork
   - containers
   - cpu
-  - cross-monitoring
   - cryptohash
   - deepseq
-  - directory
-  - either
   - ethereum-encryption
-  - ethereum-rlp
-  - exceptions
   - extra
-  - formatting
   - ghc
-  - hedis
-  - hflags
   - integer-gmp
   - lens
-  - leveldb-haskell
   - merkle-patricia-db
-  - monad-control
   - monad-logger
   - mtl
-  - ordered-containers
-  - persistent-postgresql
-  - persistent-sqlite
-  - postgresql-simple
   - primitive
-  - prometheus-client
   - resourcet
-  - strato-adit
-  - strato-conf
-  - strato-genesis
-  - strato-index
   - strato-model
-  - strato-redis-blockdb
-  - strato-sequencer
-  - strato-statediff
   - text
-  - temporary
   - time
   - transformers
   - unboxed-ref
-  - unliftio-core
   - vector
   - vm-tools
-  - wai-middleware-prometheus
-  - warp
-  - async
-  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
-                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
 
 library:
   source-dirs: src/
@@ -86,8 +50,6 @@ library:
     - Blockchain.VM
     - Blockchain.VM.Code
     - Blockchain.VM.Environment
-    - Blockchain.VM.MutableStack
-    - Blockchain.VM.Opcodes
     - Blockchain.VM.VMM
     - Blockchain.VM.VMState
   ghc-options: -Wall -O2
