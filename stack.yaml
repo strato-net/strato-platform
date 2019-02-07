@@ -24,6 +24,8 @@ packages:
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
 - core-strato/ethereum-encryption/
+- core-strato/vm-runner/
+- core-strato/vm-tools/
 - core-strato/ethereum-vm/
 - core-strato/blockapps-util/
 - core-strato/strato-api/

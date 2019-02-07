@@ -73,11 +73,12 @@ import           Blockchain.Util
 import           Blockchain.Verifier
 import           Blockchain.VM
 import           Blockchain.VM.Code
-import           Blockchain.VM.OpcodePrices
+--import           Blockchain.VM.OpcodePrices
 import           Blockchain.VM.VMM (readRefund, readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
+import           Blockchain.VMConstants
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 

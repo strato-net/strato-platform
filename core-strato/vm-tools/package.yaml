@@ -1,15 +1,10 @@
-name: ethereum-vm
+name: vm-tools
 version: 0.0.4
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
-synopsis: A Haskell version of an Ethereum client
+synopsis: types and tools needed to write a VM for Strato
 category:      Data Structures
-license: Apache-2.0
-description:
-    The client described in the Ethereum Yellowpaper
-github: blockapps/strato-platform/core-strato/ethereum-vm
 
 default-extensions:
   - DeriveGeneric
@@ -73,7 +68,6 @@ dependencies:
   - unboxed-ref
   - unliftio-core
   - vector
-  - vm-tools
   - wai-middleware-prometheus
   - warp
   - async
@@ -83,11 +77,17 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
-    - Blockchain.VM
-    - Blockchain.VM.Code
-    - Blockchain.VM.Environment
-    - Blockchain.VM.MutableStack
-    - Blockchain.VM.Opcodes
-    - Blockchain.VM.VMM
-    - Blockchain.VM.VMState
+    - Blockchain.Bagger
+    - Blockchain.Bagger.BaggerState
+    - Blockchain.Bagger.Transactions
+    - Blockchain.Data.BlockSummary
+    - Blockchain.Data.ExecResults
+    - Blockchain.DB.BlockSummaryDB
+    - Blockchain.DB.ModifyStateDB
+    - Blockchain.VMContext
+    - Blockchain.VMOptions
+    - Blockchain.VM.VMException
+    - Blockchain.VMMetrics
+    - Executable.EVMFlags
   ghc-options: -Wall -O2
+

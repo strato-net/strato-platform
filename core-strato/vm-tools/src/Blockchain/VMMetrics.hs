@@ -2,12 +2,9 @@
 module Blockchain.VMMetrics where
 
 import Control.Monad.IO.Class
-import Data.Data
 import Data.Int
 import Prometheus
 import qualified Data.Text as T
-
-import Blockchain.VM.Opcodes
 
 vmBlocksProcessed :: Counter
 vmBlocksProcessed = unsafeRegister $ counter (Info "vm_blocks_processed" "evm counter for blocks processed")
@@ -55,6 +52,8 @@ opTiming = unsafeRegister
          $ Info "opcode_timing" "Measured duration in ns for different opcodes"
 
 
-recordOpTiming :: (MonadIO m) => Operation -> Int64 -> m ()
+recordOpTiming :: (MonadIO m) => T.Text -> Int64 -> m ()
+--recordOpTiming :: (MonadIO m) => Operation -> Int64 -> m ()
 recordOpTiming op t = liftIO $
-  withLabel opTiming (T.pack . showConstr . toConstr $ op) (flip observe (fromIntegral t))
+  withLabel opTiming op (flip observe (fromIntegral t))
+

@@ -1,15 +1,10 @@
-name: ethereum-vm
+name: vm-runner
 version: 0.0.4
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
-synopsis: A Haskell version of an Ethereum client
+synopsis: The executable that runs VMs for transactions
 category:      Data Structures
-license: Apache-2.0
-description:
-    The client described in the Ethereum Yellowpaper
-github: blockapps/strato-platform/core-strato/ethereum-vm
 
 default-extensions:
   - DeriveGeneric
@@ -38,6 +33,7 @@ dependencies:
   - either
   - ethereum-encryption
   - ethereum-rlp
+  - ethereum-vm
   - exceptions
   - extra
   - formatting
@@ -83,11 +79,49 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
-    - Blockchain.VM
-    - Blockchain.VM.Code
-    - Blockchain.VM.Environment
-    - Blockchain.VM.MutableStack
-    - Blockchain.VM.Opcodes
-    - Blockchain.VM.VMM
-    - Blockchain.VM.VMState
+    - Blockchain.BlockChain
+    - Blockchain.TheDAOFork
+    - Blockchain.Timing
+    - Blockchain.Verifier
+    - Executable.EthereumVM
+    - Executable.EVMCheckpoint
   ghc-options: -Wall -O2
+
+
+executables:
+  vm-runner:
+    source-dirs: exec_src
+    main: Main.hs
+    dependencies:
+      - vm-runner
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+tests:
+  ethereum-vm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - aeson
+      - data-default
+      - ethereum-vm
+      - hspec
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+
+benchmarks:
+  microbench:
+    source-dirs: bench/
+    main: Microbench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - hashable
+      - unordered-containers
+
+  extractbench:
+    source-dirs: bench/
+    main: ExtractBench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm
