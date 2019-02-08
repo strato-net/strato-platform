@@ -47,6 +47,7 @@ packages:
 - core-strato/privacy/
 - shared-util/cross-monitoring/
 - clockwork
+- logserver
 - location:
     git: https://github.com/echatav/secp256k1-haskell/
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
