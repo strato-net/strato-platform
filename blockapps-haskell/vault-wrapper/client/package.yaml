@@ -1,27 +1,42 @@
-name: blockapps-vault-wrapper-client
-version: 0.1.0.0
-synopsis: Vault Wrapper microservice
-description: Vault Wrapper microservice
-github: blockapps/strato-platform/blockapps-haskell/vault-wrapper
-license-file: LICENSE
-author: Dustin Norwood
-maintainer: dustin@blockapps.net
-copyright: 2018 BlockApps
-category: Web
-build-type: Simple
+name:                blockapps-vault-wrapper-client
+version:             0.1.0.0
+github:              "githubuser/client"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
 
-ghc-options: -Wall
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/client#readme>
 
 dependencies:
-  - base
-  - blockapps-ethereum
-  - blockapps-vault-wrapper-api
-  - aeson
-  - containers
-  - http-client
-  - servant
-  - servant-client
-  - text
+- aeson
+- base >= 4.7 && < 5
+- servant-client
+- servant
+- text
+- blockapps-vault-wrapper-api
 
 library:
-  source-dirs: src/
+  source-dirs: src
+
+tests:
+  client-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - blockapps-vault-wrapper-client

@@ -12,6 +12,7 @@ dependencies:
   - base >=4.8 && <4.12
   - alarmclock
   - bimap
+  - blockapps-privacy
   - classy-prelude
   - strato-model
   - blockapps-data

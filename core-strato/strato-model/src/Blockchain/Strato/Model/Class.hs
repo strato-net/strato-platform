@@ -21,6 +21,9 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     buildBlock :: h -> [t] -> [h] -> b
     {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
+    blockOrdering :: b -> Integer
+    blockOrdering = blockHeaderBlockNumber . blockHeader
+
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
 
@@ -87,6 +90,7 @@ data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Or
 class (RLPSerializable t) => TransactionLike t where
     txHash        :: t -> SHA
     txPartialHash :: t -> SHA
+    txChainHash   :: t -> SHA
     txSigner      :: t -> Maybe Address
     txNonce       :: t -> Integer
     txType        :: t -> TransactionType
@@ -101,8 +105,8 @@ class (RLPSerializable t) => TransactionLike t where
     txMetadata    :: t -> Maybe (Map Text Text)
 
     morphTx :: (TransactionLike t2) => t2 -> t
-    {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
-                txCode, txData, txChainId, txMetadata, morphTx #-}
+    {-# MINIMAL txHash, txPartialHash, txChainHash, txSigner, txNonce, txType, txSignature, txValue,
+        txDestination, txGasPrice, txGasLimit, txCode, txData, txChainId, txMetadata, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

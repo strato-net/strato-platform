@@ -20,6 +20,7 @@ import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
 import           Data.Either
+import           Data.IORef.Unboxed
 import           Data.List
 import qualified Data.Map                                    as M
 import           Data.Maybe
@@ -56,9 +57,9 @@ import           Blockchain.Util
 import           Blockchain.VM
 import           Blockchain.VM.Code
 import           Blockchain.VM.Environment
+import           Blockchain.VM.VMM (readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
-import qualified Data.NibbleString                           as N
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
@@ -119,7 +120,7 @@ getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
 someHashes::M.Map SHA Int
-someHashes = M.fromList $ map (\x -> (hash (B.pack $ word256ToBytes x), fromIntegral x)) [0..255]
+someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String
 showHash val =
@@ -212,9 +213,9 @@ runTest test = do
         cfg <- ask
         vmState0 <- liftIO $ startingState True False env' cfg cxt
 
-        (result, vmState1) <- lift . lift $
-          flip runStateT vmState0{vmGasRemaining=getNumber $ gas' exec, debugCallCreates=Just []} $
-          runExceptT $ do
+        (result, vmState1) <- lift . lift $ do
+          gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
+          flip runStateT vmState0{vmGasRemaining=gasref, debugCallCreates=Just []} . runExceptT $ do
             runCodeFromStart
 
             vmState2 <- lift get
@@ -233,7 +234,9 @@ runTest test = do
         flushMemAddressStateDB
 
         case vmException vmState1 of
-         Nothing -> return (result, returnVal vmState1, vmGasRemaining vmState1, logs vmState1, debugCallCreates vmState1, Just vmState1)
+         Nothing -> do
+          gr <- readGasRemaining vmState1
+          return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
          Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
@@ -269,12 +272,12 @@ runTest test = do
 
         return $ case result of
             Right (ExecResults remGas _ retVal _ rLogs _ _ _) ->
-                      (Right (), retVal, remGas, rLogs, Just [], Nothing)
+                      (Right (), retVal, fromIntegral remGas, rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates
 
-  let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . keccak256 . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . bytesToWord256 . keccak256 . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

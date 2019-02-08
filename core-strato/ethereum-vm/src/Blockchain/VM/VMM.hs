@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMM (
@@ -9,6 +10,8 @@ module Blockchain.VM.VMM (
   localState,
   getStackItem,
   push,
+  swapn,
+  dupn,
   addDebugCallCreate,
   addSuicideList,
   getEnvVar,
@@ -29,7 +32,11 @@ module Blockchain.VM.VMM (
   putStorageKeyVal,
   vmTrace,
   getAllStorageKeyVals,
-  Word256Storable
+  Word256Storable,
+  downcastGas,
+  readGasRemaining,
+  readPC,
+  readRefund
   ) where
 
 import           Control.Monad
@@ -39,8 +46,10 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
+import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Set                           as S
+import           MonadUtils
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
@@ -56,6 +65,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.VM.Environment
+import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -143,13 +153,12 @@ instance Word256Storable Integer where
   toWord256 = fromIntegral
 
 pop::Word256Storable a=>VMM a
-pop = do
-  state' <- lift get
-  case state' of
-    VMState{stack=val:rest} -> do
-                lift $ put state'{stack=rest}
-                return $ fromWord256 val
-    _ -> throwE StackTooSmallException
+pop = fromWord256 <$> do
+  stack' <- lift $ gets stack
+  v <- liftIO $ MS.pop stack'
+  case v of
+    Nothing -> throwE StackTooSmallException
+    Just v' -> return v'
 
 localState :: (VMState -> VMState) -> VMM a -> VMM a
 localState f mv = do
@@ -160,17 +169,30 @@ localState f mv = do
   return x
 
 getStackItem::Word256Storable a=>Int->VMM a
-getStackItem i = do
-  state' <- lift get
-  if length (stack state') > fromIntegral i
-    then return $ fromWord256 (stack state' !! i)
-    else throwE StackTooSmallException
+getStackItem i = fromWord256 <$> do
+  stack' <- lift $ gets stack
+  mVal <- liftIO $ MS.get stack' i
+  case mVal of
+    Nothing -> throwE StackTooSmallException
+    Just val -> return val
 
 push::Word256Storable a=>a->VMM ()
 push val = do
-  state' <- lift get
-  when (length (stack state') > 1023) $ throwE StackTooLarge
-  lift $ put state'{stack = toWord256 val:stack state'}
+  stack' <- lift $ gets stack
+  unlessM (liftIO . MS.push stack' . toWord256 $ val) $
+    throwE StackTooLarge
+
+swapn::Int->VMM ()
+swapn n = do
+  stack' <- lift $ gets stack
+  unlessM (liftIO $ MS.swap stack' $ n-1) $
+    throwE StackTooSmallException
+
+dupn::Int->VMM ()
+dupn n = do
+  stack' <- lift $ fmap stack get
+  unlessM (liftIO $ MS.dup stack' $ n-1) $
+    throwE StackTooSmallException
 
 addDebugCallCreate::DebugCallCreate->VMM ()
 addDebugCallCreate callCreate = do
@@ -195,25 +217,25 @@ addLog newLog = do
   lift $ put state'{logs=newLog:logs state'}
 
 setPC::Int->VMM ()
-setPC p = do
-  state' <- lift get
-  lift $ put state'{pc=p}
+setPC !p = do
+  pcref <- lift $ gets pc
+  liftIO $ writeIORefU pcref p
 
 incrementPC::Int->VMM ()
 incrementPC p = do
-  state' <- lift get
-  lift $ put state'{pc=pc state' + p}
+  pcref <- lift $ gets pc
+  void . liftIO $ atomicAddCounter pcref p
 
-addToRefund::Integer->VMM ()
+addToRefund::Int->VMM ()
 addToRefund val = do
-  state' <- lift get
-  lift $ put state'{refund=refund state' + val}
+  refundref <- lift $ gets refund
+  void . liftIO . atomicAddCounter refundref $ val
 
 getCallDepth::VMM Int
 getCallDepth = lift $ fmap callDepth $ get
 
-getGasRemaining::VMM Integer
-getGasRemaining = lift $ fmap vmGasRemaining $ get
+getGasRemaining::VMM Gas
+getGasRemaining = readGasRemaining =<< lift get
 
 getReturnVal :: VMM B.ByteString
 getReturnVal = (fromMaybe B.empty . returnVal) <$> lift get
@@ -228,26 +250,26 @@ setReturnVal returnVal' = do
   state' <- lift get
   lift $ put state'{returnVal=returnVal'}
 
-setGasRemaining::Integer->VMM ()
+setGasRemaining::Gas->VMM ()
 setGasRemaining gasRemaining' = do
-  state' <- lift get
-  lift $ put state'{vmGasRemaining=gasRemaining'}
+  gasref <- lift $ gets vmGasRemaining
+  liftIO $ writeIORefU gasref gasRemaining'
 
-useGas::Integer->VMM ()
+useGas::Gas->VMM ()
 useGas gas = do
-  state' <- lift get
-  case vmGasRemaining state' - gas of
-    x | x < 0 -> do
-      lift $ put state'{vmGasRemaining=0}
-      throwE OutOfGasException
-    x -> lift $ put state'{vmGasRemaining=x}
+  gasref <- lift $ gets vmGasRemaining
+  g <- liftIO $ atomicSubCounter gasref gas
+  when (g < 0) $ do
+    liftIO $ writeIORefU gasref 0
+    throwE OutOfGasException
 
-addGas::Integer->VMM ()
+addGas::Gas->VMM ()
 addGas gas = do
-  state' <- lift get
-  case vmGasRemaining state' + gas of
-    x | x < 0 -> throwE OutOfGasException
-    x -> lift $ put state'{vmGasRemaining=x}
+  gasref <- lift $ gets vmGasRemaining
+  currentGas <- liftIO $ readIORefU gasref
+  if currentGas + gas < 0
+    then throwE OutOfGasException
+    else void . liftIO $ atomicAddCounter gasref gas
 
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
@@ -274,3 +296,20 @@ vmTrace msg = do
   cxt <- lift $ get
   lift $ put cxt{theTrace=msg:theTrace cxt}
 
+
+downcastGas :: Word256 -> VMM Gas
+downcastGas g = if g > fromIntegral (maxBound :: Int)
+                  then throwE OutOfGasException
+                  else return $! fromIntegral g
+
+{-# SPECIALIZE INLINE readGasRemaining :: VMState -> VMM Gas #-}
+readGasRemaining :: MonadIO m => VMState -> m Gas
+readGasRemaining = liftIO . readIORefU . vmGasRemaining
+
+{-# SPECIALIZE INLINE readRefund :: VMState -> VMM Gas #-}
+readRefund :: MonadIO m => VMState -> m Gas
+readRefund = liftIO . readIORefU . refund
+
+{-# SPECIALIZE INLINE readPC :: VMState -> VMM Int #-}
+readPC :: MonadIO m => VMState -> m Int
+readPC = liftIO . readIORefU . pc

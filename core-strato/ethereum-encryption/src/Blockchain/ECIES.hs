@@ -80,14 +80,14 @@ instance Binary ECIESMessage where
         theLength  =  B.length $ bsStrict
         form = errorHead "bsStrict is null" $
                B.unpack $ bsStrict
-        pubKeyX =  toInteger . bytesToWord256 . B.unpack $ B.take 32 $ B.drop 1 $ bsStrict
-        pubKeyY =  toInteger . bytesToWord256 . B.unpack $ B.take 32 $ B.drop 33 $ bsStrict
+        pubKeyX =  toInteger . bytesToWord256 $ B.take 32 $ B.drop 1 $ bsStrict
+        pubKeyY =  toInteger . bytesToWord256 $ B.take 32 $ B.drop 33 $ bsStrict
         cipherIV = B.take 16 $ B.drop 65 $ bsStrict
         cipher = B.take (theLength - 113) $ B.drop 81 $ bsStrict
         mac = B.unpack $ B.take 32 $ B.drop (theLength-32) bsStrict
     -- form <- getWord8
-    -- pubKeyX <- fmap (toInteger . bytesToWord256 . B.unpack) $ getByteString 32
-    -- pubKeyY <- fmap (toInteger . bytesToWord256 . B.unpack) $ getByteString 32
+    -- pubKeyX <- fmap (toInteger . bytesToWord256) $ getByteString 32
+    -- pubKeyY <- fmap (toInteger . bytesToWord256) $ getByteString 32
     -- cipherIV <- getByteString 16
     -- cipher <- getByteString (length - (113))
     -- mac <- sequence $ replicate 32 getWord8
@@ -95,8 +95,8 @@ instance Binary ECIESMessage where
 
   put (ECIESMessage form (Point pubKeyX pubKeyY) cipherIV cipher mac) = do
     putWord8 form
-    putByteString (B.pack . word256ToBytes . fromInteger $ pubKeyX)
-    putByteString (B.pack . word256ToBytes . fromInteger $ pubKeyY)
+    putByteString . word256ToBytes . fromInteger $ pubKeyX
+    putByteString . word256ToBytes . fromInteger $ pubKeyY
     putByteString cipherIV
     putByteString cipher
     sequence_ $ map putWord8 mac

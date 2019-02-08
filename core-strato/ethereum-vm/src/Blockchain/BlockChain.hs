@@ -74,6 +74,7 @@ import           Blockchain.Verifier
 import           Blockchain.VM
 import           Blockchain.VM.Code
 import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMM (readRefund, readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -185,21 +186,32 @@ addBlocks blocks' = do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
       didReplaceBest <- liftIO (newIORef False)
-      replacedBest   <- liftIO (newIORef undefined)
+      ranPrivateTxs  <- liftIO (newIORef False)
+      replacedBest   <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
         actions <- addBlock block
-        (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block
+        (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block
         when didReplaceThisTime . liftIO $ do
           writeIORef didReplaceBest True
           writeIORef replacedBest (block, replacedBits)
+        when ranPriv . liftIO $ do
+          writeIORef ranPrivateTxs True
+          drb <- liftIO (readIORef didReplaceBest)
+          unless drb $ do
+            writeIORef replacedBest (block, replacedBits)
         return actions
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
+      ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
       timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
-      when didReplaceBest' $ do
+      when (didReplaceBest' || ranPrivateTxs') $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        timeit "calculateAndEmitStateDiffs " timerToUse $ calculateAndEmitStateDiffs theBlock oldHeader
+        timeit "calculateAndEmitStateDiffs " timerToUse $
+          calculateAndEmitStateDiffs theBlock
+                                     oldHeader
+                                     didReplaceBest'
+                                     ranPrivateTxs'
       return $ concat actions
 
   where
@@ -217,8 +229,21 @@ setParentStateRoot b@OutputBlock{..} = do
     return bSum
 
 addBlock :: OutputBlock -> ContextM [Action]
-addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
+addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
+    when flags_debug $ do
+      bhr <- getBlockHashRoot
+      cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
+      $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
+
     putBlockHeaderInChainDB bd
+
+    when flags_debug $ do
+      bhr' <- getBlockHashRoot
+      cr' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
+      $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr'
+
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
     s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
@@ -239,20 +264,29 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles} = do
 
     db <- getStateDB
 
-    b' <- do
+    -- If there are no transactions in th
+    -- TODO: this should be handled more officially,
+    -- e.g. adding a chainId to the block
+    let skipCheck = (not $ null otxs) && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
+    unless skipCheck $ do
       when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
-          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
-          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
-      return b
+        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
+        error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
-    valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b'
-    case valid of
-        Right _ -> P.incCounter vmBlocksValid
-        Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+      valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+      case valid of
+          Right _ -> P.incCounter vmBlocksValid
+          Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+
+    when flags_debug $ do
+      bhr'' <- getBlockHashRoot
+      cr'' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
+      $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
+      $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr''
 
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed
-    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
+    $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
     return actions
 
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
@@ -263,10 +297,16 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
   fmap concat . forM chains $ \(chainId, txs) -> do
     $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
+      when flags_debug $ do
+        sr <- getStateRoot
+        $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
       flushMemStorageDB
       flushMemAddressStateDB
+      when flags_debug $ do
+        sr' <- getStateRoot
+        $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
@@ -277,7 +317,7 @@ addTransactions bd bg ts = go bd bg ts []
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      !(deltaT, result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT
@@ -304,7 +344,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     flushMemAddressStateTxToBlockDB
     flushStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
-    (time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
+    (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time'
@@ -314,7 +354,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
         Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
-blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
+blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 
 addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
 addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
@@ -333,12 +373,14 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
+        realIG = fromIntegral intrinsicGas'
+        maxGas = fromIntegral (maxBound :: Int)
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
-    when (intrinsicGas' > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
-    when (transactionGasLimit bt > remainingBlockGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
+    when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
+    when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
     unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
-    let availableGas = transactionGasLimit bt - intrinsicGas'
+    let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
     theAddress <- if isContractCreationTX bt
                   then lift $ getNewAddress tAddr
@@ -351,7 +393,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (transactionGasLimit bt - intrinsicGas') tAddr theAddress t
+            (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -359,9 +401,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                 Left e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ P.incCounter vmTxsUnsuccessful
+                    gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erRemainingTxGas     = if e == RevertException
-                                                                  then vmGasRemaining newVMState'
+                                                                  then gr
                                                                   else 0
                                        -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
                                        , erReturnVal          = returnVal newVMState'
@@ -372,8 +415,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Just e
                                        }
                 Right _ -> do
-                    let realRefund = min (refund newVMState') ((transactionGasLimit bt - vmGasRemaining newVMState') `div` 2)
-                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + vmGasRemaining newVMState') * transactionGasPrice bt)
+                    ref <- fmap fromIntegral $ readRefund newVMState'
+                    gr <- fmap fromIntegral $ readGasRemaining newVMState'
+                    let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
+                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + ref) * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
 
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
@@ -381,8 +426,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
                     lift $ P.incCounter vmTxsSuccessful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
-                                       , erRemainingTxGas     = vmGasRemaining newVMState'
+                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - gr)
+                                       , erRemainingTxGas     = gr
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
@@ -391,7 +436,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Nothing
                                        }
         else do
-            s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
+            s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
@@ -408,7 +453,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 runCodeForTransaction :: Bool
                       -> Bool
                       -> BlockData
-                      -> Integer
+                      -> Gas
                       -> Address
                       -> Address
                       -> OutputTx
@@ -416,7 +461,7 @@ runCodeForTransaction :: Bool
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  !(result, vmState) <-
+  (result, vmState) <-
     create isRunningTests'
            isHomestead
            S.empty
@@ -425,7 +470,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
            tAddr
            tAddr
            (transactionValue ut)
-           (transactionGasPrice ut)
+           (fromInteger $ transactionGasPrice ut)
            availableGas
            newAddress
            (transactionInit ut)
@@ -469,10 +514,10 @@ zeroBytesLength OutputTx{otBaseTx=bt} = length $ filter (==0) $ B.unpack codeByt
                   where
                     Code codeBytes' = transactionInit bt
 
-calculateIntrinsicGas' :: Integer -> OutputTx -> Integer
+calculateIntrinsicGas' :: Integer -> OutputTx -> Gas
 calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)
 
-intrinsicGas :: Bool -> OutputTx -> Integer
+intrinsicGas :: Bool -> OutputTx -> Gas
 intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
     where
       zeroLen = fromIntegral $ zeroBytesLength t
@@ -584,7 +629,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -605,6 +650,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+            ranPriv = any ((==PrivateHash) . txType) txs
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
@@ -621,7 +667,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
             bestNum       = if shouldReplace then newNumber else oldNumber
             bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-        return (shouldReplace, bestBlockInfo)
+        return (shouldReplace, ranPriv, bestBlockInfo)
 
 splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, SHA)]
 splitCreateDiffs =
@@ -633,8 +679,10 @@ splitCreateDiffs =
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> BlockData
+                           -> Bool
+                           -> Bool
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs newBlock oldHeader runPublic runPrivate = when flags_sqlDiff $ do
     let oldHash      = blockHeaderHash oldHeader
         oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
         newHeader    = blockHeader newBlock
@@ -642,11 +690,17 @@ calculateAndEmitStateDiffs newBlock oldHeader = when flags_sqlDiff $ do
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+    diffs <- if runPublic
+      then (:[]) <$> stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+      else return []
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
-    chainDiffs <- chainDiff newNumber oldHash newHash
+    chainDiffs <- if runPrivate
+      then if runPublic
+        then chainDiff newNumber oldHash newHash
+        else chainDiff newNumber (blockHeaderParentHash newHeader) newHash
+      else return []
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allDiffs = diffs:chainDiffs
+    let allDiffs = diffs ++ chainDiffs
 
     forM_ allDiffs $ lift . commitSqlDiffs

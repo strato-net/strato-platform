@@ -52,13 +52,14 @@ import           Data.Time.Clock
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
+import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.PrivateHashDB
 import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
@@ -72,8 +73,8 @@ data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
                       , _seenBlockDB         :: SeenBlockDB
                       , _seenTransactionDB   :: SeenTransactionDB
-                      , _blockHashRegistry   :: Map SHA BlockHashEntry
-                      , _txHashRegistry      :: Map SHA TxHashEntry
+                      , _blockHashRegistry   :: Map SHA OutputBlock
+                      , _txHashRegistry      :: Map SHA OutputTx
                       , _chainHashRegistry   :: Map SHA ChainHashEntry
                       , _chainIdRegistry     :: Map Word256 ChainIdEntry
                       , _getChainsDB         :: S.Set Word256
@@ -117,7 +118,9 @@ instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
     putGetTransactionsDB = assign getTransactionsDB
 
-instance HasPrivateHashDB SequencerM where
+instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
+    getChainId = return . hash . rlpSerialize . rlpEncode
+    generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
     generateChainHashes tx =
       let r = txSigR tx
           s = txSigS tx
@@ -125,6 +128,8 @@ instance HasPrivateHashDB SequencerM where
           sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
        in return [rs,sr]
 
+    requestChain = insertGetChainsDB
+    requestTransaction = insertGetTransactionsDB
     -- TODO: Add persistence layer
     alterBlockHashEntry bHash f = do
       bhr <- use blockHashRegistry

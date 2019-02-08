@@ -12,6 +12,7 @@ packages:
 - blockapps-haskell/strato/server
 - blockapps-haskell/vault-wrapper/api
 - blockapps-haskell/vault-wrapper/client
+- blockapps-haskell/vault-wrapper/server
 - core-strato/blockapps-milena
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
@@ -19,6 +20,7 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/ecrecover/
 - core-strato/fast-ecrecover/
+- core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
 - core-strato/ethereum-encryption/
@@ -26,6 +28,7 @@ packages:
 - core-strato/blockapps-util/
 - core-strato/strato-api/
 - core-strato/blockapps-tools/
+- core-strato/vrun/
 - core-strato/strato-genesis/
 - core-strato/strato-adit/
 - core-strato/strato-index/
@@ -39,7 +42,9 @@ packages:
 - core-strato/blockapps-haskoin/
 - core-strato/ethereum-rlp/
 - core-strato/blockstanbul/
+- core-strato/privacy/
 - shared-util/cross-monitoring/
+- clockwork
 - location:
     git: https://github.com/echatav/secp256k1-haskell/
     commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c

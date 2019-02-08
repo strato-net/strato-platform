@@ -1,45 +1,62 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Bloc22.Database.Migration where
+module BlockApps.Bloc22.Database.Migration
+  ( runBlocMigrations
+  ) where
 
-import           Control.Exception                 (catch)
-import           Control.Monad                     (forM_)
-import           Data.Int                          (Int64)
-import           Data.Maybe                        (maybe, listToMaybe)
+import           Control.Exception                            (catch)
+import           Control.Monad
+import           Data.Maybe
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           BlockApps.Bloc22.Database.Create  (createTables, hashNameTable, contractsSourceTable)
+import           BlockApps.Bloc22.Database.Create
+import           BlockApps.Bloc22.Database.Queries
+import           BlockApps.Bloc22.Database.Queries.Deprecated
+import           BlockApps.Bloc22.Monad
+
+data Migration = MigrationAction (Bloc ())
+               | MigrationQuery (MigrationErrorBehavior, Query)
 
 data MigrationErrorBehavior = Throw | Catch
 
-runBlocMigrations :: Connection -> IO Int64
-runBlocMigrations conn = do
-  dbsvs <- (query_ conn getSchemaVersion :: IO [Only Int]) `catch` (\e@SqlError{..} -> putStrLn "Error getting schema version" >> print e >> return [Only 0])
+runBlocMigrations :: Bloc ()
+runBlocMigrations = do
+  dbsvs <- blocModify $ \conn -> catch
+    (query_ conn getSchemaVersion :: IO [Only Int])
+    ((return . const []) :: (SqlError -> IO [Only Int]))
   let dbSchemaVersion = maybe 0 fromOnly $ listToMaybe dbsvs
-  forM_ (drop dbSchemaVersion migrations) $ \(meb,q) -> do
-    case meb of
-      Catch -> (execute_ conn q) `catch` (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
-      Throw -> execute_ conn q
-  updateMigrationNumber conn
+  forM_ (drop dbSchemaVersion migrations) $ \case
+    MigrationAction action -> action
+    MigrationQuery (meb,q) -> void . blocModify $ \conn -> do
+      case meb of
+        Catch -> catch
+          (execute_ conn q)
+          (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
+        Throw -> execute_ conn q
+  updateMigrationNumber
 
-updateMigrationNumber :: Connection -> IO Int64
-updateMigrationNumber conn = execute conn updateSchemaVersion (Only $ length migrations)
+updateMigrationNumber :: Bloc ()
+updateMigrationNumber = void . blocModify $ \conn -> execute conn updateSchemaVersion (Only $ length migrations)
 
-migrations :: [(MigrationErrorBehavior, Query)]
-migrations = [ (Throw, createTables)
-             , (Throw, insertSchemaVersion)
-             , (Throw, dropHashNameTable)
-             , (Throw, hashNameTable)
-             , (Throw, addConstantColumn)
-             , (Throw, addValueColumn)
-             , (Throw, addMutabilityColumn)
-             , (Throw, addChainIdColumn)
-             , (Throw, contractsSourceTable)
-             , (Throw, addSrcHashColumn)
-             , (Throw, alterValueColumn)
+migrations :: [Migration]
+migrations = [ MigrationQuery (Throw, createTables)
+             , MigrationQuery (Throw, insertSchemaVersion)
+             , MigrationQuery (Throw, dropHashNameTable)
+             , MigrationQuery (Throw, hashNameTable)
+             , MigrationQuery (Throw, addConstantColumn)
+             , MigrationQuery (Throw, addValueColumn)
+             , MigrationQuery (Throw, addMutabilityColumn)
+             , MigrationQuery (Throw, addChainIdColumn)
+             , MigrationQuery (Throw, contractsSourceTable)
+             , MigrationQuery (Throw, addSrcHashColumn)
+             , MigrationQuery (Throw, alterValueColumn)
+             , MigrationQuery (Throw, addXabiColumn)
+             , MigrationAction migrateXabi
+             , MigrationQuery (Throw, dropXabiTables)
              ]
 
 getSchemaVersion :: Query
@@ -55,14 +72,13 @@ dropHashNameTable :: Query
 dropHashNameTable = [sql| DROP TABLE IF EXISTS hash_name; |]
 
 addConstantColumn :: Query
-addConstantColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
+addConstantColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ADD COLUMN IF NOT EXISTS is_constant boolean default FALSE; |]
 
 addValueColumn :: Query
-addValueColumn = [sql| ALTER TABLE xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
+addValueColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ADD COLUMN IF NOT EXISTS value varchar(512); |]
 
 addMutabilityColumn :: Query
-addMutabilityColumn = [sql|
-ALTER TABLE xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
+addMutabilityColumn = [sql| ALTER TABLE IF EXISTS xabi_functions ADD COLUMN IF NOT EXISTS mutability varchar(20); |]
 
 addChainIdColumn :: Query
 addChainIdColumn = [sql| ALTER TABLE contracts_instance ADD COLUMN IF NOT EXISTS chainid bytea; |]
@@ -71,4 +87,32 @@ addSrcHashColumn :: Query
 addSrcHashColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS src_hash bytea; |]
 
 alterValueColumn :: Query
-alterValueColumn = [sql| ALTER TABLE xabi_variables ALTER COLUMN value TYPE text; |]
+alterValueColumn = [sql| ALTER TABLE IF EXISTS xabi_variables ALTER COLUMN value TYPE text; |]
+
+addXabiColumn :: Query
+addXabiColumn = [sql| ALTER TABLE contracts_metadata ADD COLUMN IF NOT EXISTS xabi bytea; |]
+
+migrateXabi :: Bloc ()
+migrateXabi = do
+  let idQuery = [sql| SELECT id FROM contracts_metadata ORDER BY id DESC LIMIT 1; |]
+      xabiQuery = [sql| UPDATE contracts_metadata
+                           SET xabi = tup.x
+                          FROM (VALUES (?,?::bytea)) as tup(i,x)
+                         WHERE id = tup.i;
+                      |]
+  maxId <- fromMaybe 0 . listToMaybe . map fromOnly <$> blocModify (flip query_ idQuery)
+  forM_ [0..maxId] $ \i -> do
+    xabi <- Binary . serializeXabi <$> getContractXabiFromMetaDataIdDeprecated i
+    void . blocModify $ \conn -> execute conn xabiQuery (i,xabi)
+
+dropXabiTables :: Query
+dropXabiTables = [sql| DROP TABLE IF EXISTS contracts_lookup;
+                       DROP TABLE IF EXISTS xabi_function_arguments;
+                       DROP TABLE IF EXISTS xabi_function_returns;
+                       DROP TABLE IF EXISTS xabi_variables;
+                       DROP TABLE IF EXISTS xabi_enum_names;
+                       DROP TABLE IF EXISTS xabi_struct_fields;
+                       DROP TABLE IF EXISTS xabi_functions;
+                       DROP TABLE IF EXISTS xabi_types;
+                       DROP TABLE IF EXISTS xabi_type_defs;
+                     |]

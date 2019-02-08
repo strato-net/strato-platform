@@ -10,15 +10,23 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
 import { toasts } from '../Toasts';
 import Dropzone from 'react-dropzone';
+import { autoApprove } from './contracts/AutoApprove';
+import { twoIn } from './contracts/TwoIn';
+import { majorityRules } from './contracts/MajorityRules';
+import { adminOnly } from './contracts/AdminOnly';
 
 class CreateChain extends Component {
 
   constructor(props) {
     super(props);
     this.state = {
+      form: {
+        contractSelected: 'Governance'
+      },
+      droppedFileName: '',
       members: [],
       errors: null,
-      governanceContract: null
+      governanceContract: ''
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
@@ -58,23 +66,24 @@ class CreateChain extends Component {
       });
 
       const args = {};
-      const abi = this.props.abi.src;
-      // This will take out all the constants defined in contract and append it to args
-      Object.values(abi).forEach(val => {
-        if (Object.keys(val.vars).length) {
-          Object.getOwnPropertyNames(val.vars).forEach((arg) => {
-            const v = val.vars[arg];
-            console.log(arg); console.log(v);
-            if (v.initialValue !== null) {
-              args[arg] = v.initialValue;
-            } else if ( v.type !== 'Mapping'
-                     && v.type !== 'Array'
-                     && v.type !== 'Struct') {
-              args[arg] = values[arg];
-            }
-          })
-        }
-      });
+      if (this.props.abi) {
+        const abi = this.props.abi.src;
+        // This will take out all the constants defined in contract and append it to args
+        Object.values(abi).forEach(val => {
+          if (Object.keys(val.vars).length) {
+            Object.getOwnPropertyNames(val.vars).forEach((arg) => {
+              const v = val.vars[arg];
+              console.log(arg); console.log(v);
+              if (v.initialValue !== null) {
+                args[arg] = v.initialValue;
+              } else if ( v.type !== 'Mapping'
+                       && v.type !== 'Struct') {
+                args[arg] = values[arg];
+              }
+            })
+          }
+        });
+      }
 
       this.props.createChain(values.chainName, members, balances, values.governanceContract, args);
       this.setState({
@@ -183,22 +192,31 @@ class CreateChain extends Component {
   handleFileDrop = (files, dropZoneField) => {
     this.props.touch('contract');
     dropZoneField.input.onChange(files);
-    const contract = files[0];
+    const file = files[0];
+    this.setState({ droppedFileName: file });
+    this.handleContractFile(file);
+  };
 
+  handleContractFile = (file) => {
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {
-      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-      mixpanelWrapper.track("create_contract_file_upload");
-      self.setState({ governanceContract: fileContents })
-      self.props.compileChainContract(
-        contract.name.substring(0, contract.name.indexOf('.')),
+    const fileName = file.name.substring(0, file.name.indexOf('.'));
+    const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
+    mixpanelWrapper.track("create_contract_file_upload");
+    self.updateGovernanceContract(fileName, fileContents);
+    };
+    reader.readAsText(file);
+  }
+
+  updateGovernanceContract = (fileName, fileContents) => {
+    this.setState({ governanceContract: fileContents })
+    this.props.compileChainContract(
+        fileName,
         fileContents,
         false
-      );
-    };
-    reader.readAsText(contract);
-  };
+    );
+  }
 
   compilation() {
     const src = this.props.abi && this.props.abi.src;
@@ -206,16 +224,16 @@ class CreateChain extends Component {
 
     if (src) {
       let contract = src[contractname];
+      let count = 0;
       if (contract && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
           const v = contract.vars[arg];
           if ( v.initialValue
-            || v.type == 'Mapping'
-            || v.type == 'Array'
-            || v.type == 'Struct') {
+            || v.type === 'Mapping'
+            || v.type === 'Struct') {
              return null;
           } else {
-            const self = this;
+            count++;
             return (<tr key={'arg' + i}>
               <td style={{ paddingTop: '10px' }}>{arg}</td>
               <td>
@@ -230,7 +248,8 @@ class CreateChain extends Component {
             </tr>);
           }
         });
-      } else {
+      }
+      if (count === 0) {
         return (<tr>
           <td colSpan={3}>
             <div className="text-center">No variables</div>
@@ -294,18 +313,128 @@ class CreateChain extends Component {
                     Contract
                   </label>
                 </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
                 <div className="col-sm-9 smd-pad-4">
                   <Field
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={0}
+                    label='AutoApprove'
+                    checked={this.state.form.contractSelected === 'AutoApprove'}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return {
+                            form: { contractSelected: 'AutoApprove' }
+                           };
+                        });
+                        this.updateGovernanceContract('AutoApprove', autoApprove);
+                      }
+                    }
+                  /> AutoApprove
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={0}
+                    label='TwoIn'
+                    checked={this.state.form.contractSelected === 'TwoIn'}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return {
+                            form: { contractSelected: 'TwoIn' }
+                           };
+                        });
+                        this.updateGovernanceContract('TwoIn', twoIn);
+                      }
+                    }
+                  /> TwoIn
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={0}
+                    label='MajorityRules'
+                    checked={this.state.form.contractSelected === 'MajorityRules'}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return {
+                            form: { contractSelected: 'MajorityRules' }
+                           };
+                        });
+                        this.updateGovernanceContract('MajorityRules', majorityRules);
+                      }
+                    }
+                  /> MajorityRules
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={0}
+                    label='AdminOnly'
+                    checked={this.state.form.contractSelected === 'AdminOnly'}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return {
+                            form: { contractSelected: 'AdminOnly' }
+                           };
+                        });
+                        this.updateGovernanceContract('AdminOnly', adminOnly);
+                      }
+                    }
+                  /> AdminOnly
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    style={{ marginLeft: 25 }}
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={1}
+                    label='Governance'
+                    checked={this.state.form.contractSelected === 'Governance'}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return {
+                            form: { contractSelected: 'Governance' },
+                           };
+                        });
+                        this.handleContractFile(this.state.droppedFileName);
+                      }
+                    }
+                  />
+                  <Field
                     id="input-b"
-                    className="form-width pt-input"
                     name="contract"
                     component={this.renderDropzoneInput}
                     dir="auto"
                     title="Contract Source"
-                    validate={this.isValidFileType}
-                    required
                   />
-                  <span className="error-text">{this.errorMessageFor('governanceContract')}</span>
                 </div>
               </div>
 

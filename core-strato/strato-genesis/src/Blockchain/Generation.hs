@@ -28,7 +28,6 @@ import Data.Scientific (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Vector as V
 import Data.Text.Encoding
-import Data.Word
 import GHC.Generics
 
 import Blockchain.Strato.Model.Address
@@ -77,15 +76,14 @@ instance Ae.FromJSON Records
 newtype RecordsHashMap = RecordsHashMap [[TypeHashMap]] deriving (Eq, Show, Generic)
 instance Ae.FromJSON RecordsHashMap
 
-equalChunksOf :: Int -> [Word8] -> [[Word8]]
-equalChunksOf n ws | length ws == 0 = []
-                   | length ws <= n = [ws ++ replicate (n - length ws) 0]
-                   | otherwise = let (car, cdr) = splitAt n ws
+equalChunksOf :: Int -> BS.ByteString -> [BS.ByteString]
+equalChunksOf n ws | BS.length ws == 0 = []
+                   | BS.length ws <= n = [ws <> BS.replicate (n - BS.length ws) 0]
+                   | otherwise = let (car, cdr) = BS.splitAt n ws
                                  in car : (equalChunksOf n cdr)
 
 hash :: Word256 -> Word256
-hash x = let SHA w = superProprietaryStratoSHAHash . BS.pack . word256ToBytes $ x
-         in w
+hash = bytesToWord256 . keccak256 . word256ToBytes
 
 encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
 encodeSequentially k [] = ([], k)
@@ -95,8 +93,7 @@ encodeSequentially k (t:ts) =
   in (tSlots ++ tsSlots, k'')
 
 mapHash :: Word256 -> Word256 -> Word256
-mapHash x y = let SHA w = superProprietaryStratoSHAHash . BS.pack $ (word256ToBytes x ++ word256ToBytes y)
-              in w
+mapHash x y = bytesToWord256 . keccak256 $ word256ToBytes x <> word256ToBytes y
 
 -- First return value is the slots for this value, and the second return value
 -- is the next available slot.
@@ -104,16 +101,16 @@ encodeType :: Word256 -> Type -> ([(Word256, Word256)], Word256)
 encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = ([(k, fromIntegral n)], k + 1)
                         | otherwise = error "unimplemented for negative numbers"
 encodeType k (Stryng s) =
-  if length payload < 32
-      then let pad = replicate (31 - length payload) 0
-               size = [fromIntegral $ length payload `shiftL` 1]
-           in ([(k, bytesToWord256 $ payload ++ pad ++ size)], k+1)
-      else let size = fromIntegral $ (length payload `shiftL` 1) .|. 1
+  if BS.length payload < 32
+      then let pad = BS.replicate (31 - BS.length payload) 0
+               size = BS.singleton . fromIntegral $ BS.length payload `shiftL` 1
+           in ([(k, bytesToWord256 $ payload <> pad <> size)], k+1)
+      else let size = fromIntegral $ (BS.length payload `shiftL` 1) .|. 1
                pointer = (k, size)
                start = hash k
                packets = zip (map (start+) [0..]) . map bytesToWord256 . equalChunksOf 32 $ payload
            in (pointer:packets, k + 1)
-  where payload = BS.unpack . encodeUtf8 $ s
+  where payload = encodeUtf8 s
 encodeType k (List payload) =
   let size = fromIntegral . length $ payload
       pointer = (k, size)
@@ -126,10 +123,10 @@ encodeType p (Mapping hm) =
       -- This is very specific to the case of using bytes32 as keys.
       -- Using strings as key hashes the whole string, rather than
       -- slicing to 32 bytes and extending by 0s.
-      payload s = let raw = BS.unpack . encodeUtf8 $ s
-                  in if length raw < 33
-                        then raw ++ replicate (32 - length raw) 0
-                        else take 32 raw
+      payload s = let raw = encodeUtf8 s
+                  in if BS.length raw < 33
+                        then raw <> BS.replicate (32 - BS.length raw) 0
+                        else BS.take 32 raw
       -- For a mapping value located in contract slot p with key s
       -- the slot is keccak256(s <> p)
       trieKey s = mapHash (bytesToWord256 . payload $ s) p

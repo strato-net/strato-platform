@@ -1,4 +1,4 @@
-
+{-# LANGUAGE BangPatterns #-}
 module Blockchain.VM.Code where
 
 import qualified Data.ByteString              as B
@@ -9,16 +9,13 @@ import           Text.PrettyPrint.ANSI.Leijen
 import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.Code
 import           Blockchain.Format
-import           Blockchain.Util
 import           Blockchain.VM.Opcodes
+import           Blockchain.Util
 
 
 getOperationAt::Code->CodePointer->(Operation, CodePointer)
-getOperationAt (Code bytes) p        = getOperationAt' bytes p
+getOperationAt (Code bytes) p        = opCode2Op bytes p
 getOperationAt (PrecompiledCode _) _ = error "getOperationAt called for precompilded code"
-
-getOperationAt'::B.ByteString->Int->(Operation, CodePointer)
-getOperationAt' rom p = opCode2Op $ safeIntDrop p rom
 
 showCode::CodePointer->Code->String
 showCode _ (Code bytes) | B.null bytes = ""
@@ -30,17 +27,18 @@ showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pac
 formatCode::Code->String
 formatCode = showCode 0
 
-getValidJUMPDESTs::Code->I.IntSet
-getValidJUMPDESTs (Code bytes) =
-  I.fromList $ map fst $ filter ((== JUMPDEST) . snd) $ getOps bytes 0
-  where
-    getOps::B.ByteString->Int->[(CodePointer, Operation)]
-    getOps bytes' p | p > B.length bytes' = []
-    getOps code p = (p, op):getOps code (p+len)
-      where
-        (op, len) = getOperationAt' code p
+getValidJUMPDESTs :: Code -> I.IntSet
 getValidJUMPDESTs (PrecompiledCode _) = error "getValidJUMPDESTs called on precompiled code"
-
+getValidJUMPDESTs (Code bytes) = I.fromAscList $ go 0
+ where
+  len = B.length bytes
+  go :: Int -> [Int]
+  go !x = if x >= len
+            then []
+            else case B.index bytes x of
+                    0x5b -> x : go (x+1)
+                    op | 0x60 <= op && op <= 0x7f -> go (x + 2 + fromIntegral op - 0x60)
+                       | otherwise -> go (x+1)
 
 codeLength::Code->CodePointer
 codeLength (Code bytes)        = B.length bytes
@@ -50,4 +48,3 @@ compile::[Operation]->Code
 compile x = Code bytes
   where
     bytes = B.pack $ op2OpCode =<< x
-

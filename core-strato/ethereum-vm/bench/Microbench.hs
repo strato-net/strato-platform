@@ -1,13 +1,24 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 import Criterion.Main
 
+import Control.DeepSeq
+import Control.Monad
+import GHC.Generics
 import Data.Bits ((.&.))
+import qualified Data.ByteString as B
 import Data.Word
 import qualified Data.Vector as V
 import qualified Data.Set as S
 import qualified Data.IntSet as I
 
+import Blockchain.Strato.Model.Code
+import Blockchain.VM.Code
 import Network.Haskoin.Internals (Word256)
+import qualified Blockchain.VM.MutableStack as MS
 
+-- JumpDest benchmarks
 exampleDest :: Word256
 exampleDest = 200000
 
@@ -63,13 +74,103 @@ set64MembershipTests :: Int -> Benchmark
 set64MembershipTests n = bench ("set word64 " ++ show n)
                        $ nf (S.member (downgrade exampleDest)) (set64Dests n)
 
+-- | Every opcode is a JUMPDEST
+getJumpDestsTime :: Int -> Benchmark
+getJumpDestsTime n = bench ("getJumpDests " ++ show n)
+                   $ nf getValidJUMPDESTs (Code $ B.replicate n 0x5b)
+
+-- | None of the opcodes are a jumpdest
+getJumpDestsMissTime :: Int -> Benchmark
+getJumpDestsMissTime n = bench ("getJumpDestsMissTime" ++ show n)
+                       $ nf getValidJUMPDESTs (Code $ B.replicate n 0x00)
+
+-- Stack benchmarks
+
+newtype OldStack = OldStack [Word256] deriving (Show, Eq, Generic, NFData)
+
+emptyOld :: OldStack
+emptyOld = OldStack []
+
+pushOld :: Word256 -> OldStack -> Maybe OldStack
+pushOld x (OldStack xs) = if length xs == 1024
+                            then Nothing
+                            else Just $ OldStack (x:xs)
+
+popOld :: OldStack -> Maybe (Word256, OldStack)
+popOld (OldStack []) = Nothing
+popOld (OldStack (x:xs)) = Just (x, OldStack xs)
+
+peekOld :: OldStack -> Maybe Word256
+peekOld = fmap fst . popOld
+
+swapOld :: Int -> OldStack -> Maybe OldStack
+swapOld i (OldStack os) | i >= length os = Nothing
+                        | otherwise = let (v1:middle, v2:rest) = splitAt i os
+                                      in Just $! OldStack $! (v2:middle) ++ (v1:rest)
+
+getOld :: Int -> OldStack -> Maybe Word256
+getOld i (OldStack xs) | i >= length xs = Nothing
+                       | otherwise = Just $ xs !! i
+
+dupOld :: Int -> OldStack -> Maybe OldStack
+dupOld i ss = do
+  x <- getOld i ss
+  pushOld x ss
+
+oldStackFullPush :: Int -> Benchmark
+oldStackFullPush n = bench ("old stack pushing " ++ show n)
+                   $ nf (pushAllOld emptyOld) [0..fromIntegral n]
+
+pushAllOld :: OldStack -> [Word256] -> Maybe OldStack
+pushAllOld os [] = Just os
+pushAllOld os (x:xs) = do
+  os' <- pushOld x os
+  pushAllOld os' xs
+
+swapNOld :: Int -> Benchmark
+swapNOld n = bench ("swapping old; depth = " ++ show n)
+           $ nf (swapOld n) (OldStack [1..100])
+
+mutableFullPush :: MS.MutableStack Word256 -> Int -> Benchmark
+mutableFullPush s n = bench ("mutable stack pushing " ++ show n)
+                    . nfIO $ mapM_ (MS.push s) [0..fromIntegral n]
+
+swapNMutable :: MS.MutableStack Word256 -> Int -> Benchmark
+swapNMutable s n = bench ("swapping mutable; depth = " ++ show n)
+                 . nfIO $ MS.swap s n
+
+defaultStack :: IO (MS.MutableStack Word256)
+defaultStack = do
+  s <- MS.empty
+  mapM_ (MS.push s) [1..100]
+  return s
+
+mutableStackCreation :: Benchmark
+mutableStackCreation = bench "mutable stack creation" . nfIO . void $ MS.empty
+
 main :: IO ()
 main = do
+  let stackSizes = [1, 32, 128, 1024]
+  let swapSizes = [1, 4, 16]
+  [es1, es2, es3, es4] <- replicateM 4 MS.empty
+  [s1, s2, s3] <- replicateM 3 defaultStack
+
   let jumpSizes = [256, 4096, 32768]
-  defaultMain $ map list256MembershipTests jumpSizes
+  let codeSizes = [10, 100000, 1000000]
+  defaultMain
+    [ bgroup "Stacks" $
+                map oldStackFullPush stackSizes
+             ++ [ mutableFullPush es1 1, mutableFullPush es2 32
+                , mutableFullPush es3 128, mutableFullPush es4 1024]
+             ++ map swapNOld swapSizes
+             ++ [swapNMutable s1 1, swapNMutable s2 4, swapNMutable s3 16]
+    , bgroup "JumpDests" $
+                map list256MembershipTests jumpSizes
              ++ map vec256MembershipTests jumpSizes
              ++ map set256MembershipTests jumpSizes
              ++ map list64MembershipTests jumpSizes
              ++ map vec64MembershipTests jumpSizes
              ++ map set64MembershipTests jumpSizes
              ++ map intsetMembershipTests jumpSizes
+             ++ map getJumpDestsTime codeSizes
+             ++ map getJumpDestsMissTime codeSizes]

@@ -2,10 +2,9 @@
 module BlockApps.Storage where
 
 import           Control.DeepSeq
-import           Data.LargeWord
 import           GHC.Generics
 
-import           BlockApps.Ethereum ()
+import           BlockApps.Ethereum (Word256)
 
 type Storage = Word256 -> Word256
 

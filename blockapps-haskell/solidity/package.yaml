@@ -34,7 +34,6 @@ dependencies:
   - extra
   - generic-random
   - http-api-data
-  - largeword
   - lens
   - logging-effect
   - memory

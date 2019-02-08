@@ -20,6 +20,17 @@ import BlockApps.Ethereum
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
 
+  describe "Word256" $ do
+    it "shows correctly" $ do
+      show (0x0 :: Word256) `shouldBe` "0"
+      show (0x7 :: Word256) `shouldBe` "7"
+      show (0x45 :: Word256) `shouldBe` "69"
+
+    it "renders json correctly" $ do
+      encode (0x0 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000000\""
+      encode (0x7 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000007\""
+      encode (0x45 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000045\""
+
   describe "Hex" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
     prop "has inverse read/show" $ readShowProp @ (Hex Word)

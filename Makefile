@@ -14,7 +14,7 @@ endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
-TMPDIR=/tmp/strato-docker-dummy
+TMPDIR=/tmp/$(shell whoami)/strato-docker-dummy
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -39,7 +39,7 @@ apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
 
-bloc: build_buildbase
+bloc: build_buildbase build_deploybase
 	@echo Now building bloc...
 	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
 
@@ -67,13 +67,13 @@ smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
-strato: build_buildbase
+strato: build_buildbase build_deploybase
 	@echo Now building core-strato...
 	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
 
-vault-wrapper:
+vault-wrapper: build_buildbase build_deploybase
 	@echo Now building vault-wrapper...
-	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=vault-wrapper/
+	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=blockapps-haskell/vault-wrapper/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
@@ -85,10 +85,15 @@ docker-compose:
 build_buildbase:
 	mkdir -p $(TMPDIR)
 	blockapps-haskell/pull_solc.sh 0.4.25 $(TMPDIR)/solc-0.4 $(TMPDIR)/license
-	blockapps-haskell/pull_solc.sh 0.5.1 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
+	blockapps-haskell/pull_solc.sh 0.5.2 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
 	ln -f $(TMPDIR)/solc-0.4 $(TMPDIR)/solc
 	cp -f Dockerfile.buildbase $(TMPDIR)
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
+
+build_deploybase:
+	mkdir -p $(TMPDIR)
+	cp -f Dockerfile.deploybase $(TMPDIR)
+	docker build --tag=blockapps-deploybase:latest -f $(TMPDIR)/Dockerfile.deploybase $(TMPDIR)
 
 test:
 	@echo ${VERSION}

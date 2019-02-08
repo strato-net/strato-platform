@@ -13,6 +13,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
+import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing)
 import qualified Data.ByteString                       as BS
@@ -60,7 +61,7 @@ ethereumVM = void . execContextM $ do
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
-    Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
+    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
     bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
@@ -116,7 +117,8 @@ ethereumVM = void . execContextM $ do
         pbft <- gets contextHasBlockstanbul
         reqd <- use contextBlockRequested
         let pending = B.pending state
-            hasTxs = not (null poolableNewTxs) || not (M.null pending)
+            priv = B.privateHashes $ B.miningCache state
+            hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (O.null priv)
             shouldOutputBlocks = isCaughtUp && (
               if pbft
                 then reqd && hasTxs
@@ -151,11 +153,16 @@ insertNewChains events = do
   let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
+    $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
+    $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     sr <- chainInfoToGenesisState cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
-      Just _ -> return [] -- error $ "ethereumVM.getGenesisStateRoot: chain "
+      Just gsr -> do
+        $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
+        return []
       Nothing -> do
+        $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
         putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
 

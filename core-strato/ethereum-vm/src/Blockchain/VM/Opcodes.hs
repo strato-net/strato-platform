@@ -1,15 +1,29 @@
-
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Blockchain.VM.Opcodes where
 
 import           Prelude                      hiding (EQ, GT, LT)
 
-import           Data.Binary
+import           Data.Bits
 import qualified Data.ByteString              as B
+import qualified Data.ByteString.Unsafe       as BU
+import           Data.Data
+import           Data.Primitive.ByteArray
+import           Foreign.Ptr
+import           Foreign.Storable
+import           GHC.Exts
+import           GHC.Integer.GMP.Internals (Integer(..), BigNat(..))
+import           GHC.Word
+import           System.Endian
+import           System.IO.Unsafe
 import qualified Data.Map                     as M
 import           Data.Maybe
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import           Blockchain.Util
+import           Network.Haskoin.Internals (BigWord(..), Word256)
+import           Blockchain.Strato.Model.ExtendedWord
 
 type CodePointer = Int
 
@@ -20,7 +34,7 @@ data Operation =
     ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
     BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
     POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
-    PUSH [Word8] |
+    PUSH Word256 |
     DUP1 | DUP2 | DUP3 | DUP4 |
     DUP5 | DUP6 | DUP7 | DUP8 |
     DUP9 | DUP10 | DUP11 | DUP12 |
@@ -34,11 +48,11 @@ data Operation =
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
-    MalformedOpcode Word8 deriving (Show, Eq, Ord)
+    MalformedOpcode Word8 deriving (Show, Eq, Ord, Typeable, Data)
 
 instance Pretty Operation where
   pretty x@JUMPDEST    = text $ "------" ++ show x
-  pretty x@(PUSH vals) = text $ show x ++ " --" ++ show (bytes2Integer vals)
+  pretty (PUSH v)      = text $ "PUSH " ++ show v
   pretty x             = text $ show x
 
 data OPData = OPData Word8 Operation Int Int String
@@ -180,10 +194,8 @@ code2OpMap::M.Map Word8 Operation
 code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
 op2OpCode::Operation->[Word8]
-op2OpCode (PUSH theList) | length theList <= 32 && not (null theList) =
-  0x5F + fromIntegral (length theList):theList
-op2OpCode (PUSH []) = error "PUSH needs at least one word"
-op2OpCode (PUSH x) = error $ "PUSH can only take up to 32 words: " ++ show x
+-- This preserves semantics, but it will print a different opcode than was actually in the code
+op2OpCode (PUSH v) = 0x7f:B.unpack (word256ToBytes v)
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
@@ -191,20 +203,57 @@ op2OpCode op =
     Just x  -> [x]
     Nothing -> error $ "op is missing in op2CodeMap: " ++ show op
 
-opLen::Operation->Int
-opLen (PUSH x) = 1 + length x
-opLen _        = 1
+opCode2Op::B.ByteString -> Int -> (Operation, CodePointer)
+opCode2Op rom !idx | idx >= B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
+opCode2Op rom !idx =
+  let opcode = BU.unsafeIndex rom idx in
+  if opcode < 0x60 || opcode > 0x7f
+    then (,1) . fromMaybe (MalformedOpcode opcode) . M.lookup opcode $ code2OpMap
+    else case fromIntegral (opcode - 0x5f) of
+          1 -> (PUSH $! fastExtractByte rom (idx + 1), 2)
+          len | len <= 7 -> (PUSH $! fastExtractSingle rom (idx+1) len, len+1)
+              | len >= 25 -> (PUSH $! fastExtractQuad rom (idx+1) len, len+1)
+              | otherwise -> (PUSH $! defaultExtract rom (idx+1) len, len+1)
 
-opCode2Op::B.ByteString->(Operation, CodePointer)
-opCode2Op rom | B.null rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
-opCode2Op rom =
-  let opcode = B.head rom in --head OK, null weeded out above
-  if opcode >= 0x60 && opcode <= 0x7f
-  then (PUSH $ B.unpack $ safeTake (fromIntegral $ opcode-0x5F) $ B.tail rom, fromIntegral $ opcode - 0x5E)
-  else
---    let op = fromMaybe (error $ "code is missing in code2OpMap: 0x" ++ showHex (B.head rom) "")
-    let op = fromMaybe (MalformedOpcode opcode)
-             $ M.lookup opcode code2OpMap in
-    (op, 1)
+-- Unoptimized extraction, for 8-24 bytes that are too infrequently seen
+-- to bother writing a specialization.
+defaultExtract :: B.ByteString -> Int -> Int -> Word256
+defaultExtract bs off len = let slice = B.take len . B.drop off $ bs
+                            in bytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
 
+-- Used to push 1 byte
+fastExtractByte :: B.ByteString-> Int -> Word256
+fastExtractByte !code !off = let !(W8# b#) = BU.unsafeIndex code off
+                             in BigWord (S# (word2Int# b#))
 
+-- Used to push 2-7 bytes
+fastExtractSingle :: B.ByteString-> Int -> Int -> Word256
+fastExtractSingle !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
+  let !offPtr = castPtr ptr :: Ptr Word64
+      !delta = 64 - (8 * len)
+  -- This may read past the end of the bytestring, but if the read is allowed
+  -- those garbage bytes are truncated by the shift.
+  !rawBits <- peekByteOff offPtr off
+  let !(W64# w#) = toBE64 rawBits `shiftR` delta
+  return $! BigWord (S# (word2Int# w#))
+
+-- Used to push 25-32 bytes
+fastExtractQuad :: B.ByteString -> Int -> Int -> Word256
+fastExtractQuad !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
+  let !offPtr = castPtr (plusPtr ptr (off + len)) :: Ptr Word64
+  !dst <- newByteArray 32
+  fillByteArray dst 0 32 0x0
+  !ll <- peekElemOff offPtr (-1)
+  !lh <- peekElemOff offPtr (-2)
+  !hl <- peekElemOff offPtr (-3)
+  -- This might be a violation: we read before the beginning of the bytestring.
+  -- However if the read is allowed, the garbage bytes are masked off.
+  !hh <- peekElemOff offPtr (-4)
+
+  writeByteArray dst 0 $! toBE64 ll
+  writeByteArray dst 1 $! toBE64 lh
+  writeByteArray dst 2 $! toBE64 hl
+  let !mask = bit (8 * (len - 24)) - 1
+  writeByteArray dst 3 $! toBE64 hh .&. mask
+  !(ByteArray ba#) <- unsafeFreezeByteArray dst
+  return (BigWord (Jp# (BN# ba#)))

@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-warn-unused-imports #-}
+
 module Blockchain.Sequencer.EventSpec where
 
 import           Data.Binary

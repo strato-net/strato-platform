@@ -94,9 +94,40 @@ exports[`CreateChain: index render component with empty values 1`] = `
               Contract
             </label>
           </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
-            <span className=\\"error-text\\" />
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AutoApprove\\" checked={false} onClick={[Function: onClick]} />
+             AutoApprove
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"TwoIn\\" checked={false} onClick={[Function: onClick]} />
+             TwoIn
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"MajorityRules\\" checked={false} onClick={[Function: onClick]} />
+             MajorityRules
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AdminOnly\\" checked={false} onClick={[Function: onClick]} />
+             AdminOnly
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -178,9 +209,40 @@ exports[`CreateChain: index render component with values 1`] = `
               Contract
             </label>
           </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
-            <span className=\\"error-text\\" />
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AutoApprove\\" checked={false} onClick={[Function: onClick]} />
+             AutoApprove
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"TwoIn\\" checked={false} onClick={[Function: onClick]} />
+             TwoIn
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"MajorityRules\\" checked={false} onClick={[Function: onClick]} />
+             MajorityRules
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AdminOnly\\" checked={false} onClick={[Function: onClick]} />
+             AdminOnly
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>
         <div className=\\"row\\">

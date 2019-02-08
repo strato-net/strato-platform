@@ -10,7 +10,7 @@ import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Logger
 import Control.Monad.State.Class
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Monoid ((<>))
 import qualified Data.Set as S

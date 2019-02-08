@@ -75,8 +75,11 @@ instance TransactionLike Transaction where
                        PrivateHashTX{..} -> SHA transactionTxHash
                        t -> hash . rlpSerialize $ rlpEncode t
     txPartialHash = \case
-                       PrivateHashTX{..} -> SHA transactionTxHash -- TODO: Should this be an error instead?
+                       PrivateHashTX{..} -> SHA transactionTxHash
                        t -> hash . rlpSerialize $ partialRLPEncode t
+    txChainHash   = \case
+                       PrivateHashTX{..} -> SHA transactionChainHash
+                       _ -> error "Transaction.txChainHash: Not a private transaction"
     txSigner      = \case
                        PrivateHashTX{} -> Just (Address 0) -- TODO: Should this be an error instead?
                        t -> whoSignedThisTransaction t
