@@ -7,8 +7,12 @@ executables:
     source-dirs: exec_src/
     main: LogServer.hs
     dependencies:
+      - aeson-pretty
       - base
+      - blaze-builder
+      - containers
       - hflags
+      - text
       - wai-app-static
       - wai-extra
       - wai-middleware-prometheus
