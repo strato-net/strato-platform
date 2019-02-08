@@ -14,7 +14,7 @@ import Network.Wai.Middleware.RequestLogger
 import WaiAppStatic.Types
 
 defineFlag "d:directory" ("/var/lib/strato/logs" :: String) "Directory to serve the files from"
-defineFlag "u:uri_root" ("/strato/logs/" :: T.Text) "Prefix to add in front of any URIs"
+defineFlag "u:uri_root" ("/logs/strato/" :: T.Text) "Prefix to add in front of any URIs"
 $(return [])
 
 jsonList :: Pieces -> Folder -> IO Builder
