@@ -95,9 +95,7 @@ function runBackgroundProcess {
   disown %
 }
 
-if [[ "${SERVE_LOGS}" == true ]]; then
-  runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/bloc/logs/ &>> logs/logserver
-fi
+runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/bloc/logs/ &>> logs/logserver
 
 runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
 

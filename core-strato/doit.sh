@@ -19,9 +19,7 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  if [[ "${SERVE_LOGS}" == true ]]; then
-    runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/strato/logs/ &>> logs/logserver
-  fi
+  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/strato/logs/ &>> logs/logserver
 
   if $mineBlocks
   then echo "Starting strato-adit"

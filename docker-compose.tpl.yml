@@ -86,7 +86,6 @@ services:
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
-    - SERVE_LOGS=${SERVE_LOGS}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
@@ -151,7 +150,6 @@ services:
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
-    - SERVE_LOGS=${SERVE_LOGS}
     - seqDebugMode=${seqDebugMode}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
@@ -207,6 +205,7 @@ services:
     - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
     - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
     - SMD_MODE=${SMD_MODE}
+    - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl:-false}
     - sslCertFileType=${sslCertFileType:-crt}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
