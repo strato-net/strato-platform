@@ -43,7 +43,7 @@ main = do
   unless (null unknown) . putStrLn $ "Unknown flags: " ++ show unknown
   let settings = defaultFileServerSettings flags_directory
       rawApp = staticApp settings
-             { ssGetMimeType = const (return "text/plain")
+             { ssGetMimeType = const (return "application/json")
              , ssListing = Just jsonList
              }
       app = prometheus def . logStdoutDev $ rawApp
