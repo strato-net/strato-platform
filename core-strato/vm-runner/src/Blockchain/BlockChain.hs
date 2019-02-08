@@ -419,7 +419,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     ref <- fmap fromIntegral $ readRefund newVMState'
                     gr <- fmap fromIntegral $ readGasRemaining newVMState'
                     let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
-                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + ref) * transactionGasPrice bt)
+                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + gr) * transactionGasPrice bt)
                     unless success' $ error "oops, refund was too much"
 
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
