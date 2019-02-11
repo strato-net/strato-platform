@@ -398,11 +398,18 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
+
+            gr <- fmap fromIntegral $ readGasRemaining newVMState'
+            ref <- fmap fromIntegral $ readRefund newVMState'
+            
+            let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
+            success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + gr) * transactionGasPrice bt)
+            unless success' $ error "oops, refund was too much"
+
             case result of
                 Left e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ P.incCounter vmTxsUnsuccessful
-                    gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erRemainingTxGas     = gr
                                        -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
@@ -414,11 +421,6 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                        , erException          = Just e
                                        }
                 Right _ -> do
-                    ref <- fmap fromIntegral $ readRefund newVMState'
-                    gr <- fmap fromIntegral $ readGasRemaining newVMState'
-                    let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
-                    success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + gr) * transactionGasPrice bt)
-                    unless success' $ error "oops, refund was too much"
 
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
                     forM_ (S.toList $ suicideList newVMState') $ \address' -> do

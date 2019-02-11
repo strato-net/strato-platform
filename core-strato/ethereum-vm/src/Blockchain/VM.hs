@@ -1098,12 +1098,7 @@ create' = do
 
   runCodeFromStart
 
-  maybeException <- lift $ fmap vmException get
-  
-  case maybeException of
-    Nothing -> return ()
-    Just RevertException -> return ()
-    _ -> setGasRemaining 0
+  revertChangesIfError
 
   vmState <- lift get
 
@@ -1215,12 +1210,7 @@ call' noValueTransfer = do
 
   runCodeFromStart
 
-  maybeException <- lift $ fmap vmException get
-
-  case maybeException of
-    Nothing -> return ()
-    Just RevertException -> return ()
-    _ -> setGasRemaining 0
+  revertChangesIfError
 
   vmState <- lift get
 
@@ -1376,3 +1366,22 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
         Left e -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
+
+
+
+
+
+
+revertChangesIfError :: VMM ()
+revertChangesIfError = do 
+
+  maybeException <- lift $ fmap vmException get
+  
+  case maybeException of
+    Nothing -> return ()
+    Just RevertException -> do  -- state reverts, hence refund goes to 0, but gas still used.
+      clearRefund
+      return ()
+    _ -> do
+      clearRefund
+      setGasRemaining 0
