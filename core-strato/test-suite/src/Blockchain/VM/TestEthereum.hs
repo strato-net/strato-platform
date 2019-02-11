@@ -271,7 +271,7 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (ExecResults remGas _ retVal _ rLogs _ _ _) ->
+            Right (ExecResults remGas _ retVal _ rLogs _ _ _ _) ->
                       (Right (), retVal, fromIntegral remGas, rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 

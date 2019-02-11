@@ -416,6 +416,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     , erLogs               = logs newVMState'
                     -- I think erNewContractAddress should be Nothing if there is an error
                     , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                    , erSuicideList        = suicideList newVMState'
                     , erAction             = Just $ _action newVMState'
                     , erException          = either Just (const Nothing) result
                     }
@@ -426,8 +427,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     lift $ P.incCounter vmTxsUnsuccessful
                 Right _ -> do
 
-                    when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
-                    forM_ (S.toList $ suicideList newVMState') $ \address' -> do
+                    when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
+                    forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
                     lift $ P.incCounter vmTxsSuccessful
@@ -446,6 +447,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
+                               , erSuicideList = S.empty
                                , erAction = Nothing
                                , erException = Just Blockchain.VM.VMException.InsufficientFunds
                                }
