@@ -10,12 +10,9 @@ export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
-# IMPORTANT: blockapps-rest is not designed to be used internally between containers through docker network
-# We are putting `postgrest:3001` docker host here but blockapps-rest adds /search/ to this host in some cases
-# (mostly used in tests - search for "searchUrl" in blockapps-rest code) which will fail.
-# So far it works fine for Apex (these ba-rest features are not used) but we need to add the simplest proxy to postgrest
-# to proxy all requests coming to postgrest:3001/search/<something> -> to postgrest:3001/<something>
-#  to avoid blockapps-rest issues
+# Despite blockapps-rest wasn't initially designed for use inside the platform (to interact between micro-services) and 
+# should only call STRATO platform through nginx - starting with version 6.4.0 it supports different formats of searchUrl
+# to be also used to call postgrest directly, without 'cirrus/(search)' substring in URI
 sed -i -e 's|__searchUrl__|'"${postgrestRoot}"'|g' config-prod.yaml
 
 # Set postgres configurations

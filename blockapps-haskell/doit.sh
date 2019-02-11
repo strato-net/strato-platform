@@ -95,6 +95,8 @@ function runBackgroundProcess {
   disown %
 }
 
+runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/logs/bloc/ &>> logs/logserver
+
 runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
 
 runBackgroundProcess /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
