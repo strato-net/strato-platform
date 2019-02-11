@@ -34,3 +34,4 @@ calculateReturned t er =
   let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
   in realRefund + erRemainingTxGas er
   
+

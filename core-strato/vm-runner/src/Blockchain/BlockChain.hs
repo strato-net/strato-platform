@@ -74,7 +74,7 @@ import           Blockchain.Verifier
 import           Blockchain.VM
 import           Blockchain.VM.Code
 --import           Blockchain.VM.OpcodePrices
-import           Blockchain.VM.VMM (readRefund, readGasRemaining)
+--import           Blockchain.VM.VMM (readRefund, readGasRemaining)
 import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -397,28 +397,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            (result, newVMState') <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
+            (result, execResults) <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
-
-            gr <- fmap fromIntegral $ readGasRemaining newVMState'
-            ref <- fmap fromIntegral $ readRefund newVMState'
-            
-            let execResults =
-                  ExecResults {
-                    erRemainingTxGas     = gr
-                    , erRefund             = ref
-                    -- For errors, ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
-                    , erReturnVal          = returnVal newVMState'
-                    , erTrace              = theTrace newVMState'
-                    , erLogs               = logs newVMState'
-                    -- I think erNewContractAddress should be Nothing if there is an error
-                    , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                    , erSuicideList        = suicideList newVMState'
-                    , erAction             = Just $ _action newVMState'
-                    , erException          = either Just (const Nothing) result
-                    }
 
 
             success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr (calculateReturned bt execResults * transactionGasPrice bt)
@@ -463,11 +445,11 @@ runCodeForTransaction :: Bool
                       -> Address
                       -> Address
                       -> OutputTx
-                      -> ContextM (Either VMException B.ByteString, VMState)
+                      -> ContextM (Either VMException B.ByteString, ExecResults)
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  (result, vmState) <-
+  (result, execResults) <-
     create isRunningTests'
            isHomestead
            S.empty
@@ -484,7 +466,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
            (txChainId ut)
            (txMetadata ut)
 
-  return (const B.empty <$> result, vmState)
+  return (const B.empty <$> result, execResults)
 
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)

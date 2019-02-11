@@ -26,12 +26,12 @@ import qualified Blockchain.Data.Block as BDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.Data.Code
+import           Blockchain.Data.ExecResults
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM
 import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VM.Opcodes
-import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
 
@@ -53,7 +53,7 @@ spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
+      ((result,execResults),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
@@ -103,10 +103,10 @@ spec = do
              Nothing
              Nothing
       result `shouldSatisfy` isRight
-      print $ theTrace vmState
-      print $ vmException vmState
+      print $ erTrace execResults
+      print $ erException execResults
       print $ B16.encode "ec630643"
-      case returnVal vmState of
+      case erReturnVal execResults of
         Nothing -> liftIO $ putStrLn "No return value"
         Just code -> do
           print code
