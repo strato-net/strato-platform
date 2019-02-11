@@ -64,7 +64,7 @@ vmBaggerTxs:: Vector T.Text Gauge
 vmBaggerTxs = unsafeRegister
             . vector "group"
             . gauge
-            $ Info "vm_bagger_pending_tx" "Count of pending transactions in bagger"
+            $ Info "vm_bagger_txs" "Count of pending transactions in bagger"
 
 recordBaggerMetrics :: (MonadIO m) => BaggerState -> m ()
 recordBaggerMetrics bs = liftIO $ do
