@@ -3,8 +3,11 @@ module Blockchain.VMMetrics where
 
 import Control.Monad.IO.Class
 import Data.Int
-import Prometheus
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import Prometheus
+
+import Blockchain.Bagger.BaggerState
 
 vmBlocksProcessed :: Counter
 vmBlocksProcessed = unsafeRegister $ counter (Info "vm_blocks_processed" "evm counter for blocks processed")
@@ -57,3 +60,16 @@ recordOpTiming :: (MonadIO m) => T.Text -> Int64 -> m ()
 recordOpTiming op t = liftIO $
   withLabel opTiming op (flip observe (fromIntegral t))
 
+vmBaggerTxs:: Vector T.Text Gauge
+vmBaggerTxs = unsafeRegister
+            . vector "group"
+            . gauge
+            $ Info "vm_bagger_pending_tx" "Count of pending transactions in bagger"
+
+recordBaggerMetrics :: (MonadIO m) => BaggerState -> m ()
+recordBaggerMetrics bs = liftIO $ do
+  let atlVolume :: (BaggerState -> ATL) -> Double
+      atlVolume sel = fromIntegral . sum . map M.size . M.elems . sel $ bs
+  withLabel vmBaggerTxs "pending" $ \g -> setGauge g (atlVolume pending)
+  withLabel vmBaggerTxs "queued" $ \g -> setGauge g (atlVolume queued)
+  withLabel vmBaggerTxs "seen" $ \g -> setGauge g . fromIntegral . M.size . seen $ bs
