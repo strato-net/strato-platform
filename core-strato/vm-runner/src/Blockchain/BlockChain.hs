@@ -406,20 +406,24 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + gr) * transactionGasPrice bt)
             unless success' $ error "oops, refund was too much"
 
+            let execResults =
+                  ExecResults {
+                    erRemainingBlockGas = remainingBlockGas - (transactionGasLimit bt-realRefund-gr)
+                    , erRemainingTxGas     = gr
+                    -- For errors, ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
+                    , erReturnVal          = returnVal newVMState'
+                    , erTrace              = theTrace newVMState'
+                    , erLogs               = logs newVMState'
+                    -- I think erNewContractAddress should be Nothing if there is an error
+                    , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
+                    , erAction             = Just $ _action newVMState'
+                    , erException          = either Just (const Nothing) result
+                    }
+            
             case result of
                 Left e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ P.incCounter vmTxsUnsuccessful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
-                                       , erRemainingTxGas     = gr
-                                       -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
-                                       , erReturnVal          = returnVal newVMState'
-                                       , erTrace              = theTrace newVMState'
-                                       , erLogs               = logs newVMState'
-                                       , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erAction             = Just $ _action newVMState'
-                                       , erException          = Just e
-                                       }
                 Right _ -> do
 
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (suicideList newVMState'))
@@ -427,15 +431,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
                     lift $ P.incCounter vmTxsSuccessful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - gr)
-                                       , erRemainingTxGas     = gr
-                                       , erReturnVal          = returnVal newVMState'
-                                       , erTrace              = theTrace newVMState'
-                                       , erLogs               = logs newVMState'
-                                       , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
-                                       , erAction             = Just $ _action newVMState'
-                                       , erException          = Nothing
-                                       }
+
+
+                    
+            return execResults
         else do
             s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
