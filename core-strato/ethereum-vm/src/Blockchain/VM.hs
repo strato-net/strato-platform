@@ -1098,6 +1098,13 @@ create' = do
 
   runCodeFromStart
 
+  maybeException <- lift $ fmap vmException get
+  
+  case maybeException of
+    Nothing -> return ()
+    Just RevertException -> return ()
+    _ -> setGasRemaining 0
+
   vmState <- lift get
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
@@ -1207,6 +1214,13 @@ call' noValueTransfer = do
     return ()
 
   runCodeFromStart
+
+  maybeException <- lift $ fmap vmException get
+
+  case maybeException of
+    Nothing -> return ()
+    Just RevertException -> return ()
+    _ -> setGasRemaining 0
 
   vmState <- lift get
 

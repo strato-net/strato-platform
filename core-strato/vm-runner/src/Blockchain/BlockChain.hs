@@ -404,9 +404,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     lift $ P.incCounter vmTxsUnsuccessful
                     gr <- fmap fromIntegral . liftIO $ readGasRemaining newVMState'
                     return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
-                                       , erRemainingTxGas     = if e == RevertException
-                                                                  then gr
-                                                                  else 0
+                                       , erRemainingTxGas     = gr
                                        -- ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
