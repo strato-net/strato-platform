@@ -104,7 +104,7 @@ putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()
 bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
 
-putBlockHeaderInChainDB :: (BlockHeaderLike h, HasStateDB m, HasChainDB m) => h -> m ()
+putBlockHeaderInChainDB :: (BlockHeaderLike h, Format h, HasStateDB m, HasChainDB m) => h -> m ()
 putBlockHeaderInChainDB b = do
   let p = blockHeaderParentHash b
       h = blockHeaderHash b
@@ -112,7 +112,7 @@ putBlockHeaderInChainDB b = do
   when (isNothing mExistingChainRoot) $ do -- its chain root will already exist
     mChainRoot <- getChainRoot p
     case mChainRoot of
-      Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found"
+      Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found.\n" ++ format b
       Just chainRoot -> putChainBlockHashInfo h p chainRoot
 
 getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)

@@ -28,6 +28,7 @@ import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import           Data.Char
+import           Data.Data
 import           Data.Function
 import           Data.Int
 import qualified Data.IntSet                        as I
@@ -74,6 +75,7 @@ import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
+
 
 bool2Word256::Bool->Word256
 bool2Word256 True  = 1
@@ -910,7 +912,7 @@ runCodeEVMProfile = whileM $ do
 runCodeEVMMetrics :: VMM ()
 runCodeEVMMetrics = whileM $ do
   (op, t) <- runCodeClockwork
-  recordOpTiming op t
+  recordOpTiming (T.pack . showConstr . toConstr $ op) t
   fmap not . lift $ gets done
 
 runCodeSQLTrace :: Int -> VMM ()

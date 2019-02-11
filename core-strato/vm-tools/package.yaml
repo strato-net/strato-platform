@@ -1,0 +1,68 @@
+name: vm-tools
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: types and tools needed to write a VM for Strato
+category:      Data Structures
+
+default-extensions:
+  - DeriveGeneric
+  - DeriveAnyClass
+
+dependencies:
+  - base >= 4 && < 5
+  - ansi-wl-pprint
+  - binary
+  - blockapps-data
+  - blockapps-milena
+  - blockapps-util
+  - bytestring
+  - containers
+  - cross-monitoring
+  - deepseq
+  - directory
+  - ethereum-rlp
+  - exceptions
+  - extra
+  - hedis
+  - hflags
+  - lens
+  - leveldb-haskell
+  - merkle-patricia-db
+  - monad-logger
+  - mtl
+  - ordered-containers
+  - persistent-postgresql
+  - persistent-sqlite
+  - prometheus-client
+  - resourcet
+  - strato-adit
+  - strato-conf
+  - strato-index
+  - strato-model
+  - strato-redis-blockdb
+  - strato-sequencer
+  - text
+  - temporary
+  - time
+  - transformers
+  - unliftio-core
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.Bagger
+    - Blockchain.Bagger.BaggerState
+    - Blockchain.Bagger.Transactions
+    - Blockchain.Data.BlockSummary
+    - Blockchain.Data.ExecResults
+    - Blockchain.DB.BlockSummaryDB
+    - Blockchain.DB.ModifyStateDB
+    - Blockchain.VMContext
+    - Blockchain.VMOptions
+    - Blockchain.VM.VMException
+    - Blockchain.VMMetrics
+    - Executable.EVMFlags
+  ghc-options: -Wall -O2
+

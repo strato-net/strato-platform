@@ -53,6 +53,8 @@ dependencies:
   - transformers
   - unboxed-ref
   - unordered-containers
+  - vm-runner
+  - vm-tools
 
 ghc-options: -Wall -Werror -threaded
 

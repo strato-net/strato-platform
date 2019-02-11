@@ -105,17 +105,6 @@ opGasPrice (MalformedOpcode _) = 0 --gonna fail anyway, just put something arbit
 
 opGasPrice x                   = error $ "Missing opcode in opCodePrice: " ++ show x
 
-
-
-gHomesteadFirstBlock = 1150000 :: Gas
-
-
-gTX = 21000 :: Gas
-gCREATETX = 53000 :: Gas
-gTXDATANONZERO = 68 :: Gas
-gTXDATAZERO = 4 :: Gas
-
-
 gMEMWORD = 3 :: Gas
 gQUADCOEFFDIV = 512 :: Gas
 

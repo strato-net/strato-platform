@@ -41,6 +41,8 @@ dependencies:
 - text
 - time
 - transformers
+- vm-runner
+- vm-tools
 
 executables:
   vrun:

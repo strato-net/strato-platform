@@ -1,0 +1,99 @@
+name: vm-runner
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: The executable that runs VMs for transactions
+category:      Data Structures
+
+default-extensions:
+  - DeriveGeneric
+  - DeriveAnyClass
+
+dependencies:
+  - base >= 4 && < 5
+  - ansi-wl-pprint
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-milena
+  - blockapps-util
+  - bytestring
+  - classy-prelude
+  - containers
+  - cross-monitoring
+  - ethereum-rlp
+  - ethereum-vm
+  - hflags
+  - lens
+  - merkle-patricia-db
+  - monad-logger
+  - mtl
+  - ordered-containers
+  - prometheus-client
+  - resourcet
+  - strato-adit
+  - strato-conf
+  - strato-genesis
+  - strato-index
+  - strato-model
+  - strato-redis-blockdb
+  - strato-sequencer
+  - strato-statediff
+  - text
+  - time
+  - transformers
+  - vm-tools
+  - wai-middleware-prometheus
+  - warp
+  - async
+
+  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
+                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
+
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.BlockChain
+    - Executable.EthereumVM
+  ghc-options: -Wall -O2
+
+
+executables:
+  vm-runner:
+    source-dirs: exec_src
+    main: Main.hs
+    dependencies:
+      - vm-runner
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+tests:
+  ethereum-vm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - aeson
+      - data-default
+      - ethereum-vm
+      - hspec
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+
+benchmarks:
+  microbench:
+    source-dirs: bench/
+    main: Microbench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm
+      - hashable
+      - unordered-containers
+
+  extractbench:
+    source-dirs: bench/
+    main: ExtractBench.hs
+    other-modules: []
+    dependencies:
+      - criterion
+      - ethereum-vm
