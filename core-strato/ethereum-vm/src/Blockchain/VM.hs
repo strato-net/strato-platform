@@ -56,8 +56,8 @@ import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
@@ -1014,7 +1014,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
           return (Left e, vmState'{logs=[]})
       (_, stateAfter) -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ stateAfter
-          putStorageTxMap $ contextStorageTxMap $ dbs stateAfter
+          putRawStorageTxMap $ contextStorageTxMap $ dbs stateAfter
           putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs stateAfter
 
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
@@ -1278,7 +1278,7 @@ create_debugWrapper block owner value initCodeBytes = do
       ((result, finalVMState), finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-      putStorageTxMap $ contextStorageTxMap finalDBs
+      putRawStorageTxMap $ contextStorageTxMap finalDBs
       putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
       gr <- liftIO . readGasRemaining $ finalVMState
       setGasRemaining gr
@@ -1334,7 +1334,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-  putStorageTxMap $ contextStorageTxMap finalDBs
+  putRawStorageTxMap $ contextStorageTxMap finalDBs
   putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 

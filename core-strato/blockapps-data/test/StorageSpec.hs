@@ -12,6 +12,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
+import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Database.LevelDB as DB
@@ -29,13 +30,14 @@ import Blockchain.Data.Address
 import Blockchain.Data.AddressStateDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
+import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
 
-type SMap = M.Map (Address, Word256) Word256
+type SMap = M.Map (Address, B.ByteString) B.ByteString
 type AMap = M.Map Address AddressStateModification
 
 data CachedStorage = CS
@@ -51,11 +53,11 @@ makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT IO)
 
-instance HasStorageDB StorM where
-  getStorageTxDB = liftM2 (,) (use sdb) (use stx)
-  putStorageTxMap = assign stx
-  getStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
-  putStorageBlockMap = assign sbs
+instance HasRawStorageDB StorM where
+  getRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  putRawStorageTxMap = assign stx
+  getRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  putRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
   getAddressStateTxDBMap = use atx
