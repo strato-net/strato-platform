@@ -11,11 +11,12 @@ import           Blockchain.VM.VMException
 import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
+import           Blockchain.Data.Transaction
 
 data ExecResults =
   ExecResults {
-    erRemainingBlockGas  :: Integer,
     erRemainingTxGas     :: Integer,
+    erRefund             :: Integer,
     erReturnVal          :: Maybe B.ByteString,
     erTrace              :: [String],
     erLogs               :: [Log],
@@ -26,3 +27,10 @@ data ExecResults =
     } deriving (Show, Generic)
 
 instance NFData ExecResults
+
+
+calculateReturned :: Transaction -> ExecResults -> Integer
+calculateReturned t er =
+  let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
+  in realRefund + erRemainingTxGas er
+  

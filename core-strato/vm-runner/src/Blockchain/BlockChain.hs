@@ -314,7 +314,7 @@ addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
 addTransactions bd bg ts = go bd bg ts []
   where
     go _ _ [] as = return . reverse $ catMaybes as
-    go b blockGas (t:rest) as = do
+    go b blockGas (t@OutputTx{otBaseTx=bt}:rest) as = do
       flushMemAddressStateTxToBlockDB
       flushStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
@@ -329,7 +329,7 @@ addTransactions bd bg ts = go bd bg ts []
       let remainingBlockGas =
             case result of
             Left _           -> blockGas
-            Right execResult -> erRemainingBlockGas execResult
+            Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
       go b remainingBlockGas rest (mAction : as)
 
@@ -341,7 +341,7 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
 
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
-mineTransactions' header remGas ran unran@(tx:txs) = do
+mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
@@ -351,8 +351,11 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time'
     let trr = TxRunResult tx result time' beforeMap afterMap
     case result of
-        Right execResult -> mineTransactions' header (erRemainingBlockGas execResult) (trr:ran) txs
+        Right execResult -> do
+          let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
+          mineTransactions' header nextRemGas (trr:ran) txs
         Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
+
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
@@ -402,14 +405,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             gr <- fmap fromIntegral $ readGasRemaining newVMState'
             ref <- fmap fromIntegral $ readRefund newVMState'
             
-            let realRefund = min ref ((transactionGasLimit bt - gr) `div` 2)
-            success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr ((realRefund + gr) * transactionGasPrice bt)
-            unless success' $ error "oops, refund was too much"
-
             let execResults =
                   ExecResults {
-                    erRemainingBlockGas = remainingBlockGas - (transactionGasLimit bt-realRefund-gr)
-                    , erRemainingTxGas     = gr
+                    erRemainingTxGas     = gr
+                    , erRefund             = ref
                     -- For errors, ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
                     , erReturnVal          = returnVal newVMState'
                     , erTrace              = theTrace newVMState'
@@ -420,6 +419,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     , erAction             = Just $ _action newVMState'
                     , erException          = either Just (const Nothing) result
                     }
+
+
+            success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr (calculateReturned bt execResults * transactionGasPrice bt)
+            unless success' $ error "oops, refund was too much"
             
             case result of
                 Left e -> do
@@ -441,8 +444,9 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
-            return ExecResults { erRemainingBlockGas=remainingBlockGas
-                               , erRemainingTxGas=transactionGasLimit bt
+            return ExecResults {
+                                 erRemainingTxGas=transactionGasLimit bt
+                               , erRefund=0
                                , erReturnVal=Nothing
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]

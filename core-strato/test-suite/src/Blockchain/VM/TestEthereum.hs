@@ -271,8 +271,10 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (ExecResults remGas _ retVal _ rLogs _ _ _ _) ->
-                      (Right (), retVal, fromIntegral remGas, rLogs, Just [], Nothing)
+            Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
+                      (Right (), retVal,
+                       fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
+                       rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates
