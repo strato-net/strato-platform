@@ -38,6 +38,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.VMContext
+import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import           Executable.EVMCheckpoint
@@ -70,6 +71,7 @@ ethereumVM = void . execContextM $ do
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
     forever $ loopTimeit "one full loop" $ do
+        recordBaggerMetrics =<< gets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
