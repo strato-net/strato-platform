@@ -5,6 +5,7 @@ author: Jamshid
 maintainer:    jamshidnh@gmail.com
 synopsis: A Haskell version of an Ethereum EVM
 category:      Data Structures
+license: Apache-2.0
 description:
     The client described in the Ethereum Yellowpaper
 
