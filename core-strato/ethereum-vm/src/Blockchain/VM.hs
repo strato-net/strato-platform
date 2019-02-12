@@ -1015,7 +1015,15 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
       Left e -> do
           lift . lift $ $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
           when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
-          return (Left e, execResults{erLogs=[], erException = Just e})
+          return (Left e, execResults{
+                               erLogs=[],
+                               erException = Just e,
+                               erRefund=0, -- even if e == RevertException, since the full state reverts, all refunds go to 0.
+                               erRemainingTxGas =
+                                    if e == RevertException
+                                    then erRemainingTxGas execResults
+                                    else 0
+                               })
       _ -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs vmState'
           putStorageTxMap $ contextStorageTxMap $ dbs vmState'
@@ -1102,8 +1110,6 @@ create' = do
   action . actionData %= M.insert owner (ActionData (SHA 0) M.empty [])
 
   runCodeFromStart
-
-  revertChangesIfError
 
   vmState <- lift get
 
@@ -1214,8 +1220,6 @@ call' noValueTransfer = do
     return ()
 
   runCodeFromStart
-
-  revertChangesIfError
 
   vmState <- lift get
 
@@ -1369,21 +1373,6 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
 
 
 
-
-
-revertChangesIfError :: VMM ()
-revertChangesIfError = do 
-
-  maybeException <- lift $ fmap vmException get
-  
-  case maybeException of
-    Nothing -> return ()
-    Just RevertException -> do  -- state reverts, hence refund goes to 0, but gas still used.
-      clearRefund
-      return ()
-    _ -> do
-      clearRefund
-      setGasRemaining 0
 
 
 vmStateToExecResults :: MonadIO m =>

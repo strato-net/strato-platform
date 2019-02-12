@@ -233,11 +233,11 @@ runTest test = do
         flushMemStorageDB
         flushMemAddressStateDB
 
-        case vmException vmState1 of
-         Nothing -> do
+        case result of
+         Right _ -> do
           gr <- readGasRemaining vmState1
           return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Left _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of

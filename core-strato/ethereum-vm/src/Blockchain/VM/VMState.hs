@@ -34,7 +34,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.VM.Environment
 import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VMContext
-import           Blockchain.VM.VMException
 
 type Gas = Int
 
@@ -89,8 +88,6 @@ data VMState =
 
     environment      :: Environment,
 
-    vmException      :: Maybe VMException,
-
     writable         :: Bool, -- Whether to throw on attempted changes to storage
 
     _action          :: Action,
@@ -137,7 +134,6 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
                pc = pcref,
                done=False,
                returnVal=Nothing,
-               vmException=Nothing,
                writable=True,
                vmGasRemaining=gasref,
                stack=stackHandle,
