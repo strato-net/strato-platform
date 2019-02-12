@@ -1107,7 +1107,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (SHA 0) M.empty [])
+  action . actionData %= M.insert owner (ActionData (SHA 0) EVM M.empty [])
 
   runCodeFromStart
 
@@ -1212,7 +1212,7 @@ call' noValueTransfer = do
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
   ch <- addressStateCodeHash <$> getAddressState receiveAddress
-  action . actionData %= M.insert receiveAddress (ActionData ch M.empty [])
+  action . actionData %= M.insert receiveAddress (ActionData ch EVM M.empty [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

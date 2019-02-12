@@ -18,6 +18,7 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-datadefs
+  - solid-vm-model
   - blockapps-haskoin
   - blockapps-milena
   - blockapps-util
