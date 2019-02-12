@@ -305,7 +305,7 @@ runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
   addressState <- getAddressState address
-  code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+  code <- getEVMCode (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
@@ -316,7 +316,7 @@ runOperation EXTCODECOPY = do
   size <- pop
 
   addressState <- getAddressState address
-  code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+  code <- getEVMCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
 runOperation RETURNDATASIZE = do
@@ -1130,7 +1130,7 @@ create' = do
   where
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
-      addCode codeBytes
+      addCode EVM codeBytes
       newAddressState <- getAddressState address
       putAddressState address newAddressState{addressStateCodeHash=hash codeBytes}
     assignDetails = do
@@ -1173,7 +1173,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
   code <-
     if 0 < codeAddress && codeAddress < 5
     then return $ PrecompiledCode $ fromIntegral codeAddress
-    else Code . fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+    else Code <$> getEVMCode (addressStateCodeHash addressState)
 
   let env =
         Environment{

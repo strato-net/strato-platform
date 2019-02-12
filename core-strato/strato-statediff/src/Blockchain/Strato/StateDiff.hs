@@ -241,7 +241,8 @@ eventualAccountState
     addressStateCodeHash
     }
   = do
-    code <- lookupCode addressStateCodeHash
+    -- TODO(tim): dispatch storage decoding based on vmkind
+    (_, code) <- lookupCode addressStateCodeHash
     storage <- eventualStorage addressStateContractRoot
     return AccountDiff{
       nonce = Just (Value addressStateNonce),
@@ -315,7 +316,7 @@ retrieveMPDBValue = rlpDecode . rlpDeserialize . rlpDecode
 lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m ByteString
+lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m (CodeKind, ByteString)
 lookupCode = lookupInMPDB "contract code" getCode
 
 lookupStorageKey :: (HasCodeDB m, HasHashDB m, MonadResource m) => Key -> m Word256
