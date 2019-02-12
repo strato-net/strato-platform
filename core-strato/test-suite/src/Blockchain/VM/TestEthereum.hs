@@ -69,7 +69,7 @@ defineFlag "debugEnabled2" False "enable debugging"
 
 populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
 populateAndConvertAddressState cid owner addressState' = do
-  addCode . codeBytes . contractCode' $ addressState'
+  addCode EVM . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
@@ -94,8 +94,7 @@ showHexInt x
 
 getDataAndRevertAddressState::Address->AddressState->ContextM AddressState'
 getDataAndRevertAddressState _ addressState = do
-  theCode <- fromMaybe (error $ "Missing code in getDataAndRevertAddressState: " ++ format addressState) <$>
-             getCode (addressStateCodeHash addressState)
+  theCode <- getEVMCode (addressStateCodeHash addressState)
 
   -- Copied wholesale from Context.hs:getAllStorageKeyVals'
   -- since that function requires an unhashed owner.

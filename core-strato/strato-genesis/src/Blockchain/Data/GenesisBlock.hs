@@ -136,7 +136,7 @@ parseHex theString =
    _ -> error $ "parseHex: error parsing string: " ++ theString
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
+initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
 
 chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => ChainInfo

@@ -14,7 +14,6 @@ import           Control.Monad.Logger
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
-import           Data.Maybe
 import qualified Data.Set                as S
 import           Data.Either
 import qualified Data.Text.Encoding      as Text
@@ -83,7 +82,7 @@ spec = do
                     Nothing
         addressState <- getAddressState newAddress
         liftIO . putStrLn $ show addressState
-        code <- fromMaybe C8.empty <$> getCode (addressStateCodeHash addressState)
+        code <- getEVMCode (addressStateCodeHash addressState)
         liftIO . putStrLn $ show $ B16.encode code
         call isRunningTests
              isHomestead

@@ -467,7 +467,7 @@ oneTimeSetup genesisBlockName = do
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
          void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
-           addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
+           addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
              (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets
