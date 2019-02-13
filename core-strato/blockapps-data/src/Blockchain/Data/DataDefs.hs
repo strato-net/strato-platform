@@ -27,7 +27,6 @@ import           Data.Time
 import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
@@ -38,6 +37,7 @@ import qualified Data.ByteString                         as BS
 
 import           Blockchain.ExtWord
 import           Blockchain.SHA
+import           BlockApps.CommonTypes
 import           Data.Word
 
 import           Control.Lens.TH                         (makeLensesFor)
@@ -62,6 +62,9 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS parent_chain varchar;"
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS creation_block varchar;"
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS chain_nonce varchar;"
+  exec "ALTER TABLE IF EXISTS storage ADD COLUMN IF NOT EXISTS kind varchar;"
+  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN key TYPE varchar;"
+  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN value TYPE varchar;"
   migrateAuto
 
 -- todo newtype me

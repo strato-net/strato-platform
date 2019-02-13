@@ -39,6 +39,7 @@ dependencies:
   - binary
   - blaze-html
   - blaze-markup
+  - blockapps-common-types
   - blockapps-data
   - blockapps-haskoin
   - blockapps-util

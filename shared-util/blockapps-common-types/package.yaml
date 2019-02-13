@@ -1,0 +1,10 @@
+name: blockapps-common-types
+
+library:
+  source-dirs: src/
+  dependencies:
+    - aeson
+    - base
+    - base16-bytestring
+    - bytestring
+    - text

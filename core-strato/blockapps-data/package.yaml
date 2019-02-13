@@ -23,6 +23,7 @@ dependencies:
   - bytestring
   - bytestring-arbitrary
   - clock
+  - blockapps-common-types
   - conduit
   - conduit-combinators
   - containers

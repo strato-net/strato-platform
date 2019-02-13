@@ -61,7 +61,8 @@ createAccount chainId blockNumber addressDiffs = do
   newStorage <-
     forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
       let (_, diff) = addressDiff
-      return [Storage addrID k v | (k, Value v) <- Map.toList $ storage diff]
+      return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
+             | (k, Value v) <- Map.toList $ storage diff]
   SQL.insertMany_ $ concat newStorage
 
   where
@@ -127,7 +128,7 @@ updateAccount chainId blockNumber address diff = do
 commitStorage :: MonadResource m =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
 commitStorage addrID key Create{newValue} =
-  SQL.insert_ $ Storage addrID key newValue
+  SQL.insert_ $ Storage addrID EVM (word256ToHexStorage key) (word256ToHexStorage newValue)
 
 commitStorage addrID key Delete{} = do
   storageID <- getStorageKeySQL addrID key "delete"
@@ -135,7 +136,7 @@ commitStorage addrID key Delete{} = do
 
 commitStorage addrID key Update{newValue} = do
   storageID <- getStorageKeySQL addrID key "update"
-  SQL.update storageID [ StorageValue =. newValue ]
+  SQL.update storageID [ StorageValue =. (word256ToHexStorage newValue) ]
 
 getAddressStateSQL :: MonadResource m
                    => Maybe Word256
@@ -153,7 +154,7 @@ getStorageKeySQL :: MonadResource m
                  -> SqlDbM m (SQL.Key Storage)
 getStorageKeySQL addrID storageKey' s = do
   storageIDs <- SQL.selectKeysList
-              [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. storageKey' ]
+              [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. (word256ToHexStorage storageKey') ]
               [ LimitTo 1 ]
   if null storageIDs
     then error $ s ++ ": Storage key not found in SQL db: " ++ showHex4 storageKey'

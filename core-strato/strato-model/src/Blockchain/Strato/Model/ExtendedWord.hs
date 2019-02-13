@@ -10,6 +10,7 @@ module Blockchain.Strato.Model.ExtendedWord
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
     slowWord256ToBytes, slowBytesToWord256, word256ToBytes, bytesToWord256,
+    word256ToHexStorage,
     word512ToBytes, bytesToWord512,
     fastWord256LSB
  ) where
@@ -38,6 +39,7 @@ import           System.Endian
 import           System.IO.Unsafe
 
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
+import           BlockApps.CommonTypes
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Format
 
@@ -67,6 +69,9 @@ bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of byt
 
 slowWord256ToBytes :: Word256 -> [Word8]
 slowWord256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]
+
+word256ToHexStorage :: Word256 -> HexStorage
+word256ToHexStorage = HexStorage . word256ToBytes
 
 word256ToBytes :: Word256 -> B.ByteString
 word256ToBytes ws = unsafePerformIO $ do
