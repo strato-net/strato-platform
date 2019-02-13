@@ -57,8 +57,8 @@ import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
@@ -306,7 +306,7 @@ runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
   addressState <- getAddressState address
-  code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+  code <- getEVMCode (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
@@ -317,7 +317,7 @@ runOperation EXTCODECOPY = do
   size <- pop
 
   addressState <- getAddressState address
-  code <- fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+  code <- getEVMCode (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
 runOperation RETURNDATASIZE = do
@@ -1025,10 +1025,9 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
                                     else 0
                                })
       _ -> do
-          setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs vmState'
-          putStorageTxMap $ contextStorageTxMap $ dbs vmState'
+          setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ vmState'
+          putRawStorageTxMap $ contextStorageTxMap $ dbs vmState'
           putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs vmState'
-
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return (res, execResults)
 
@@ -1143,7 +1142,7 @@ create' = do
   where
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
-      addCode codeBytes
+      addCode EVM codeBytes
       newAddressState <- getAddressState address
       putAddressState address newAddressState{addressStateCodeHash=hash codeBytes}
     assignDetails = do
@@ -1186,7 +1185,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
   code <-
     if 0 < codeAddress && codeAddress < 5
     then return $ PrecompiledCode $ fromIntegral codeAddress
-    else Code . fromMaybe B.empty <$> getCode (addressStateCodeHash addressState)
+    else Code <$> getEVMCode (addressStateCodeHash addressState)
 
   let env =
         Environment{
@@ -1291,7 +1290,7 @@ create_debugWrapper block owner value initCodeBytes = do
       ((result, execResults), finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-      putStorageTxMap $ contextStorageTxMap finalDBs
+      putRawStorageTxMap $ contextStorageTxMap finalDBs
       putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
       setGasRemaining $ fromIntegral $ erRemainingTxGas execResults
 
@@ -1345,7 +1344,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
-  putStorageTxMap $ contextStorageTxMap finalDBs
+  putRawStorageTxMap $ contextStorageTxMap finalDBs
   putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 

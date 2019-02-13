@@ -61,6 +61,7 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
@@ -106,19 +107,19 @@ instance HasChainDB VMM where
     vmState <- lift get
     lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
 
-instance HasStorageDB VMM where
-    getStorageTxDB = do
+instance HasRawStorageDB VMM where
+    getRawStorageTxDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageTxMap $ dbs cxt)
-    putStorageTxMap theMap = do
+    putRawStorageTxMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
-    getStorageBlockDB = do
+    getRawStorageBlockDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageBlockMap $ dbs cxt)
-    putStorageBlockMap theMap = do
+    putRawStorageBlockMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
