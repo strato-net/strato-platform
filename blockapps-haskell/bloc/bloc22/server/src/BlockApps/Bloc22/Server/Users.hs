@@ -25,6 +25,7 @@ import           Crypto.Secp256k1
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
+import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.Either
@@ -217,10 +218,14 @@ postUsersContract userName addr chainId resolve
               md
               chainId
               resolve
-  postUsersContract' bcp (return . signTransaction sk)
-
-postUsersContract' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
-postUsersContract' ContractParameters{..} sign = blocTransaction $ do
+  case join $ fmap (Map.lookup "VM") $ md of
+    Just "EVM" -> postUsersContractEVM' bcp (return . signTransaction sk)
+    Just "SolidVM" -> postUsersContractSolidVM' bcp (return . signTransaction sk)
+    Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
+    Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
+    
+postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   idsAndDetails <- compileContract src
@@ -257,6 +262,23 @@ postUsersContract' ContractParameters{..} sign = blocTransaction $ do
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
+  getBlocTransactionResult' chainId [hash] resolve
+
+postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
+  params <- getAccountTxParams fromAddr chainId txParams
+  logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+  tx <- signAndPrepare sign fromAddr metadata $
+    TransactionHeader
+      Nothing
+      fromAddr
+      params
+      (Wei (fromIntegral (maybe 0 unStrung value)))
+      (BC.pack $ Text.unpack src)
+      0
+      chainId
+  logWith logNotice ("tx is: " <> Text.pack (show tx))
+  hash <- blocStrato $ postTx tx
   getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
