@@ -1,4 +1,4 @@
-name: ethereum-vm
+name: solid-vm
 version: 0.0.4
 build-type: Simple
 author: Jamshid
@@ -15,6 +15,8 @@ default-extensions:
 
 dependencies:
   - base >= 4 && < 5
+  - vm-tools
+  - ethereum-vm
   - ansi-wl-pprint
   - base16-bytestring
   - binary
@@ -45,14 +47,9 @@ dependencies:
   - vector
   - vm-tools
 
+
 library:
   source-dirs: src/
   exposed-modules:
-    - Blockchain.EVM
-    - Blockchain.EVM.Code
-    - Blockchain.EVM.Environment
-    - Blockchain.EVM.MutableStack
-    - Blockchain.EVM.Opcodes
-    - Blockchain.EVM.VMM
-    - Blockchain.EVM.VMState
+    - Blockchain.SolidVM
   ghc-options: -Wall -O2

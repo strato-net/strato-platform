@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Blockchain.VM.MutableStack where
+module Blockchain.EVM.MutableStack where
 
 import Control.DeepSeq
 import Control.Monad

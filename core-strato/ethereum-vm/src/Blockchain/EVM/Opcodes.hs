@@ -2,7 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
-module Blockchain.VM.Opcodes where
+module Blockchain.EVM.Opcodes where
 
 import           Prelude                      hiding (EQ, GT, LT)
 

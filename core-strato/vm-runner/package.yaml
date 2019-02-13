@@ -32,6 +32,7 @@ dependencies:
   - ordered-containers
   - prometheus-client
   - resourcet
+  - solid-vm
   - strato-adit
   - strato-conf
   - strato-genesis

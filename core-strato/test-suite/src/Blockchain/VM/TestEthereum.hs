@@ -48,17 +48,17 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.EVM
+import           Blockchain.EVM.Code
+import           Blockchain.EVM.Environment
+import           Blockchain.EVM.VMM (readGasRemaining)
+import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA                 (keccak256)
 import           Blockchain.SHA
 import           Blockchain.Util
-import           Blockchain.VM
-import           Blockchain.VM.Code
-import           Blockchain.VM.Environment
-import           Blockchain.VM.VMM (readGasRemaining)
-import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 
 import           Blockchain.VM.TestDescriptions

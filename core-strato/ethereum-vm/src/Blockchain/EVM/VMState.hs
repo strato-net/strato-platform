@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.VM.VMState (
+module Blockchain.EVM.VMState (
   VMState(..),
   Gas,
   action,
@@ -28,11 +28,11 @@ import           GHC.Generics
 import           Blockchain.Data.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
+import           Blockchain.EVM.Environment
+import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
-import           Blockchain.VM.Environment
-import qualified Blockchain.VM.MutableStack as MS
 import           Blockchain.VMContext
 
 type Gas = Int
