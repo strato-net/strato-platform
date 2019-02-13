@@ -35,3 +35,16 @@ calculateReturned t er =
   in realRefund + erRemainingTxGas er
   
 
+errorExecResults :: Integer -> VMException -> ExecResults
+errorExecResults remainingGas e = 
+  ExecResults {
+    erRemainingTxGas=remainingGas
+    , erRefund=0
+    , erReturnVal=Nothing
+    , erTrace=[]
+    , erLogs=[]
+    , erNewContractAddress=Nothing
+    , erSuicideList = S.empty
+    , erAction = Nothing
+    , erException = Just e
+    }

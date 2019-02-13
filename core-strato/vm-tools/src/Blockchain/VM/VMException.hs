@@ -3,6 +3,7 @@ module Blockchain.VM.VMException (
   ) where
 
 import Control.DeepSeq
+import Data.Text (Text)
 import GHC.Generics
 
 data VMException =
@@ -18,4 +19,5 @@ data VMException =
   InvalidJump |
   InvalidInstruction |
   WriteProtection |
-  RevertException deriving (Show, Eq, Generic, NFData)
+  RevertException |
+  UnsupportedVM Text deriving (Show, Eq, Generic, NFData)

@@ -995,7 +995,7 @@ runCodeFromStart = do
      EVMMetrics -> $logInfoS "runCodeFromStart" "running evm metrics profiled code" >> runCodeEVMMetrics
 
 -- | runVMM fully evaluates its results to limit memory leaks.
-runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM (Either VMException a, ExecResults)
+runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM ExecResults
 runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
   dbs' <- get
   sqldbs' <- ask
@@ -1015,21 +1015,22 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
       Left e -> do
           lift . lift $ $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
           when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
-          return (Left e, execResults{
-                               erLogs=[],
-                               erException = Just e,
-                               erRefund=0, -- even if e == RevertException, since the full state reverts, all refunds go to 0.
-                               erRemainingTxGas =
-                                    if e == RevertException
-                                    then erRemainingTxGas execResults
-                                    else 0
-                               })
+          return execResults{
+                   erLogs=[],
+                   erException = Just e,
+                   erRefund=0, -- even if e == RevertException, since the full state reverts, all refunds go to 0.
+                   erRemainingTxGas =
+                       if e == RevertException
+                       then erRemainingTxGas execResults
+                       else 0
+                   }
       _ -> do
-          setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ vmState'
+          setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs vmState'
           putRawStorageTxMap $ contextStorageTxMap $ dbs vmState'
           putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs vmState'
+
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
-          return (res, execResults)
+          return execResults
 
 create :: Bool
        -> Bool
@@ -1046,7 +1047,7 @@ create :: Bool
        -> SHA
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
-       -> ContextM (Either VMException Code, ExecResults)
+       -> ContextM ExecResults
 create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
        value gasPrice availableGas newAddress initCode txHash chainId metadata = do
   let env =
@@ -1084,14 +1085,14 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
     pay "transfer value" sender newAddress $ fromIntegral value
     else return True
 
-  (ret, execResults) <-
+  execResults <-
     if success
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas create'
       else do
         execResults <- vmStateToExecResults vmState
-        return (Left InsufficientFunds, execResults)
-  case ret of
-    Left e -> do
+        return execResults{erException=Just InsufficientFunds}
+  case erException execResults of
+    Just e -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
       --have the value, and I can revert without checking for success.
       _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
@@ -1099,8 +1100,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       purgeStorageMap newAddress
       deleteAddressState newAddress
       -- Need to zero gas in the case of an exception.
-      return (Left e, execResults{erRemainingTxGas=0, erException=Just e})
-    _ -> return (ret, execResults{erNewContractAddress=Just newAddress})
+      return execResults{erRemainingTxGas=0, erException=Just e}
+    Nothing -> return $ execResults{erNewContractAddress=Just newAddress}
 
 create' :: VMM Code
 create' = do
@@ -1176,7 +1177,7 @@ call :: Bool
      -> SHA
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
-     -> ContextM (Either VMException B.ByteString, ExecResults)
+     -> ContextM ExecResults
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
      (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
 
@@ -1270,7 +1271,7 @@ create_debugWrapper block owner value initCodeBytes = do
 
       let runEm :: ContextM a -> VMM (a, Context)
           runEm f = lift . lift . flip runReaderT sqldb' . runStateT f $ dbs'
-          callEm :: ContextM (Either VMException Code, ExecResults)
+          callEm :: ContextM ExecResults
           callEm = create (isRunningTests currentVMState)
                           (vmIsHomestead currentVMState)
                           (suicideList currentVMState)
@@ -1287,18 +1288,18 @@ create_debugWrapper block owner value initCodeBytes = do
                           chainId
                           metadata
 
-      ((result, execResults), finalDBs) <- runEm callEm
+      (execResults, finalDBs) <- runEm callEm
 
       setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
       putRawStorageTxMap $ contextStorageTxMap finalDBs
       putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
       setGasRemaining $ fromIntegral $ erRemainingTxGas execResults
 
-      case result of
-        Left e -> do
+      case erException execResults of
+        Just e -> do
           when flags_debug $ lift $ $logInfoS "create_debugWrapper" $ T.pack $ CL.red $ show e
           return Nothing
-        Right _ -> do
+        Nothing -> do
 
           forM_ (reverse $ erLogs execResults) addLog
           state' <- lift get
@@ -1321,7 +1322,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
 
   let runEm :: ContextM a -> VMM (a, Context)
       runEm = lift . lift . flip runReaderT sqldb' . flip runStateT dbs'
-      callEm :: ContextM (Either VMException B.ByteString, ExecResults)
+      callEm :: ContextM ExecResults
       callEm = call (isRunningTests currentVMState)
                     (vmIsHomestead currentVMState)
                     noValueTransfer
@@ -1340,7 +1341,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
                     (envChainId env)
                     (envMetadata env)
 
-  ((result, execResults), finalDBs) <-
+  (execResults, finalDBs) <-
       runEm callEm
 
   setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ finalDBs
@@ -1348,8 +1349,8 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
   putAddressStateTxDBMap $ contextAddressStateTxDBMap finalDBs
 
 
-  case result of
-        Right retVal -> do
+  case erException execResults of
+        Nothing -> do
           forM_ (reverse $ erLogs execResults) addLog
           state' <- lift get
           lift $ put state'{suicideList = erSuicideList execResults}
@@ -1358,14 +1359,14 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (erRemainingTxGas execResults)
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           addToRefund $ fromIntegral $ erRefund execResults
-          return (1, Just retVal)
-        Left RevertException -> do
+          return (1, erReturnVal execResults)
+        Just RevertException -> do
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (erReturnVal execResults)
           addToRefund $ fromIntegral $ erRefund execResults
           return (0, erReturnVal execResults)
-        Left e -> do
+        Just e -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
 

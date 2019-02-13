@@ -71,7 +71,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.TheDAOFork
 import           Blockchain.Util
 import           Blockchain.Verifier
-import           Blockchain.VM
+import qualified Blockchain.VM                           as EVM
 import           Blockchain.VM.Code
 --import           Blockchain.VM.OpcodePrices
 --import           Blockchain.VM.VMM (readRefund, readGasRemaining)
@@ -397,7 +397,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            (result, execResults) <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
+            execResults <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -406,12 +406,11 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr (calculateReturned bt execResults * transactionGasPrice bt)
             unless success' $ error "oops, refund was too much"
             
-            case result of
-                Left e -> do
+            case erException execResults of
+                Just e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ P.incCounter vmTxsUnsuccessful
-                Right _ -> do
-
+                Nothing -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
                     forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
                         lift $ purgeStorageMap address'
@@ -426,17 +425,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
-            return ExecResults {
-                                 erRemainingTxGas=transactionGasLimit bt
-                               , erRefund=0
-                               , erReturnVal=Nothing
-                               , erTrace=[] --error "theTrace not set" -- seriously?
-                               , erLogs=[]
-                               , erNewContractAddress=Nothing
-                               , erSuicideList = S.empty
-                               , erAction = Nothing
-                               , erException = Just Blockchain.VM.VMException.InsufficientFunds
-                               }
+            return $
+              errorExecResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
 runCodeForTransaction :: Bool
                       -> Bool
@@ -445,12 +435,20 @@ runCodeForTransaction :: Bool
                       -> Address
                       -> Address
                       -> OutputTx
-                      -> ContextM (Either VMException B.ByteString, ExecResults)
+                      -> ContextM ExecResults
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  (result, execResults) <-
-    create isRunningTests'
+  let create =
+        case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
+          Just "EVM" -> EVM.create
+          Just "SolidVM" -> error "SolidVM doesn't yet exist" -- SolidVM.create
+          Nothing -> EVM.create --EVM is the default
+          Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
+            \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                         return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+  
+  create isRunningTests'
            isHomestead
            S.empty
            b
@@ -466,11 +464,18 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
            (txChainId ut)
            (txMetadata ut)
 
-  return (const B.empty <$> result, execResults)
-
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
+  let call =
+        case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
+          Just "EVM" -> EVM.call
+          Just "SolidVM" -> error "SolidVM doesn't yet exist" -- SolidVM.call
+          Nothing -> EVM.call --EVM is the default
+          Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
+            \_ _ _ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
+                         return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+  
   call isRunningTests'
        isHomestead
        False
@@ -598,7 +603,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
     let tNonce = transactionNonce t
         txPretty = if isMessageTX t
           then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
-          else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
+          else "Create Contract "  ++ fromMaybe "<failed>                                " (fmap (show . pretty) $ erNewContractAddress results) ++ "                  "
     logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                , "Tx hash:  " ++ format theHash
                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce

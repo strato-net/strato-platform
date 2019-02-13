@@ -14,8 +14,8 @@ import           Control.Monad.Logger
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
+import           Data.Maybe
 import qualified Data.Set                as S
-import           Data.Either
 import qualified Data.Text.Encoding      as Text
 
 import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
@@ -52,7 +52,7 @@ spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      ((result,execResults),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
+      (execResults,_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
@@ -101,7 +101,7 @@ spec = do
              (SHA 0)
              Nothing
              Nothing
-      result `shouldSatisfy` isRight
+      erException execResults `shouldSatisfy` isNothing
       print $ erTrace execResults
       print $ erException execResults
       print $ B16.encode "ec630643"
