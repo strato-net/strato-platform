@@ -19,6 +19,7 @@ module Blockchain.VM.VMM (
   setPC,
   incrementPC,
   addToRefund,
+  clearRefund,
   getCallDepth,
   getGasRemaining,
   getReturnVal,
@@ -231,6 +232,11 @@ addToRefund::Int->VMM ()
 addToRefund val = do
   refundref <- lift $ gets refund
   void . liftIO . atomicAddCounter refundref $ val
+
+clearRefund :: VMM ()
+clearRefund = do
+  refundref <- lift $ gets refund
+  liftIO $ writeIORefU refundref 0
 
 getCallDepth::VMM Int
 getCallDepth = lift $ fmap callDepth $ get

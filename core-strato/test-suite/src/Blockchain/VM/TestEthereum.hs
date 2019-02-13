@@ -232,11 +232,11 @@ runTest test = do
         flushMemStorageDB
         flushMemAddressStateDB
 
-        case vmException vmState1 of
-         Nothing -> do
+        case result of
+         Right _ -> do
           gr <- readGasRemaining vmState1
           return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Left _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of
@@ -270,8 +270,10 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (ExecResults remGas _ retVal _ rLogs _ _ _) ->
-                      (Right (), retVal, fromIntegral remGas, rLogs, Just [], Nothing)
+            Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
+                      (Right (), retVal,
+                       fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
+                       rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates
