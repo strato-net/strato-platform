@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Blockchain.VM.Code where
+module Blockchain.EVM.Code where
 
 import qualified Data.ByteString              as B
 import qualified Data.IntSet                  as I
@@ -8,8 +8,8 @@ import           Text.PrettyPrint.ANSI.Leijen
 
 import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.Code
+import           Blockchain.EVM.Opcodes
 import           Blockchain.Format
-import           Blockchain.VM.Opcodes
 import           Blockchain.Util
 
 

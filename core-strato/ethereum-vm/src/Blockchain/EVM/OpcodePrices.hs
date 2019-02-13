@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC  -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 
-module Blockchain.VM.OpcodePrices where
+module Blockchain.EVM.OpcodePrices where
 
 import           Prelude               hiding (EQ, GT, LT)
 
-import           Blockchain.VM.Opcodes
+import           Blockchain.EVM.Opcodes
 import           Blockchain.Strato.Model.Gas
 
 opGasPrice::Operation->Gas

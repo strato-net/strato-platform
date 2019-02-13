@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Blockchain.VM
+module Blockchain.EVM
     ( runCodeFromStart
     , call
     , create
@@ -63,15 +63,15 @@ import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
-import           Blockchain.VM.Code
-import           Blockchain.VM.Environment
-import           Blockchain.VM.Memory
-import qualified Blockchain.VM.MutableStack        as MS
-import           Blockchain.VM.OpcodePrices
-import           Blockchain.VM.Opcodes
-import           Blockchain.VM.PrecompiledContracts
-import           Blockchain.VM.VMM
-import           Blockchain.VM.VMState
+import           Blockchain.EVM.Code
+import           Blockchain.EVM.Environment
+import           Blockchain.EVM.Memory
+import qualified Blockchain.EVM.MutableStack        as MS
+import           Blockchain.EVM.OpcodePrices
+import           Blockchain.EVM.Opcodes
+import           Blockchain.EVM.PrecompiledContracts
+import           Blockchain.EVM.VMM
+import           Blockchain.EVM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException

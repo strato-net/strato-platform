@@ -65,17 +65,16 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import qualified Blockchain.EVM                           as EVM
+import           Blockchain.EVM.Code
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
+import qualified Blockchain.SolidVM                      as SolidVM
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.TheDAOFork
 import           Blockchain.Util
 import           Blockchain.Verifier
-import qualified Blockchain.VM                           as EVM
-import           Blockchain.VM.Code
---import           Blockchain.VM.OpcodePrices
---import           Blockchain.VM.VMM (readRefund, readGasRemaining)
-import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 import           Blockchain.VMConstants
@@ -442,7 +441,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
   let create =
         case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
           Just "EVM" -> EVM.create
-          Just "SolidVM" -> error "SolidVM doesn't yet exist" -- SolidVM.create
+          Just "SolidVM" -> SolidVM.create
           Nothing -> EVM.create --EVM is the default
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
@@ -470,7 +469,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner Out
   let call =
         case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
           Just "EVM" -> EVM.call
-          Just "SolidVM" -> error "SolidVM doesn't yet exist" -- SolidVM.call
+          Just "SolidVM" -> SolidVM.call
           Nothing -> EVM.call --EVM is the default
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->

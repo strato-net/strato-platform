@@ -4,7 +4,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.VM.VMM (
+module Blockchain.EVM.VMM (
   VMM,
   pop,
   localState,
@@ -64,13 +64,13 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.EVM.Environment
+import qualified Blockchain.EVM.MutableStack as MS
+import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           Blockchain.VM.Environment
-import qualified Blockchain.VM.MutableStack as MS
-import           Blockchain.VM.VMState
-import           Blockchain.VMContext
 import           Blockchain.VM.VMException
+import           Blockchain.VMContext
 
 type VMM = ExceptT VMException (StateT VMState (ResourceT (LoggingT IO)))
 

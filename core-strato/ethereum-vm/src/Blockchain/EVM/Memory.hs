@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TemplateHaskell      #-}
-module Blockchain.VM.Memory (
+module Blockchain.EVM.Memory (
   Memory(..),
   getSizeInBytes,
   getSizeInWords,
@@ -36,11 +36,11 @@ import           Foreign
 import           System.Exit
 
 import qualified Blockchain.Colors            as CL
+import           Blockchain.EVM.OpcodePrices
+import           Blockchain.EVM.VMM
+import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
-import           Blockchain.VM.OpcodePrices
 import           Blockchain.VM.VMException
-import           Blockchain.VM.VMM
-import           Blockchain.VM.VMState
 
 safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
 safeReadRange v !offset !count = do

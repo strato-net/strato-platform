@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.VM.PrecompiledContracts (
+module Blockchain.EVM.PrecompiledContracts (
   callPrecompiledContract
   ) where
 
@@ -15,10 +15,10 @@ import           Network.Haskoin.Internals  (Signature (..))
 
 import           Blockchain.Data.Address
 import           Blockchain.ExtendedECDSA
+import           Blockchain.EVM.OpcodePrices
+import           Blockchain.EVM.VMM
 import           Blockchain.ExtWord
 import           Blockchain.Util
-import           Blockchain.VM.OpcodePrices
-import           Blockchain.VM.VMM
 
 
 --import Debug.Trace

@@ -1,4 +1,4 @@
-module Blockchain.VM.Environment where
+module Blockchain.EVM.Environment where
 
 import           Control.DeepSeq
 import qualified Data.ByteString            as B

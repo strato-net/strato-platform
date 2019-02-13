@@ -26,11 +26,11 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
+import           Blockchain.EVM
+import qualified Blockchain.EVM.MutableStack as MS
+import           Blockchain.EVM.Opcodes
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
-import           Blockchain.VM
-import qualified Blockchain.VM.MutableStack as MS
-import           Blockchain.VM.Opcodes
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
 
