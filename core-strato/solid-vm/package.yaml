@@ -12,40 +12,70 @@ description:
 default-extensions:
   - DeriveGeneric
   - DeriveAnyClass
+  - LambdaCase
+
 
 dependencies:
   - base >= 4 && < 5
-  - vm-tools
-  - ethereum-vm
-  - ansi-wl-pprint
-  - base16-bytestring
+  - aeson
+  - aeson-casing
   - binary
   - blockapps-data
-  - blockapps-haskoin
   - blockapps-util
   - bytestring
-  - clockwork
   - containers
-  - cpu
-  - cryptohash
+  - cryptonite
   - deepseq
-  - ethereum-encryption
   - extra
-  - ghc
-  - integer-gmp
+  - generic-random
+  - largeword
   - lens
-  - merkle-patricia-db
-  - monad-logger
-  - mtl
-  - primitive
-  - resourcet
+  - memory
+  - parsec
+  - QuickCheck
+  - quickcheck-instances
+  - semver-range
+  - servant-docs
   - strato-model
+  - swagger2
   - text
   - time
   - transformers
-  - unboxed-ref
+  - unordered-containers
   - vector
   - vm-tools
+
+
+#  - ethereum-vm
+#  - ansi-wl-pprint
+#  - base16-bytestring
+#  - binary
+#  - blockapps-haskoin
+#  - bytestring
+#  - clockwork
+#  - containers
+#  - cpu
+#  - cryptohash
+#  - deepseq
+#  - ethereum-encryption
+#  - extra
+#  - ghc
+#  - integer-gmp
+#  - lens
+#  - merkle-patricia-db
+#  - monad-logger
+#  - mtl
+#  - primitive
+#  - resourcet
+#  - text
+#  - unboxed-ref
+#  - vector
+#  - vm-tools
+#  - http-api-data
+#  - persistent
+#  - random
+#  - servant
+
 
 
 library:

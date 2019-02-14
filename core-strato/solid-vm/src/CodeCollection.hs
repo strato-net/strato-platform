@@ -1,0 +1,143 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+module CodeCollection where
+
+import Control.Lens
+import Data.Map (Map)
+import qualified Data.Map as M
+import           Data.Maybe
+import qualified Data.Text as T
+
+import           BlockApps.Solidity.Parse.Declarations
+import           BlockApps.Solidity.Parse.File
+import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi as Xabi
+import qualified BlockApps.Solidity.Xabi.Def as Xabi
+import qualified BlockApps.Solidity.Xabi.Statement as Xabi
+import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
+
+
+
+data Contract =
+  Contract {
+    _parents :: [String],
+    _constants :: Map String ConstantDecl,
+    _storageDefs :: Map String VariableDecl,
+    _enums :: Map String [String],
+    _structs :: Map String [(T.Text, Xabi.FieldType)],
+    _functions :: Map String Func,
+    _constructor :: Maybe Func
+  } deriving (Show)
+
+makeLenses ''Contract
+
+data CodeCollection =
+  CodeCollection {
+    _contracts :: Map String Contract
+  } deriving (Show)
+
+makeLenses ''CodeCollection
+
+
+emptyCodeCollection :: CodeCollection
+emptyCodeCollection =
+  CodeCollection M.empty
+
+
+
+xabiToContract :: [String] -> Xabi -> Contract
+xabiToContract parents' xabi =
+  Contract {
+  _parents = parents',
+  _storageDefs = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiVars xabi,
+  _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
+  _enums = M.fromList [(T.unpack name, map T.unpack vals) | (name, Xabi.Enum vals _) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(T.unpack name, vals) | (name, Xabi.Struct vals _) <- M.toList $ Xabi.xabiTypes xabi],
+  _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
+  _constructor =
+      case M.toList $ Xabi.xabiConstr xabi of
+        [] -> Nothing
+        [(_, x)] -> Just x
+        _ -> error "multiple constructors in contract" --TODO- figure out if this is allowed in Solidity
+  }
+
+
+
+
+
+applyInheritence :: CodeCollection -> CodeCollection
+applyInheritence cc =
+  cc{
+    _contracts = M.map (addInheritedObjects cc) $ cc^.contracts
+  }
+
+addInheritedObjects :: CodeCollection -> Contract -> Contract
+addInheritedObjects cc c =
+  c{
+  _functions=getContractFunctions cc c,
+  _storageDefs=getContractStorageDefs cc c,
+  _enums=getContractEnums cc c,
+  _structs=getContractStructs cc c
+  }
+
+getContractFunctions :: CodeCollection -> Contract -> Map String Xabi.Func
+getContractFunctions cc c =
+  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
+      parentFunctions = map (getContractFunctions cc) parentContracts :: [Map String Xabi.Func]
+  in M.unions $ c^.functions:parentFunctions
+
+getContractStorageDefs :: CodeCollection -> Contract -> Map String Xabi.VariableDecl
+getContractStorageDefs cc c =
+  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
+      parentStorageDefs = map (getContractStorageDefs cc) parentContracts
+  in M.unions $ c^.storageDefs:parentStorageDefs
+
+getContractEnums :: CodeCollection -> Contract -> Map String [String]
+getContractEnums cc c =
+  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
+      parentEnums = map (getContractEnums cc) parentContracts :: [Map String [String]]
+  in M.unions $ c^.enums:parentEnums
+
+getContractStructs :: CodeCollection -> Contract -> Map String [(T.Text, Xabi.FieldType)]
+getContractStructs cc c =
+  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
+      parentStructs = map (getContractStructs cc) parentContracts
+  in M.unions $ c^.structs:parentStructs
+
+
+
+
+getFunctionCode' :: M.Map T.Text Xabi.Func -> T.Text -> [Xabi.Statement]
+getFunctionCode' _ "uint" = []
+getFunctionCode' _ "string" = []
+getFunctionCode' _ "byte" = []
+getFunctionCode' _ "bytes" = []
+getFunctionCode' _ "new bytes" = []
+getFunctionCode' _ "push" = []
+getFunctionCode' _ "EventLogEntry" = []
+getFunctionCode' _ "TicketState" = []
+getFunctionCode' _ "ValidationRuleInterface" = []
+getFunctionCode' _ "TaxCodeManager" = []
+getFunctionCode' _ "Transition" = []
+getFunctionCode' _ "constructor for Bytes" = []
+getFunctionCode' _ "Ticket" = [] --TODO we probably should add this
+getFunctionCode' _ "fare" = [] --TODO we probably should add this
+getFunctionCode' _ "coam" = [] --TODO we probably should add this
+getFunctionCode' _ "eqfr" = [] --TODO we probably should add this
+getFunctionCode' _ "cort" = [] --TODO we probably should add this
+getFunctionCode' _ x | "constructor for" `T.isPrefixOf` x = [] --TODO we probably should add this
+getFunctionCode' functions' name =
+  let
+    Just theFunction = M.lookup name functions'
+    Just funcStatements = Xabi.funcContents theFunction
+  in funcStatements
+
+getFunction :: File -> T.Text -> T.Text -> (T.Text, Xabi.Func)
+getFunction file contractName functionName =
+  let
+    Just contract' = lookup contractName $ [(name, xabi) | NamedXabi name (xabi, _) <- unsourceUnits file]
+
+    Just func = M.lookup functionName $ Xabi.xabiFuncs contract'
+  in (functionName, func)
+    
