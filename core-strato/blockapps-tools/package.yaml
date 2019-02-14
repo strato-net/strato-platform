@@ -33,7 +33,7 @@ dependencies:
   - resourcet
   - time
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - strato-index
   - strato-redis-blockdb
   - strato-model

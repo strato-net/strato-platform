@@ -67,9 +67,8 @@ dependencies:
   - shakespeare                   >= 2.0
   - strato-conf
   - strato-genesis
-  - strato-init
   - strato-model
-  - strato-sequencer
+  - seqevents
   - template-haskell
   - text                          >= 0.11
   - time

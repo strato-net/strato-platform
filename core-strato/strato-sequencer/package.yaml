@@ -59,6 +59,7 @@ dependencies:
   - deepseq
   - exceptions
   - unliftio
+  - seqevents
 
 ghc-options: -Wall -O2 -threaded
 
