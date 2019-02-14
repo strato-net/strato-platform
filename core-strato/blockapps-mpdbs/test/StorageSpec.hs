@@ -25,8 +25,6 @@ import Test.Hspec (Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 
-import Blockchain.Constants
-import Blockchain.Data.Address
 import Blockchain.Data.AddressStateDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
@@ -34,6 +32,7 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
 
@@ -77,8 +76,8 @@ initialEnv = do
   tmpdir <- mkdtemp "/tmp/storage_spec"
   let ldbOptions = DB.defaultOptions { DB.createIfMissing = True }
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
-  s <- openDB stateDBPath
-  h <- openDB hashDBPath
+  s <- openDB "/state/"
+  h <- openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runResourceT . flip execStateT st $ do
     MP.initializeBlank =<< getStateDB

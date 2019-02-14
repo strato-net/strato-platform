@@ -11,14 +11,14 @@ module Blockchain.DB.StorageDB (
 import           Data.Bifunctor                              (second)
 import qualified Data.ByteString                             as B
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 
 -- A thin layer around raw storage db for clients who expect to work on
 -- keys and values of Word256

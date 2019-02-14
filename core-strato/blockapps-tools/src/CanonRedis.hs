@@ -58,11 +58,7 @@ canonRedis ip start range = do
       return curr
 
     isCanonical :: SHA -> Integer -> Redis Bool
-    isCanonical hash num = do
-      mHash <- getCanonical num
-      case mHash of
-        Nothing -> return False
-        Just hash' ->return $  hash == hash'
+    isCanonical hsh num = (== Just hsh) <$> getCanonical num
 
     printBlockHeader :: (SHA,BlockHeader) -> IO ()
     printBlockHeader (sha, h) = do

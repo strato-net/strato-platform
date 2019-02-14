@@ -17,6 +17,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -86,9 +87,12 @@ benchmarks:
     main: Microbench.hs
     other-modules: []
     dependencies:
+      - blockapps-haskoin
       - criterion
+      - deepseq
       - ethereum-vm
       - hashable
+      - vector
       - unordered-containers
 
   extractbench:

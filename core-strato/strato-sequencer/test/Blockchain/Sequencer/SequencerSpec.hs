@@ -92,8 +92,8 @@ runPBFTTestM m = do
 runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
 runPBFTTestMWithGenesis m = do
   gb <- makeGenesisBlock
-  let hash = blockHash . ingestBlockToBlock $ gb
-  void $ withTemporaryDepBlockDB True gb (m hash)
+  let hsh = blockHash . ingestBlockToBlock $ gb
+  void $ withTemporaryDepBlockDB True gb (m hsh)
 
 withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB pbft genesisBlock m = do
@@ -126,9 +126,9 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         auSenders = [myAddr]
         ctx = newContext (View 0 0) vals auSenders pkey
         mCtx = if pbft then Just ctx else Nothing
-        hash = blockHash . ingestBlockToBlock $ genesisBlock
+        hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
-        boot = bootstrapGenesisBlock hash difficulty
+        boot = bootstrapGenesisBlock hsh difficulty
     fromLeft (error "webserver completed") <$>
       race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
            ( run testWebserverPort

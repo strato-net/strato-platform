@@ -20,6 +20,7 @@ library:
     - strato-model
     - strato-conf
     - blockapps-data
+    - blockapps-mpdbs
     - blockapps-util
     - ethereum-rlp
     - merkle-patricia-db

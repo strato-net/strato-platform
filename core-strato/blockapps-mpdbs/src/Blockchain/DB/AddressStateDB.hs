@@ -24,7 +24,6 @@ module Blockchain.DB.AddressStateDB (
   getStorageKeyFromHash
 ) where
 
-import           Blockchain.Data.Address
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
@@ -32,7 +31,8 @@ import qualified Blockchain.Database.MerklePatricia          as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Util
 
 import           Data.Binary

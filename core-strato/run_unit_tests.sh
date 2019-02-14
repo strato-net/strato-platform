@@ -7,6 +7,7 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
+  blockapps-mpdbs
   blockstanbul
   ethereum-discovery
   ethereum-rlp
@@ -23,7 +24,7 @@ TESTS=(
 )
 
 BENCHES=(
-  ethereum-vm
+  vm-runner
 )
 # There's a good chance that strato-getting-started is also running, so
 # we change redis's port to avoid a conflict.

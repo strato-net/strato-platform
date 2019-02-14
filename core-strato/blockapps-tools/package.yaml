@@ -16,6 +16,7 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - cmdargs

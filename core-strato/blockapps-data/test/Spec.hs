@@ -28,7 +28,6 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 
-import           StorageSpec
 import           Test.QuickCheck
 
 main :: IO()
@@ -57,7 +56,6 @@ main = hspec $ do
     eventualHashIdempotency
     eventualFromIdempotency
     directComparison
-  storageSpec
 
 rlpRT :: (RLPSerializable a) => a -> a
 rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
