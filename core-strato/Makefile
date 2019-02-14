@@ -18,11 +18,13 @@ prebuild:
 
 build_haskell: prebuild
 	stack build --test --no-run-tests \
+        --bench --no-run-benchmarks \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_haskell_profiled: prebuild build_buildbase
 	stack build --profile --work-dir .stack-work-profile \
         --test --no-run-tests \
+        --bench --no-run-benchmarks \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_docker: prebuild build_haskell

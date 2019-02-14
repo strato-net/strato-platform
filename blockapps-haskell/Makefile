@@ -27,11 +27,13 @@ $(FAKEROOT)/usr/bin/solc: $(FAKEROOT)/usr/bin/solc-0.4 $(FAKEROOT)/usr/bin/solc-
 
 build_haskell: prebuild $(FAKEROOT)/usr/bin/solc
 	stack build --test --no-run-tests \
+        --bench --no-run-benchmarks \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_haskell_profiled: prebuild build_solidity
 	stack build --profile --work-dir .stack-work-profile \
         --test --no-run-tests \
+        --bench --no-run-benchmarks \
         --copy-bins --local-bin-path=$(FAKEROOT)/usr/bin
 
 build_docker: build_haskell $(FAKEROOT)/usr/bin/solc
