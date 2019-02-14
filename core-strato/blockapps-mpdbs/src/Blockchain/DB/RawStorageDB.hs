@@ -15,7 +15,7 @@ import qualified Data.ByteString                             as B
 import qualified Data.Map                                    as M
 import qualified Database.LevelDB                            as DB
 
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP

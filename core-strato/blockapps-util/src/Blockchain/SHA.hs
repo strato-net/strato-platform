@@ -5,10 +5,8 @@
 module Blockchain.SHA (
   module Blockchain.Strato.Model.SHA,
   formatSHAWithoutColor,
-  hash
   ) where
 
-import qualified Data.ByteString.Char8       as BC
 import qualified Data.Text                   as T
 import           Numeric
 import           Web.HttpApiData
@@ -55,7 +53,3 @@ instance FromHttpApiData SHA where
         where unmaybe = \case
                 Nothing -> Left "couldn't parse SHA"
                 Just x  -> Right x
-
-hash :: BC.ByteString -> SHA
-hash = superProprietaryStratoSHAHash
-

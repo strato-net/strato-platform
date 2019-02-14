@@ -65,9 +65,8 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import qualified Blockchain.EVM                           as EVM
 import           Blockchain.EVM.Code
-import           Blockchain.ExtWord
+import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
@@ -161,12 +160,12 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    NonceTooLow    s q expected OutputTx{otHash=hash, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hash)
-    BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
-        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hash)
-    GasLimitTooLow s q _ OutputTx{otHash=hash} ->
-        (p' s q ++ "tx gas limit", hash)
+    NonceTooLow    s q expected OutputTx{otHash=hsh, otBaseTx=bt} ->
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
+    BalanceTooLow  s q needed actual OutputTx{otHash=hsh} ->
+        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
+    GasLimitTooLow s q _ OutputTx{otHash=hsh} ->
+        (p' s q ++ "tx gas limit", hsh)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
         (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
 
@@ -404,7 +403,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
             success' <- lift $ pay "VM refund fees" (blockDataCoinbase b) tAddr (calculateReturned bt execResults * transactionGasPrice bt)
             unless success' $ error "oops, refund was too much"
-            
+
             case erException execResults of
                 Just e -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
@@ -417,7 +416,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     lift $ P.incCounter vmTxsSuccessful
 
 
-                    
+
             return execResults
         else do
             s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
@@ -446,7 +445,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                          return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
-  
+
   create isRunningTests'
            isHomestead
            S.empty
@@ -474,7 +473,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner Out
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
                          return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
-  
+
   call isRunningTests'
        isHomestead
        False
@@ -615,9 +614,6 @@ indexMaybe _ i        | i < 0 = error "indexMaybe called for i < 0"
 indexMaybe [] _       = Nothing
 indexMaybe (x:_) 0    = Just x
 indexMaybe (_:rest) i = indexMaybe rest (i-1)
-
-formatAddress :: Address->String
-formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 

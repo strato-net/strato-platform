@@ -6,7 +6,9 @@
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
-      formatAddress, stringAddress
+      formatAddress, formatAddressWithoutColor, stringAddress,
+      getNewAddress_unsafe,
+      addressAsNibbleString, addressFromNibbleString
     ) where
 
 import           Control.DeepSeq
@@ -18,7 +20,7 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Strato.Model.Colors       as CL
 import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import           Blockchain.Strato.Model.SHA          (keccak256)
+import           Blockchain.Strato.Model.SHA          (keccak256, hash)
 import           Blockchain.Strato.Model.Util
 
 import qualified Data.Aeson                           as AS
@@ -28,6 +30,7 @@ import qualified Data.Aeson.Encoding                  as Enc
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
+import qualified Data.NibbleString                    as N
 
 import qualified Data.Text                            as T
 import           Text.Read                            (readMaybe)
@@ -121,3 +124,18 @@ instance ToHttpApiData Address where
   toUrlPiece = T.pack . formatAddress
 
 instance NFData Address
+
+getNewAddress_unsafe ::Address->Integer->Address
+getNewAddress_unsafe a n =
+    let theHash = hash $ rlpSerialize $ RLPArray [rlpEncode a, rlpEncode n]
+    in decode $ BL.drop 12 $ encode theHash
+
+addressAsNibbleString::Address->N.NibbleString
+addressAsNibbleString (Address s) =
+  byteString2NibbleString $ BL.toStrict $ encode s
+
+addressFromNibbleString::N.NibbleString->Address
+addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
+
+formatAddressWithoutColor::Address->String
+formatAddressWithoutColor = formatAddress

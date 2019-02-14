@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import GHC.Generics
 
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.SHA hiding (hash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.ChainInfo

@@ -18,12 +18,12 @@ import           Control.DeepSeq
 import qualified Data.Map                       as M
 import GHC.Generics
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.DB.AddressStateDB   as DB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Format
+import           Blockchain.Strato.Model.Address
 
 data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Generic)
 

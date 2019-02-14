@@ -181,8 +181,8 @@ stem' _ []                  = error "stem' called with empty list"
 stem' l (c:cs) | l == c     = [l]
                | otherwise  = l:(stem' parent (c:cs))
     where
-        hash = blockDataParentHash l
-        parent = fromMaybe l (find (\b -> blockHeaderHash b == hash) (c:cs))
+        hsh = blockDataParentHash l
+        parent = fromMaybe l (find (\b -> blockHeaderHash b == hsh) (c:cs))
 
 showTree :: (Show a) => Tree a -> String
 showTree = drawTree . prettyTree
