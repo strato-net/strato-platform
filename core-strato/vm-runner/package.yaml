@@ -86,10 +86,13 @@ benchmarks:
     main: Microbench.hs
     other-modules: []
     dependencies:
+      - blockapps-haskoin
       - criterion
+      - deepseq
       - ethereum-vm
       - hashable
       - unordered-containers
+      - vector
 
   extractbench:
     source-dirs: bench/

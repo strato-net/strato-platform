@@ -4,7 +4,7 @@ import qualified BlockApps.ECRecover.BytesFormat   as A
 import qualified BlockApps.ECRecover.IntegerFormat as B
 import           Criterion.Main
 
-
+main :: IO ()
 main =
   defaultMain $
   [
