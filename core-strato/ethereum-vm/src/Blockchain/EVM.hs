@@ -996,7 +996,7 @@ runCodeFromStart = do
 
 -- | runVMM fully evaluates its results to limit memory leaks.
 runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM ExecResults
-runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
+runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
