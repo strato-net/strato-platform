@@ -10,7 +10,6 @@ dependencies:
   - ansi-wl-pprint
   - base
   - base16-bytestring
-  - blockapps-common-types
   - containers
   - ethereum-rlp
   - binary

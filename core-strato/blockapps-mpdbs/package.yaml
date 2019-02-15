@@ -14,7 +14,6 @@ dependencies:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
-  - blockapps-common-types
   - blockapps-util
   - bytestring
   - containers
@@ -26,6 +25,7 @@ dependencies:
   - mtl
   - nibblestring
   - resourcet
+  - solid-vm-model
   - strato-model
 
 ghc-options: -Wall -O2

@@ -39,7 +39,6 @@ dependencies:
   - binary
   - blaze-html
   - blaze-markup
-  - blockapps-common-types
   - blockapps-data
   - blockapps-haskoin
   - blockapps-util
@@ -66,6 +65,7 @@ dependencies:
   - postgresql-simple
   - process
   - shakespeare                   >= 2.0
+  - solid-vm-model
   - strato-conf
   - strato-genesis
   - strato-init

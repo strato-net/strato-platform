@@ -13,7 +13,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           BlockApps.CommonTypes
+import           SolidVM.Model
 
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.Text                          as T

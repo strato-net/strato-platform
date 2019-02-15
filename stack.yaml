@@ -47,8 +47,8 @@ packages:
 - core-strato/ethereum-rlp/
 - core-strato/blockstanbul/
 - core-strato/privacy/
-- shared-util/blockapps-common-types
 - shared-util/cross-monitoring/
+- shared-util/solid-vm-model
 - clockwork
 - logserver
 - location:

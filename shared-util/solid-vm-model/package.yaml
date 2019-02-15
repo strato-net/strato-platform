@@ -1,4 +1,4 @@
-name: blockapps-common-types
+name: solid-vm-model
 
 library:
   source-dirs: src/
@@ -7,4 +7,5 @@ library:
     - base
     - base16-bytestring
     - bytestring
+    - strato-model
     - text

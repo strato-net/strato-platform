@@ -23,7 +23,6 @@ dependencies:
   - bytestring
   - bytestring-arbitrary
   - clock
-  - blockapps-common-types
   - conduit
   - conduit-combinators
   - containers
@@ -49,6 +48,7 @@ dependencies:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - solid-vm-model
   - QuickCheck
   - resourcet
   - strato-conf

@@ -25,6 +25,7 @@ import           Database.Persist.TH
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
+import           Data.Word
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.TransactionResultStatus
@@ -37,8 +38,7 @@ import qualified Data.ByteString                         as BS
 
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           BlockApps.CommonTypes
-import           Data.Word
+import           SolidVM.Model
 
 import           Control.Lens.TH                         (makeLensesFor)
 import           GHC.Generics

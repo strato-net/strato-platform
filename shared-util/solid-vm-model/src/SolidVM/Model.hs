@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module BlockApps.CommonTypes where
+module SolidVM.Model where
 
 import Data.Aeson
 import Data.Aeson.Types
@@ -8,7 +8,12 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.Text as T
 import Data.Text.Encoding
 
+import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+
 newtype HexStorage = HexStorage B.ByteString deriving (Eq, Show, Read)
+
+word256ToHexStorage :: Word256 -> HexStorage
+word256ToHexStorage = HexStorage . word256ToBytes
 
 instance ToJSON HexStorage where
   toJSON (HexStorage hs) = String . decodeUtf8 . B16.encode $ hs
