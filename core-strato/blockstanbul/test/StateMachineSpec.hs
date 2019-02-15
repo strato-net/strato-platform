@@ -110,7 +110,7 @@ spec = parallel $ do
         let hsh2 = blockHash blk2
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
         map oMessage omsgs3 `shouldMatchList`
-            if ppr == nextPpr
+            if sender ppr == sender nextPpr
               then [Prepare v2 hsh2, Prepare v2 hsh2]
               else [Prepare v2 hsh2]
         -- Old prepares are now ignored
@@ -170,7 +170,7 @@ spec = parallel $ do
         use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
-      runTest $ do
+      (sender auth /= addr) ==> runTest $ do
         proposer .= addr
         validators .= S.fromList [sender auth, addr]
         curView <- use view
@@ -233,7 +233,7 @@ spec = parallel $ do
         sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
-      runTest $ do
+      (S.size (S.fromList [a1, a2, a3]) == 3) ==> runTest $ do
         (curView, di) <- setupRound blk [a1, a2, a3]
         let upgrade a = IMsg (MsgAuth a sig) $ Prepare curView di
         sendMessages (map upgrade [a1, a2]) `shouldReturn` []
@@ -326,7 +326,7 @@ spec = parallel $ do
 
   describe "A round change message" $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3 ->
-      runTest $ do
+      (S.size (S.fromList $ map sender [a1, a2, a3]) == 3) ==> runTest $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
