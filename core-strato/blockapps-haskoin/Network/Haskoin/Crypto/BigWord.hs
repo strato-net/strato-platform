@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
@@ -70,7 +72,9 @@ import Data.Ratio (numerator, denominator)
 import qualified Data.ByteString as BS (head, length, reverse)
 import qualified Data.Text as T (pack, unpack)
 import Data.Data (Data(..))
+import Data.Hashable (Hashable)
 import Data.Typeable (Typeable)
+import GHC.Generics (Generic)
 import Text.Printf
 import Text.Read (Read(..))
 
@@ -109,7 +113,7 @@ data ModP
 data ModN
 
 newtype BigWord n = BigWord { getBigWordInteger :: Integer }
-    deriving (Eq, Ord, Data, Typeable)
+    deriving (Eq, Ord, Data, Typeable, Generic, Hashable)
 
 instance Show (BigWord n) where
   show (BigWord n) = show n
