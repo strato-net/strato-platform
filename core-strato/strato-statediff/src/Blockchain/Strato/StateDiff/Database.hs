@@ -22,6 +22,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
+import           SolidVM.Model
 
 import           Control.Monad
 import           Control.Monad.IO.Class
