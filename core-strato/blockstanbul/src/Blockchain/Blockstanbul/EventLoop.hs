@@ -29,8 +29,8 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
-import Blockchain.Format
-import Blockchain.SHA
+import Blockchain.Strato.Model.Format
+import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 type StateMachineM m = (MonadState BlockstanbulContext m, MonadIO m, MonadLogger m)

@@ -21,6 +21,7 @@ library:
     - strato-model
     - strato-conf
     - blockapps-data
+    - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-util
     - ethereum-rlp

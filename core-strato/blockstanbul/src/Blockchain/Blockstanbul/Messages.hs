@@ -16,13 +16,13 @@ import Test.QuickCheck
 import Text.Printf
 
 import Blockchain.Data.RLP
-import Blockchain.ExtWord
-import Blockchain.Format
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
-import Blockchain.SHA
+import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Format
 import qualified Blockchain.Strato.Model.Colors as CL
 
 type RoundNumber = Word256

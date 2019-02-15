@@ -16,6 +16,7 @@ dependencies:
   - classy-prelude
   - strato-model
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - strato-conf
   - clock
