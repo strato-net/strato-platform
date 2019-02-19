@@ -10,10 +10,10 @@ import           Database.Persist.Sql
 import           Database.Persist.TH
 
 import           Blockchain.Data.Address
---import Blockchain.Data.Transaction
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.ExtWord
 import           Blockchain.SHA
+import           SolidVM.Model
 
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.Text                          as T
@@ -51,6 +51,24 @@ instance PersistField Integer where
 instance PersistFieldSql Integer where
   sqlType _ = SqlNumeric integerCap 0
 -}
+
+instance PersistField CodeKind where
+  toPersistValue = PersistText . T.pack . show
+  fromPersistValue (PersistText t) = Right . read . T.unpack $ t
+  fromPersistValue x = Left . T.pack $ "PersistField CodeKind: expected int: " ++ show x
+
+instance PersistFieldSql CodeKind where
+  sqlType _  = SqlString
+
+instance PersistField HexStorage where
+  toPersistValue (HexStorage hs) = PersistText . decodeUtf8 . B16.encode $ hs
+  fromPersistValue (PersistText t) = case B16.decode (encodeUtf8 t) of
+    (h, "") -> Right $ HexStorage h
+    (_, _) -> Left $ T.pack $ "Invalid hex text: " ++ show t
+  fromPersistValue x = Left $ T.pack $ "PersistField HexStorage: expected varchar: " ++ (show x)
+
+instance PersistFieldSql HexStorage where
+  sqlType _ = SqlString
 
 instance PersistField Word256 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)

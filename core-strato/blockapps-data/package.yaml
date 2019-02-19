@@ -48,6 +48,7 @@ dependencies:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - solid-vm-model
   - QuickCheck
   - resourcet
   - strato-conf

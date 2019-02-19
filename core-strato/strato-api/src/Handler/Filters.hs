@@ -6,10 +6,8 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T
 import qualified Prelude                     as P
 
-import           Data.Binary                 as Bin
 import           Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BS8
-import qualified Data.ByteString.Lazy        as BS
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Numeric
@@ -20,6 +18,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
+import           SolidVM.Model
 
 import           Control.Monad
 import           Data.Set
@@ -93,7 +92,7 @@ getBlkFilter (bdRef, _, _) ("blockid", v)   = bdRef E.^. BlockDataRefId E.==. E.
 getBlkFilter (bdRef, _, _) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) )
 
 
-getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
+getBlkFilter _ _ = P.error ("no match in getBlkFilter"::String)
 
 
 
@@ -134,7 +133,7 @@ getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefC
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
 getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
 
-getAccFilter _             _                 = P.undefined ("no match in getAccFilter"::String)
+getAccFilter _             _                 = P.error ("no match in getAccFilter"::String)
 
 transactionQueryParams:: [Text]
 transactionQueryParams = [ "address",
@@ -186,43 +185,26 @@ getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue 
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
 getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. E.val (fromHexText v))
-getTransFilter _           _                   = P.undefined ("no match in getTransFilter"::String)
+getTransFilter _           _                   = P.error ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
-getStorageFilter _ ("page",_)  = E.val True
-getStorageFilter _ ("index",_) = E.val True
-getStorageFilter (storage,_) ("key", v)
-  = storage E.^. StorageKey E.==. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("minkey", v)
-  = storage E.^. StorageKey E.>=. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("maxkey", v)
-  = storage E.^. StorageKey E.<=. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("keystring", v)
-  = storage E.^. StorageKey E.==. E.val (Bin.decode $ BS.fromStrict $ T.encodeUtf8 v :: Word256)
-getStorageFilter (storage,_) ("keyhex", v)
-  = storage E.^. StorageKey E.==. E.val (fromHexText v)
-getStorageFilter (storage,_) ("value", v)
-  = storage E.^. StorageValue E.==. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("minvalue", v)
-  = storage E.^. StorageValue E.>=. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("maxvalue", v)
-  = storage E.^. StorageValue E.<=. E.val (P.fromIntegral (toInteger' v) :: Word256)
-getStorageFilter (storage,_) ("valuestring", v)
-  = storage E.^. StorageValue E.==. E.val (Bin.decode $ BS.fromStrict $ T.encodeUtf8 v :: Word256)
-getStorageFilter (storage,_) ("addressid", v)
-  = storage E.^. StorageAddressStateRefId E.==. E.val (toAddrId v)
-getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
-  = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-getStorageFilter (_,addrStRef) ("chainid", v)
-  = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
-
-getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
+getStorageFilter (storage, addrStRef) (k, v) = case k of
+  "key" -> storage E.^. StorageKey E.==. E.val (toHex v)
+  "minkey" -> storage E.^. StorageKey E.>=. E.val (toHex v)
+  "maxkey" -> storage E.^. StorageKey E.<=. E.val (toHex v)
+  "value" -> storage E.^. StorageValue E.==. E.val (toHex v)
+  "minvalue" -> storage E.^. StorageValue E.>=. E.val (toHex v)
+  "maxvalue" -> storage E.^. StorageValue E.<=. E.val (toHex v)
+  -- Note: a join is done in StorageInfo
+  "address" -> addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+  "chainid" -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
+  _ -> P.error ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
 getLogFilter _ ("index",_) = E.val True         -- indexes are intercepted in handlers. We should probably deal with them here in the future
 getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)
 getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
-getLogFilter _           _  = P.undefined ("no match in getLogFilter"::String)
+getLogFilter _           _  = P.error ("no match in getLogFilter"::String)
 
 toAddrId :: Text -> Key AddressStateRef
 toAddrId = toId
@@ -236,6 +218,9 @@ toId v = toSqlKey (fromIntegral $ (toInteger' v) )
 toAddr :: Text -> Address
 toAddr v = Address wd160
   where ((wd160, _):_) = readHex $ T.unpack $ v :: [(Word160,String)]
+
+toHex :: Text -> HexStorage
+toHex = word256ToHexStorage . P.read . T.unpack
 
 toInteger' :: Text -> Integer
 toInteger' v = P.read $ T.unpack v
