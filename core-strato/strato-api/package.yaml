@@ -66,7 +66,7 @@ dependencies:
   - postgresql-simple
   - process
   - shakespeare                   >= 2.0
-  - solid-vm-model
+  - solid-vm-modeL
   - strato-conf
   - strato-genesis
   - strato-model

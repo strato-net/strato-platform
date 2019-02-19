@@ -86,10 +86,10 @@ instance StorableValue Word256 where
   decodeMPDBValue = retrieveMPDBValue
 
 instance StorableKey B.ByteString where
-  lookupStorageKey = error "TODO(tim): Decode solidvm key"
+  lookupStorageKey = lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
 instance StorableValue B.ByteString where
-  decodeMPDBValue = error "TODO(tim): Decoding solidvm value"
+  decodeMPDBValue = rlpDecode
 
 -- | Describes all the changes to a particular account.  The address is not
 -- recorded; it appears as the key in the map in the 'StateDiff'
