@@ -267,6 +267,17 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
 postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
+  --I had to temporarily replace the compileContract call to get the metadata needed for the transaction results call later on.
+  --At best we should remove the need for the metadata completely, at worst, we should remove the compile and just generate the metadata.  To get the interpreter working, I am just putting this all back in now, and will notate which lines we should eventually remove again
+  idsAndDetails <- compileContract src      --remove
+  (_,(cmId,ContractDetails{..})) <-     --remove
+    case contract of                        --remove
+     Nothing ->                             --remove
+       case Map.toList idsAndDetails of     --remove
+         [] -> throwError $ UserError "You need to supply at least one contract in the source" --remove
+         [x] -> return x                    --remove
+         _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
+     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)              --remove
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
   tx <- signAndPrepare sign fromAddr metadata $
     TransactionHeader
@@ -279,6 +290,13 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [  --remove
+    ( Nothing                                                      --remove
+    , constant hash                                                --remove
+    , constant cmId                                                --remove
+    , constant (1 :: Int32)                                        --remove
+    , constant contractdetailsName                                 --remove
+    )]                                                             --remove
   getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
