@@ -46,7 +46,6 @@ dependencies:
   - resourcet
   - strato-conf
   - strato-model
-  - strato-p2p
   - strato-redis-blockdb
   - strato-sequencer
   - text
