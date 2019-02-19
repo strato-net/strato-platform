@@ -26,9 +26,12 @@ import           Text.Parsec
 
 import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA hiding (keccak256, hash)
@@ -70,7 +73,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata = 
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
-create _ _ _ _ _ sender' _ _ _ _ _ (Code initCode) _ _ _ = do
+create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
   let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack initCode
 
   let file = 
@@ -102,6 +105,9 @@ create _ _ _ _ _ sender' _ _ _ _ _ (Code initCode) _ _ _ = do
         accounts = M.empty,
         callStack = []
         } 
+
+  newAddressState <- getAddressState newAddress
+  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr}
   
   liftIO $ runSM startingState $ do
          create' sender' cc "qq" []

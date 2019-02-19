@@ -21,6 +21,7 @@ dependencies:
   - aeson-casing
   - binary
   - blockapps-data
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - containers
@@ -31,6 +32,7 @@ dependencies:
   - largeword
   - lens
   - memory
+  - merkle-patricia-db
   - parsec
   - QuickCheck
   - quickcheck-instances
