@@ -403,7 +403,10 @@ runOperation SSTORE = do
   putStorageKeyVal p val --putStorageKeyVal will delete value if val=0
 
   owner <- getEnvVar envOwner
-  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= M.insert p val
+  let ins = \case
+              ActionEVMDiff m -> ActionEVMDiff $ M.insert p val m
+              _ -> error "SolidVM Diff executing in EVM"
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -1107,7 +1110,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (SHA 0) EVM M.empty [])
+  action . actionData %= M.insert owner (ActionData (SHA 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1212,7 +1215,7 @@ call' noValueTransfer = do
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
   ch <- addressStateCodeHash <$> getAddressState receiveAddress
-  action . actionData %= M.insert receiveAddress (ActionData ch EVM M.empty [])
+  action . actionData %= M.insert receiveAddress (ActionData ch EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

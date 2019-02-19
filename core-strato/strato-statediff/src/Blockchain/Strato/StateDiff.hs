@@ -30,7 +30,6 @@ import           Blockchain.Strato.Model.Format
 import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource
 
-import           Data.Aeson
 import qualified Data.ByteString                             as B
 import           Data.Function
 import           Data.Maybe
@@ -62,16 +61,8 @@ data StateDiff =
     }
     deriving (Generic)
 
-instance ToJSON StateDiff
-
 data StorageDiff (v :: Detail) = EVMDiff (Map Word256 (Diff Word256 v))
                                | SolidVMDiff (Map B.ByteString (Diff B.ByteString v))
-
-instance ToJSON (StorageDiff 'Incremental) where
-  toJSON = error "TODO(tim): toJSON incremental"
-
-instance ToJSON (StorageDiff 'Eventual) where
-  toJSON = error "TODO(tim): toJSON Eventual"
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (HasHashDB m, HasCodeDB m) => Key -> m a
@@ -113,11 +104,6 @@ data AccountDiff (v :: Detail) =
     }
     deriving (Generic)
 
--- | We have to duplicate the instance definitions because for some reason,
--- GHC doesn't infer that our instances for 'Diff a v' cover all values of
--- 'v'.
-instance ToJSON (AccountDiff 'Incremental)
-instance ToJSON (AccountDiff 'Eventual)
 
 -- | Generic type for holding various kinds of diff
 data family Diff a (v :: Detail)
@@ -130,18 +116,6 @@ data instance Diff a 'Incremental =
 -- | This instance just records the single meaningful value in the change.
 -- See the 'Detailed' instance for what that means.
 newtype instance Diff a 'Eventual = Value a
-
-instance (ToJSON a) => ToJSON (Diff a 'Incremental) where
-  toJSON Create{newValue} = object ["newValue" .= newValue]
-  toJSON Delete{oldValue} = object ["oldValue" .= oldValue]
-  toJSON Update{oldValue, newValue} =
-    object [
-      "newValue" .= newValue,
-      "oldValue" .= oldValue
-      ]
-
-instance (ToJSON a) => ToJSON (Diff a 'Eventual) where
-  toJSON (Value a) = toJSON a
 
 -- | Not a type, but a data kind
 data Detail = Incremental | Eventual
