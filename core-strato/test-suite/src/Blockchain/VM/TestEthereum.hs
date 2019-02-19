@@ -81,7 +81,7 @@ populateAndConvertAddressState cid owner addressState' = do
       (nonce' addressState')
       (balance' addressState')
       (addressStateContractRoot addressState)
-      (hash $ codeBytes $ contractCode' addressState')
+      (EVMCode $ hash $ codeBytes $ contractCode' addressState')
       cid
 
 showHexInt::Integer->String
@@ -94,7 +94,10 @@ showHexInt x
 
 getDataAndRevertAddressState::Address->AddressState->ContextM AddressState'
 getDataAndRevertAddressState _ addressState = do
-  theCode <- getEVMCode (addressStateCodeHash addressState)
+  theCode <- getEVMCode $
+             case addressStateCodeHash addressState of
+               EVMCode x -> x
+               _ -> error "getDataAndRevertAddressState only supports EVMCode"
 
   -- Copied wholesale from Context.hs:getAllStorageKeyVals'
   -- since that function requires an unhashed owner.

@@ -202,14 +202,19 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  (codeHash d)
+                                  ch
                                   (Map.map fromDiff $ storage d)
                                   [A.emptyCallData]
-            , A._actionMetadata = getMetadata (codeHash d)
+            , A._actionMetadata = getMetadata ch
             }
+            where ch =
+                    case codeHash d of
+                      EVMCode ch' -> ch'
+                      SolidVMCode _ ch' -> ch'
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
+          
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
@@ -225,6 +230,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs (statediff fullAccountDiffs)
+
       mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
       case filterResponse <$> mErr of
        Right [] -> return ()

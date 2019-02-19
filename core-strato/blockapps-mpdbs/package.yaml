@@ -11,6 +11,7 @@ github: blockapps/strato-platform/core-strato/blockapps-mpdbs
 
 dependencies:
   - base
+  - aeson
   - ansi-wl-pprint
   - base16-bytestring
   - binary

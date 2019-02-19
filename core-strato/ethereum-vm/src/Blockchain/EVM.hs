@@ -306,7 +306,7 @@ runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
   addressState <- getAddressState address
-  code <- getEVMCode (addressStateCodeHash addressState)
+  code <- getEVMCode' (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
@@ -317,7 +317,7 @@ runOperation EXTCODECOPY = do
   size <- pop
 
   addressState <- getAddressState address
-  code <- getEVMCode (addressStateCodeHash addressState)
+  code <- getEVMCode' (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
 runOperation RETURNDATASIZE = do
@@ -1145,7 +1145,7 @@ create' = do
     assignCode codeBytes address = do
       addCode EVM codeBytes
       newAddressState <- getAddressState address
-      putAddressState address newAddressState{addressStateCodeHash=hash codeBytes}
+      putAddressState address newAddressState{addressStateCodeHash=EVMCode $ hash codeBytes}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
@@ -1186,7 +1186,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
   code <-
     if 0 < codeAddress && codeAddress < 5
     then return $ PrecompiledCode $ fromIntegral codeAddress
-    else Code <$> getEVMCode (addressStateCodeHash addressState)
+    else Code <$> getEVMCode' (addressStateCodeHash addressState)
 
   let env =
         Environment{
@@ -1211,7 +1211,10 @@ call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  ch <- addressStateCodeHash <$> getAddressState receiveAddress
+  cp <- addressStateCodeHash <$> getAddressState receiveAddress
+  let ch = case cp of
+        EVMCode x -> x
+        _ -> error "internal error- the EVM was called for non-evm code"
   action . actionData %= M.insert receiveAddress (ActionData ch M.empty [])
 
   --TODO- Deal with this return value
@@ -1396,3 +1399,9 @@ vmStateToExecResults vmState = do
       , erException          = Nothing
       }
 
+
+
+getEVMCode' :: HasCodeDB m =>
+               CodePtr -> m BC.ByteString
+getEVMCode' (EVMCode ch) = getEVMCode ch
+getEVMCode' _ = error "internal error- the EVM was called for non-evm code"

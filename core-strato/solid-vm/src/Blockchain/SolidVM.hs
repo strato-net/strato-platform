@@ -31,10 +31,11 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
-import           Blockchain.SHA hiding (keccak256, hash)
+import           Blockchain.SHA
 import           BlockApps.Solidity.Parse.Declarations
 import           BlockApps.Solidity.Parse.File
 import           Blockchain.Strato.Model.Gas
@@ -50,6 +51,9 @@ import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
 import           Account
 import           CodeCollection
 import           Value
+
+
+
 
 trace :: Bool
 trace = True
@@ -106,8 +110,10 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
         callStack = []
         } 
 
+  addCode SolidVM $ initCode
+
   newAddressState <- getAddressState newAddress
-  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr}
+  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
   
   liftIO $ runSM startingState $ do
          create' sender' cc "qq" []

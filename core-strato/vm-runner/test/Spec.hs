@@ -82,7 +82,10 @@ spec = do
                     Nothing
         addressState <- getAddressState newAddress
         liftIO . putStrLn $ show addressState
-        code <- getEVMCode (addressStateCodeHash addressState)
+        code <- getEVMCode $
+                case addressStateCodeHash addressState of
+                  EVMCode x -> x
+                  _ -> error "vm-runner tests only support EVMCode"
         liftIO . putStrLn $ show $ B16.encode code
         call isRunningTests
              isHomestead

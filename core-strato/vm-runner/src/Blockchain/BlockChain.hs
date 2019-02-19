@@ -657,7 +657,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 
         return (shouldReplace, ranPriv, bestBlockInfo)
 
-splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, SHA)]
+splitCreateDiffs :: [SD.StateDiff] -> [(MP.StateRoot, CodePtr)]
 splitCreateDiffs =
     let sr = stateRoot &&& (M.toList . createdAccounts)
         ch = fmap (codeHash . snd)

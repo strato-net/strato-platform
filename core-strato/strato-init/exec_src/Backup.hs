@@ -111,7 +111,10 @@ handleWordValue _ _ = return ()
 dumpAddressState :: LDB.MonadResource m=>DBs->AddressState->m ()
 dumpAddressState dbs AddressState{addressStateContractRoot=sr, addressStateCodeHash=c} = do
   when (sr /= emptyTriePtr) $ dumpNodeRef dbs handleWordValue $ PtrRef sr
-  dumpCode dbs c
+  dumpCode dbs $
+    case c of
+      EVMCode c' -> c'
+      SolidVMCode _ c' -> c'
 
 dumpCode :: LDB.MonadResource m=>DBs->SHA->m ()
 --dumpCode _ codeHash | codeHash == hash "" = do

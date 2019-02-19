@@ -74,7 +74,7 @@ data AccountDiff (v :: Detail) =
     -- change
     code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
-    codeHash     :: SHA, -- Maybe
+    codeHash     :: CodePtr, -- Maybe
     sourceCodeHash     :: Maybe (SHA, Text),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
@@ -316,8 +316,9 @@ retrieveMPDBValue = rlpDecode . rlpDeserialize . rlpDecode
 lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m (CodeKind, ByteString)
-lookupCode = lookupInMPDB "contract code" getCode
+lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
+lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 
 lookupStorageKey :: (HasCodeDB m, HasHashDB m, MonadResource m) => Key -> m Word256
 lookupStorageKey = lookupInMPDB "storage key" getStorageKeyFromHash

@@ -12,6 +12,7 @@ import           Database.Persist                            hiding (Update, get
 import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
@@ -71,7 +72,10 @@ createAccount chainId blockNumber addressDiffs = do
       addressStateRefBalance = getField (theError address "balance") $ balance diff,
       addressStateRefContractRoot = getField (theError address "contractRoot") $ contractRoot diff,
       addressStateRefCode = getField (theError address "code") $ code diff,
-      addressStateRefCodeHash = codeHash diff,
+      addressStateRefCodeHash =
+          case codeHash diff of
+            SolidVMCode _ ch -> ch
+            EVMCode ch -> ch,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefChainId = chainId
       }
