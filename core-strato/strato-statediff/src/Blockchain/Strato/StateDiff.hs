@@ -304,8 +304,6 @@ incrementalStorage kind oldRoot newRoot = do
   (case kind of
     EVM -> fmap EVMDiff . decodeAll
     SolidVM -> fmap SolidVMDiff . decodeAll) storageDiffs
-  -- storageAssoc <- mapM decodeDiffKV storageDiffs
-  -- return $ Map.fromList storageAssoc
 
   where
     decodeDiffKV (Diff.Create k vNew) = do
