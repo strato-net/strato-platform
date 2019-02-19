@@ -16,22 +16,23 @@ import           Handler.Filters
 import           Import
 
 import           Blockchain.Data.Address
-import           Blockchain.ExtWord      (Word256)
+import           SolidVM.Model
 
 import qualified Database.Esqueleto      as E
 import qualified Prelude                 as P
 import qualified Data.Text               as T
 
 data StorageAddress = StorageAddress {
-    key     :: Word256,
-    value   :: Word256,
+    key     :: HexStorage,
+    value   :: HexStorage,
+    kind    :: CodeKind,
     address :: Address
 } deriving (Show, Read, Eq, Generic)
 
 instance ToJSON StorageAddress
 
 storage2StorageAddress :: Storage -> Address -> StorageAddress
-storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) addr)
+storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
 
 getStorageInfoR :: HandlerFor App Value
 getStorageInfoR = do

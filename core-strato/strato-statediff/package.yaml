@@ -17,6 +17,7 @@ library:
     - unordered-containers
     - resourcet
     - aeson
+    - solid-vm-model
     - strato-model
     - strato-conf
     - blockapps-data

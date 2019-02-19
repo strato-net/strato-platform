@@ -20,15 +20,12 @@ import qualified Database.LevelDB                   as DB
 
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
+import           SolidVM.Model
 
 type CodeDB = DB.DB
 
 class MonadResource m => HasCodeDB m where
   getCodeDB :: m CodeDB
-
-data CodeKind = EVM
-              | SolidVM
-              deriving (Eq, Show, Enum, Ord)
 
 toWord8 :: CodeKind -> Word8
 toWord8 = fromIntegral . fromEnum
