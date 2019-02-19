@@ -20,6 +20,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-haskoin
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - clockwork

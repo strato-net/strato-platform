@@ -154,6 +154,15 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
           \s@SqlError{..} -> throwError . AlreadyExists $
             "keystore could not be inserted: " <> Text.pack (show s)
 
+waitForBalance :: Address -> Bloc ()
+waitForBalance addr = go 20
+  where go :: Int -> Bloc ()
+        go ms = do
+          when (ms > 30000) . throwError $ CouldNotFind "no user account found"
+          accts <- blocStrato $ getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+          when (null accts || accountBalance (head accts) == Strung 0) $ do
+            liftIO . threadDelay $ ms * 1000
+            go $ 2 * ms
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
@@ -166,7 +175,10 @@ postUsersFill _ addr resolve = blocTransaction $ do
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
     ) | h <- hashes]
-  getBlocTransactionResult' Nothing hashes resolve
+  result <- getBlocTransactionResult' Nothing hashes resolve
+  when (resolve && Success == blocTransactionStatus result) $ do
+    waitForBalance addr
+  return result
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr chainId resolve
@@ -223,7 +235,7 @@ postUsersContract userName addr chainId resolve
     Just "SolidVM" -> postUsersContractSolidVM' bcp (return . signTransaction sk)
     Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
-    
+
 postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams

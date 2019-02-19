@@ -14,6 +14,7 @@ dependencies:
   - blockapps-data
   - blockapps-haskoin
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - conduit

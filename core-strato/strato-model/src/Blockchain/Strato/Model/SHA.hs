@@ -4,7 +4,7 @@ module Blockchain.Strato.Model.SHA where
 
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
-import "cryptonite" Crypto.Hash                          (Digest, hash, Keccak_512)
+import qualified "cryptonite" Crypto.Hash                as Cr (Digest, hash, Keccak_512)
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
 import              Data.Binary
@@ -64,7 +64,10 @@ keccak256 :: S8.ByteString -> S8.ByteString
 keccak256 = fastKeccak256
 
 keccak512 :: S8.ByteString -> S8.ByteString
-keccak512 bs = convert (hash bs :: Digest Keccak_512)
+keccak512 bs = convert (Cr.hash bs :: Cr.Digest Cr.Keccak_512)
 
 rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+
+hash :: S8.ByteString -> SHA
+hash = superProprietaryStratoSHAHash

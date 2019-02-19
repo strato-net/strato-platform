@@ -16,6 +16,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - containers
