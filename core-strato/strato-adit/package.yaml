@@ -28,7 +28,7 @@ dependencies:
   - lifted-base
   - text
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - mtl
   - lens
   - containers

@@ -67,7 +67,7 @@ dependencies:
   - warp
   - ansi-wl-pprint
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - strato-model
   - strato-redis-blockdb
   - hedis

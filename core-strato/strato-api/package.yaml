@@ -68,9 +68,8 @@ dependencies:
   - solid-vm-model
   - strato-conf
   - strato-genesis
-  - strato-init
   - strato-model
-  - strato-sequencer
+  - seqevents
   - template-haskell
   - text                          >= 0.11
   - time

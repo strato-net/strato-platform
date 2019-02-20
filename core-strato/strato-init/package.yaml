@@ -45,6 +45,7 @@ dependencies:
   - persistent-postgresql
   - resourcet
   - scientific
+  - seqevents
   - split
   - strato-conf
   - strato-genesis

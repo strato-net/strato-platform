@@ -37,7 +37,7 @@ dependencies:
 - prometheus-client
 - resourcet
 - strato-model
-- strato-sequencer
+- seqevents
 - temporary
 - text
 - time

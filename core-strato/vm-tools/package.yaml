@@ -43,7 +43,7 @@ dependencies:
   - strato-index
   - strato-model
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - text
   - temporary
   - time
