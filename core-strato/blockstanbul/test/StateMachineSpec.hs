@@ -77,10 +77,13 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk'' blk2'' as' seal ->
+    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
         let as = sortOn sender as'
-        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra) (blk'', blk2'')
+            -- The nonce is set to avoid voting out the sole validator
+            setNonce :: Block -> Block
+            setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
+        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra . setNonce) (blk'', blk2'')
             blk = setBlockNo 19 blk'
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
