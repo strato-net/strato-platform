@@ -17,6 +17,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)
 import Prometheus
+import System.Exit
 import Text.Printf
 
 import Blockapps.Crossmon
@@ -236,6 +237,8 @@ nextRound nt = do
   use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
+  when (S.null vals) . liftIO $
+    die "All participants voted out, consensus is stuck."
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
