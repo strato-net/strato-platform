@@ -15,6 +15,7 @@ dependencies:
   - ansi-wl-pprint
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util

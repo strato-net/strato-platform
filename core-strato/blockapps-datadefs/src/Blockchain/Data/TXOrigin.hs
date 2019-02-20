@@ -11,8 +11,8 @@ import           Data.Aeson
 
 import           Blockchain.Data.PersistTypes ()
 
-import           Blockchain.Format
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Format
+import           Blockchain.Strato.Model.SHA
 
 import           GHC.Generics
 

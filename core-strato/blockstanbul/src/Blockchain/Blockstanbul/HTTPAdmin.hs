@@ -24,9 +24,9 @@ import Control.Monad.IO.Class
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Test.QuickCheck
 
-import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Format
+import Blockchain.Strato.Model.Format
+import Blockchain.Strato.Model.Address
 
 -- API
 

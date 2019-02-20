@@ -19,6 +19,7 @@ dependencies:
   - binary
   - aeson
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - bytestring
   - classy-prelude

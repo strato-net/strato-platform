@@ -24,13 +24,13 @@ import qualified Data.Set as S
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
-import Blockchain.SHA
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext

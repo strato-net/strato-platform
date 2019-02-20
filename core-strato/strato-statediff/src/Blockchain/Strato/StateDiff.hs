@@ -11,7 +11,6 @@ module Blockchain.Strato.StateDiff
     , incrementalAccountState
     ) where
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
@@ -22,9 +21,10 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.Format
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Format
 
 import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource

@@ -13,6 +13,7 @@ dependencies:
   - bytestring
   - monad-logger
   - blockapps-data
+  - blockapps-datadefs
   - random
   - stm
   - normaldistribution
