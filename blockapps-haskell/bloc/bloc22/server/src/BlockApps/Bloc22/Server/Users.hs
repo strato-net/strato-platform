@@ -159,7 +159,10 @@ waitForBalance addr = go 20
   where go :: Int -> Bloc ()
         go ms = do
           when (ms > 30000) . throwError $ CouldNotFind "no user account found"
-          accts <- blocStrato $ getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+          let params = accountsFilterParams{qaAddress = Just addr}
+          accts <- blocStrato $ getAccountsFilter params
+          logWith logNotice $ "waitForBalance req: " <> Text.pack (show params)
+          logWith logNotice $ "waitForBalance resp: " <> Text.pack (show accts)
           when (null accts || accountBalance (head accts) == Strung 0) $ do
             liftIO . threadDelay $ ms * 1000
             go $ 2 * ms
@@ -178,6 +181,8 @@ postUsersFill _ addr resolve = blocTransaction $ do
   result <- getBlocTransactionResult' Nothing hashes resolve
   when (resolve && Success == blocTransactionStatus result) $ do
     waitForBalance addr
+  logWith logNotice $ "postUsersFill: resolve = " <> Text.pack (show resolve)
+  logWith logNotice $ "postUsersFill: result = " <> Text.pack (show result)
   return result
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
@@ -765,8 +770,10 @@ getAccountTxParams addr chainId = \case
       Nothing -> getAcctNonce >>= \n -> return params{txparamsNonce = Just n}
   where
     getAcctNonce = do
-      accts <- blocStrato $ getAccountsFilter
-        accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+      let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+      accts <- blocStrato $ getAccountsFilter params
+      logWith logNotice $ "getAccountNonce req: " <> Text.pack (show params)
+      logWith logNotice $ "getAccountNonce resp: " <> Text.pack (show accts)
       case listToMaybe accts of
         Nothing   -> throwError . UserError $ "User does not have a balance"
         Just acct -> return $ accountNonce acct
