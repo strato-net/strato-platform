@@ -48,7 +48,6 @@ local unique_name = ''
 if not isEmpty(res.id_token[username_property]) then
   unique_name=res.id_token[username_property]
 else
-  -- TODO: make sure appid is in the id_token when the token is obtained with oauth client credential grant flow (machine way to authenticate)
   unique_name=res.id_token.appid
 end
 ngx.header['Set-Cookie'] = username_cookie_name .. '=' .. unique_name .. '; path=/'

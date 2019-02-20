@@ -118,33 +118,33 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   # TODO: merge the $OAUTH_ENABLED and $OAUTH_JWT_VALIDATION_ENABLED into one value (using strato-getting-started as well) with backward compatibility
   if [ "$OAUTH_ENABLED" = true ] ; then
-    cp /tmp/openid-auth.tpl.lua /tmp/openid-auth.lua
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-auth.lua
-    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
-    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-auth.lua
-    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
+    cp /tmp/openid-login.tpl.lua /tmp/openid-login.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-login.lua
+    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-login.lua
+    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-login.lua
+    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-login.lua
 
     if [ "$ssl" = true ] ; then
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-auth.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-login.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-login.lua
     else
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid-auth.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-login.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid-login.lua
     fi
   fi
 
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ] ; then
-    cp /tmp/openid-auth-jwt.tpl.lua /tmp/openid-auth-jwt.lua
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-auth-jwt.lua
-    sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-auth-jwt.lua
-    #sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-auth-jwt.lua
+    cp /tmp/openid-verify.tpl.lua /tmp/openid-verify.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-verify.lua
+    sed -i 's*<OAUTH_JWT_VALIDATION_DISCOVERY_URL>*'"$OAUTH_JWT_VALIDATION_DISCOVERY_URL"'*g' /tmp/openid-verify.lua
+    #sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-verify.lua
 
     if [ "$ssl" = true ] ; then
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-auth-jwt.lua
-      #sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-auth-jwt.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-verify.lua
+      #sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-verify.lua
     else
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-auth-jwt.lua
-      #sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-auth-jwt.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-verify.lua
+      #sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-verify.lua
     fi
   fi
 
@@ -154,11 +154,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   if [ "$OAUTH_ENABLED" = true ]; then
-    mv /tmp/openid-auth.lua /usr/local/openresty/nginx/lua/openid-auth.lua
+    mv /tmp/openid-login.lua /usr/local/openresty/nginx/lua/openid-login.lua
   fi
 
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" = true ]; then
-    mv /tmp/openid-auth-jwt.lua /usr/local/openresty/nginx/lua/openid-auth-jwt.lua
+    mv /tmp/openid-verify.lua /usr/local/openresty/nginx/lua/openid-verify.lua
   fi
 
   if [ "$ssl" = true ] ; then
