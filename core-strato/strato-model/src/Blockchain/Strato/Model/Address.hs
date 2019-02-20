@@ -15,6 +15,7 @@ import           Control.DeepSeq
 import           Control.Monad
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
+import           Test.QuickCheck                      (Arbitrary(..))
 
 import           Blockchain.Data.RLP
 import qualified Blockchain.Strato.Model.Colors       as CL
@@ -50,7 +51,10 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+
+instance Show Address where
+  show (Address a) = printf "%040x" a
 
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word
@@ -139,3 +143,6 @@ addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteSt
 
 formatAddressWithoutColor::Address->String
 formatAddressWithoutColor = formatAddress
+
+instance Arbitrary Address where
+  arbitrary = Address <$> arbitrary
