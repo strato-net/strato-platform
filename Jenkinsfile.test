@@ -169,9 +169,8 @@ pipeline {
   post {
     always {
       sh 'rm -rf logs'
-      dir('logs') {
-        sh './log_artifacts.sh .'
-      }
+      sh 'mkdir logs'
+      sh './log_artifacts.sh logs'
       archiveArtifacts artifacts: 'logs/*', fingerprint: true
     }
 
