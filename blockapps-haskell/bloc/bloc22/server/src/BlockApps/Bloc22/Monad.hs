@@ -23,7 +23,6 @@ import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
 import           Data.Maybe                         (fromMaybe)
 import           Data.Profunctor.Product.Default
-import           Data.String
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
 import           Data.Text.Prettyprint.Doc
