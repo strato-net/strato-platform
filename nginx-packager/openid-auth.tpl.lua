@@ -1,6 +1,13 @@
+-- TODO: refactor with shared lua util file for common stuff across the lua scripts
+
+local access_token_cookie_name = "strato_access_token"
+local username_cookie_name = "strato_user_name"
+local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
+
 -- configruation for openid connect
 local opts = {
     -- see https://github.com/zmartzone/lua-resty-openidc for reference
+    -- TODO: DEPRECATED: "using deprecated option `opts.redirect_uri_path`; switch to using an absolute URI and `opts.redirect_uri"
     redirect_uri_path             = "/auth/openidc/return",
     discovery                     = "<OAUTH_DISCOVERY_URL>",
     client_id                     = "<CLIENT_ID_PLACEHOLDER>",
@@ -25,18 +32,30 @@ local res, err = require("resty.openidc").authenticate(opts)
 
 -- error handling needs to be polished
 if err then
-    ngx.status = 500
-    ngx.say(err)
-    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  ngx.status = 500
+  ngx.say(err)
+  ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  ngx.header['Set-Cookie'] = access_token_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  ngx.header['Set-Cookie'] = username_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 end
 
--- some oauth providers return email under `id_token` object, some - under `user`
-local unique_name = res.id_token.email or res.user.email
-local user_id = res.id_token.sub
+local function isEmpty(s)
+  return s == nil or s == ''
+end
 
--- set request header to forward to APIs
-ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
-ngx.req.set_header("X-USER-ID", user_id)
+-- get username from access token and set username cookie (used in SMD UI)
+local unique_name = ''
+if not isEmpty(res.id_token[username_property]) then
+  unique_name=res.id_token[username_property]
+else
+  -- TODO: make sure appid is in the id_token when the token is obtained with oauth client credential grant flow (machine way to authenticate)
+  unique_name=res.id_token.appid
+end
+ngx.header['Set-Cookie'] = username_cookie_name .. '=' .. unique_name .. '; path=/'
 
--- set response cookie header
-ngx.header['Set-Cookie'] = 'strato_user_name=' .. unique_name .. '; path=/'
+
+local current_access_token = ngx.var["cookie_" .. access_token_cookie_name]
+if current_access_token ~= res.access_token then
+  -- TODO: set "expires" for ${cookie_name} cookie with 'res.id_token.exp' value (need to transform timestamp into proper format with lua)
+  ngx.header['Set-Cookie'] = access_token_cookie_name .. '=' .. res.access_token .. '; path=/;'
+end

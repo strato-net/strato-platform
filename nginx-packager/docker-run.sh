@@ -72,11 +72,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   if [ "$OAUTH_ENABLED" != true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH_STRATO/d' /tmp/nginx.conf
+    sed -i '/#TEMPLATE_MARK_OAUTH_LOGIN/d' /tmp/nginx.conf
   fi
 
   if [ "$OAUTH_JWT_VALIDATION_ENABLED" != true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH_JWT/d' /tmp/nginx.conf
+    sed -i '/#TEMPLATE_MARK_OAUTH_VERIFY/d' /tmp/nginx.conf
   fi
 
   # Remove SSL lines if deployment is not SSL-enabled
@@ -116,8 +116,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
+  # TODO: merge the $OAUTH_ENABLED and $OAUTH_JWT_VALIDATION_ENABLED into one value (using strato-getting-started as well) with backward compatibility
   if [ "$OAUTH_ENABLED" = true ] ; then
     cp /tmp/openid-auth.tpl.lua /tmp/openid-auth.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-auth.lua
     sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-auth.lua
     sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-auth.lua
     sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-auth.lua
