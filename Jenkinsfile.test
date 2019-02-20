@@ -172,7 +172,7 @@ pipeline {
       dir('logs') {
         sh './log_artifacts.sh .'
       }
-      archiveArtifacts artifacts: logs/*, fingerprint: true
+      archiveArtifacts artifacts: 'logs/*', fingerprint: true
     }
 
     success {
