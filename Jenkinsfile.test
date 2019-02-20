@@ -170,7 +170,7 @@ pipeline {
     always {
       sh 'rm -rf logs'
       sh 'mkdir logs'
-      sh './log_artifacts.sh logs'
+      sh './log_artifact.sh logs'
       archiveArtifacts artifacts: 'logs/*', fingerprint: true
     }
 
