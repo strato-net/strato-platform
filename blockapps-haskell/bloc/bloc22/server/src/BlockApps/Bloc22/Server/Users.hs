@@ -183,6 +183,8 @@ postUsersFill _ addr resolve = blocTransaction $ do
     waitForBalance addr
   logWith logNotice $ "postUsersFill: resolve = " <> Text.pack (show resolve)
   logWith logNotice $ "postUsersFill: result = " <> Text.pack (show result)
+  when (Failure == blocTransactionStatus result) $
+    throwError $ UnavailableError "faucet transaction failed; please try again"
   return result
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
