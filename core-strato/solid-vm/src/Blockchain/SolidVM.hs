@@ -189,18 +189,86 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = 
 
-call _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =
-  error "SolidVM call not yet implemented"
+call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
+
+
+  addressState <- getAddressState codeAddress
+
+  ccString <- 
+    case addressStateCodeHash addressState of
+      SolidVMCode _ ch -> getEVMCode ch
+      _ -> error "internal error- SolidVM was called for non-solid-vm code"
+
+  theCurrentTime <- liftIO getCurrentTime
+
+
+
+
+
+  let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack ccString
+
+  let file = 
+        case maybeFile of
+          Left e -> error $ show e
+          Right v -> v
+  
+      namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
+
+
+
+
+
+
+  let
+    cc = applyInheritence
+        $ CodeCollection {
+            _contracts=M.fromList namedContracts
+          }
+  
+    startingState =
+        SState {
+        env = Environment {
+            sender = Address 0x1234,
+            origin = Address 0x1234,
+            blockHeader =
+                BlockHeader {
+                timestamp = theCurrentTime,
+                number = 10
+                }
+            },
+        codeCollection = cc,
+        accounts = M.empty,
+        callStack = []
+        } 
+
+  _ <- 
+    liftIO $ runSM startingState $ do
+           call'' codeAddress "getTheValue" []
+
+
+  return ExecResults {
+    erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+    erRefund = 0,
+    erReturnVal = Just B.empty,
+    erTrace = [],
+    erLogs = [],
+    erNewContractAddress = Nothing,
+    erSuicideList = S.empty,
+    erAction = Nothing,
+    erException = Nothing
+    }
 
 
 
 call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
---  sstate <- get
---  liftIO $ putStrLn $ "            available accounts: " ++ show (M.keys $ accounts sstate)
+  sstate <- get
 
   account <- getAccount address
-  let (contractName, cc) = contract account
+
+  let contractName = "qq"
+      cc = codeCollection sstate
+
   when trace $ do
     argStrings <- liftIO $ forM args showIO
     liftIO $ putStrLn $ box ["calling function: " ++ format address, contractName ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
