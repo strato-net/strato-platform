@@ -4,6 +4,7 @@ dependencies:
   - base
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - blockapps-milena
   - blockstanbul
