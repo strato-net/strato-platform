@@ -465,14 +465,12 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
+  addressState <- getAddressState owner
+
   let call =
-        case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-          Just "EVM" -> EVM.call
-          Just "SolidVM" -> SolidVM.call
-          Nothing -> EVM.call --EVM is the default
-          Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
-            \_ _ _ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
-                         return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+        case addressStateCodeHash addressState of
+          EVMCode _ -> EVM.call
+          SolidVMCode _ _ -> SolidVM.call
 
   call isRunningTests'
        isHomestead
