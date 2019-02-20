@@ -167,6 +167,14 @@ pipeline {
   }
 
   post {
+    always {
+      sh 'rm -rf logs'
+      dir('logs') {
+        sh './log_artifacts.sh .'
+      }
+      archiveArtifacts artifacts: logs/*, fingerprint: true
+    }
+
     success {
       slackSend (
         color: 'good',
@@ -180,6 +188,7 @@ pipeline {
         message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
       )
 
+
       script {
         if (env.PLATFORM_BRANCH_NAME == 'develop') {
           slackSend(
@@ -190,7 +199,7 @@ pipeline {
         }
       }
     }
-    
+
     fixed {
       script {
         if (env.PLATFORM_BRANCH_NAME == 'develop') {
