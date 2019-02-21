@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.SolidVM
-    ( 
+    (
       call
     , create
     ) where
@@ -73,7 +73,7 @@ create :: Bool
        -> Maybe (M.Map T.Text T.Text)
        -> ContextM ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
---       value gasPrice availableGas newAddress initCode txHash chainId metadata = 
+--       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
 create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
   addCode SolidVM $ initCode
@@ -84,7 +84,7 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
   sillyValue <- getRawStorageKeyVal' newAddress "theValue"
 
   liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
-  
+
   runSM initCode $ do
     putRawStorageKeyVal' newAddress "theValue" $ B.pack [130, 1, 2]
     create' sender' "qq" []
@@ -93,19 +93,19 @@ create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator name argExps = do
   sstate <- get
   let cc = codeCollection sstate
-   
+
   --TODO- Replace this address creation with the safe version:
   nonce' <- getNonce creator
   setNonce creator $ nonce'+1
   let address = getNewAddress_unsafe creator nonce'
   --------------------------------
-  
+
   when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show address ++ " of type " ++ name
 
   let account = Account 0 0 M.empty (name, cc)
-  
+
   addAccount address account
-  
+
   let contract' = fromMaybe (error $ "no contract with name " ++ name) (cc ^. contracts . at name)
 
   -- Add Storage
@@ -140,7 +140,7 @@ create' creator name argExps = do
 
 
 
-  
+
 call :: Bool
      -> Bool
      -> Bool
@@ -160,7 +160,7 @@ call :: Bool
      -> Maybe (M.Map T.Text T.Text)
      -> ContextM ExecResults
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
---     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = 
+--     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
 call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
 
@@ -169,10 +169,10 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
 
   liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
 
-  
+
   addressState <- getAddressState codeAddress
 
-  ccString <- 
+  ccString <-
     case addressStateCodeHash addressState of
       SolidVMCode _ ch -> getEVMCode ch
       _ -> error "internal error- SolidVM was called for non-solid-vm code"
@@ -209,7 +209,7 @@ call'' address functionName args = do
   when trace $ do
     argStrings <- liftIO $ forM args showIO
     liftIO $ putStrLn $ box ["calling function: " ++ format address, contractName ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
-  
+
   let contract' = fromMaybe (error $ "contract name doesn't exist in CodeCollection: " ++ contractName) $  M.lookup contractName $ cc^.contracts
 
 --  liftIO $ putStrLn $ "            available contracts: " ++ show (M.keys $ cc^.contracts)
@@ -280,7 +280,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
-  
+
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToVar e1
   v2 <- expToVar e2
@@ -304,7 +304,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition _ varNames maybeExpr
     valueString <- liftIO $ showIO value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
     liftIO $ putStrLn $ "             to: " ++ valueString
-  
+
 
   case (varNames, value) of
     ([Just name], _) -> addLocalVariable name value
@@ -313,9 +313,9 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition _ varNames maybeExpr
       forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
         value' <- getVar variable'
         addLocalVariable name' value'
-        
+
     _ -> error "VariableDefinition expected a tuple, but the returned value was not one"
-    
+
   return Nothing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
@@ -330,11 +330,11 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
-  _ <- 
+  _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
       _ -> return Nothing
-    
+
   let conditionExp =
         case maybeConditionExp of
           Just x -> x
@@ -343,7 +343,7 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
   let loopExp =
         case maybeLoopExp of
           Just x -> x
-          Nothing -> error "can't handle for loops with no loop expression yet" 
+          Nothing -> error "can't handle for loops with no loop expression yet"
 
   let condition = getVar =<< expToVar conditionExp
 
@@ -352,26 +352,26 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
       return result
-  
+
 --  error $ "gonna for: " ++ show code
 
-{-  
+{-
   conditionResult <- getVar =<< expToVar condition
   case conditionResult of
     SBool True -> runStatements code'
     SBool False -> return Nothing
     _ -> error "IfStatement returned a non bool value"
 -}
-  
+
 runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
     Just e -> fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
-    
+
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
 while :: SM Value -> SM (Maybe Value) -> SM (Maybe Value)
-while condition code = do  
+while condition code = do
   val <- condition
   when trace $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show val
 
@@ -404,7 +404,7 @@ expToVar (Xabi.PlusPlus e) = do
           _ -> error "PlusPlus applied to a non integer"
 
   when trace $ logAssigningVariable $ SInteger value
-      
+
   setVar var $ SInteger $ value + 1
   return $ Constant $ SInteger value
 
@@ -417,18 +417,18 @@ expToVar (Xabi.Unitary "++" e) = do
           _ -> error "PlusPlus applied to a non integer"
 
   when trace $ logAssigningVariable $ SInteger value
-      
+
   setVar var $ SInteger $ value + 1
   return $ Constant $ SInteger $ value + 1
 
 
-  
+
 expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
 expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
-  
+
 expToVar (Xabi.MemberAccess expr name) = do
   var <- expToVar expr
   val <- getVar var
@@ -451,7 +451,7 @@ expToVar (Xabi.MemberAccess expr name) = do
     (SContractDef contractName, constName) -> do
       sstate <- get
 
-      
+
       let c = fromMaybe (error $ "code refers to a contract that doesn't exist: " ++ contractName) (M.lookup contractName $ codeCollection sstate^.contracts)
 
       let Xabi.ConstantDecl _ _ constExp = fromMaybe (error $ "code refers to a const that doesn't exist: " ++ contractName ++ "." ++ constName) (M.lookup constName $ c^.constants)
@@ -479,9 +479,9 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     (SContract contractName a, funcName) -> do
       return $ Constant $ SContractFunction contractName a funcName
-      
+
     _ -> return $ Property name var
-    
+
 expToVar (Xabi.IndexAccess e (Just iExp)) = do
   var <- expToVar e
   val <- getVar var
@@ -491,8 +491,8 @@ expToVar (Xabi.IndexAccess e (Just iExp)) = do
       return $ v V.! fromInteger i
     (SMap valType m, val') -> do
       return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
-      
-    _ -> error $ "code tried to get an index, but the values weren't correct:\n" ++ show val ++ "\n" ++ show iVal 
+
+    _ -> error $ "code tried to get an index, but the values weren't correct:\n" ++ show val ++ "\n" ++ show iVal
 
 expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
@@ -509,7 +509,7 @@ expToVar (Xabi.Unitary "!" expr) = do
 
 expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   isEqual <- liftIO $ val1 `valEquals` val2
@@ -528,7 +528,7 @@ expToVar (Xabi.Binary "==" expr1 expr2) = do
 
 expToVar (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
@@ -537,16 +537,16 @@ expToVar (Xabi.Binary "<" expr1 expr2) = do
 
 expToVar (Xabi.Binary ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
     _ -> error $ "binary '<' used on non number values"
-  
+
 expToVar (Xabi.Binary ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
@@ -555,7 +555,7 @@ expToVar (Xabi.Binary ">=" expr1 expr2) = do
 
 expToVar (Xabi.Binary "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
@@ -564,7 +564,7 @@ expToVar (Xabi.Binary "<=" expr1 expr2) = do
 
 expToVar (Xabi.Binary "&&" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
@@ -573,7 +573,7 @@ expToVar (Xabi.Binary "&&" expr1 expr2) = do
 
 expToVar (Xabi.Binary "||" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
-  
+
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   case (val1, val2) of
@@ -593,13 +593,13 @@ expToVar (Xabi.Ternary condition expr1 expr2) = do
       expToVar expr2
     x -> error $ "ternary condition is not a bool: " ++ show x
 
-  
+
 expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName)) args) = do
   creator <- getCurrentAddress
   let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
   execResults <- create' creator contractName argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
-      
+
 expToVar (Xabi.FunctionCall e args) = do
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
@@ -617,17 +617,17 @@ expToVar (Xabi.FunctionCall e args) = do
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
       let vals = fromMaybe (error $ "code refers to a struct that does not exist in the contract: " ++ structName) $ M.lookup structName $ contract'^.structs
-      
+
       return $ Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
-      
+
     Constant (SContractDef contractName) -> do
       case argVals of
         [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
           return $ Constant $ SContract contractName address
-        [SAddress (Address address)] -> 
+        [SAddress (Address address)] ->
           return $ Constant $ SContract contractName $ toInteger address
         x -> error $ "args wrong for contract variable creation: " ++ show x
-        
+
     Constant (SContractItem address itemName) -> do
       result <- call'' (Address $ fromInteger address) itemName argVals
       case result of
@@ -647,7 +647,7 @@ expToVar (Xabi.FunctionCall e args) = do
           let theEnum = fromMaybe (error $ "code refers to enum that doesn't exist: " ++ enumName) $ M.lookup enumName $ c^.enums
           return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
         _ -> error "called enum constructor with improper args"
-      
+
     Property "push" var' -> do
       val <- getVar var'
       case (val, argVals) of
@@ -656,14 +656,14 @@ expToVar (Xabi.FunctionCall e args) = do
           setVar var' $ SArray valType $ vec `V.snoc` newVar
           return $ Constant SNULL
         x -> error $ "push property called on a type that is not a SArray: " ++ show x
-    
+
     _ -> error $ "code tried to call a function on a non-funciton value:\n" ++ show var
 
 
 {-
 SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (Label "Hashmap")) [])))
 -}
-    
+
 expToVar x = error $ "unhandled expression in call to expToVar: " ++ show x
 
 --------------
@@ -691,7 +691,7 @@ callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
     $ toInteger
     $ fromMaybe (error $ "code refers to an enum val that is not in the enum: " ++ enumVal ++ " is not in " ++ enumName)
     $ enumVal `elemIndex` enumVals
-    
+
 callBuiltin "uint" args _ = do
   error $ "uint undefined for args: " ++ show args
 callBuiltin "push" [v] (Just o) = do
@@ -736,7 +736,7 @@ getContractAddress (Address v) = do
 
 {-
 bytesToInteger :: [Word8] -> Integer
-bytesToInteger bytes = 
+bytesToInteger bytes =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [0, 8..] $ reverse bytes
 -}
 
@@ -746,21 +746,21 @@ runTheConstructors cc address contractName argExps = do
   let contract' =
           fromMaybe (error $ "contract inherits from a contract that doesn't exits: " ++ contractName)
           $ cc^.contracts . at contractName
-  
+
       argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ fromMaybe M.empty $ fmap Xabi.funcArgs $ contract'^.constructor]
 
   when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName ++ "(" ++ intercalate ", " argNames ++ ")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
-  
+
   addCallInfo address contract' (M.fromList $ zip argNames (map Constant argVals))
-  
+
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
                $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
     runTheConstructors cc address parent args
-      
-  _ <- 
+
+  _ <-
     case contract'^.constructor of
       Just theFunction -> do
         --argVals <- forM argExps evaluate
@@ -768,11 +768,11 @@ runTheConstructors cc address contractName argExps = do
         let Just commands = Xabi.funcContents theFunction
         _ <- runStatements commands
         return ()
-        
+
       Nothing -> return ()
 
   popCallInfo
-  
+
   return ()
 {-
 create :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM Address
@@ -780,9 +780,9 @@ create creator cc name argExps = do
   address <- getContractAddress creator
   when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show address ++ " of type " ++ name
   let account = Account 0 0 M.empty (name, cc)
-  
+
   addAccount address account
-  
+
   let contract' = fromMaybe (error $ "no contract with name " ++ name) (cc ^. contracts . at name)
 
   -- Add Storage
@@ -811,14 +811,14 @@ call' address' contract' theFunction argVals = do
   let argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ Xabi.funcArgs theFunction]
 
   when trace $ liftIO $ putStrLn $ "            args: " ++ show argNames
-  
+
   addCallInfo address' contract' (M.fromList $ zip argNames (map Constant argVals))
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands
 
   popCallInfo
-  
+
   return val
 
 
@@ -828,9 +828,16 @@ call' address' contract' theFunction argVals = do
 box :: [String] -> String
 box strings = unlines $
   [C.magenta ("╔" ++ replicate (width - 2) '═' ++ "╗")]
-  ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - length s - 4) ' ' ++ C.magenta " ║") strings
+  ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " ║") strings
   ++ [C.magenta ("╚" ++ replicate (width - 2) '═' ++ "╝")]
   where width = maximum (map length strings) + 4
+        printedLength = go False
+        go :: Bool -> String -> Int
+        go True ('m':t) = go False t
+        go True (_:t) = go True t
+        go False ('\ESC':t) = go True t
+        go False (_:t) = 1 + go False t
+        go _ [] = 0
 
 
 
