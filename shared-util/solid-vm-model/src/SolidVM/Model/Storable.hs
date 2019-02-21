@@ -33,8 +33,8 @@ data BasicValue = BInteger Integer
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
 -- TODO(tim): Can be numeric/bool/address/string/text
-data IndexType = Num Integer
-               | Text B.ByteString
+data IndexType = INum Integer
+               | IText B.ByteString
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StorableValue = BasicValue BasicValue
@@ -100,8 +100,8 @@ parseMapIndex = do
                  ignoreEscapedQuotes _ _ = Just False
              strContents <- scan False ignoreEscapedQuotes
              skip (== c2w8 '"')
-             return . Text . unescapeKey $ strContents
-           else Num <$> parseInteger
+             return . IText . unescapeKey $ strContents
+           else INum <$> parseInteger
   skip (== c2w8 '>')
   MapIndex idx <$> pathParser
 
@@ -168,8 +168,8 @@ unparsePath = B.concat . go
         go Null = []
         go (Field p sp) = [".", p] ++ go sp
         go (ArrayIndex n sp) = ["[", C8.pack $ show n, "]"] ++ go sp
-        go (MapIndex (Num n) sp) = ["<", C8.pack $ show n, ">"] ++ go sp
-        go (MapIndex (Text t) sp) = ["<\"", escapeKey t, "\">"] ++ go sp
+        go (MapIndex (INum n) sp) = ["<", C8.pack $ show n, ">"] ++ go sp
+        go (MapIndex (IText t) sp) = ["<\"", escapeKey t, "\">"] ++ go sp
 
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 

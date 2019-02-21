@@ -30,24 +30,24 @@ spec = do
     it "should be able to unambiguously parse a path" $ do
       parsePath "" `shouldBe` Right Null
       parsePath "[3]" `shouldBe` Right (ArrayIndex 3 Null)
-      parsePath "<773472>" `shouldBe` Right (MapIndex (Num 773472) Null)
-      parsePath "<\"xor\">" `shouldBe` Right (MapIndex (Text "xor") Null)
-      parsePath "<\"\">" `shouldBe` Right (MapIndex (Text "") Null)
+      parsePath "<773472>" `shouldBe` Right (MapIndex (INum 773472) Null)
+      parsePath "<\"xor\">" `shouldBe` Right (MapIndex (IText "xor") Null)
+      parsePath "<\"\">" `shouldBe` Right (MapIndex (IText "") Null)
       parsePath ".extra" `shouldBe` Right (Field "extra" Null)
       parsePath ".hashmap" `shouldBe` Right (Field "hashmap" Null)
-      parsePath ".hashmap<30>" `shouldBe` Right (Field "hashmap" (MapIndex (Num 30) Null))
+      parsePath ".hashmap<30>" `shouldBe` Right (Field "hashmap" (MapIndex (INum 30) Null))
 
     it "should be able to unparse a path" $ do
       unparsePath Null `shouldBe` ""
       unparsePath (ArrayIndex 3 Null) `shouldBe` "[3]"
-      unparsePath (MapIndex (Num 773472) Null) `shouldBe` "<773472>"
-      unparsePath (MapIndex (Text "xor") Null) `shouldBe` "<\"xor\">"
-      unparsePath (MapIndex (Text "") Null) `shouldBe` "<\"\">"
+      unparsePath (MapIndex (INum 773472) Null) `shouldBe` "<773472>"
+      unparsePath (MapIndex (IText "xor") Null) `shouldBe` "<\"xor\">"
+      unparsePath (MapIndex (IText "") Null) `shouldBe` "<\"\">"
       unparsePath (Field "extra" Null) `shouldBe` ".extra"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
-        `shouldBe` Right (MapIndex (Num (product (replicate 100 10))) Null)
+        `shouldBe` Right (MapIndex (INum (product (replicate 100 10))) Null)
 
     it "should not allow unbounded array indices" $ do
       parsePath (B.concat ["[1", B.replicate 100 0x30, "]"])
@@ -55,10 +55,10 @@ spec = do
 
     it "should unescape paths" $ do
       parsePath "<\"quoth:\\\"\">" `shouldBe`
-        Right (MapIndex (Text "quoth:\"") Null)
+        Right (MapIndex (IText "quoth:\"") Null)
 
     it "should escape quotes in map indices" $ do
-      unparsePath (MapIndex (Text "dan\"ger") Null) `shouldBe` "<\"dan\\\"ger\">"
+      unparsePath (MapIndex (IText "dan\"ger") Null) `shouldBe` "<\"dan\\\"ger\">"
 
   describe "StorageDelta" $ do
     let exStorage = HM.fromList [("count", BasicValue $ BInteger 99), ("name", BasicValue $ BString "iago")]
@@ -76,7 +76,7 @@ spec = do
     it "should be able to insert into a map" $ do
       let spine = HM.singleton "hashmap" . SMapping . HM.fromList
           input = spine []
-          want  = spine [(Num 30, BasicValue $ BInteger 0x234)]
+          want  = spine [(INum 30, BasicValue $ BInteger 0x234)]
           got = replayDelta [(forceParse ".hashmap<30>", BInteger 0x234)] input
       got `shouldBe` Right want
 
@@ -97,7 +97,7 @@ spec = do
     it "should be able to target nested fields" $ do
       let spine = HM.singleton "array" . SArray
                 . I.singleton 3 . SMapping
-                . HM.singleton (Text "brimstone") . SStruct
+                . HM.singleton (IText "brimstone") . SStruct
                 . HM.singleton "and_fire" . BasicValue . BInteger
           input = spine 0x12345
           want  = spine 700000
@@ -107,7 +107,7 @@ spec = do
     it "should be able to guess the intermediate structure from a path" $ do
       let input = HM.singleton "map" $ SMapping HM.empty
           want = HM.singleton "map" . SMapping
-               . HM.singleton (Text "array") . SArray
+               . HM.singleton (IText "array") . SArray
                . I.singleton 9292 . SStruct
                . HM.singleton "array2" . SArray
                . I.singleton 14 . BasicValue . BBool $ True
@@ -117,9 +117,9 @@ spec = do
     it "should be able to play multiple deltas" $ do
       let input = HM.singleton "map" $ SMapping HM.empty
           want = HM.singleton "map" . SMapping . HM.fromList
-               $ [ (Num 4, BasicValue $ BBool True)
-                 , (Num 5, BasicValue $ BBool False)
-                 , (Num 7, BasicValue $ BInteger 43)]
+               $ [ (INum 4, BasicValue $ BBool True)
+                 , (INum 5, BasicValue $ BBool False)
+                 , (INum 7, BasicValue $ BInteger 43)]
           got = flip replayDelta input [ (forceParse ".map<4>", BBool True)
                                        , (forceParse ".map<7>", BInteger 43)
                                        , (forceParse ".map<5>", BBool False)]
@@ -135,21 +135,21 @@ spec = do
 
     it "can analyze a map" $ do
       let input = HM.singleton "coll" . SMapping
-                $ HM.fromList [(Text "monarch", BasicValue $ BString "4cm"),
-                               (Text "mariposa", BasicValue $ BInteger 6)]
+                $ HM.fromList [(IText "monarch", BasicValue $ BString "4cm"),
+                               (IText "mariposa", BasicValue $ BInteger 6)]
       analyze input `shouldMatchList` [(forceParse ".coll<\"monarch\">", BString "4cm")
                                       , (forceParse ".coll<\"mariposa\">", BInteger 6)]
 
     it "can analyze a map of maps" $ do
       let input = HM.singleton "coll" . SMapping
                 $ HM.fromList [
-                (Text "results", SMapping $ HM.fromList [
-                  (Text "ok", BasicValue $ BInteger 20),
-                  (Text "fail", BasicValue $ BInteger 4),
-                  (Text "pending", BasicValue $ BInteger 2)]),
-                (Text "todo", SMapping $ HM.fromList [
-                  (Text "tasks", BasicValue $ BInteger 3),
-                  (Text "stories", BasicValue $ BInteger 2)])]
+                (IText "results", SMapping $ HM.fromList [
+                  (IText "ok", BasicValue $ BInteger 20),
+                  (IText "fail", BasicValue $ BInteger 4),
+                  (IText "pending", BasicValue $ BInteger 2)]),
+                (IText "todo", SMapping $ HM.fromList [
+                  (IText "tasks", BasicValue $ BInteger 3),
+                  (IText "stories", BasicValue $ BInteger 2)])]
       analyze input `shouldMatchList`
          [ (forceParse ".coll<\"results\"><\"ok\">", BInteger 20)
          , (forceParse ".coll<\"results\"><\"fail\">", BInteger 4)
@@ -203,10 +203,10 @@ spec = do
                   , (forceParse ".byDepth<100>", BString "bay")
                   ]
           want = HM.singleton "byDepth" . SMapping $ HM.fromList
-               [ (Num 20, BasicValue $ BString "river")
-               , (Num 4, BasicValue $ BString "stream")
-               , (Num 0, BasicValue $ BString "puddle")
-               , (Num 100, BasicValue $ BString "bay")
+               [ (INum 20, BasicValue $ BString "river")
+               , (INum 4, BasicValue $ BString "stream")
+               , (INum 0, BasicValue $ BString "puddle")
+               , (INum 100, BasicValue $ BString "bay")
                ]
       synthesize input `shouldBe` Right want
 
