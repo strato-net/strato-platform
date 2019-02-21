@@ -10,6 +10,7 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - bytestring
   - classy-prelude

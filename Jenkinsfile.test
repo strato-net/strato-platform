@@ -53,7 +53,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=$(</host)
-          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} genesis=smokeTest loglevel=6 ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
@@ -167,6 +167,13 @@ pipeline {
   }
 
   post {
+    always {
+      sh 'rm -rf logs'
+      sh 'mkdir logs'
+      sh './log_artifact.sh logs'
+      archiveArtifacts artifacts: 'logs/*', fingerprint: true
+    }
+
     success {
       slackSend (
         color: 'good',
@@ -180,6 +187,7 @@ pipeline {
         message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
       )
 
+
       script {
         if (env.PLATFORM_BRANCH_NAME == 'develop') {
           slackSend(
@@ -190,7 +198,7 @@ pipeline {
         }
       }
     }
-    
+
     fixed {
       script {
         if (env.PLATFORM_BRANCH_NAME == 'develop') {

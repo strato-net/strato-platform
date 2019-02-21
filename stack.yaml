@@ -18,6 +18,7 @@ packages:
 - core-strato/miner-ethash/
 - core-strato/merkle-patricia-db/
 - core-strato/blockapps-data/
+- core-strato/blockapps-datadefs/
 - core-strato/blockapps-mpdbs/
 - core-strato/ecrecover/
 - core-strato/fast-ecrecover/
@@ -32,6 +33,7 @@ packages:
 - core-strato/strato-api/
 - core-strato/blockapps-tools/
 - core-strato/vrun/
+- core-strato/seqevents/
 - core-strato/solid-vm/
 - core-strato/strato-genesis/
 - core-strato/strato-adit/

@@ -5,22 +5,20 @@
 
 module Blockchain.Data.PersistTypes where
 
-import           Database.Persist
-import           Database.Persist.Sql
-import           Database.Persist.TH
-
-import           Blockchain.Data.Address
-import           Blockchain.Database.MerklePatricia
-import           Blockchain.ExtWord
-import           Blockchain.SHA
-import           SolidVM.Model
-
+import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.Text                          as T
 import           Data.Text.Encoding
-
-import           Crypto.Types.PubKey.ECC
+import           Database.Persist
+import           Database.Persist.Sql
+import           Database.Persist.TH
 import           Numeric
+
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.StateRoot
+import           SolidVM.Model
 
 derivePersistField "Integer"
 derivePersistField "Point"

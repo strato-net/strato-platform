@@ -15,6 +15,7 @@ dependencies:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
+  - solid-vm-model
   - blockapps-util
   - bytestring
   - containers

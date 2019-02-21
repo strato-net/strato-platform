@@ -14,7 +14,6 @@ import           Data.Time
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
@@ -57,11 +56,6 @@ instance Arbitrary PositiveInteger where
 
 instance Arbitrary HaskoinPrvKey where
     arbitrary = HaskoinPrvKey <$> fromJust <$> ((H.makePrvKey <$> arbitrary) `suchThat` (isJust))
-
-instance Arbitrary Address where
-    arbitrary = do
-        random160Bit <- fastRandBs 20
-        return . Address . fromIntegral . byteString2Integer $ random160Bit
 
 instance Arbitrary T.Text where
   arbitrary = T.pack <$> arbitrary

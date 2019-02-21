@@ -8,19 +8,24 @@
 module Blockchain.Data.Action where
 
 import           Blockchain.Data.Address
-import           Blockchain.ExtWord           (Word256)
+import           Blockchain.ExtWord           (Word256, bytesToWord256)
 import           Blockchain.MiscJSON()
 import           Blockchain.SHA
 import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))
+import           Control.Monad                (liftM2)
 import           Data.Aeson
-import           Data.ByteString              (ByteString, empty)
+import           Data.Aeson.Types
+import qualified Data.ByteString              as B
 import           Data.Function                (on)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
+import qualified Data.HashMap.Strict          as HM
 import           Data.Text                    (Text)
 import           Data.Time
 import           GHC.Generics
+
+import           SolidVM.Model
 
 instance FromJSONKey Address where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
@@ -36,8 +41,8 @@ data CallData = CallData
   , _callDataOwner    :: Address
   , _callDataGasPrice :: Integer
   , _callDataValue    :: Integer
-  , _callDataInput    :: ByteString
-  , _callDataOutput   :: Maybe ByteString
+  , _callDataInput    :: B.ByteString
+  , _callDataOutput   :: Maybe B.ByteString
   } deriving (Show, Generic, NFData)
 makeLenses ''CallData
 
@@ -70,35 +75,75 @@ emptyCallData = CallData
   , _callDataOwner    = Address 0
   , _callDataGasPrice = 0
   , _callDataValue    = 0
-  , _callDataInput    = empty
+  , _callDataInput    = B.empty
   , _callDataOutput   = Nothing
   }
 
+data ActionDataDiff = ActionEVMDiff (Map Word256 Word256)
+                    | ActionSolidVMDiff (Map B.ByteString B.ByteString)
+                    deriving (Eq, Show, Generic, NFData)
+
+instance ToJSON ActionDataDiff where
+  toJSON (ActionEVMDiff m) = toJSON m
+  toJSON (ActionSolidVMDiff m) = toJSON m
+
+sequenceTuple :: Monad m => (m a, m b) -> m (a, b)
+sequenceTuple = uncurry (liftM2 (,))
+
+-- There is intentionally no FromJSON instance. The ToJSON encoding does not
+-- have enough information to recover the original type, and it is expected
+-- that a sibling of ActionDataDiff will have the information to determine
+-- which parser to use.
+parseDiffEVM :: Value -> Parser ActionDataDiff
+parseDiffEVM (Object obs) = fmap (ActionEVMDiff . M.fromList)
+                          . mapM (sequenceTuple . bimap (f.String) f)
+                          $ HM.toList obs
+  where f :: Value -> Parser Word256
+        f = fmap bytesToWord256 . parseJSON
+parseDiffEVM x = typeMismatch "ActionEVMDiff" x
+
+parseDiffSolidVM :: Value -> Parser ActionDataDiff
+parseDiffSolidVM (Object obs) = fmap (ActionSolidVMDiff . M.fromList)
+                              . mapM (sequenceTuple . bimap (f.String) f)
+                              $ HM.toList obs
+  where f :: Value -> Parser B.ByteString
+        f = parseJSON
+parseDiffSolidVM x = typeMismatch "ActionSolidVMDiff" x
+
 data ActionData = ActionData
   { _actionDataCodeHash     :: SHA
-  , _actionDataStorageDiffs :: Map Word256 Word256
+  , _actionDataCodeKind     :: CodeKind
+  , _actionDataStorageDiffs :: ActionDataDiff
   , _actionDataCallData     :: [CallData]
   } deriving (Show, Generic, NFData)
 makeLenses ''ActionData
 
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
-  let diffs = (M.union `on` _actionDataStorageDiffs) newData oldData
+  let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
+        (ActionEVMDiff n, ActionEVMDiff o) -> ActionEVMDiff $ n `M.union` o
+        (ActionSolidVMDiff n, ActionSolidVMDiff o) -> ActionSolidVMDiff $ n `M.union` o
+        _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallData) oldData newData
-   in ActionData (_actionDataCodeHash oldData) diffs calls
+   in ActionData (_actionDataCodeHash oldData) (_actionDataCodeKind oldData) diffs calls
 
 instance ToJSON ActionData where
   toJSON ActionData{..} = object
     [ "codeHash" .= _actionDataCodeHash
     , "diff"     .= _actionDataStorageDiffs
     , "data"     .= _actionDataCallData
+    , "codeKind" .= _actionDataCodeKind
     ]
 
 instance FromJSON ActionData where
-  parseJSON (Object o) = ActionData
-    <$> (o .: "codeHash")
-    <*> (o .: "diff")
-    <*> (o .: "data")
+  parseJSON (Object o) = do
+    ch <- o .: "codeHash"
+    ck <- o .: "codeKind"
+    df <- case ck of
+      EVM -> explicitParseField parseDiffEVM o "diff"
+      SolidVM -> explicitParseField parseDiffSolidVM o "diff"
+    dt <- o .: "data"
+    return $ ActionData ch ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action = Action

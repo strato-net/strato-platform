@@ -11,6 +11,7 @@ dependencies:
   - base
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
   - blockapps-util
   - bytestring
@@ -25,7 +26,7 @@ dependencies:
   - strato-conf
   - strato-model
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - text
   - transformers
 

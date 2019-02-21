@@ -203,7 +203,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionData = Map.singleton a $
                                 A.ActionData
                                   ch
-                                  (Map.map fromDiff $ storage d)
+                                  EVM
+                                  (case storage d of
+                                    EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                    SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
                                   [A.emptyCallData]
             , A._actionMetadata = getMetadata ch
             }
@@ -214,7 +217,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
-          
+
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates

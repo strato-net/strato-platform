@@ -104,8 +104,8 @@ spec = do
         runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
           `L.shouldReturn` [GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ \wm ->
-      runTestPeer $ \ch -> do
-        let addr = blockstanbulSender wm
+      let addr = blockstanbulSender wm
+      in addr /= 0 && addr /= 0xa ==> runTestPeer $ \ch -> do
         -- Without "proof" of which peer this is, assume it could be addr
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` True
