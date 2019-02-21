@@ -1,5 +1,20 @@
 name: solid-vm-model
 
+dependencies:
+  - aeson
+  - attoparsec
+  - base
+  - base16-bytestring
+  - bytestring
+  - containers
+  - deepseq
+  - ethereum-rlp
+  - hashable
+  - scientific
+  - strato-model
+  - text
+  - unordered-containers
+
 default-extensions:
   - BangPatterns
   - DeriveAnyClass
@@ -8,11 +23,22 @@ default-extensions:
 
 library:
   source-dirs: src/
-  dependencies:
-    - aeson
-    - base
-    - base16-bytestring
-    - bytestring
-    - deepseq
-    - strato-model
-    - text
+
+tests:
+  storage-test:
+    source-dirs: test/
+    main: StorageTest.hs
+    other-modules: []
+    dependencies:
+      - hspec
+      - solid-vm-model
+
+benchmarks:
+  storage-bench:
+    source-dirs: bench/
+    main: StorageBench.hs
+    other-modules: []
+    dependencies:
+      - cereal
+      - criterion
+      - solid-vm-model
