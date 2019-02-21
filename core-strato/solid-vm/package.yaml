@@ -36,6 +36,7 @@ dependencies:
   - parsec
   - QuickCheck
   - quickcheck-instances
+  - resourcet
   - semver-range
   - servant-docs
   - strato-model

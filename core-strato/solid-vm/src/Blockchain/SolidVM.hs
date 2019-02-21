@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.SolidVM
     ( 
@@ -11,7 +12,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Char8                as BC
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -22,7 +22,6 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
 import           GHC.Exts
-import           Text.Parsec
 
 import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
@@ -33,11 +32,10 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SHA
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.File
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -78,49 +76,24 @@ create :: Bool
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata = 
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
 create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
-  let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack initCode
-
-  let file = 
-        case maybeFile of
-          Left e -> error $ show e
-          Right v -> v
-  
-      namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-      cc = applyInheritence
-        $ CodeCollection {
-            _contracts=M.fromList namedContracts
-          }
-
-  theCurrentTime <- liftIO getCurrentTime
-
-  let startingState =
-        SState {
-        env = Environment {
-            sender = Address 0x1234,
-            origin = Address 0x1234,
-            blockHeader =
-                BlockHeader {
-                timestamp = theCurrentTime,
-                number = 10
-                }
-            },
-        codeCollection = cc,
-        accounts = M.empty,
-        callStack = []
-        } 
-
   addCode SolidVM $ initCode
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
+
+  sillyValue <- getRawStorageKeyVal' newAddress "theValue"
+
+  liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
   
-  liftIO $ runSM startingState $ do
-         create' sender' cc "qq" []
+  runSM initCode $ do
+    putRawStorageKeyVal' newAddress "theValue" $ B.pack [130, 1, 2]
+    create' sender' "qq" []
 
-create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
-create' creator cc name argExps = do
-
+create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
+create' creator name argExps = do
+  sstate <- get
+  let cc = codeCollection sstate
+   
   --TODO- Replace this address creation with the safe version:
   nonce' <- getNonce creator
   setNonce creator $ nonce'+1
@@ -192,6 +165,11 @@ call :: Bool
 call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
 
 
+  sillyValue <- getRawStorageKeyVal' codeAddress "theValue"
+
+  liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
+
+  
   addressState <- getAddressState codeAddress
 
   ccString <- 
@@ -199,51 +177,10 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
       SolidVMCode _ ch -> getEVMCode ch
       _ -> error "internal error- SolidVM was called for non-solid-vm code"
 
-  theCurrentTime <- liftIO getCurrentTime
 
-
-
-
-
-  let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack ccString
-
-  let file = 
-        case maybeFile of
-          Left e -> error $ show e
-          Right v -> v
-  
-      namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-
-
-
-
-
-  let
-    cc = applyInheritence
-        $ CodeCollection {
-            _contracts=M.fromList namedContracts
-          }
-  
-    startingState =
-        SState {
-        env = Environment {
-            sender = Address 0x1234,
-            origin = Address 0x1234,
-            blockHeader =
-                BlockHeader {
-                timestamp = theCurrentTime,
-                number = 10
-                }
-            },
-        codeCollection = cc,
-        accounts = M.empty,
-        callStack = []
-        } 
-
-  _ <- 
-    liftIO $ runSM startingState $ do
+  _ <- runSM ccString $ do
            call'' codeAddress "getTheValue" []
+
 
 
   return ExecResults {
@@ -659,9 +596,8 @@ expToVar (Xabi.Ternary condition expr1 expr2) = do
   
 expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName)) args) = do
   creator <- getCurrentAddress
-  sstate <- get
   let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
-  execResults <- create' creator (codeCollection sstate) contractName argExps
+  execResults <- create' creator contractName argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
       
 expToVar (Xabi.FunctionCall e args) = do
