@@ -264,7 +264,9 @@ eventualAccountState
 incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m, MonadResource m) =>
                            AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
-  codeKind <- getCodeKind $ addressStateCodeHash newState
+  let codeKind = case addressStateCodeHash newState of
+                   EVMCode{} -> EVM
+                   SolidVMCode{} -> SolidVM
   storage <- (incrementalStorage codeKind `on` addressStateContractRoot) oldState newState
   return AccountDiff{
     nonce = (diff `on` addressStateNonce) oldState newState,

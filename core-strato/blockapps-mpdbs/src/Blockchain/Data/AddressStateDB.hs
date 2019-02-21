@@ -10,8 +10,6 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState
 ) where
 
-import           Data.Aeson
-
 import qualified Blockchain.Colors                  as CL
 
 import           Blockchain.Data.RLP
@@ -26,16 +24,6 @@ import           Control.DeepSeq
 import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
-
-data CodePtr = EVMCode SHA | SolidVMCode String SHA deriving (Show, Read, Eq, Ord, Generic)
-
-instance Format CodePtr where
-  format (EVMCode ch) = format ch
-  format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
-
-instance NFData CodePtr
-
-instance ToJSON CodePtr
 
 data AddressState =
   AddressState{
