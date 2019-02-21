@@ -57,6 +57,8 @@ import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 
+import qualified Blockchain.Strato.Model.Action as BS
+
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
@@ -64,6 +66,11 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+
+todoToMap :: BS.ActionDataDiff -> Map.Map Word256 Word256
+todoToMap = \case
+  BS.ActionEVMDiff m -> m
+  BS.ActionSolidVMDiff _ -> error "TODO(tim): Processing not implemented for SolidVM"
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
@@ -98,7 +105,7 @@ hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
 
 matters :: Action -> Bool
-matters Action{..} = (actionType == Create) || (not . Map.null $ actionStorage)
+matters Action{..} = (actionType == Create) || (not . Map.null $ todoToMap actionStorage)
 
 on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
 on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
@@ -124,7 +131,7 @@ combineActions [x]    = x
 combineActions (x:xs) = let y = combineActions xs
                          in merge x y
   where
-    merge a b = b { actionStorage  = (Map.union `on` actionStorage) b a
+    merge a b = b { actionStorage  = BS.ActionEVMDiff $ (Map.union `on` todoToMap . actionStorage) b a
                   , actionMetadata = (Map.union `on` actionMetadata) b a
                   }
 
@@ -318,7 +325,7 @@ processTheMessages messages conn g = do
               strName = T.replace "\"" "" $ contractdetailsName details
               cont = either error id . xAbiToContract $ contractdetailsXabi details
               chain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
-              cache = flip Map.lookup $ actionStorage row
+              cache = flip Map.lookup . todoToMap $ actionStorage row
               updateGlobal m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
                 let contracts = filter (not . T.null) $ T.splitOn "," v
                 forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
@@ -346,12 +353,12 @@ processTheMessages messages conn g = do
                           0
                           oldState
           setContractState g addr chainId newState
-          let indexContract = processedContract strAbi strName chain (Map.fromList newState) row
+          let indexContract = processedContract strAbi strName chain (Map.fromList $ newState) row
 
           hist <- isHistoric g $ actionCodeHash row
           (hs,fhs) <- unzip <$> if hist
             then accumStateT oldState actions $ \hRow -> do
-              let hCache = flip Map.lookup $ actionStorage hRow
+              let hCache = flip Map.lookup . todoToMap $ actionStorage hRow
               modify $ SVR.decodeCacheValues
                        (typeDefs cont)
                        (mainStruct cont)

@@ -65,6 +65,7 @@ dependencies:
   - semigroups
   - servant-client
   - split
+  - strato-model
   - template-haskell
   - text
   - time
@@ -98,6 +99,7 @@ tests:
     dependencies:
       - base >=4 && < 5
       - aeson
+      - aeson-qq
       - base16-bytestring
       - bytestring
       - containers
@@ -110,4 +112,5 @@ tests:
       - QuickCheck
       - raw-strings-qq
       - slipstream
+      - strato-model
       - text

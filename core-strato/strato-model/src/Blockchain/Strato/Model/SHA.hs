@@ -14,6 +14,7 @@ import              Data.Binary.Get
 import              Data.Binary.Put
 import              Data.ByteArray                       (convert)
 import qualified    Data.ByteString                      as B
+import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
@@ -22,6 +23,7 @@ import              GHC.Generics
 import              Numeric                              (readHex, showHex)
 import              Web.HttpApiData
 import              Web.PathPieces
+import              Test.QuickCheck
 
 import              FastKeccak256
 import              Blockchain.Data.RLP
@@ -112,3 +114,8 @@ instance FromHttpApiData SHA where
         where unmaybe = \case
                 Nothing -> Left "couldn't parse SHA"
                 Just x  -> Right x
+
+instance Arbitrary SHA where
+    arbitrary = do
+        random256Bit <- fastRandBs 32
+        return . SHA . fromIntegral . byteString2Integer $ random256Bit

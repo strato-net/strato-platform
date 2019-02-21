@@ -39,7 +39,6 @@ import           Text.Read                            (readMaybe)
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
--- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
 import           Web.PathPieces
@@ -106,6 +105,9 @@ instance AS.FromJSON Address where
           drop0x ('0':'X':cs) = cs
           drop0x cs = cs
   parseJSON x = typeMismatch "Address" x
+
+instance FromJSONKey Address where
+  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 instance Lei.Pretty Address where
   pretty = Lei.text . CL.yellow . formatAddress
