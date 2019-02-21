@@ -15,18 +15,21 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Short        as BSS
+import           Data.DeriveTH
 import           Data.Function                (on)
+import qualified Data.HashMap.Strict          as HM
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
-import qualified Data.HashMap.Strict          as HM
 import           Data.Text                    (Text)
 import           Data.Time
 import           GHC.Generics
+import           Test.QuickCheck
 
+import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord           (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.SHA
 
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
@@ -89,10 +92,10 @@ instance ToJSON ActionDataDiff where
 sequenceTuple :: Monad m => (m a, m b) -> m (a, b)
 sequenceTuple = uncurry (liftM2 (,))
 
--- There is intentionally no FromJSON instance. The ToJSON encoding does not
--- have enough information to recover the original type, and it is expected
--- that a sibling of ActionDataDiff will have the information to determine
--- which parser to use.
+-- There is intentionally no FromJSON instance. The ToJSON instance does
+-- not have enough information to recover the original type, and it is
+-- expected that a sibling of ActionDataDiff will have the information to
+-- determine with parser to use.
 parseDiffEVM :: Value -> Parser ActionDataDiff
 parseDiffEVM (Object obs) = fmap (ActionEVMDiff . M.fromList)
                           . mapM (sequenceTuple . bimap (f.String) f)
@@ -120,9 +123,9 @@ makeLenses ''ActionData
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
   let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
-        (ActionEVMDiff n, ActionEVMDiff o) -> ActionEVMDiff $ n `M.union` o
-        (ActionSolidVMDiff n, ActionSolidVMDiff o) -> ActionSolidVMDiff $ n `M.union` o
-        _ -> error "mismatched action kinds at the same address"
+          (ActionEVMDiff n, ActionEVMDiff o) -> ActionEVMDiff $ n <> o
+          (ActionSolidVMDiff n, ActionSolidVMDiff o) -> ActionSolidVMDiff $ n <> o
+          _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallData) oldData newData
    in ActionData (_actionDataCodeHash oldData) (_actionDataCodeKind oldData) diffs calls
 
@@ -137,16 +140,13 @@ instance ToJSON ActionData where
 instance FromJSON ActionData where
   parseJSON (Object o) = do
     ch <- o .: "codeHash"
-    ck <- o .: "codeKind"
-    df <- case ck of
-      EVM -> explicitParseField parseDiffEVM o "diff"
-      SolidVM -> explicitParseField parseDiffSolidVM o "diff"
+    ck <- o .:? "codeKind" .!= EVM
+    df <- (case ck of
+      EVM -> explicitParseField parseDiffEVM
+      SolidVM -> explicitParseField parseDiffSolidVM) o "diff"
     dt <- o .: "data"
     return $ ActionData ch ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
-
-instance FromJSONKey Address where
-  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 data Action = Action
   { _actionBlockHash          :: SHA
@@ -183,3 +183,9 @@ instance FromJSON Action where
     <*> (o .: "data")
     <*> (o .: "metadata")
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
+
+derive makeArbitrary ''CallType
+derive makeArbitrary ''CallData
+derive makeArbitrary ''ActionDataDiff
+derive makeArbitrary ''ActionData
+derive makeArbitrary ''Action
