@@ -1,24 +1,45 @@
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.SolidVM.SM where
 
-import Control.Lens
-import Control.Monad.IO.Class
-import Control.Monad.Trans.State
-import Data.IORef
-import Data.Map (Map)
+import           Control.Lens
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.IORef
+import           Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe
-import Data.Time
+import           Data.Maybe
+import qualified Data.Text as T
+import           Data.Time
+import           Text.Parsec
 
---import qualified BlockApps.Solidity.Xabi as Xabi
+
+import           BlockApps.Solidity.Parse.Declarations
+import           BlockApps.Solidity.Parse.File
 import qualified BlockApps.Solidity.Xabi.Statement as Xabi
 
-import Blockchain.Data.Address
---import Blockchain.Strato.Model.Address
+import           Blockchain.Data.Address
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.StateDB
+import           Blockchain.VMContext
 
 import Account
 import CodeCollection
 import Value
+
+
+
+
+
+
+
 
 data CallInfo =
   CallInfo {
@@ -65,15 +86,108 @@ data SState =
     env :: Environment,
     codeCollection :: CodeCollection,
     accounts :: Map Address Account,
-    callStack :: [CallInfo]
+    callStack :: [CallInfo],
+    hashDB                 :: HashDB,
+    stateDB                :: MP.MPDB,
+    addressStateTxDBMap    :: M.Map Address AddressStateModification,
+    addressStateBlockDBMap :: M.Map Address AddressStateModification,
+    storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
+    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
   }
 
-type SM a = StateT SState IO a
+type SM = StateT SState (ResourceT IO)
+
+--type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+
+instance HasMemAddressStateDB SM where
+  getAddressStateTxDBMap = addressStateTxDBMap <$> get
+  putAddressStateTxDBMap theMap = do
+    sstate <- get
+    put $ sstate{addressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = addressStateBlockDBMap <$> get
+  putAddressStateBlockDBMap theMap = do
+    sstate <- get
+    put $ sstate{addressStateBlockDBMap=theMap}
+
+instance HasRawStorageDB SM where
+  getRawStorageTxDB = do
+    cxt <- get
+    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
+            storageTxMap cxt)
+  putRawStorageTxMap theMap = do
+    cxt <- get
+    put cxt{storageTxMap=theMap}
+  getRawStorageBlockDB = do
+    cxt <- get
+    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
+            storageBlockMap cxt)
+  putRawStorageBlockMap theMap = do
+    cxt <- get
+    put cxt{storageBlockMap=theMap}
+
+instance HasStateDB SM where
+  getStateDB = stateDB <$> get
+  setStateDBStateRoot sr = do
+    cxt <- get
+    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
+
+instance HasHashDB SM where
+  getHashDB = hashDB <$> get
 
 
-runSM :: SState -> SM a -> IO a
-runSM sstate f = do
-  (value, _) <- runStateT f sstate
+runSM :: B.ByteString -> SM a -> ContextM a
+runSM theCode f = do
+  let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack theCode
+
+  let file = 
+        case maybeFile of
+          Left e -> error $ show e
+          Right v -> v
+  
+      namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
+
+      cc = applyInheritence
+        $ CodeCollection {
+            _contracts=M.fromList namedContracts
+          }
+
+
+  vmcontext <- get
+
+  theCurrentTime <- liftIO getCurrentTime
+
+  let startingState =
+        SState {
+        env = Environment {
+            sender = Address 0x1234,
+            origin = Address 0x1234,
+            blockHeader =
+                BlockHeader {
+                timestamp = theCurrentTime,
+                number = 10
+                }
+            },
+        codeCollection = cc,
+        accounts = M.empty,
+        callStack = [],
+        hashDB = contextHashDB vmcontext,
+        stateDB = contextStateDB vmcontext,
+        addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
+        addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
+        storageTxMap = contextStorageTxMap vmcontext,
+        storageBlockMap = contextStorageBlockMap vmcontext
+        } 
+
+  (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
+
+  vmcontext' <- get 
+  put vmcontext'{
+    contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
+    contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
+    contextStorageTxMap = storageTxMap sstateAfter,
+    contextStorageBlockMap = storageBlockMap sstateAfter
+    }
+
   return value
 
 getEnv :: SM Environment
