@@ -561,13 +561,20 @@ postUsersContractMethod' FunctionParameters{..} sign = do
 emptyBatchState :: BatchState
 emptyBatchState = BatchState Map.empty Map.empty
 
+-- getBlocTransactionResult' will return only one of the results
+-- when multiple hashes are provided. This is a glass-half-full
+-- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: Maybe ChainId -> [Keccak256] -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' _ [] _ = throwError $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' chainId hashes@(txh:_) resolve =
   if resolve
     then do
       promises <- forM hashes $ \h -> async (getBlocTransactionResult h chainId True)
-      snd <$> waitAny promises
+      results <- mapM wait promises
+      logWith logNotice $ "Transaction results: " <> Text.pack (show results)
+      case filter ((== Success) . blocTransactionStatus) results of
+        (winner:_) -> return winner
+        [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> Bloc BlocTransactionResult
