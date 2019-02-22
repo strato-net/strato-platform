@@ -1,9 +1,11 @@
 import qualified Data.ByteString as B
+import Control.Monad
 import Data.Either (isLeft)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import Test.Hspec
 
+import Blockchain.Data.RLP
 import SolidVM.Model.Storable
 
 main :: IO ()
@@ -231,4 +233,12 @@ spec = do
             ]
       synthesize input `shouldBe` Right want
 
-
+  describe "BasicValue RLP encoding" $ do
+    it "should be reversible" $ do
+      let examples = [ BInteger 3399293429
+                     , BString "This is text"
+                     , BBool True
+                     , BAddress 0x23421421421341232341bbbb
+                     , BEnumVal "type" "num"
+                     ]
+      forM_ examples $ \bv ->  rlpDecode (rlpEncode bv) `shouldBe` bv

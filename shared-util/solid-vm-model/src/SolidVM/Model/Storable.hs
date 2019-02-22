@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 module SolidVM.Model.Storable where
 
 import           Control.DeepSeq
@@ -213,8 +215,22 @@ constructFromNothing (MapIndex n sp) = SMapping . HM.singleton n . constructFrom
 constructFromNothing (ArrayIndex n sp) = SArray . I.singleton n . constructFromNothing sp
 
 instance RLPSerializable BasicValue where
-  rlpEncode = error "TODO(tim): BasicValue rlpEncode"
-  rlpDecode = error "TODO(tim): BasicValue rlpDecode"
+  rlpEncode = \case
+    BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
+    BString t -> RLPArray [RLPScalar 1, rlpEncode t]
+    BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
+    BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
+    BEnumVal a b -> RLPArray [RLPScalar 4, rlpEncode a, rlpEncode b]
+  rlpDecode x@(RLPArray ((RLPScalar t):f:s)) =
+    case (t, s) of
+      (0, []) -> BInteger $ rlpDecode f
+      (1, []) -> BString $ rlpDecode f
+      (2, []) -> BBool $ rlpDecode f
+      (3, []) -> BAddress $ rlpDecode f
+      (4, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      _ -> error $ "invalid type or data length for BasicValue: " ++ show x
+  rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
+
 
 instance Ae.ToJSON StorableValue where
   toJSON = error "TODO(tim): StorableValue toJSON"

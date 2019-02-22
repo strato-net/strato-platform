@@ -8,8 +8,10 @@ dependencies:
   - bytestring
   - containers
   - deepseq
+  - derive
   - ethereum-rlp
   - hashable
+  - QuickCheck
   - scientific
   - strato-model
   - text
