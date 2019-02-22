@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module BlockApps.Solidity.Selector.Type where
+module SolidVM.Solidity.Selector.Type where
 
 import           Control.DeepSeq
 import           Data.Binary

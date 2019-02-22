@@ -1,7 +1,7 @@
 
-module BlockApps.Solidity.Xabi.Statement where
+module SolidVM.Solidity.Xabi.Statement where
 
-import BlockApps.Solidity.Xabi.Type
+import SolidVM.Solidity.Xabi.Type
 
 data Statement = 
   IfStatement Expression [Statement] (Maybe [Statement]) -- if then else

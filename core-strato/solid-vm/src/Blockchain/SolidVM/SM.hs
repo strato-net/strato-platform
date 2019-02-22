@@ -18,9 +18,9 @@ import           Data.Time
 import           Text.Parsec
 
 
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.File
-import qualified BlockApps.Solidity.Xabi.Statement as Xabi
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.File
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 
 import           Blockchain.Data.Address
 import qualified Blockchain.Database.MerklePatricia as MP

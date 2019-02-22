@@ -4,7 +4,7 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 -- Maintainer: Charles Crain <charles@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-module BlockApps.Solidity.Parse.Declarations where
+module SolidVM.Solidity.Parse.Declarations where
 
 import           Data.List
 import qualified Data.Map as Map
@@ -16,17 +16,17 @@ import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
 import           Text.Printf                          (printf)
 
-import           BlockApps.Solidity.Parse.Statement
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
-import           BlockApps.Solidity.Parse.Types
+import           SolidVM.Solidity.Parse.Statement
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Types
 
-import           BlockApps.Solidity.Xabi.Statement
-import           BlockApps.Solidity.Xabi              (Xabi (..))
-import qualified BlockApps.Solidity.Xabi              as Xabi
-import qualified BlockApps.Solidity.Xabi.Def          as Xabi
-import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
-import qualified BlockApps.Solidity.Xabi.VarDef       as Xabitype
+import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi              (Xabi (..))
+import qualified SolidVM.Solidity.Xabi              as Xabi
+import qualified SolidVM.Solidity.Xabi.Def          as Xabi
+import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
+import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 
 data SourceUnit = Pragma Identifier String

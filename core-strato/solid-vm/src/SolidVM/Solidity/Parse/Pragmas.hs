@@ -4,13 +4,13 @@
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-module BlockApps.Solidity.Parse.Pragmas (solidityPragma) where
+module SolidVM.Solidity.Parse.Pragmas (solidityPragma) where
 
 import           Text.Parsec
 
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
 
 
 solidityPragma :: SolidityParser SourceUnit

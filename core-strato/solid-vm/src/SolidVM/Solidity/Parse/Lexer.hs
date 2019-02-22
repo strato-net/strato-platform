@@ -3,7 +3,7 @@
 -- Description: Parsers for various lexical elements of a Solidity source
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module BlockApps.Solidity.Parse.Lexer where
+module SolidVM.Solidity.Parse.Lexer where
 
 import           Text.Parsec
 import           Text.Parsec.Language                 (javaStyle)

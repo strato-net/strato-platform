@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Solidity.Xabi.VarDef where
+module SolidVM.Solidity.Xabi.VarDef where
 
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
@@ -14,8 +14,8 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
-import           BlockApps.Solidity.Xabi.Statement
-import           BlockApps.Solidity.Xabi.Type
+import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi.Type
 
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}

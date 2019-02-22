@@ -12,8 +12,8 @@ import           Data.Traversable
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 
-import qualified BlockApps.Solidity.Xabi            as Xabi
-import qualified BlockApps.Solidity.Xabi.Type       as Xabi
+import qualified SolidVM.Solidity.Xabi            as Xabi
+import qualified SolidVM.Solidity.Xabi.Type       as Xabi
 import           Blockchain.Data.Address
 import           Blockchain.Strato.Model.Format
 

@@ -1,14 +1,14 @@
 
-module BlockApps.Solidity.Parse.Statement where
+module SolidVM.Solidity.Parse.Statement where
 
 import           Data.Functor.Identity
 import           Text.Parsec
 import           Text.Parsec.Expr
 
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
-import           BlockApps.Solidity.Parse.Types
-import           BlockApps.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Types
+import           SolidVM.Solidity.Xabi.Statement
 
 
 

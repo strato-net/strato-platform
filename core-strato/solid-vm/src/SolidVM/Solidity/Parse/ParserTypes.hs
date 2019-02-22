@@ -3,7 +3,7 @@
 -- Description: Types used throughout solidity-abi, primarily the ones
 --   containing the structure of a parsed contract.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
-module BlockApps.Solidity.Parse.ParserTypes where
+module SolidVM.Solidity.Parse.ParserTypes where
 
 --import           Control.Monad
 --import           Data.Either.Extra
@@ -12,7 +12,7 @@ module BlockApps.Solidity.Parse.ParserTypes where
 --import qualified Data.Text as T
 import           Text.Parsec
 
---import           BlockApps.Solidity.Xabi
+--import           SolidVM.Solidity.Xabi
 
 
 -- | Source file names; also source file /paths/.
