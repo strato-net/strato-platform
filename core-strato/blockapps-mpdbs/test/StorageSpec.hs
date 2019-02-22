@@ -29,12 +29,14 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
+import SolidVM.Model.Storable
 
 type SMap = M.Map (Address, B.ByteString) B.ByteString
 type AMap = M.Map Address AddressStateModification
@@ -148,3 +150,17 @@ storageSpec = do
       got <- addressStateContractRoot <$> getAddressState 0x1234
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
+
+  describe "RawStorageDB" $ do
+    it "should get its puts" . runStorM $ do
+      putRawStorageKeyVal' 0x888 "aKey" "aValue"
+      getRawStorageKeyVal' 0x888 "aKey" `shouldReturn` "aValue"
+
+  describe "SolidStorageDB" $ do
+    it "should get its puts" . runStorM $ do
+      putSolidStorageKeyVal' 0x99 (Field "x" (ArrayIndex 99 Null)) (BString "txt")
+      getSolidStorageKeyVal' 0x99 (Field "x" (ArrayIndex 99 Null)) `shouldReturn` BString "txt"
+
+    it "should be able to flush" . runStorM $ do
+      putSolidStorageKeyVal' 0x342 (Field "x" Null) (BBool True)
+      flushMemSolidStorageDB
