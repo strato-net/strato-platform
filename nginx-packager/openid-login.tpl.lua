@@ -16,9 +16,8 @@ local opts = {
     token_endpoint_auth_method    = "client_secret_post",
     ssl_verify                    = "<IS_SSL_PLACEHOLDER_YES_NO>",
     redirect_uri_scheme           = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-    -- 'access_token' is required for refresh token, 'user' is for providers sending 'email' in user object instead openid
-    -- keeping commented to have everything stored in session
-    -- session_contents           = {id_token=true, user=true, access_token=true},
+    -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+    --session_contents              = {id_token=true, access_token=true}, -- comment out to keep everything
     renew_access_token_on_expiry  = true,
     access_token_expires_in       = 3600,
     logout_path                   = "/auth/openidc/logout",
