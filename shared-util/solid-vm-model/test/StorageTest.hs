@@ -4,6 +4,7 @@ import Data.Either (isLeft)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import Test.Hspec
+import UnliftIO.Exception
 
 import Blockchain.Data.RLP
 import SolidVM.Model.Storable
@@ -242,3 +243,10 @@ spec = do
                      , BEnumVal "type" "num"
                      ]
       forM_ examples $ \bv ->  rlpDecode (rlpEncode bv) `shouldBe` bv
+
+    it "should fail on invalids" $ do
+      let examples = [ RLPArray []
+                     , RLPArray [RLPScalar 6, rlpEncode (300 :: Integer)]
+                     , RLPArray [RLPScalar 0, rlpEncode (8 :: Integer), rlpEncode (7 :: Integer)]
+                     ]
+      forM_ examples $ \rlp -> evaluate (rlpDecode rlp::BasicValue) `shouldThrow` anyErrorCall
