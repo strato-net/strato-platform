@@ -164,6 +164,3 @@ storageSpec = do
     it "should be able to flush" . runStorM $ do
       putSolidStorageKeyVal' 0x342 (Field "x" Null) (BBool True)
       flushMemSolidStorageDB
-    -- describe "SolidStorageDB" . runStorM $ do
-
-
