@@ -1,0 +1,196 @@
+BlockData
+    parentHash SHA
+    unclesHash SHA
+    coinbase Address
+    stateRoot StateRoot
+    transactionsRoot StateRoot
+    receiptsRoot StateRoot
+    logBloom BS.ByteString
+    difficulty Integer sqltype=numeric(1000,0)
+    number Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    gasUsed Integer sqltype=numeric(1000,0)
+    timestamp UTCTime
+    extraData BS.ByteString
+    nonce Word64
+    mixHash SHA
+    deriving Eq Read Show Generic
+
+BlockDataRef
+    parentHash SHA
+    unclesHash SHA
+    coinbase Address
+    stateRoot StateRoot
+    transactionsRoot StateRoot
+    receiptsRoot StateRoot
+    logBloom BS.ByteString
+    difficulty Integer sqltype=numeric(1000,0)
+    number Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    gasUsed Integer sqltype=numeric(1000,0)
+    timestamp UTCTime
+    extraData BS.ByteString
+    nonce Word64
+    mixHash SHA
+    hash SHA
+    blockUncles [BlockData]
+    powVerified Bool
+    isConfirmed Bool
+    totalDifficulty Integer sqltype=numeric(1000,0)
+    deriving Eq Read Show
+
+BlockTransaction
+    blockDataRefId BlockDataRefId
+    transaction RawTransactionId
+    deriving Eq Read Show
+
+AddressStateRef
+    address Address
+    nonce Integer sqltype=numeric(1000,0)
+    balance Integer sqltype=numeric(1000,0)
+    contractRoot StateRoot
+    code BS.ByteString
+    codeHash SHA
+    chainId Word256 Maybe
+    latestBlockDataRefNumber Integer
+    deriving Eq Read Show
+
+RawTransaction
+    timestamp UTCTime
+    fromAddress Address
+    nonce Integer sqltype=numeric(1000,0)
+    gasPrice Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    toAddress Address Maybe
+    value Integer sqltype=numeric(1000,0)
+    codeOrData BS.ByteString
+    chainId Word256
+    r Integer
+    s Integer
+    v Word8
+    metadata [TextPair] Maybe
+    blockNumber Int
+    txHash SHA
+    origin TXOrigin
+    UniqueTXHash txHash chainId
+    deriving Eq Generic Read Show
+
+Storage json
+    addressStateRefId AddressStateRefId
+    kind CodeKind
+    key HexStorage
+    value HexStorage
+    deriving Eq Read Show
+
+TransactionResult json
+    blockHash SHA
+    transactionHash SHA
+    message String
+    response String
+    trace String
+    gasUsed Word256
+    etherUsed Word256
+    contractsCreated String
+    contractsDeleted String
+    stateDiff String
+    time Double
+    newStorage String
+    deletedStorage String
+    status TransactionResultStatus Maybe
+    chainId Word256 Maybe
+    deriving Eq Read Show Generic
+
+UserN json
+    email String
+    loginPassHash BS.ByteString
+    lastLogin UTCTime
+    numLogins Int
+    verified Bool
+    verkey BS.ByteString
+    deriving Eq Read Show
+
+UserData json
+    encryptedWallet String
+    address Address
+    userId UserNId
+    deriving Eq Read Show
+
+BlockApp json
+    name String
+    developerName String
+    developerEmail String
+    appUrl String
+    repoUrl String Maybe
+    loginPassHash BS.ByteString
+    verified Bool
+    verkey BS.ByteString
+    deriving Eq Read Show
+
+BlockAppLogin json
+    userId UserNId
+    blockAppId BlockAppId
+    timestamp UTCTime
+    ip String
+    deriving Eq Read Show
+
+Extra
+    theKey String
+    value String
+    Primary theKey
+    TheKey theKey
+    deriving Eq Read Show
+
+LogDB
+    blockHash SHA
+    transactionHash SHA
+    chainId Word256 Maybe
+    address Address
+    topic1 Word256 Maybe
+    topic2 Word256 Maybe
+    topic3 Word256 Maybe
+    topic4 Word256 Maybe
+    theData BS.ByteString
+    bloom Word512
+    deriving Eq Read Show Generic
+
+ChainInfoRef
+    chainId Word256
+    chainLabel String
+    parentChain Word256 Maybe
+    creationBlock SHA
+    chainNonce Word256
+    deriving Eq Generic Show
+
+ChainSignatureRef
+    chainInfoId ChainInfoRefId
+    r Integer
+    s Integer
+    v Word8
+    deriving Eq Generic Show
+
+ChainMemberRef
+    chainInfoId ChainInfoRefId
+    name String
+    address Address
+    deriving Eq Generic Show
+
+AccountInfoRef
+    chainInfoId ChainInfoRefId
+    address Address
+    balance Integer
+    codeHash SHA Maybe
+    map [MapPair] Maybe
+    deriving Eq Generic Show
+
+CodeInfoRef
+    chainInfoId ChainInfoRefId
+    evmByteCode BS.ByteString
+    contractCode String
+    contractName String
+    deriving Eq Generic Show
+
+ChainMetadataRef
+    chainInfoId ChainInfoRefId
+    key String
+    value String
+    deriving Eq Generic Show

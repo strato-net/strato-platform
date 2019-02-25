@@ -6,8 +6,6 @@ import           Blockchain.SHA
 
 import           Blockchain.Verification                 (ommersVerificationValue)
 
-import           Blockchain.Sequencer.ArbitraryInstances ()
-
 import           Control.Monad
 
 import           Test.QuickCheck

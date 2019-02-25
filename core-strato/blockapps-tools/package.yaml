@@ -16,6 +16,8 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - cmdargs
@@ -33,7 +35,7 @@ dependencies:
   - resourcet
   - time
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - strato-index
   - strato-redis-blockdb
   - strato-model

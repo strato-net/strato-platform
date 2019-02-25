@@ -31,7 +31,7 @@ executables:
       - random
       - strato-conf
       - strato-model
-      - strato-sequencer
+      - seqevents
       - text
       - unordered-containers
       - vector

@@ -17,9 +17,12 @@ library:
     - unordered-containers
     - resourcet
     - aeson
+    - solid-vm-model
     - strato-model
     - strato-conf
     - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
     - blockapps-util
     - ethereum-rlp
     - merkle-patricia-db

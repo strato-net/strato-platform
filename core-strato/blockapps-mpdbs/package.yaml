@@ -1,0 +1,54 @@
+name: blockapps-mpdbs
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+maintainer: jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category: Data Structures
+license: Apache-2.0
+description: The client described in the Ethereum Yellowpaper
+github: blockapps/strato-platform/core-strato/blockapps-mpdbs
+
+dependencies:
+  - base
+  - ansi-wl-pprint
+  - base16-bytestring
+  - binary
+  - blockapps-util
+  - bytestring
+  - containers
+  - data-default
+  - deepseq
+  - ethereum-rlp
+  - leveldb-haskell
+  - merkle-patricia-db
+  - mtl
+  - nibblestring
+  - resourcet
+  - solid-vm-model
+  - strato-model
+
+ghc-options: -Wall -O2
+
+library:
+  source-dirs: src/
+  default-extensions: TemplateHaskell
+
+tests:
+  blockapps-mpdbs-test:
+    source-dirs: test/
+    main: Main.hs
+    dependencies:
+      - aeson-diff
+      - blockapps-mpdbs
+      - directory
+      - hspec
+      - hspec-expectations-lifted
+      - lens
+      - HUnit
+      - transformers
+      - unix
+      - unordered-containers
+      - unliftio
+      - vector
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

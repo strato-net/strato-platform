@@ -16,6 +16,7 @@ dependencies:
   - bytestring
   - cryptonite
   - deepseq
+  - hashable
   - lens
   - path-pieces
   - memory

@@ -10,6 +10,7 @@ TESTS=(
   blockapps-bloc22-server
   blockapps-bloc22-api
   slipstream
+  solid-vm-model
 )
 
 for tst in ${TESTS[@]}; do

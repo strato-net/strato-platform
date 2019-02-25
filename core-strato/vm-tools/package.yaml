@@ -15,7 +15,9 @@ dependencies:
   - ansi-wl-pprint
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - containers
@@ -42,7 +44,7 @@ dependencies:
   - strato-index
   - strato-model
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - text
   - temporary
   - time
