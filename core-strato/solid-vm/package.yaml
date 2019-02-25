@@ -22,6 +22,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-mpdbs
+  - ethereum-rlp
   - blockapps-util
   - bytestring
   - containers

@@ -28,11 +28,11 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.SolidVM.Account
+import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 
-import Account
 import CodeCollection
-import Value
 
 
 
@@ -215,10 +215,6 @@ getVariableOfName name = do
       vars = localVariables currentCallInfo
       maybeLocalValue = M.lookup name $ vars
 
-      maybeStorageValue :: Maybe Variable
-      maybeStorageValue =
-        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
-
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
       
@@ -252,6 +248,21 @@ getVariableOfName name = do
         then Just $ Constant $ SContractDef name
         else Nothing
 
+      maybeStorageItem :: Maybe Variable
+      maybeStorageItem = 
+        if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
+        then Just $ StorageItem name
+        else Nothing
+
+
+
+
+
+
+
+--        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
+
+  
   --TODO- Add the constant lookup properly
   {-
   maybeConstantValue <- do
@@ -267,7 +278,7 @@ getVariableOfName name = do
   
   return
     $ flip fromMaybe maybeLocalValue
-    $ flip fromMaybe maybeStorageValue
+    $ flip fromMaybe maybeStorageItem
     $ flip fromMaybe maybeContractFunction
     $ flip fromMaybe maybeBuiltinFunction
     $ flip fromMaybe maybeBuiltinVariable
@@ -343,7 +354,7 @@ getStorage address name = do
     Nothing -> return Nothing
     Just account ->return $ M.lookup name $ storage account
 -}
-
+{-
 addToStorage :: Address -> String -> Value -> SM ()
 addToStorage address name value = do
   variable <- liftIO $ fmap Variable $ newIORef value
@@ -351,7 +362,7 @@ addToStorage address name value = do
   let account = fromMaybe initialAccount $ M.lookup address $ accounts sstate :: Account
       newAccount = account{storage=M.insert name variable $ storage account} :: Account
   put sstate{accounts = M.insert address newAccount $ accounts sstate}
-
+-}
 
 getAccount :: Address -> SM Account
 getAccount a = do

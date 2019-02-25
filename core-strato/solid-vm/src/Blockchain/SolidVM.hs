@@ -12,6 +12,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Char8                as BC
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -29,12 +30,16 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import           Blockchain.SolidVM.Account
+import           Blockchain.SolidVM.SetGet
+import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
@@ -46,9 +51,7 @@ import qualified BlockApps.Solidity.Xabi.Statement as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
 
-import           Account
 import           CodeCollection
-import           Value
 
 
 
@@ -81,12 +84,7 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
 
-  sillyValue <- getRawStorageKeyVal' newAddress "theValue"
-
-  liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
-
   runSM initCode $ do
-    putRawStorageKeyVal' newAddress "theValue" $ B.pack [130, 1, 2]
     create' sender' "qq" []
 
 create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
@@ -102,7 +100,7 @@ create' creator name argExps = do
 
   when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show address ++ " of type " ++ name
 
-  let account = Account 0 0 M.empty (name, cc)
+  let account = initialAccount{contract=(name, cc)}
 
   addAccount address account
 
@@ -117,7 +115,8 @@ create' creator name argExps = do
       case maybeExpression of
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
-    addToStorage address n initialValue
+    putRawStorageKeyVal' address (BC.pack n) $ rlpSerialize $ rlpEncode initialValue
+--    addToStorage address n initialValue
 
   popCallInfo
 
@@ -163,13 +162,6 @@ call :: Bool
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
 call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
-
-
-  sillyValue <- getRawStorageKeyVal' codeAddress "theValue"
-
-  liftIO $ putStrLn $ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%****************************** sillyValue = " ++ show sillyValue
-
-
   addressState <- getAddressState codeAddress
 
   ccString <-
@@ -201,13 +193,11 @@ call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
   sstate <- get
 
-  account <- getAccount address
-
   let contractName = "qq"
       cc = codeCollection sstate
 
   when trace $ do
-    argStrings <- liftIO $ forM args showIO
+    argStrings <- forM args showSM
     liftIO $ putStrLn $ box ["calling function: " ++ format address, contractName ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
   let contract' = fromMaybe (error $ "contract name doesn't exist in CodeCollection: " ++ contractName) $  M.lookup contractName $ cc^.contracts
@@ -223,7 +213,7 @@ call'' address functionName args = do
         resultString <-
           case result of
             Nothing -> return ""
-            Just v -> liftIO $ showIO v
+            Just v -> showSM v
 
         liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
@@ -232,8 +222,7 @@ call'' address functionName args = do
     _ -> do --Maybe the function is actually a getter
       case M.lookup functionName $ contract'^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          let var = fromMaybe (error "no storage value for getter") $ M.lookup functionName $ storage account
-          val <- getVar var
+          val <- getVar $ StorageItem functionName
           return $ Just val
         Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
 
@@ -286,6 +275,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
   v2 <- expToVar e2
   value <- getVar v2
 
+  when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   when trace $ logAssigningVariable value
   setVar v1 value
   return Nothing
@@ -301,7 +291,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition _ varNames maybeExpr
       Nothing -> return SNULL
 
   when trace $ do
-    valueString <- liftIO $ showIO value
+    valueString <- showSM value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
     liftIO $ putStrLn $ "             to: " ++ valueString
 
@@ -844,5 +834,5 @@ box strings = unlines $
 
 logAssigningVariable :: Value -> SM ()
 logAssigningVariable v = do
-  valueString <- liftIO $ showIO v
+  valueString <- showSM v
   liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString

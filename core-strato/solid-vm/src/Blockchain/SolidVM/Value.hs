@@ -1,10 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 
-module Value where
+module Blockchain.SolidVM.Value where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import           Data.IORef
-import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -14,68 +16,21 @@ import qualified Data.Vector as V
 
 import qualified BlockApps.Solidity.Xabi            as Xabi
 import qualified BlockApps.Solidity.Xabi.Type       as Xabi
+import           Blockchain.Data.RLP
 import           Blockchain.Data.Address
-import           Blockchain.Strato.Model.Format
-
-
 
 data Variable = Variable (IORef Value)
   | Property String Variable
   | Constant Value
   | UnsetMapItem Variable Value Xabi.Type
+  | StorageItem String
   
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Property name o) = "<prop:" ++ name ++ "> of " ++ show o
   show (Constant v) = "Constant: " ++ show v
   show (UnsetMapItem _ key valType) = "<unsetmapitem: " ++ show key ++ ">, type =" ++ show valType
-
-setVar :: MonadIO m =>
-          Variable -> Value -> m ()
-setVar (Property "length" o) newVal = do
-  val <- getVar o
-  case (val, newVal) of
-    (SArray valType oldV, SInteger i) -> do
-      newV <-
-        case toInteger (V.length oldV) `compare` i of
-          EQ -> return oldV
-          LT -> do
-            extra <-
-              liftIO $ V.replicateM (fromInteger i-V.length oldV) (fmap Variable $ newIORef $ defaultValue valType)
-            return $ oldV V.++ extra
-          GT -> return $ V.take (fromInteger i) oldV
-      setVar o $ SArray valType newV
-
-    _ -> error "setVar length called for unknown params"
-
-
-setVar (Variable ioRef) val = do
-  liftIO $ writeIORef ioRef val
-
-setVar (UnsetMapItem mapVariable key _) val = do
-  (SMap valType theMap) <- getVar mapVariable
-  newVar <- liftIO $ fmap Variable $ newIORef val
-  setVar mapVariable $ SMap valType $ M.insert key newVar theMap
-
-setVar (Constant _) _ = error "setVar was called for a constant, this is forbidden"
-
-  
-setVar x _ = error $ "setVar called for undefined value: " ++ show x
-
-getVar :: MonadIO m =>
-          Variable -> m Value
-getVar (Variable ioRef) = do
-  liftIO $ readIORef ioRef
-getVar (Constant x) = return x
-getVar (Property "length" var) = do
-  val <- getVar var
-  case val of
-    SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
-    SString s -> return $ SInteger $ toInteger $ length s
-    x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
-getVar (UnsetMapItem _ _ valType) = return $ defaultValue valType
-getVar x = error $ "getVar called for undefined value: " ++ show x
-
+  show (StorageItem key) = "<storage: " ++ show key ++ ">"
 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
@@ -103,6 +58,11 @@ data Value =
   | SContractFunction String Integer String -- contractName, address, functionName
   | SNULL deriving (Show)
 
+
+--TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
+--This only allows for comparison within the same type of values
+--(the move to static typing will probably automatically clean this up)
+
 instance Eq Value where
   (SInteger i1) == (SInteger i2) = i1 == i2
   (SString s1) == (SString s2) = s1 == s2
@@ -114,6 +74,14 @@ instance Ord Value where
   compare (SString s1) (SString s2) = compare s1 s2
   compare (SBool b1) (SBool b2) = compare b1 b2
   compare x y = error $ "Ord not defined for Values given:\n" ++ show x ++ "\n" ++ show y
+
+
+instance RLPSerializable Value where
+  rlpEncode (SInteger i) = RLPArray [RLPString "I", rlpEncode i]
+  rlpEncode x = error $ "undefined case in rlpEncode for Value: " ++ show x
+  
+  rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
+  rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
 
 varEquals :: MonadIO m =>
              Variable -> Variable -> m Bool
@@ -179,43 +147,6 @@ valEquals (SAddress (Address v1)) (SInteger v2) = return $ v1 == fromInteger v2 
 valEquals (SInteger v1) (SAddress (Address v2)) = return $ fromInteger v1 == v2
 valEquals _ _ = return False
 
-showIO :: Value -> IO String
-showIO SNULL = return "NULL"
-showIO (SInteger v) = return $ show v
-showIO (SString v) = return $ show v
-showIO (SBool v) = return $ show v
-showIO (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
-showIO (SAddress a) = return $ format a
-showIO (STuple v) = do
-  vals <- forM (V.toList v) getVar
-  strings <- forM vals showIO 
-  return $ "(" ++ intercalate ", " strings ++ ")"
-showIO (SArray _ v) = do
-  vals <- forM (V.toList v) getVar
-  strings <- forM vals showIO 
-  return $ "[" ++ intercalate ", " strings ++ "]"
-showIO (SStruct name m) = do
-  valStrings <- 
-    forM (M.toList m) $ \(n, var) -> do
-      val <- getVar var
-      valString <- showIO val
-      return (n, valString)
-  return $ name ++ "{"
-                ++ intercalate ", " (map (\(n, v) -> n ++ ": " ++ v) valStrings)
-                ++ "}"
-showIO (SMap _ m) = do
-  valStrings <- 
-    forM (M.toList m) $ \(key, var) -> do
-      val <- getVar var
-      valString <- showIO val
-      keyString <- showIO key
-      return (keyString, valString)
-  return $ "{"
-           ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
-           ++ "}"
-showIO (SContract name address) = do
-  return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
-showIO x = error $ "showIO called for unsupported value: " ++ show x
 
 defaultValue :: Xabi.Type -> Value
 defaultValue (Xabi.Array valType _) = SArray valType V.empty
@@ -227,3 +158,11 @@ defaultValue (Xabi.String _) = SString ""
 defaultValue (Xabi.Bytes _ _) = SString ""
 defaultValue (Xabi.Label name) = SString $ "Label: " ++ name  --TODO- clearly this is wrong.......  I just need something here to run the program through to the end, this needs to be fixed later
 defaultValue x = error $ "missing type in defaultValue: " ++ show x
+
+
+
+
+
+byteStringToValue :: ByteString -> Maybe Value
+byteStringToValue x | x == B.singleton 128 = Nothing
+byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x

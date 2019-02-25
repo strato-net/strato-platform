@@ -1,17 +1,15 @@
 
-module Account where
+module Blockchain.SolidVM.Account where
 
-import Data.Map (Map)
-import qualified Data.Map as M
+import qualified Blockchain.Database.MerklePatricia as MP
 
 import CodeCollection
-import Value
 
 data Account =
   Account {
     nonce :: Integer,
     balance :: Integer,
-    storage :: Map String Variable,
+    storage :: MP.StateRoot,
     contract :: (String, CodeCollection)
   } deriving (Show)
 
@@ -22,6 +20,6 @@ initialAccount =
   Account {
     nonce=0,
     balance=0,
-    storage=M.empty,
+    storage=MP.emptyTriePtr,
     contract=("", emptyCodeCollection)
   }
