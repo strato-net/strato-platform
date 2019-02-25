@@ -95,7 +95,6 @@ benchmarks:
       - hashable
       - vector
       - unordered-containers
-      - vector
 
   extractbench:
     source-dirs: bench/
