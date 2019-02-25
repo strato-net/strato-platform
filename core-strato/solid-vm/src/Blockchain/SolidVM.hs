@@ -11,6 +11,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
+import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
 import           Data.IORef
@@ -170,7 +171,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
       _ -> error "internal error- SolidVM was called for non-solid-vm code"
 
 
-  _ <- runSM ccString $ do
+  returnValue <- runSM ccString $ do
            call'' codeAddress "getTheValue" []
 
 
@@ -178,7 +179,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = Just B.empty,
+    erReturnVal = fmap encodeForReturn returnValue,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Nothing,
@@ -836,3 +837,10 @@ logAssigningVariable :: Value -> SM ()
 logAssigningVariable v = do
   valueString <- showSM v
   liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
+
+
+
+--TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
+encodeForReturn :: Value -> ByteString
+encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
+encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x
