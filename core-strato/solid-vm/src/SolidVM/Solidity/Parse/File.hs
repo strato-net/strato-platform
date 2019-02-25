@@ -6,7 +6,7 @@
 --
 -- Currently does contracts and pragmas.  In the future should also handle
 -- imports.
-module BlockApps.Solidity.Parse.File where
+module SolidVM.Solidity.Parse.File where
 
 import           Prelude                               hiding (lookup)
 
@@ -18,10 +18,10 @@ import qualified Data.Text                             as T
 import           Text.Parsec
 
 
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
-import           BlockApps.Solidity.Parse.Pragmas
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Pragmas
 
 
 newtype File = File {

@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Solidity.Xabi where
+module SolidVM.Solidity.Xabi where
 
 import           Control.Applicative
 import           Control.Lens                 (mapped, (&), (?~))
@@ -26,11 +26,11 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 import           BlockApps.Ethereum
---import           BlockApps.Solidity.Parse.Expression
-import           BlockApps.Solidity.Xabi.Statement
-import qualified BlockApps.Solidity.Xabi.Def  as Xabi
-import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
-import qualified BlockApps.Solidity.Xabi.VarDef  as Xabi
+--import           SolidVM.Solidity.Parse.Expression
+import           SolidVM.Solidity.Xabi.Statement
+import qualified SolidVM.Solidity.Xabi.Def  as Xabi
+import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
+import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
 
 data XabiKind = ContractKind
               | InterfaceKind

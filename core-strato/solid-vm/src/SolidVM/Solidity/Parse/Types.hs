@@ -3,15 +3,15 @@
 -- Description: Parsers for type expressions
 -- Maintainer: Ryan Reich <ryan.reich@gmail.com>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-module BlockApps.Solidity.Parse.Types where
+module SolidVM.Solidity.Parse.Types where
 
 import           Text.Parsec
 
-import           BlockApps.Solidity.Parse.Expression
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Expression
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
 
-import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
+import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)

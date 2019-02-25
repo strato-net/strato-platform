@@ -9,13 +9,13 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
 
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.File
-import           BlockApps.Solidity.Xabi
-import qualified BlockApps.Solidity.Xabi as Xabi
-import qualified BlockApps.Solidity.Xabi.Def as Xabi
-import qualified BlockApps.Solidity.Xabi.Statement as Xabi
-import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.File
+import           SolidVM.Solidity.Xabi
+import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Def as Xabi
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 
 

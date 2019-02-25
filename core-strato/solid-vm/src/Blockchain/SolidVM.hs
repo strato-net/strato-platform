@@ -45,11 +45,11 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
 
-import           BlockApps.Solidity.Parse.UnParser (unparseStatement)
-import qualified BlockApps.Solidity.Xabi as Xabi
-import qualified BlockApps.Solidity.Xabi.Statement as Xabi
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
-import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
+import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           CodeCollection
 

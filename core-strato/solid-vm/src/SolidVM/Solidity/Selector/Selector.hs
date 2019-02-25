@@ -4,7 +4,7 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module BlockApps.Solidity.Selector.Selector (deriveSelector) where
+module SolidVM.Solidity.Selector.Selector (deriveSelector) where
 import           Crypto.Hash
 import qualified Data.ByteArray          as ByteArray
 import           Data.ByteString         (ByteString)
@@ -14,7 +14,7 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Encoding
 
-import           BlockApps.Solidity.Selector.Type
+import           SolidVM.Solidity.Selector.Type
 
 -- | The 'selector' function is responsible for producing the 4-byte
 -- hash that Solidity uses to identify functions.  It's essentially the

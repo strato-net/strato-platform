@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module BlockApps.Solidity.Xabi.Def where
+module SolidVM.Solidity.Xabi.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
@@ -14,7 +14,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 
-import qualified BlockApps.Solidity.Xabi.VarDef as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}

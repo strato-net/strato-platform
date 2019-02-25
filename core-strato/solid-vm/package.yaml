@@ -30,7 +30,6 @@ dependencies:
   - deepseq
   - extra
   - generic-random
-  - largeword
   - lens
   - memory
   - merkle-patricia-db

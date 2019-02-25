@@ -4,15 +4,15 @@
 -- array sizes.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module BlockApps.Solidity.Parse.Expression where
+module SolidVM.Solidity.Parse.Expression where
 
 import           Text.Parsec
 import           Text.Parsec.Expr
 
 import           Data.Functor.Identity
 
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse.Lexer
+import           SolidVM.Solidity.Parse.ParserTypes
 
 -- | Parses an arithmetic expression involving integer values and
 -- operations

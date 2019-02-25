@@ -5,7 +5,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
-module BlockApps.Solidity.Parse.UnParser where
+module SolidVM.Solidity.Parse.UnParser where
 
 import           Data.Maybe
 import           Data.Text  (Text)
@@ -15,13 +15,13 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.File
-import           BlockApps.Solidity.Xabi.Statement
-import           BlockApps.Solidity.Xabi
-import           BlockApps.Solidity.Xabi.Type
-import           BlockApps.Solidity.Xabi.VarDef
-import qualified BlockApps.Solidity.Xabi.Def as Xabi
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.File
+import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi
+import           SolidVM.Solidity.Xabi.Type
+import           SolidVM.Solidity.Xabi.VarDef
+import qualified SolidVM.Solidity.Xabi.Def as Xabi
 
 
 
