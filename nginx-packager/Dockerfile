@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    opm get zmartzone/lua-resty-openidc=1.7.0
+    opm get zmartzone/lua-resty-openidc=1.7.1
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD curl  --silent --output /dev/null --fail localhost:80/ || \
