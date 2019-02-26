@@ -86,3 +86,14 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
   ghc-options: -Wall -O2
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: SolidVMSpec.hs
+    dependencies:
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - monad-logger
+      - solid-vm
