@@ -43,7 +43,7 @@ data CallData = CallData
   , _callDataValue    :: Integer
   , _callDataInput    :: B.ByteString
   , _callDataOutput   :: Maybe B.ByteString
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''CallData
 
 instance ToJSON CallData where
@@ -115,7 +115,7 @@ data ActionData = ActionData
   , _actionDataCodeKind     :: CodeKind
   , _actionDataStorageDiffs :: ActionDataDiff
   , _actionDataCallData     :: [CallData]
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''ActionData
 
 mergeActionData :: ActionData -> ActionData -> ActionData
@@ -155,7 +155,7 @@ data Action = Action
   , _actionTransactionSender  :: Address
   , _actionData               :: Map Address ActionData
   , _actionMetadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action
 
 instance ToJSON Action where

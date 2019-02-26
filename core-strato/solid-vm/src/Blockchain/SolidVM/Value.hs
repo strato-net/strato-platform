@@ -29,7 +29,7 @@ data Variable = Variable (IORef Value)
   | Constant Value
   | UnsetMapItem Variable Value Xabi.Type
   | StorageItem String
-  
+
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Property name o) = "<prop:" ++ name ++ "> of " ++ show o
@@ -85,7 +85,7 @@ instance RLPSerializable Value where
   rlpEncode (SInteger i) = RLPArray [RLPString "I", rlpEncode i]
   rlpEncode (SString s) = RLPArray [RLPString "S", rlpEncode s]
   rlpEncode x = error $ "undefined case in rlpEncode for Value: " ++ show x
-  
+
   rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
@@ -113,7 +113,7 @@ valEquals (SStruct n1 m1) (SStruct n2 m2) = do
       fieldNames2 = M.keys m2
   if (n1 == n2 && fieldNames1 == fieldNames2)
     then do
-      results <- 
+      results <-
         forM fieldNames1 $ \fieldName -> do
           let var1 = fromMaybe (error $ "Internal error in valEquals- key in map")
                      $ M.lookup fieldName m1
@@ -122,7 +122,7 @@ valEquals (SStruct n1 m1) (SStruct n2 m2) = do
           varEquals var1 var2
       return $ and results
     else return False
-    
+
 valEquals (STuple vec1) (STuple vec2) = do
   if V.length vec1 == V.length vec2
     then do
@@ -131,7 +131,7 @@ valEquals (STuple vec1) (STuple vec2) = do
         varEquals var1 var2
       return $ and results
     else return False
-  
+
 valEquals (SArray _ vec1) (SArray _ vec2) = do
   if V.length vec1 == V.length vec2
     then do
