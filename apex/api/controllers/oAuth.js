@@ -126,7 +126,8 @@ module.exports = {
       // Create blockchain user in bloc
       let blocUser;
       try {
-          blocUser = yield ax.post(process.env.STRATO_HOST, req.body, '/strato/v2.3/key', req.headers);
+          console.log("=======!")
+          blocUser = yield ax.post(process.env.VAULT_HOST, req.body, '/strato/v2.3/key', req.headers);
           console.log('GHEE GHEE')
           console.log(blocUser)
       } catch (blocError) {

@@ -21,9 +21,10 @@ if [ "$NODE_ENV" == development ]; then
   export NODE_HOST=localhost
   export OAUTH_ENABLED=${OAUTH_ENABLED:-}
 
-  #strato:3000 and bloc:8000 ports should be mapped locally in your docker-compose.yml
-  export stratoRoot=${STRATO_HOST}/eth/v1.2
+  #strato:3000 , bloc:8000 & vault-wrapper:8000 ports should be mapped locally in your docker-compose.yml
   export blocRoot=${BLOC_HOST}/bloc/v2.2
+  export stratoRoot=${STRATO_HOST}/eth/v1.2
+  export vaultRoot=${VAULT_HOST}/strato/v2.3
 
   export PG_HOST=localhost
   export PG_PORT=5432
