@@ -7,10 +7,12 @@ dependencies:
   - blockapps-util
   - containers
   - lens
+  - monad-alter
   - monad-logger
   - prometheus-client
   - QuickCheck
   - resourcet
+  - seqevents
   - strato-model
   - text
   - transformers
