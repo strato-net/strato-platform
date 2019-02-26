@@ -121,7 +121,11 @@ instance HasGetTransactionsDB SequencerM where
 
     -- TODO: Add persistence layer
 instance (SHA `Alters` OutputBlock) SequencerM where
-    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alterMany _ bHashes f = do
+      bhr <- use blockHashRegistry
+      bhr' <- f $ M.restrictKeys bhr (S.fromList bHashes)
+      assign blockHashRegistry $ bhr' `M.union` bhr
+      return bhr'
     alter _ bHash f = do
       bhr <- use blockHashRegistry
       mbhe <- f $ M.lookup bHash bhr
@@ -129,7 +133,11 @@ instance (SHA `Alters` OutputBlock) SequencerM where
       return mbhe
 
 instance (SHA `Alters` OutputTx) SequencerM where
-    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alterMany _ tHashes f = do
+      thr <- use txHashRegistry
+      thr' <- f $ M.restrictKeys thr (S.fromList tHashes)
+      assign txHashRegistry $ thr' `M.union` thr
+      return thr'
     alter _ tHash f = do
       thr <- use txHashRegistry
       mthe <- f $ M.lookup tHash thr
@@ -137,7 +145,11 @@ instance (SHA `Alters` OutputTx) SequencerM where
       return mthe
 
 instance (SHA `Alters` ChainHashEntry) SequencerM where
-    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alterMany _ cHashes f = do
+      chr <- use chainHashRegistry
+      chr' <- f $ M.restrictKeys chr (S.fromList cHashes)
+      assign chainHashRegistry $ chr' `M.union` chr
+      return chr'
     alter _ cHash f = do
       chr <- use chainHashRegistry
       mche <- f $ M.lookup cHash chr
@@ -145,7 +157,11 @@ instance (SHA `Alters` ChainHashEntry) SequencerM where
       return mche
 
 instance (Word256 `Alters` ChainIdEntry) SequencerM where
-    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alterMany _ cIds f = do
+      cir <- use chainIdRegistry
+      cir' <- f $ M.restrictKeys cir (S.fromList cIds)
+      assign chainIdRegistry $ cir' `M.union` cir
+      return cir'
     alter _ cId f = do
       cir <- use chainIdRegistry
       mcie <- f $ M.lookup cId cir
