@@ -1,14 +1,23 @@
 const HTTP_PROTOCOL = (window.IS_SSL && window.IS_SSL === 'true') ? 'https' : 'http';
 const WS_PROTOCOL = (window.IS_SSL && window.IS_SSL === 'true') ? 'wss' : 'ws';
 
+const _apex_uri = '/apex-api';
+const _bloc_uri = '/bloc/v2.2';
+const _bloc_doc_uri = '/docs/?url=/bloc/v2.2/swagger.json';
+const _cirrus_uri = '/cirrus/search';
+const _strato_uri = '/strato-api/eth/v1.2';
+const _strato_doc_uri = '/docs/?url=/strato-api/eth/v1.2/swagger.json';
+
+const _node_url = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? `${HTTP_PROTOCOL}://${window.NODE_HOST}` : `${HTTP_PROTOCOL}://localhost`;
+
 export const env = {
   NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
-  BLOC_URL: window.BLOC_URL && window.BLOC_URL !== '__BLOC_URL__' ? window.BLOC_URL : `${HTTP_PROTOCOL}://localhost/bloc/v2.2`,
-  BLOC_DOC_URL: window.BLOC_DOC_URL && window.BLOC_DOC_URL !== '__BLOC_DOC_URL__' ? window.BLOC_DOC_URL : `${HTTP_PROTOCOL}://localhost/docs/?url=/bloc/v2.2/swagger.json`,
-  STRATO_URL: window.STRATO_URL && window.STRATO_URL !== '__STRATO_URL__' ? window.STRATO_URL : `${HTTP_PROTOCOL}://localhost/strato-api/eth/v1.2`,
-  STRATO_DOC_URL: window.STRATO_DOC_URL && window.STRATO_DOC_URL !== '__STRATO_DOC_URL__' ? window.STRATO_DOC_URL : `${HTTP_PROTOCOL}://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json`,
-  CIRRUS_URL: window.CIRRUS_URL && window.CIRRUS_URL !== '__CIRRUS_URL__' ? window.CIRRUS_URL : `${HTTP_PROTOCOL}://localhost/cirrus/search`,
-  APEX_URL: window.APEX_URL && window.APEX_URL !== '__APEX_URL__' ? window.APEX_URL : `${HTTP_PROTOCOL}://localhost/apex-api`,
+  BLOC_URL: _node_url + _bloc_uri,
+  BLOC_DOC_URL: _node_url + _bloc_doc_uri,
+  STRATO_URL: _node_url + _strato_uri,
+  STRATO_DOC_URL: _node_url + _strato_doc_uri,
+  CIRRUS_URL: _node_url + _cirrus_uri,
+  APEX_URL: _node_url + _apex_uri,
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
