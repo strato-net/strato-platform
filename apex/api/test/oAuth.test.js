@@ -17,6 +17,7 @@ const createInitialData = require('../migrations/init-script/init');
 const appConfig = require('../config/app.config');
 const checkMode = require('../lib/checkMode');
 
+const testFactory = require(`${process.cwd()}/test/factory`);
 
 const waitFaucet = async function(address) {
     const res = await chai.request(process.env.stratoRoot)
@@ -43,14 +44,18 @@ const waitFaucet = async function(address) {
 
 chai.use(chaiHttp);
 
-const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
+const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
 
-describe('Auth/public tests', function () {
+describe('OAuth tests', function () {
   this.timeout(10000);
+
+  let app, userAccountAddress;
+  const userData = testFactory.getUserData();
 
     //need to add skip check to each describe block because of mocha bug.
     // technically beforeEach would work, but other beforeEach's still run
   before(function(){
+
       if(SKIP_TEST_BLOCK){
           this.skip();
       }
@@ -58,46 +63,31 @@ describe('Auth/public tests', function () {
 
   before(async function () {
 
-    if(SKIP_TEST_BLOCK){
-        this.skip();
-    }
-
-    try {
-      await initDb.dropdb();
-    } catch (error) {
-      // Ignore errors about dropping nonexistent dbs.
-      if (error.name != 'invalid_catalog_name') {
-        throw error;
-      }
-    }
-    await initDb();
-    await models.sequelize.sync();
-    await createInitialData();
-    await models.User.create({
-      username: 'test@test.com',
-      passwordHash: 'password'
-    });
-    await models.TempUser.create({
-      email: 'test1@test.com',
-      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds)
-    });
-    await models.TempUser.create({
-      email: 'verifieduser@test.com',
-      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
-      verified: true
-    });
-  });
-
-  after(function () {
-
       if(SKIP_TEST_BLOCK){
           this.skip();
       }
 
-    rp.post.restore();
-  })
+    console.log('ohohoh',process.env.OAUTH_ENABLED)
+    app = require('../app');
 
-  describe('In public mode', function () {
+    const result = await chai.request(app)
+        .post('/users')
+        .set('X-USER-UNIQUE-NAME',userData.userName)
+        .set('X-USER-ID',userData.hash)
+        .send({
+            username: userData.userName,
+            password: userData.password
+        });
+
+    console.log('ME ME ME ME ME')
+    console.log(result)
+
+    userAccountAddress = JSON.parse(res1.text).user.accountAddress;
+    await waitFaucet(accountAddress);
+  });
+
+
+  describe.skip('In public mode', function () {
     let app, checkModeStub;
 
     before(function(){
@@ -107,22 +97,12 @@ describe('Auth/public tests', function () {
     })
 
     beforeEach(function () {
-
-        if(SKIP_TEST_BLOCK){
-            this.skip();
-        }
-
       checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
         return next();
       });
       app = require('../app');
     });
     afterEach(function () {
-
-        if(SKIP_TEST_BLOCK){
-            this.skip();
-        }
-
       checkMode.checkMode.restore();
     })
 
@@ -134,7 +114,7 @@ describe('Auth/public tests', function () {
           }
       })
 
-      it('replies Bad Request without un/pw', async function () {
+      it('replies Bad Request without headers', async function () {
         chai.request(app)
           .post('/login')
           .catch((err) => {
@@ -143,113 +123,7 @@ describe('Auth/public tests', function () {
             assert.equal(res.status, '400');
           });
       });
-      it('replies 401 with incorrect un/pw', async function () {
-        chai.request(app)
-          .post('/login')
-          .send({
-            username: "me",
-            password: "hunter2"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("does not exist"));
-            assert.equal(res.status, '401');
-          });
-      });
-      it('creates accounts', async function () {
-        this.timeout(20000);
-        await models.TempUser.create({
-          email: 'you@test.com',
-          password: bcrypt.hashSync('hunter2', appConfig.passwordSaltRounds),
-          verified: true
-        });
-        const res1 = await chai.request(app)
-          .post('/users')
-          .send({
-            username: "you@test.com",
-            password: "hunter2"
-          })
-        assert.equal(res1.status, '200');
-        const tempUser = await models.TempUser.findOne({ where: { email: 'you@test.com' } });
-        // The user should be deleted from TempUser after account creation
-        should.not.exist(tempUser);
-        const res2 = await chai.request(app)
-          .post('/login')
-          .send({
-            username: "you@test.com",
-            password: "hunter2"
-          })
-        assert.equal(res2.status, '200');
-      });
-      it('doesn\'t log out without creds', async function () {
-        await chai.request(app)
-          .post('/logout')
-          .catch((err) => {
-            assert.equal(err.status, '401');
-          });
-      });
 
-      it('400s when missing an arg', async function () {
-        await chai.request(app)
-          .post('/dapps')
-          .send({
-            username: "dev",
-            password: "hunter3",
-            address: "0x171717171"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert.equal(res.status, '400');
-            assert(res.text.includes("wrong params"));
-          });
-      });
-
-      it('Accepts a working bundle', async function () {
-        this.timeout(60000);
-        const username = 'username@example.com';
-        const password = 'randomPassword';
-        await models.TempUser.create({
-          email: username,
-          password: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
-          verified: true
-        });
-        const res1 = await chai.request(app)
-          .post('/users')
-          .send({
-            username: username,
-            password: password
-          });
-        assert.equal(res1.status, '200');
-        const address = JSON.parse(res1.text).user.accountAddress;
-        assert.notEqual(address, undefined);
-
-        await waitFaucet(address);
-
-        const res3 = await chai.request(app)
-          .post('/dapps')
-          .attach('file',
-            fs.readFileSync('./test/testdata/testdata.zip'),
-            'testdata.zip')
-          .field('username', username)
-          .field('password', password)
-          .field('address', address)
-        assert.equal(res3.status, 200);
-        assert(res3.text.includes("\"url\""));
-        assert(res3.text.includes("\"metadata\""));
-        assert(res3.text.includes("\"nunya\""));
-      });
-
-      it("parses initfile.json", async function () {
-        const got = await parseInitfile('./test/testdata/');
-        const want = {
-          'storage': {
-            'contractName': 'SimpleStorage',
-            'contractFilename': 'contracts/SimpleStorage.sol',
-            'args': {}
-          }
-        };
-        expect(got).to.deep.equal(want);
-      });
 
       it("can upload init contracts", async function () {
         this.timeout(30000);
