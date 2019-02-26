@@ -3,7 +3,8 @@ const bcrypt = require('bcrypt');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 const moment = require('moment');
-var rp = require('request-promise');
+const rp = require('request-promise');
+const querystring = require('querystring');
 
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 
@@ -12,79 +13,38 @@ const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
 
-const sendLoginResponse = function (res, user) {
-  let tokenData;
-  try {
-    tokenData = authHandler.issue(user);
-  }
-  catch (err) {
-    return next(err);
-  }
-
-  res.cookie(
-    appConfig.jwtConfig.authCookieName,
-    tokenData.token,
-    {
-      domain: appConfig.jwtConfig.authCookieDomain,
-      httpOnly: true,
-      secure: appConfig.jwtConfig.authCookieSecure,
-      expire: moment(tokenData.expireDate).toDate()
-    }
-  );
-
-  res.status(200).json({ user: user.toJson() });
-};
-
 module.exports = {
   // no check if the user is already logged in - always login with credentials provided
-  login: function (req, res, next) {
+  getKey: function (req, res, next) {
     console.log('in oauth')
 
-    const username = req.body.username;
-    const password = req.body.password;
+      const username = req.headers['x-user-unique-name'];
+      const hash = req.headers['x-user-id'];
 
-    if (!username || !password) {
-      let err = new Error("wrong params, expected: {username, password}");
-      err.status = 400;
-      return next(err);
-    }
-
-    // Check if password provided for the user is correct
-    models.User.findOne({
-      where: { username: username },
-      include: [{
-        model: models.Role,
-      }]
-    }).then(user => {
-      const authErrorText = "user does not exist or wrong user-password pair provided";
-      if (!user) {
-        models.TempUser.findOne({ where: { email: username } }).then(tempUser => {
-          let err;
-          if (tempUser) {
-            err = new Error('Please link your account to STRATO Testnet');
-            err.status = 401;
-            return next(err);
-          }
-          err = new Error(authErrorText);
-          err.status = 401;
+      if (!username || !hash) {
+          let err = new Error("invalid header params, expected: {x-user-unique-name:username, x-user-id:hash}");
+          err.status = 400;
           return next(err);
-        })
-      } else {
-        bcrypt.compare(password, user.passwordHash, function (err, passIsCorrect) {
-          if (err) {
-            return next(err);
-          } else {
-            if (!passIsCorrect) {
-              let err2 = new Error(authErrorText);
-              err2.status = 401;
-              return next(err2);
-            } else {
-              sendLoginResponse(res, user);
-            }
-          }
-        });
       }
-    }).catch(err => next(err));
+
+      co(function* () {
+          try {
+              console.log("=======? finding blocUser", process.env.VAULT_HOST, req.headers)
+              const query = req.body ? `?${querystring.stringify(req.body)}` : ''; //todo - do we need this atm?
+              const blocUser = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key${query}`, {
+                  "x-user-unique-name": req.headers['x-user-unique-name'],
+                  "x-user-id": req.headers['x-user-id']
+              });
+              console.log('BLOC USER FOUND')
+              console.log(blocUser)
+              res.status(200).json({user: blocUser});
+          } catch (blocError) {
+              // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
+              let err = new Error('could not find bloc account: ', blocError);
+              return next(err);
+          }
+      })
+
   },
 
   logout: function (req, res) {
@@ -94,50 +54,38 @@ module.exports = {
     });
   },
 
-  create: function (req, res, next) {
+  createKey: function (req, res, next) {
     console.log('CREATION')
     co(function* () {
 
-      //todo - separate out validation for oauth/non
+      //todo - separate out to a validation function - dupicate w/ login
       const username = req.headers['x-user-unique-name'];
       const hash = req.headers['x-user-id'];
       const password = req.body.password; //todo - does the call to create users expect this?
 
       if (!username || !hash) {
-        let err = new Error("wrong params, expected: {username, hash}");
+          let err = new Error("invalid header params, expected: {x-user-unique-name:username, x-user-id:hash}");
         err.status = 400;
         return next(err);
       }
-
-      if (username.length < 2 || username.length > 320) { //todo - well, this should be determined by oauth provider, remove
-        let err = new Error("Username must be at least 2 characters and 320 characters max");
-        err.status = 400;
-        return next(err);
-      }
-      if (password.length < 6) { //todo - hash min length? do we care?
-        let err = new Error("Password must be at least 6 characters");
-        err.status = 400;
-        return next(err);
-      }
-
 
 
       //todo - depending on oauth - put try catch block for blockUser or vaultWrapper CreateKey [155-167]
       // Create blockchain user in bloc
-      let blocUser;
       try {
-          console.log("=======!")
-          blocUser = yield ax.post(process.env.VAULT_HOST, req.body, '/strato/v2.3/key', req.headers);
-          console.log('GHEE GHEE')
+          console.log("=======! creatin blocUser")
+          const blocUser = yield ax.post(process.env.VAULT_HOST, req.body, '/strato/v2.3/key', req.headers);
+          console.log('BLOC USER CREATED')
           console.log(blocUser)
+          res.status(200).json({ user: blocUser });
       } catch (blocError) {
           // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
+          console.log(blocError)
           let err = new Error('could not create bloc account: ', blocError);
-          err.status = 500;
+          //err.status = 500; //todo - why was this 500? should see actual error
           return next(err);
       }
 
-      sendLoginResponse(res, blocUser);
     });
   },
 

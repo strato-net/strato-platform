@@ -35,8 +35,8 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-router.post('/login', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.login : authController.login);
-router.post('/users', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.create : authController.create);
+router.post('/login', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.getKey : authController.login);
+router.post('/users', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.createKey : authController.create);
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);

@@ -18,6 +18,7 @@ const appConfig = require('../config/app.config');
 const checkMode = require('../lib/checkMode');
 
 const testFactory = require(`${process.cwd()}/test/factory`);
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 const waitFaucet = async function(address) {
     const res = await chai.request(process.env.stratoRoot)
@@ -63,12 +64,25 @@ describe('OAuth tests', function () {
 
   before(async function () {
 
-      if(SKIP_TEST_BLOCK){
-          this.skip();
-      }
+    if(SKIP_TEST_BLOCK){
+      this.skip();
+    }
 
     console.log('ohohoh',process.env.OAUTH_ENABLED)
     app = require('../app');
+
+    const user = await chai.request(app)
+        .post('/login')
+        .set('X-USER-UNIQUE-NAME',userData.userName)
+        .set('X-USER-ID',userData.hash)
+        .catch((err) => {
+            const res = err.response;
+            assert.equal(res.status, RestStatus.INTERNAL_SERVER_ERROR); //todo - pull rest-SIMILAR-to from ba-sol or ht3
+     });
+
+     if(user && user.status == RestStatus.OK){ //user found, yay
+         return;
+     }
 
     const result = await chai.request(app)
         .post('/users')
@@ -79,11 +93,13 @@ describe('OAuth tests', function () {
             password: userData.password
         });
 
-    console.log('ME ME ME ME ME')
-    console.log(result)
 
-    userAccountAddress = JSON.parse(res1.text).user.accountAddress;
-    await waitFaucet(accountAddress);
+      if(result.status == RestStatus.OK){ //user created, faucet em
+          userAccountAddress = result.body.user.address;
+          await waitFaucet(userAccountAddress);
+      }
+
+
   });
 
 
@@ -97,6 +113,7 @@ describe('OAuth tests', function () {
     })
 
     beforeEach(function () {
+        console.log('whyo')
       checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
         return next();
       });
@@ -180,246 +197,9 @@ describe('OAuth tests', function () {
       });
     });
 
-    describe('post /verify-email', function () {
-      let rpStub;
-
-      before(function(){
-          if(SKIP_TEST_BLOCK){
-              this.skip();
-          }
-
-          rpStub = sinon.stub(rp, 'post');
-          rpStub.onFirstCall().rejects();
-          rpStub.onSecondCall().resolves({
-              hash: null
-          });
-          rpStub.resolves({
-              hash: bcrypt.hashSync('temporarypassword', appConfig.passwordSaltRounds)
-          });
-
-      })
 
 
-      it('replies 400 when email is missing', async function () {
-        chai.request(app)
-          .post('/verify-email')
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, 400);
-          });
-      });
 
-      it('replies 401 when user a/c is already created', async function () {
-        await chai.request(app)
-          .post('/verify-email')
-          .send({
-            email: "test@test.com"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("User account already exists."));
-            assert.equal(res.status, '401');
-          });
-      });
-
-      it('replies 500 for server error', async function () {
-        const email = "newuser@test.com";
-        // First call to rpStub
-        await chai.request(app)
-          .post('/verify-email')
-          .send({ email })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, '500');
-          })
-      });
-
-      it('replies 401 when user is unregistered on signup.blockapps.net', async function () {
-        // Second call to rpStub
-        await chai.request(app)
-          .post('/verify-email')
-          .send({
-            email: "unregistered@test.com"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("User not found"));
-            assert.equal(res.status, '401');
-          });
-      });
-
-      it('creates new record in TempUsers table for new users', async function () {
-        const email = "newuser@test.com";
-        const response = await chai.request(app)
-          .post('/verify-email')
-          .send({ email });
-        assert.equal(response.status, 200);
-        assert.deepEqual(response.body, { exists: true });
-        const user = await models.TempUser.findOne({ where: { email } });
-        should.exist(user);
-      });
-
-      it('replies 500 for database error on create', async function () {
-        const createStub = sinon.stub(models.TempUser, 'create');
-        createStub.rejects({ name: "Error" });
-        const email = "anothernewuser@test.com";
-        await chai.request(app)
-          .post('/verify-email')
-          .send({ email })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, 500);
-          });
-        models.TempUser.create.restore();
-      });
-
-      it('updates verified & password fields in TempUsers for existing record', async function () {
-        const email = "verifieduser@test.com";
-        const response = await chai.request(app)
-          .post('/verify-email')
-          .send({ email });
-        assert.equal(response.status, 200);
-        assert.deepEqual(response.body, { exists: true });
-        const user = await models.TempUser.findOne({ where: { email } });
-        should.exist(user);
-        expect(user.verified).to.be.false;
-        const isPasswordMatching = await bcrypt.compare('temporarypassword', user.password);
-        expect(isPasswordMatching).to.be.true;
-      });
-
-      it('replies 500 for database error on update', async function () {
-        const updateStub = sinon.stub(models.TempUser, 'update');
-        updateStub.rejects();
-        const email = "verifieduser@test.com";
-        await chai.request(app)
-          .post('/verify-email')
-          .send({ email })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, 500);
-          });
-        models.TempUser.update.restore();
-      });
-    });
-
-    describe('post /verify-temporary-password', function () {
-
-      before(function(){
-          if(SKIP_TEST_BLOCK){
-              this.skip();
-          }
-      })
-
-      it('replies 400 when arguments are missing', async function () {
-        chai.request(app)
-          .post('/verify-temporary-password')
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, 400);
-          });
-      });
-
-      it('replies 401 when entered password is wrong', async function () {
-        await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "test1@test.com",
-            tempPassword: "wrongpassword"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("temporary password is incorrect"));
-            assert.equal(res.status, 401);
-          });
-      });
-
-      it('replies 401 when user does not exist', async function () {
-        await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "doesnotexist@test.com",
-            tempPassword: "password"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Couldn't find user"));
-            assert.equal(res.status, 401);
-          });
-      });
-
-      it('replies 200 for correct credentials', async function () {
-        const res = await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "test1@test.com",
-            tempPassword: "password"
-          });
-        assert.equal(res.status, 200);
-        assert.deepEqual(res.body, {
-          success: true,
-          error: null
-        })
-      });
-
-      it('replies 500 for database error on find', async function () {
-        const findStub = sinon.stub(models.TempUser, 'find');
-        findStub.rejects();
-
-        await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "test@test.com",
-            tempPassword: "password"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, 500);
-          });
-        models.TempUser.find.restore();
-      });
-
-      it('replies 500 for database error on update', async function () {
-        const updateStub = sinon.stub(models.TempUser, 'update');
-        updateStub.rejects();
-
-        await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "test1@test.com",
-            tempPassword: "password"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, 500);
-          });
-        models.TempUser.update.restore();
-      });
-
-      it('replies 500 for bcrypt compare error', async function () {
-        const compareStub = sinon.stub(bcrypt, 'compare');
-        compareStub.callsArgWith(2, 'error');
-
-        await chai.request(app)
-          .post('/verify-temporary-password')
-          .send({
-            email: "test1@test.com",
-            tempPassword: "password"
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Unexpected server error"));
-            assert.equal(res.status, 500);
-          });
-        bcrypt.compare.restore();
-      });
-    });
   });
 
   describe('Checkmode middleware', function () {
@@ -451,7 +231,7 @@ describe('OAuth tests', function () {
       mockNext = function () { nextCalled = true }
     })
 
-    it('calls next() for public mode', () => {
+    it('calls next() for public mode', () => { //todo - public and ouath incompattible, do check for process.env instead
       rewiredCheckMode.__set__("appConfig", { SMD_MODE: 'public' });
       rewiredCheckMode.checkMode(mockReq, mockRes, mockNext)
       expect(nextCalled).to.be.true;
