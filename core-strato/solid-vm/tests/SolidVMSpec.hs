@@ -77,20 +77,24 @@ defaultExecResults = ExecResults
  , erException = Nothing
  }
 
+checkStorage :: ContextM [(MP.Key, B.ByteString)]
+checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
+
 spec :: Spec
 spec = do
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
-      flushMemRawStorageDB
-      getAllRawStorageKeyVals' uploadAddress `shouldReturn` []
+      checkStorage `shouldReturn` []
 
     it "should be able to store a default int" . runTest $ do
       runCreate "testdata/DefaultInt.sol" `shouldReturn` defaultExecResults
-      flushMemRawStorageDB
-      getAllRawStorageKeyVals' uploadAddress `shouldNotReturn` []
+      checkStorage `shouldNotReturn` []
 
     it "should be able to explicitly store an int" . runTest $ do
       runCreate "testdata/SetInt.sol" `shouldReturn` defaultExecResults
-      flushMemRawStorageDB
-      getAllRawStorageKeyVals' uploadAddress `shouldNotReturn` []
+      checkStorage `shouldNotReturn` []
+
+    it "should be able to store a string" . runTest $ do
+      runCreate "testdata/SetString.sol" `shouldReturn` defaultExecResults
+      checkStorage `shouldNotReturn` []
