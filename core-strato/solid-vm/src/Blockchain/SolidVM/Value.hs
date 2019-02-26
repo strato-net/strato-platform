@@ -17,9 +17,9 @@ import qualified Data.Vector as V
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
 
+import qualified SolidVM.Model.Storable           as MS
 import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
-
 
 
 
@@ -28,7 +28,7 @@ data Variable = Variable (IORef Value)
   | Property String Variable
   | Constant Value
   | UnsetMapItem Variable Value Xabi.Type
-  | StorageItem String
+  | StorageItem MS.StoragePath
 
 instance Show Variable where
   show (Variable _) = "<variable>"

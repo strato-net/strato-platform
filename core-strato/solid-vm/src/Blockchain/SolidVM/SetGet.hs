@@ -1,20 +1,39 @@
 
 module Blockchain.SolidVM.SetGet where
 
+import Debug.Trace
+
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
+import qualified Data.Text as T
 import qualified Data.Vector as V
 
-import           Blockchain.Data.RLP
 import           Blockchain.Data.Address
-import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
+import qualified SolidVM.Model.Storable as MS
+
+fromBasic :: MS.BasicValue -> Value
+fromBasic = \case
+  MS.BInteger i -> SInteger i
+  MS.BString s -> SString . T.unpack $ s
+  MS.BBool b -> SBool b
+  MS.BAddress a -> SAddress a
+  MS.BEnumVal k t -> SEnumVal (T.unpack k) (T.unpack t)
+
+toBasic :: Value -> MS.BasicValue
+toBasic = \case
+  SInteger i -> MS.BInteger i
+  SString s -> MS.BString (T.pack s)
+  SBool b -> MS.BBool b
+  SAddress a -> MS.BAddress a
+  SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
+  x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: Variable -> Value -> SM ()
 setVar (Property "length" o) newVal = do
@@ -43,11 +62,13 @@ setVar (UnsetMapItem mapVariable key _) val = do
   setVar mapVariable $ SMap valType $ M.insert key newVar theMap
 
 setVar (StorageItem key) val = do
+  traceShowM key
+  traceShowM val
   currentAddress' <- getCurrentAddress
-  putRawStorageKeyVal' currentAddress' (BC.pack key) $ rlpSerialize $ rlpEncode val
+  putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
 setVar (Constant _) _ = error "setVar was called for a constant, this is forbidden"
-  
+
 setVar x _ = error $ "setVar called for undefined value: " ++ show x
 
 
@@ -65,8 +86,7 @@ getVar (Property "length" var) = do
 getVar (UnsetMapItem _ _ valType) = return $ defaultValue valType
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
-  rawVal <- getRawStorageKeyVal' currentAddress' (BC.pack key)
-  return $ rlpDecode $ rlpDeserialize rawVal
+  fromBasic <$> getSolidStorageKeyVal' currentAddress' key
 getVar x = error $ "getVar called for undefined value: " ++ show x
 
 
@@ -80,14 +100,14 @@ showSM (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
 showSM (SAddress a) = return $ format a
 showSM (STuple v) = do
   vals <- forM (V.toList v) getVar
-  strings <- forM vals showSM 
+  strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
 showSM (SArray _ v) = do
   vals <- forM (V.toList v) getVar
-  strings <- forM vals showSM 
+  strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
 showSM (SStruct name m) = do
-  valStrings <- 
+  valStrings <-
     forM (M.toList m) $ \(n, var) -> do
       val <- getVar var
       valString <- showSM val
@@ -96,7 +116,7 @@ showSM (SStruct name m) = do
                 ++ intercalate ", " (map (\(n, v) -> n ++ ": " ++ v) valStrings)
                 ++ "}"
 showSM (SMap _ m) = do
-  valStrings <- 
+  valStrings <-
     forM (M.toList m) $ \(key, var) -> do
       val <- getVar var
       valString <- showSM val

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Blockchain.SolidVM
     (
@@ -46,6 +47,8 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
+
+import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
@@ -172,8 +175,8 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       maybeArgString = join $ fmap (M.lookup "args") metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "qq" "qq" argString
-      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs 
-      
+      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
+
   addressState <- getAddressState codeAddress
 
   ccString <-
@@ -235,7 +238,7 @@ call'' address functionName args = do
     _ -> do --Maybe the function is actually a getter
       case M.lookup functionName $ contract'^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar $ StorageItem functionName
+          val <- getVar . StorageItem $ MS.Field (BC.pack $ '.':functionName) MS.Null
           return $ Just val
         Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
 
@@ -855,7 +858,7 @@ logAssigningVariable v = do
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> ByteString
 encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
-encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly 
-  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0  
+encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
+  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
 encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x
