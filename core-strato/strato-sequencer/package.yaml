@@ -38,6 +38,7 @@ dependencies:
   - bytestring
   - ethereum-rlp
   - lifted-async
+  - monad-alter
   - monad-control
   - time
   - stm

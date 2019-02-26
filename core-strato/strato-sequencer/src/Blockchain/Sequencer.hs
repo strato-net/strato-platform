@@ -12,6 +12,7 @@ import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
+import           Control.Monad.Change
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -25,6 +26,7 @@ import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Data.Traversable                          (for)
+import           Prelude                                   hiding (lookup)
 import           Prometheus                                as P
 import           Text.Printf
 
@@ -254,7 +256,7 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
-        mcInfo <- fmap _chainIdInfo <$> getChainIdEntry chainId
+        mcInfo <- fmap _chainIdInfo <$> lookup (P::X ChainIdEntry) chainId
         case mcInfo of
           Nothing -> do
             logF . concat $

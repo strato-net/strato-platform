@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleContexts               #-}
 {-# LANGUAGE FlexibleInstances              #-}
 {-# LANGUAGE MultiParamTypeClasses          #-}
-{-# LANGUAGE TemplateHaskell                #-}
 {-# LANGUAGE OverloadedStrings              #-}
+{-# LANGUAGE TemplateHaskell                #-}
+{-# LANGUAGE TypeOperators                  #-}
 {-# OPTIONS_GHC -fno-warn-orphans           #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
 module Blockchain.Sequencer.Monad (
@@ -32,6 +33,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
+import           Control.Monad.Change                      hiding (modify)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -52,7 +54,6 @@ import           Data.Time.Clock
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Privacy
@@ -118,7 +119,40 @@ instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
     putGetTransactionsDB = assign getTransactionsDB
 
-instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
+    -- TODO: Add persistence layer
+instance (SHA `Alters` OutputBlock) SequencerM where
+    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alter _ bHash f = do
+      bhr <- use blockHashRegistry
+      mbhe <- f $ M.lookup bHash bhr
+      blockHashRegistry %= M.alter (const mbhe) bHash
+      return mbhe
+
+instance (SHA `Alters` OutputTx) SequencerM where
+    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alter _ tHash f = do
+      thr <- use txHashRegistry
+      mthe <- f $ M.lookup tHash thr
+      txHashRegistry %= M.alter (const mthe) tHash
+      return mthe
+
+instance (SHA `Alters` ChainHashEntry) SequencerM where
+    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alter _ cHash f = do
+      chr <- use chainHashRegistry
+      mche <- f $ M.lookup cHash chr
+      chainHashRegistry %= M.alter (const mche) cHash
+      return mche
+
+instance (Word256 `Alters` ChainIdEntry) SequencerM where
+    alterMany _ _ _ = error "alterMany: Not implemented for (SHA `Alters` OutputBlock) SequencerM"
+    alter _ cId f = do
+      cir <- use chainIdRegistry
+      mcie <- f $ M.lookup cId cir
+      chainIdRegistry %= M.alter (const mcie) cId
+      return mcie
+
+instance HasPrivateHashDB SequencerM where
     getChainId = return . hash . rlpSerialize . rlpEncode
     generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
     generateChainHashes tx =
@@ -127,33 +161,8 @@ instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
           rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
           sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
        in return [rs,sr]
-
     requestChain = insertGetChainsDB
     requestTransaction = insertGetTransactionsDB
-    -- TODO: Add persistence layer
-    alterBlockHashEntry bHash f = do
-      bhr <- use blockHashRegistry
-      mbhe <- f $ M.lookup bHash bhr
-      blockHashRegistry %= M.alter (const mbhe) bHash
-      return mbhe
-
-    alterTxHashEntry tHash f = do
-      thr <- use txHashRegistry
-      mthe <- f $ M.lookup tHash thr
-      txHashRegistry %= M.alter (const mthe) tHash
-      return mthe
-
-    alterChainHashEntry cHash f = do
-      chr <- use chainHashRegistry
-      mche <- f $ M.lookup cHash chr
-      chainHashRegistry %= M.alter (const mche) cHash
-      return mche
-
-    alterChainIdEntry cId f = do
-      cir <- use chainIdRegistry
-      mcie <- f $ M.lookup cId cir
-      chainIdRegistry %= M.alter (const mcie) cId
-      return mcie
 
 instance HasSeenBlockDB SequencerM where
     getSeenBlockDB = use seenBlockDB
