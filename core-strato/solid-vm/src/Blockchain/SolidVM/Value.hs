@@ -2,6 +2,7 @@
 
 module Blockchain.SolidVM.Value where
 
+
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
@@ -61,7 +62,10 @@ data Value =
   | SContractItem Integer String
   | SContract String Integer --second param is address
   | SContractFunction String Integer String -- contractName, address, functionName
-  | SNULL deriving (Show)
+  | SNULL
+  | SDefault -- TODO(tim): The default value, but does not yet have a type hint
+             -- It would be better to have `fromBasic :: Type -> BasicValue -> Value`,
+  deriving (Show)
 
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing

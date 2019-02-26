@@ -1,8 +1,6 @@
 
 module Blockchain.SolidVM.SetGet where
 
-import Debug.Trace
-
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.IORef
@@ -20,6 +18,7 @@ import qualified SolidVM.Model.Storable as MS
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
+  MS.BDefault -> SDefault
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . T.unpack $ s
   MS.BBool b -> SBool b
@@ -33,6 +32,7 @@ toBasic = \case
   SBool b -> MS.BBool b
   SAddress a -> MS.BAddress a
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
+  SDefault -> MS.BDefault
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: Variable -> Value -> SM ()
@@ -62,8 +62,6 @@ setVar (UnsetMapItem mapVariable key _) val = do
   setVar mapVariable $ SMap valType $ M.insert key newVar theMap
 
 setVar (StorageItem key) val = do
-  traceShowM key
-  traceShowM val
   currentAddress' <- getCurrentAddress
   putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
