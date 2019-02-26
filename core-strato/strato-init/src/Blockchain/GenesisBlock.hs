@@ -203,7 +203,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionData = Map.singleton a $
                                 A.ActionData
                                   (codeHash d)
-                                  (Map.map fromDiff $ storage d)
+                                  EVM
+                                  (case storage d of
+                                    EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                    SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
                                   [A.emptyCallData]
             , A._actionMetadata = getMetadata (codeHash d)
             }

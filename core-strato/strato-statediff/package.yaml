@@ -20,6 +20,7 @@ library:
     - solid-vm-model
     - strato-model
     - strato-conf
+    - solid-vm-model
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs

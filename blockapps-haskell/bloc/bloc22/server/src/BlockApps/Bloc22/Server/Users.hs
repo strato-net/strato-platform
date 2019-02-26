@@ -159,7 +159,10 @@ waitForBalance addr = go 20
   where go :: Int -> Bloc ()
         go ms = do
           when (ms > 30000) . throwError $ CouldNotFind "no user account found"
-          accts <- blocStrato $ getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+          let params = accountsFilterParams{qaAddress = Just addr}
+          accts <- blocStrato $ getAccountsFilter params
+          logWith logNotice $ "waitForBalance req: " <> Text.pack (show params)
+          logWith logNotice $ "waitForBalance resp: " <> Text.pack (show accts)
           when (null accts || accountBalance (head accts) == Strung 0) $ do
             liftIO . threadDelay $ ms * 1000
             go $ 2 * ms
@@ -178,6 +181,10 @@ postUsersFill _ addr resolve = blocTransaction $ do
   result <- getBlocTransactionResult' Nothing hashes resolve
   when (resolve && Success == blocTransactionStatus result) $ do
     waitForBalance addr
+  logWith logNotice $ "postUsersFill: resolve = " <> Text.pack (show resolve)
+  logWith logNotice $ "postUsersFill: result = " <> Text.pack (show result)
+  when (Failure == blocTransactionStatus result) $
+    throwError $ UnavailableError "faucet transaction failed; please try again"
   return result
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
@@ -554,13 +561,20 @@ postUsersContractMethod' FunctionParameters{..} sign = do
 emptyBatchState :: BatchState
 emptyBatchState = BatchState Map.empty Map.empty
 
+-- getBlocTransactionResult' will return only one of the results
+-- when multiple hashes are provided. This is a glass-half-full
+-- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: Maybe ChainId -> [Keccak256] -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' _ [] _ = throwError $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' chainId hashes@(txh:_) resolve =
   if resolve
     then do
       promises <- forM hashes $ \h -> async (getBlocTransactionResult h chainId True)
-      snd <$> waitAny promises
+      results <- mapM wait promises
+      logWith logNotice $ "Transaction results: " <> Text.pack (show results)
+      case filter ((== Success) . blocTransactionStatus) results of
+        (winner:_) -> return winner
+        [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> Bloc BlocTransactionResult
@@ -765,8 +779,10 @@ getAccountTxParams addr chainId = \case
       Nothing -> getAcctNonce >>= \n -> return params{txparamsNonce = Just n}
   where
     getAcctNonce = do
-      accts <- blocStrato $ getAccountsFilter
-        accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+      let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+      accts <- blocStrato $ getAccountsFilter params
+      logWith logNotice $ "getAccountNonce req: " <> Text.pack (show params)
+      logWith logNotice $ "getAccountNonce resp: " <> Text.pack (show accts)
       case listToMaybe accts of
         Nothing   -> throwError . UserError $ "User does not have a balance"
         Just acct -> return $ accountNonce acct

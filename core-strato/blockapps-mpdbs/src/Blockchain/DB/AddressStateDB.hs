@@ -21,6 +21,7 @@ module Blockchain.DB.AddressStateDB (
   deleteAddressState,
   addressStateExists,
   getAddressFromHash,
+  getRawStorageKeyFromHash,
   getStorageKeyFromHash
 ) where
 
@@ -35,10 +36,9 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Util
 
-import           Data.Binary
+import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Base16                      as B16
 import qualified Data.ByteString.Char8                       as BC
-import qualified Data.ByteString.Lazy                        as BL
 import           Data.Maybe
 
 import           Control.Monad                               (liftM)
@@ -75,8 +75,10 @@ getAddressFromHash =
   liftM (fmap addressFromNibbleString) . hashDBGet
 
 getStorageKeyFromHash::(HasHashDB m, MonadResource m)=>N.NibbleString -> m (Maybe Word256)
-getStorageKeyFromHash  =
-  liftM (fmap (decode . BL.fromStrict . nibbleString2ByteString) ) . hashDBGet
+getStorageKeyFromHash  = fmap (fmap bytesToWord256) . getRawStorageKeyFromHash
+
+getRawStorageKeyFromHash :: (HasHashDB m, MonadResource m)=> N.NibbleString -> m (Maybe B.ByteString)
+getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
 putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
 putAddressState address newState = do

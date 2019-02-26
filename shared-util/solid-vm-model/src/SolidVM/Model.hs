@@ -1,16 +1,17 @@
-{-# LANGUAGE OverloadedStrings #-}
 module SolidVM.Model where
 
+import Control.DeepSeq
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Text as T
 import Data.Text.Encoding
+import GHC.Generics
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
-newtype HexStorage = HexStorage B.ByteString deriving (Eq, Show, Read)
+newtype HexStorage = HexStorage B.ByteString deriving (Eq, Show, Read, Generic, NFData)
 
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
@@ -26,7 +27,7 @@ instance FromJSON HexStorage where
 
 data CodeKind = EVM
               | SolidVM
-              deriving (Eq, Show, Enum, Ord, Read)
+              deriving (Eq, Show, Enum, Ord, Read, Generic, NFData)
 
 instance ToJSON CodeKind where
   toJSON = String . T.pack . show

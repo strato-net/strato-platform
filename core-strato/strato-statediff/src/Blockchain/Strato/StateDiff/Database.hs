@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase       #-}
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE TypeFamilies     #-}
 
@@ -21,13 +22,12 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           Blockchain.Util
 import           SolidVM.Model
 
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                             as BS (empty)
+import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
 import           Data.Maybe
@@ -62,8 +62,11 @@ createAccount chainId blockNumber addressDiffs = do
   newStorage <-
     forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
       let (_, diff) = addressDiff
-      return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
-             | (k, Value v) <- Map.toList $ storage diff]
+      case storage diff of
+        EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
+                            | (k, Value v) <- Map.toList m]
+        SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
+                                | (k, Value v) <- Map.toList m]
   SQL.insertMany_ $ concat newStorage
 
   where
@@ -118,7 +121,9 @@ updateAccount chainId blockNumber address diff = do
         setField nonce AddressStateRefNonce $
         setField balance AddressStateRefBalance $
           [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
-      sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
+      case storage diff of
+        EVMDiff m -> sequence_ $ Map.mapWithKey (commitStorage addrID) m
+        SolidVMDiff m2 -> sequence_ $ Map.mapWithKey (commitSolidStorage addrID) m2
 
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
@@ -128,16 +133,27 @@ updateAccount chainId blockNumber address diff = do
 
 commitStorage :: MonadResource m =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
-commitStorage addrID key Create{newValue} =
-  SQL.insert_ $ Storage addrID EVM (word256ToHexStorage key) (word256ToHexStorage newValue)
+commitStorage addrID key = \case
+  Create{newValue} ->
+    SQL.insert_ $ Storage addrID EVM (word256ToHexStorage key) (word256ToHexStorage newValue)
+  Delete{} -> do
+    storageID <- getStorageKeySQL addrID (word256ToHexStorage key) "delete"
+    SQL.delete storageID
+  Update{newValue} -> do
+    storageID <- getStorageKeySQL addrID (word256ToHexStorage key) "update"
+    SQL.update storageID [ StorageValue =. (word256ToHexStorage newValue) ]
 
-commitStorage addrID key Delete{} = do
-  storageID <- getStorageKeySQL addrID key "delete"
-  SQL.delete storageID
-
-commitStorage addrID key Update{newValue} = do
-  storageID <- getStorageKeySQL addrID key "update"
-  SQL.update storageID [ StorageValue =. (word256ToHexStorage newValue) ]
+commitSolidStorage :: MonadResource m =>
+                      SQL.Key AddressStateRef -> BS.ByteString -> Diff BS.ByteString 'Incremental -> SqlDbM m ()
+commitSolidStorage addrID key = \case
+  Create{newValue} ->
+    SQL.insert_ $ Storage addrID SolidVM (HexStorage key) (HexStorage newValue)
+  Delete{} -> do
+    storageID <- getStorageKeySQL addrID (HexStorage key) "delete"
+    SQL.delete storageID
+  Update{newValue} -> do
+    storageID <- getStorageKeySQL addrID (HexStorage key) "update"
+    SQL.update storageID [ StorageValue =. HexStorage newValue ]
 
 getAddressStateSQL :: MonadResource m
                    => Maybe Word256
@@ -150,13 +166,13 @@ getAddressStateSQL chainId addr' = do
 
 getStorageKeySQL :: MonadResource m
                  => SQL.Key AddressStateRef
-                 -> Word256
+                 -> HexStorage
                  -> String
                  -> SqlDbM m (SQL.Key Storage)
 getStorageKeySQL addrID storageKey' s = do
   storageIDs <- SQL.selectKeysList
-              [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. (word256ToHexStorage storageKey') ]
+              [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. storageKey' ]
               [ LimitTo 1 ]
   if null storageIDs
-    then error $ s ++ ": Storage key not found in SQL db: " ++ showHex4 storageKey'
+    then error $ s ++ ": Storage key not found in SQL db: " ++ show storageKey'
     else return $ head storageIDs
