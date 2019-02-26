@@ -83,9 +83,11 @@ instance Ord Value where
 
 instance RLPSerializable Value where
   rlpEncode (SInteger i) = RLPArray [RLPString "I", rlpEncode i]
+  rlpEncode (SString s) = RLPArray [RLPString "S", rlpEncode s]
   rlpEncode x = error $ "undefined case in rlpEncode for Value: " ++ show x
   
   rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
+  rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
 
 varEquals :: MonadIO m =>

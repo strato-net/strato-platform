@@ -172,7 +172,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       maybeArgString = join $ fmap (M.lookup "args") metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "qq" "qq" argString
-      args = either (error . ("args can not be parsed: " ++) . show) id maybeArgs 
+      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs 
       
   addressState <- getAddressState codeAddress
 
@@ -855,4 +855,7 @@ logAssigningVariable v = do
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> ByteString
 encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
+encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly 
+  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0  
+  where stringBytes = BC.pack s
 encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x
