@@ -199,3 +199,5 @@ numberUnit = do
     <|> (reserved "ether" >> return Ether)
 
   
+parseArgs :: SolidityParser [Expression]
+parseArgs = parens $ commaSep expression

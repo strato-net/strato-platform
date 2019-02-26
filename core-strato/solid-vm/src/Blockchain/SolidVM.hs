@@ -24,6 +24,7 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
 import           GHC.Exts
+import           Text.Parsec
 
 import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
@@ -46,6 +47,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
 
+import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
@@ -162,7 +164,16 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
+call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
+
+
+  let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
+      funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
+      maybeArgString = join $ fmap (M.lookup "args") metadata
+      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+      maybeArgs = runParser parseArgs "qq" "qq" argString
+      args = either (error . ("args can not be parsed: " ++) . show) id maybeArgs 
+      
   addressState <- getAddressState codeAddress
 
   ccString <-
@@ -172,7 +183,8 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ _ = do
 
 
   returnValue <- runSM ccString $ do
-           call'' codeAddress "getTheValue" []
+           argValues <- forM args $ \arg -> getVar =<< expToVar arg
+           call'' codeAddress funcName argValues
 
 
 
