@@ -499,11 +499,11 @@ expToVar (Xabi.IndexAccess e (Just iExp)) = do
   var <- expToVar e
   val <- getVar var
   iVal <- getVar =<< expToVar iExp
-  case (val, iVal) of
-    (SArray _ v, SInteger i) -> do
-      return $ v V.! fromInteger i
-    (SMap valType m, val') -> do
-      return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
+  case (var, iVal) of
+    (StorageItem (MS.Field n MS.Null) , SInteger i) -> do
+      Constant <$> getVar (StorageItem (MS.Field n (MS.ArrayIndex (fromIntegral i) MS.Null)))
+    -- (SMap valType m, val') -> do
+    --   return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
 
     _ -> error $ "code tried to get an index, but the values weren't correct:\n" ++ show val ++ "\n" ++ show iVal
 

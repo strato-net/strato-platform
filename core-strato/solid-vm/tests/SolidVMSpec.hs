@@ -113,3 +113,23 @@ spec = do
         `shouldReturn` BInteger 1
       getSolidStorageKeyVal' uploadAddress (Field "nums" (ArrayIndex 0 Null))
         `shouldReturn` BInteger 3
+
+    it "should be able to read an array" . runTest $ do
+      checkStorage `shouldReturn` []
+      runCreate "testdata/ArrayRead.sol" `shouldReturn` defaultExecResults
+      st <- checkStorage
+      st `shouldSatisfy` (== 5) . length
+      mapM (getSolidStorageKeyVal' uploadAddress)
+        [ Field "xs" (Field "length" Null)
+        , Field "xs" (ArrayIndex 0 Null)
+        , Field "xs" (ArrayIndex 1 Null)
+        , Field "xs" (ArrayIndex 2 Null)
+        , Field "y" Null
+        , Field "z" Null
+        ] `shouldReturn` [ BInteger 2
+                         , BInteger 0x5577
+                         , BInteger 0xffff
+                         , BDefault
+                         , BInteger 0x5577
+                         , BInteger 0xffff]
+
