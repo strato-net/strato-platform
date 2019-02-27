@@ -12,7 +12,7 @@ import qualified Network.Kafka                     as K
 import qualified Network.Kafka.Producer            as KW
 import qualified Network.Kafka.Protocol            as KP
 
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.KafkaTopics            (lookupTopic)
 
 stateDiffTopicName :: KP.TopicName

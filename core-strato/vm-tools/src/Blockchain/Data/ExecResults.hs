@@ -8,7 +8,7 @@ import qualified Data.Set                as S
 import           GHC.Generics
 
 import           Blockchain.VM.VMException
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction

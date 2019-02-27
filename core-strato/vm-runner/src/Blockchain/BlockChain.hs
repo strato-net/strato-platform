@@ -44,7 +44,7 @@ import           Text.Printf
 
 import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB

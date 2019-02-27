@@ -18,7 +18,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.StateRoot
-import           SolidVM.Model
+import           Blockchain.SolidVM.Model
 
 derivePersistField "Integer"
 derivePersistField "Point"
