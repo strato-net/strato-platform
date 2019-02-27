@@ -32,6 +32,7 @@ data BasicValue = BInteger Integer
                 | BBool Bool
                 | BAddress Address
                 | BEnumVal T.Text T.Text
+                | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
 -- TODO(tim): Can be numeric/bool/address/string/text
@@ -216,6 +217,7 @@ constructFromNothing (ArrayIndex n sp) = SArray . I.singleton n . constructFromN
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
+    BDefault -> RLPString ""
     BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
@@ -229,6 +231,7 @@ instance RLPSerializable BasicValue where
       (3, []) -> BAddress $ rlpDecode f
       (4, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
+  rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
 
 

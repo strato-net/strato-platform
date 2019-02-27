@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.SolidVM
     (
@@ -14,7 +16,6 @@ import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
-import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import           Data.Maybe
@@ -25,6 +26,7 @@ import           Data.Traversable
 import qualified Data.Vector as V
 import           GHC.Exts
 import           Text.Parsec
+import           Text.Printf
 
 import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
@@ -36,7 +38,7 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.SolidStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SolidVM.Account
@@ -46,6 +48,8 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
+
+import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
@@ -118,9 +122,15 @@ create' creator name argExps = do
       case maybeExpression of
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
-    putRawStorageKeyVal' address (BC.pack n) $ rlpSerialize $ rlpEncode initialValue
---    addToStorage address n initialValue
-
+    let fieldName :: MS.StoragePath -> MS.StoragePath
+        fieldName = MS.Field (BC.pack n)
+    -- TODO: This cannot handle nested arrays, or most types really
+    -- It might make more sense to just leave it at SDefault and determine
+    -- the result from that
+    let (k, v) = case initialValue of
+                    SArray vt _ -> (fieldName (MS.Field "length" MS.Null), toBasic $ defaultValue vt)
+                    x -> (fieldName MS.Null, toBasic x)
+    putSolidStorageKeyVal' address k v
   popCallInfo
 
   -- Run the constructor
@@ -172,8 +182,8 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       maybeArgString = join $ fmap (M.lookup "args") metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "qq" "qq" argString
-      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs 
-      
+      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
+
   addressState <- getAddressState codeAddress
 
   ccString <-
@@ -235,7 +245,7 @@ call'' address functionName args = do
     _ -> do --Maybe the function is actually a getter
       case M.lookup functionName $ contract'^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar $ StorageItem functionName
+          val <- getVar . StorageItem $ MS.Field (BC.pack $ '.':functionName) MS.Null
           return $ Just val
         Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
 
@@ -652,13 +662,22 @@ expToVar (Xabi.FunctionCall e args) = do
         _ -> error "called enum constructor with improper args"
 
     Property "push" var' -> do
-      val <- getVar var'
-      case (val, argVals) of
-        (SArray valType vec, [newVal]) -> do
-          newVar <- liftIO $ fmap Variable $ newIORef newVal
-          setVar var' $ SArray valType $ vec `V.snoc` newVar
-          return $ Constant SNULL
-        x -> error $ "push property called on a type that is not a SArray: " ++ show x
+      let prefix' = case var' of
+                        StorageItem (MS.Field x MS.Null) -> MS.Field x
+                        _ -> error $ "unimplemented array access: " ++ show var'
+          lenPath = prefix' $ MS.Field "length" MS.Null
+      len' <- getVar $ StorageItem lenPath
+      let len ::Int = case len' of
+                        SInteger b -> fromInteger b
+                        SDefault -> 0
+                        x -> error $ "Invalid length type: " ++ show x
+          newLen = SInteger $ fromIntegral $ len + 1
+      let idxPath = prefix' $ MS.ArrayIndex len MS.Null
+      setVar (StorageItem lenPath) newLen
+      case argVals of
+        [av] -> setVar (StorageItem idxPath) av
+        _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
+      return $ Constant newLen
 
     _ -> error $ "code tried to call a function on a non-funciton value:\n" ++ show var
 
@@ -855,7 +874,7 @@ logAssigningVariable v = do
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> ByteString
 encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
-encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly 
-  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0  
+encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
+  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
 encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x

@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import           Data.Time
 import           Text.Parsec
 
-
+import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
@@ -139,11 +139,11 @@ runSM :: B.ByteString -> SM a -> ContextM a
 runSM theCode f = do
   let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack theCode
 
-  let file = 
+  let file =
         case maybeFile of
           Left e -> error $ show e
           Right v -> v
-  
+
       namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
 
       cc = applyInheritence
@@ -176,11 +176,11 @@ runSM theCode f = do
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
         storageBlockMap = contextStorageBlockMap vmcontext
-        } 
+        }
 
   (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
 
-  vmcontext' <- get 
+  vmcontext' <- get
   put vmcontext'{
     contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
     contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
@@ -200,7 +200,7 @@ addLocalVariable name value = do
   sstate <- get
   case callStack sstate of
     [] -> error "addLocalVariable called with an empty stack"
-    (currentSlice:rest) -> 
+    (currentSlice:rest) ->
       put sstate
           {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
 
@@ -217,19 +217,19 @@ getVariableOfName name = do
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
-      
+
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
         if name `elem` ["uint"]
         then Just $ Constant $ SBuiltinFunction name Nothing
         else Nothing
-        
+
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable =
         if name `elem` ["msg", "block", "tx"]
         then Just $ Constant $ SBuiltinVariable name
         else Nothing
-        
+
       maybeEnum :: Maybe Variable
       maybeEnum =
         if name `elem` M.keys (currentContract currentCallInfo^.enums)
@@ -249,9 +249,10 @@ getVariableOfName name = do
         else Nothing
 
       maybeStorageItem :: Maybe Variable
-      maybeStorageItem = 
+      maybeStorageItem =
+        -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just $ StorageItem name
+        then either (error . show) (Just . StorageItem) . MS.parsePath . BC.pack $ '.':name
         else Nothing
 
 
@@ -262,7 +263,7 @@ getVariableOfName name = do
 
 --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 
-  
+
   --TODO- Add the constant lookup properly
   {-
   maybeConstantValue <- do
@@ -275,7 +276,7 @@ getVariableOfName name = do
         --error "gonna constant"
         return $ Just $ Constant $ val
 -}
-  
+
   return
     $ flip fromMaybe maybeLocalValue
     $ flip fromMaybe maybeStorageItem
@@ -307,14 +308,14 @@ constExpToVar x = error $ "constExpToVar not defined for " ++ show x
 addCallInfo :: Address -> Contract -> Map String Variable -> SM ()
 addCallInfo a c initialLocalVariables = do
   sstate <- get
-  
+
   let newCallInfo =
         CallInfo {
           currentAddress=a,
           currentContract=c,
           localVariables=initialLocalVariables
         }
-        
+
   put sstate{callStack = newCallInfo:callStack sstate}
 
 popCallInfo :: SM ()
@@ -384,4 +385,4 @@ setNonce a n = do
   account <- getAccount a
   sstate <- get
   put sstate{accounts=M.insert a account{nonce = n} $ accounts sstate}
-  
+
