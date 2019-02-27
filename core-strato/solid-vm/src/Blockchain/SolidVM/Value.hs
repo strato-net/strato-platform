@@ -23,7 +23,7 @@ import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
 
 
-
+data IndexType = ArrayIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
 data Variable = Variable (IORef Value)
   | Property String Variable

@@ -4,9 +4,10 @@ import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import qualified Data.Map as M
 import qualified Data.Set as S
 import HFlags
-import Test.Hspec (hspec, Spec, describe, it, xit)
+import Test.Hspec (hspec, Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 
 import Blockchain.Data.ExecResults
@@ -61,7 +62,7 @@ runCreate fp = do
       availableGas = error "TODO: availableGas"
       txHash = error "TODO: txHash"
       chainId = error "TODO: chainId"
-      metadata = error "TODO: metadata"
+      metadata = Just $ M.singleton "name" "qq"
 
   SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
@@ -85,19 +86,19 @@ checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 spec :: Spec
 spec = do
   describe "Create" $ do
-    xit "should be able to run an empty contract" . runTest $ do
+    it "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldReturn` []
 
-    xit "should be able to store a default int" . runTest $ do
+    it "should be able to store a default int" . runTest $ do
       runCreate "testdata/DefaultInt.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
-    xit "should be able to explicitly store an int" . runTest $ do
+    it "should be able to explicitly store an int" . runTest $ do
       runCreate "testdata/SetInt.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
-    xit "should be able to store a string" . runTest $ do
+    it "should be able to store a string" . runTest $ do
       runCreate "testdata/SetString.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
@@ -142,3 +143,14 @@ spec = do
         , [Field "us", MapIndex (INum 999999)]
         , [Field "us", MapIndex (INum 10)]
         ] `shouldReturn` [BInteger 4, BInteger 21, BDefault]
+
+    it "should be able to read from a map" . runTest $ do
+      runCreate "testdata/MappingRead.sol" `shouldReturn` defaultExecResults
+      st <- checkStorage
+      -- The z assignment doesn't count, as at is set to the empty string
+      st `shouldSatisfy` (== 2) . length
+      mapM (getSolidStorageKeyVal' uploadAddress)
+        [ [Field "xs", MapIndex (INum 400)]
+        , [Field "y"]
+        , [Field "z"]
+        ] `shouldReturn` [BInteger 343, BInteger 343, BDefault] -- z may also be 0

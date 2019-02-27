@@ -88,7 +88,7 @@ create :: Bool
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
 create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
   addCode SolidVM $ initCode
-  
+
   let maybeContractName = join $ fmap (M.lookup "name") metadata
       contractName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
@@ -296,14 +296,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
-
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
   value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   when trace $ logAssigningVariable value
-  -- TODO(tim): This might fail when assigning to a non storage variable.
+  -- TODO(tim): This might fail when assigning to a memory variable
   setVar (StorageItem v1) value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
@@ -401,33 +400,36 @@ while condition code = do
     SBool False -> return Nothing
     x -> error $ "condition in for loop didn't evaluate to a bool: " ++ show x
 
+getIndexType :: MS.StoragePath -> SM IndexType
+getIndexType [] = error "TODO(tim): getIndexType of empty"
+getIndexType [MS.Field field] = do
+  ctract <- getCurrentContract
+  let decls = ctract ^. storageDefs
+  case M.lookup (BC.unpack field) decls of
+    Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
+    Just Xabi.VariableDecl {Xabi.varType=v} -> return $
+      case v of
+         Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
+         Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
+         Xabi.Array{} -> ArrayIndex
+         _ -> error $ "TODO(tim): unanticipated type in variable declarations: " ++ show v
+getIndexType xs = error $ "TODO(tim): higher order index references: " ++ show xs
+
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath <- expToPath parent
   idxExp <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
-  endPath <- case parPath of
-    [MS.Field field] -> do
-      ctract <- getCurrentContract
-      let decls = ctract ^. storageDefs
-      case M.lookup (BC.unpack field) decls of
-        Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.Int{}}} -> do
-          -- This might require reading an IORef
-          n <- case idxExp of
-            Constant (SInteger i) -> return i
-            Variable var -> do
-              val <- liftIO $ readIORef var
-              case val of
-                SInteger i -> return i
-                _ -> error "TODO(tim): non-integer in int map position"
-            _ -> error "TODO(tim): non constant/variable in int map position"
-          return $ MS.MapIndex (MS.INum n)
-        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.String{}}} -> do
-          return $ MS.MapIndex (MS.IText $ error "TODO(tim): INum")
-        Just v -> error $ "TODO(tim): vardec " ++ show v
-    _ -> error "TODO(tim): deeper previous paths"
-  return $ parPath ++ [endPath]
+  idxType <- getIndexType parPath
+  idx <- case idxExp of
+            Constant val -> return val
+            Variable var -> liftIO $ readIORef var
+            _ -> error $ "TODO(tim): read from " ++ show idxExp
+  return . (parPath ++) $ case (idxType, idx) of
+    (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
+    (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
+    (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
+    p -> error $ "TODO(tim): unsupported index combination: " ++ show p
 expToPath x = error $ "TODO(tim): expToPath: " ++ show x
 
 
@@ -529,19 +531,10 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     _ -> return $ Property name var
 
-expToVar (Xabi.IndexAccess e (Just iExp)) = do
-  var <- expToVar e
-  val <- getVar var
-  iVal <- getVar =<< expToVar iExp
-  case (var, iVal) of
-    (StorageItem [MS.Field n] , SInteger i) -> do
-      -- TODO: this should also be a mappingindex
-      value <- getVar (StorageItem [MS.Field n, MS.ArrayIndex (fromIntegral i)])
-      Variable <$> liftIO (newIORef value)
-    -- (SMap valType m, val') -> do
-    --   return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
-
-    _ -> error $ "code tried to get an index, but the values weren't correct:\n" ++ show val ++ "\n" ++ show iVal
+expToVar x@(Xabi.IndexAccess{}) = do
+  idxPath <- expToPath x
+  value <- getVar $ StorageItem idxPath
+  Variable <$> liftIO (newIORef value)
 
 expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger

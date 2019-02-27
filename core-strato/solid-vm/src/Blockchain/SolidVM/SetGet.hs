@@ -69,8 +69,6 @@ setVar (Constant _) _ = error "setVar was called for a constant, this is forbidd
 
 setVar x _ = error $ "setVar called for undefined value: " ++ show x
 
-
-
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = do
   liftIO $ readIORef ioRef
@@ -125,4 +123,5 @@ showSM (SMap _ m) = do
            ++ "}"
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
+showSM SDefault = return "<default>"
 showSM x = error $ "showSM called for unsupported value: " ++ show x
