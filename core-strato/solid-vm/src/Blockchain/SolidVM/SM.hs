@@ -255,7 +255,10 @@ getVariableOfName name = do
         then either (error . show) (Just . StorageItem) . MS.parsePath . BC.pack $ '.':name
         else Nothing
 
-
+      maybeThis :: Maybe Variable
+      maybeThis = if name == "this"
+                   then Just . Constant . SAddress . currentAddress $ currentCallInfo
+                   else Nothing
 
 
 
@@ -286,6 +289,7 @@ getVariableOfName name = do
     $ flip fromMaybe maybeEnum
     $ flip fromMaybe maybeStructDef
     $ flip fromMaybe maybeContract
+    $ flip fromMaybe maybeThis
 --    $ flip fromMaybe maybeConstantValue
     $ (error $ "No variable with name " ++ name)
 

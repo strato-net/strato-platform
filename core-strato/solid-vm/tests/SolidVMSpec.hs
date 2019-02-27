@@ -90,7 +90,7 @@ getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 spec :: Spec
 spec = do
   describe "Create" $ do
-    xit "should be able to run an empty contract" . runTest $ do
+    it "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldReturn` []
 
@@ -174,3 +174,6 @@ spec = do
     it "can delete" . runTest $ do
       runCreate "testdata/Delete.sol" `shouldReturn` defaultExecResults
       getAll [[Field "x"]] `shouldReturn` [BDefault]
+
+    it "can run complicated constructors" . runTest $ do
+      runCreate "testdata/Constructor.sol" `shouldReturn` defaultExecResults
