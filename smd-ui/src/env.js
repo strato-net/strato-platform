@@ -12,12 +12,12 @@ const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? win
 
 export const env = {
   NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
-  APEX_URL: `${http_protocol}://${node_host}/${apex_uri}`,
-  BLOC_URL: `${http_protocol}://${node_host}/${bloc_uri}`,
-  BLOC_DOC_URL: `${http_protocol}://${node_host}/${bloc_doc_uri}`,
-  CIRRUS_URL: `${http_protocol}://${node_host}/${cirrus_uri}`,
-  STRATO_URL: `${http_protocol}://${node_host}/${strato_uri}`,
-  STRATO_DOC_URL: `${http_protocol}://${node_host}/${strato_doc_uri}`,
+  APEX_URL: `${http_protocol}://${node_host}${apex_uri}`,
+  BLOC_URL: `${http_protocol}://${node_host}${bloc_uri}`,
+  BLOC_DOC_URL: `${http_protocol}://${node_host}${bloc_doc_uri}`,
+  CIRRUS_URL: `${http_protocol}://${node_host}${cirrus_uri}`,
+  STRATO_URL: `${http_protocol}://${node_host}${strato_uri}`,
+  STRATO_DOC_URL: `${http_protocol}://${node_host}${strato_doc_uri}`,
   SOCKET_SERVER: `${ws_protocol}://${node_host}/`,
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
