@@ -10,6 +10,13 @@ cd -
 
 if [ "$NODE_ENV" == development ]; then
 
+  echo " "
+  echo "==========="
+  echo "Fixme: Have you run start:dev yet to create the apex_dev database?"
+  echo "Todo: maybe create that here instead..."
+  echo "==========="
+  echo " "
+
   # Check if postgres client is installed
   if ! command -v psql &> /dev/null; then
     echo "no postgres-client installed, please install"
