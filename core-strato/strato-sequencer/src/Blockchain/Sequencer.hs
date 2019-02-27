@@ -130,7 +130,11 @@ checkForVotes crs = do
                       . RL.rlpDeserialize
                       . fst
                       . traceShowId
-                      . B16.decode $ pack (API.signature br)
+                      . B16.decode
+                      . traceShowId
+                      . pack
+                      . traceShowId
+                      . API.signature $ br
               bauth = MsgAuth { sender = API.sender br, signature = extsign}
           in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 

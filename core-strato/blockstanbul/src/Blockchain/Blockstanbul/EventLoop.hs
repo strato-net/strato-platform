@@ -165,7 +165,9 @@ isAuthorized iev = do
         unless nonceAuth $
           warn $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
         unless signAuth $
-          warn "Rejecting NewBeneficiary; bad seal"
+          warn $ "Rejecting NewBeneficiary; bad seal, address: " ++ (show addr) ++ " Seal: "
+              ++ (show sign) ++ " info: " ++ (show (benf, dir, nonc)) ++ " address decoded: "
+              ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sign))
         return $ ifAuthMember && nonceAuth && signAuth
       -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
       -- but with incorrect extraData.
