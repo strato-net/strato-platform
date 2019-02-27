@@ -8,7 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Set as S
 import HFlags
-import Test.Hspec (hspec, Spec, describe, it, xit)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
 
 import Blockchain.Data.ExecResults
@@ -89,6 +89,12 @@ getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 
 spec :: Spec
 spec = do
+  describe "Ballot" $ do
+    xit "can be created" . runTest $ do
+      liftIO $ pendingWith "Struct literal parsing, storage vs memory, multiline statements\
+                           \ and address map keys need to be supported"
+      runCreate "testdata/Ballot.sol" `shouldReturn` defaultExecResults
+
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
