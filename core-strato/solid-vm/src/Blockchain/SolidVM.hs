@@ -85,14 +85,17 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
-create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ _ = do
+create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
   addCode SolidVM $ initCode
+  
+  let maybeContractName = join $ fmap (M.lookup "name") metadata
+      contractName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
 
   runSM initCode $ do
-    create' sender' "qq" []
+    create' sender' contractName []
 
 create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator name argExps = do
