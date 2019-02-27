@@ -298,7 +298,12 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)              --remove
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName)]
+
+  let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+  (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
+
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
+  
   tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing

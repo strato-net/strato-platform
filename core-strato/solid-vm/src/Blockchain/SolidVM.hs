@@ -95,8 +95,13 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
 
+  let maybeArgString = join $ fmap (M.lookup "args") metadata
+      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+      maybeArgs = runParser parseArgs "qq" "qq" argString
+      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
+
   runSM initCode $ do
-    create' sender' contractName []
+    create' sender' contractName args
 
 create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator name argExps = do

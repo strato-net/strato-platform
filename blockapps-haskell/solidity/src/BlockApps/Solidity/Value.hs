@@ -206,7 +206,7 @@ valueToText = \case
 simpleValueToText :: SimpleValue -> Maybe Text
 simpleValueToText sv = Just $ case sv of
   ValueBool tf -> if tf then "true" else "false"
-  ValueAddress addr -> Text.pack $ addressString addr
+  ValueAddress addr -> Text.pack $ "0x" ++ addressString addr
   ValueString tx -> Text.pack $ show tx
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
