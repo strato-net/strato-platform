@@ -104,6 +104,7 @@ tests:
     source-dirs: tests/
     main: SolidVMSpec.hs
     dependencies:
+      - base16-bytestring
       - hflags
       - hspec
       - hspec-expectations-lifted

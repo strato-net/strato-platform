@@ -553,6 +553,10 @@ expToVar (Xabi.Unitary "!" expr) = do
   case res of
     SBool v -> return $ Constant $ SBool $ not v
     _ -> error "Unitary ! calculated a non bool value"
+expToVar (Xabi.Unitary "delete" expr) = do
+  p <- expToPath expr
+  setVar (StorageItem p) SDefault
+  return . Constant $ SNULL
 
 expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
   val1 <- getVar =<< expToVar expr1

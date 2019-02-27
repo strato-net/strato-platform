@@ -5,10 +5,12 @@ import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text as T
 import HFlags
-import Test.Hspec (hspec, Spec, describe, it, xit)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
 
 import Blockchain.Data.ExecResults
@@ -89,8 +91,14 @@ getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 
 spec :: Spec
 spec = do
+  describe "Ballot" $ do
+    xit "can be created" . runTest $ do
+      liftIO $ pendingWith "Struct literal parsing, storage vs memory, multiline statements\
+                           \ and address map keys need to be supported"
+      runCreate "testdata/Ballot.sol" `shouldReturn` defaultExecResults
+
   describe "Create" $ do
-    xit "should be able to run an empty contract" . runTest $ do
+    it "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldReturn` []
 
@@ -170,3 +178,63 @@ spec = do
       getAll [ [Field "xs", Field "length"]
              , [Field "y"]
              ] `shouldReturn` [BInteger 0x400, BInteger 0x400]
+
+    it "can delete" . runTest $ do
+      runCreate "testdata/Delete.sol" `shouldReturn` defaultExecResults
+      getAll [[Field "x"]] `shouldReturn` [BDefault]
+
+    it "can run complicated constructors" . runTest $ do
+      runCreate "testdata/Constructor.sol" `shouldReturn` defaultExecResults
+
+    it "can exponentiate" . runTest $ do
+      liftIO $ pendingWith "cannot parse `2 ** 5` as a binop"
+      void $ runCreate "testdata/Exp.sol"
+      getAll [[Field "x"]] `shouldReturn` [BInteger 25]
+
+    it "can create a struct" . runTest $ do
+      void $ runCreate "testdata/Struct.sol"
+      getAll [ [Field "x", Field "a"]
+             , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
+
+    it "can assign a struct" . runTest $ do
+      liftIO $ pendingWith "cannot assign a struct literal"
+      void $ runCreate "testdata/StructAssign.sol"
+      getAll [ [Field "x", Field "a"]
+             , [Field "x", Field "b"]] `shouldReturn` [BInteger 3, BInteger 4]
+
+    it "can push a struct" . runTest $ do
+      liftIO $ pendingWith "struct storage"
+      void $ runCreate "testdata/StructPush.sol"
+      getAll [ [Field "xs"]
+             , [Field "xs", Field "length"]
+             , [Field "xs", ArrayIndex 0, Field "a"]
+             , [Field "xs", ArrayIndex 0, Field "b"]
+             ] `shouldReturn` [BDefault, BInteger 1, BInteger 88, BInteger 73]
+
+    it "can explicitly push a struct" . runTest $ do
+      liftIO $ pendingWith "struct storage"
+      void $ runCreate "testdata/StructPushSet.sol"
+      getAll [ [Field "xs"]
+             , [Field "xs", Field "length"]
+             , [Field "xs", ArrayIndex 0, Field "a"]
+             , [Field "xs", ArrayIndex 0, Field "b"]
+             ] `shouldReturn` [BDefault, BInteger 1, BInteger 9000, BInteger 3000]
+
+    it "can use addresses as map keys" . runTest $ do
+      liftIO $ pendingWith "Address map"
+      void $ runCreate "testdata/AddressMapping.sol"
+
+    it "can reduce a modulus" . runTest $ do
+      void $ runCreate "testdata/Modulo.sol"
+      getAll [[Field "x"]] `shouldReturn` [BInteger 0xbe]
+
+    it "can hash correctly" . runTest $ do
+      liftIO $ pendingWith "keccak256 selection"
+      void $ runCreate "testdata/Keccak256.sol"
+      let input = map (\t -> [Field t]) ["buf1", "buf2", "hash1", "hash2"]
+      getAll input `shouldReturn`
+        [ BString (T.replicate 32 "\xfe")
+        , BString (T.replicate 32 "x")
+        , BString "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a"
+        , BString "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868"
+        ]
