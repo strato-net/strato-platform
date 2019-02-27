@@ -14,11 +14,16 @@ const bcrypt = require('bcrypt');
 const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
-const waitFaucet = async function (address) {
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
+const testFactory = require(`${process.cwd()}/test/factory`);
+
+const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
+
+const waitFaucet = async function (address) { //fixme - function duplicated in multiple tests, move to util file 
   const res = await chai.request(process.env.stratoRoot)
     .post('/faucet')
     .field('address', address);
-  assert.equal(res.status, '200');
+  assert.equal(res.status, RestStatus.OK);
   const sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
   };
@@ -39,41 +44,51 @@ const waitFaucet = async function (address) {
 
 chai.use(chaiHttp);
 
-const USERNAME = 'test01@test.com';
-describe.skip('File', function () {
+describe('File - ExternalStorage', function () {
   this.timeout(20000);
-  let _contractAddress, accountAddress, app;
 
-  before(async function () {
-    checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
-      return next();
-    });
+  const userData = testFactory.getUserData();
+  
+  let _contractAddress, userAccountAddress, app;
+  
+  
+  before(async function () {//fixme - is this before block garuanteed to complete before the describe/it below? look into mocha promises
+
+    if(SKIP_TEST_BLOCK){
+      this.skip();
+    }
 
     app = require('../app');
 
-    //fixme - investigate if needed
-    await models.TempUser.create({
-      email: USERNAME , //todo - CPR
-      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
-      verified: true
-    });
+    //fixme - is there a way to clear all keys in db - in case test is run on non clean system?
 
-    const res1 = await chai.request(app)
-      .post('/users')
-        .set('X-USER-UNIQUE-NAME','test01@test.com')
-        .set('X-USER-ID','uHash')
-        .send({
-          username: "test01@test.com",
-          password: "password"
+    const user = await chai.request(app)
+        .post('/login')
+        .set('X-USER-UNIQUE-NAME',userData.userName)
+        .set('X-USER-ID',userData.hash)
+        .catch((err) => {
+          const res = err.response;
+          assert.equal(res.status, RestStatus.INTERNAL_SERVER_ERROR,'user not found');
         });
 
-    accountAddress = JSON.parse(res1.text).user.accountAddress;
-    await waitFaucet(accountAddress);
+    if(user && user.status == RestStatus.OK){ //user found, yay
+      return;
+    }
+
+    const result = await chai.request(app)
+        .post('/users')
+        .set('X-USER-UNIQUE-NAME',userData.userName)
+        .set('X-USER-ID',userData.hash)
+        .send();
+
+
+    if(result.status == RestStatus.OK){ //user created, faucet em
+      userAccountAddress = result.body.user.address;
+      await waitFaucet(userAccountAddress);
+    }
+
   });
 
-  after(function () {
-    checkMode.checkMode.restore();
-  })
 
 
   describe('post /bloc/file/upload', async function () {
@@ -94,65 +109,60 @@ describe.skip('File', function () {
       uploader.upload.restore();
     })
 
-    it('replies Bad Request without content, username, address, password, provider, metadata', async function () {
+    it('replies Bad Request without content', async function () {
       chai.request(app)
         .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME','test01@test.com')
-          .set('X-USER-ID','uHash')
+          .set('X-USER-UNIQUE-NAME',userData.userName)
+          .set('X-USER-ID',userData.hash)
         .catch((err) => {
           const res = err.response;
-          assert(res.text.includes("wrong params"));
-          assert.equal(res.status, '400');
+          assert.equal(res.status, RestStatus.BAD_REQUEST);
         });
     });
 
-    it('replies Bad Request without username, address, password, provider, metadata', async function () {
+    it('replies Bad Request without content', async function () {
       chai.request(app)
         .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME','test01@test.com')
-          .set('X-USER-ID','uHash')
+          .set('X-USER-UNIQUE-NAME',userData.userName)
+          .set('X-USER-ID',userData.hash)
         .attach('content', './test/testdata/testImage.png')
         .catch((err) => {
           const res = err.response;
-          assert(res.text.includes("wrong params"));
-          assert.equal(res.status, '400');
+          assert.equal(res.status, RestStatus.BAD_REQUEST);
         });
     });
 
-    it('replies 200 with file uplaod and data entry', async function () {
+    it('replies OK with file uplaod and data entry', async function () {
       console.log('=============')
       console.log('=============')
       console.log('=============')
-      const username = 'test01@test.com';
+      const username = userData.userName;
       const result = await chai.request(app)
         .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME','test01@test.com')
-          .set('X-USER-ID','uHash')
-          .field('username', username)
-          .field('address', accountAddress)
-          .field('password', 'password')
+          .set('X-USER-UNIQUE-NAME',userData.userName)
+          .set('X-USER-ID',userData.hash)
+          //.field('username', username)
+          //.field('address', accountAddress)
+          //.field('password', 'password')
           .field('metadata', 'Nature Pics')
           .field('provider', 's3')
           .attach('content', './test/testdata/testImage.png')
           .type('form')
 
-      expect(result).to.have.status(200);
+      expect(result).to.have.status(RestStatus.OK);
       // all the below testcases are dependent on contractAddress assigned here
       _contractAddress = result.body.contractAddress;
     });
 
-    it('replies 400 with incorrect password', async function () {
+    it('replies UNAUTHORIZED with invalid headers', async function () {
       await chai.request(app)
         .post('/bloc/file/upload')
-        .field('username', 'test01@test.com')
-        .field('address', accountAddress)
-        .field('password', 'passwo')
-        .field('metadata', 'Nature Pics')
-        .field('provider', 's3')
-        .attach('content', './test/testdata/testImage.png')
-        .type('form').catch(error => {
-          assert.equal(error.status, '400');
-        })
+          .field('metadata', 'Nature Pics')
+          .field('provider', 's3')
+          .attach('content', './test/testdata/testImage.png')
+          .type('form').catch(error => {
+            assert.equal(error.status, RestStatus.UNAUTHORIZED);
+          })
     });
 
     describe('rejects', async function () {
@@ -168,35 +178,39 @@ describe.skip('File', function () {
       it('throws 500', async function () {
         await chai.request(app)
           .post('/bloc/file/upload')
-          .field('username', 'test01@test.com')
-          .field('address', accountAddress)
-          .field('password', 'password')
-          .field('metadata', 'Nature Pics')
-          .field('provider', 's3')
-          .attach('content', './test/testdata/testImage.png')
-          .type('form')
-          .catch((err) => {
-            const res = err.response;
-            assert.equal(res.status, '500');
-          });
+            .set('X-USER-UNIQUE-NAME',userData.userName)
+            .set('X-USER-ID',userData.hash)
+            .field('username', userData.userName)
+            .field('address', accountAddress)
+            .field('password', 'password')
+            .field('metadata', 'Nature Pics')
+            .field('provider', 's3')
+            .attach('content', './test/testdata/testImage.png')
+            .type('form')
+            .catch((err) => {
+              const res = err.response;
+              assert.equal(res.status, '500');
+            });
       });
 
     });
 
   });
 
-  describe('get /bloc/file/list', async function () {
+  describe.skip('get /bloc/file/list', async function () {
 
     it('replies 200 with list of uploads', async function () {
       const res = await chai.request(app)
         .get('/bloc/file/list')
+          .set('X-USER-UNIQUE-NAME',userData.userName)
+          .set('X-USER-ID',userData.hash)
 
       assert.equal(res.status, '200');
     });
 
   });
 
-  describe('get /bloc/file/verify', async function () {
+  describe.skip('get /bloc/file/verify', async function () {
 
     describe('resolve', async function () {
       let storage;
@@ -220,6 +234,8 @@ describe.skip('File', function () {
       it('replies 400 with wrong query', async function () {
         chai.request(app)
           .get('/bloc/file/verify')
+            .set('X-USER-UNIQUE-NAME',userData.userName)
+            .set('X-USER-ID',userData.hash)
           .query({
             'contractAddress': null
           })
@@ -281,7 +297,7 @@ describe.skip('File', function () {
 
   });
 
-  describe('post /bloc/file/attest', async function () {
+  describe.skip('post /bloc/file/attest', async function () {
 
     describe('resolve', async function () {
       let storage;
@@ -393,7 +409,7 @@ describe.skip('File', function () {
     });
   });
 
-  describe('get /bloc/file/download ', async function () {
+  describe.skip('get /bloc/file/download ', async function () {
 
     describe('resolve', async function () {
       let storage;

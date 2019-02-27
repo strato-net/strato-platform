@@ -7,7 +7,11 @@ const s3 = require('../lib/s3');
 const uploader = require('../lib/uploader');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const crypto = require('crypto');
-var rp = require('request-promise');
+const rp = require('request-promise');
+
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
+
+//todo - probably need to do oauth version of file && externalStorage
 
 module.exports = {
   upload: function (req, res, next) {
@@ -16,44 +20,36 @@ module.exports = {
       const provider = req.body.provider;
       const metadata = req.body.metadata;
 
-      const username = req.body.username;
-      const password = req.body.password;
-      const address = req.body.address;
+
+      const uID = req.headers['x-user-unique-name'];
+      const uHash = req.headers['x-user-id'];
+
+      console.log('jfresh -- the upload years')
+      console.log(uID, uHash)
+      console.log('HEADERS',req.headers)
 
       const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
 
-      if (!metadata || !provider || !username || !password || !address) {
-        let err = new Error('wrong params, expected: {username, password, address, provider, metadata}');
-        err.status = 400;
+      if (!uID || !uHash ) { //fixme - is this check needed?
+        console.log('invalid headers')
+        let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}');
+        err.status = RestStatus.UNAUTHORIZED;
         return next(err);
       }
 
-      var params = {
+      if (!metadata || !provider ) {
+        console.log('wrong params, expected: {provider, metadata}')
+        let err = new Error('wrong params, expected: {provider, metadata}');
+        err.status = RestStatus.BAD_REQUEST;
+        return next(err);
+      }
+
+      const params = {
         Bucket: appConfig.s3.bucket.Bucket,
         Key: `${Date.now()}-${req.file.originalname}`,
         Body: req.file.buffer,
       };
 
-      // Checking if the username/password pair is correct
-      // TODO: this is the only way to find out if credentials are correct but it costs some wei - change this request once there's another way in our APIs
-      const options = {
-        method: 'POST',
-        uri: `${process.env.blocRoot}/users/${username}/${address}/send?resolve`,
-        body: {
-          value: 1,
-          password: password,
-          toAddress: address
-        },
-        json: true
-      };
-
-      try {
-        yield rp.post(options);
-      } catch (error) {
-        let err = new Error('Unable to verify username/password pair');
-        err.status = 400;
-        return next(err);
-      }
 
       try {
         const uploadedFile = yield uploader.upload(params);
@@ -62,16 +58,15 @@ module.exports = {
           _uri: uploadedFile.Location,
           _host: provider,
           _hash: hash,
-          _metadata: metadata
+          _metadata: metadata,
+          _uID: uID,
+          _uHash: uHash
         };
 
-        const userCredentials = {
-          name: username,
-          address: address,
-          password: password
-        };
-
-        const contractUpload = yield externalStorage.uploadContract(userCredentials, args);
+        const contractUpload = yield externalStorage.uploadContract({
+          'x-user-unique-name':req.headers['x-user-unique-name'],
+          'x-user-id': req.headers['x-user-id']
+        }, args);
 
         yield models.Upload.create({
           contractAddress: contractUpload.address,
@@ -79,10 +74,11 @@ module.exports = {
           hash: hash
         });
 
-        res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+        res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
       } catch (error) {
+        console.log(error)
         let err = new Error(error);
-        err.status = 500;
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
         return next(err);
       };
     });

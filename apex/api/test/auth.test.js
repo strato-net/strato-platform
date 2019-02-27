@@ -559,6 +559,11 @@ describe('Auth/public tests', function () {
     })
 
     beforeEach(function () {
+
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
       mockReq = {
         headers: {}
       }

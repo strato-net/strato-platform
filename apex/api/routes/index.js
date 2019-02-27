@@ -8,7 +8,7 @@ const oAuthController = require('../controllers/oAuth');
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
-const healthHandler = require('../controllers/health');
+const healthHandler = require('../controllers/health'); //fixme - crashes in oauth cause not able to establish db connection. probably should keep it? use a flag?
 const checkMode = require('../lib/checkMode').checkMode;
 const fileController = require('../controllers/file');
 const appConfig = require(`${process.cwd()}/config/app.config`);
@@ -37,6 +37,7 @@ router.post('/dapps', dappController.upload);
 
 router.post('/login', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.getKey : authController.login);
 router.post('/users', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.createKey : authController.create);
+
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
