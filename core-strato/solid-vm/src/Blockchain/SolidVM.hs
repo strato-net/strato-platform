@@ -8,8 +8,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
-
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -127,12 +125,12 @@ create' creator name argExps = do
         Nothing -> return $ defaultValue theType
     let fieldName :: MS.StoragePath -> MS.StoragePath
         fieldName = (MS.Field (BC.pack n):)
-    -- TODO: This cannot handle nested arrays, or most types really
-    -- It might make more sense to just leave it at SDefault and determine
-    -- the result from that
+    -- TODO: It might make more sense to just leave it at BDefault and
+    -- determine the result from that
     let (k, v) = case initialValue of
-                    SArray vt _ -> (fieldName [MS.Field "length"], toBasic $ defaultValue vt)
-                    x ->           (fieldName [], toBasic x)
+                    SArray{} -> (fieldName [MS.Field "length"], MS.BInteger 0)
+                    SMap{} ->      (fieldName [], MS.BDefault)
+                    x ->           (fieldName [], toBasic $ traceShowId x)
     putSolidStorageKeyVal' address k v
   popCallInfo
 
@@ -297,20 +295,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  traceShowM (e1, '=', e2)
-  -- Should convert v1 to a path
-  v1 <- expToVar e1
+  v1 <- expToPath e1
   v2 <- expToVar e2
   value <- getVar v2
-  traceM "ok"
-  liftIO $ case v1 of
-             Variable var -> liftIO $ print =<< readIORef var
-             x -> print x
-  traceM "ok2"
-  traceShowM (v1, v2, value)
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   when trace $ logAssigningVariable value
-  setVar v1 value
+  -- TODO(tim): This might fail when assigning to a non storage variable.
+  setVar (StorageItem v1) value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -406,6 +397,38 @@ while condition code = do
         _ -> return result
     SBool False -> return Nothing
     x -> error $ "condition in for loop didn't evaluate to a bool: " ++ show x
+
+expToPath :: Xabi.Expression -> SM MS.StoragePath
+expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
+expToPath x@(Xabi.IndexAccess parent mIndex) = do
+  parPath <- expToPath parent
+  idxExp <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
+  endPath <- case parPath of
+    [MS.Field field] -> do
+      ctract <- getCurrentContract
+      let decls = ctract ^. storageDefs
+      case M.lookup (BC.unpack field) decls of
+        Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
+        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.Int{}}} -> do
+          -- This might require reading an IORef
+          n <- case idxExp of
+            Constant (SInteger i) -> return i
+            Variable var -> do
+              val <- liftIO $ readIORef var
+              case val of
+                SInteger i -> return i
+                _ -> error "TODO(tim): non-integer in int map position"
+            _ -> error "TODO(tim): non constant/variable in int map position"
+          traceShowM (idxExp, n)
+          return $ MS.MapIndex (MS.INum n)
+        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.String{}}} -> do
+          return $ MS.MapIndex (MS.IText $ error "TODO(tim): INum")
+        Just v -> error $ "TODO(tim): vardec " ++ show v
+    _ -> error "TODO(tim): deeper previous paths"
+  traceShowM (parPath, idxExp, endPath)
+  return $ parPath ++ [endPath]
+expToPath x = error $ "TODO(tim): expToPath: " ++ show x
+
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar (Xabi.NumberLiteral v Nothing) = return $ Constant $ SInteger v --TODO- handle solidity units
