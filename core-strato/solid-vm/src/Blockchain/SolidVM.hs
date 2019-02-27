@@ -16,6 +16,7 @@ import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
+import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import           Data.Maybe
@@ -126,13 +127,13 @@ create' creator name argExps = do
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
     let fieldName :: MS.StoragePath -> MS.StoragePath
-        fieldName = MS.Field (BC.pack n)
-    -- TODO: This cannot handle nested arrays, or most types really
-    -- It might make more sense to just leave it at SDefault and determine
-    -- the result from that
+        fieldName = (MS.Field (BC.pack n):)
+    -- TODO: It might make more sense to just leave it at BDefault and
+    -- determine the result from that
     let (k, v) = case initialValue of
-                    SArray vt _ -> (fieldName (MS.Field "length" MS.Null), toBasic $ defaultValue vt)
-                    x -> (fieldName MS.Null, toBasic x)
+                    SArray{} -> (fieldName [MS.Field "length"], MS.BInteger 0)
+                    SMap{} ->      (fieldName [], MS.BDefault)
+                    x ->           (fieldName [], toBasic x)
     putSolidStorageKeyVal' address k v
   popCallInfo
 
@@ -248,7 +249,7 @@ call'' address functionName args = do
     _ -> do --Maybe the function is actually a getter
       case M.lookup functionName $ contract'^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar . StorageItem $ MS.Field (BC.pack $ '.':functionName) MS.Null
+          val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
           return $ Just val
         Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
 
@@ -297,13 +298,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  v1 <- expToVar e1
+  v1 <- expToPath e1
   v2 <- expToVar e2
   value <- getVar v2
-
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   when trace $ logAssigningVariable value
-  setVar v1 value
+  -- TODO(tim): This might fail when assigning to a non storage variable.
+  setVar (StorageItem v1) value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -399,6 +400,36 @@ while condition code = do
         _ -> return result
     SBool False -> return Nothing
     x -> error $ "condition in for loop didn't evaluate to a bool: " ++ show x
+
+expToPath :: Xabi.Expression -> SM MS.StoragePath
+expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
+expToPath x@(Xabi.IndexAccess parent mIndex) = do
+  parPath <- expToPath parent
+  idxExp <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
+  endPath <- case parPath of
+    [MS.Field field] -> do
+      ctract <- getCurrentContract
+      let decls = ctract ^. storageDefs
+      case M.lookup (BC.unpack field) decls of
+        Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
+        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.Int{}}} -> do
+          -- This might require reading an IORef
+          n <- case idxExp of
+            Constant (SInteger i) -> return i
+            Variable var -> do
+              val <- liftIO $ readIORef var
+              case val of
+                SInteger i -> return i
+                _ -> error "TODO(tim): non-integer in int map position"
+            _ -> error "TODO(tim): non constant/variable in int map position"
+          return $ MS.MapIndex (MS.INum n)
+        Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.String{}}} -> do
+          return $ MS.MapIndex (MS.IText $ error "TODO(tim): INum")
+        Just v -> error $ "TODO(tim): vardec " ++ show v
+    _ -> error "TODO(tim): deeper previous paths"
+  return $ parPath ++ [endPath]
+expToPath x = error $ "TODO(tim): expToPath: " ++ show x
+
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar (Xabi.NumberLiteral v Nothing) = return $ Constant $ SInteger v --TODO- handle solidity units
@@ -502,11 +533,13 @@ expToVar (Xabi.IndexAccess e (Just iExp)) = do
   var <- expToVar e
   val <- getVar var
   iVal <- getVar =<< expToVar iExp
-  case (val, iVal) of
-    (SArray _ v, SInteger i) -> do
-      return $ v V.! fromInteger i
-    (SMap valType m, val') -> do
-      return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
+  case (var, iVal) of
+    (StorageItem [MS.Field n] , SInteger i) -> do
+      -- TODO: this should also be a mappingindex
+      value <- getVar (StorageItem [MS.Field n, MS.ArrayIndex (fromIntegral i)])
+      Variable <$> liftIO (newIORef value)
+    -- (SMap valType m, val') -> do
+    --   return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
 
     _ -> error $ "code tried to get an index, but the values weren't correct:\n" ++ show val ++ "\n" ++ show iVal
 
@@ -666,16 +699,16 @@ expToVar (Xabi.FunctionCall e args) = do
 
     Property "push" var' -> do
       let prefix' = case var' of
-                        StorageItem (MS.Field x MS.Null) -> MS.Field x
+                        StorageItem [MS.Field x] -> [MS.Field x]
                         _ -> error $ "unimplemented array access: " ++ show var'
-          lenPath = prefix' $ MS.Field "length" MS.Null
+          lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
       let len ::Int = case len' of
                         SInteger b -> fromInteger b
                         SDefault -> 0
                         x -> error $ "Invalid length type: " ++ show x
           newLen = SInteger $ fromIntegral $ len + 1
-      let idxPath = prefix' $ MS.ArrayIndex len MS.Null
+      let idxPath = prefix' ++ [MS.ArrayIndex len]
       setVar (StorageItem lenPath) newLen
       case argVals of
         [av] -> setVar (StorageItem idxPath) av

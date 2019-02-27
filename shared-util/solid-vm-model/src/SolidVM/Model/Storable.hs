@@ -46,11 +46,12 @@ data StorableValue = BasicValue BasicValue
                    | SMapping (HM.HashMap IndexType StorableValue)
                    deriving (Eq, Show, Generic, NFData)
 
-data StoragePath = Null
-                 | Field B.ByteString StoragePath
-                 | MapIndex IndexType StoragePath
-                 | ArrayIndex Int StoragePath
-                 deriving (Eq, Show, Generic, NFData, Hashable)
+data StoragePathPiece = Field B.ByteString
+                      | MapIndex IndexType
+                      | ArrayIndex Int
+                      deriving (Eq, Show, Generic, NFData, Hashable)
+
+type StoragePath = [StoragePathPiece]
 
 type StorageDelta = [(StoragePath, BasicValue)]
 
@@ -72,7 +73,7 @@ pathParser :: Parser StoragePath
 pathParser = do
   ch <- fmap w82c <$> peekWord8
   case ch of
-    Nothing -> return Null
+    Nothing -> return []
     Just '.' -> parseField
     Just '[' -> parseArrayIndex
     Just '<' -> parseMapIndex
@@ -89,7 +90,7 @@ parseArrayIndex = do
   skip (== c2w8 '[')
   idx <- parseInt
   skip (== c2w8 ']')
-  ArrayIndex idx <$> pathParser
+  (ArrayIndex idx:) <$> pathParser
 
 parseMapIndex :: Parser StoragePath
 parseMapIndex = do
@@ -106,13 +107,13 @@ parseMapIndex = do
              return . IText . unescapeKey $ strContents
            else INum <$> parseInteger
   skip (== c2w8 '>')
-  MapIndex idx <$> pathParser
+  (MapIndex idx:) <$> pathParser
 
 parseField :: Parser StoragePath
 parseField = do
   skip (== c2w8 '.')
   n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
-  Field n <$> pathParser
+  (Field n:) <$> pathParser
 
 parsePath :: B.ByteString-> Either String StoragePath
 parsePath = parseOnly pathParser
@@ -166,13 +167,12 @@ unescapeKey srcBS = unsafePerformIO $ do
       copyAndUnescape 0 0
 
 unparsePath :: StoragePath -> B.ByteString
-unparsePath = B.concat . go
-  where go :: StoragePath -> [B.ByteString]
-        go Null = []
-        go (Field p sp) = [".", p] ++ go sp
-        go (ArrayIndex n sp) = ["[", C8.pack $ show n, "]"] ++ go sp
-        go (MapIndex (INum n) sp) = ["<", C8.pack $ show n, ">"] ++ go sp
-        go (MapIndex (IText t) sp) = ["<\"", escapeKey t, "\">"] ++ go sp
+unparsePath = B.concat . concatMap go
+  where go :: StoragePathPiece -> [B.ByteString]
+        go (Field p) = [".", p]
+        go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
+        go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
+        go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
 
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 
@@ -185,35 +185,35 @@ data ReplayFailure = MissingPath StoragePath
 
 replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
 replayDelta [] ts = Right ts
-replayDelta ((Field f sp, bv):rs) ts =
+replayDelta ((Field f:sp, bv):rs) ts =
   case HM.lookup f ts of
     Just sv -> do
       ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta sp bv sv
       replayDelta rs ts'
-    Nothing -> Left . MissingPath $ Field f Null
+    Nothing -> Left . MissingPath $ [Field f]
 replayDelta ((p, _):_) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue
-applyDelta Null bv (BasicValue _) = Right $ BasicValue bv
-applyDelta (Field n sp) bv (SStruct ss) =
+applyDelta [] bv (BasicValue _) = Right $ BasicValue bv
+applyDelta (Field n:sp) bv (SStruct ss) =
   case HM.lookup n ss of
     Just v -> SStruct . (\x -> HM.insert n x ss) <$> applyDelta sp bv v
     Nothing -> Right . SStruct $ HM.insert n (constructFromNothing sp bv) ss
-applyDelta (MapIndex n sp) bv (SMapping ms) =
+applyDelta (MapIndex n:sp) bv (SMapping ms) =
   case HM.lookup n ms of
     Just v -> SMapping . (\x -> HM.insert n x ms) <$> applyDelta sp bv v
     Nothing -> Right . SMapping $ HM.insert n (constructFromNothing sp bv) ms
-applyDelta (ArrayIndex n sp) bv (SArray vs) =
+applyDelta (ArrayIndex n:sp) bv (SArray vs) =
   case I.lookup n vs of
     Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta sp bv v
     Nothing -> Right . SArray $ I.insert n (constructFromNothing sp bv) vs
 applyDelta _ _ _ = Left TypeMismatch
 
 constructFromNothing :: StoragePath -> BasicValue -> StorableValue
-constructFromNothing Null = BasicValue
-constructFromNothing (Field n sp) = SStruct . HM.singleton n . constructFromNothing sp
-constructFromNothing (MapIndex n sp) = SMapping . HM.singleton n . constructFromNothing sp
-constructFromNothing (ArrayIndex n sp) = SArray . I.singleton n . constructFromNothing sp
+constructFromNothing [] = BasicValue
+constructFromNothing (Field n:sp) = SStruct . HM.singleton n . constructFromNothing sp
+constructFromNothing (MapIndex n:sp) = SMapping . HM.singleton n . constructFromNothing sp
+constructFromNothing (ArrayIndex n:sp) = SArray . I.singleton n . constructFromNothing sp
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
@@ -243,23 +243,23 @@ instance Ae.FromJSON StorableValue where
 
 analyze :: TotalStorage -> [(StoragePath, BasicValue)]
 analyze = HM.foldlWithKey' go []
-  where go prev field sv = map (first (Field field)) (analyze' sv) <> prev
+  where go prev field sv = map (first (Field field:)) (analyze' sv) <> prev
 
 analyze' :: StorableValue -> [(StoragePath, BasicValue)]
-analyze' (BasicValue bv) = [(Null, bv)]
+analyze' (BasicValue bv) = [([], bv)]
 analyze' (SMapping sm) = HM.foldlWithKey' go [] sm
-  where go prev k sv = map (first (MapIndex k)) (analyze' sv) <> prev
+  where go prev k sv = map (first (MapIndex k:)) (analyze' sv) <> prev
 analyze' (SStruct ss) = HM.foldlWithKey' go [] ss
-  where go prev k sv = map (first (Field k)) (analyze' sv) <> prev
+  where go prev k sv = map (first (Field k:)) (analyze' sv) <> prev
 analyze' (SArray vs) = I.foldMapWithKey go vs
-  where go k sv = map (first (ArrayIndex k)) $ analyze' sv
+  where go k sv = map (first (ArrayIndex k:)) $ analyze' sv
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do
   byFields <- mapM fieldsOnly spbvs
   let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
   sequence $ HM.map synthesize' basicLists
- where fieldsOnly (Field t sp, bv) = return (t, (sp, bv))
+ where fieldsOnly (Field t:sp, bv) = return (t, (sp, bv))
        fieldsOnly _ = Left FieldRequiredAtTopLevel
 
 synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure StorableValue

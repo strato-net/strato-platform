@@ -153,7 +153,7 @@ data ConstantDecl =
   constIsPublic :: Bool,
   constInitialVal :: Expression
   } deriving (Show, Eq)
-  
+
 funcPayable :: Func -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True
 funcPayable _ = False
