@@ -102,16 +102,16 @@ spec = do
       checkStorage `shouldNotReturn` []
 
     it "should be able to store an array" . runTest $ do
-      getSolidStorageKeyVal' uploadAddress (Field "nums" (Field "length" Null))
+      getSolidStorageKeyVal' uploadAddress [Field "nums", Field "length"]
         `shouldReturn` BDefault
-      getSolidStorageKeyVal' uploadAddress (Field "nums" (ArrayIndex 0 Null))
+      getSolidStorageKeyVal' uploadAddress [Field "nums", ArrayIndex 0]
         `shouldReturn` BDefault
       runCreate "testdata/ArrayPush.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
-      getSolidStorageKeyVal' uploadAddress (Field "nums" (Field "length" Null))
+      getSolidStorageKeyVal' uploadAddress [Field "nums", Field "length"]
         `shouldReturn` BInteger 1
-      getSolidStorageKeyVal' uploadAddress (Field "nums" (ArrayIndex 0 Null))
+      getSolidStorageKeyVal' uploadAddress [Field "nums", ArrayIndex 0]
         `shouldReturn` BInteger 3
 
     it "should be able to read an array" . runTest $ do
@@ -120,12 +120,12 @@ spec = do
       st <- checkStorage
       st `shouldSatisfy` (== 5) . length
       mapM (getSolidStorageKeyVal' uploadAddress)
-        [ Field "xs" (Field "length" Null)
-        , Field "xs" (ArrayIndex 0 Null)
-        , Field "xs" (ArrayIndex 1 Null)
-        , Field "xs" (ArrayIndex 2 Null)
-        , Field "y" Null
-        , Field "z" Null
+        [ [Field "xs", Field "length"]
+        , [Field "xs", ArrayIndex 0]
+        , [Field "xs", ArrayIndex 1]
+        , [Field "xs", ArrayIndex 2]
+        , [Field "y"]
+        , [Field "z"]
         ] `shouldReturn` [ BInteger 2
                          , BInteger 0x5577
                          , BInteger 0xffff
@@ -133,3 +133,12 @@ spec = do
                          , BInteger 0x5577
                          , BInteger 0xffff]
 
+    it "should be able to insert into a mapping" . runTest $ do
+      runCreate "testdata/MappingSet.sol" `shouldReturn` defaultExecResults
+      st <- checkStorage
+      st `shouldSatisfy` (== 2) . length
+      mapM (getSolidStorageKeyVal' uploadAddress)
+        [ [Field "us", MapIndex (INum 22)]
+        , [Field "us", MapIndex (INum 999999)]
+        , [Field "us", MapIndex (INum 10)]
+        ] `shouldReturn` [BInteger 4, BInteger 21, BDefault]

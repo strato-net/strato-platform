@@ -8,6 +8,8 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
+
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -16,6 +18,7 @@ import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
+import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import           Data.Maybe
@@ -123,13 +126,13 @@ create' creator name argExps = do
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
     let fieldName :: MS.StoragePath -> MS.StoragePath
-        fieldName = MS.Field (BC.pack n)
+        fieldName = (MS.Field (BC.pack n):)
     -- TODO: This cannot handle nested arrays, or most types really
     -- It might make more sense to just leave it at SDefault and determine
     -- the result from that
     let (k, v) = case initialValue of
-                    SArray vt _ -> (fieldName (MS.Field "length" MS.Null), toBasic $ defaultValue vt)
-                    x -> (fieldName MS.Null, toBasic x)
+                    SArray vt _ -> (fieldName [MS.Field "length"], toBasic $ defaultValue vt)
+                    x ->           (fieldName [], toBasic x)
     putSolidStorageKeyVal' address k v
   popCallInfo
 
@@ -245,7 +248,7 @@ call'' address functionName args = do
     _ -> do --Maybe the function is actually a getter
       case M.lookup functionName $ contract'^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar . StorageItem $ MS.Field (BC.pack $ '.':functionName) MS.Null
+          val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
           return $ Just val
         Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
 
@@ -294,10 +297,17 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
+  traceShowM (e1, '=', e2)
+  -- Should convert v1 to a path
   v1 <- expToVar e1
   v2 <- expToVar e2
   value <- getVar v2
-
+  traceM "ok"
+  liftIO $ case v1 of
+             Variable var -> liftIO $ print =<< readIORef var
+             x -> print x
+  traceM "ok2"
+  traceShowM (v1, v2, value)
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   when trace $ logAssigningVariable value
   setVar v1 value
@@ -495,13 +505,16 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     _ -> return $ Property name var
 
-expToVar (Xabi.IndexAccess e (Just iExp)) = do
+expToVar x@(Xabi.IndexAccess e (Just iExp)) = do
+  traceShowM x
   var <- expToVar e
   val <- getVar var
   iVal <- getVar =<< expToVar iExp
   case (var, iVal) of
-    (StorageItem (MS.Field n MS.Null) , SInteger i) -> do
-      Constant <$> getVar (StorageItem (MS.Field n (MS.ArrayIndex (fromIntegral i) MS.Null)))
+    (StorageItem [MS.Field n] , SInteger i) -> do
+      -- TODO: this should also be a mappingindex
+      value <- getVar (StorageItem [MS.Field n, MS.ArrayIndex (fromIntegral i)])
+      Variable <$> liftIO (newIORef value)
     -- (SMap valType m, val') -> do
     --   return $ fromMaybe (UnsetMapItem var val' valType) $ M.lookup val' m
 
@@ -663,16 +676,16 @@ expToVar (Xabi.FunctionCall e args) = do
 
     Property "push" var' -> do
       let prefix' = case var' of
-                        StorageItem (MS.Field x MS.Null) -> MS.Field x
+                        StorageItem [MS.Field x] -> [MS.Field x]
                         _ -> error $ "unimplemented array access: " ++ show var'
-          lenPath = prefix' $ MS.Field "length" MS.Null
+          lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
       let len ::Int = case len' of
                         SInteger b -> fromInteger b
                         SDefault -> 0
                         x -> error $ "Invalid length type: " ++ show x
           newLen = SInteger $ fromIntegral $ len + 1
-      let idxPath = prefix' $ MS.ArrayIndex len MS.Null
+      let idxPath = prefix' ++ [MS.ArrayIndex len]
       setVar (StorageItem lenPath) newLen
       case argVals of
         [av] -> setVar (StorageItem idxPath) av
