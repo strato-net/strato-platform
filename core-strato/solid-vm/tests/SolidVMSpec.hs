@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
@@ -7,7 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Set as S
 import HFlags
-import Test.Hspec (hspec, Spec, describe, it)
+import Test.Hspec (hspec, Spec, describe, it, xit)
 import Test.Hspec.Expectations.Lifted
 
 import Blockchain.Data.ExecResults
@@ -83,10 +84,13 @@ defaultExecResults = ExecResults
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 
+getAll :: [StoragePath] -> ContextM [BasicValue]
+getAll = mapM (getSolidStorageKeyVal' uploadAddress)
+
 spec :: Spec
 spec = do
   describe "Create" $ do
-    it "should be able to run an empty contract" . runTest $ do
+    xit "should be able to run an empty contract" . runTest $ do
       runCreate "testdata/Empty.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldReturn` []
 
@@ -103,24 +107,22 @@ spec = do
       checkStorage `shouldNotReturn` []
 
     it "should be able to store an array" . runTest $ do
-      getSolidStorageKeyVal' uploadAddress [Field "nums", Field "length"]
-        `shouldReturn` BDefault
-      getSolidStorageKeyVal' uploadAddress [Field "nums", ArrayIndex 0]
-        `shouldReturn` BDefault
+      getAll [ [Field "nums", Field "length"]
+             , [Field "nums", ArrayIndex 0]
+             ] `shouldReturn` [BDefault, BDefault]
       runCreate "testdata/ArrayPush.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
-      getSolidStorageKeyVal' uploadAddress [Field "nums", Field "length"]
-        `shouldReturn` BInteger 1
-      getSolidStorageKeyVal' uploadAddress [Field "nums", ArrayIndex 0]
-        `shouldReturn` BInteger 3
+      getAll [ [Field "nums", Field "length"]
+             , [Field "nums", ArrayIndex 0]
+             ] `shouldReturn` [BInteger 1, BInteger 3]
 
     it "should be able to read an array" . runTest $ do
       checkStorage `shouldReturn` []
       runCreate "testdata/ArrayRead.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 5) . length
-      mapM (getSolidStorageKeyVal' uploadAddress)
+      getAll
         [ [Field "xs", Field "length"]
         , [Field "xs", ArrayIndex 0]
         , [Field "xs", ArrayIndex 1]
@@ -138,7 +140,7 @@ spec = do
       runCreate "testdata/MappingSet.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
-      mapM (getSolidStorageKeyVal' uploadAddress)
+      getAll
         [ [Field "us", MapIndex (INum 22)]
         , [Field "us", MapIndex (INum 999999)]
         , [Field "us", MapIndex (INum 10)]
@@ -149,8 +151,22 @@ spec = do
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
       st `shouldSatisfy` (== 2) . length
-      mapM (getSolidStorageKeyVal' uploadAddress)
+      getAll
         [ [Field "xs", MapIndex (INum 400)]
         , [Field "y"]
         , [Field "z"]
         ] `shouldReturn` [BInteger 343, BInteger 343, BDefault] -- z may also be 0
+
+    it "should be able to set array length" . runTest $ do
+      runCreate "testdata/Length.sol" `shouldReturn` defaultExecResults
+      st <- checkStorage
+      st `shouldSatisfy` (== 1) . length
+      getAll [[Field "xs", Field "length"]] `shouldReturn` [BInteger 24]
+
+    it "should be able to read array length" . runTest $ do
+      runCreate "testdata/ReadLength.sol" `shouldReturn` defaultExecResults
+      st <- checkStorage
+      st `shouldSatisfy` (== 2) . length
+      getAll [ [Field "xs", Field "length"]
+             , [Field "y"]
+             ] `shouldReturn` [BInteger 0x400, BInteger 0x400]

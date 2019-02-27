@@ -1,4 +1,4 @@
-
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
@@ -70,15 +70,17 @@ setVar (Constant _) _ = error "setVar was called for a constant, this is forbidd
 setVar x _ = error $ "setVar called for undefined value: " ++ show x
 
 getVar :: Variable -> SM Value
-getVar (Variable ioRef) = do
-  liftIO $ readIORef ioRef
+getVar (Variable ioRef) = liftIO $ readIORef ioRef
 getVar (Constant x) = return x
 getVar (Property "length" var) = do
-  val <- getVar var
-  case val of
-    SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
-    SString s -> return $ SInteger $ toInteger $ length s
-    x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
+  case var of
+    StorageItem p -> getVar . StorageItem $ p ++ [MS.Field "length"]
+    _ -> do
+      val <- getVar var
+      case val of
+        SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
+        SString s -> return $ SInteger $ toInteger $ length s
+        x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
 getVar (UnsetMapItem _ _ valType) = return $ defaultValue valType
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress

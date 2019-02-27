@@ -419,17 +419,18 @@ expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath <- expToPath parent
-  idxExp <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
   idxType <- getIndexType parPath
-  idx <- case idxExp of
-            Constant val -> return val
-            Variable var -> liftIO $ readIORef var
-            _ -> error $ "TODO(tim): read from " ++ show idxExp
+  idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
+  idx <- getVar idxVar
   return . (parPath ++) $ case (idxType, idx) of
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
     (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
     p -> error $ "TODO(tim): unsupported index combination: " ++ show p
+expToPath (Xabi.MemberAccess parent field) = do
+  parPath <- expToPath parent
+  return $ parPath ++ [MS.Field $ BC.pack field]
+
 expToPath x = error $ "TODO(tim): expToPath: " ++ show x
 
 
@@ -481,7 +482,6 @@ expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove th
 expToVar (Xabi.MemberAccess expr name) = do
   var <- expToVar expr
   val <- getVar var
-
   when trace $ liftIO $ putStrLn $ "         val = " ++ show val
 
   case (val, name) of
