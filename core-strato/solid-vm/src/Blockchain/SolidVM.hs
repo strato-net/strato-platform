@@ -130,7 +130,7 @@ create' creator name argExps = do
     let (k, v) = case initialValue of
                     SArray{} -> (fieldName [MS.Field "length"], MS.BInteger 0)
                     SMap{} ->      (fieldName [], MS.BDefault)
-                    x ->           (fieldName [], toBasic $ traceShowId x)
+                    x ->           (fieldName [], toBasic x)
     putSolidStorageKeyVal' address k v
   popCallInfo
 
@@ -419,13 +419,11 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
                 SInteger i -> return i
                 _ -> error "TODO(tim): non-integer in int map position"
             _ -> error "TODO(tim): non constant/variable in int map position"
-          traceShowM (idxExp, n)
           return $ MS.MapIndex (MS.INum n)
         Just Xabi.VariableDecl {Xabi.varType=Xabi.Mapping{Xabi.key=Xabi.String{}}} -> do
           return $ MS.MapIndex (MS.IText $ error "TODO(tim): INum")
         Just v -> error $ "TODO(tim): vardec " ++ show v
     _ -> error "TODO(tim): deeper previous paths"
-  traceShowM (parPath, idxExp, endPath)
   return $ parPath ++ [endPath]
 expToPath x = error $ "TODO(tim): expToPath: " ++ show x
 
@@ -528,8 +526,7 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     _ -> return $ Property name var
 
-expToVar x@(Xabi.IndexAccess e (Just iExp)) = do
-  traceShowM x
+expToVar (Xabi.IndexAccess e (Just iExp)) = do
   var <- expToVar e
   val <- getVar var
   iVal <- getVar =<< expToVar iExp

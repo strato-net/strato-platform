@@ -86,7 +86,18 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - SolidVM.Solidity.Parse.File
   ghc-options: -Wall -O2
+
+executables:
+  parse-solidvm:
+    source-dirs: exec_src
+    main: Parse.hs
+    dependencies:
+      - solid-vm
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+
 
 tests:
   solid-vm-spec:

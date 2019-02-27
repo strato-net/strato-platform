@@ -79,6 +79,7 @@ forStatement = do
 variableDefinitionStatement :: SolidityParser SimpleStatement
 variableDefinitionStatement = do
   theType <- ((reserved "var" >> return Nothing) <|> Just <$> simpleTypeExpression)
+  _ <- optional $ reserved "memory"
   names <- fmap ((:[]) . Just) identifier <|> parens (commaSep2 $ optionMaybe identifier)
   expr <- optionMaybe (reservedOp "=" >> expression)
   return $ VariableDefinition theType names expr
