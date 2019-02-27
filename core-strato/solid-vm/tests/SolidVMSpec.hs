@@ -170,3 +170,7 @@ spec = do
       getAll [ [Field "xs", Field "length"]
              , [Field "y"]
              ] `shouldReturn` [BInteger 0x400, BInteger 0x400]
+
+    it "can delete" . runTest $ do
+      runCreate "testdata/Delete.sol" `shouldReturn` defaultExecResults
+      getAll [[Field "x"]] `shouldReturn` [BDefault]
