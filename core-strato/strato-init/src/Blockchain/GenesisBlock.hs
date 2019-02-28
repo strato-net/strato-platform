@@ -26,7 +26,7 @@ import qualified Data.Text                                    as T
 import           System.Directory
 
 import           Blockchain.BackupBlocks
-import qualified Blockchain.Data.Action                       as A
+import qualified Blockchain.Strato.Model.Action                       as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs

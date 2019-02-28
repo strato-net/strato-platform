@@ -25,7 +25,7 @@ import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
 import           GHC.Generics
 
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
