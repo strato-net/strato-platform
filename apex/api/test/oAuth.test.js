@@ -70,12 +70,13 @@ describe('OAuth tests', function () {
 
 
   it('replies Bad Request without headers', async function () {
-    chai.request(app)
-        .post('/login')
-        .catch((err) => {
-          const res = err.response;
-          assert.equal(res.status, RestStatus.BAD_REQUEST,'bad request, no headers');
-        });
+    await assert.shouldThrowRest(
+        async function () {
+          chai.request(app)
+              .post('/login')
+        }, RestStatus.BAD_REQUEST
+    )
+
   });
 
 

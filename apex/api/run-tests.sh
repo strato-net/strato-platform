@@ -32,6 +32,7 @@ if [ "$NODE_ENV" == development ]; then
   export blocRoot=${BLOC_HOST}/bloc/v2.2
   export stratoRoot=${STRATO_HOST}/eth/v1.2
   export vaultRoot=${VAULT_HOST}/strato/v2.3
+  export postgresPort=${POSTGRES_PORT:-5432}
 
   export PG_HOST=localhost
   export PG_PORT=5432

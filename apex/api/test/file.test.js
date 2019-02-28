@@ -45,10 +45,11 @@ const waitFaucet = async function (address) { //fixme - function duplicated in m
 chai.use(chaiHttp);
 
 describe('File - ExternalStorage', function () {
-  this.timeout(20000);
+  this.timeout(200000);
 
   const userData = testFactory.getUserData();
-  
+  const uploadData = testFactory.getUploadData()
+
   let _contractAddress, userAccountAddress, app;
   
   
@@ -72,6 +73,7 @@ describe('File - ExternalStorage', function () {
         });
 
     if(user && user.status == RestStatus.OK){ //user found, yay
+      await createTestContract();
       return;
     }
 
@@ -85,23 +87,17 @@ describe('File - ExternalStorage', function () {
     if(result.status == RestStatus.OK){ //user created, faucet em
       userAccountAddress = result.body.user.address;
       await waitFaucet(userAccountAddress);
+      await createTestContract();
     }
 
   });
 
 
 
+
   describe('post /bloc/file/upload', async function () {
 
     beforeEach(function () {
-      let uploadData = {
-        ETag: '"123b0b7aef8ba5d26ac7cab3438837f9"',
-        Location: 'https://strato-external-storage.s3.amazonaws.com/1530596484075-Rie1vaW.png',
-        key: '1530596484075-Rie1vaW.png',
-        Key: '1530596484075-Rie1vaW.png',
-        Bucket: 'strato-external-storage'
-      };
-
       sinon.stub(uploader, 'upload').resolves(uploadData);
     });
 
@@ -110,14 +106,14 @@ describe('File - ExternalStorage', function () {
     })
 
     it('replies Bad Request without content', async function () {
-      chai.request(app)
-        .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME',userData.userName)
-          .set('X-USER-ID',userData.hash)
-        .catch((err) => {
-          const res = err.response;
-          assert.equal(res.status, RestStatus.BAD_REQUEST);
-        });
+      await assert.shouldThrowRest(
+          async function () {
+            chai.request(app)
+                .post('/bloc/file/upload')
+                .set('X-USER-UNIQUE-NAME',userData.userName)
+                .set('X-USER-ID',userData.hash)
+          }, RestStatus.BAD_REQUEST
+      )
     });
 
     it('replies Bad Request without content', async function () {
@@ -133,36 +129,30 @@ describe('File - ExternalStorage', function () {
     });
 
     it('replies OK with file uplaod and data entry', async function () {
-      console.log('=============')
-      console.log('=============')
-      console.log('=============')
       const username = userData.userName;
       const result = await chai.request(app)
         .post('/bloc/file/upload')
           .set('X-USER-UNIQUE-NAME',userData.userName)
           .set('X-USER-ID',userData.hash)
-          //.field('username', username)
-          //.field('address', accountAddress)
-          //.field('password', 'password')
           .field('metadata', 'Nature Pics')
           .field('provider', 's3')
           .attach('content', './test/testdata/testImage.png')
           .type('form')
 
       expect(result).to.have.status(RestStatus.OK);
-      // all the below testcases are dependent on contractAddress assigned here
-      _contractAddress = result.body.contractAddress;
     });
 
     it('replies UNAUTHORIZED with invalid headers', async function () {
-      await chai.request(app)
-        .post('/bloc/file/upload')
-          .field('metadata', 'Nature Pics')
-          .field('provider', 's3')
-          .attach('content', './test/testdata/testImage.png')
-          .type('form').catch(error => {
-            assert.equal(error.status, RestStatus.UNAUTHORIZED);
-          })
+      await assert.shouldThrowRest(
+          async function () {
+            await chai.request(app)
+                .post('/bloc/file/upload')
+                .field('metadata', 'Nature Pics')
+                .field('provider', 's3')
+                .attach('content', './test/testdata/testImage.png')
+                .type('form')
+          }, RestStatus.INTERNAL_SERVER_ERROR
+      )
     });
 
     describe('rejects', async function () {
@@ -175,42 +165,39 @@ describe('File - ExternalStorage', function () {
         externalStorage.uploadContract.restore();
       })
 
-      it('throws 500', async function () {
-        await chai.request(app)
-          .post('/bloc/file/upload')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
-            .set('X-USER-ID',userData.hash)
-            .field('username', userData.userName)
-            .field('address', accountAddress)
-            .field('password', 'password')
-            .field('metadata', 'Nature Pics')
-            .field('provider', 's3')
-            .attach('content', './test/testdata/testImage.png')
-            .type('form')
-            .catch((err) => {
-              const res = err.response;
-              assert.equal(res.status, '500');
-            });
+      it('throws INTERNAL_SERVER_ERROR', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .post('/bloc/file/upload')
+                  .set('X-USER-UNIQUE-NAME',userData.userName)
+                  .set('X-USER-ID',userData.hash)
+                  .field('metadata', 'Nature Pics')
+                  .field('provider', 's3')
+                  .attach('content', './test/testdata/testImage.png')
+                  .type('form')
+            }, RestStatus.INTERNAL_SERVER_ERROR
+        )
       });
 
     });
 
   });
 
-  describe.skip('get /bloc/file/list', async function () {
+  describe('get /bloc/file/list', async function () {
 
-    it('replies 200 with list of uploads', async function () {
+    it('replies OK with list of uploads', async function () {
       const res = await chai.request(app)
         .get('/bloc/file/list')
           .set('X-USER-UNIQUE-NAME',userData.userName)
           .set('X-USER-ID',userData.hash)
 
-      assert.equal(res.status, '200');
+      assert.equal(res.status, RestStatus.OK);
     });
 
   });
 
-  describe.skip('get /bloc/file/verify', async function () {
+  describe('get /bloc/file/verify', async function () {
 
     describe('resolve', async function () {
       let storage;
@@ -220,7 +207,7 @@ describe('File - ExternalStorage', function () {
           uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
           timeStamp: 1530538131,
           signers: [
-            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
+            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad" //todo - where did string come from. put in factory
           ]
         };
 
@@ -231,43 +218,49 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('replies 400 with wrong query', async function () {
-        chai.request(app)
+      it('replies BAD_REQUEST with wrong query', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              chai.request(app)
+                  .get('/bloc/file/verify')
+                  .set('X-USER-UNIQUE-NAME',userData.userName)
+                  .set('X-USER-ID',userData.hash)
+                  .query({
+                    'contractAddress': null
+                  })
+                  .catch((err) => {
+                    const res = err.response;
+                    assert.equal(res.status, RestStatus.BAD_REQUEST);
+                  });
+            }, RestStatus.BAD_REQUEST
+        )
+      });
+
+      it('replies BAD_REQUEST with no data exists', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              chai.request(app)
+                  .get('/bloc/file/verify')
+                  .set('X-USER-UNIQUE-NAME',userData.userName)
+                  .set('X-USER-ID',userData.hash)
+                  .query({
+                    'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+                  })
+            }, RestStatus.BAD_REQUEST
+        )
+      });
+
+      it('replies OK with data exists', async function () {
+        const res = await chai.request(app)
           .get('/bloc/file/verify')
             .set('X-USER-UNIQUE-NAME',userData.userName)
             .set('X-USER-ID',userData.hash)
-          .query({
-            'contractAddress': null
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, '400');
-          });
-      });
-
-      it('replies 400 with no data exists', async function () {
-        chai.request(app)
-          .get('/bloc/file/verify')
-          .query({
-            'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, '400');
-          });
-      });
-
-      it('replies 200 with data exists', async function () {
-        const res = await chai.request(app)
-          .get('/bloc/file/verify')
-          .query({
-            'contractAddress': _contractAddress
-          })
+            .query({
+              'contractAddress': _contractAddress
+            })
 
         assert.deepEqual(res.body, storage);
-        assert.equal(res.status, '200');
+        assert.equal(res.status, RestStatus.OK);
       });
     });
 
@@ -281,23 +274,25 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws 500', async function () {
-        await chai.request(app)
-          .get('/bloc/file/verify')
-          .query({
-            'contractAddress': _contractAddress
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert.equal(res.status, '500');
-          });
+      it('throws INTERNAL_SERVER_ERROR', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .get('/bloc/file/verify')
+                  .set('X-USER-UNIQUE-NAME', userData.userName)
+                  .set('X-USER-ID', userData.hash)
+                  .query({
+                    'contractAddress': _contractAddress
+                  })
+            }, RestStatus.INTERNAL_SERVER_ERROR
+        )
       });
 
     });
 
   });
 
-  describe.skip('post /bloc/file/attest', async function () {
+  describe('post /bloc/file/attest', async function () {
 
     describe('resolve', async function () {
       let storage;
@@ -307,7 +302,7 @@ describe('File - ExternalStorage', function () {
           uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
           timeStamp: 1530538131,
           signers: [
-            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
+            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad" //todo - factory
           ]
         };
 
@@ -320,62 +315,58 @@ describe('File - ExternalStorage', function () {
         externalStorage.attest.restore();
       })
 
-      it('replies Bad Request without username, address, password, contractAddress', async function () {
+      it('missing headers', async function () {
         chai.request(app)
           .post('/bloc/file/attest')
           .catch((err) => {
             const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, '400');
+            assert.equal(res.status, RestStatus.UNAUTHORIZED);
           });
       });
 
-      it('replies 400 with no data exists', async function () {
+      it('replies BAD_REQUEST with no data exists', async function () {
         chai.request(app)
           .post('/bloc/file/attest')
-          .send({
-            contractAddress: 'a51f27e78aef85a06631f0725f380001e0a',
-            username: 'test1@mailinator.com',
-            password: 'password',
-            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Contract address not found"));
-            assert.equal(res.status, '400');
-          });
+            .set('X-USER-UNIQUE-NAME',userData.userName)
+            .set('X-USER-ID',userData.hash)
+            .send({
+              contractAddress: 'a51f27e78aef85a06631f0725f380001e0a',
+            })
+            .catch((err) => {
+              const res = err.response;
+              assert(res.text.includes("Contract address not found"));
+              assert.equal(res.status, RestStatus.BAD_REQUEST);
+            });
       });
 
-      it('replies 200 with valid data', async function () {
+      it('replies OK with valid data', async function () {
         const res = await chai.request(app)
           .post('/bloc/file/attest')
-          .send({
-            contractAddress: _contractAddress,
-            username: 'test1@mailinator.com',
-            password: 'password',
-            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
-          })
+            .set('X-USER-UNIQUE-NAME',userData.userName)
+            .set('X-USER-ID',userData.hash)
+            .send({
+              contractAddress: _contractAddress,
+            })
 
         assert.deepEqual(
           { attested: true, signers: ['6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad', 'a51f27e78aef85a06631f0725f380001e0ae9fb6'] },
           res.body
         )
-        assert.equal(res.status, '200');
+        assert.equal(res.status, RestStatus.OK);
       });
 
       it('replies 400 with signer already exists', async function () {
-        await chai.request(app)
-          .post('/bloc/file/attest')
-          .send({
-            contractAddress: _contractAddress,
-            username: 'test1@mailinator.com',
-            password: 'password',
-            address: '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert.equal(res.status, '400');
-          });
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .post('/bloc/file/attest')
+                  .set('X-USER-UNIQUE-NAME',userData.userName)
+                  .set('X-USER-ID',userData.hash)
+                  .send({
+                    contractAddress: _contractAddress,
+                  })
+            },
+            RestStatus.BAD_REQUEST);
       });
 
     });
@@ -390,26 +381,24 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws 500', async function () {
-        await chai.request(app)
-          .post('/bloc/file/attest')
-          .send({
-            contractAddress: _contractAddress,
-            username: 'test1@mailinator.com',
-            password: 'password',
-            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Internal server error"));
-            assert.equal(res.status, '500');
-          });
+      it('throws INTERNAL SERVER ERROR', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .post('/bloc/file/attest')
+                  .set('X-USER-UNIQUE-NAME',userData.userName)
+                  .set('X-USER-ID',userData.hash)
+                  .send({
+                    contractAddress: _contractAddress,
+                  })
+            }, RestStatus.INTERNAL_SERVER_ERROR
+        )
       });
 
     });
   });
 
-  describe.skip('get /bloc/file/download ', async function () {
+  describe('get /bloc/file/download ', async function () {
 
     describe('resolve', async function () {
       let storage;
@@ -430,40 +419,38 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('replies 400 with wrong query', async function () {
-        await chai.request(app)
-          .get('/bloc/file/download')
-          .query({
-            'contractAddress': null
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, '400');
-          });
+      it('replies BAD_REQUEST with wrong query', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .get('/bloc/file/download')
+                  .query({
+                    'contractAddress': null
+                  })
+            }, RestStatus.BAD_REQUEST
+        )
       });
 
-      it('replies 400 with contractAddress not exists', async function () {
-        chai.request(app)
-          .get('/bloc/file/download')
-          .query({
-            'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("wrong params"));
-            assert.equal(res.status, '400');
-          });
+      it('replies BAD_REQUEST with contractAddress not exists', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              chai.request(app)
+                  .get('/bloc/file/download')
+                  .query({
+                    'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+                  })
+            }, RestStatus.BAD_REQUEST
+        )
       });
 
-      it('replies 200 with data exists', async function () {
+      it('replies OK with data exists', async function () {
         const res = await chai.request(app)
           .get('/bloc/file/download')
           .query({
             'contractAddress': _contractAddress
           })
 
-        assert.equal(res.status, '200');
+        assert.equal(res.status, RestStatus.OK);
       });
 
     });
@@ -478,21 +465,39 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws 500', async function () {
-        let res = await chai.request(app)
-          .get('/bloc/file/download')
-          .query({
-            'contractAddress': _contractAddress
-          })
-          .catch((err) => {
-            const res = err.response;
-            assert(res.text.includes("Internal server error"));
-            assert.equal(res.status, '500');
-          });
+      it('throws INTERNAL SERVER ERROR', async function () {
+        await assert.shouldThrowRest(
+            async function () {
+              await chai.request(app)
+                  .get('/bloc/file/download')
+                  .query({
+                    'contractAddress': _contractAddress
+                  })
+            }, RestStatus.INTERNAL_SERVER_ERROR
+        )
       });
 
     });
 
   });
 
+  async function createTestContract(){
+
+    sinon.stub(uploader, 'upload').resolves(uploadData);
+
+    const username = userData.userName;
+    const uploadResult = await chai.request(app)
+        .post('/bloc/file/upload')
+        .set('X-USER-UNIQUE-NAME',userData.userName)
+        .set('X-USER-ID',userData.hash)
+        .field('metadata', 'Nature Pics')
+        .field('provider', 's3')
+        .attach('content', './test/testdata/testImage.png')
+        .type('form')
+
+    _contractAddress = uploadResult.body.contractAddress;
+
+    uploader.upload.restore();
+
+  }
 });

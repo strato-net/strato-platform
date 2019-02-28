@@ -40,20 +40,19 @@ function* compileSearch() {
 
 // ================== contract methods ====================
 function* attest(user, contractAddress, args) {
-  rest.verbose('attest', args);
   let contract = {
     name: contractName,
     address: contractAddress
   }
   // function attest(bytes32 _signature) public view returns(bytes32[]) {
   const method = 'attest';
-  const result = yield rest.callMethod(user, contract, method, args);
+  const result = yield callMethodOAuth(user, contract, method, args);
   return result;
 }
 
 // ================== wrapper methods ====================
 function* getExternalStorage(address) {
-  const results = (yield rest.waitQuery(`${contractName}?address=eq.${address}`, 1, 3 * 60 * 1000))[0];
+  const results = (yield waitQuery(`${contractName}?address=eq.${address}`, 1, 3 * 60 * 1000))[0];
   return results;
 }
 
@@ -109,7 +108,7 @@ function chainResolveQuery(chainId, resolve) {
  * @param{Object} options the optional arguments {doNotResolve: Boolean, txParams: Object, chainId: Number, node: Number, enableHistory: Boolean, enableIndex: Boolean}
  * @returns{()} doNotResolve=true: [transaction hash] (String), doNotResolve=false: [uploaded contract details]
  */
-function* uploadContractString(user, contractName, contractSrc, args, options={}) {
+function* uploadContractString(userHeaders, contractName, contractSrc, args, options={}) {
     args = args || {};
     const txParams = options.txParams || {};
     const txs = [{
@@ -128,7 +127,7 @@ console.log(' pre call ')
     let result = yield sendTransactions({
       txs,
       txParams,
-    }, user, !options.doNotResolve, options.chainId, options.node)
+    }, userHeaders, !options.doNotResolve, options.chainId, options.node)
         .catch(function(e) {
             throw (e instanceof Error) ? e : new HttpError(e);
         });
@@ -176,6 +175,125 @@ console.log('=====================================')
 }
 
 
+function* callMethodOAuth(userHeaders, contract, methodName, args, options={}) {
+  return yield callOAuth(userHeaders, contract, methodName, args, options);
+}
+
+/**
+ * This function calls a method from a users contract with given args for OAuth flow.
+ * @method{callOAuth}
+ * @param{String} token the contract owner's token
+ * @param{String} contract the target contract
+ * @param{String} methodName the target method
+ * @param{Object} args the arguments to be supplied to the targer method
+ * @param{Object} options the optional arguments {value: Number, doNotResolve: Boolean, chainId: Number, node: Number, enableHistory: Boolean, enableIndex: Boolean}
+ * @returns{()} doNotResolve=true: [transaction hash] (String), doNotResolve=false: [method call return vals] (String|Int)
+ */
+function* callOAuth(userHeaders, contract, methodName, args, options={}) {
+  args = args || {};
+  const value = options.value || 0;
+  const valueFixed = (value instanceof BigNumber) ? value.toFixed(0) : value;
+
+  const txs = [{
+    payload: {
+      contractName: contract['name'],
+      contractAddress: contract['address'],
+      value: valueFixed,
+      method: methodName,
+      args: args,
+      metadata: constructMetadata(options, contract['name'])
+    },
+    type: 'FUNCTION'
+  }];
+
+  const result = yield api.strato23.sendTransactions({
+    txs: txs,
+  }, userHeaders, !options.doNotResolve, options.chainId, options.node)
+      .catch(function(e) {
+        throw (e instanceof Error) ? e : new HttpError(e);
+      });
+
+  // When options.doNotResolve=false, expect bloc to only return once transaction has either succeeded or failed.
+  // When options.doNotResolve=true, bloc will return the transaction hash immediately, and it is the caller's responsibility to check it.
+  if(!options.doNotResolve) {
+
+    const resolvedResults = yield resolveResult(result, options);
+
+    if(resolvedResults[0].status === constants.FAILURE) {
+      throw new HttpError400(result[0].txResult.message);
+    }
+    return result[0].data.contents;
+  }
+  return result[0].hash;
+}
+
+function* waitQuery(queryString, count, timeoutMilli, node) {
+  if (count <= 0 ) throw new Error('waitQuery: illegal count');
+  const predicate = function(results) {
+    // abort if exceeded the count - unexpected records exist
+    if (results.length > count) {
+      throw new Error(`waitQuery: query results count ${results.length} exceed expected count ${count}`);
+    }
+    // count reached - done
+    if (results.length == count) {
+      return true;
+    }
+    // count not reached - sleep
+    verbose('waitQuery', `query results count ${results.length}, expected count ${count}`);
+    return false;
+  }
+
+  const res = yield queryUntil(queryString, predicate, timeoutMilli, node);
+  return res;
+}
+
+function* queryUntil(queryString, predicate, timeoutMilli, node) {
+  if (queryString === undefined) throw new Error('queryUntil: queryString undefined');
+  const action = function*(n) {
+    let res;
+    try {
+      res = yield query(queryString, n);
+    }
+    catch(e) {
+      // 404 is an acceptable response, since the table may not yet exist
+      if(!e.status || e.status != 404) {
+        throw e;
+      }
+      res = [];
+    }
+    return res;
+  }
+  const res = yield until(predicate, action, timeoutMilli, node);
+  return res;
+}
+
+function* until(predicate, action, timeoutMilli, node) {
+  if (timeoutMilli === undefined) timeoutMilli = 60*1000;
+  const phi = 1.618;
+  let dt = 100;
+  let totalSleep = 0;
+  while (totalSleep < timeoutMilli) {
+    const result = yield action(node);
+
+    if (predicate(result)) {
+      return result;
+    } else {
+      yield promiseTimeout(dt);
+      totalSleep += dt;
+      dt *= phi;
+    }
+  }
+  // retries exceeded - timeout
+  throw new Error(`until: timeout ${timeoutMilli}ms exceeded`);
+}
+
+function promiseTimeout(timeout) {
+  return new Promise(function(resolve, reject) {
+    setTimeout(function() {
+      resolve();
+    }, timeout);
+  });
+}
 
 /**
  * This function constructes metadata that can be used to control the history and index flags
@@ -281,6 +399,6 @@ class HttpError extends Error {
 module.exports = {
   compileSearch: compileSearch,
   uploadContract: uploadContract,
-  attest: attest,
-  getExternalStorage: getExternalStorage
+  attest,
+  getExternalStorage,
 };
