@@ -2,6 +2,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+module SolidVMSpec where
+
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
@@ -26,11 +28,6 @@ import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Executable.EVMFlags() -- for HFlags
 import SolidVM.Model.Storable
-
-main :: IO ()
-main = do
-  void $ $initHFlags "solid vm spec"
-  hspec spec
 
 sender :: Address
 sender = 0xdeadbeef
@@ -303,3 +300,14 @@ contract qq {
   }
 }|]
       getAll [ [Field "x"], [Field "y"]] `shouldReturn` [BInteger 100, BInteger 100]
+
+    it "can decrement" . runTest $ do
+      liftIO $ pendingWith "Needs to parse x--"
+      void $ runBS [r|
+contract qq {
+  uint x;
+  constructor() {
+    x--;
+  }
+}|]
+      getAll [[Field "x"]] `shouldReturn` [BInteger (-1)]

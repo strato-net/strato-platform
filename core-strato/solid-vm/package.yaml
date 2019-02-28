@@ -87,6 +87,8 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - SolidVM.Solidity.Parse.File
+    - SolidVM.Solidity.Parse.Statement
+    - SolidVM.Solidity.Xabi.Statement
   ghc-options: -Wall -O2
 
 executables:
@@ -102,7 +104,7 @@ executables:
 tests:
   solid-vm-spec:
     source-dirs: tests/
-    main: SolidVMSpec.hs
+    main: Main.hs
     dependencies:
       - base16-bytestring
       - hflags
