@@ -8,6 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
+
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -773,6 +774,8 @@ callBuiltin "push" [v] (Just o) = do
   error $ "push undefined for args: " ++ show v ++ ", " ++ show o
 callBuiltin "identity" [v] Nothing = do
   return v
+callBuiltin "keccak256" [SString buf] Nothing = do
+  return . SString . BC.unpack . keccak256 . BC.pack $ buf
 callBuiltin x _ _ = error $ "callBuiltin called for an unknown function: " ++ x
 
 

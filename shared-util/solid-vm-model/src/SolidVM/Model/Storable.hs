@@ -28,7 +28,7 @@ import           Blockchain.Strato.Model.Address
 
 
 data BasicValue = BInteger Integer
-                | BString T.Text
+                | BString B.ByteString
                 | BBool Bool
                 | BAddress Address
                 | BEnumVal T.Text T.Text

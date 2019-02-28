@@ -8,10 +8,12 @@ import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Text.Encoding
 import HFlags
 import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
@@ -95,7 +97,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "Struct literal parsing, storage vs memory, multiline statements\
+      liftIO $ pendingWith "storage vs memory, multiline statements\
                            \ and address map keys need to be supported"
       runFile "testdata/Ballot.sol" `shouldReturn` defaultExecResults
 
@@ -202,14 +204,13 @@ spec = do
       void $ runFile "testdata/AddressMapping.sol"
 
     it "can hash correctly" . runTest $ do
-      liftIO $ pendingWith "keccak256 selection"
       void $ runFile "testdata/Keccak256.sol"
       let input = map (\t -> [Field t]) ["buf1", "buf2", "hash1", "hash2"]
       getAll input `shouldReturn`
-        [ BString (T.replicate 32 "\xfe")
-        , BString (T.replicate 32 "x")
-        , BString "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a"
-        , BString "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868"
+        [ BString (B.replicate 32 0xfe)
+        , BString (BC.replicate 32 'x')
+        , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
+        , BString (fst $ B16.decode "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
         ]
 
     it "can create a struct" . runTest $ do

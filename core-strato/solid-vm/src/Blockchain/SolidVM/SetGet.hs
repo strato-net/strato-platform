@@ -22,7 +22,7 @@ fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BDefault -> SDefault
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . T.unpack $ s
+  MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
   MS.BEnumVal k t -> SEnumVal (T.unpack k) (T.unpack t)
@@ -30,7 +30,7 @@ fromBasic = \case
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
   SInteger i -> MS.BInteger i
-  SString s -> MS.BString (T.pack s)
+  SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
   SAddress a -> MS.BAddress a
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
