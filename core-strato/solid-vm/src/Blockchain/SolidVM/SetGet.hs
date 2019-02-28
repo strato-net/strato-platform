@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.SolidVM.SetGet where
 
-import           Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -64,7 +63,6 @@ setVar (UnsetMapItem mapVariable key _) val = do
   setVar mapVariable $ SMap valType $ M.insert key newVar theMap
 
 setVar (StorageItem key) val = do
-  traceShowM ("setVarStorage" :: String, key, val)
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
   currentAddress' <- getCurrentAddress
@@ -73,11 +71,9 @@ setVar (StorageItem key) val = do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
-        traceShowM ("Looping over storage. What if its not stored?"::String)
         val' <- case var of
           Constant x -> return $ toBasic x
           _ -> getSolidStorageKeyVal' currentAddress' srcKey
-        traceShowM (suffix, srcKey, dstKey, val')
         putSolidStorageKeyVal' currentAddress' dstKey val'
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 

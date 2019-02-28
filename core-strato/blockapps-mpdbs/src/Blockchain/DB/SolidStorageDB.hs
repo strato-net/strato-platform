@@ -8,7 +8,6 @@ module Blockchain.DB.SolidStorageDB (
   flushMemSolidStorageDB
   ) where
 
-import Debug.Trace
 import           Data.Bifunctor                              (second)
 import qualified Data.ByteString                             as B
 
@@ -35,15 +34,10 @@ fromVal :: B.ByteString -> BasicValue
 fromVal = rlpDecode . rlpDeserialize
 
 putSolidStorageKeyVal' :: FullSolidStorage m => Address -> StoragePath -> BasicValue -> m ()
-putSolidStorageKeyVal' addr key val = do
-  traceShowM ("putSolidStorage: ", key, val)
-  putRawStorageKeyVal' addr (toKey key) (toVal val)
+putSolidStorageKeyVal' addr key val = putRawStorageKeyVal' addr (toKey key) (toVal val)
 
 getSolidStorageKeyVal' :: FullSolidStorage m => Address -> StoragePath -> m BasicValue
-getSolidStorageKeyVal' addr key = do
-  v <- fromVal <$> getRawStorageKeyVal' addr (toKey key)
-  traceShowM ("getSolidStorage: ", key, v)
-  return v
+getSolidStorageKeyVal' addr key = fromVal <$> getRawStorageKeyVal' addr (toKey key)
 
 getAllSolidStorageKeyVals' :: FullSolidStorage m => Address -> m [(MP.Key, BasicValue)]
 getAllSolidStorageKeyVals' addr = map (second fromVal) <$> getAllRawStorageKeyVals' addr

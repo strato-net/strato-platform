@@ -4,7 +4,6 @@
 
 module Blockchain.SolidVM.SM where
 
-import Debug.Trace
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -286,7 +285,6 @@ getVariableOfName name = do
 
 getTypeOfName :: String -> SM Typo
 getTypeOfName s = do
-  traceShowM s
   let lookInContract :: Contract -> [Typo]
       lookInContract (Contract{..}) = catMaybes
         [ fmap StructTypo (M.lookup s _structs)
@@ -294,7 +292,6 @@ getTypeOfName s = do
         , fmap FuncTypo (M.lookup s _functions)
         ]
   CodeCollection ccs <- gets codeCollection
-  traceShowM ccs
   case concatMap lookInContract ccs of
     [] -> error $ "TODO(tim): unable to find type: " ++ show s
     (typo:_) -> return typo

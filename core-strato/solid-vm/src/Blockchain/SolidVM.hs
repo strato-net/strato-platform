@@ -8,7 +8,6 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -279,7 +278,6 @@ runStatements (s:rest) = do
     if True
     then liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
     else liftIO $ putStrLn $ C.green $ "statement> " ++ show s
-  traceShowM s
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -322,12 +320,6 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   return Nothing -- just throw away the return value
 
 runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybeExpression)) = do
-  -- traceShowM (mType, varNames, maybeExpression)
-  -- t' <- case t of
-  --         Nothing -> error "TODO(tim): typeless var"
-  --         Just (Xabi.Label t') -> getTypeOfName t'
-  --         Just x -> error $ "TODO(tim): what could this be?: " ++ show x
-  -- traceShowM t'
   value <-
     case maybeExpression of
       Just e -> getVar =<< expToVar e
@@ -366,7 +358,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
       initializeStruct = mapM initializeField . M.mapKeys T.unpack . M.fromList
 
       initializeField :: Xabi.FieldType -> SM Variable
-      initializeField = fmap Variable . liftIO . newIORef . traceShowId . defaultValue . traceShowId . Xabi.fieldTypeType
+      initializeField = fmap Variable . liftIO . newIORef . defaultValue . Xabi.fieldTypeType
 
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
@@ -681,8 +673,7 @@ expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName)) args)
   execResults <- create' creator contractName argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
 
-expToVar x@(Xabi.FunctionCall e args) = do
-  traceShowM ("FunctionCall"::String, x)
+expToVar (Xabi.FunctionCall e args) = do
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
   case var of
@@ -697,12 +688,9 @@ expToVar x@(Xabi.FunctionCall e args) = do
         Nothing -> return $ Constant $ SNULL
 
     Constant (SStructDef structName) -> do
-      traceShowM ("StructDef"::String, structName)
       contract' <- getCurrentContract
       let vals = fromMaybe (error $ "code refers to a struct that does not exist in the contract: " ++ structName) $ M.lookup structName $ contract'^.structs
-      let st = Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
-      traceShowM st
-      return st
+      return $ Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
 
     Constant (SContractDef contractName) -> do
       case argVals of
@@ -733,13 +721,11 @@ expToVar x@(Xabi.FunctionCall e args) = do
         _ -> error "called enum constructor with improper args"
 
     Property "push" var' -> do
-      traceShowM (var', argVals)
       let prefix' = case var' of
                         StorageItem [MS.Field f] -> [MS.Field f]
                         _ -> error $ "unimplemented array access: " ++ show var'
           lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
-      traceShowM len'
       let len ::Int = case len' of
                         SInteger b -> fromInteger b
                         SDefault -> 0
@@ -748,9 +734,7 @@ expToVar x@(Xabi.FunctionCall e args) = do
       let idxPath = prefix' ++ [MS.ArrayIndex len]
       setVar (StorageItem lenPath) newLen
       case argVals of
-        [av] -> do
-          traceShowM ("setVar" ::String, idxPath, av)
-          setVar (StorageItem idxPath) av
+        [av] -> setVar (StorageItem idxPath) av
         _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
       return $ Constant newLen
 
