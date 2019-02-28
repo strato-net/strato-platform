@@ -7,7 +7,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -314,12 +314,28 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition _ varNames maybeExpression)) = do  -- TODO- figure out if we want types, I am currently ignoring them
-
+runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybeExpression)) = do
+  -- traceShowM (mType, varNames, maybeExpression)
+  -- t' <- case t of
+  --         Nothing -> error "TODO(tim): typeless var"
+  --         Just (Xabi.Label t') -> getTypeOfName t'
+  --         Just x -> error $ "TODO(tim): what could this be?: " ++ show x
+  -- traceShowM t'
   value <-
     case maybeExpression of
       Just e -> getVar =<< expToVar e
-      Nothing -> return SNULL
+      Nothing ->
+        case varNames of
+           [Just name] ->
+             case mType of
+               Nothing -> error $ "TODO(tim): type inference not implemented"
+               Just (Xabi.Label l) -> do
+                 t' <- getTypeOfName l
+                 case t' of
+                    StructTypo fs ->  SStruct name <$> initializeStruct fs
+                    _ -> error $ "TODO(tim): initialize type " ++ show t'
+               Just t -> error $ "TODO(tim): " ++ show t
+           _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
 
   when trace $ do
     valueString <- showSM value
@@ -338,6 +354,13 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition _ varNames maybeExpr
     _ -> error "VariableDefinition expected a tuple, but the returned value was not one"
 
   return Nothing
+    where
+      initializeStruct :: [(T.Text, Xabi.FieldType)] -> SM (M.Map String Variable)
+      initializeStruct = mapM initializeField . M.mapKeys T.unpack . M.fromList
+
+      initializeField :: Xabi.FieldType -> SM Variable
+      initializeField = fmap Variable . liftIO . newIORef . traceShowId . defaultValue . traceShowId . Xabi.fieldTypeType
+
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getVar =<< expToVar condition
@@ -700,11 +723,14 @@ expToVar (Xabi.FunctionCall e args) = do
         _ -> error "called enum constructor with improper args"
 
     Property "push" var' -> do
+      traceShowM (var', argVals)
       let prefix' = case var' of
+
                         StorageItem [MS.Field x] -> [MS.Field x]
                         _ -> error $ "unimplemented array access: " ++ show var'
           lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
+      traceShowM len'
       let len ::Int = case len' of
                         SInteger b -> fromInteger b
                         SDefault -> 0
@@ -713,7 +739,9 @@ expToVar (Xabi.FunctionCall e args) = do
       let idxPath = prefix' ++ [MS.ArrayIndex len]
       setVar (StorageItem lenPath) newLen
       case argVals of
-        [av] -> setVar (StorageItem idxPath) av
+        [av] -> do
+          traceShowM ("setVar" ::String, idxPath, av)
+          setVar (StorageItem idxPath) av
         _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
       return $ Constant newLen
 

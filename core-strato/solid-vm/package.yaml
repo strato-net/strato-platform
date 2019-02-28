@@ -109,4 +109,5 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - monad-logger
+      - raw-strings-qq
       - solid-vm

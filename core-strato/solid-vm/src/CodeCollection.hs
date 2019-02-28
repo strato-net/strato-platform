@@ -17,7 +17,10 @@ import qualified SolidVM.Solidity.Xabi.Def as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
-
+data Typo = StructTypo [(T.Text, Xabi.FieldType)]
+          | EnumTypo [String]
+          | FuncTypo Func
+          deriving (Show)
 
 data Contract =
   Contract {
@@ -140,4 +143,4 @@ getFunction file contractName functionName =
 
     Just func = M.lookup functionName $ Xabi.xabiFuncs contract'
   in (functionName, func)
-    
+
