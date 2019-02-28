@@ -27,23 +27,24 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
       echo 'OAuth cannot be used with SMD_MODE=public'
       exit 4
     fi
-
-    if [ ${OAUTH_STRATO42_FALLBACK} = true ]; then
-      if [[ ${OAUTH_DISCOVERY_URL} = NULL ]] ; then
-        echo 'OAUTH_DISCOVERY_URL is required for OAuth in OAUTH_STRATO42_FALLBACK mode. Exit'
-        exit 7
-      fi
-    else
-      if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
-        echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
-        exit 5
-      fi
+    if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+      echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+      exit 5
     fi
-
     if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
     then
       echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
       exit 6
+    fi
+  else
+    # STRATO 4.2 OAuth init way compatibility
+    if [[ ${OAUTH_JWT_VALIDATION_ENABLED} = true && ${OAUTH_STRATO42_FALLBACK} = true ]]; then
+      if [ -z ${OAUTH_JWT_VALIDATION_DISCOVERY_URL} ] ; then
+        echo 'OAUTH_JWT_VALIDATION_DISCOVERY_URL is required for OAUTH_JWT_VALIDATION_ENABLED=true in OAUTH_STRATO42_FALLBACK mode. Exit'
+        exit 7
+      fi
+      OAUTH_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED}
+      OAUTH_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
     fi
   fi
 
