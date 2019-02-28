@@ -3,10 +3,12 @@
 module Main where
 
 import qualified Data.ByteString.Char8      as C8
+import qualified Data.ByteString.Base64     as B64
 import           Data.ByteString.Base16              as B16
 import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
+import           Debug.Trace
 import qualified Network.Haskoin.Crypto     as HK
 import           Servant.Client
 import           System.Console.GetOpt
@@ -96,12 +98,24 @@ fromOptRight (Left err) = error ("Input error: " ++ (show err) ++ "\n" ++ helpMe
 main :: IO()
 main = do
   opt <- parseArgs
-  pkey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-  let pk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ C8.pack pkey
-      sender = prvKey2Address pk
-  esign <- signBenfInfo pk (fromOptRight (optRecipient opt), (optRemove opt), fromOptRight (optNonce opt))
-  let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
-      vote = API.CandidateReceived{API.sender=sender
+  skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+  let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+      pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+      sender = prvKey2Address pkey
+  print sender
+  print (fromOptRight (optRecipient opt), not (optRemove opt), fromOptRight (optNonce opt))
+  esign <- signBenfInfo pkey (fromOptRight (optRecipient opt), not (optRemove opt), fromOptRight (optNonce opt))
+  print esign
+  let esignStr = traceShowId
+               . C8.unpack
+               . traceShowId
+               . B16.encode
+               . traceShowId
+               . rlpSerialize
+               . traceShowId
+               . rlpEncode $ esign
+  print esignStr
+  let vote = API.CandidateReceived{API.sender=sender
                                  , API.signature=esignStr
                                  , API.recipient= fromOptRight (optRecipient opt)
                                  , API.votingdir= not (optRemove opt)
