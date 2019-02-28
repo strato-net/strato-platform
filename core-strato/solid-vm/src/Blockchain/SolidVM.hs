@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 module Blockchain.SolidVM
     (
@@ -135,11 +136,16 @@ create' creator name argExps = do
         fieldName = (MS.Field (BC.pack n):)
     -- TODO: It might make more sense to just leave it at BDefault and
     -- determine the result from that
-    let (k, v) = case initialValue of
-                    SArray{} -> (fieldName [MS.Field "length"], MS.BInteger 0)
-                    SMap{} ->      (fieldName [], MS.BDefault)
-                    x ->           (fieldName [], toBasic x)
-    putSolidStorageKeyVal' address k v
+    kvs <- case initialValue of
+             SArray _ iv -> if V.null iv then return [(fieldName [MS.Field "length"], MS.BInteger 0)]
+                                         else error $ "TODO(tim): initilized array storage " ++ show initialValue
+             SMap _ im -> if M.null im then return [(fieldName [], MS.BDefault)]
+                                       else error $ "TODO(tim): initialize map storage " ++ show initialValue
+             SStruct _ fs -> forM (M.toList fs) $
+                 \(f, var) -> ((fieldName [MS.Field $ BC.pack f],) . toBasic) <$> getVar var
+
+             x -> return [(fieldName [], toBasic x)]
+    mapM_ (uncurry $ putSolidStorageKeyVal' address) kvs
   popCallInfo
 
   -- Run the constructor
@@ -273,6 +279,7 @@ runStatements (s:rest) = do
     if True
     then liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
     else liftIO $ putStrLn $ C.green $ "statement> " ++ show s
+  traceShowM s
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -674,7 +681,8 @@ expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName)) args)
   execResults <- create' creator contractName argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
 
-expToVar (Xabi.FunctionCall e args) = do
+expToVar x@(Xabi.FunctionCall e args) = do
+  traceShowM ("FunctionCall"::String, x)
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
   case var of
@@ -689,10 +697,12 @@ expToVar (Xabi.FunctionCall e args) = do
         Nothing -> return $ Constant $ SNULL
 
     Constant (SStructDef structName) -> do
+      traceShowM ("StructDef"::String, structName)
       contract' <- getCurrentContract
       let vals = fromMaybe (error $ "code refers to a struct that does not exist in the contract: " ++ structName) $ M.lookup structName $ contract'^.structs
-
-      return $ Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
+      let st = Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
+      traceShowM st
+      return st
 
     Constant (SContractDef contractName) -> do
       case argVals of
@@ -700,7 +710,7 @@ expToVar (Xabi.FunctionCall e args) = do
           return $ Constant $ SContract contractName address
         [SAddress (Address address)] ->
           return $ Constant $ SContract contractName $ toInteger address
-        x -> error $ "args wrong for contract variable creation: " ++ show x
+        _ -> error $ "args wrong for contract variable creation: " ++ show argVals
 
     Constant (SContractItem address itemName) -> do
       result <- call'' (Address $ fromInteger address) itemName argVals
@@ -725,8 +735,7 @@ expToVar (Xabi.FunctionCall e args) = do
     Property "push" var' -> do
       traceShowM (var', argVals)
       let prefix' = case var' of
-
-                        StorageItem [MS.Field x] -> [MS.Field x]
+                        StorageItem [MS.Field f] -> [MS.Field f]
                         _ -> error $ "unimplemented array access: " ++ show var'
           lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
@@ -734,7 +743,7 @@ expToVar (Xabi.FunctionCall e args) = do
       let len ::Int = case len' of
                         SInteger b -> fromInteger b
                         SDefault -> 0
-                        x -> error $ "Invalid length type: " ++ show x
+                        _ -> error $ "Invalid length type: " ++ show len'
           newLen = SInteger $ fromIntegral $ len + 1
       let idxPath = prefix' ++ [MS.ArrayIndex len]
       setVar (StorageItem lenPath) newLen
@@ -745,7 +754,7 @@ expToVar (Xabi.FunctionCall e args) = do
         _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
       return $ Constant newLen
 
-    _ -> error $ "code tried to call a function on a non-funciton value:\n" ++ show var
+    _ -> error $ "code tried to call a function on a non-function value:\n" ++ show var
 
 
 {-

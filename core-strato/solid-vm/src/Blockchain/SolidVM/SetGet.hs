@@ -69,11 +69,14 @@ setVar (StorageItem key) val = do
   -- is deeper, read the subfields and assign to their adjustment
   currentAddress' <- getCurrentAddress
   case val of
-      SStruct name fs -> forM_ (M.keys fs) $ \f -> do
+      SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
-        val' <- getSolidStorageKeyVal' currentAddress' srcKey
+        traceShowM ("Looping over storage. What if its not stored?"::String)
+        val' <- case var of
+          Constant x -> return $ toBasic x
+          _ -> getSolidStorageKeyVal' currentAddress' srcKey
         traceShowM (suffix, srcKey, dstKey, val')
         putSolidStorageKeyVal' currentAddress' dstKey val'
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)

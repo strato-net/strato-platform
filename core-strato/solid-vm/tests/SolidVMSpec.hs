@@ -97,34 +97,34 @@ getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 spec :: Spec
 spec = do
   describe "Ballot" $ do
-    xit "can be created" . runTest $ do
+    it "can be created" . runTest $ do
       liftIO $ pendingWith "Struct literal parsing, storage vs memory, multiline statements\
                            \ and address map keys need to be supported"
       runFile "testdata/Ballot.sol" `shouldReturn` defaultExecResults
 
   describe "Create" $ do
-    xit "should be able to run an empty contract" . runTest $ do
+    it "should be able to run an empty contract" . runTest $ do
       runFile "testdata/Empty.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldReturn` []
 
-    xit "should be able to store a default int" . runTest $ do
+    it "should be able to store a default int" . runTest $ do
       runFile "testdata/DefaultInt.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
-    xit "should be able to explicitly store an int" . runTest $ do
+    it "should be able to explicitly store an int" . runTest $ do
       runFile "testdata/SetInt.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
-    xit "can reduce a modulus" . runTest $ do
+    it "can reduce a modulus" . runTest $ do
       void $ runFile "testdata/Modulo.sol"
       getAll [[Field "x"]] `shouldReturn` [BInteger 0xbe]
 
 
-    xit "should be able to store a string" . runTest $ do
+    it "should be able to store a string" . runTest $ do
       runFile "testdata/SetString.sol" `shouldReturn` defaultExecResults
       checkStorage `shouldNotReturn` []
 
-    xit "should be able to store an array" . runTest $ do
+    it "should be able to store an array" . runTest $ do
       getAll [ [Field "nums", Field "length"]
              , [Field "nums", ArrayIndex 0]
              ] `shouldReturn` [BDefault, BDefault]
@@ -135,7 +135,7 @@ spec = do
              , [Field "nums", ArrayIndex 0]
              ] `shouldReturn` [BInteger 1, BInteger 3]
 
-    xit "should be able to read an array" . runTest $ do
+    it "should be able to read an array" . runTest $ do
       checkStorage `shouldReturn` []
       runFile "testdata/ArrayRead.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
@@ -154,7 +154,7 @@ spec = do
                          , BInteger 0x5577
                          , BInteger 0xffff]
 
-    xit "should be able to insert into a mapping" . runTest $ do
+    it "should be able to insert into a mapping" . runTest $ do
       runFile "testdata/MappingSet.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
@@ -164,7 +164,7 @@ spec = do
         , [Field "us", MapIndex (INum 10)]
         ] `shouldReturn` [BInteger 4, BInteger 21, BDefault]
 
-    xit "should be able to read from a map" . runTest $ do
+    it "should be able to read from a map" . runTest $ do
       runFile "testdata/MappingRead.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
@@ -175,13 +175,13 @@ spec = do
         , [Field "z"]
         ] `shouldReturn` [BInteger 343, BInteger 343, BDefault] -- z may also be 0
 
-    xit "should be able to set array length" . runTest $ do
+    it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 1) . length
       getAll [[Field "xs", Field "length"]] `shouldReturn` [BInteger 24]
 
-    xit "should be able to read array length" . runTest $ do
+    it "should be able to read array length" . runTest $ do
       runFile "testdata/ReadLength.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
@@ -189,23 +189,23 @@ spec = do
              , [Field "y"]
              ] `shouldReturn` [BInteger 0x400, BInteger 0x400]
 
-    xit "can delete" . runTest $ do
+    it "can delete" . runTest $ do
       runFile "testdata/Delete.sol" `shouldReturn` defaultExecResults
       getAll [[Field "x"]] `shouldReturn` [BDefault]
 
-    xit "can run complicated constructors" . runTest $ do
+    it "can run complicated constructors" . runTest $ do
       runFile "testdata/Constructor.sol" `shouldReturn` defaultExecResults
 
-    xit "can exponentiate" . runTest $ do
+    it "can exponentiate" . runTest $ do
       liftIO $ pendingWith "cannot parse `2 ** 5` as a binop"
       void $ runFile "testdata/Exp.sol"
       getAll [[Field "x"]] `shouldReturn` [BInteger 25]
 
-    xit "can use addresses as map keys" . runTest $ do
+    it "can use addresses as map keys" . runTest $ do
       liftIO $ pendingWith "Address map"
       void $ runFile "testdata/AddressMapping.sol"
 
-    xit "can hash correctly" . runTest $ do
+    it "can hash correctly" . runTest $ do
       liftIO $ pendingWith "keccak256 selection"
       void $ runFile "testdata/Keccak256.sol"
       let input = map (\t -> [Field t]) ["buf1", "buf2", "hash1", "hash2"]
@@ -238,14 +238,23 @@ contract qq {
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
     it "can assign a struct" . runTest $ do
-      liftIO $ pendingWith "cannot assign a struct literal"
       void $ runFile "testdata/StructAssign.sol"
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 3, BInteger 4]
 
     it "can push a struct" . runTest $ do
-      liftIO $ pendingWith "struct storage"
-      void $ runFile "testdata/StructPush.sol"
+      void $ runBS [r|
+contract qq {
+  struct X {
+    int a;
+    int b;
+  }
+  X[] xs;
+  constructor() {
+    xs.push(X(88, 73));
+  }
+}
+|]
       getAll [ [Field "xs"]
              , [Field "xs", Field "length"]
              , [Field "xs", ArrayIndex 0, Field "a"]
