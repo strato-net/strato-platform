@@ -232,7 +232,8 @@ nextRound nt = do
   val <- uses validators S.toList
   vot <- use voted
   validators .= S.fromList (updateValidator val vot)
-
+  $logInfoS "blockstanbul/updateValvoted" . T.pack $
+                 "updated" ++ show vot
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
@@ -299,12 +300,17 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         vs <- use validators
         --extract from pending list and vote
         pending <- use pendingvotes
+        $logInfoS "blockstanbul/pendingvotes" . T.pack $
+                 "pending votes list: " ++ show pending
         editedBlk <- if null pending
               then return blk
               else do
                  let ((bnf,nonc),newPending) = M.deleteFindMin pending
                  pendingvotes .= newPending
                  return $ editBeneficiary blk bnf nonc
+        pending' <- use pendingvotes
+        $logInfoS "blockstanbul/pendingvotes" . T.pack $
+           "after edit" ++ show pending'
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
@@ -362,9 +368,13 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                     Just (bnef,vot) -> do
                       -- insert the vote into map
                       val <- uses voted $M.lookup bnef
+                      $logInfoS "blockstanbul/extractBeneficiary" . T.pack $
+                        "after edit" ++ show val
                       let unwrapVal = fromMaybe M.empty val
                       let nval = M.insert pr vot unwrapVal
                       voted %= M.insert bnef nval
+                      voted' <- use voted
+                      $logInfoS "blockstanbul/checkVoted" . T.pack $ show voted'
                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
