@@ -194,7 +194,6 @@ spec = do
       runFile "testdata/Constructor.sol" `shouldReturn` defaultExecResults
 
     it "can exponentiate" . runTest $ do
-      liftIO $ pendingWith "cannot parse `2 ** 5` as a binop"
       void $ runFile "testdata/Exp.sol"
       getAll [[Field "x"]] `shouldReturn` [BInteger 25]
 

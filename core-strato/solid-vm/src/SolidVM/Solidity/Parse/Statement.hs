@@ -105,6 +105,7 @@ expression =
     [Postfix (do { reservedOp "++"; return PlusPlus})],
     [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+    [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
     [binary "<<", binary ">>"],

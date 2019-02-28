@@ -15,6 +15,8 @@ spec = do
                 , ("++x", Unitary "++" (Variable "x"))
                 , ("--x", Unitary "--" (Variable "x"))
                 , ("x--", MinusMinus (Variable "x"))
+                , ("x + y", Binary "+" (Variable "x") (Variable "y"))
+                , ("x ** y", Binary "**" (Variable "x") (Variable "y"))
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
