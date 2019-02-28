@@ -286,8 +286,25 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
 postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
+  --I had to temporarily replace the compileContract call to get the metadata needed for the transaction results call later on.
+  --At best we should remove the need for the metadata completely, at worst, we should remove the compile and just generate the metadata.  To get the interpreter working, I am just putting this all back in now, and will notate which lines we should eventually remove again
+  idsAndDetails <- compileContract src      --remove
+  (cName,(cmId,ContractDetails{..})) <-     --remove
+    case contract of                        --remove
+     Nothing ->                             --remove
+       case Map.toList idsAndDetails of     --remove
+         [] -> throwError $ UserError "You need to supply at least one contract in the source" --remove
+         [x] -> return x                    --remove
+         _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
+     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)              --remove
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-  tx <- signAndPrepare sign fromAddr metadata $
+
+  let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+  (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
+
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
+  
+  tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing
       fromAddr
@@ -298,6 +315,13 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [  --remove
+    ( Nothing                                                      --remove
+    , constant hash                                                --remove
+    , constant cmId                                                --remove
+    , constant (1 :: Int32)                                        --remove
+    , constant contractdetailsName                                 --remove
+    )]                                                             --remove
   getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
@@ -532,13 +556,19 @@ postUsersContractMethod' FunctionParameters{..} sign = do
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
         xabiArgs = maybe Map.empty funcArgs . Map.lookup funcName $ xabiFuncs xabi
-
+        
     sel <-
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
-    argsBin <- constructArgValues (Just (fmap argValueToText args)) xabiArgs
-    tx <- signAndPrepare sign fromAddr metadata $
+
+    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+    let metadataWithCallInfo =
+          Map.insert "funcName" funcName
+          $ Map.insert "args" argsAsSource
+          $ fromMaybe Map.empty metadata
+   
+    tx <- signAndPrepare sign fromAddr (Just metadataWithCallInfo) $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -716,9 +746,10 @@ convertResultResToVals txResp responseTypes =
   let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
-constructArgValues args argNamesTypes = do
+getArgValues :: Map Text Text -> Map Text Xabi.IndexedType -> Bloc [Value]
+getArgValues argsMap argNamesTypes = do
     let
+      determineValue :: Text -> Xabi.IndexedType -> Bloc (Int32, Value)
       determineValue valStr (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
@@ -754,21 +785,44 @@ constructArgValues args argNamesTypes = do
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
+    argsVals <-
+      if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
+      then do
+        let
+          argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
+          argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
+        throwError (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
+      else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
+    return $ map snd (sortOn fst (toList argsVals))
+  
+constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
+constructArgValues args argNamesTypes = do
     case args of
       Nothing ->
         if Map.null argNamesTypes
           then return ByteString.empty
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
-        argsVals <- if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
-          then do
-            let
-              argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
-              argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
-            throwError (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
-          else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
-        let vals = map snd (sortOn fst (toList argsVals))
+        vals <- getArgValues argsMap argNamesTypes
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
+
+constructArgValuesAndSource :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
+constructArgValuesAndSource args argNamesTypes = do
+    case args of
+      Nothing ->
+        if Map.null argNamesTypes
+          then return (ByteString.empty, "()")
+          else throwError (UserError "no arguments provided to function.")
+      Just argsMap -> do
+        vals <- getArgValues argsMap argNamesTypes
+        --TODO- valueToText returns type "Maybe Text", but as far as I can tell from reading the code, "Nothing" is not a possible return value....  I can't imagine why it ever would be.  We should either figure out what was intended, or change the return value of `valueToText` to "Text"
+        --For now, I'll just treat a nothing as an internal developer error, and crash the program.
+        let valsAsText = fromMaybe (error $ "Internal error: args can not be represented as source code: " ++ show vals) $ sequence $ map valueToText vals
+        return $
+          (
+            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
+            "(" <> Text.intercalate ", " valsAsText <> ")"
+          )
 
 getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
 getAccountTxParams addr chainId = \case

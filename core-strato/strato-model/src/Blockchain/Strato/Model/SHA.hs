@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
@@ -112,3 +113,10 @@ instance FromHttpApiData SHA where
         where unmaybe = \case
                 Nothing -> Left "couldn't parse SHA"
                 Just x  -> Right x
+
+data CodePtr = EVMCode SHA | SolidVMCode String SHA
+             deriving (Show, Read, Eq, Ord, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
+
+instance Format CodePtr where
+  format (EVMCode ch) = format ch
+  format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"

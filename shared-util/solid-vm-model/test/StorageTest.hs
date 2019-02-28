@@ -31,26 +31,26 @@ spec = do
 
   describe "StoragePath" $ do
     it "should be able to unambiguously parse a path" $ do
-      parsePath "" `shouldBe` Right Null
-      parsePath "[3]" `shouldBe` Right (ArrayIndex 3 Null)
-      parsePath "<773472>" `shouldBe` Right (MapIndex (INum 773472) Null)
-      parsePath "<\"xor\">" `shouldBe` Right (MapIndex (IText "xor") Null)
-      parsePath "<\"\">" `shouldBe` Right (MapIndex (IText "") Null)
-      parsePath ".extra" `shouldBe` Right (Field "extra" Null)
-      parsePath ".hashmap" `shouldBe` Right (Field "hashmap" Null)
-      parsePath ".hashmap<30>" `shouldBe` Right (Field "hashmap" (MapIndex (INum 30) Null))
+      parsePath "" `shouldBe` Right []
+      parsePath "[3]" `shouldBe` Right [ArrayIndex 3]
+      parsePath "<773472>" `shouldBe` Right [MapIndex (INum 773472)]
+      parsePath "<\"xor\">" `shouldBe` Right [MapIndex (IText "xor")]
+      parsePath "<\"\">" `shouldBe` Right [MapIndex (IText "")]
+      parsePath ".extra" `shouldBe` Right [Field "extra"]
+      parsePath ".hashmap" `shouldBe` Right [Field "hashmap"]
+      parsePath ".hashmap<30>" `shouldBe` Right [Field "hashmap", MapIndex (INum 30)]
 
     it "should be able to unparse a path" $ do
-      unparsePath Null `shouldBe` ""
-      unparsePath (ArrayIndex 3 Null) `shouldBe` "[3]"
-      unparsePath (MapIndex (INum 773472) Null) `shouldBe` "<773472>"
-      unparsePath (MapIndex (IText "xor") Null) `shouldBe` "<\"xor\">"
-      unparsePath (MapIndex (IText "") Null) `shouldBe` "<\"\">"
-      unparsePath (Field "extra" Null) `shouldBe` ".extra"
+      unparsePath [] `shouldBe` ""
+      unparsePath [ArrayIndex 3] `shouldBe` "[3]"
+      unparsePath [MapIndex (INum 773472)] `shouldBe` "<773472>"
+      unparsePath [MapIndex (IText "xor")] `shouldBe` "<\"xor\">"
+      unparsePath [MapIndex (IText "")] `shouldBe` "<\"\">"
+      unparsePath [Field "extra"] `shouldBe` ".extra"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
-        `shouldBe` Right (MapIndex (INum (product (replicate 100 10))) Null)
+        `shouldBe` Right [MapIndex (INum (product (replicate 100 10)))]
 
     it "should not allow unbounded array indices" $ do
       parsePath (B.concat ["[1", B.replicate 100 0x30, "]"])
@@ -58,10 +58,10 @@ spec = do
 
     it "should unescape paths" $ do
       parsePath "<\"quoth:\\\"\">" `shouldBe`
-        Right (MapIndex (IText "quoth:\"") Null)
+        Right [MapIndex (IText "quoth:\"")]
 
     it "should escape quotes in map indices" $ do
-      unparsePath (MapIndex (IText "dan\"ger") Null) `shouldBe` "<\"dan\\\"ger\">"
+      unparsePath [MapIndex (IText "dan\"ger")]`shouldBe` "<\"dan\\\"ger\">"
 
   describe "StorageDelta" $ do
     let exStorage = HM.fromList [("count", BasicValue $ BInteger 99), ("name", BasicValue $ BString "iago")]
@@ -69,8 +69,8 @@ spec = do
       replayDelta [] exStorage `shouldBe` Right exStorage
 
     it "should fail to do the impossible" $ do
-      replayDelta [(Null, BInteger 99)] exStorage `shouldBe` Left (MissingPath Null)
-      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage `shouldBe` Left (MissingPath (Field "no_such_field" Null))
+      replayDelta [([], BInteger 99)] exStorage `shouldBe` Left (MissingPath [])
+      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage `shouldBe` Left (MissingPath [Field "no_such_field"])
 
     it "should be able to increment" $ do
       replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`

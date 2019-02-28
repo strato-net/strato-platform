@@ -94,7 +94,7 @@ data AccountDiff (v :: Detail) =
     -- change
     code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
-    codeHash     :: SHA, -- Maybe
+    codeHash     :: CodePtr, -- Maybe
     sourceCodeHash     :: Maybe (SHA, Text),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
@@ -264,7 +264,9 @@ eventualAccountState
 incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m, MonadResource m) =>
                            AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
-  codeKind <- getCodeKind $ addressStateCodeHash newState
+  let codeKind = case addressStateCodeHash newState of
+                   EVMCode{} -> EVM
+                   SolidVMCode{} -> SolidVM
   storage <- (incrementalStorage codeKind `on` addressStateContractRoot) oldState newState
   return AccountDiff{
     nonce = (diff `on` addressStateNonce) oldState newState,
@@ -331,8 +333,9 @@ decodeStorageKV k v = do
 lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m (CodeKind, ByteString)
-lookupCode = lookupInMPDB "contract code" getCode
+lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
+lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 
 lookupInMPDB :: (HasHashDB m, HasCodeDB m, Format a) =>
                 String -> (a -> m (Maybe b)) -> a -> m b

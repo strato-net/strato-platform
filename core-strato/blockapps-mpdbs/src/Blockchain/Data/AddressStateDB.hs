@@ -6,6 +6,7 @@
 
 module Blockchain.Data.AddressStateDB (
   AddressState(..),
+  CodePtr(..),
   blankAddressState
 ) where
 
@@ -29,14 +30,14 @@ data AddressState =
     addressStateNonce::Integer,
     addressStateBalance::Integer,
     addressStateContractRoot::MP.StateRoot,
-    addressStateCodeHash::SHA,
+    addressStateCodeHash::CodePtr,
     addressStateChainId::Maybe Word256
     } deriving (Eq, Generic, Read, Show)
 
 instance NFData AddressState
 
 blankAddressState:: AddressState
-blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" , addressStateChainId = Nothing}
+blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=EVMCode $ hash "" , addressStateChainId = Nothing}
 
 
 instance Format AddressState where
@@ -75,3 +76,9 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
+instance RLPSerializable CodePtr where
+  rlpEncode (EVMCode codeHash) = rlpEncode codeHash
+  rlpEncode (SolidVMCode n ch) = RLPArray [RLPString "SolidVM", rlpEncode n, rlpEncode ch]
+
+  rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
+  rlpDecode ch = EVMCode $ rlpDecode ch
