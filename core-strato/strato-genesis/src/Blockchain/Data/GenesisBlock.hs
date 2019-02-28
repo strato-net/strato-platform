@@ -24,7 +24,7 @@ import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
-import qualified Blockchain.Data.Action               as A
+import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo

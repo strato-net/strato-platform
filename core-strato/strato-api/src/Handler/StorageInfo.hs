@@ -16,7 +16,7 @@ import           Handler.Filters
 import           Import
 
 import           Blockchain.Data.Address
-import           SolidVM.Model
+import           Blockchain.SolidVM.Model
 
 import qualified Database.Esqueleto      as E
 import qualified Prelude                 as P

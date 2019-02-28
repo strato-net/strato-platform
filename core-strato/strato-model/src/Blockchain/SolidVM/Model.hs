@@ -1,4 +1,8 @@
-module SolidVM.Model where
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings #-}
+module Blockchain.SolidVM.Model where
 
 import Control.DeepSeq
 import Data.Aeson
@@ -11,7 +15,9 @@ import GHC.Generics
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
-newtype HexStorage = HexStorage B.ByteString deriving (Eq, Show, Read, Generic, NFData)
+newtype HexStorage = HexStorage B.ByteString
+                   deriving (Eq, Show, Read, Generic)
+                   deriving anyclass NFData
 
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
