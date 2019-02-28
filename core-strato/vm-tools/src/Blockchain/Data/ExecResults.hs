@@ -8,7 +8,7 @@ import qualified Data.Set                as S
 import           GHC.Generics
 
 import           Blockchain.VM.VMException
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
@@ -24,7 +24,7 @@ data ExecResults =
     erSuicideList        :: S.Set Address,
     erAction             :: Maybe Action,
     erException          :: Maybe VMException
-    } deriving (Show, Generic)
+    } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
 
@@ -33,10 +33,10 @@ calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
   let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
   in realRefund + erRemainingTxGas er
-  
+
 
 errorExecResults :: Integer -> VMException -> ExecResults
-errorExecResults remainingGas e = 
+errorExecResults remainingGas e =
   ExecResults {
     erRemainingTxGas=remainingGas
     , erRefund=0

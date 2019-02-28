@@ -77,8 +77,9 @@ RawTransaction
 
 Storage json
     addressStateRefId AddressStateRefId
-    key Word256
-    value Word256
+    kind CodeKind
+    key HexStorage
+    value HexStorage
     deriving Eq Read Show
 
 TransactionResult json

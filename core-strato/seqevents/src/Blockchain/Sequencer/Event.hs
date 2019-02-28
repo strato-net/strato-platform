@@ -2,12 +2,15 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
 module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
 import           Data.Binary
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
+import           Data.DeriveTH
+import           Test.QuickCheck
 
 import qualified Blockchain.Data.Address                   as A
 import           Blockchain.Data.Block                     (Block)
@@ -417,3 +420,17 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
 
     blockOrdering = obTotalDifficulty
     buildBlock = OutputBlock TO.Morphism 0
+
+derive makeArbitrary ''IngestEvent
+derive makeArbitrary ''IngestTx
+derive makeArbitrary ''IngestBlock
+derive makeArbitrary ''IngestGenesis
+derive makeArbitrary ''SequencedBlock
+derive makeArbitrary ''OutputEvent
+derive makeArbitrary ''OutputTx
+derive makeArbitrary ''OutputBlock
+derive makeArbitrary ''OutputGenesis
+
+-- just end me fam
+instance Arbitrary JsonRpcCommand where
+   arbitrary = JRCGetBalance <$> arbitrary <*> arbitrary <*> arbitrary

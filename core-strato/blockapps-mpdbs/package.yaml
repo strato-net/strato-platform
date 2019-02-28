@@ -11,9 +11,11 @@ github: blockapps/strato-platform/core-strato/blockapps-mpdbs
 
 dependencies:
   - base
+  - aeson
   - ansi-wl-pprint
   - base16-bytestring
   - binary
+  - solid-vm-model
   - blockapps-util
   - bytestring
   - containers
@@ -25,6 +27,7 @@ dependencies:
   - mtl
   - nibblestring
   - resourcet
+  - solid-vm-model
   - strato-model
 
 ghc-options: -Wall -O2

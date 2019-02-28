@@ -23,7 +23,6 @@ import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
 import           Data.Maybe                         (fromMaybe)
 import           Data.Profunctor.Product.Default
-import           Data.String
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
 import           Data.Text.Prettyprint.Doc
@@ -122,6 +121,7 @@ data BlocError
   | Unimplemented Text
   | AlreadyExists Text
   | RuntimeError SomeException
+  | UnavailableError Text
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -173,7 +173,7 @@ enterBloc env x
     reThrowError
       = \case
           StratoError (FailureResponse (Response Status{statusCode=404} _ _ _)) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc seems to be improperly configured: Strato page is missing.",
@@ -181,9 +181,9 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           StratoError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
-            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc can not connect to Strato.",
@@ -192,7 +192,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           StratoError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc recieved a malformed response from Strato.",
@@ -201,9 +201,9 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           VaultWrapperError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
-            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           VaultWrapperError (ConnectionError _) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc can not connect to Strato.",
@@ -212,7 +212,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           VaultWrapperError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc recieved a malformed response from Strato.",
@@ -221,19 +221,20 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           DBError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something is broken in the Bloc Server database.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          UserError err -> err400{errBody = fromString $ show err}
-          AlreadyExists err -> err409{errBody = fromString $ show err}
-          CouldNotFind err -> err404{errBody = fromString $ show err}
+          CirrusError err -> err500{errBody = JSON.encode (show err)}
+          UserError err -> err400{errBody = JSON.encode err}
+          AlreadyExists err -> err409{errBody = JSON.encode err}
+          CouldNotFind err -> err404{errBody = JSON.encode err}
+          UnavailableError err -> err503{errBody = JSON.encode err}
           AnError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something is broken in the Bloc Server.",
@@ -241,13 +242,13 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           Unimplemented err ->
-            err501{errBody = fromString $ unlines
+            err501{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "You are using a feature of the Bloc Server that has not yet been implemented.",
                      Text.unpack err
                    ]}
-          RuntimeError _ -> err500{errBody = fromString $ unlines
+          RuntimeError _ -> err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something wrong has happened inside of bloc.",

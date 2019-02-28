@@ -17,6 +17,8 @@ dependencies:
   - base-unicode-symbols
   - base16-bytestring
   - binary
+  - blockapps-datadefs
+  - solid-vm-model
   - blockapps-haskoin
   - blockapps-milena
   - blockapps-util
@@ -48,6 +50,7 @@ dependencies:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - solid-vm-model
   - QuickCheck
   - resourcet
   - strato-conf
@@ -57,6 +60,7 @@ dependencies:
   - transformers
   - unliftio
   - unliftio-core
+  - unordered-containers
   - vector
 
 ghc-options: -Wall -O2

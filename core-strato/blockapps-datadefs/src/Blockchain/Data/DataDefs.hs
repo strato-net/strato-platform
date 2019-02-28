@@ -15,6 +15,7 @@
 module Blockchain.Data.DataDefs where
 
 import           Control.DeepSeq
+import           Control.Lens.TH                         (makeLensesFor)
 import           Control.Monad.Trans.Class (lift)
 
 import           Database.Persist
@@ -22,26 +23,25 @@ import           Database.Persist.Quasi
 import           Database.Persist.Sql
 import           Database.Persist.TH
 
+import qualified Data.Binary                             as BIN
+import qualified Data.ByteString                         as BS
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
+import           Data.Word
+import           GHC.Generics
 
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.StateRoot
+import           Blockchain.SolidVM.Model
+
 import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
-import           Blockchain.Database.MerklePatricia
 import           Blockchain.MiscJSON                     ()
 
-import qualified Data.Binary                             as BIN
-import qualified Data.ByteString                         as BS
-
-import           Blockchain.ExtWord
-import           Blockchain.SHA
-import           Data.Word
-
-import           Control.Lens.TH                         (makeLensesFor)
-import           GHC.Generics
 
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
@@ -62,6 +62,9 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS parent_chain varchar;"
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS creation_block varchar;"
   exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS chain_nonce varchar;"
+  exec "ALTER TABLE IF EXISTS storage ADD COLUMN IF NOT EXISTS kind varchar;"
+  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN key TYPE varchar;"
+  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN value TYPE varchar;"
   migrateAuto
 
 -- todo newtype me

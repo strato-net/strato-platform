@@ -44,7 +44,7 @@ import           Text.Printf
 
 
 import qualified Blockchain.Colors                  as CL
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -306,7 +306,7 @@ runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
   addressState <- getAddressState address
-  code <- getEVMCode (addressStateCodeHash addressState)
+  code <- getEVMCode' (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
@@ -317,7 +317,7 @@ runOperation EXTCODECOPY = do
   size <- pop
 
   addressState <- getAddressState address
-  code <- getEVMCode (addressStateCodeHash addressState)
+  code <- getEVMCode' (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
 runOperation RETURNDATASIZE = do
@@ -403,7 +403,10 @@ runOperation SSTORE = do
   putStorageKeyVal p val --putStorageKeyVal will delete value if val=0
 
   owner <- getEnvVar envOwner
-  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= M.insert p val
+  let ins = \case
+              ActionEVMDiff m -> ActionEVMDiff $ M.insert p val m
+              _ -> error "SolidVM Diff executing in EVM"
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -996,7 +999,7 @@ runCodeFromStart = do
 
 -- | runVMM fully evaluates its results to limit memory leaks.
 runVMM :: (NFData a) => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM ExecResults
-runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = do
+runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
@@ -1107,7 +1110,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (SHA 0) M.empty [])
+  action . actionData %= M.insert owner (ActionData (SHA 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1145,7 +1148,7 @@ create' = do
     assignCode codeBytes address = do
       addCode EVM codeBytes
       newAddressState <- getAddressState address
-      putAddressState address newAddressState{addressStateCodeHash=hash codeBytes}
+      putAddressState address newAddressState{addressStateCodeHash=EVMCode $ hash codeBytes}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
@@ -1186,7 +1189,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
   code <-
     if 0 < codeAddress && codeAddress < 5
     then return $ PrecompiledCode $ fromIntegral codeAddress
-    else Code <$> getEVMCode (addressStateCodeHash addressState)
+    else Code <$> getEVMCode' (addressStateCodeHash addressState)
 
   let env =
         Environment{
@@ -1211,8 +1214,11 @@ call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  ch <- addressStateCodeHash <$> getAddressState receiveAddress
-  action . actionData %= M.insert receiveAddress (ActionData ch M.empty [])
+  cp <- addressStateCodeHash <$> getAddressState receiveAddress
+  let ch = case cp of
+        EVMCode x -> x
+        _ -> error "internal error- the EVM was called for non-evm code"
+  action . actionData %= M.insert receiveAddress (ActionData ch EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1396,3 +1402,9 @@ vmStateToExecResults vmState = do
       , erException          = Nothing
       }
 
+
+
+getEVMCode' :: HasCodeDB m =>
+               CodePtr -> m BC.ByteString
+getEVMCode' (EVMCode ch) = getEVMCode ch
+getEVMCode' _ = error "internal error- the EVM was called for non-evm code"
