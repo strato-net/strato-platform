@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
@@ -37,30 +38,26 @@ toBasic = \case
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: Variable -> Value -> SM ()
-setVar (Property "length" o) newVal = do
-  val <- getVar o
-  case (val, newVal) of
-    (SArray valType oldV, SInteger i) -> do
-      newV <-
-        case toInteger (V.length oldV) `compare` i of
-          EQ -> return oldV
-          LT -> do
-            extra <-
-              liftIO $ V.replicateM (fromInteger i-V.length oldV) (fmap Variable $ newIORef $ defaultValue valType)
-            return $ oldV V.++ extra
-          GT -> return $ V.take (fromInteger i) oldV
-      setVar o $ SArray valType newV
+setVar Property{} _ = error "unimplemented: setVar Property"
+-- setVar (Property "length" o) newVal = error "unimplemented: setVar Property"
+--   val <- getVar o
+--   case (val, newVal) of
+--     (SArray valType oldV, SInteger i) -> do
+--       newV <-
+--         case toInteger (V.length oldV) `compare` i of
+--           EQ -> return oldV
+--           LT -> do
+--             extra <-
+--               liftIO $ V.replicateM (fromInteger i-V.length oldV) (fmap Variable $ newIORef $ defaultValue valType)
+--             return $ oldV V.++ extra
+--           GT -> return $ V.take (fromInteger i) oldV
+--       setVar o $ SArray valType newV
 
-    _ -> error "setVar length called for unknown params"
+--     _ -> error "setVar length called for unknown params"
 
 
-setVar (Variable ioRef) val = do
-  liftIO $ writeIORef ioRef val
-
-setVar (UnsetMapItem mapVariable key _) val = do
-  (SMap valType theMap) <- getVar mapVariable
-  newVar <- liftIO $ fmap Variable $ newIORef val
-  setVar mapVariable $ SMap valType $ M.insert key newVar theMap
+-- setVar (Variable ioRef) val = liftIO $ writeIORef ioRef val
+setVar Variable{} _ = error "unimplemented: setVar Variable"
 
 setVar (StorageItem key) val = do
   -- If val is a simple value, assign it. If it
@@ -77,28 +74,26 @@ setVar (StorageItem key) val = do
         putSolidStorageKeyVal' currentAddress' dstKey val'
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
-setVar (Constant _) _ = error "setVar was called for a constant, this is forbidden"
+setVar Constant{} _ = error "setVar was called for a constant, this is forbidden"
 
-setVar x _ = error $ "setVar called for undefined value: " ++ show x
+-- setVar x _ = error $ "setVar called for undefined value: " ++ show x
 
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = liftIO $ readIORef ioRef
-getVar (Constant x) = return x
+getVar (Constant c) = return c
 getVar (Property "length" var) = do
   case var of
     StorageItem p -> getVar . StorageItem $ p ++ [MS.Field "length"]
-    _ -> do
-      val <- getVar var
-      case val of
-        SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
-        SString s -> return $ SInteger $ toInteger $ length s
-        x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
-getVar (UnsetMapItem _ _ valType) = return $ defaultValue valType
+    _ -> error "nonstorage length"
+      -- val <- getVar var
+      -- case val of
+      --   SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
+      --   SString s -> return $ SInteger $ toInteger $ length s
+      --   x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
   fromBasic <$> getSolidStorageKeyVal' currentAddress' key
 getVar x = error $ "getVar called for undefined value: " ++ show x
-
 
 
 showSM :: Value -> SM String

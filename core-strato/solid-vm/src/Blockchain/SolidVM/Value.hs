@@ -28,14 +28,12 @@ data IndexType = ArrayIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 data Variable = Variable (IORef Value)
   | Property String Variable
   | Constant Value
-  | UnsetMapItem Variable Value Xabi.Type
   | StorageItem MS.StoragePath
 
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Property name o) = "<prop:" ++ name ++ "> of " ++ show o
   show (Constant v) = "Constant: " ++ show v
-  show (UnsetMapItem _ key valType) = "<unsetmapitem: " ++ show key ++ ">, type =" ++ show valType
   show (StorageItem key) = "<storage: " ++ show key ++ ">"
 
 --TODO- we need to figure out this ambiguity on the Address types....
