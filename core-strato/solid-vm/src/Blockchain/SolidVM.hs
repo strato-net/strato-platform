@@ -293,6 +293,7 @@ runStatement :: Xabi.Statement -> SM (Maybe Value)
 --      I checked the Wings contracts, they never use this.
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
   var <- expToVar e
+  path <- expToPath e
   v <- getVar var
   let value =
         case v of
@@ -301,7 +302,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
   logAssigningVariable $ SInteger value
 
-  setVar var $ SInteger $ value + 1
+  setVar path $ SInteger $ value + 1
   return Nothing
 
 
@@ -312,8 +313,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
   value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
   logAssigningVariable value
-  -- TODO(tim): This might fail when assigning to a memory variable
-  setVar (StorageItem v1) value
+  setVar v1 value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -464,6 +464,7 @@ expToVar (Xabi.Variable name) = do
 
 expToVar (Xabi.PlusPlus e) = do
   var <- expToVar e
+  path <- expToPath e
   v <- getVar var
   let value =
         case v of
@@ -472,11 +473,12 @@ expToVar (Xabi.PlusPlus e) = do
 
   logAssigningVariable $ SInteger value
 
-  setVar var $ SInteger $ value + 1
+  setVar path $ SInteger $ value + 1
   return $ Constant $ SInteger value
 
 expToVar (Xabi.Unitary "++" e) = do
   var <- expToVar e
+  path <- expToPath e
   v <- getVar var
   let value =
         case v of
@@ -485,7 +487,7 @@ expToVar (Xabi.Unitary "++" e) = do
 
   logAssigningVariable $ SInteger value
 
-  setVar var $ SInteger $ value + 1
+  setVar path $ SInteger $ value + 1
   return $ Constant $ SInteger $ value + 1
 
 
@@ -560,7 +562,7 @@ expToVar (Xabi.Unitary "!" expr) = do
     _ -> error "Unitary ! calculated a non bool value"
 expToVar (Xabi.Unitary "delete" expr) = do
   p <- expToPath expr
-  setVar (StorageItem p) SDefault
+  setVar p SDefault
   return . Constant $ SNULL
 
 expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
@@ -712,9 +714,9 @@ expToVar (Xabi.FunctionCall e args) = do
                         _ -> error $ "Invalid length type: " ++ show len'
           newLen = SInteger $ fromIntegral $ len + 1
       let idxPath = prefix' ++ [MS.ArrayIndex len]
-      setVar (StorageItem lenPath) newLen
+      setVar lenPath newLen
       case argVals of
-        [av] -> setVar (StorageItem idxPath) av
+        [av] -> setVar idxPath av
         _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
       return $ Constant newLen
 

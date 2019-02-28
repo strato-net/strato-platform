@@ -282,3 +282,24 @@ contract qq {
              , [Field "xs", ArrayIndex 0, Field "a"]
              , [Field "xs", ArrayIndex 0, Field "b"]
              ] `shouldReturn` [BDefault, BInteger 1, BInteger 9000, BInteger 3000]
+    it "can post increment" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  uint x = 400000000;
+  uint y;
+  constructor() {
+    y = x++;
+  }
+}|]
+      getAll [ [Field "x"], [Field "y"] ] `shouldReturn` [BInteger 400000001, BInteger 400000000]
+
+    it "can pre increment" . runTest $ do
+      void $ runBS [r|
+contract qq {
+ uint x = 99;
+ uint y = 17;
+ constructor() {
+   y = ++x;
+  }
+}|]
+      getAll [ [Field "x"], [Field "y"]] `shouldReturn` [BInteger 100, BInteger 100]
