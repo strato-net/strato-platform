@@ -175,3 +175,7 @@ defaultValue x = error $ "missing type in defaultValue: " ++ show x
 byteStringToValue :: ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
+
+castToInt :: Value -> Integer
+castToInt (SInteger i) = i
+castToInt s = error $ "cast: not an integer: " ++ show s

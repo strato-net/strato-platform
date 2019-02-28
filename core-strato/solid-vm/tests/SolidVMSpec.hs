@@ -301,13 +301,25 @@ contract qq {
 }|]
       getAll [ [Field "x"], [Field "y"]] `shouldReturn` [BInteger 100, BInteger 100]
 
-    it "can decrement" . runTest $ do
-      liftIO $ pendingWith "Needs to parse x--"
+    it "can post decrement" . runTest $ do
       void $ runBS [r|
 contract qq {
-  uint x;
+  uint x = 10;
+  uint y;
   constructor() {
-    x--;
+    y = x--;
+
   }
 }|]
-      getAll [[Field "x"]] `shouldReturn` [BInteger (-1)]
+      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 9, BInteger 10]
+
+    it "can pre decrement" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  uint x = 20;
+  uint y;
+  constructor() {
+    y = --x;
+  }
+}|]
+      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 19, BInteger 19]

@@ -13,6 +13,8 @@ spec = do
     let parseExpr = runParser expression "" ""
         cases = [ ("x++", PlusPlus (Variable "x"))
                 , ("++x", Unitary "++" (Variable "x"))
+                , ("--x", Unitary "--" (Variable "x"))
+                , ("x--", MinusMinus (Variable "x"))
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want

@@ -467,11 +467,7 @@ expToVar (Xabi.Variable name) = do
 expToVar (Xabi.PlusPlus e) = do
   var <- expToVar e
   path <- expToPath e
-  v <- getVar var
-  let value =
-        case v of
-          (SInteger i) -> i
-          _ -> error "PlusPlus applied to a non integer"
+  value <- castToInt <$> getVar var
 
   logAssigningVariable $ SInteger value
 
@@ -481,16 +477,29 @@ expToVar (Xabi.PlusPlus e) = do
 expToVar (Xabi.Unitary "++" e) = do
   var <- expToVar e
   path <- expToPath e
-  v <- getVar var
-  let value =
-        case v of
-          (SInteger i) -> i
-          _ -> error "PlusPlus applied to a non integer"
+  value <- castToInt <$> getVar var
+  let next = SInteger $ value + 1
+  logAssigningVariable next
 
+  setVar path next
+  return $ Constant next
+
+expToVar (Xabi.MinusMinus e) = do
+  var <- expToVar e
+  path <- expToPath e
+  value <- castToInt <$> getVar var
   logAssigningVariable $ SInteger value
+  setVar path . SInteger $ value - 1
+  return $ Constant $ SInteger value
 
-  setVar path $ SInteger $ value + 1
-  return $ Constant $ SInteger $ value + 1
+expToVar (Xabi.Unitary "--" e) = do
+  var <- expToVar e
+  path <- expToPath e
+  value <- castToInt <$> getVar var
+  let next = SInteger $ value -1
+  logAssigningVariable next
+  setVar path next
+  return $ Constant next
 
 
 
