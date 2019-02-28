@@ -65,7 +65,7 @@ runCreate fp = do
       availableGas = error "TODO: availableGas"
       txHash = error "TODO: txHash"
       chainId = error "TODO: chainId"
-      metadata = Just $ M.singleton "name" "qq"
+      metadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
 
   SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
