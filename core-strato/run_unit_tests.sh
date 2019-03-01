@@ -14,6 +14,7 @@ TESTS=(
   ethereum-vm
   fast-keccak256
   merkle-patricia-db
+  solid-vm
   strato-api:unittests
   strato-genesis
   strato-init
