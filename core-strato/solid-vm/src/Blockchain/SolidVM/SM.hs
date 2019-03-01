@@ -188,7 +188,7 @@ runSM theCode f = do
     contextStorageTxMap = storageTxMap sstateAfter,
     contextStorageBlockMap = storageBlockMap sstateAfter
     }
-
+  setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
   return value
 
 getEnv :: SM Environment
