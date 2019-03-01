@@ -293,7 +293,6 @@ runStatement :: Xabi.Statement -> SM (Maybe Value)
 --      looks like this `x = (y = 1)`
 --      I checked the Wings contracts, they never use this.
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
-  -- error "wrong plus plus"
   var <- expToVar e
   path <- expToPath e
   v <- getVar var
@@ -305,8 +304,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
   logAssigningVariable $ SInteger value
 
   setVar path $ SInteger $ value + 1
-  -- return Nothing
-  error "wnog plus plus"
+  return Nothing
 
 
 

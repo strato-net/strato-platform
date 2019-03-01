@@ -97,8 +97,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "storage vs memory, multiline statements\
-                           \ and address map keys need to be supported"
+      liftIO $ pendingWith "storage vs memory and address map keys need to be supported"
       runFile "testdata/Ballot.sol" `shouldReturn` defaultExecResults
 
   describe "Create" $ do
