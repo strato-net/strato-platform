@@ -12,7 +12,6 @@ const rp = require('request-promise');
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
-//todo - probably need to do oauth version of file && externalStorage
 
 module.exports = {
   upload: function (req, res, next) {
@@ -25,9 +24,8 @@ module.exports = {
       const uID = req.headers['x-user-unique-name'];
       const uHash = req.headers['x-user-id'];
 
-      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
 
-      if (!uID || !uHash ) { //fixme - is this check needed?
+      if (!uID || !uHash ) {
         let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}'); //fixme - there must be a better way .jpg
         err.status = RestStatus.UNAUTHORIZED;
         return next(err);
@@ -38,6 +36,14 @@ module.exports = {
         err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
+
+      if (!req.file ) {
+        let err = new Error('file missing');
+        err.status = RestStatus.BAD_REQUEST;
+        return next(err);
+      }
+
+      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
 
       const params = {
         Bucket: appConfig.s3.bucket.Bucket,
@@ -82,7 +88,6 @@ module.exports = {
   },
 
   list: function (req, res, next) {
-    //todo - check x-user* headers
     co(function* () {
       const uploads = yield models.Upload.all({
         attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
@@ -111,7 +116,6 @@ module.exports = {
         err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
-
       try {
         const data = yield externalStorage.getExternalStorage(contractAddress);
         res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });

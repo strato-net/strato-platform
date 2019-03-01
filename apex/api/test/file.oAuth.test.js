@@ -248,25 +248,6 @@ describe('File - ExternalStorage - OAuth', function () {
         }
       })
 
-      beforeEach(function () {
-        if(SKIP_TEST_BLOCK){
-          this.skip();
-        }
-
-        storage = {
-          uri: testVerifiable.uri,
-          timeStamp: testVerifiable.timestamp,
-          signers: [
-            testSigners[0]
-          ]
-        };
-
-        sinon.stub(externalStorage, 'getExternalStorage').resolves(storage);
-      });
-
-      afterEach(function () {
-        externalStorage.getExternalStorage.restore();
-      })
 
       it('replies BAD_REQUEST with wrong query', async function () {
         await assert.shouldThrowRest(
@@ -309,7 +290,7 @@ describe('File - ExternalStorage - OAuth', function () {
               'contractAddress': _contractAddress
             })
 
-        assert.deepEqual(res.body, storage);
+        assert.equal(res.body.uri, uploadData.Location);
         assert.equal(res.status, RestStatus.OK);
       });
     });

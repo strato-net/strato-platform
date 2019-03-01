@@ -25,7 +25,7 @@ function* waitQuery(queryString, count, timeoutMilli, node) {
     // count not reached - sleep
     return false;
   }
-
+console.log('qs',queryString)
   const res = yield queryUntil(queryString, predicate, timeoutMilli, node);
   return res;
 }
@@ -83,6 +83,10 @@ function* isSearchable(codeHash) {
 
 function compile (body, node) {
   return ax.post(process.env.BLOC_HOST, body, '/bloc/v2.2/contracts/compile'); //todo - should probably replace blocHost w/ blocRoot to shorten urls
+}
+
+function query(query, node) {
+  return ax.get(process.env.POSTGREST_HOST, `/${query}`);
 }
 
 function sendTransactions(body, headers, resolve, chainId, node) {
@@ -322,6 +326,7 @@ function* queryUntil(queryString, predicate, timeoutMilli, node) {
     }
     return res;
   }
+  console.log('actionable')
   const res = yield until(predicate, action, timeoutMilli, node);
   return res;
 }
