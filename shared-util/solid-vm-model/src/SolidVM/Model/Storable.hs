@@ -35,10 +35,10 @@ data BasicValue = BInteger Integer
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
--- TODO(tim): Can also be an address
 data IndexType = INum Integer
                | IText B.ByteString
                | IBool Bool
+               | IAddress Address
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StorableValue = BasicValue BasicValue
@@ -100,6 +100,10 @@ parseMapIndex = do
   idx <- case w82c nextChar of
     't' -> string "true" >> return (IBool True)
     'f' -> string "false" >> return (IBool False)
+    'a' -> do
+      _ <- string "a:"
+      eAddress <- addressFromHex <$> Atto.take 40
+      IAddress <$> either fail return eAddress
     '"' -> do
        skip (== c2w8 '"')
        let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
@@ -178,6 +182,7 @@ unparsePath = B.concat . concatMap go
         go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
         go (MapIndex (IBool True)) = ["<true>"]
         go (MapIndex (IBool False)) = ["<false>"]
+        go (MapIndex (IAddress a)) = ["<a:", addressToHex a, ">"]
 
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 

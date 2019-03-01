@@ -4,12 +4,14 @@ import Control.Monad
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as C8
 import Data.Word
 import GHC.Exts
 import GHC.Integer.GMP.Internals
 import Test.Hspec
 import Test.QuickCheck
 
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Network.Haskoin.Internals (BigWord(..))
 
@@ -66,3 +68,11 @@ spec = do
       fastWord256LSB n `shouldBe` slowByte n
     it "works on S# Word256" $ do
       fastWord256LSB (BigWord (S# 0x93342434#)) `shouldBe` 0x34
+
+  describe "Address serialization" $ do
+    it "should be fixed width" $ do
+      addressToHex 0xdeadbeef `shouldBe`
+                    "00000000000000000000000000000000deadbeef"
+      addressToHex 0 `shouldBe` C8.replicate 40 '0'
+      addressToHex 0xca35b7d915458ef540ade6068dfe2f44e8fa733c `shouldBe`
+                    "ca35b7d915458ef540ade6068dfe2f44e8fa733c"

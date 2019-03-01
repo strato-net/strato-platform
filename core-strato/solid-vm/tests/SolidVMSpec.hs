@@ -199,8 +199,8 @@ spec = do
       getAll [[Field "x"]] `shouldReturn` [BInteger 25]
 
     it "can use addresses as map keys" . runTest $ do
-      liftIO $ pendingWith "Address map"
       void $ runFile "testdata/AddressMapping.sol"
+      getAll [[Field "perms", MapIndex (IAddress 0xdeadbeef)]] `shouldReturn` [BInteger 0xfff]
 
     it "can hash correctly" . runTest $ do
       void $ runFile "testdata/Keccak256.sol"

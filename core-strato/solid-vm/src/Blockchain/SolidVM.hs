@@ -109,7 +109,6 @@ create' creator name argExps = do
   sstate <- get
   let cc = codeCollection sstate
 
-  --TODO- Replace this address creation with the safe version:
   nonce' <- getNonce creator
   setNonce creator $ nonce'+1
   let address = getNewAddress_unsafe creator nonce'
@@ -443,6 +442,8 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
   idx <- getVar idxVar
   return . (parPath ++) $ case (idxType, idx) of
+    (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
+    (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
     (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
