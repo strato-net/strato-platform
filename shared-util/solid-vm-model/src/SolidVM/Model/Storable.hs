@@ -27,11 +27,12 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 
 
-data BasicValue = BInteger Integer
-                | BString B.ByteString
-                | BBool Bool
-                | BAddress Address
-                | BEnumVal T.Text T.Text
+data BasicValue = BInteger !Integer
+                | BString !B.ByteString
+                | BBool !Bool
+                | BAddress !Address
+                | BEnumVal !T.Text !T.Text
+                | BContract !T.Text !Address
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
@@ -232,14 +233,16 @@ instance RLPSerializable BasicValue where
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
     BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
-    BEnumVal a b -> RLPArray [RLPScalar 4, rlpEncode a, rlpEncode b]
+    BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
+    BEnumVal a b -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b]
   rlpDecode x@(RLPArray ((RLPScalar t):f:s)) =
     case (t, s) of
       (0, []) -> BInteger $ rlpDecode f
       (1, []) -> BString $ rlpDecode f
       (2, []) -> BBool $ rlpDecode f
       (3, []) -> BAddress $ rlpDecode f
-      (4, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (4, [a']) -> BContract (rlpDecode f) (rlpDecode a')
+      (5, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x

@@ -354,3 +354,10 @@ contract qq {
       getAll [ [Field "bs", MapIndex $ IBool False]
              , [Field "bs", MapIndex $ IBool True]] `shouldReturn` [BInteger 0, BInteger 0x87324]
 
+    it "should be able to store a contract" . runTest $ do
+      void $ runBS [r|
+contract X {}
+contract qq {
+  X x = X(0x999999);
+}|]
+      getAll [ [Field "x"] ] `shouldReturn` [BContract "X" 0x999999]

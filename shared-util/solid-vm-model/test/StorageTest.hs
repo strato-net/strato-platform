@@ -258,6 +258,7 @@ spec = do
                      , BString "This is text"
                      , BBool True
                      , BAddress 0x23421421421341232341bbbb
+                     , BContract "Wings!" 0xdeadbeef
                      , BEnumVal "type" "num"
                      ]
       forM_ examples $ \bv ->  rlpDecode (rlpEncode bv) `shouldBe` bv
