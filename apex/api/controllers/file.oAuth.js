@@ -161,9 +161,9 @@ module.exports = {
       try {
         const result = yield externalStorage.getExternalStorage(contractAddress);
 
-        const blocUser = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
+        const account = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
 
-        if (result.signers.indexOf(blocUser.address) > -1) {
+        if (result.signers.indexOf(account.address) > -1) {
           let err = new Error('You already signed this transaction');
           err.status = RestStatus.BAD_REQUEST;
           return next(err);

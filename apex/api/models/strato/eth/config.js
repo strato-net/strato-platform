@@ -1,4 +1,4 @@
-const request = require('sync-request'); //fixme - the npm page suggests not to use this in a a production environtment
+const request = require('sync-request');
 
 // TODO: Clean the UUID retrieval. Should happen at apex initialization.
 
