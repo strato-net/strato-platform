@@ -25,6 +25,7 @@ import           Database.Persist.TH
 
 import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
+import qualified Data.ByteString.Short                   as BSS
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
@@ -41,7 +42,6 @@ import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
-
 
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
