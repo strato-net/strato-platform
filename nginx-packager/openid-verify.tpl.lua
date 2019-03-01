@@ -1,15 +1,22 @@
+-- TODO: refactor with shared lua util file for common stuff across the lua scripts
+
 --'aud' should not necessarily contain the URLs according to openid standard. Could be the unique client ids instead. Skipping check.
 --local expected_audience = "<NODE_HOST_PROTOCOL>://<NODE_HOST>"
 
+local access_token_cookie_name = "strato_access_token"
 local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
-  discovery                     = "<OAUTH_JWT_VALIDATION_DISCOVERY_URL>",
+  discovery                     = "<OAUTH_DISCOVERY_URL>",
   ssl_verify                    = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg               = false,
   accept_unsupported_alg        = false
 }
+
+if ngx.var['cookie_'..access_token_cookie_name] and not ngx.req.get_headers()["Authorization"] then
+  ngx.req.set_header("Authorization", "Bearer " .. ngx.var['cookie_'..access_token_cookie_name])
+end
 
 -- call bearer_jwt_verify for OAuth 2.0 JWT validation
 local res, err = require("resty.openidc").bearer_jwt_verify(opts)
@@ -50,3 +57,5 @@ local user_id = res.sub
 -- set request header to forward to APIs
 ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 ngx.req.set_header("X-USER-ID", user_id)
+-- Clearing Authorization header to prevent Postgrest's built-in JWT permissioning to trigger
+ngx.req.clear_header("Authorization")
