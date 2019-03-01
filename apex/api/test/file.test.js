@@ -49,11 +49,14 @@ describe('File - ExternalStorage', function () {
 
   const userData = testFactory.getUserData();
   const uploadData = testFactory.getUploadData()
-
+  const testContent = testFactory.getTestContent()
+  const testSigners = testFactory.getTestSigners()
+  const testVerifiable = testFactory.getTestVerifiable()
+  
   let _contractAddress, userAccountAddress, app;
   
   
-  before(async function () {//fixme - is this before block garuanteed to complete before the describe/it below? look into mocha promises
+  before(async function () { //todo - is this async before block garuanteed to complete before the describe blocks below? - i think so but double check
 
     if(SKIP_TEST_BLOCK){
       this.skip();
@@ -121,7 +124,7 @@ describe('File - ExternalStorage', function () {
         .post('/bloc/file/upload')
           .set('X-USER-UNIQUE-NAME',userData.userName)
           .set('X-USER-ID',userData.hash)
-        .attach('content', './test/testdata/testImage.png')
+        .attach('content', testContent.image)
         .catch((err) => {
           const res = err.response;
           assert.equal(res.status, RestStatus.BAD_REQUEST);
@@ -134,9 +137,9 @@ describe('File - ExternalStorage', function () {
         .post('/bloc/file/upload')
           .set('X-USER-UNIQUE-NAME',userData.userName)
           .set('X-USER-ID',userData.hash)
-          .field('metadata', 'Nature Pics')
-          .field('provider', 's3')
-          .attach('content', './test/testdata/testImage.png')
+          .field('metadata', testContent.meta)
+          .field('provider', testContent.provider)
+          .attach('content', testContent.image)
           .type('form')
 
       expect(result).to.have.status(RestStatus.OK);
@@ -147,9 +150,9 @@ describe('File - ExternalStorage', function () {
           async function () {
             await chai.request(app)
                 .post('/bloc/file/upload')
-                .field('metadata', 'Nature Pics')
-                .field('provider', 's3')
-                .attach('content', './test/testdata/testImage.png')
+                .field('metadata', testContent.meta)
+                .field('provider', testContent.provider)
+                .attach('content', testContent.image)
                 .type('form')
           }, RestStatus.INTERNAL_SERVER_ERROR
       )
@@ -172,9 +175,9 @@ describe('File - ExternalStorage', function () {
                   .post('/bloc/file/upload')
                   .set('X-USER-UNIQUE-NAME',userData.userName)
                   .set('X-USER-ID',userData.hash)
-                  .field('metadata', 'Nature Pics')
-                  .field('provider', 's3')
-                  .attach('content', './test/testdata/testImage.png')
+                  .field('metadata', testContent.meta)
+                  .field('provider', testContent.provider)
+                  .attach('content', testContent.image)
                   .type('form')
             }, RestStatus.INTERNAL_SERVER_ERROR
         )
@@ -204,10 +207,10 @@ describe('File - ExternalStorage', function () {
 
       beforeEach(function () {
         storage = {
-          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
-          timeStamp: 1530538131,
+          uri: testVerifiable.uri,
+          timeStamp: testVerifiable.timestamp,
           signers: [
-            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad" //todo - where did string come from. put in factory
+            testSigners[0]
           ]
         };
 
@@ -244,7 +247,7 @@ describe('File - ExternalStorage', function () {
                   .set('X-USER-UNIQUE-NAME',userData.userName)
                   .set('X-USER-ID',userData.hash)
                   .query({
-                    'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+                    'contractAddress': testSigners[0]
                   })
             }, RestStatus.BAD_REQUEST
         )
@@ -299,15 +302,15 @@ describe('File - ExternalStorage', function () {
 
       beforeEach(function () {
         storage = {
-          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
-          timeStamp: 1530538131,
+          uri: testVerifiable.uri,
+          timeStamp: testVerifiable.timestamp,
           signers: [
-            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad" //todo - factory
+            testSigners[0]
           ]
         };
 
         sinon.stub(externalStorage, 'getExternalStorage').resolves(storage);
-        sinon.stub(externalStorage, 'attest').resolves([['6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad', 'a51f27e78aef85a06631f0725f380001e0ae9fb6']]);
+        sinon.stub(externalStorage, 'attest').resolves([ testSigners ]);
       });
 
       afterEach(function () {
@@ -349,7 +352,7 @@ describe('File - ExternalStorage', function () {
             })
 
         assert.deepEqual(
-          { attested: true, signers: ['6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad', 'a51f27e78aef85a06631f0725f380001e0ae9fb6'] },
+          { attested: true, signers: testSigners },
           res.body
         )
         assert.equal(res.status, RestStatus.OK);
@@ -405,10 +408,10 @@ describe('File - ExternalStorage', function () {
 
       beforeEach(function () {
         storage = {
-          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
-          timeStamp: 1530538131,
+          uri: testVerifiable.uri,
+          timeStamp: testVerifiable.timestamp,
           signers: [
-            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
+            testSigners[0]
           ]
         };
 
@@ -437,7 +440,7 @@ describe('File - ExternalStorage', function () {
               chai.request(app)
                   .get('/bloc/file/download')
                   .query({
-                    'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+                    'contractAddress': testSigners[0]
                   })
             }, RestStatus.BAD_REQUEST
         )
@@ -490,9 +493,9 @@ describe('File - ExternalStorage', function () {
         .post('/bloc/file/upload')
         .set('X-USER-UNIQUE-NAME',userData.userName)
         .set('X-USER-ID',userData.hash)
-        .field('metadata', 'Nature Pics')
-        .field('provider', 's3')
-        .attach('content', './test/testdata/testImage.png')
+        .field('metadata', testContent.meta)
+        .field('provider', testContent.provider)
+        .attach('content', testContent.image)
         .type('form')
 
     _contractAddress = uploadResult.body.contractAddress;
