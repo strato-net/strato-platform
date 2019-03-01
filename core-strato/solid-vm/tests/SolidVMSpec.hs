@@ -341,3 +341,16 @@ contract qq {
     );
   }
 }|] `shouldReturn` defaultExecResults
+
+    it "can index into maps with bool" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  mapping(bool => uint) bs;
+  constructor() public {
+    bs[true] = 0x87324;
+    bs[false] = 0x000;
+  }
+}|]
+      getAll [ [Field "bs", MapIndex $ IBool False]
+             , [Field "bs", MapIndex $ IBool True]] `shouldReturn` [BInteger 0, BInteger 0x87324]
+

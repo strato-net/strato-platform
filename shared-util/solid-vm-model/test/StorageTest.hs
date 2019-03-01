@@ -39,6 +39,16 @@ spec = do
       parsePath ".extra" `shouldBe` Right [Field "extra"]
       parsePath ".hashmap" `shouldBe` Right [Field "hashmap"]
       parsePath ".hashmap<30>" `shouldBe` Right [Field "hashmap", MapIndex (INum 30)]
+      parsePath ".hashmap<true>" `shouldBe` Right [Field "hashmap", MapIndex (IBool True)]
+      parsePath ".hashmap<false>" `shouldBe` Right [Field "hashmap", MapIndex (IBool False)]
+
+    it "should fail on badly formed paths" $ do
+      let checkFail = (`shouldSatisfy` isLeft) . parsePath
+      checkFail ".hashmap<3"
+      checkFail ".hashmap<\"unfinished string>"
+      checkFail ".hashmap<tr>"
+      checkFail ".array[\"wrong type\"]"
+      checkFail ".array[false]"
 
     it "should be able to unparse a path" $ do
       unparsePath [] `shouldBe` ""
@@ -47,6 +57,8 @@ spec = do
       unparsePath [MapIndex (IText "xor")] `shouldBe` "<\"xor\">"
       unparsePath [MapIndex (IText "")] `shouldBe` "<\"\">"
       unparsePath [Field "extra"] `shouldBe` ".extra"
+      unparsePath [MapIndex (IBool True)] `shouldBe` "<true>"
+      unparsePath [MapIndex (IBool False)] `shouldBe` "<false>"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])

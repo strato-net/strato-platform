@@ -35,9 +35,10 @@ data BasicValue = BInteger Integer
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
--- TODO(tim): Can be numeric/bool/address/string/text
+-- TODO(tim): Can also be an address
 data IndexType = INum Integer
                | IText B.ByteString
+               | IBool Bool
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StorableValue = BasicValue BasicValue
@@ -95,17 +96,19 @@ parseArrayIndex = do
 parseMapIndex :: Parser StoragePath
 parseMapIndex = do
   skip (== c2w8 '<')
-  isStr <- (== Just (c2w8 '"')) <$> peekWord8
-  idx <- if isStr
-           then do
-             skip (== c2w8 '"')
-             let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
-                 ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
-                 ignoreEscapedQuotes _ _ = Just False
-             strContents <- scan False ignoreEscapedQuotes
-             skip (== c2w8 '"')
-             return . IText . unescapeKey $ strContents
-           else INum <$> parseInteger
+  nextChar <- peekWord8'
+  idx <- case w82c nextChar of
+    't' -> string "true" >> return (IBool True)
+    'f' -> string "false" >> return (IBool False)
+    '"' -> do
+       skip (== c2w8 '"')
+       let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
+           ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
+           ignoreEscapedQuotes _ _ = Just False
+       strContents <- scan False ignoreEscapedQuotes
+       skip (== c2w8 '"')
+       return . IText . unescapeKey $ strContents
+    _ -> INum <$> parseInteger
   skip (== c2w8 '>')
   (MapIndex idx:) <$> pathParser
 
@@ -173,6 +176,8 @@ unparsePath = B.concat . concatMap go
         go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
         go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
         go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
+        go (MapIndex (IBool True)) = ["<true>"]
+        go (MapIndex (IBool False)) = ["<false>"]
 
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 

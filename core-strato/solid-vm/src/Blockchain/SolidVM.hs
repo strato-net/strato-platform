@@ -429,6 +429,8 @@ getIndexType [MS.Field field] = do
       case v of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
          Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
+         Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
+         Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
          _ -> error $ "TODO(tim): unanticipated type in variable declarations: " ++ show v
 getIndexType xs = error $ "TODO(tim): higher order index references: " ++ show xs
@@ -441,6 +443,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
   idx <- getVar idxVar
   return . (parPath ++) $ case (idxType, idx) of
+    (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
     (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
