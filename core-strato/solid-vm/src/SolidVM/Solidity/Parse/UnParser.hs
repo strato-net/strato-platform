@@ -187,6 +187,7 @@ unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do
 unparseExpression :: Expression -> String
 unparseExpression (PlusPlus v) = unparseExpression v ++ "++"
+unparseExpression (MinusMinus v) = unparseExpression v ++ "--"
 unparseExpression (Unitary op v) = op ++ unparseExpression v
 unparseExpression (Binary op v1 v2) =
   unparseExpression v1 ++ " " ++ op ++ " " ++ unparseExpression v2

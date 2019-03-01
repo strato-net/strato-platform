@@ -24,7 +24,7 @@ import qualified Database.LevelDB                   as DB
 
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
-import           SolidVM.Model
+import           Blockchain.SolidVM.Model
 
 type CodeDB = DB.DB
 

@@ -3,14 +3,11 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE RecordWildCards      #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Data.Action where
+module Blockchain.Strato.Model.Action where
 
-import           Blockchain.Data.Address
-import           Blockchain.ExtWord           (Word256, bytesToWord256)
-import           Blockchain.MiscJSON()
-import           Blockchain.SHA
 import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))
 import           Control.Monad                (liftM2)
@@ -25,10 +22,11 @@ import           Data.Text                    (Text)
 import           Data.Time
 import           GHC.Generics
 
-import           SolidVM.Model
-
-instance FromJSONKey Address where
-    fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
+import           Blockchain.MiscJSON()
+import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord           (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.SHA
 
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
 
@@ -145,6 +143,9 @@ instance FromJSON ActionData where
     dt <- o .: "data"
     return $ ActionData ch ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
+
+instance FromJSONKey Address where
+  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 data Action = Action
   { _actionBlockHash          :: SHA

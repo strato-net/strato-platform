@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.SolidVM.SM where
@@ -204,6 +205,10 @@ addLocalVariable name value = do
       put sstate
           {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
 
+toMaybe :: Bool -> a -> Maybe a
+toMaybe True x = Just x
+toMaybe False _ = Nothing
+
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
   sstate <- get
@@ -219,34 +224,24 @@ getVariableOfName name = do
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction =
-        if name `elem` ["uint"]
-        then Just $ Constant $ SBuiltinFunction name Nothing
-        else Nothing
+      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
+        Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
-      maybeBuiltinVariable =
-        if name `elem` ["msg", "block", "tx"]
-        then Just $ Constant $ SBuiltinVariable name
-        else Nothing
+      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx"]) $
+        Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum =
-        if name `elem` M.keys (currentContract currentCallInfo^.enums)
-        then Just $ Constant $ SEnum name
-        else Nothing
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
+        Constant $ SEnum name
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef =
-        if name `elem` M.keys (currentContract currentCallInfo^.structs)
-        then Just $ Constant $ SStructDef name
-        else Nothing
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
+        Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
-      maybeContract =
-        if name `elem` M.keys (codeCollection sstate^.contracts)
-        then Just $ Constant $ SContractDef name
-        else Nothing
+      maybeContract = toMaybe (name `elem` M.keys (codeCollection sstate^.contracts)) $
+        Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
@@ -256,11 +251,7 @@ getVariableOfName name = do
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = if name == "this"
-                   then Just . Constant . SAddress . currentAddress $ currentCallInfo
-                   else Nothing
-
-
+      maybeThis = toMaybe (name == "this") . Constant . SAddress . currentAddress $ currentCallInfo
 
 
 
@@ -292,6 +283,19 @@ getVariableOfName name = do
     $ flip fromMaybe maybeThis
 --    $ flip fromMaybe maybeConstantValue
     $ (error $ "No variable with name " ++ name)
+
+getTypeOfName :: String -> SM Typo
+getTypeOfName s = do
+  let lookInContract :: Contract -> [Typo]
+      lookInContract (Contract{..}) = catMaybes
+        [ fmap StructTypo (M.lookup s _structs)
+        , fmap EnumTypo (M.lookup s _enums)
+        , fmap FuncTypo (M.lookup s _functions)
+        ]
+  CodeCollection ccs <- gets codeCollection
+  case concatMap lookInContract ccs of
+    [] -> error $ "TODO(tim): unable to find type: " ++ show s
+    (typo:_) -> return typo
 
 {-
   c <- fmap (currentContract . head . callStack) get

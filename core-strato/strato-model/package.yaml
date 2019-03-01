@@ -6,30 +6,31 @@ build-type:          Simple
 license:             Apache-2.0
 
 dependencies:
+  - QuickCheck
   - aeson
   - ansi-wl-pprint
   - base
   - base16-bytestring
-  - containers
-  - ethereum-rlp
   - binary
+  - blockapps-haskoin
   - bytestring
+  - containers
+  - cpu
   - cryptonite
   - deepseq
+  - ethereum-rlp
+  - fast-keccak256
   - hashable
+  - http-api-data
+  - integer-gmp
   - lens
-  - path-pieces
   - memory
   - nibblestring
-  - blockapps-haskoin
+  - path-pieces
+  - primitive
   - text
   - time
-  - QuickCheck
-  - http-api-data
-  - primitive
-  - cpu
-  - integer-gmp
-  - fast-keccak256
+  - unordered-containers
 
 ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
 

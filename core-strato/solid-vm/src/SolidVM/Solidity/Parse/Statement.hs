@@ -103,7 +103,9 @@ expression =
      ]
     ],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
+    [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+    [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
     [binary "<<", binary ">>"],
@@ -175,7 +177,7 @@ Expression
 
 
 primaryExpression :: SolidityParser Expression
-primaryExpression = do  
+primaryExpression = do
   (reserved "msg" >> return (Variable "msg"))
   <|> (reserved "address" >> return (Variable "address"))
   <|> (reserved "this" >> return (Variable "this"))
@@ -199,6 +201,6 @@ numberUnit = do
     <|> (reserved "finny" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
-  
+
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep expression
