@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const sinon = require('sinon');
 const rp = require('request-promise');
 const rewire = require('rewire');
+const co = require('co');
 
 const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
@@ -20,6 +21,7 @@ const checkMode = require('../lib/checkMode');
 const testFactory = require(`${process.cwd()}/test/factory`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const util = require(`${process.cwd()}/lib/rest-utils/util`);
+const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
 const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
 
@@ -72,8 +74,7 @@ describe('OAuth tests', function () {
   it('replies Bad Request without headers', async function () {
     await assert.shouldThrowRest(
         async function () {
-          chai.request(app)
-              .post('/login')
+          await co.wrap(oAuth.createKey);
         }, RestStatus.BAD_REQUEST
     )
 
@@ -83,11 +84,10 @@ describe('OAuth tests', function () {
   it('creates new user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const user = await chai.request(app)
-        .post('/users')
-        .set('X-USER-UNIQUE-NAME',username)
-        .set('X-USER-ID',userData.hash)
-        .send();
+    const user = await co.wrap(oAuth.createKey)({
+      'X-USER-UNIQUE-NAME': username,
+      'X-USER-ID': userData.hash
+    })
 
     assert.equal(user.status,RestStatus.OK,'user created')
   });
@@ -96,23 +96,20 @@ describe('OAuth tests', function () {
   it('finds existing user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const result = await chai.request(app)
-        .post('/users')
-        .set('X-USER-UNIQUE-NAME',username)
-        .set('X-USER-ID',userData.hash)
-        .send();
-
+    const result = await co.wrap(oAuth.createKey)({
+      'X-USER-UNIQUE-NAME': username,
+      'X-USER-ID': userData.hash
+    })
 
     if(result.status == RestStatus.OK){ //user created, faucet em
-      userAccountAddress = result.body.user.address;
+      userAccountAddress = result.user.address;
       await waitFaucet(userAccountAddress);
     }
 
-    const user = await chai.request(app)
-        .post('/login')
-        .set('X-USER-UNIQUE-NAME',username)
-        .set('X-USER-ID',userData.hash)
-        .send()
+    const user = await co.wrap(oAuth.getKey)({
+      'X-USER-UNIQUE-NAME': username,
+      'X-USER-ID': userData.hash
+    })
 
     assert.equal(user.status,RestStatus.OK,'user found')
   });

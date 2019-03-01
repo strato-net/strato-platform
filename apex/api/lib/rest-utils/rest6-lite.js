@@ -75,7 +75,6 @@ function* isSearchable(codeHash) {
   // return (results.length > 0);
 }
 
-
 //=======================
 // Helper Functions
 //=======================

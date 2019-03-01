@@ -4,11 +4,11 @@ const router = express.Router();
 const authHandler = require('../middlewares/authHandler.js');
 
 const authController = require('../controllers/auth');
-const oAuthController = require('../controllers/oAuth');
+const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
-const healthHandler = require('../controllers/health'); //fixme - crashes in oauth cause not able to establish db connection. probably should keep it? use a flag?
+const healthHandler = require('../controllers/health');
 const checkMode = require('../lib/checkMode').checkMode;
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const multer = require('multer');
@@ -36,9 +36,8 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-router.post('/login', checkMode, isOAuth() ? oAuthController.getKey : authController.login);
-router.post('/users', checkMode, isOAuth() ? oAuthController.createKey : authController.create);
-
+router.post('/login', checkMode, authController.login);
+router.post('/users', checkMode, authController.create);
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
@@ -65,7 +64,7 @@ router.get('/_ping', healthHandler.ping);
 router.get('/_track', trackHandler._track);
 
 
-function isOAuth(){ //fixme - util file somewhere?
+function isOAuth(){
   return process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
 }
 
