@@ -288,7 +288,7 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --I had to temporarily replace the compileContract call to get the metadata needed for the transaction results call later on.
   --At best we should remove the need for the metadata completely, at worst, we should remove the compile and just generate the metadata.  To get the interpreter working, I am just putting this all back in now, and will notate which lines we should eventually remove again
-  idsAndDetails <- compileContract src      --remove
+  idsAndDetails <- getMetadataNoCompile src      --remove
   (cName,(cmId,ContractDetails{..})) <-     --remove
     case contract of                        --remove
      Nothing ->                             --remove
