@@ -323,3 +323,22 @@ contract qq {
   }
 }|]
       getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 19, BInteger 19]
+
+    it "can require" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 3, "Who is John Galt?");
+  }
+}|] `shouldReturn` defaultExecResults
+
+    it "can multiline require" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() public {
+    require(
+      3 == 3,
+      "Who is John Galt????"
+    );
+  }
+}|] `shouldReturn` defaultExecResults

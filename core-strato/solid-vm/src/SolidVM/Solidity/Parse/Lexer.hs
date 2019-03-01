@@ -3,6 +3,7 @@
 -- Description: Parsers for various lexical elements of a Solidity source
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
@@ -31,6 +32,8 @@ import           Text.Parsec
 import           Text.Parsec.Language                 (javaStyle)
 import qualified Text.Parsec.Token                    as P
 
+import           SolidVM.Solidity.Parse.ParserTypes  (SolidityParser)
+
 reserved = P.reserved solidityLexer
 reservedOp = P.reservedOp solidityLexer
 identifier = P.identifier solidityLexer
@@ -46,8 +49,7 @@ dot = P.dot solidityLexer
 semi = P.semi solidityLexer
 --semiSep = P.semiSep solidityLexer
 --semiSep1 = P.semiSep1 solidityLexer
-stringLiteral :: Stream s m Char =>
-                 ParsecT s u m String
+stringLiteral :: SolidityParser String
 stringLiteral = solidityStringLiteral
 whiteSpace = P.whiteSpace solidityLexer
 
@@ -88,45 +90,37 @@ solidityLanguage = javaStyle {
 -------------------------
 
 
-solidityStringLiteral :: Stream s m Char =>
-                         ParsecT s u m String
-solidityStringLiteral = 
+solidityStringLiteral :: SolidityParser String
+solidityStringLiteral = lexeme $
   (between (char '"') (char '"' <?> "double quote") (many $ doubleQuoteStringChar))
   <|>
   (between (char '\'') (char '\'' <?> "single quote") (many $ singleQuoteStringChar))
 
 
-singleQuoteStringChar :: Stream s m Char =>
-                         ParsecT s u m Char
+singleQuoteStringChar :: SolidityParser Char
 singleQuoteStringChar = singleQuoteStringLetter <|> stringEscape
                         <?> "string character"
 
-doubleQuoteStringChar :: Stream s m Char =>
-                         ParsecT s u m Char
+doubleQuoteStringChar :: SolidityParser Char
 doubleQuoteStringChar = doubleQuoteStringLetter <|> stringEscape
                         <?> "string character"
 
-singleQuoteStringLetter :: Stream s m Char =>
-                           ParsecT s u m Char
+singleQuoteStringLetter :: SolidityParser Char
 singleQuoteStringLetter = satisfy (\c -> (c /= '\'') && (c /= '\\'))
 
-doubleQuoteStringLetter :: Stream s m Char =>
-                           ParsecT s u m Char
+doubleQuoteStringLetter :: SolidityParser Char
 doubleQuoteStringLetter = satisfy (\c -> (c /= '"') && (c /= '\\'))
 
-stringEscape :: Stream s m Char =>
-                ParsecT s u m Char
+stringEscape :: SolidityParser Char
 stringEscape = do
   _ <- char '\\'
   escapeCode
 
-escapeCode :: Stream s m Char =>
-              ParsecT s u m Char
+escapeCode :: SolidityParser Char
 escapeCode = charEsc <|> hexChar <|> unicodeChar
              <?> "escape code"
 
-hexChar :: Stream s m Char =>
-           ParsecT s u m Char
+hexChar :: SolidityParser Char
 hexChar = do
   _ <- char 'x'
   d1 <- hexDigit
@@ -134,8 +128,7 @@ hexChar = do
   let ((d, _):_) = readHex [d1,d2]
   return $ w2c d
 
-unicodeChar :: Stream s m Char =>
-               ParsecT s u m Char
+unicodeChar :: SolidityParser Char
 unicodeChar = do
   _ <- char 'u'
   d1 <- digit
@@ -145,8 +138,7 @@ unicodeChar = do
   let ((d, _):_) = readHex [d1,d2,d3,d4]
   return $ toEnum d
 
-charEsc :: Stream s m Char =>
-           ParsecT s u m Char
+charEsc :: SolidityParser Char
 charEsc = choice (map parseEsc escMap)
   where
     parseEsc (c,code) = do{ _ <- char c; return code }

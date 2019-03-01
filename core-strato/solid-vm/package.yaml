@@ -87,6 +87,7 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - SolidVM.Solidity.Parse.File
+    - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
     - SolidVM.Solidity.Xabi.Statement
   ghc-options: -Wall -O2
@@ -110,6 +111,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - HUnit
       - monad-logger
       - raw-strings-qq
       - solid-vm

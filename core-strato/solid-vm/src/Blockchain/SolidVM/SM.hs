@@ -224,7 +224,7 @@ getVariableOfName name = do
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256"]) $
+      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
         Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

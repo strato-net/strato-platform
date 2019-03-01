@@ -776,6 +776,12 @@ callBuiltin "identity" [v] Nothing = do
   return v
 callBuiltin "keccak256" [SString buf] Nothing = do
   return . SString . BC.unpack . keccak256 . BC.pack $ buf
+callBuiltin "require" (SBool cond :msg) Nothing = do
+  unless cond $ do
+    case msg of
+      [] -> error "Assertion thrown"
+      (m:_) -> error $ "Assertion throw: " ++ show m
+  return $ SNULL
 callBuiltin x _ _ = error $ "callBuiltin called for an unknown function: " ++ x
 
 
