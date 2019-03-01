@@ -56,13 +56,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Remove OAuth configuration lines if deployment is not OAuth-enabled
   if [ "$OAUTH_ENABLED" != true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
-  else
-    sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
-  fi
-
-  if [ "$OAUTH_ENABLED" != true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH_LOGIN/d' /tmp/nginx.conf
     sed -i '/#TEMPLATE_MARK_OAUTH_VERIFY/d' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
   fi
   
   if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
