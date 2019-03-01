@@ -12,44 +12,102 @@ description:
 default-extensions:
   - DeriveGeneric
   - DeriveAnyClass
+  - LambdaCase
+
 
 dependencies:
   - base >= 4 && < 5
-  - vm-tools
-  - ethereum-vm
-  - ansi-wl-pprint
-  - base16-bytestring
+  - aeson
+  - aeson-casing
   - binary
   - blockapps-data
-  - blockapps-haskoin
+  - blockapps-mpdbs
+  - ethereum-rlp
   - blockapps-util
   - bytestring
-  - clockwork
   - containers
-  - cpu
-  - cryptohash
+  - cryptonite
   - deepseq
-  - ethereum-encryption
   - extra
-  - ghc
-  - integer-gmp
+  - generic-random
   - lens
+  - memory
   - merkle-patricia-db
-  - monad-logger
-  - mtl
-  - primitive
+  - parsec
+  - QuickCheck
+  - quickcheck-instances
   - resourcet
+  - semver-range
+  - servant-docs
+  - solid-vm-model
   - strato-model
+  - swagger2
   - text
   - time
   - transformers
-  - unboxed-ref
+  - unordered-containers
   - vector
   - vm-tools
+
+
+#  - ethereum-vm
+#  - ansi-wl-pprint
+#  - base16-bytestring
+#  - binary
+#  - blockapps-haskoin
+#  - bytestring
+#  - clockwork
+#  - containers
+#  - cpu
+#  - cryptohash
+#  - deepseq
+#  - ethereum-encryption
+#  - extra
+#  - ghc
+#  - integer-gmp
+#  - lens
+#  - merkle-patricia-db
+#  - monad-logger
+#  - mtl
+#  - primitive
+#  - resourcet
+#  - text
+#  - unboxed-ref
+#  - vector
+#  - vm-tools
+#  - http-api-data
+#  - persistent
+#  - random
+#  - servant
+
 
 
 library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - SolidVM.Solidity.Parse.File
   ghc-options: -Wall -O2
+
+executables:
+  parse-solidvm:
+    source-dirs: exec_src
+    main: Parse.hs
+    dependencies:
+      - solid-vm
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: SolidVMSpec.hs
+    dependencies:
+      - base16-bytestring
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - monad-logger
+      - raw-strings-qq
+      - solid-vm

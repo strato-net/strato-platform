@@ -158,9 +158,9 @@ storageSpec = do
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putSolidStorageKeyVal' 0x99 (Field "x" (ArrayIndex 99 Null)) (BString "txt")
-      getSolidStorageKeyVal' 0x99 (Field "x" (ArrayIndex 99 Null)) `shouldReturn` BString "txt"
+      putSolidStorageKeyVal' 0x99 [Field "x", ArrayIndex 99] (BString "txt")
+      getSolidStorageKeyVal' 0x99 [Field "x", ArrayIndex 99] `shouldReturn` BString "txt"
 
     it "should be able to flush" . runStorM $ do
-      putSolidStorageKeyVal' 0x342 (Field "x" Null) (BBool True)
+      putSolidStorageKeyVal' 0x342 [Field "x"] (BBool True)
       flushMemSolidStorageDB

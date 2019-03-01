@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
@@ -119,3 +120,10 @@ instance Arbitrary SHA where
     arbitrary = do
         random256Bit <- fastRandBs 32
         return . SHA . fromIntegral . byteString2Integer $ random256Bit
+
+data CodePtr = EVMCode SHA | SolidVMCode String SHA
+             deriving (Show, Read, Eq, Ord, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
+
+instance Format CodePtr where
+  format (EVMCode ch) = format ch
+  format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
