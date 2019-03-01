@@ -10,10 +10,11 @@ const dappController = require('../controllers/dapp');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health'); //fixme - crashes in oauth cause not able to establish db connection. probably should keep it? use a flag?
 const checkMode = require('../lib/checkMode').checkMode;
-const fileController = require('../controllers/file');
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const multer = require('multer');
-var upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage() });
+
+const fileController = isOAuth() ? require(`${process.cwd()}/controllers/file.oAuth`) : require('../controllers/file');
 
 const multerMiddleware = (req, res, next) => {
   upload.single('content')(req, res, (error) => {
@@ -35,8 +36,8 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-router.post('/login', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.getKey : authController.login);
-router.post('/users', checkMode, process.env.OAUTH_ENABLED==appConfig.oAuthEnabledTrueValue ? oAuthController.createKey : authController.create);
+router.post('/login', checkMode, isOAuth() ? oAuthController.getKey : authController.login);
+router.post('/users', checkMode, isOAuth() ? oAuthController.createKey : authController.create);
 
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
@@ -62,5 +63,10 @@ router.get('/status', healthHandler.nodeStatus);
 router.get('/_ping', healthHandler.ping);
 
 router.get('/_track', trackHandler._track);
+
+
+function isOAuth(){ //fixme - util file somewhere?
+  return process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
+}
 
 module.exports = router;

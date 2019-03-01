@@ -5,7 +5,7 @@ const appConfig = require('../config/app.config');
 const models = require('../models');
 const s3 = require('../lib/s3');
 const uploader = require('../lib/uploader');
-const externalStorage = require('../lib/externalStorage/externalStorage');
+const externalStorage = require('../lib/externalStorage/externalStorage.oAuth');
 const crypto = require('crypto');
 const rp = require('request-promise');
 

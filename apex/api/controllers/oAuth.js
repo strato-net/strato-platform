@@ -31,12 +31,8 @@ function createKey(req, res, next) {
     //todo - depending on oauth - put try catch block for blockUser or vaultWrapper CreateKey [155-167]
     // Create blockchain user in bloc
     try {
-      console.log("=======! creatin blocUser")
 
       const blocUser = yield ax.post(process.env.VAULT_HOST, req.body, '/strato/v2.3/key', req.headers);
-
-      console.log('BLOC USER CREATED')
-      console.log(blocUser)
 
       res.status(RestStatus.OK).json({ user: blocUser });
     } catch (blocError) {
@@ -60,8 +56,6 @@ function getKey(req, res, next) {
 
   co(function* () {
     try {
-      console.log("=======? finding blocUser")
-
       const query = req.body ? `?${querystring.stringify(req.body)}` : ''; //todo - do we need this atm?
 
       const blocUser = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key${query}`, {
@@ -69,8 +63,6 @@ function getKey(req, res, next) {
         "x-user-id": req.headers['x-user-id']
       });
 
-      console.log('BLOC USER FOUND')
-      console.log(blocUser)
 
       res.status(RestStatus.OK).json({user: blocUser});
     } catch (blocError) {

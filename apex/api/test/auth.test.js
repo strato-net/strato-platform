@@ -45,7 +45,7 @@ chai.use(chaiHttp);
 
 const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
 
-describe('Auth/public tests', function () {
+describe('non-OAuth/public Auth tests', function () {
   this.timeout(10000);
 
     //need to add skip check to each describe block because of mocha bug.

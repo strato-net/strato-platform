@@ -186,7 +186,6 @@ function* uploadContractString(userHeaders, contractName, contractSrc, args, opt
   }];
 
 
-  console.log('Uploading Contract')
   let result = yield sendTransactions({
     txs,
     txParams,

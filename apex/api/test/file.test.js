@@ -14,16 +14,13 @@ const bcrypt = require('bcrypt');
 const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
-const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
-const testFactory = require(`${process.cwd()}/test/factory`);
+const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
 
-const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
-
-const waitFaucet = async function (address) { //fixme - function duplicated in multiple tests, move to util file 
+const waitFaucet = async function (address) {
   const res = await chai.request(process.env.stratoRoot)
     .post('/faucet')
     .field('address', address);
-  assert.equal(res.status, RestStatus.OK);
+  assert.equal(res.status, '200');
   const sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
   };
@@ -44,143 +41,161 @@ const waitFaucet = async function (address) { //fixme - function duplicated in m
 
 chai.use(chaiHttp);
 
-describe('File - ExternalStorage', function () {
-  this.timeout(200000);
+describe('File - ExternalStorage - non-OAuth/Public', function () {
+  this.timeout(20000);
+  let _contractAddress, accountAddress, app;
 
-  const userData = testFactory.getUserData();
-  const uploadData = testFactory.getUploadData()
-  const testContent = testFactory.getTestContent()
-  const testSigners = testFactory.getTestSigners()
-  const testVerifiable = testFactory.getTestVerifiable()
-  
-  let _contractAddress, userAccountAddress, app;
-  
-  
-  before(async function () { //todo - is this async before block garuanteed to complete before the describe blocks below? - i think so but double check
-
+  before(async function () {
     if(SKIP_TEST_BLOCK){
       this.skip();
     }
 
+    checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
+      return next();
+    });
+
     app = require('../app');
 
-    //fixme - is there a way to clear all keys in db - in case test is run on non clean system?
+    await models.TempUser.create({
+      email: 'test01@test.com',
+      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
+      verified: true
+    });
+    const res1 = await chai.request(app)
+      .post('/users')
+      .send({
+        username: "test01@test.com",
+        password: "password"
+      });
 
-    const user = await chai.request(app)
-        .post('/login')
-        .set('X-USER-UNIQUE-NAME',userData.userName)
-        .set('X-USER-ID',userData.hash)
-        .catch((err) => {
-          const res = err.response;
-          assert.equal(res.status, RestStatus.INTERNAL_SERVER_ERROR,'user not found');
-        });
-
-    if(user && user.status == RestStatus.OK){ //user found, yay
-      await createTestContract();
-      return;
-    }
-
-    const result = await chai.request(app)
-        .post('/users')
-        .set('X-USER-UNIQUE-NAME',userData.userName)
-        .set('X-USER-ID',userData.hash)
-        .send();
-
-
-    if(result.status == RestStatus.OK){ //user created, faucet em
-      userAccountAddress = result.body.user.address;
-      await waitFaucet(userAccountAddress);
-      await createTestContract();
-    }
-
+    accountAddress = JSON.parse(res1.text).user.accountAddress;
+    await waitFaucet(accountAddress);
   });
 
+  after(function () {
+    if(SKIP_TEST_BLOCK){
+      this.skip();
+    }
 
+    checkMode.checkMode.restore();
+  })
 
 
   describe('post /bloc/file/upload', async function () {
 
     beforeEach(function () {
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
+      let uploadData = {
+        ETag: '"123b0b7aef8ba5d26ac7cab3438837f9"',
+        Location: 'https://strato-external-storage.s3.amazonaws.com/1530596484075-Rie1vaW.png',
+        key: '1530596484075-Rie1vaW.png',
+        Key: '1530596484075-Rie1vaW.png',
+        Bucket: 'strato-external-storage'
+      };
+
       sinon.stub(uploader, 'upload').resolves(uploadData);
     });
 
     afterEach(function () {
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
       uploader.upload.restore();
     })
 
-    it('replies Bad Request without content', async function () {
-      await assert.shouldThrowRest(
-          async function () {
-            chai.request(app)
-                .post('/bloc/file/upload')
-                .set('X-USER-UNIQUE-NAME',userData.userName)
-                .set('X-USER-ID',userData.hash)
-          }, RestStatus.BAD_REQUEST
-      )
-    });
-
-    it('replies Bad Request without content', async function () {
+    it('replies Bad Request without content, username, address, password, provider, metadata', async function () {
       chai.request(app)
         .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME',userData.userName)
-          .set('X-USER-ID',userData.hash)
-        .attach('content', testContent.image)
         .catch((err) => {
           const res = err.response;
-          assert.equal(res.status, RestStatus.BAD_REQUEST);
+          assert(res.text.includes("wrong params"));
+          assert.equal(res.status, '400');
         });
     });
 
-    it('replies OK with file uplaod and data entry', async function () {
-      const username = userData.userName;
-      const result = await chai.request(app)
+    it('replies Bad Request without username, address, password, provider, metadata', async function () {
+      chai.request(app)
         .post('/bloc/file/upload')
-          .set('X-USER-UNIQUE-NAME',userData.userName)
-          .set('X-USER-ID',userData.hash)
-          .field('metadata', testContent.meta)
-          .field('provider', testContent.provider)
-          .attach('content', testContent.image)
-          .type('form')
-
-      expect(result).to.have.status(RestStatus.OK);
+        .attach('content', './test/testdata/testImage.png')
+        .catch((err) => {
+          const res = err.response;
+          assert(res.text.includes("wrong params"));
+          assert.equal(res.status, '400');
+        });
     });
 
-    it('replies UNAUTHORIZED with invalid headers', async function () {
-      await assert.shouldThrowRest(
-          async function () {
-            await chai.request(app)
-                .post('/bloc/file/upload')
-                .field('metadata', testContent.meta)
-                .field('provider', testContent.provider)
-                .attach('content', testContent.image)
-                .type('form')
-          }, RestStatus.INTERNAL_SERVER_ERROR
-      )
+    it('replies 200 with file uplaod and data entry', async function () {
+      const result = await chai.request(app)
+        .post('/bloc/file/upload')
+        .field('username', 'test01@test.com')
+        .field('address', accountAddress)
+        .field('password', 'password')
+        .field('metadata', 'Nature Pics')
+        .field('provider', 's3')
+        .attach('content', './test/testdata/testImage.png')
+        .type('form')
+
+      expect(result).to.have.status(200);
+      // all the below testcases are dependent on contractAddress assigned here
+      _contractAddress = result.body.contractAddress;
+    });
+
+    it('replies 400 with incorrect password', async function () {
+      await chai.request(app)
+        .post('/bloc/file/upload')
+        .field('username', 'test01@test.com')
+        .field('address', accountAddress)
+        .field('password', 'passwo')
+        .field('metadata', 'Nature Pics')
+        .field('provider', 's3')
+        .attach('content', './test/testdata/testImage.png')
+        .type('form').catch(error => {
+          assert.equal(error.status, '400');
+        })
     });
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'uploadContract').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.uploadContract.restore();
       })
 
-      it('throws INTERNAL_SERVER_ERROR', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .post('/bloc/file/upload')
-                  .set('X-USER-UNIQUE-NAME',userData.userName)
-                  .set('X-USER-ID',userData.hash)
-                  .field('metadata', testContent.meta)
-                  .field('provider', testContent.provider)
-                  .attach('content', testContent.image)
-                  .type('form')
-            }, RestStatus.INTERNAL_SERVER_ERROR
-        )
+      it('throws 500', async function () {
+        await chai.request(app)
+          .post('/bloc/file/upload')
+          .field('username', 'test01@test.com')
+          .field('address', accountAddress)
+          .field('password', 'password')
+          .field('metadata', 'Nature Pics')
+          .field('provider', 's3')
+          .attach('content', './test/testdata/testImage.png')
+          .type('form')
+          .catch((err) => {
+            const res = err.response;
+            assert.equal(res.status, '500');
+          });
       });
 
     });
@@ -188,29 +203,47 @@ describe('File - ExternalStorage', function () {
   });
 
   describe('get /bloc/file/list', async function () {
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
 
-    it('replies OK with list of uploads', async function () {
+    it('replies 200 with list of uploads', async function () {
       const res = await chai.request(app)
         .get('/bloc/file/list')
-          .set('X-USER-UNIQUE-NAME',userData.userName)
-          .set('X-USER-ID',userData.hash)
 
-      assert.equal(res.status, RestStatus.OK);
+      assert.equal(res.status, '200');
     });
 
   });
 
   describe('get /bloc/file/verify', async function () {
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
 
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         storage = {
-          uri: testVerifiable.uri,
-          timeStamp: testVerifiable.timestamp,
+          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
+          timeStamp: 1530538131,
           signers: [
-            testSigners[0]
+            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
           ]
         };
 
@@ -221,74 +254,79 @@ describe('File - ExternalStorage', function () {
         externalStorage.getExternalStorage.restore();
       })
 
-      it('replies BAD_REQUEST with wrong query', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              chai.request(app)
-                  .get('/bloc/file/verify')
-                  .set('X-USER-UNIQUE-NAME',userData.userName)
-                  .set('X-USER-ID',userData.hash)
-                  .query({
-                    'contractAddress': null
-                  })
-                  .catch((err) => {
-                    const res = err.response;
-                    assert.equal(res.status, RestStatus.BAD_REQUEST);
-                  });
-            }, RestStatus.BAD_REQUEST
-        )
+      it('replies 400 with wrong query', async function () {
+        chai.request(app)
+          .get('/bloc/file/verify')
+          .query({
+            'contractAddress': null
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("wrong params"));
+            assert.equal(res.status, '400');
+          });
       });
 
-      it('replies BAD_REQUEST with no data exists', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              chai.request(app)
-                  .get('/bloc/file/verify')
-                  .set('X-USER-UNIQUE-NAME',userData.userName)
-                  .set('X-USER-ID',userData.hash)
-                  .query({
-                    'contractAddress': testSigners[0]
-                  })
-            }, RestStatus.BAD_REQUEST
-        )
+      it('replies 400 with no data exists', async function () {
+        chai.request(app)
+          .get('/bloc/file/verify')
+          .query({
+            'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("wrong params"));
+            assert.equal(res.status, '400');
+          });
       });
 
-      it('replies OK with data exists', async function () {
+      it('replies 200 with data exists', async function () {
         const res = await chai.request(app)
           .get('/bloc/file/verify')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
-            .set('X-USER-ID',userData.hash)
-            .query({
-              'contractAddress': _contractAddress
-            })
+          .query({
+            'contractAddress': _contractAddress
+          })
 
         assert.deepEqual(res.body, storage);
-        assert.equal(res.status, RestStatus.OK);
+        assert.equal(res.status, '200');
       });
     });
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws INTERNAL_SERVER_ERROR', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .get('/bloc/file/verify')
-                  .set('X-USER-UNIQUE-NAME', userData.userName)
-                  .set('X-USER-ID', userData.hash)
-                  .query({
-                    'contractAddress': _contractAddress
-                  })
-            }, RestStatus.INTERNAL_SERVER_ERROR
-        )
+      it('throws 500', async function () {
+        await chai.request(app)
+          .get('/bloc/file/verify')
+          .query({
+            'contractAddress': _contractAddress
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert.equal(res.status, '500');
+          });
       });
 
     });
@@ -297,105 +335,145 @@ describe('File - ExternalStorage', function () {
 
   describe('post /bloc/file/attest', async function () {
 
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
+
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         storage = {
-          uri: testVerifiable.uri,
-          timeStamp: testVerifiable.timestamp,
+          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
+          timeStamp: 1530538131,
           signers: [
-            testSigners[0]
+            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
           ]
         };
 
         sinon.stub(externalStorage, 'getExternalStorage').resolves(storage);
-        sinon.stub(externalStorage, 'attest').resolves([ testSigners ]);
+        sinon.stub(externalStorage, 'attest').resolves([['6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad', 'a51f27e78aef85a06631f0725f380001e0ae9fb6']]);
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
         externalStorage.attest.restore();
       })
 
-      it('missing headers', async function () {
+      it('replies Bad Request without username, address, password, contractAddress', async function () {
         chai.request(app)
           .post('/bloc/file/attest')
           .catch((err) => {
             const res = err.response;
-            assert.equal(res.status, RestStatus.UNAUTHORIZED);
+            assert(res.text.includes("wrong params"));
+            assert.equal(res.status, '400');
           });
       });
 
-      it('replies BAD_REQUEST with no data exists', async function () {
+      it('replies 400 with no data exists', async function () {
         chai.request(app)
           .post('/bloc/file/attest')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
-            .set('X-USER-ID',userData.hash)
-            .send({
-              contractAddress: 'a51f27e78aef85a06631f0725f380001e0a',
-            })
-            .catch((err) => {
-              const res = err.response;
-              assert(res.text.includes("Contract address not found"));
-              assert.equal(res.status, RestStatus.BAD_REQUEST);
-            });
+          .send({
+            contractAddress: 'a51f27e78aef85a06631f0725f380001e0a',
+            username: 'test1@mailinator.com',
+            password: 'password',
+            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("Contract address not found"));
+            assert.equal(res.status, '400');
+          });
       });
 
-      it('replies OK with valid data', async function () {
+      it('replies 200 with valid data', async function () {
         const res = await chai.request(app)
           .post('/bloc/file/attest')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
-            .set('X-USER-ID',userData.hash)
-            .send({
-              contractAddress: _contractAddress,
-            })
+          .send({
+            contractAddress: _contractAddress,
+            username: 'test1@mailinator.com',
+            password: 'password',
+            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
+          })
 
         assert.deepEqual(
-          { attested: true, signers: testSigners },
+          { attested: true, signers: ['6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad', 'a51f27e78aef85a06631f0725f380001e0ae9fb6'] },
           res.body
         )
-        assert.equal(res.status, RestStatus.OK);
+        assert.equal(res.status, '200');
       });
 
       it('replies 400 with signer already exists', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .post('/bloc/file/attest')
-                  .set('X-USER-UNIQUE-NAME',userData.userName)
-                  .set('X-USER-ID',userData.hash)
-                  .send({
-                    contractAddress: _contractAddress,
-                  })
-            },
-            RestStatus.BAD_REQUEST);
+        await chai.request(app)
+          .post('/bloc/file/attest')
+          .send({
+            contractAddress: _contractAddress,
+            username: 'test1@mailinator.com',
+            password: 'password',
+            address: '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert.equal(res.status, '400');
+          });
       });
 
     });
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws INTERNAL SERVER ERROR', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .post('/bloc/file/attest')
-                  .set('X-USER-UNIQUE-NAME',userData.userName)
-                  .set('X-USER-ID',userData.hash)
-                  .send({
-                    contractAddress: _contractAddress,
-                  })
-            }, RestStatus.INTERNAL_SERVER_ERROR
-        )
+      it('throws 500', async function () {
+        await chai.request(app)
+          .post('/bloc/file/attest')
+          .send({
+            contractAddress: _contractAddress,
+            username: 'test1@mailinator.com',
+            password: 'password',
+            address: 'a51f27e78aef85a06631f0725f380001e0ae9fb6'
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("Internal server error"));
+            assert.equal(res.status, '500');
+          });
       });
 
     });
@@ -403,15 +481,31 @@ describe('File - ExternalStorage', function () {
 
   describe('get /bloc/file/download ', async function () {
 
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
+
+
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         storage = {
-          uri: testVerifiable.uri,
-          timeStamp: testVerifiable.timestamp,
+          uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
+          timeStamp: 1530538131,
           signers: [
-            testSigners[0]
+            "6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad"
           ]
         };
 
@@ -419,88 +513,90 @@ describe('File - ExternalStorage', function () {
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         externalStorage.getExternalStorage.restore();
       })
 
-      it('replies BAD_REQUEST with wrong query', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .get('/bloc/file/download')
-                  .query({
-                    'contractAddress': null
-                  })
-            }, RestStatus.BAD_REQUEST
-        )
+      it('replies 400 with wrong query', async function () {
+        await chai.request(app)
+          .get('/bloc/file/download')
+          .query({
+            'contractAddress': null
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("wrong params"));
+            assert.equal(res.status, '400');
+          });
       });
 
-      it('replies BAD_REQUEST with contractAddress not exists', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              chai.request(app)
-                  .get('/bloc/file/download')
-                  .query({
-                    'contractAddress': testSigners[0]
-                  })
-            }, RestStatus.BAD_REQUEST
-        )
+      it('replies 400 with contractAddress not exists', async function () {
+        chai.request(app)
+          .get('/bloc/file/download')
+          .query({
+            'contractAddress': '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("wrong params"));
+            assert.equal(res.status, '400');
+          });
       });
 
-      it('replies OK with data exists', async function () {
+      it('replies 200 with data exists', async function () {
         const res = await chai.request(app)
           .get('/bloc/file/download')
           .query({
             'contractAddress': _contractAddress
           })
 
-        assert.equal(res.status, RestStatus.OK);
+        assert.equal(res.status, '200');
       });
 
     });
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
       })
 
-      it('throws INTERNAL SERVER ERROR', async function () {
-        await assert.shouldThrowRest(
-            async function () {
-              await chai.request(app)
-                  .get('/bloc/file/download')
-                  .query({
-                    'contractAddress': _contractAddress
-                  })
-            }, RestStatus.INTERNAL_SERVER_ERROR
-        )
+      it('throws 500', async function () {
+        let res = await chai.request(app)
+          .get('/bloc/file/download')
+          .query({
+            'contractAddress': _contractAddress
+          })
+          .catch((err) => {
+            const res = err.response;
+            assert(res.text.includes("Internal server error"));
+            assert.equal(res.status, '500');
+          });
       });
 
     });
 
   });
 
-  async function createTestContract(){
-
-    sinon.stub(uploader, 'upload').resolves(uploadData);
-
-    const username = userData.userName;
-    const uploadResult = await chai.request(app)
-        .post('/bloc/file/upload')
-        .set('X-USER-UNIQUE-NAME',userData.userName)
-        .set('X-USER-ID',userData.hash)
-        .field('metadata', testContent.meta)
-        .field('provider', testContent.provider)
-        .attach('content', testContent.image)
-        .type('form')
-
-    _contractAddress = uploadResult.body.contractAddress;
-
-    uploader.upload.restore();
-
-  }
 });
