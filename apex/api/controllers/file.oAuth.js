@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const rp = require('request-promise');
 
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
+const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 
@@ -30,6 +31,13 @@ module.exports = {
         err.status = RestStatus.UNAUTHORIZED;
         return next(err);
       }
+
+      //validates or creates user account, will throw on failure
+      yield oAuth.getOrCreateKey({
+        'X-USER-UNIQUE-NAME': uID,
+        'X-USER-ID': uHash
+      })
+
 
       if (!metadata || !provider ) {
         let err = new Error('wrong params, expected: {provider, metadata}');
@@ -97,7 +105,6 @@ module.exports = {
   },
 
   verify: function (req, res, next) {
-    //todo - check x-user* headers
     co(function* () {
       const contractAddress = req.query.contractAddress;
 
@@ -140,6 +147,12 @@ module.exports = {
         err.status = RestStatus.UNAUTHORIZED;
         return next(err);
       }
+
+      //validates or creates user account, will throw on failure
+      yield oAuth.getOrCreateKey({
+        'X-USER-UNIQUE-NAME': uID,
+        'X-USER-ID': uHash
+      })
 
 
       const record = yield models.Upload.findOne({

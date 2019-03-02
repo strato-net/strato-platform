@@ -56,41 +56,14 @@ describe('File - ExternalStorage - OAuth', function () {
   let _contractAddress, userAccountAddress, app;
   
   
-  before(async function () { //todo - is this async before block garuanteed to complete before the describe blocks below? - i think so but double check
+  before(async function () {
     if(SKIP_TEST_BLOCK){
       this.skip();
     }
 
     app = require('../app');
 
-    //fixme - is there a way to clear all keys in db - in case test is run on non clean system?
-
-    const user = await chai.request(app)
-        .post('/login')
-        .set('X-USER-UNIQUE-NAME',userData.userName)
-        .set('X-USER-ID',userData.hash)
-        .catch((err) => {
-          const res = err.response;
-          assert.equal(res.status, RestStatus.INTERNAL_SERVER_ERROR,'user not found');
-        });
-
-    if(user && user.status == RestStatus.OK){ //user found, yay
-      await createTestContract();
-      return;
-    }
-
-    const result = await chai.request(app)
-        .post('/users')
-        .set('X-USER-UNIQUE-NAME',userData.userName)
-        .set('X-USER-ID',userData.hash)
-        .send();
-
-
-    if(result.status == RestStatus.OK){ //user created, faucet em
-      userAccountAddress = result.body.user.address;
-      await waitFaucet(userAccountAddress);
-      await createTestContract();
-    }
+    await createTestContract();
 
   });
 

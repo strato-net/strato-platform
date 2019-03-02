@@ -14,7 +14,7 @@ const models = require('../../models/index');
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 
-function* createKey(userHeaders, userParams = {}) {
+function* createKey(userHeaders, userParams = null) {
 
     const username = userHeaders['X-USER-UNIQUE-NAME'];
     const hash = userHeaders['X-USER-ID'];
@@ -29,6 +29,7 @@ function* createKey(userHeaders, userParams = {}) {
     // Create blockchain user in bloc
     try {
 
+      userParams = userParams == null ? {} : userParams;
       const userAccount = yield ax.post(process.env.VAULT_HOST, userParams, '/strato/v2.3/key', userHeaders);
 
       return {
@@ -72,7 +73,17 @@ function* getKey(userHeaders, userQuery = null) {
 
 }
 
+function* getOrCreateKey(userHeaders, userQuery = null){
+  try {
+    return yield getKey(userHeaders, userQuery)
+  } catch (err) {
+    //todo - is there any error logging already in place?
+    return yield createKey(userHeaders, userQuery )
+  }
+}
+
 module.exports = {
   createKey,
   getKey,
+  getOrCreateKey,
 };
