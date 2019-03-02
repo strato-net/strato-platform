@@ -7,8 +7,7 @@ local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 -- configruation for openid connect
 local opts = {
     -- see https://github.com/zmartzone/lua-resty-openidc for reference
-    -- TODO: DEPRECATED: "using deprecated option `opts.redirect_uri_path`; switch to using an absolute URI and `opts.redirect_uri"
-    redirect_uri_path             = "/auth/openidc/return",
+    redirect_uri                  = "/auth/openidc/return",
     discovery                     = "<OAUTH_DISCOVERY_URL>",
     client_id                     = "<CLIENT_ID_PLACEHOLDER>",
     client_secret                 = "<CLIENT_SECRET_PLACEHOLDER>",
@@ -16,16 +15,19 @@ local opts = {
     token_endpoint_auth_method    = "client_secret_post",
     ssl_verify                    = "<IS_SSL_PLACEHOLDER_YES_NO>",
     redirect_uri_scheme           = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-    -- 'access_token' is required for refresh token, 'user' is for providers sending 'email' in user object instead openid
-    -- keeping commented to have everything stored in session
-    -- session_contents           = {id_token=true, user=true, access_token=true},
+    -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+    --session_contents              = {id_token=true, access_token=true}, -- comment out to keep everything
     renew_access_token_on_expiry  = true,
     access_token_expires_in       = 3600,
-    logout_path                   = "/auth/openidc/logout",
-    -- TODO: handle the logout properly, unset the cookie for client
-    --  redirect_after_logout_uri  = "https://login.microsoftonline.com/common/oauth2/logout", -- ?post_logout_redirect_uri=http://localhost/"
-    --  redirect_after_logout_with_id_token_hint = true,
+    logout_path                   = "/auth/logout",
+    post_logout_redirect_uri      = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://"..ngx.var.http_host.."/"
 }
+
+-- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
+if ngx.var.request_uri == opts.logout_path then
+  ngx.header['Set-Cookie'] = access_token_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  ngx.header['Set-Cookie'] = username_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+end
 
 -- call authenticate for OpenID Connect user authentication
 local res, err = require("resty.openidc").authenticate(opts)

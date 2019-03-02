@@ -6,8 +6,8 @@ dependencies:
   - base
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
   - containers
   - conduit
@@ -61,7 +61,6 @@ tests:
       - blockstanbul
       - hspec
       - hspec-expectations-lifted
-      - merkle-patricia-db
       - time
 
 benchmarks:

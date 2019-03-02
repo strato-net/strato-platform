@@ -12,6 +12,7 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-milena
   - blockapps-mpdbs
@@ -48,7 +49,7 @@ dependencies:
   - strato-model
   - strato-p2p
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - text
   - time
   - transformers

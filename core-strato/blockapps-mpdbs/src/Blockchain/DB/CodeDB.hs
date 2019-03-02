@@ -1,14 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Blockchain.DB.CodeDB (
   CodeDB,
   CodeKind(..),
   HasCodeDB(..),
   addCode,
   getCode,
+  getCodeKind,
   getEVMCode,
   codeDBGet,
   codeDBPut
   ) where
+
 
 
 import           Control.Monad.Trans.Resource
@@ -20,15 +24,12 @@ import qualified Database.LevelDB                   as DB
 
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
+import           Blockchain.SolidVM.Model
 
 type CodeDB = DB.DB
 
 class MonadResource m => HasCodeDB m where
   getCodeDB :: m CodeDB
-
-data CodeKind = EVM
-              | SolidVM
-              deriving (Eq, Show, Enum, Ord)
 
 toWord8 :: CodeKind -> Word8
 toWord8 = fromIntegral . fromEnum
@@ -44,6 +45,9 @@ getCode theHash = codeDBGet (BL.toStrict $ encode $ sha2StateRoot theHash)
 
 getEVMCode :: (HasCodeDB m, MonadResource m) => SHA -> m B.ByteString
 getEVMCode hsh = maybe "" snd <$> getCode hsh
+
+getCodeKind :: HasCodeDB m => SHA -> m CodeKind
+getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> getCode hsh
 
 codeDBPut :: HasCodeDB m => Word8 -> B.ByteString -> m ()
 codeDBPut kind code = do

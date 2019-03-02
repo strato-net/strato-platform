@@ -8,7 +8,7 @@ local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 
 local opts = {
   -- see https://github.com/zmartzone/lua-resty-openidc for reference
-  discovery                     = "<OAUTH_JWT_VALIDATION_DISCOVERY_URL>",
+  discovery                     = "<OAUTH_DISCOVERY_URL>",
   ssl_verify                    = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg               = false,
   accept_unsupported_alg        = false

@@ -14,3 +14,6 @@ instance FromJSON B.ByteString where
 
 instance ToJSON B.ByteString where
     toJSON  = String . decodeUtf8 .  B16.encode
+
+instance ToJSONKey B.ByteString where
+    toJSONKey = toJSONKeyText (decodeUtf8 . B16.encode)

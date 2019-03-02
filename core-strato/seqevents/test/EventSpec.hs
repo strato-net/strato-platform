@@ -1,7 +1,5 @@
 {-# OPTIONS -fno-warn-unused-imports #-}
 
-module Blockchain.Sequencer.EventSpec where
-
 import           Data.Binary
 import           Test.Hspec
 import           Test.QuickCheck
@@ -10,7 +8,6 @@ import           Blockchain.Data.ArbitraryInstances      ()
 import qualified Blockchain.Data.ChainInfo               as CI
 import qualified Blockchain.Data.DataDefs                as DD
 import qualified Blockchain.Data.Transaction             as TX
-import           Blockchain.Sequencer.ArbitraryInstances ()
 import           Blockchain.Sequencer.Event
 
 main :: IO ()
