@@ -83,7 +83,7 @@ describe('File - ExternalStorage - OAuth', function () {
         this.skip();
       }
 
-      sinon.stub(uploader, 'upload').resolves(uploadData);
+      sinon.stub(uploader, 'upload').resolves(uploadData); //todo - sinon intercepting call to uploader (here and below), should be ok like this? dont wnat to upload to s3 w/ every test
     });
 
     afterEach(function () {
@@ -570,7 +570,7 @@ describe('File - ExternalStorage - OAuth', function () {
 
   async function createTestContract(){
 
-    sinon.stub(uploader, 'upload').resolves(uploadData);
+    sinon.stub(uploader, 'upload').resolves(uploadData); //fixme - sinon intercepting call to uploader
 
     const username = userData.userName;
     const uploadResult = await chai.request(app)
