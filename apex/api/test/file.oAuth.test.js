@@ -1,6 +1,9 @@
 /* jshint esnext: true */
 const chai = require('chai');
+const co = require('co');
+
 const chaiHttp = require('chai-http');
+
 const assert = chai.assert;
 const expect = chai.expect;
 const sinon = require('sinon');
@@ -14,33 +17,14 @@ const bcrypt = require('bcrypt');
 const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
+const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
+const util = require(`${process.cwd()}/lib/rest-utils/util`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const testFactory = require(`${process.cwd()}/test/factory`);
 
 const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
 
-const waitFaucet = async function (address) { //fixme - function duplicated in multiple tests, move to util file 
-  const res = await chai.request(process.env.stratoRoot)
-    .post('/faucet')
-    .field('address', address);
-  assert.equal(res.status, RestStatus.OK);
-  const sleep = function (ms) {
-    return new Promise(resolve => setTimeout(resolve, ms))
-  };
-  let text = "[]";
-  do {
-    await sleep(400);
-    let res = await chai.request(process.env.stratoRoot)
-      .get('/account')
-      .query({
-        'address': address
-      })
-      .catch((err) => {
-        throw err;
-      });
-    text = res.text;
-  } while (text === "[]");
-}
+
 
 chai.use(chaiHttp);
 
@@ -157,7 +141,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        sinon.stub(externalStorage, 'uploadContract').rejects('Internal server error');
       });
 
       afterEach(function () {
@@ -165,7 +148,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        externalStorage.uploadContract.restore();
       })
 
       it('throws INTERNAL_SERVER_ERROR', async function () {
@@ -282,7 +264,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
@@ -290,7 +271,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        externalStorage.getExternalStorage.restore();
       })
 
       it('throws INTERNAL_SERVER_ERROR', async function () {
@@ -342,8 +322,6 @@ describe('File - ExternalStorage - OAuth', function () {
           ]
         };
 
-        sinon.stub(externalStorage, 'getExternalStorage').resolves(storage);
-        sinon.stub(externalStorage, 'attest').resolves([ testSigners ]);
       });
 
       afterEach(function () {
@@ -351,8 +329,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        externalStorage.getExternalStorage.restore();
-        externalStorage.attest.restore();
       })
 
       it('missing headers', async function () {
@@ -380,19 +356,24 @@ describe('File - ExternalStorage - OAuth', function () {
       });
 
       it('replies OK with valid data', async function () {
+        const username = util.uid(userData.userName)
+        const { user } = await co.wrap(oAuth.createKey)({
+          'X-USER-UNIQUE-NAME': username,
+          'X-USER-ID': userData.hash
+        })
+
         const res = await chai.request(app)
           .post('/bloc/file/attest')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
+            .set('X-USER-UNIQUE-NAME',username)
             .set('X-USER-ID',userData.hash)
             .send({
               contractAddress: _contractAddress,
             })
 
-        assert.deepEqual(
-          { attested: true, signers: testSigners },
-          res.body
-        )
+
         assert.equal(res.status, RestStatus.OK);
+        assert.equal(res.body.attested, true, 'should be attested')
+        assert.include (res.body.signers, user.address, 'signers should include user')
       });
 
       it('replies 400 with signer already exists', async function () {
@@ -424,14 +405,14 @@ describe('File - ExternalStorage - OAuth', function () {
         if(SKIP_TEST_BLOCK){
           this.skip();
         }
-        sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
+
       });
 
       afterEach(function () {
         if(SKIP_TEST_BLOCK){
           this.skip();
         }
-        externalStorage.getExternalStorage.restore();
+
       })
 
       it('throws INTERNAL SERVER ERROR', async function () {
@@ -481,14 +462,13 @@ describe('File - ExternalStorage - OAuth', function () {
           ]
         };
 
-        sinon.stub(externalStorage, 'getExternalStorage').resolves(storage);
       });
 
       afterEach(function () {
         if(SKIP_TEST_BLOCK){
           this.skip();
         }
-        externalStorage.getExternalStorage.restore();
+
       })
 
       it('replies BAD_REQUEST with wrong query', async function () {
@@ -541,7 +521,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
@@ -549,7 +528,6 @@ describe('File - ExternalStorage - OAuth', function () {
           this.skip();
         }
 
-        externalStorage.getExternalStorage.restore();
       })
 
       it('throws INTERNAL SERVER ERROR', async function () {
@@ -570,7 +548,7 @@ describe('File - ExternalStorage - OAuth', function () {
 
   async function createTestContract(){
 
-    sinon.stub(uploader, 'upload').resolves(uploadData); //fixme - sinon intercepting call to uploader
+    sinon.stub(uploader, 'upload').resolves(uploadData); // so that s3 isnt hit every time
 
     const username = userData.userName;
     const uploadResult = await chai.request(app)

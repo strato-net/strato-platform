@@ -32,11 +32,15 @@ function* createKey(userHeaders, userParams = null) {
       userParams = userParams == null ? {} : userParams;
       const userAccount = yield ax.post(process.env.VAULT_HOST, userParams, '/strato/v2.3/key', userHeaders);
 
+      //faucet user so they can do stuff
+      yield waitFaucet(userAccount.address)
+
       return {
         status: RestStatus.OK,
         user: userAccount
       };
     } catch (blocError) {
+      console.log(blocError)
       let err = new Error('could not create bloc account: ', blocError); //fixme - see universalError in ht3
       throw err;
     }
@@ -77,10 +81,44 @@ function* getOrCreateKey(userHeaders, userQuery = null){
   try {
     return yield getKey(userHeaders, userQuery)
   } catch (err) {
-    //todo - is there any error logging already in place?
-    return yield createKey(userHeaders, userQuery )
+    return yield createKey(userHeaders, userQuery)
   }
 }
+
+
+
+//===================
+// Helper functions
+//===================
+
+function* waitFaucet(address) { //fixme - function duplicated in multiple tests, move to util file
+  const params = {
+    address: address
+  }
+
+  //faucet
+  yield ax.postue(process.env.stratoRoot, params, '/faucet')
+
+
+  //wait for update
+  const sleep = function (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  };
+
+  let res = [];
+  do {
+    yield sleep(400);
+    const query = `?${querystring.stringify(params)}`;
+
+    res = yield ax.get(process.env.stratoRoot, `/account${query}`)
+
+  } while (res.length < 1);
+
+}
+
+
+//===================
+
 
 module.exports = {
   createKey,

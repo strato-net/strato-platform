@@ -47,7 +47,6 @@ function* attest(user, contractAddress, args) {
 
 // ================== wrapper methods ====================
 function* getExternalStorage(address) {
-  console.log('aaa')
   const results = (yield restLite.waitQuery(`${contractName}?address=eq.${address}`, 1, 3 * 60 * 1000))[0];
   return results;
 }

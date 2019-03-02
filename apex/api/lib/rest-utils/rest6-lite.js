@@ -1,3 +1,5 @@
+const BigNumber = require('bignumber.js');
+
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 const constants = require(`${process.cwd()}/lib/rest-utils/constants`);
 const importer = require(`${process.cwd()}/lib/externalStorage/importer`);
@@ -25,7 +27,7 @@ function* waitQuery(queryString, count, timeoutMilli, node) {
     // count not reached - sleep
     return false;
   }
-console.log('qs',queryString)
+
   const res = yield queryUntil(queryString, predicate, timeoutMilli, node);
   return res;
 }
@@ -325,7 +327,7 @@ function* queryUntil(queryString, predicate, timeoutMilli, node) {
     }
     return res;
   }
-  console.log('actionable')
+
   const res = yield until(predicate, action, timeoutMilli, node);
   return res;
 }

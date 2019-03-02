@@ -1,4 +1,5 @@
 /* jshint esnext: true */
+
 const co = require('co');
 
 const appConfig = require('../config/app.config');
@@ -13,224 +14,236 @@ const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
-
-module.exports = {
-  upload: function (req, res, next) {
-    co(function* () {
-      const content = req.body.content;
-      const provider = req.body.provider;
-      const metadata = req.body.metadata;
+function upload(req, res, next) {
+  co(function* () {
+    const content = req.body.content;
+    const provider = req.body.provider;
+    const metadata = req.body.metadata;
 
 
-      const uID = req.headers['x-user-unique-name'];
-      const uHash = req.headers['x-user-id'];
+    const uID = req.headers['x-user-unique-name'];
+    const uHash = req.headers['x-user-id'];
 
 
-      if (!uID || !uHash ) {
-        let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}'); //fixme - there must be a better way .jpg
-        err.status = RestStatus.UNAUTHORIZED;
-        return next(err);
-      }
+    if (!uID || !uHash ) {
+      let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}'); //fixme - there must be a better way .jpg
+      err.status = RestStatus.UNAUTHORIZED;
+      return next(err);
+    }
 
-      //validates or creates user account, will throw on failure
-      yield oAuth.getOrCreateKey({
-        'X-USER-UNIQUE-NAME': uID,
-        'X-USER-ID': uHash
-      })
+    //validates or creates user account, will throw on failure
+    yield oAuth.getOrCreateKey({
+      'X-USER-UNIQUE-NAME': uID,
+      'X-USER-ID': uHash
+    })
 
 
-      if (!metadata || !provider ) {
-        let err = new Error('wrong params, expected: {provider, metadata}');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
+    if (!metadata || !provider ) {
+      let err = new Error('wrong params, expected: {provider, metadata}');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
 
-      if (!req.file ) {
-        let err = new Error('file missing');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
+    if (!req.file ) {
+      let err = new Error('file missing');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
 
-      const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
+    const hash = crypto.createHmac('sha256', req.file.buffer).digest('hex');
 
-      const params = {
-        Bucket: appConfig.s3.bucket.Bucket,
-        Key: `${Date.now()}-${req.file.originalname}`,
-        Body: req.file.buffer,
+    const params = {
+      Bucket: appConfig.s3.bucket.Bucket,
+      Key: `${Date.now()}-${req.file.originalname}`,
+      Body: req.file.buffer,
+    };
+
+
+    try {
+      const uploadedFile = yield uploader.upload(params);
+
+      const args = {
+        _uri: uploadedFile.Location,
+        _host: provider,
+        _hash: hash,
+        _metadata: metadata,
+        _uID: uID,
+        _uHash: uHash
       };
 
-
-      try {
-        const uploadedFile = yield uploader.upload(params);
-
-        const args = {
-          _uri: uploadedFile.Location,
-          _host: provider,
-          _hash: hash,
-          _metadata: metadata,
-          _uID: uID,
-          _uHash: uHash
-        };
-
-        const userCredentials = {
-          'x-user-unique-name':req.headers['x-user-unique-name'],
-          'x-user-id': req.headers['x-user-id']
-        };
-
-        const contractUpload = yield externalStorage.uploadContract(userCredentials, args);
-
-        yield models.Upload.create({
-          contractAddress: contractUpload.address,
-          uri: uploadedFile.Location,
-          hash: hash
-        });
-
-        res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
-      } catch (error) {
-        console.log(error)
-        let err = new Error(error);
-        err.status = RestStatus.INTERNAL_SERVER_ERROR;
-        return next(err);
-      };
-    });
-  },
-
-  list: function (req, res, next) {
-    co(function* () {
-      const uploads = yield models.Upload.all({
-        attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
-      });
-      res.status(RestStatus.OK).json({ list: uploads });
-    });
-  },
-
-  verify: function (req, res, next) {
-    co(function* () {
-      const contractAddress = req.query.contractAddress;
-
-      if (!contractAddress) {
-        let err = new Error('wrong params, expected: {contractAddress}');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
-
-      const record = yield models.Upload.findOne({
-        where: { contractAddress: contractAddress },
-      });
-
-      if (!record) {
-        let err = new Error('Address not found');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
-      try {
-        const data = yield externalStorage.getExternalStorage(contractAddress);
-        res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
-      } catch (error) {
-        let err = new Error(error);
-        err.status = RestStatus.INTERNAL_SERVER_ERROR;
-        return next(err);
-      }
-    });
-  },
-
-  attest: function (req, res, next) {
-    co(function* () {
-      const contractAddress = req.body.contractAddress;
-
-
-      const uID = req.headers['x-user-unique-name'];
-      const uHash = req.headers['x-user-id'];
-
-      if (!uID || !uHash ) { //fixme - is this check needed?
-        let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}');
-        err.status = RestStatus.UNAUTHORIZED;
-        return next(err);
-      }
-
-      //validates or creates user account, will throw on failure
-      yield oAuth.getOrCreateKey({
-        'X-USER-UNIQUE-NAME': uID,
-        'X-USER-ID': uHash
-      })
-
-
-      const record = yield models.Upload.findOne({
-        where: { contractAddress: contractAddress },
-      });
-
-      if (!record) {
-        let err = new Error('Contract address not found');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
-
-      const args = {};
       const userCredentials = {
         'x-user-unique-name':req.headers['x-user-unique-name'],
         'x-user-id': req.headers['x-user-id']
       };
 
-      try {
-        const result = yield externalStorage.getExternalStorage(contractAddress);
+      const contractUpload = yield externalStorage.uploadContract(userCredentials, args);
 
-        const account = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
-
-        if (result.signers.indexOf(account.address) > -1) {
-          let err = new Error('You already signed this transaction');
-          err.status = RestStatus.BAD_REQUEST;
-          return next(err);
-        } else {
-          const data = yield externalStorage.attest(userCredentials, contractAddress, args);
-          res.status(RestStatus.OK).json({ attested: true, signers: data[0] });
-        }
-
-      } catch (error) {
-        let err = new Error(error);
-        err.status = RestStatus.INTERNAL_SERVER_ERROR;
-        return next(err);
-      }
-    });
-  },
-
-  download: function (req, res, next) {
-    co(function* () {
-      const contractAddress = req.query.contractAddress;
-
-      if (!contractAddress) {
-        let err = new Error('wrong params, expected: {contractAddress}');
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
-
-      const record = yield models.Upload.findOne({
-        where: { contractAddress: contractAddress },
+      yield models.Upload.create({
+        contractAddress: contractUpload.address,
+        uri: uploadedFile.Location,
+        hash: hash
       });
 
-      if (!record) {
-        let err = new Error('Address not found');
+      res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+    } catch (error) {
+      let err = new Error(error);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    };
+  });
+}
+
+function list(req, res, next) {
+  co(function* () {
+    const uploads = yield models.Upload.all({
+      attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
+    });
+    res.status(RestStatus.OK).json({ list: uploads });
+  });
+}
+
+function verify(req, res, next) {
+  co(function* () {
+    const contractAddress = req.query.contractAddress;
+
+    if (!contractAddress) {
+      let err = new Error('wrong params, expected: {contractAddress}');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
+
+    const record = yield models.Upload.findOne({
+      where: { contractAddress: contractAddress },
+    });
+
+    if (!record) {
+      let err = new Error('Address not found');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
+    try {
+      const data = yield externalStorage.getExternalStorage(contractAddress);
+      res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
+    } catch (error) {
+      let err = new Error(error);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    }
+  });
+}
+
+function attest(req, res, next) {
+  co(function* () {
+    const contractAddress = req.body.contractAddress;
+
+
+    const uID = req.headers['x-user-unique-name'];
+    const uHash = req.headers['x-user-id'];
+
+    if (!uID || !uHash ) { //fixme - is this check needed?
+      let err = new Error('wrong headers, expected: {x-user-unique-name, x-user-id}');
+      err.status = RestStatus.UNAUTHORIZED;
+      return next(err);
+    }
+
+    //validates or creates user account, will throw on failure
+    yield oAuth.getOrCreateKey({
+      'X-USER-UNIQUE-NAME': uID,
+      'X-USER-ID': uHash
+    })
+
+
+    const record = yield models.Upload.findOne({
+      where: { contractAddress: contractAddress },
+    });
+
+    if (!record) {
+      let err = new Error('Contract address not found');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
+
+    const args = {};
+    const userCredentials = {
+      'x-user-unique-name':req.headers['x-user-unique-name'],
+      'x-user-id': req.headers['x-user-id']
+    };
+
+    try {
+      const result = yield externalStorage.getExternalStorage(contractAddress);
+      const account = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
+      if (result.signers.indexOf(account.address) > -1) {
+        let err = new Error('You already signed this transaction');
         err.status = RestStatus.BAD_REQUEST;
         return next(err);
+      } else {
+        const data = yield externalStorage.attest(userCredentials, contractAddress, args);
+        res.status(RestStatus.OK).json({ attested: true, signers: data[0] });
       }
 
-      try {
-        const data = yield externalStorage.getExternalStorage(contractAddress);
+    } catch (error) {
+      console.log(error)
 
-        var options = {
-          Bucket: appConfig.s3.bucket.Bucket,
-          Key: /[^/]*$/.exec(data.uri)[0],
-          Expires: 3600
-        };
+      let err = new Error(error);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    }
+  });
+}
 
-        const url = s3.getSignedUrl('getObject', options);
-        res.status(RestStatus.OK).json({ url: url });
+function download(req, res, next) {
+  co(function* () {
+    const contractAddress = req.query.contractAddress;
 
-      } catch (error) {
-        let err = new Error(error);
-        err.status = RestStatus.INTERNAL_SERVER_ERROR;
-        return next(err);
-      }
+    if (!contractAddress) {
+      let err = new Error('wrong params, expected: {contractAddress}');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
 
-    })
-  }
+    const record = yield models.Upload.findOne({
+      where: { contractAddress: contractAddress },
+    });
+
+    if (!record) {
+      let err = new Error('Address not found');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
+
+    try {
+      const data = yield externalStorage.getExternalStorage(contractAddress);
+
+      var options = {
+        Bucket: appConfig.s3.bucket.Bucket,
+        Key: /[^/]*$/.exec(data.uri)[0],
+        Expires: 3600
+      };
+
+      const url = s3.getSignedUrl('getObject', options);
+      res.status(RestStatus.OK).json({ url: url });
+
+    } catch (error) {
+      let err = new Error(error);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    }
+
+  })
+}
+
+//===================
+// Helper functions
+//===================
+
+
+//===================
+
+
+module.exports = {
+  attest,
+  download,
+  list,
+  upload,
+  verify,
 };
