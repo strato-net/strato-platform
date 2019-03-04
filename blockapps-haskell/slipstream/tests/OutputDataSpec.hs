@@ -97,7 +97,6 @@ spec = do
     transaction_function_name = excluded.transaction_function_name,
     "owners" = excluded."owners";|]
 
-
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
