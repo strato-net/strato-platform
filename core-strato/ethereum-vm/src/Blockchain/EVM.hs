@@ -1160,8 +1160,8 @@ create' = do
               , _callDataOwner       = envOwner
               , _callDataGasPrice    = envGasPrice
               , _callDataValue       = envValue
-              , _callDataInput       = envInputData
-              , _callDataOutput      = returnVal vmState
+              , _callDataInput       = BSS.toShort envInputData
+              , _callDataOutput      = BSS.toShort <$> returnVal vmState
               }
 
 call :: Bool
@@ -1243,8 +1243,8 @@ call' noValueTransfer = do
           , _callDataOwner       = envOwner
           , _callDataGasPrice    = envGasPrice
           , _callDataValue       = envValue
-          , _callDataInput       = envInputData
-          , _callDataOutput      = returnVal vmState
+          , _callDataInput       = BSS.toShort envInputData
+          , _callDataOutput      = BSS.toShort <$> returnVal vmState
           }
 
   return (fromMaybe B.empty $ returnVal vmState)

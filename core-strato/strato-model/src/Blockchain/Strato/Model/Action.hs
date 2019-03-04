@@ -14,6 +14,7 @@ import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
+import qualified Data.ByteString.Short        as BSS
 import           Data.Function                (on)
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -39,8 +40,8 @@ data CallData = CallData
   , _callDataOwner    :: Address
   , _callDataGasPrice :: Integer
   , _callDataValue    :: Integer
-  , _callDataInput    :: B.ByteString
-  , _callDataOutput   :: Maybe B.ByteString
+  , _callDataInput    :: BSS.ShortByteString
+  , _callDataOutput   :: Maybe BSS.ShortByteString
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''CallData
 
@@ -73,7 +74,7 @@ emptyCallData = CallData
   , _callDataOwner    = Address 0
   , _callDataGasPrice = 0
   , _callDataValue    = 0
-  , _callDataInput    = B.empty
+  , _callDataInput    = BSS.empty
   , _callDataOutput   = Nothing
   }
 
