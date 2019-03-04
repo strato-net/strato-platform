@@ -8,6 +8,7 @@ ssl=${ssl:-false}
 
 sed -i "s|__NODE_HOST__|$NODE_HOST|g" build/index.html
 sed -i "s|__NODE_NAME__|$NODE_NAME|g" build/index.html
+sed -i "s|__OAUTH_ENABLED__|$OAUTH_ENABLED|g" build/index.html
 sed -i "s|__STRATO_GS_MODE__|$STRATO_GS_MODE|g" build/index.html
 sed -i "s|__SINGLE_NODE__|$SINGLE_NODE|g" build/index.html
 sed -i "s|__IS_SSL__|$ssl|g" build/index.html
