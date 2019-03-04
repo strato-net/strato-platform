@@ -138,7 +138,7 @@ instance HasHashDB SM where
 
 runSM :: B.ByteString -> SM a -> ContextM a
 runSM theCode f = do
-  let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack theCode
+  let maybeFile = runParser solidityFile "" "" $ BC.unpack theCode
 
   let file =
         case maybeFile of
