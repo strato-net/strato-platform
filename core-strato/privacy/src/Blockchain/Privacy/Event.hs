@@ -185,7 +185,7 @@ hydratePrivateHashes :: HasPrivateHashDB h t b m
 hydratePrivateHashes chainF b = do
   let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ blockHeader b
-  when (any isPrivateHashTx $ blockTransactions b) $
+  when (any isPrivateHashTX $ blockTransactions b) $
     insertBlockHashEntry bHash b
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (blockTransactions b) $ \st@(dts,cs) tx -> do
