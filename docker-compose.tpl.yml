@@ -153,8 +153,10 @@ services:
     - seqDebugMode=${seqDebugMode}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
+    - seqProfiler=${seqProfiler:-}
     - useSyncMode=${useSyncMode}
     - validators=${validators:-}
+    - vmRunnerProfil=${vmRunnerProfil:-}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
