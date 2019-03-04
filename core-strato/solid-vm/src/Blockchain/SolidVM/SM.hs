@@ -136,7 +136,7 @@ runSM theCode blk f = do
 
   let file =
         case maybeFile of
-          Left e -> error $ show e
+          Left e -> error $ show e ++ ":`" ++ BC.unpack theCode ++ "`"
           Right v -> v
 
       namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]

@@ -1,7 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 module ParserSpec where
 
 import Control.Monad
+import Data.Either (isLeft)
 import Test.Hspec
 import Test.HUnit (assertEqual)
 import Text.Parsec
@@ -44,3 +46,16 @@ spec = do
                    ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
+
+  describe "Statement parsing" $ do
+    let parseStatement = runParser statement "" ""
+        scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x")
+                 , ("assembly { dst := mload(add(src, 32)) }",
+                      AssemblyStatement $ MloadAdd32 "dst" "src")
+                 ]
+    forM_ scases $ \(input, want) -> do
+        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want
+
+    let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
+    forM_ fcases $ \input -> do
+      it ("cannot parse " ++ input) $ parseStatement input `shouldSatisfy` isLeft

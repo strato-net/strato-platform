@@ -333,7 +333,8 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                  case t' of
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
-               Just t -> error $ "TODO(tim): " ++ show t
+               Just (Xabi.Bytes {}) -> return $ SString ""
+               Just t -> error $ "TODO(tim): Require a default value for type: " ++ show t
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
 
   when trace $ do
@@ -400,6 +401,12 @@ runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
     Just e -> fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
+
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
+  var <- expToVar $ Xabi.Variable $ T.unpack src;
+  path <- expToPath $ Xabi.Variable $ T.unpack dst;
+  setVar path =<< getVar var
+  return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 

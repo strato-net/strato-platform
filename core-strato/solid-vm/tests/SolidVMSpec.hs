@@ -389,3 +389,19 @@ contract qq {
  }
 }|]
       getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
+
+    it "can parse one specific assembly block" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  bytes32 stored;
+  constructor() {
+    string source = "alright.";
+    bytes32 result;
+    assembly {
+          result := mload(add(source, 32))
+    }
+    stored = result;
+  }
+}|]
+      getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
+
