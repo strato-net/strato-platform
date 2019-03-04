@@ -21,7 +21,7 @@ instance ToJSONKey B.ByteString where
 
 instance FromJSON BSS.ShortByteString where
     parseJSON (String t) = pure . BSS.toShort . fst . B16.decode $ encodeUtf8 t
-    parseJSON v          = typeMismatch "ByteString" v
+    parseJSON v          = typeMismatch "ShortByteString" v
 
 instance ToJSON BSS.ShortByteString where
     toJSON  = String . decodeUtf8 .  B16.encode . BSS.fromShort
