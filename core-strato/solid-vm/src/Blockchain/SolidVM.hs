@@ -87,7 +87,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
-create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
+create _ _ _ blockData _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
   addCode SolidVM $ initCode
 
   let maybeContractName = join $ fmap (M.lookup "name") metadata
@@ -101,7 +101,7 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
       maybeArgs = runParser parseArgs "qq" "qq" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
 
-  runSM initCode $ do
+  runSM initCode blockData $ do
     create' sender' contractName args
 
 create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
@@ -188,7 +188,7 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
+call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
 
 
   let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
@@ -206,7 +206,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       _ -> error "internal error- SolidVM was called for non-solid-vm code"
 
 
-  returnValue <- runSM ccString $ do
+  returnValue <- runSM ccString blockData $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            call'' codeAddress funcName argValues
 
@@ -542,11 +542,11 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ timestamp $ blockHeader env'
+      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ blockHeader env'
 
     (SBuiltinVariable "block", "number") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ number $ blockHeader env'
+      return $ Constant $ SInteger $ blockDataNumber $ blockHeader env'
 
     (SAddress (Address a), itemName) -> do
       return $ Constant $ SContractItem (toInteger a) itemName

@@ -21,6 +21,7 @@ dependencies:
   - aeson-casing
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-mpdbs
   - ethereum-rlp
   - blockapps-util

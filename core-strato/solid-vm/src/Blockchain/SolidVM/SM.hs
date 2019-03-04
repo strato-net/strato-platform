@@ -15,7 +15,6 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
-import           Data.Time
 import           Text.Parsec
 
 import qualified SolidVM.Model.Storable as MS
@@ -24,6 +23,7 @@ import           SolidVM.Solidity.Parse.File
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.DataDefs (BlockData(..))
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -49,12 +49,6 @@ data CallInfo =
     localVariables :: Map String Variable
     }
 
-data BlockHeader =
-  BlockHeader {
-  timestamp :: UTCTime,
-  number :: Integer
-  }
-
 {-
 BlockData
     parentHash SHA
@@ -79,7 +73,7 @@ data Environment =
   Environment {
     sender :: Address,
     origin :: Address,
-    blockHeader :: BlockHeader
+    blockHeader :: BlockData
     }
 
 data SState =
@@ -136,8 +130,8 @@ instance HasHashDB SM where
   getHashDB = hashDB <$> get
 
 
-runSM :: B.ByteString -> SM a -> ContextM a
-runSM theCode f = do
+runSM :: B.ByteString -> BlockData -> SM a -> ContextM a
+runSM theCode blk f = do
   let maybeFile = runParser solidityFile "qq" "qq" $ BC.unpack theCode
 
   let file =
@@ -155,18 +149,12 @@ runSM theCode f = do
 
   vmcontext <- get
 
-  theCurrentTime <- liftIO getCurrentTime
-
   let startingState =
         SState {
         env = Environment {
             sender = Address 0x1234,
             origin = Address 0x1234,
-            blockHeader =
-                BlockHeader {
-                timestamp = theCurrentTime,
-                number = 10
-                }
+            blockHeader = blk
             },
         codeCollection = cc,
         accounts = M.empty,

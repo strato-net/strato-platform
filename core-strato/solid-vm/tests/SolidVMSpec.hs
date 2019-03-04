@@ -2,6 +2,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-missing-fields #-}
 module SolidVMSpec where
 
 import Control.Monad
@@ -14,11 +15,13 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding
+import Data.Time.Clock.POSIX
 import HFlags
 import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
 import Text.RawString.QQ
 
+import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.RawStorageDB
@@ -26,6 +29,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.SHA
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Executable.EVMFlags() -- for HFlags
@@ -61,7 +65,21 @@ runBS bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = error "TODO: blockData"
+      blockData = BlockData { blockDataParentHash = SHA 0x0
+                            , blockDataUnclesHash = SHA 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = SHA 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       origin = error "TODO: origin"
       value = error "TODO: value"
@@ -361,3 +379,13 @@ contract qq {
   X x = X(0x999999);
 }|]
       getAll [ [Field "x"] ] `shouldReturn` [BContract "X" 0x999999]
+
+    it "should be able to return the time from the header" . runTest $ do
+      void $ runBS [r|
+contract qq {
+ uint ts;
+ constructor() {
+   ts = block.timestamp;
+ }
+}|]
+      getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
