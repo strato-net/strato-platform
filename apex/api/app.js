@@ -7,7 +7,6 @@ var bodyParser = require('body-parser');
 const cors = require('cors');
 const appConfig = require('./config/app.config');
 const acquireDapp = require('./controllers/dapp').acquireDapp;
-
 var index = require('./routes/index');
 // var users = require('./routes/users');
 
@@ -52,6 +51,7 @@ app.use('/apps/', express.static('apps'), acquireDapp);
 
 app.use('/', index);
 // app.use('/users', users);
+
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
