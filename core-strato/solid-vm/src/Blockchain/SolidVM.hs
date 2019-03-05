@@ -259,28 +259,14 @@ getCodeAndCollection address' = do
 call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
   (contract, cc) <-getCodeAndCollection address
---  addressState <- getAddressState address
-{-
-  ccString <-
-    case addressStateCodeHash addressState of
-      SolidVMCode _ ch -> getEVMCode ch
-      _ -> error "internal error- SolidVM was called for non-solid-vm code"
--}
-
-  let contractName' = contract^.contractName
 
   when trace $ do
     argStrings <- forM args showSM
-    liftIO $ putStrLn $ box ["calling function: " ++ format address, contractName' ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
+    liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
-  let contract' = fromMaybe (error $ "contract name doesn't exist in CodeCollection: " ++ contractName') $  M.lookup contractName' $ cc^.contracts
-
---  liftIO $ putStrLn $ "            available contracts: " ++ show (M.keys $ cc^.contracts)
---  liftIO $ putStrLn $ "            available functions: " ++ show (M.keys $ contract'^.functions)
-
-  case M.lookup functionName $ contract'^.functions of
+  case M.lookup functionName $ contract^.functions of
     Just theFunction -> do
-      result <- call' address contract' cc theFunction args
+      result <- call' address contract cc theFunction args
 
       when trace $ do
         resultString <-
@@ -293,11 +279,11 @@ call'' address functionName args = do
       return result
 
     _ -> do --Maybe the function is actually a getter
-      case M.lookup functionName $ contract'^.storageDefs of
+      case M.lookup functionName $ contract^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
           val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
           return $ Just val
-        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName' ++ "'"
+        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
 
 
 ---------------------------------------------
