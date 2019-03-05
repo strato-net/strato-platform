@@ -30,14 +30,14 @@ data Contract =
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _functions :: Map String Func,
     _constructor :: Maybe Func
-  } deriving (Show)
+  } deriving (Show, Read)
 
 makeLenses ''Contract
 
 data CodeCollection =
   CodeCollection {
     _contracts :: Map String Contract
-  } deriving (Show)
+  } deriving (Show, Read)
 
 makeLenses ''CodeCollection
 

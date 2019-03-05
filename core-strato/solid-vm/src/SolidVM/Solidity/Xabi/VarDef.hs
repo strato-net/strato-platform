@@ -22,7 +22,7 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
-                 deriving (Eq, Show, Generic)
+                 deriving (Eq, Show, Read, Generic)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -89,7 +89,7 @@ instance ToSchema VarType where
 instance Arbitrary VarType where arbitrary = GR.genericArbitrary GR.uniform
 -}
 data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
-               deriving (Eq, Show, Generic)
+               deriving (Eq, Show, Read, Generic)
 
 instance FromJSON FieldType where
   parseJSON =

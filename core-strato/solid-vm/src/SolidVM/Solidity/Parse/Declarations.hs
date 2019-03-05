@@ -31,7 +31,7 @@ import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 data SourceUnit = Pragma Identifier String
                 | NamedXabi Text.Text (Xabi, [Text.Text])
-                deriving (Eq, Show)
+                deriving (Eq, Show, Read)
 
 
 -- | Parses an entire Solidity contract
