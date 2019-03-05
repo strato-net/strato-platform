@@ -44,7 +44,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
-import           Blockchain.SolidVM.Account
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
@@ -128,10 +127,6 @@ create' creator cc contractName argExps = do
   addCode SolidVM ccString
 
   when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName
-
-  let account = initialAccount{contract=(contractName, cc)}
-
-  addAccount newAddress account
 
   let contract' = fromMaybe (error $ "no contract with name " ++ contractName) (cc ^. contracts . at contractName)
 
