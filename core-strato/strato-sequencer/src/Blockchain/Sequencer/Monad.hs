@@ -60,7 +60,6 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
@@ -71,7 +70,6 @@ import qualified Database.LevelDB                          as LDB
 
 data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
-                      , _seenBlockDB         :: SeenBlockDB
                       , _seenTransactionDB   :: SeenTransactionDB
                       , _blockHashRegistry   :: Map SHA OutputBlock
                       , _txHashRegistry      :: Map SHA OutputTx
@@ -155,10 +153,6 @@ instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
       chainIdRegistry %= M.alter (const mcie) cId
       return mcie
 
-instance HasSeenBlockDB SequencerM where
-    getSeenBlockDB = use seenBlockDB
-    putSeenBlockDB = assign seenBlockDB
-
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
     putSeenTransactionDB = assign seenTransactionDB
@@ -179,7 +173,6 @@ runSequencerM c mbc m = do
         latestRound <- liftIO $ newIORef 0
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
-            , _seenBlockDB         = mkSeenBlockDB stxSize
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _blockHashRegistry   = M.empty
             , _txHashRegistry      = M.empty
