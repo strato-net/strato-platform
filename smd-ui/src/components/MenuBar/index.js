@@ -50,7 +50,7 @@ class MenuBar extends Component {
             <small className="pt-text-muted welcome-user"> {Cookies.get('strato_user_name')} </small>
             <span className="pt-navbar-divider" />
             <a target="_blank" rel="noopener noreferrer">
-              <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
+              <button className="pt-button pt-minimal pt-small" onClick={() => { window.location.href = '/auth/logout' }}>Logout</button>
             </a></span>}
         </div>
       );

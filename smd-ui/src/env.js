@@ -10,7 +10,7 @@ const strato_doc_uri = '/docs/?url=/strato-api/eth/v1.2/swagger.json';
 
 const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? window.NODE_HOST : (process.env.REACT_APP_NODE_HOST ? process.env.REACT_APP_NODE_HOST : 'localhost');
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
-const smd_mode = window.SMD_MODE && window.SMD_MODE !== '__SMD_MODE__' ? window.SMD_MODE : (oauth_enabled ? 'oauth' : 'enterprise');
+const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
 
 export const env = {
   NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
