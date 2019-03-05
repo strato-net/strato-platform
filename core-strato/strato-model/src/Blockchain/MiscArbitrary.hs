@@ -4,6 +4,7 @@ module Blockchain.MiscArbitrary () where
 import Test.QuickCheck
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Arbitrary
 import qualified Data.Text as T
 import Data.Time
@@ -18,6 +19,11 @@ instance Arbitrary UTCTime where
 
 instance Arbitrary B.ByteString where
   arbitrary = fromABS <$> arbitrary
+
+instance Arbitrary BSS.ShortByteString where
+  arbitrary = do
+    n <- choose (0, 256)
+    BSS.toShort <$> slowRandBs n
 
 instance Arbitrary T.Text where
   arbitrary = T.pack <$> arbitrary
