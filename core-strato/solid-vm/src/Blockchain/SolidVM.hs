@@ -16,6 +16,7 @@ import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.Short                   as BSS
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -155,7 +156,7 @@ create' creator name argExps = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = Just B.empty,
+    erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Just address,
@@ -215,7 +216,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = fmap encodeForReturn returnValue,
+    erReturnVal = BSS.toShort . encodeForReturn <$> returnValue,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Nothing,

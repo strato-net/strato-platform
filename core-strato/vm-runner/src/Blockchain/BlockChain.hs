@@ -28,8 +28,7 @@ import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
-import qualified Data.ByteString.Base16                  as B16
-import qualified Data.ByteString.Char8                   as BC
+import qualified Data.ByteString.Short                   as BSS
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
@@ -144,7 +143,7 @@ instance Bagger.MonadBagger ContextM where
                      TransactionResult { transactionResultBlockHash        = SHA 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
-                                       , transactionResultResponse         = ""
+                                       , transactionResultResponse         = BSS.empty
                                        , transactionResultTrace            = "rejected"
                                        , transactionResultGasUsed          = 0
                                        , transactionResultEtherUsed        = 0
@@ -542,11 +541,11 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-          (response, theTrace', theLogs) =
+          (!response, theTrace', theLogs) =
             case result of
-              Left _ -> ("", [], []) --TODO keep the trace when the run fails
+              Left _ -> (BSS.empty, [], []) --TODO keep the trace when the run fails
               Right r ->
-                (BC.unpack $ B16.encode $ fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
+                (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
 
       newAddresses <-
           case result of
