@@ -14,6 +14,7 @@ import           Control.Monad.Logger
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
+import qualified Data.ByteString.Short   as BSS
 import           Data.Maybe
 import qualified Data.Set                as S
 import qualified Data.Text.Encoding      as Text
@@ -110,7 +111,8 @@ spec = do
       print $ B16.encode "ec630643"
       case erReturnVal execResults of
         Nothing -> liftIO $ putStrLn "No return value"
-        Just code -> do
+        Just short -> do
+          let code = BSS.fromShort short
           print code
           print . fst . B16.decode $ code
           print . Text.decodeUtf8 $ code

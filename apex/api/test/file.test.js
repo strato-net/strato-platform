@@ -14,6 +14,8 @@ const bcrypt = require('bcrypt');
 const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
+const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
+
 const waitFaucet = async function (address) {
   const res = await chai.request(process.env.stratoRoot)
     .post('/faucet')
@@ -39,11 +41,15 @@ const waitFaucet = async function (address) {
 
 chai.use(chaiHttp);
 
-describe('File', function () {
+describe('File - ExternalStorage - non-OAuth/Public', function () {
   this.timeout(20000);
   let _contractAddress, accountAddress, app;
 
   before(async function () {
+    if(SKIP_TEST_BLOCK){
+      this.skip();
+    }
+
     checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
       return next();
     });
@@ -67,6 +73,10 @@ describe('File', function () {
   });
 
   after(function () {
+    if(SKIP_TEST_BLOCK){
+      this.skip();
+    }
+
     checkMode.checkMode.restore();
   })
 
@@ -74,6 +84,10 @@ describe('File', function () {
   describe('post /bloc/file/upload', async function () {
 
     beforeEach(function () {
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
       let uploadData = {
         ETag: '"123b0b7aef8ba5d26ac7cab3438837f9"',
         Location: 'https://strato-external-storage.s3.amazonaws.com/1530596484075-Rie1vaW.png',
@@ -86,6 +100,10 @@ describe('File', function () {
     });
 
     afterEach(function () {
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
       uploader.upload.restore();
     })
 
@@ -142,11 +160,25 @@ describe('File', function () {
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'uploadContract').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.uploadContract.restore();
       })
 
@@ -171,6 +203,11 @@ describe('File', function () {
   });
 
   describe('get /bloc/file/list', async function () {
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
 
     it('replies 200 with list of uploads', async function () {
       const res = await chai.request(app)
@@ -182,11 +219,26 @@ describe('File', function () {
   });
 
   describe('get /bloc/file/verify', async function () {
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
 
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         storage = {
           uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
           timeStamp: 1530538131,
@@ -242,11 +294,26 @@ describe('File', function () {
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
       })
 
@@ -268,10 +335,27 @@ describe('File', function () {
 
   describe('post /bloc/file/attest', async function () {
 
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
+
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         storage = {
           uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
           timeStamp: 1530538131,
@@ -285,6 +369,10 @@ describe('File', function () {
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
         externalStorage.attest.restore();
       })
@@ -351,11 +439,24 @@ describe('File', function () {
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         externalStorage.getExternalStorage.restore();
       })
 
@@ -380,10 +481,26 @@ describe('File', function () {
 
   describe('get /bloc/file/download ', async function () {
 
+    before(function(){
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+    })
+
+
     describe('resolve', async function () {
       let storage;
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         storage = {
           uri: 'https://strato-external-storage.s3.amazonaws.com/1530511399877-widescreen.jpeg',
           timeStamp: 1530538131,
@@ -396,6 +513,9 @@ describe('File', function () {
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
         externalStorage.getExternalStorage.restore();
       })
 
@@ -439,11 +559,26 @@ describe('File', function () {
 
     describe('rejects', async function () {
 
+      before(function(){
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+      })
+
+
       beforeEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         sinon.stub(externalStorage, 'getExternalStorage').rejects('Internal server error');
       });
 
       afterEach(function () {
+        if(SKIP_TEST_BLOCK){
+          this.skip();
+        }
+
         externalStorage.getExternalStorage.restore();
       })
 

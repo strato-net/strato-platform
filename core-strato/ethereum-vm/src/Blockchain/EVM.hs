@@ -27,6 +27,7 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
+import qualified Data.ByteString.Short              as BSS
 import           Data.Char
 import           Data.Data
 import           Data.Function
@@ -565,7 +566,7 @@ runOperation CALL = do
 
   case maybeBytes of
     Nothing    -> return ()
-    Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
+    Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) $ BSS.fromShort bytes
 
   push result
 
@@ -624,7 +625,7 @@ runOperation CALLCODE = do
 
   case maybeBytes of
     Nothing    -> return ()
-    Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
+    Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) $ BSS.fromShort bytes
 
   push result
 
@@ -684,7 +685,7 @@ runOperation DELEGATECALL = do
 
       case maybeBytes of
         Nothing    -> return ()
-        Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
+        Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) $ BSS.fromShort bytes
 
       push result
 
@@ -1159,8 +1160,8 @@ create' = do
               , _callDataOwner       = envOwner
               , _callDataGasPrice    = envGasPrice
               , _callDataValue       = envValue
-              , _callDataInput       = envInputData
-              , _callDataOutput      = returnVal vmState
+              , _callDataInput       = BSS.toShort envInputData
+              , _callDataOutput      = BSS.toShort <$> returnVal vmState
               }
 
 call :: Bool
@@ -1242,8 +1243,8 @@ call' noValueTransfer = do
           , _callDataOwner       = envOwner
           , _callDataGasPrice    = envGasPrice
           , _callDataValue       = envValue
-          , _callDataInput       = envInputData
-          , _callDataOutput      = returnVal vmState
+          , _callDataInput       = BSS.toShort envInputData
+          , _callDataOutput      = BSS.toShort <$> returnVal vmState
           }
 
   return (fromMaybe B.empty $ returnVal vmState)
@@ -1315,7 +1316,7 @@ create_debugWrapper block owner value initCodeBytes = do
 
           return $ Just newAddress
 
-nestedRun_debugWrapper :: Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe B.ByteString)
+nestedRun_debugWrapper :: Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe BSS.ShortByteString)
 nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) sender value inputData = do
 
   currentCallDepth <- getCallDepth
@@ -1392,7 +1393,7 @@ vmStateToExecResults vmState = do
       erRemainingTxGas     = gr
       , erRefund             = ref
       -- For errors, ReturnVal is only set for RETURN and REVERT, so this must be a REVERT.
-      , erReturnVal          = returnVal vmState
+      , erReturnVal          = BSS.toShort <$> returnVal vmState
       , erTrace              = theTrace vmState
       , erLogs               = logs vmState
       -- I think erNewContractAddress should be Nothing if there is an error

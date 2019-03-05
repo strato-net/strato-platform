@@ -7,6 +7,7 @@ module Blockchain.Data.PersistTypes where
 
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Short              as BSS
 import qualified Data.Text                          as T
 import           Data.Text.Encoding
 import           Database.Persist
@@ -111,5 +112,9 @@ instance PersistField SHA where
 instance PersistFieldSql SHA where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
 
+instance PersistField BSS.ShortByteString where
+    toPersistValue = toPersistValue . BSS.fromShort
+    fromPersistValue = fmap BSS.toShort . fromPersistValue
 
-
+instance PersistFieldSql BSS.ShortByteString where
+    sqlType _ = SqlBlob

@@ -86,7 +86,7 @@ TransactionResult json
     blockHash SHA
     transactionHash SHA
     message String
-    response String
+    response BSS.ShortByteString
     trace String
     gasUsed Word256
     etherUsed Word256
