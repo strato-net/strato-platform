@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
@@ -21,48 +22,25 @@ fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BDefault -> SDefault
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . T.unpack $ s
+  MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
+  MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
   MS.BEnumVal k t -> SEnumVal (T.unpack k) (T.unpack t)
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
   SInteger i -> MS.BInteger i
-  SString s -> MS.BString (T.pack s)
+  SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
   SAddress a -> MS.BAddress a
+  SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
   SDefault -> MS.BDefault
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
-setVar :: Variable -> Value -> SM ()
-setVar (Property "length" o) newVal = do
-  val <- getVar o
-  case (val, newVal) of
-    (SArray valType oldV, SInteger i) -> do
-      newV <-
-        case toInteger (V.length oldV) `compare` i of
-          EQ -> return oldV
-          LT -> do
-            extra <-
-              liftIO $ V.replicateM (fromInteger i-V.length oldV) (fmap Variable $ newIORef $ defaultValue valType)
-            return $ oldV V.++ extra
-          GT -> return $ V.take (fromInteger i) oldV
-      setVar o $ SArray valType newV
-
-    _ -> error "setVar length called for unknown params"
-
-
-setVar (Variable ioRef) val = do
-  liftIO $ writeIORef ioRef val
-
-setVar (UnsetMapItem mapVariable key _) val = do
-  (SMap valType theMap) <- getVar mapVariable
-  newVar <- liftIO $ fmap Variable $ newIORef val
-  setVar mapVariable $ SMap valType $ M.insert key newVar theMap
-
-setVar (StorageItem key) val = do
+setVar :: MS.StoragePath -> Value -> SM ()
+setVar key val = do
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
   currentAddress' <- getCurrentAddress
@@ -77,13 +55,9 @@ setVar (StorageItem key) val = do
         putSolidStorageKeyVal' currentAddress' dstKey val'
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
-setVar (Constant _) _ = error "setVar was called for a constant, this is forbidden"
-
-setVar x _ = error $ "setVar called for undefined value: " ++ show x
-
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = liftIO $ readIORef ioRef
-getVar (Constant x) = return x
+getVar (Constant c) = return c
 getVar (Property "length" var) = do
   case var of
     StorageItem p -> getVar . StorageItem $ p ++ [MS.Field "length"]
@@ -93,12 +67,10 @@ getVar (Property "length" var) = do
         SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
         SString s -> return $ SInteger $ toInteger $ length s
         x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
-getVar (UnsetMapItem _ _ valType) = return $ defaultValue valType
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
   fromBasic <$> getSolidStorageKeyVal' currentAddress' key
 getVar x = error $ "getVar called for undefined value: " ++ show x
-
 
 
 showSM :: Value -> SM String

@@ -27,17 +27,19 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 
 
-data BasicValue = BInteger Integer
-                | BString T.Text
-                | BBool Bool
-                | BAddress Address
-                | BEnumVal T.Text T.Text
+data BasicValue = BInteger !Integer
+                | BString !B.ByteString
+                | BBool !Bool
+                | BAddress !Address
+                | BEnumVal !T.Text !T.Text
+                | BContract !T.Text !Address
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable)
 
--- TODO(tim): Can be numeric/bool/address/string/text
 data IndexType = INum Integer
                | IText B.ByteString
+               | IBool Bool
+               | IAddress Address
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StorableValue = BasicValue BasicValue
@@ -95,17 +97,23 @@ parseArrayIndex = do
 parseMapIndex :: Parser StoragePath
 parseMapIndex = do
   skip (== c2w8 '<')
-  isStr <- (== Just (c2w8 '"')) <$> peekWord8
-  idx <- if isStr
-           then do
-             skip (== c2w8 '"')
-             let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
-                 ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
-                 ignoreEscapedQuotes _ _ = Just False
-             strContents <- scan False ignoreEscapedQuotes
-             skip (== c2w8 '"')
-             return . IText . unescapeKey $ strContents
-           else INum <$> parseInteger
+  nextChar <- peekWord8'
+  idx <- case w82c nextChar of
+    't' -> string "true" >> return (IBool True)
+    'f' -> string "false" >> return (IBool False)
+    'a' -> do
+      _ <- string "a:"
+      eAddress <- addressFromHex <$> Atto.take 40
+      IAddress <$> either fail return eAddress
+    '"' -> do
+       skip (== c2w8 '"')
+       let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
+           ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
+           ignoreEscapedQuotes _ _ = Just False
+       strContents <- scan False ignoreEscapedQuotes
+       skip (== c2w8 '"')
+       return . IText . unescapeKey $ strContents
+    _ -> INum <$> parseInteger
   skip (== c2w8 '>')
   (MapIndex idx:) <$> pathParser
 
@@ -173,6 +181,9 @@ unparsePath = B.concat . concatMap go
         go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
         go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
         go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
+        go (MapIndex (IBool True)) = ["<true>"]
+        go (MapIndex (IBool False)) = ["<false>"]
+        go (MapIndex (IAddress a)) = ["<a:", addressToHex a, ">"]
 
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 
@@ -222,14 +233,16 @@ instance RLPSerializable BasicValue where
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
     BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
-    BEnumVal a b -> RLPArray [RLPScalar 4, rlpEncode a, rlpEncode b]
+    BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
+    BEnumVal a b -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b]
   rlpDecode x@(RLPArray ((RLPScalar t):f:s)) =
     case (t, s) of
       (0, []) -> BInteger $ rlpDecode f
       (1, []) -> BString $ rlpDecode f
       (2, []) -> BBool $ rlpDecode f
       (3, []) -> BAddress $ rlpDecode f
-      (4, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (4, [a']) -> BContract (rlpDecode f) (rlpDecode a')
+      (5, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x

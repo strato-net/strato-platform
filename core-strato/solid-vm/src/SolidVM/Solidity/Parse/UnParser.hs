@@ -14,6 +14,7 @@ import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
+import           Text.Printf
 
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
@@ -163,6 +164,7 @@ unparseStatement (Return Nothing) = "return;"
 unparseStatement (Return (Just e)) = "return " ++ unparseExpression e ++ ";"
 unparseStatement Break = "break;"
 unparseStatement Continue = "continue;"
+unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %s := mload(add(%s, 32)) }" dst src
 --unparseStatement x = show x
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
@@ -187,6 +189,7 @@ unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do
 unparseExpression :: Expression -> String
 unparseExpression (PlusPlus v) = unparseExpression v ++ "++"
+unparseExpression (MinusMinus v) = unparseExpression v ++ "--"
 unparseExpression (Unitary op v) = op ++ unparseExpression v
 unparseExpression (Binary op v1 v2) =
   unparseExpression v1 ++ " " ++ op ++ " " ++ unparseExpression v2

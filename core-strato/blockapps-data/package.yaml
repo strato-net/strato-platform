@@ -18,7 +18,6 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-datadefs
-  - solid-vm-model
   - blockapps-haskoin
   - blockapps-milena
   - blockapps-util
@@ -50,7 +49,6 @@ dependencies:
   - persistent
   - persistent-postgresql
   - persistent-template
-  - solid-vm-model
   - QuickCheck
   - resourcet
   - strato-conf

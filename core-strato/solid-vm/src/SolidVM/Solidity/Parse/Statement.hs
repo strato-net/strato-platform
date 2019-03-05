@@ -1,7 +1,9 @@
 
 module SolidVM.Solidity.Parse.Statement where
 
+import           Control.Monad
 import           Data.Functor.Identity
+import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
 
@@ -32,6 +34,7 @@ statement = do
   <|> try (SimpleStatement <$> variableDefinitionStatement <* semi)
   <|> (reserved "continue" >> return Continue <* semi)
   <|> (reserved "break" >> return Break <* semi)
+  <|> (reserved "assembly" >> inlineAssembly)
   <|> (SimpleStatement . ExpressionStatement <$> expression <* semi)
 
 
@@ -103,7 +106,9 @@ expression =
      ]
     ],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
+    [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+    [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
     [binary "<<", binary ">>"],
@@ -175,7 +180,7 @@ Expression
 
 
 primaryExpression :: SolidityParser Expression
-primaryExpression = do  
+primaryExpression = do
   (reserved "msg" >> return (Variable "msg"))
   <|> (reserved "address" >> return (Variable "address"))
   <|> (reserved "this" >> return (Variable "this"))
@@ -199,6 +204,21 @@ numberUnit = do
     <|> (reserved "finny" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
-  
+
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep expression
+
+inlineAssembly :: SolidityParser Statement
+inlineAssembly = fmap AssemblyStatement . braces $ do
+  let match = void . lexeme . string
+  dst <- identifier
+  match ":="
+  match "mload"
+  src <- parens $ do
+    match "add"
+    parens $ do
+      src <- identifier
+      void $ comma
+      match "32"
+      return src
+  return $ MloadAdd32 (T.pack dst) (T.pack src)

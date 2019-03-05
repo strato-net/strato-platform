@@ -14,7 +14,6 @@ import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 data Typo = StructTypo [(T.Text, Xabi.FieldType)]
@@ -109,32 +108,6 @@ getContractStructs cc c =
   in M.unions $ c^.structs:parentStructs
 
 
-
-
-getFunctionCode' :: M.Map T.Text Xabi.Func -> T.Text -> [Xabi.Statement]
-getFunctionCode' _ "uint" = []
-getFunctionCode' _ "string" = []
-getFunctionCode' _ "byte" = []
-getFunctionCode' _ "bytes" = []
-getFunctionCode' _ "new bytes" = []
-getFunctionCode' _ "push" = []
-getFunctionCode' _ "EventLogEntry" = []
-getFunctionCode' _ "TicketState" = []
-getFunctionCode' _ "ValidationRuleInterface" = []
-getFunctionCode' _ "TaxCodeManager" = []
-getFunctionCode' _ "Transition" = []
-getFunctionCode' _ "constructor for Bytes" = []
-getFunctionCode' _ "Ticket" = [] --TODO we probably should add this
-getFunctionCode' _ "fare" = [] --TODO we probably should add this
-getFunctionCode' _ "coam" = [] --TODO we probably should add this
-getFunctionCode' _ "eqfr" = [] --TODO we probably should add this
-getFunctionCode' _ "cort" = [] --TODO we probably should add this
-getFunctionCode' _ x | "constructor for" `T.isPrefixOf` x = [] --TODO we probably should add this
-getFunctionCode' functions' name =
-  let
-    Just theFunction = M.lookup name functions'
-    Just funcStatements = Xabi.funcContents theFunction
-  in funcStatements
 
 getFunction :: File -> T.Text -> T.Text -> (T.Text, Xabi.Func)
 getFunction file contractName functionName =
