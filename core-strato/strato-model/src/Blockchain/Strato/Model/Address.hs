@@ -8,7 +8,8 @@ module Blockchain.Strato.Model.Address
       prvKey2Address, pubKey2Address,
       formatAddress, formatAddressWithoutColor, stringAddress,
       getNewAddress_unsafe,
-      addressAsNibbleString, addressFromNibbleString
+      addressAsNibbleString, addressFromNibbleString,
+      addressToHex, addressFromHex
     ) where
 
 import           Control.DeepSeq
@@ -30,6 +31,7 @@ import qualified Data.Aeson.Encoding                  as Enc
 
 import           Data.Binary
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Lazy                 as BL
 import qualified Data.NibbleString                    as N
 
@@ -144,6 +146,16 @@ addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteSt
 
 formatAddressWithoutColor::Address->String
 formatAddressWithoutColor = formatAddress
+
+addressToHex :: Address -> B.ByteString
+addressToHex = B16.encode . BL.toStrict . encode
+
+addressFromHex :: B.ByteString -> Either String Address
+addressFromHex hex = case B16.decode hex of
+                     (h, "") -> case decodeOrFail (BL.fromStrict h) of
+                                  Right (_, _, a) -> return a
+                                  Left (_, _, msg) -> Left $ "cannot decode address: " ++ msg
+                     (_, _) -> Left $ "invalid hex address: " ++ show hex
 
 instance Arbitrary Address where
   arbitrary = Address <$> arbitrary

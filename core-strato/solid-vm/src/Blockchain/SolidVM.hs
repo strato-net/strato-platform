@@ -8,6 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
+
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -16,6 +17,7 @@ import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.Short                   as BSS
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -86,7 +88,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
-create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
+create _ _ _ blockData _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
   addCode SolidVM $ initCode
 
   let maybeContractName = join $ fmap (M.lookup "name") metadata
@@ -100,7 +102,7 @@ create _ _ _ _ _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
       maybeArgs = runParser parseArgs "qq" "qq" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
 
-  runSM initCode $ do
+  runSM initCode blockData $ do
     create' sender' contractName args
 
 create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
@@ -108,7 +110,6 @@ create' creator name argExps = do
   sstate <- get
   let cc = codeCollection sstate
 
-  --TODO- Replace this address creation with the safe version:
   nonce' <- getNonce creator
   setNonce creator $ nonce'+1
   let address = getNewAddress_unsafe creator nonce'
@@ -155,7 +156,7 @@ create' creator name argExps = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = Just B.empty,
+    erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Just address,
@@ -188,7 +189,7 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
+call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
 
 
   let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
@@ -206,7 +207,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       _ -> error "internal error- SolidVM was called for non-solid-vm code"
 
 
-  returnValue <- runSM ccString $ do
+  returnValue <- runSM ccString blockData $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            call'' codeAddress funcName argValues
 
@@ -215,7 +216,7 @@ call _ _ _ _ _ _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = fmap encodeForReturn returnValue,
+    erReturnVal = BSS.toShort . encodeForReturn <$> returnValue,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Nothing,
@@ -293,15 +294,16 @@ runStatement :: Xabi.Statement -> SM (Maybe Value)
 --      I checked the Wings contracts, they never use this.
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
   var <- expToVar e
+  path <- expToPath e
   v <- getVar var
   let value =
         case v of
           (SInteger i) -> i
           _ -> error "PlusPlus applied to a non integer"
 
-  when trace $ logAssigningVariable $ SInteger value
+  logAssigningVariable $ SInteger value
 
-  setVar var $ SInteger $ value + 1
+  setVar path $ SInteger $ value + 1
   return Nothing
 
 
@@ -311,9 +313,8 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
   v2 <- expToVar e2
   value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
-  when trace $ logAssigningVariable value
-  -- TODO(tim): This might fail when assigning to a memory variable
-  setVar (StorageItem v1) value
+  logAssigningVariable value
+  setVar v1 value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -333,7 +334,8 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                  case t' of
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
-               Just t -> error $ "TODO(tim): " ++ show t
+               Just (Xabi.Bytes {}) -> return $ SString ""
+               Just t -> error $ "TODO(tim): Require a default value for type: " ++ show t
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
 
   when trace $ do
@@ -396,20 +398,16 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       _ <- getVar =<< expToVar loopExp
       return result
 
---  error $ "gonna for: " ++ show code
-
-{-
-  conditionResult <- getVar =<< expToVar condition
-  case conditionResult of
-    SBool True -> runStatements code'
-    SBool False -> return Nothing
-    _ -> error "IfStatement returned a non bool value"
--}
-
 runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
     Just e -> fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
+
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
+  var <- expToVar $ Xabi.Variable $ T.unpack src;
+  path <- expToPath $ Xabi.Variable $ T.unpack dst;
+  setVar path =<< getVar var
+  return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
@@ -438,6 +436,8 @@ getIndexType [MS.Field field] = do
       case v of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
          Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
+         Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
+         Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
          _ -> error $ "TODO(tim): unanticipated type in variable declarations: " ++ show v
 getIndexType xs = error $ "TODO(tim): higher order index references: " ++ show xs
@@ -450,6 +450,9 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
   idx <- getVar idxVar
   return . (parPath ++) $ case (idxType, idx) of
+    (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
+    (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
+    (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
     (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
@@ -474,29 +477,40 @@ expToVar (Xabi.Variable name) = do
 
 expToVar (Xabi.PlusPlus e) = do
   var <- expToVar e
-  v <- getVar var
-  let value =
-        case v of
-          (SInteger i) -> i
-          _ -> error "PlusPlus applied to a non integer"
+  path <- expToPath e
+  value <- castToInt <$> getVar var
 
-  when trace $ logAssigningVariable $ SInteger value
+  logAssigningVariable $ SInteger value
 
-  setVar var $ SInteger $ value + 1
+  setVar path $ SInteger $ value + 1
   return $ Constant $ SInteger value
 
 expToVar (Xabi.Unitary "++" e) = do
   var <- expToVar e
-  v <- getVar var
-  let value =
-        case v of
-          (SInteger i) -> i
-          _ -> error "PlusPlus applied to a non integer"
+  path <- expToPath e
+  value <- castToInt <$> getVar var
+  let next = SInteger $ value + 1
+  logAssigningVariable next
 
-  when trace $ logAssigningVariable $ SInteger value
+  setVar path next
+  return $ Constant next
 
-  setVar var $ SInteger $ value + 1
-  return $ Constant $ SInteger $ value + 1
+expToVar (Xabi.MinusMinus e) = do
+  var <- expToVar e
+  path <- expToPath e
+  value <- castToInt <$> getVar var
+  logAssigningVariable $ SInteger value
+  setVar path . SInteger $ value - 1
+  return $ Constant $ SInteger value
+
+expToVar (Xabi.Unitary "--" e) = do
+  var <- expToVar e
+  path <- expToPath e
+  value <- castToInt <$> getVar var
+  let next = SInteger $ value -1
+  logAssigningVariable next
+  setVar path next
+  return $ Constant next
 
 
 
@@ -536,20 +550,13 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ timestamp $ blockHeader env'
+      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ blockHeader env'
 
     (SBuiltinVariable "block", "number") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ number $ blockHeader env'
+      return $ Constant $ SInteger $ blockDataNumber $ blockHeader env'
 
     (SAddress (Address a), itemName) -> do
-{-
-      (contractName, cc) <- fmap contract $ getAccount $ Address a
-
-      if isFunction
-        then return $ Constant $ SContractFunction contractName a itemName
-        else return $ Constant $ SContractItem a itemName
--}
       return $ Constant $ SContractItem (toInteger a) itemName
 
 
@@ -567,6 +574,7 @@ expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SIntege
 expToVar (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
+expToVar (Xabi.Binary "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar (Xabi.Binary "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 
@@ -577,7 +585,7 @@ expToVar (Xabi.Unitary "!" expr) = do
     _ -> error "Unitary ! calculated a non bool value"
 expToVar (Xabi.Unitary "delete" expr) = do
   p <- expToPath expr
-  setVar (StorageItem p) SDefault
+  setVar p SDefault
   return . Constant $ SNULL
 
 expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
@@ -593,17 +601,14 @@ expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bin
 expToVar (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n%%%% val2 = " ++ show val2
-  isEqual <- liftIO $ val1 `valEquals` val2
-  if isEqual
-    then return $ Constant $ SBool True
-    else return $ Constant $ SBool False
+  logVals val1 val2
+  fmap (Constant . SBool) .liftIO $ val1 `valEquals` val2
 
 expToVar (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
     _ -> error $ "binary '<' used on non number values"
@@ -612,7 +617,7 @@ expToVar (Xabi.Binary ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
     _ -> error $ "binary '<' used on non number values"
@@ -621,7 +626,7 @@ expToVar (Xabi.Binary ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
     _ -> error $ "binary '<' used on non number values"
@@ -630,7 +635,7 @@ expToVar (Xabi.Binary "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
     _ -> error $ "binary '<' used on non number values"
@@ -639,7 +644,7 @@ expToVar (Xabi.Binary "&&" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SBool b1, SBool b2) -> return $ Constant $ SBool $ b1 && b2
     _ -> error $ "binary '<' used on non number values"
@@ -648,7 +653,7 @@ expToVar (Xabi.Binary "||" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  logVals val1 val2
   case (val1, val2) of
     (SBool b1, SBool b2) -> return $ Constant $ SBool $ b1 || b2
     _ -> error $ "binary '<' used on non number values"
@@ -732,9 +737,9 @@ expToVar (Xabi.FunctionCall e args) = do
                         _ -> error $ "Invalid length type: " ++ show len'
           newLen = SInteger $ fromIntegral $ len + 1
       let idxPath = prefix' ++ [MS.ArrayIndex len]
-      setVar (StorageItem lenPath) newLen
+      setVar lenPath newLen
       case argVals of
-        [av] -> setVar (StorageItem idxPath) av
+        [av] -> setVar idxPath av
         _ -> error $ printf "push has arity 1; %d args provided" (length argVals)
       return $ Constant newLen
 
@@ -779,6 +784,14 @@ callBuiltin "push" [v] (Just o) = do
   error $ "push undefined for args: " ++ show v ++ ", " ++ show o
 callBuiltin "identity" [v] Nothing = do
   return v
+callBuiltin "keccak256" [SString buf] Nothing = do
+  return . SString . BC.unpack . keccak256 . BC.pack $ buf
+callBuiltin "require" (SBool cond :msg) Nothing = do
+  unless cond $ do
+    case msg of
+      [] -> error "Assertion thrown"
+      (m:_) -> error $ "Assertion throw: " ++ show m
+  return $ SNULL
 callBuiltin x _ _ = error $ "callBuiltin called for an unknown function: " ++ x
 
 
@@ -855,37 +868,9 @@ runTheConstructors cc address contractName argExps = do
   popCallInfo
 
   return ()
-{-
-create :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM Address
-create creator cc name argExps = do
-  address <- getContractAddress creator
-  when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show address ++ " of type " ++ name
-  let account = Account 0 0 M.empty (name, cc)
 
-  addAccount address account
 
-  let contract' = fromMaybe (error $ "no contract with name " ++ name) (cc ^. contracts . at name)
 
-  -- Add Storage
-
-  addCallInfo address contract' M.empty
-
-  forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
-    initialValue <-
-      case maybeExpression of
-        Just e -> getVar =<< expToVar e
-        Nothing -> return $ defaultValue theType
-    addToStorage address n initialValue
-
-  popCallInfo
-
-  -- Run the constructor
-  runTheConstructors cc address name argExps
-
-  when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show address ++ " of type " ++ name
-
-  return address
--}
 
 call' :: Address -> Contract -> Xabi.Func -> [Value] -> SM (Maybe Value)
 call' address' contract' theFunction argVals = do
@@ -928,7 +913,10 @@ logAssigningVariable v = do
   valueString <- showSM v
   liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
-
+logVals :: Value -> Value -> SM ()
+logVals val1 val2 = when trace . liftIO . putStrLn $ printf
+  "            %%%% val1 = %s\n\
+  \            %%%% val2 = %s" (show val1) (show val2)
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> ByteString

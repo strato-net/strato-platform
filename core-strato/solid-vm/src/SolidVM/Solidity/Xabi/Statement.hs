@@ -1,9 +1,9 @@
 
 module SolidVM.Solidity.Xabi.Statement where
-
+import qualified Data.Text as T
 import SolidVM.Solidity.Xabi.Type
 
-data Statement = 
+data Statement =
   IfStatement Expression [Statement] (Maybe [Statement]) -- if then else
   | WhileStatement Expression [Statement]
   | ForStatement (Maybe SimpleStatement) (Maybe Expression) (Maybe Expression) [Statement]
@@ -14,6 +14,7 @@ data Statement =
   | Return (Maybe Expression)
   | Throw
   | EmitStatement String [(Maybe String, Expression)]
+  | AssemblyStatement InlineAssembly
   | SimpleStatement SimpleStatement
   deriving (Show, Eq)
 
@@ -21,7 +22,12 @@ data SimpleStatement =
   VariableDefinition (Maybe Type) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
   | ExpressionStatement Expression deriving (Show, Eq)
 
-
+-- Currently, the only supported inline assembly is:
+-- assembly {
+--  result := mload(add(source, 32))
+-- }
+-- Anything else is a parse error.
+data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq)
 
 
 

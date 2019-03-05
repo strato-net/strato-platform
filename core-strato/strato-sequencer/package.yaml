@@ -62,7 +62,7 @@ dependencies:
   - unliftio
   - seqevents
 
-ghc-options: -Wall -O2 -threaded
+ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 library:
   source-dirs:     src

@@ -25,6 +25,7 @@ import           Database.Persist.TH
 
 import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
+import qualified Data.ByteString.Short                   as BSS
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
@@ -41,7 +42,6 @@ import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
-
 
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
@@ -65,6 +65,7 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS storage ADD COLUMN IF NOT EXISTS kind varchar;"
   exec "ALTER TABLE IF EXISTS storage ALTER COLUMN key TYPE varchar;"
   exec "ALTER TABLE IF EXISTS storage ALTER COLUMN value TYPE varchar;"
+  exec "ALTER TABLE IF EXISTS transaction_result ALTER COLUMN response TYPE bytea USING response::bytea;"
   migrateAuto
 
 -- todo newtype me

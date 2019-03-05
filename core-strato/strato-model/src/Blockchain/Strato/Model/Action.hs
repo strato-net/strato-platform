@@ -15,6 +15,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
 import           Data.DeriveTH
+import qualified Data.ByteString.Short        as BSS
 import           Data.Function                (on)
 import qualified Data.HashMap.Strict          as HM
 import           Data.Map.Strict              (Map)
@@ -42,8 +43,8 @@ data CallData = CallData
   , _callDataOwner    :: Address
   , _callDataGasPrice :: Integer
   , _callDataValue    :: Integer
-  , _callDataInput    :: B.ByteString
-  , _callDataOutput   :: Maybe B.ByteString
+  , _callDataInput    :: BSS.ShortByteString
+  , _callDataOutput   :: Maybe BSS.ShortByteString
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''CallData
 
@@ -76,7 +77,7 @@ emptyCallData = CallData
   , _callDataOwner    = Address 0
   , _callDataGasPrice = 0
   , _callDataValue    = 0
-  , _callDataInput    = B.empty
+  , _callDataInput    = BSS.empty
   , _callDataOutput   = Nothing
   }
 
