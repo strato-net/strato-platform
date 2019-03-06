@@ -19,10 +19,12 @@ import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 data Typo = StructTypo [(T.Text, Xabi.FieldType)]
           | EnumTypo [String]
           | FuncTypo Func
+          | ContractTypo String
           deriving (Show)
 
 data Contract =
   Contract {
+    _contractName :: String,
     _parents :: [String],
     _constants :: Map String ConstantDecl,
     _storageDefs :: Map String VariableDecl,
@@ -30,14 +32,14 @@ data Contract =
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _functions :: Map String Func,
     _constructor :: Maybe Func
-  } deriving (Show)
+  } deriving (Show, Read)
 
 makeLenses ''Contract
 
 data CodeCollection =
   CodeCollection {
     _contracts :: Map String Contract
-  } deriving (Show)
+  } deriving (Show, Read)
 
 makeLenses ''CodeCollection
 
@@ -48,9 +50,10 @@ emptyCodeCollection =
 
 
 
-xabiToContract :: [String] -> Xabi -> Contract
-xabiToContract parents' xabi =
+xabiToContract :: String -> [String] -> Xabi -> Contract
+xabiToContract contractName' parents' xabi =
   Contract {
+  _contractName = contractName',
   _parents = parents',
   _storageDefs = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiVars xabi,
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
@@ -110,9 +113,9 @@ getContractStructs cc c =
 
 
 getFunction :: File -> T.Text -> T.Text -> (T.Text, Xabi.Func)
-getFunction file contractName functionName =
+getFunction file name functionName =
   let
-    Just contract' = lookup contractName $ [(name, xabi) | NamedXabi name (xabi, _) <- unsourceUnits file]
+    Just contract' = lookup name $ [(name', xabi) | NamedXabi name' (xabi, _) <- unsourceUnits file]
 
     Just func = M.lookup functionName $ Xabi.xabiFuncs contract'
   in (functionName, func)

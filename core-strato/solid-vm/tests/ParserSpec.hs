@@ -12,6 +12,7 @@ import Text.RawString.QQ
 import SolidVM.Solidity.Xabi.Statement
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
+import SolidVM.Solidity.Parse.UnParser
 
 spec :: Spec
 spec = do
@@ -31,9 +32,20 @@ spec = do
                 , ("x--", MinusMinus (Variable "x"))
                 , ("x + y", Binary "+" (Variable "x") (Variable "y"))
                 , ("x ** y", Binary "**" (Variable "x") (Variable "y"))
+                , ("x[q]", IndexAccess (Variable "x") (Just $ Variable "q"))
+                , ("x[a][b][c]", IndexAccess (
+                                   IndexAccess (
+                                     IndexAccess
+                                       (Variable "x")
+                                       (Just $ Variable "a"))
+                                     (Just $ Variable "b"))
+                                   (Just $ Variable "c"))
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
+
+    forM_ cases $ \(want, input) -> do
+      it ("can unparse to " ++ want) $ unparseExpression input `shouldBe` want
 
     it "can parse function calls" $ do
       let f = FunctionCall (Variable "f")

@@ -2,7 +2,25 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
-module Blockchain.SolidVM.SM where
+
+--{-# OPTIONS -fno-warn-unused-top-binds  #-}
+
+module Blockchain.SolidVM.SM (
+  CallInfo(..),
+  SState(..),
+  Environment(..),
+  SM,
+  runSM,
+  getCurrentAddress,
+  addCallInfo,
+  popCallInfo,
+  getCurrentContract,
+  getCurrentCodeCollection,
+  getEnv,
+  getVariableOfName,
+  addLocalVariable,
+  getTypeOfName
+  ) where
 
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -14,22 +32,17 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
-import qualified Data.Text as T
-import           Text.Parsec
 
 import qualified SolidVM.Model.Storable as MS
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs (BlockData(..))
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.SolidVM.Account
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 
@@ -46,6 +59,7 @@ data CallInfo =
   CallInfo {
     currentAddress :: Address,
     currentContract :: Contract,
+    codeCollection :: CodeCollection,
     localVariables :: Map String Variable
     }
 
@@ -79,9 +93,8 @@ data Environment =
 data SState =
   SState {
     env :: Environment,
-    codeCollection :: CodeCollection,
-    accounts :: Map Address Account,
     callStack :: [CallInfo],
+    codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
     stateDB                :: MP.MPDB,
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
@@ -91,8 +104,6 @@ data SState =
   }
 
 type SM = StateT SState (ResourceT IO)
-
---type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
 instance HasMemAddressStateDB SM where
   getAddressStateTxDBMap = addressStateTxDBMap <$> get
@@ -129,24 +140,11 @@ instance HasStateDB SM where
 instance HasHashDB SM where
   getHashDB = hashDB <$> get
 
+instance HasCodeDB SM where
+  getCodeDB = codeDB <$> get
 
-runSM :: B.ByteString -> BlockData -> SM a -> ContextM a
-runSM theCode blk f = do
-  let maybeFile = runParser solidityFile "" "" $ BC.unpack theCode
-
-  let file =
-        case maybeFile of
-          Left e -> error $ show e ++ ":`" ++ BC.unpack theCode ++ "`"
-          Right v -> v
-
-      namedContracts = [(T.unpack name, xabiToContract (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-      cc = applyInheritence
-        $ CodeCollection {
-            _contracts=M.fromList namedContracts
-          }
-
-
+runSM :: BlockData -> SM a -> ContextM a
+runSM blk f = do
   vmcontext <- get
 
   let startingState =
@@ -156,9 +154,8 @@ runSM theCode blk f = do
             origin = Address 0x1234,
             blockHeader = blk
             },
-        codeCollection = cc,
-        accounts = M.empty,
         callStack = [],
+        codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,
         stateDB = contextStateDB vmcontext,
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
@@ -228,7 +225,7 @@ getVariableOfName name = do
         Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
-      maybeContract = toMaybe (name `elem` M.keys (codeCollection sstate^.contracts)) $
+      maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
         Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
@@ -272,6 +269,15 @@ getVariableOfName name = do
 --    $ flip fromMaybe maybeConstantValue
     $ (error $ "No variable with name " ++ name)
 
+
+getCurrentCallInfo :: SM CallInfo
+getCurrentCallInfo = do
+  sstate <- get
+  case callStack sstate of
+    [] -> error "getCurrentCallInfo called with an empty stack"
+    (currentCallInfo:_) -> return currentCallInfo
+
+
 getTypeOfName :: String -> SM Typo
 getTypeOfName s = do
   let lookInContract :: Contract -> [Typo]
@@ -280,8 +286,9 @@ getTypeOfName s = do
         , fmap EnumTypo (M.lookup s _enums)
         , fmap FuncTypo (M.lookup s _functions)
         ]
-  CodeCollection ccs <- gets codeCollection
-  case concatMap lookInContract ccs of
+  CodeCollection ccs <- fmap codeCollection getCurrentCallInfo
+  let ctrs = map ContractTypo $ M.keys ccs
+  case concatMap lookInContract ccs ++ ctrs of
     [] -> error $ "TODO(tim): unable to find type: " ++ show s
     (typo:_) -> return typo
 
@@ -297,18 +304,16 @@ getTypeOfName s = do
   runStatements funcStatements
 -}
 
-constExpToVar :: Xabi.Expression -> Value
-constExpToVar x = error $ "constExpToVar not defined for " ++ show x
 
-
-addCallInfo :: Address -> Contract -> Map String Variable -> SM ()
-addCallInfo a c initialLocalVariables = do
+addCallInfo :: Address -> Contract -> CodeCollection -> Map String Variable -> SM ()
+addCallInfo a c cc initialLocalVariables = do
   sstate <- get
 
   let newCallInfo =
         CallInfo {
           currentAddress=a,
           currentContract=c,
+          codeCollection=cc,
           localVariables=initialLocalVariables
         }
 
@@ -336,49 +341,9 @@ getCurrentAddress = do
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
     _ -> error $ "getCurrentContract called with an empty stack"
 
-{-
-setStorage :: Address -> String -> Value -> SM ()
-setStorage address name value = do
-  sstate <- get
-  let account = fromMaybe initialAccount $ M.lookup address $ accounts sstate :: Account
-      newAccount = account{storage=M.insert name value $ storage account} :: Account
-  put sstate{accounts = M.insert address newAccount $ accounts sstate}
-
-getStorage :: Address -> String -> SM (Maybe Value)
-getStorage address name = do
-  sstate <- get
-  case M.lookup address $ accounts sstate of
-    Nothing -> return Nothing
-    Just account ->return $ M.lookup name $ storage account
--}
-{-
-addToStorage :: Address -> String -> Value -> SM ()
-addToStorage address name value = do
-  variable <- liftIO $ fmap Variable $ newIORef value
-  sstate <- get
-  let account = fromMaybe initialAccount $ M.lookup address $ accounts sstate :: Account
-      newAccount = account{storage=M.insert name variable $ storage account} :: Account
-  put sstate{accounts = M.insert address newAccount $ accounts sstate}
--}
-
-getAccount :: Address -> SM Account
-getAccount a = do
-  sstate <- get
-  return $ fromMaybe initialAccount $ M.lookup a $ accounts sstate
-
-addAccount :: Address -> Account -> SM ()
-addAccount a account = do
-  sstate <- get
-  put sstate{accounts=M.insert a account $ accounts sstate}
-
-getNonce :: Address -> SM Integer
-getNonce a = do
-  account <- getAccount a
-  return $ nonce account
-
-setNonce :: Address -> Integer -> SM ()
-setNonce a n = do
-  account <- getAccount a
-  sstate <- get
-  put sstate{accounts=M.insert a account{nonce = n} $ accounts sstate}
-
+getCurrentCodeCollection :: SM CodeCollection
+getCurrentCodeCollection = do
+  cs <- fmap callStack get
+  case cs of
+    (currentCallInfo:_) -> return $ codeCollection currentCallInfo
+    _ -> error $ "getCurrentContract called with an empty stack"

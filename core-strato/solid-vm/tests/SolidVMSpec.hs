@@ -405,3 +405,115 @@ contract qq {
 }|]
       getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
 
+  it "can handle nested mappings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => mapping(uint => string)) xs;
+  constructor() {
+    xs[10][20] = "ok";
+  }
+}|]
+    getAll [ [Field "xs", MapIndex (INum 10), MapIndex (INum 20)] ] `shouldReturn` [BString "ok"]
+
+  it "can handle deeply nested mappings" . runTest $ do
+    void $ runBS [r|
+contract X {}
+contract qq {
+  mapping (bytes32 => mapping(bytes32 => mapping(bool => X))) public ruleSets;
+
+  constructor() {
+    bytes32 profileName = "profileName";
+    bytes32 ruleName = "ruleName";
+    ruleSets[profileName][ruleName][true] = X(0xdeadbeef);
+  }
+}|]
+    getAll [ [ Field "ruleSets"
+             , MapIndex $ IText "profileName"
+             , MapIndex $ IText "ruleName"
+             , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
+
+  it "can default construct arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+  }
+}|]
+    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BDefault]
+
+  it "can push onto local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+    mnames.push("rulename");
+  }
+}|]
+    liftIO $ pendingWith "locals must not be persisted to storage"
+    getAll [ [Field "mnames", Field "length"]
+           , [Field "mnames", ArrayIndex 0]
+           ] `shouldReturn` [BDefault, BDefault]
+
+  it "can access length of local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint len;
+  constructor() {
+    bytes32[] arr;
+    arr.push("ok");
+    len = arr.length;
+  }
+}|]
+    getAll [ [Field "len"]] `shouldReturn` [BInteger 1]
+
+  it "can array index with uninitialized numbers" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint[] xs;
+  uint y;
+  constructor() public {
+    uint idx;
+    y = xs[idx];
+  }
+}|]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+
+  it "can map index with uninitialized numbers" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => uint) xs;
+  uint y;
+  constructor() public {
+    uint idx;
+    y = xs[idx];
+  }
+}|]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+
+  it "can map index with uninitialized strings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(string => uint) xs;
+  uint y;
+  constructor() {
+    string idx;
+    y = xs[idx];
+  }
+}|]
+    getAll [ [Field "y"] ] `shouldReturn` [BDefault]
+
+  it "can access fields of structs from arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint f;
+  }
+  S[] ss;
+  uint y;
+  constructor() {
+    ss.push(S(0xdeadbeef));
+    S s = ss[0];
+    y = s.f;
+  }
+}|]
+    getAll [ [Field "y"] ] `shouldReturn` [BInteger 0xdeadbeef]

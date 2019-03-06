@@ -16,18 +16,18 @@ data Statement =
   | EmitStatement String [(Maybe String, Expression)]
   | AssemblyStatement InlineAssembly
   | SimpleStatement SimpleStatement
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq)
 
 data SimpleStatement =
   VariableDefinition (Maybe Type) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
-  | ExpressionStatement Expression deriving (Show, Eq)
+  | ExpressionStatement Expression deriving (Show, Read, Eq)
 
 -- Currently, the only supported inline assembly is:
 -- assembly {
 --  result := mload(add(source, 32))
 -- }
 -- Anything else is a parse error.
-data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq)
+data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Read, Eq)
 
 
 
@@ -47,7 +47,7 @@ data Expression =
   | NumberLiteral Integer (Maybe NumberUnit)
   | StringLiteral String
   | TupleExpression [Expression]
-  | Variable String deriving (Show, Eq)
+  | Variable String deriving (Show, Read, Eq)
 
 
-data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq)
+data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Read, Eq)
