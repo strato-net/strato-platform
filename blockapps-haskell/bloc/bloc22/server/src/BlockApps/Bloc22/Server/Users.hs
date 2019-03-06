@@ -478,8 +478,13 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
              Just (_, TypeFunction selector _ _) -> return selector
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
           let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
-          argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
-          tx <- lift . signAndPrepare sign fromAddr methodcallMetadata $
+          (argsBin, argsAsSource) <-
+            lift $ constructArgValuesAndSource (Just (fmap argValueToText methodcallArgs)) xabiArgs
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare sign fromAddr methodcallMetadataWithCallInfo $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr

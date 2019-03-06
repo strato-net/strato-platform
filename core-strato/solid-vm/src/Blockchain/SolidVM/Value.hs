@@ -3,15 +3,11 @@
 module Blockchain.SolidVM.Value where
 
 
-import           Control.Monad
-import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe
-import           Data.Traversable
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 
@@ -94,69 +90,33 @@ instance RLPSerializable Value where
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
 
-varEquals :: MonadIO m =>
-             Variable -> Variable -> m Bool
-varEquals (Variable v1) (Variable v2) = do
-  res1 <- liftIO $ readIORef v1
-  res2 <- liftIO $ readIORef v2
-  valEquals res1 res2
-varEquals _ _ = error "varEquals is not yet defined for Properties...."
+nullMatch :: Value -> Value -> Bool
+nullMatch SDefault = \case
+  SBool False -> True
+  SInteger 0 -> True
+  SString "" -> True
+  SAddress 0x0 -> True
+  SEnumVal e v -> error $ "TODO(tim): cannot yet determine 0 of an enum:" ++ show (e, v)
+  _ -> False
+nullMatch _ = const False
 
+valEquals :: Value -> Value -> Bool
+valEquals lhs rhs =
+     nullMatch lhs rhs
+  || nullMatch rhs lhs
+  || case (lhs, rhs) of
+           (SInteger i1, SInteger i2) -> i1 == i2
+           (SString s1, SString s2) -> s1 == s2
+           (SBool b1, SBool b2) -> b1 == b2
+           (SAddress v1, SAddress v2) -> v1 == v2
+           (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
 
-valEquals :: MonadIO m =>
-             Value -> Value -> m Bool
-valEquals (SInteger i1) (SInteger i2) = return $ i1 == i2
-valEquals (SString s1) (SString s2) = return $ s1 == s2
-valEquals (SBool b1) (SBool b2) = return $ b1 == b2
-valEquals (SAddress v1) (SAddress v2) = return $ v1 == v2
-valEquals (SEnum v1) (SEnum v2) = return $ v1 == v2
-valEquals (SEnumVal e1 v1) (SEnumVal e2 v2) = return $ (e1 == e2) && (v1 == v2)
-valEquals (SStructDef v1) (SStructDef v2) = return $ v1 == v2
-valEquals (SStruct n1 m1) (SStruct n2 m2) = do
-  let fieldNames1 = M.keys m1
-      fieldNames2 = M.keys m2
-  if (n1 == n2 && fieldNames1 == fieldNames2)
-    then do
-      results <-
-        forM fieldNames1 $ \fieldName -> do
-          let var1 = fromMaybe (error $ "Internal error in valEquals- key in map")
-                     $ M.lookup fieldName m1
-              var2 = fromMaybe (error $ "Internal error in valEquals- key in map")
-                     $ M.lookup fieldName m2
-          varEquals var1 var2
-      return $ and results
-    else return False
-
-valEquals (STuple vec1) (STuple vec2) = do
-  if V.length vec1 == V.length vec2
-    then do
-      results <-
-        for (V.zip vec1 vec2) $ \(var1, var2) -> do
-        varEquals var1 var2
-      return $ and results
-    else return False
-
-valEquals (SArray _ vec1) (SArray _ vec2) = do
-  if V.length vec1 == V.length vec2
-    then do
-      results <-
-        for (V.zip vec1 vec2) $ \(var1, var2) -> do
-        varEquals var1 var2
-      return $ and results
-    else return False
-valEquals (SFunction v1) (SFunction v2) = return $ v1 == v2
-valEquals (SBuiltinFunction v1 maybeO1) (SBuiltinFunction v2 maybeO2) = do
-  case (maybeO1, maybeO2) of
-    (Just o1, Just o2) -> do
-      result <- valEquals o1 o2
-      return $ result && v1 == v2
-    (Nothing, Nothing) -> return $ v1 == v2
-    _ -> return False
-valEquals (SBuiltinVariable v1) (SBuiltinVariable v2) = return $ v1 == v2
-valEquals (SContractDef v1) (SContractDef v2) = return $ v1 == v2
-valEquals (SAddress (Address v1)) (SInteger v2) = return $ v1 == fromInteger v2 --Meh, Solidity doesn't recognize a difference between Address and Integer....
-valEquals (SInteger v1) (SAddress (Address v2)) = return $ fromInteger v1 == v2
-valEquals _ _ = return False
+--Meh, Solidity doesn't recognize a difference between Address and Integer....
+           (SAddress (Address v1), SInteger v2) -> v1 == fromInteger v2
+           (SInteger v1, SAddress (Address v2)) -> fromInteger v1 == v2
+           (SBuiltinVariable v1, SBuiltinVariable v2) ->
+             error $ "Comparison of builtin vars requires evaluation: " ++ show (v1, v2)
+           _ -> error $ "unsupported type combination in valEquals: " ++ show (lhs, rhs)
 
 
 defaultValue :: Xabi.Type -> Value
@@ -180,4 +140,5 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
+castToInt SDefault = 0
 castToInt s = error $ "cast: not an integer: " ++ show s

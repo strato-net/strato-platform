@@ -8,7 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
--- import Debug.Trace hiding (trace)
+
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -205,16 +205,17 @@ call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
 
-  returnValue <- runSM blockData $ do
+  encodedReturnValue <- runSM blockData $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
-           call'' codeAddress funcName argValues
-
-
+           maybeRet <- call'' codeAddress funcName argValues
+           case maybeRet of
+             Just x -> fmap Just $ encodeForReturn x
+             Nothing -> return Nothing
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = BSS.toShort . encodeForReturn <$> returnValue,
+    erReturnVal = fmap BSS.toShort encodedReturnValue,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Nothing,
@@ -256,41 +257,39 @@ getCodeAndCollection address' = do
     return (contract', cc)
 
 
-call'' :: Address -> String -> [Value] -> SM (Maybe Value)
-call'' address functionName args = do
-  (contract, cc) <-getCodeAndCollection address
-
+logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall args address contract functionName f = do
   when trace $ do
     argStrings <- forM args showSM
     liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
-  case M.lookup functionName $ contract^.functions of
-    Just theFunction -> do
-      result <- call' address contract cc theFunction args
+  result <- f
 
-      when trace $ do
-        resultString <-
-          case result of
-            Nothing -> return ""
-            Just v -> showSM v
+  when trace $ do
+    resultString <-
+      case result of
+        Nothing -> return ""
+        Just v -> showSM v
 
-        liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
-
-      return result
-
-    _ -> do --Maybe the function is actually a getter
-      case M.lookup functionName $ contract^.storageDefs of
-        Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
-          return $ Just val
-        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
+    liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
 
----------------------------------------------
+  return result
 
 
+call'' :: Address -> String -> [Value] -> SM (Maybe Value)
+call'' address functionName args = do
+  (contract, cc) <-getCodeAndCollection address
 
-
+  logFunctionCall args address contract functionName $
+    case M.lookup functionName $ contract^.functions of
+      Just theFunction -> do
+        call' address contract cc theFunction args
+      _ -> do --Maybe the function is actually a getter
+        case M.lookup functionName $ contract^.storageDefs of
+          Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
+            fmap Just $ getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
+          Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
 
 
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
@@ -345,17 +344,16 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
   value <-
     case maybeExpression of
       Just e -> do
+        rhs <- expToVar e
         let getRef = SReference <$> expToPath e
             getValue = getVar =<< expToVar e
-        case mType of
-          Just (Xabi.Label name) -> do
+        case (rhs, mType) of
+          (Constant c, _) -> return c
+          (_, Just (Xabi.Label name)) -> do
             ty <- getTypeOfName name
             case ty of
               StructTypo{} -> getRef
               _ -> getValue
-          Just Xabi.Array{} -> getRef
-          Just Xabi.Struct{} -> getRef
-          Just Xabi.Mapping{} -> getRef
           _ -> getValue
 
       Nothing ->
@@ -557,7 +555,14 @@ expToVar (Xabi.Unitary "--" e) = do
   setVar path next
   return $ Constant next
 
-
+expToVar (Xabi.Binary "+=" lhs rhs) = do
+  let readInt e = fmap castToInt $ getVar =<< expToVar e
+  delta <- readInt rhs
+  curValue <- readInt lhs
+  path <- expToPath lhs
+  let next = SInteger $ curValue + delta
+  setVar path next
+  return $ Constant next
 
 expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
@@ -620,6 +625,7 @@ expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SIntege
 expToVar (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
+expToVar (Xabi.Binary "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
 expToVar (Xabi.Binary "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar (Xabi.Binary "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
@@ -639,8 +645,7 @@ expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bin
 
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  isEqual <- liftIO $ val1 `valEquals` val2
-  if not $ isEqual
+  if not $ val1 `valEquals` val2
     then return $ Constant $ SBool True
     else return $ Constant $ SBool False
 
@@ -648,7 +653,7 @@ expToVar (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
-  fmap (Constant . SBool) .liftIO $ val1 `valEquals` val2
+  return . Constant . SBool $ val1 `valEquals` val2
 
 expToVar (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -811,13 +816,9 @@ expToVarInteger :: Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -
 expToVarInteger expr1 o expr2 retType = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
-  case (val1, val2) of
-    (SInteger i1, SInteger i2) -> return $ Constant $ retType $ i1 `o` i2
-    _ -> error $ "code tried to perform math on two values that aren't SIntegers:\n" ++ show val1 ++ "\n" ++ show val2
-
-
-
-
+  let i1 = castToInt val1
+      i2 = castToInt val2
+  return . Constant . retType $ i1 `o` i2
 
 
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
@@ -972,9 +973,12 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
   \            %%%% val2 = %s" (show val1) (show val2)
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
-encodeForReturn :: Value -> ByteString
-encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
+encodeForReturn :: Value -> SM ByteString
+encodeForReturn (SInteger i) = return $ rlpSerialize $ rlpEncode i
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
-  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
+  return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
+encodeForReturn (STuple items) = do
+  encodedBytestrings <- forM (V.toList items) $ \i -> encodeForReturn =<< getVar i
+  return $ B.concat encodedBytestrings
 encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x
