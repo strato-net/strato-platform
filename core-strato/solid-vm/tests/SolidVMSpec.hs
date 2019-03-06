@@ -405,3 +405,29 @@ contract qq {
 }|]
       getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
 
+  it "can handle nested mappings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => mapping(uint => string)) xs;
+  constructor() {
+    xs[10][20] = "ok";
+  }
+}|]
+    getAll [ [Field "xs", MapIndex (INum 10), MapIndex (INum 20)] ] `shouldReturn` [BString "ok"]
+
+  it "can handle deeply nested mappings" . runTest $ do
+    void $ runBS [r|
+contract X {}
+contract qq {
+  mapping (bytes32 => mapping(bytes32 => mapping(bool => X))) public ruleSets;
+
+  constructor() {
+    bytes32 profileName = "profileName";
+    bytes32 ruleName = "ruleName";
+    ruleSets[profileName][ruleName][true] = X(0xdeadbeef);
+  }
+}|]
+    getAll [ [ Field "ruleSets"
+             , MapIndex $ IText "profileName"
+             , MapIndex $ IText "ruleName"
+             , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]

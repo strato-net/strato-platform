@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -120,7 +121,7 @@ create' creator cc contractName argExps = do
   nonce' <- fmap addressStateNonce $ getAddressState creator
   let newAddress = getNewAddress_unsafe creator nonce'
       ccString = BC.pack $ show cc
-      
+
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName $ hash ccString}
 
@@ -231,7 +232,7 @@ getCodeAndCollection address' = do
         case callStack' of
           (current:_) -> Just $ currentAddress current
           _ -> Nothing
-          
+
   liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
   liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
@@ -252,9 +253,9 @@ getCodeAndCollection address' = do
     let cc = read $ BC.unpack codeString
 
         contract' = fromMaybe (error $ "no contract with name: " ++ contractName) $ M.lookup contractName $ cc^.contracts
-  
+
     return (contract', cc)
-  
+
 
 call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
@@ -462,24 +463,32 @@ while condition code = do
 
 getIndexType :: MS.StoragePath -> SM IndexType
 getIndexType [] = error "TODO(tim): getIndexType of empty"
-getIndexType [MS.Field field] = do
+getIndexType p@(MS.Field field:_) = do
   ctract <- getCurrentContract
   let decls = ctract ^. storageDefs
+  let n = length p - 1
   case M.lookup (BC.unpack field) decls of
     Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> return $
-      case v of
+    Just Xabi.VariableDecl {Xabi.varType=v} -> return $! loop n $ traceShowId v
+ where loop :: Int -> Xabi.Type -> IndexType
+       loop 0 t = case t of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
          Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
+         Xabi.Mapping{Xabi.key=Xabi.Bytes{}} -> MapStringIndex
          Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
          Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
-         _ -> error $ "TODO(tim): unanticipated type in variable declarations: " ++ show v
-getIndexType xs = error $ "TODO(tim): higher order index references: " ++ show xs
+         _ -> error $ "TODO(tim): unanticipated index type in variable declarations: " ++ show t
+       loop n t = case t of
+         Xabi.Mapping{Xabi.value=t'} -> loop (n - 1) t'
+         Xabi.Array{Xabi.entry=t'} -> loop (n - 1) t'
+         _ -> error $ "incorrect indexing type in variable declarations: " ++ show t
+getIndexType xs = error $ "TODO(tim): getIndexType starting from non-field: " ++ show xs
 
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
+  traceShowM x
   parPath <- expToPath parent
   idxType <- getIndexType parPath
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
